@@ -13,19 +13,38 @@ export function quizVocalComponent(gen: any) {
       return this.gen.data || [];
     },
 
-    playQuestion() {
-      const url = this.gen.audioUrls?.[this.currentQ];
-      if (!url) return;
-      const audio = new Audio(url);
+    currentAudioUrl() {
+      return this.gen.audioUrls?.[this.currentQ] || '';
+    },
+
+    questionAudio(this: any): HTMLAudioElement | null {
+      return (this.$refs?.questionAudio as HTMLAudioElement | undefined) ?? null;
+    },
+
+    stopQuestion(this: any) {
+      const audio = this.questionAudio();
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+      this.audioPlaying = false;
+    },
+
+    playQuestion(this: any) {
+      const audio = this.questionAudio();
+      if (!audio || !this.currentAudioUrl()) return;
+      audio.pause();
+      audio.currentTime = 0;
+      audio.load();
       this.audioPlaying = true;
-      audio.onended = () => {
+      audio.play().catch(() => {
         this.audioPlaying = false;
-      };
-      audio.play();
+      });
     },
 
     async startVocalRecording(this: any) {
       try {
+        this.stopQuestion();
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.vocalRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
         const chunks: Blob[] = [];
@@ -82,6 +101,7 @@ export function quizVocalComponent(gen: any) {
     },
 
     nextQuestion(this: any) {
+      this.stopQuestion();
       this.feedback = null;
       this.currentQ++;
       if (this.currentQ >= this.questions().length) {
@@ -91,11 +111,13 @@ export function quizVocalComponent(gen: any) {
       }
     },
 
-    resetVocalQuiz() {
+    resetVocalQuiz(this: any) {
+      this.stopQuestion();
       this.currentQ = 0;
       this.score = 0;
       this.finished = false;
       this.feedback = null;
+      this.$nextTick(() => this.playQuestion());
     },
   };
 }

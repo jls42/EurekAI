@@ -69,7 +69,7 @@ async function generateQuizWithRetry(
 export async function generateQuiz(
   client: Mistral,
   markdown: string,
-  model = 'magistral-medium-latest',
+  model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<QuizQuestion[]> {
@@ -77,7 +77,7 @@ export async function generateQuiz(
     client,
     quizSystem(ageGroup),
     quizUser(markdown, lang),
-    'Ta reponse etait vide ou incomplete. Regenere 3 questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
+    'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
   );
@@ -94,7 +94,7 @@ export async function generateQuizVocal(
     client,
     quizVocalSystem(ageGroup),
     quizVocalUser(markdown, lang),
-    'Ta reponse etait vide ou incomplete. Regenere 3 questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
+    'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,
   );
@@ -104,7 +104,7 @@ export async function generateQuizReview(
   client: Mistral,
   markdown: string,
   weakQuestions: QuizQuestion[],
-  model = 'magistral-medium-latest',
+  model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<QuizQuestion[]> {
@@ -113,7 +113,7 @@ export async function generateQuizReview(
     client,
     quizReviewSystem(ageGroup),
     quizReviewUser(weakConcepts, markdown, lang),
-    'Ta reponse etait vide ou incomplete. Regenere 3 NOUVELLES questions QCM. JSON valide uniquement.',
+    'Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM. JSON valide uniquement.',
     "Le modele n'a pas reussi a generer la revision quiz apres 2 tentatives",
     model,
   );

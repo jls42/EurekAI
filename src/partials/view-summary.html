@@ -102,20 +102,20 @@
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
-          <div class="flex items-center gap-2 mb-4 flex-wrap">
+          <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
             <button
               @click="generateVoice(gen)"
               :disabled="gen._generatingVoice === true"
-              class="min-h-touch px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
+              class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
             >
               <i data-lucide="volume-2" class="w-5 h-5"></i>
               <span
                 x-show="!gen._generatingVoice && !(gen.data.audioUrl || gen._audioUrl)"
-                x-text="t('common.readAloud')"
+                x-text="t('common.generateAudio')"
               ></span>
               <span
                 x-show="!gen._generatingVoice && (gen.data.audioUrl || gen._audioUrl)"
-                x-text="t('common.regenerate')"
+                x-text="t('common.regenerateAudio')"
               ></span>
               <span
                 x-show="gen._generatingVoice"
@@ -126,7 +126,8 @@
             <audio
               x-show="gen.data.audioUrl || gen._audioUrl"
               controls
-              class="h-10 max-w-xs"
+              preload="metadata"
+              class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
               :src="gen.data.audioUrl || gen._audioUrl"
               :data-gen-id="gen.id"
             ></audio>
@@ -187,7 +188,10 @@
               <template x-for="v in summaryData(gen).vocabulary" :key="v.word">
                 <div class="bg-accent-light rounded-button p-3">
                   <strong class="text-accent-dark text-body-sm" x-text="v.word"></strong>
-                  <p class="text-text-primary text-sm" x-text="v.definition"></p>
+                  <p
+                    class="text-text-primary text-sm chat-markdown"
+                    x-html="renderWithSources(v.definition, gen)"
+                  ></p>
                 </div>
               </template>
             </div>

@@ -18,12 +18,19 @@ export interface Profile {
 
 // --- Sources ---
 
+export type ModerationStatus = 'pending' | 'safe' | 'unsafe' | 'error';
+
+export interface ModerationResult {
+  status: ModerationStatus;
+  categories: Record<string, boolean>;
+}
+
 export interface Source {
   id: string;
   filename: string;
   markdown: string;
   uploadedAt: string;
-  moderation?: { safe: boolean; categories: Record<string, boolean> };
+  moderation?: ModerationResult;
   sourceType?: 'ocr' | 'text' | 'voice' | 'websearch';
   filePath?: string;
 }

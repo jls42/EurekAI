@@ -75,7 +75,7 @@ public/
 | Usage | Modele | Pourquoi |
 |-------|--------|----------|
 | Fiche, Flashcards, Podcast, Traduction | mistral-large-latest | Meilleur multilingual + instruction |
-| Quiz (QCM) | magistral-medium-latest | Raisonnement, questions pertinentes |
+| Quiz (QCM) | mistral-large-latest | Raisonnement, questions pertinentes |
 | OCR | mistral-ocr-latest | 96.6% tables, 88.9% handwriting |
 | STT | voxtral-mini-latest | ~4% WER, langue=fr 4x+ rapide |
 | Moderation | mistral-moderation-latest | 9 categories, garde-fou enfants |
@@ -90,7 +90,7 @@ public/
 - **ElevenLabs TTS** : `eleven_v3`, voix configurable, `collectStream()` pour async iterable
 - **Agent web_search** : creer agent temporaire, `extractAllText()` recursif sur outputs, cleanup apres
 - **Multi-generations** : chaque generation = objet avec id/title/type/data/dataEN, stockees dans `results.generations[]`
-- **Quiz adaptatif** : QuizStats avec tentatives + stats par question, quiz-review genere 3 nouvelles questions
+- **Quiz adaptatif** : QuizStats avec tentatives + stats par question, quiz-review genere 5-10 nouvelles questions
 - **Migration auto** : ancien format plat (summary/flashcards/quiz) -> generations[] au chargement
 
 ## Regles OBLIGATOIRES pour tout generateur/route

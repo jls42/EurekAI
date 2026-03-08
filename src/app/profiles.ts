@@ -1,3 +1,5 @@
+import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
+
 export function createProfiles() {
   return {
     async loadProfiles(this: any) {
@@ -22,9 +24,7 @@ export function createProfiles() {
       this.currentProfile = profile;
       this.showProfilePicker = false;
       localStorage.setItem('sf-profileId', id);
-      // localStorage is the source of truth for language (profile.locale is fallback)
-      const savedLang = localStorage.getItem('sf-lang');
-      this.setLocale(savedLang || profile.locale || 'fr', true);
+      this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
       // Reset project state and reload projects for this profile
       this.currentProjectId = null;
       this.currentProject = null;
@@ -90,6 +90,7 @@ export function createProfiles() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pin }),
               });
+              clearProfileLocale(id);
               this.profiles = this.profiles.filter((p: any) => p.id !== id);
               if (this.currentProfile?.id === id) {
                 this.currentProfile = null;
@@ -115,6 +116,7 @@ export function createProfiles() {
       this.confirmDelete(target, async () => {
         try {
           await fetch('/api/profiles/' + id, { method: 'DELETE' });
+          clearProfileLocale(id);
           this.profiles = this.profiles.filter((p: any) => p.id !== id);
           if (this.currentProfile?.id === id) {
             this.currentProfile = null;
@@ -142,6 +144,7 @@ export function createProfiles() {
           const idx = this.profiles.findIndex((p: any) => p.id === id);
           if (idx !== -1) this.profiles[idx] = updated;
           if (this.currentProfile?.id === id) this.currentProfile = updated;
+          if (updated.locale) setProfileLocale(id, updated.locale);
         } else {
           const err = await res.json();
           if (err.error) this.showToast(err.error, 'error');

@@ -182,9 +182,10 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       const audioUrl = `/output/projects/${req.params.pid}/${audioFilename}`;
 
       if (gen.type === 'summary') {
-        (gen as SummaryGeneration).data.audioUrl = audioUrl;
+        store.updateGeneration(req.params.pid, req.params.gid, {
+          data: { ...(gen as SummaryGeneration).data, audioUrl },
+        } as any);
       }
-      store.updateGeneration(req.params.pid, req.params.gid, gen as any);
 
       res.json({ audioUrl });
     } catch (e) {

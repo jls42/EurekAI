@@ -1,8 +1,34 @@
 import { Mistral } from '@mistralai/mistralai';
+import type { ModerationResult } from '../types.js';
 
-export interface ModerationResult {
-  safe: boolean;
-  categories: Record<string, boolean>;
+export const MODERATION_CHUNK_SIZE = 20_000;
+
+function isUnsafe(categories: Record<string, boolean>, blockedCategories?: string[]): boolean {
+  return blockedCategories && blockedCategories.length > 0
+    ? blockedCategories.some((cat) => categories[cat] === true)
+    : Object.values(categories).some((value) => value === true);
+}
+
+function mergeCategories(
+  acc: Record<string, boolean>,
+  next: Record<string, boolean>,
+): Record<string, boolean> {
+  const merged = { ...acc };
+  for (const [category, flagged] of Object.entries(next)) {
+    if (flagged) merged[category] = true;
+    else if (!(category in merged)) merged[category] = false;
+  }
+  return merged;
+}
+
+function chunkText(text: string): string[] {
+  if (text.length <= MODERATION_CHUNK_SIZE) return [text];
+
+  const chunks: string[] = [];
+  for (let index = 0; index < text.length; index += MODERATION_CHUNK_SIZE) {
+    chunks.push(text.slice(index, index + MODERATION_CHUNK_SIZE));
+  }
+  return chunks;
 }
 
 export async function moderateContent(
@@ -10,17 +36,23 @@ export async function moderateContent(
   text: string,
   blockedCategories?: string[],
 ): Promise<ModerationResult> {
-  const response = await (client.classifiers as any).moderate({
-    model: 'mistral-moderation-latest',
-    inputs: [text.slice(0, 4000)],
-  });
+  const chunks = chunkText(text);
+  let categories: Record<string, boolean> = {};
 
-  const result = response.results[0];
-  const categories = result.categories as Record<string, boolean>;
-  const safe =
-    blockedCategories && blockedCategories.length > 0
-      ? !blockedCategories.some((cat) => categories[cat] === true)
-      : !Object.values(categories).some((v) => v === true);
+  for (const chunk of chunks) {
+    const response = await (client.classifiers as any).moderate({
+      model: 'mistral-moderation-latest',
+      inputs: [chunk],
+    });
 
-  return { safe, categories };
+    const result = response.results[0];
+    const chunkCategories = result.categories as Record<string, boolean>;
+    categories = mergeCategories(categories, chunkCategories);
+
+    if (isUnsafe(chunkCategories, blockedCategories)) {
+      return { status: 'unsafe', categories };
+    }
+  }
+
+  return { status: 'safe', categories };
 }

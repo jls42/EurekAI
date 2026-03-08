@@ -1,10 +1,13 @@
 import { marked } from 'marked';
+import { escapeHtmlAttribute, escapeMarkdownHtml, sanitizeRenderedHtml } from './render-utils';
 
 export function createRender() {
   return {
     renderMarkdown(content: string) {
       if (!content) return '';
-      return marked.parse(content, { breaks: true, gfm: true }) as string;
+      const escaped = escapeMarkdownHtml(content);
+      const html = marked.parse(escaped, { breaks: true, gfm: true }) as string;
+      return sanitizeRenderedHtml(html);
     },
 
     renderWithSources(this: any, content: string, gen: any) {
@@ -14,7 +17,7 @@ export function createRender() {
         const idx = Number.parseInt(num, 10) - 1;
         const src = srcs[idx];
         if (!src) return `<span class="source-badge">${num}</span>`;
-        return `<button onclick="window._openSource('${src.id}')" class="source-badge" title="${src.filename}">${num}</button>`;
+        return `<button type="button" class="source-badge" data-source-id="${escapeHtmlAttribute(src.id)}" title="${escapeHtmlAttribute(src.filename)}">${num}</button>`;
       };
       // prettier-ignore
       let text = content.replace( // NOSONAR(S4043) — regex with g flag and capture group callback, replaceAll not applicable

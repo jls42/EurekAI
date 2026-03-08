@@ -67,8 +67,8 @@ function checkModeration(
     sourceIds && sourceIds.length > 0
       ? project.sources.filter((s) => sourceIds.includes(s.id))
       : project.sources;
-  const unsafe = selected.find((s) => s.moderation && !s.moderation.safe);
-  if (unsafe) return unsafe.filename;
+  const blocked = selected.find((s) => s.moderation && s.moderation.status !== 'safe');
+  if (blocked) return blocked.filename;
   return null;
 }
 

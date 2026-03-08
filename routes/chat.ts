@@ -30,7 +30,8 @@ export function chatRoutes(
   // Send message
   router.post('/:pid/chat', async (req, res) => {
     try {
-      const project = store.getProject(req.params.pid);
+      const pid = req.params.pid;
+      const project = store.getProject(pid);
       if (!project) {
         res.status(404).json({ error: 'Projet introuvable' });
         return;
@@ -57,28 +58,24 @@ export function chatRoutes(
         const categories = MODERATION_CATEGORIES[profile.ageGroup] || [];
         if (categories.length > 0) {
           const modResult = await moderateContent(client, message.trim(), categories);
-          if (!modResult.safe) {
+          if (modResult.status !== 'safe') {
             res.status(400).json({ error: 'chat.moderationBlocked' });
             return;
           }
         }
       }
 
-      // Init chat history
-      if (!project.chat) project.chat = { messages: [] };
-
-      // Add user message
+      const existingMessages = project.chat?.messages ?? [];
       const userMsg: ChatMessage = {
         role: 'user',
         content: message.trim(),
         timestamp: new Date().toISOString(),
       };
-      project.chat.messages.push(userMsg);
-
-      // Cap history at 50 messages
-      if (project.chat.messages.length > 50) {
-        project.chat.messages = project.chat.messages.slice(-50);
-      }
+      const historyForApi = [...existingMessages, userMsg].slice(-50).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      store.appendChatMessage(pid, userMsg);
 
       // Build context
       const sourceContext =
@@ -87,10 +84,6 @@ export function chatRoutes(
           : 'Aucune source ajoutee pour le moment.';
 
       const config = getConfig();
-      const historyForApi = project.chat.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
 
       const result = await chatWithSources(
         client,
@@ -159,7 +152,7 @@ export function chatRoutes(
             }
 
             if (gen) {
-              store.addGeneration(req.params.pid, gen);
+              store.addGeneration(pid, gen);
               generatedIds.push(gen.id);
               generatedGens.push(gen);
               console.log(`  Chat tool: ${type} generated`);
@@ -177,9 +170,7 @@ export function chatRoutes(
         timestamp: new Date().toISOString(),
         generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
       };
-      project.chat.messages.push(assistantMsg);
-
-      store.saveProject(req.params.pid, project);
+      store.appendChatMessage(pid, assistantMsg);
 
       res.json({
         reply: result.reply,
@@ -209,8 +200,7 @@ export function chatRoutes(
       res.status(404).json({ error: 'Projet introuvable' });
       return;
     }
-    project.chat = { messages: [] };
-    store.saveProject(req.params.pid, project);
+    store.clearChat(req.params.pid);
     res.json({ ok: true });
   });
 

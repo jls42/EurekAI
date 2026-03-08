@@ -205,6 +205,126 @@ describe('getGeneration', () => {
   });
 });
 
+describe('chat helpers', () => {
+  it('ajoute des messages sans ecraser les generations existantes', () => {
+    const p = store.createProject('Chat merge');
+    const gen1: Generation = {
+      id: 'g-chat-1',
+      title: 'Fiche',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: { title: 'T1', summary: 'S1', key_points: ['a'], vocabulary: [] },
+    };
+    const gen2: Generation = {
+      id: 'g-chat-2',
+      title: 'Quiz',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'quiz',
+      data: [],
+    };
+
+    store.addGeneration(p.meta.id, gen1);
+    store.appendChatMessage(p.meta.id, {
+      role: 'user',
+      content: 'Explique-moi la lecon',
+      timestamp: new Date().toISOString(),
+    });
+    store.addGeneration(p.meta.id, gen2);
+    store.appendChatMessage(p.meta.id, {
+      role: 'assistant',
+      content: 'Voici un resume',
+      timestamp: new Date().toISOString(),
+      generatedIds: ['g-chat-2'],
+    });
+
+    const found = store.getProject(p.meta.id);
+    expect(found!.results.generations.map((g) => g.id)).toEqual(['g-chat-1', 'g-chat-2']);
+    expect(found!.chat?.messages).toHaveLength(2);
+  });
+
+  it("vide l'historique du chat", () => {
+    const p = store.createProject('Chat clear');
+    store.appendChatMessage(p.meta.id, {
+      role: 'user',
+      content: 'Bonjour',
+      timestamp: new Date().toISOString(),
+    });
+
+    expect(store.clearChat(p.meta.id)).toBe(true);
+    expect(store.getProject(p.meta.id)?.chat?.messages).toEqual([]);
+  });
+});
+
+describe('project field helpers', () => {
+  it('met a jour la consigne sans perdre les sources', () => {
+    const p = store.createProject('Consigne');
+    store.addSource(p.meta.id, {
+      id: 'src-1',
+      filename: 'cours.md',
+      markdown: '# Hello',
+      uploadedAt: new Date().toISOString(),
+    });
+
+    store.setConsigne(p.meta.id, {
+      found: true,
+      text: 'Reviser les dates importantes',
+      keyTopics: ['dates'],
+    });
+
+    const found = store.getProject(p.meta.id);
+    expect(found!.sources).toHaveLength(1);
+    expect(found!.consigne?.keyTopics).toEqual(['dates']);
+  });
+
+  it('met a jour la moderation d une source ciblee', () => {
+    const p = store.createProject('Moderation');
+    store.addSource(p.meta.id, {
+      id: 'src-2',
+      filename: 'cours.md',
+      markdown: '# Hello',
+      uploadedAt: new Date().toISOString(),
+    });
+
+    const updated = store.setSourceModeration(p.meta.id, 'src-2', {
+      status: 'unsafe',
+      categories: { violence_and_threats: true },
+    });
+
+    expect(updated?.moderation?.status).toBe('unsafe');
+    expect(store.getProject(p.meta.id)?.sources[0].moderation?.categories).toEqual({
+      violence_and_threats: true,
+    });
+  });
+
+  it('migre le format legacy safe:boolean vers status', () => {
+    const p = store.createProject('Legacy moderation');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+    const legacyProject = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-legacy',
+          filename: 'legacy.txt',
+          markdown: 'ancien format',
+          uploadedAt: new Date().toISOString(),
+          moderation: { safe: true, categories: { violence_and_threats: false } },
+        },
+      ],
+      results: { generations: [] },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(legacyProject, null, 2));
+
+    const found = store.getProject(p.meta.id);
+    expect(found?.sources[0].moderation).toEqual({
+      status: 'safe',
+      categories: { violence_and_threats: false },
+    });
+  });
+});
+
 describe('migrateFromLegacy', () => {
   it('importe un sources.json legacy et renomme en .bak', () => {
     const legacyPath = join(tempDir, 'sources.json');

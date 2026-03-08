@@ -12,6 +12,14 @@ import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 
+function pendingModeration(): Source['moderation'] {
+  return { status: 'pending', categories: {} };
+}
+
+function errorModeration(): Source['moderation'] {
+  return { status: 'error', categories: {} };
+}
+
 function triggerConsigneDetection(store: ProjectStore, client: Mistral, pid: string, lang = 'fr') {
   setTimeout(async () => {
     try {
@@ -19,10 +27,7 @@ function triggerConsigneDetection(store: ProjectStore, client: Mistral, pid: str
       if (!project || project.sources.length === 0) return;
       const markdown = getMarkdown(project.sources);
       const result = await detectConsigne(client, markdown, undefined, lang);
-      const freshProject = store.getProject(pid);
-      if (!freshProject) return;
-      freshProject.consigne = result;
-      store.saveProject(pid, freshProject);
+      if (!store.setConsigne(pid, result)) return;
       console.log(
         `  Consigne detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`,
       );
@@ -49,27 +54,19 @@ function getModerationCategories(
 function triggerModeration(
   store: ProjectStore,
   client: Mistral,
-  profileStore: ProfileStore,
   pid: string,
   sourceId: string,
   markdown: string,
+  categories: string[],
 ) {
   setTimeout(async () => {
     try {
-      const categories = getModerationCategories(store, profileStore, pid);
-      if (!categories) return;
       const result = await moderateContent(client, markdown, categories);
-      const freshProject = store.getProject(pid);
-      if (!freshProject) return;
-      const source = freshProject.sources.find((s) => s.id === sourceId);
-      if (!source) return;
-      source.moderation = result;
-      store.saveProject(pid, freshProject);
-      console.log(
-        `  Moderation: ${result.safe ? 'safe' : 'UNSAFE'} (source ${sourceId.slice(0, 8)})`,
-      );
+      if (!store.setSourceModeration(pid, sourceId, result)) return;
+      console.log(`  Moderation: ${result.status.toUpperCase()} (source ${sourceId.slice(0, 8)})`);
     } catch (e) {
       console.error('  Moderation error:', e);
+      store.setSourceModeration(pid, sourceId, errorModeration());
     }
   }, 100);
 }
@@ -113,6 +110,7 @@ export function sourceRoutes(
     }
 
     const results: Source[] = [];
+    const modCats = getModerationCategories(store, profileStore, pid);
     for (const file of files) {
       try {
         const { markdown, elapsed } = await ocrFile(client, file.path, file.originalname);
@@ -123,6 +121,7 @@ export function sourceRoutes(
           uploadedAt: new Date().toISOString(),
           sourceType: 'ocr',
           filePath: `projects/${pid}/uploads/${file.filename}`,
+          moderation: modCats ? pendingModeration() : undefined,
         };
         store.addSource(pid, source);
         results.push(source);
@@ -139,7 +138,9 @@ export function sourceRoutes(
     const lang = req.body.lang || 'fr';
     triggerConsigneDetection(store, client, pid, lang);
     for (const src of results) {
-      triggerModeration(store, client, profileStore, pid, src.id, src.markdown);
+      if (modCats) {
+        triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+      }
     }
     res.json(results);
   });
@@ -159,12 +160,14 @@ export function sourceRoutes(
     }
 
     const modCats = getModerationCategories(store, profileStore, req.params.pid);
+    let sourceModeration: Source['moderation'] = undefined;
     if (modCats) {
       const modResult = await moderateContent(client, text.trim(), modCats);
-      if (!modResult.safe) {
+      if (modResult.status !== 'safe') {
         res.status(400).json({ error: 'moderation.blocked' });
         return;
       }
+      sourceModeration = modResult;
     }
 
     const source: Source = {
@@ -173,12 +176,12 @@ export function sourceRoutes(
       markdown: text.trim(),
       uploadedAt: new Date().toISOString(),
       sourceType: 'text',
+      moderation: sourceModeration,
     };
     store.addSource(req.params.pid, source);
     console.log(`  Texte libre ajoute: ${source.markdown.length} chars`);
     const lang = req.body.lang || 'fr';
     triggerConsigneDetection(store, client, req.params.pid, lang);
-    triggerModeration(store, client, profileStore, req.params.pid, source.id, source.markdown);
     res.json(source);
   });
 
@@ -207,18 +210,22 @@ export function sourceRoutes(
         res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
         return;
       }
+      const modCats = getModerationCategories(store, profileStore, pid);
       const source: Source = {
         id: randomUUID(),
         filename: 'Enregistrement vocal',
         markdown: text.trim(),
         uploadedAt: new Date().toISOString(),
         sourceType: 'voice',
+        moderation: modCats ? pendingModeration() : undefined,
       };
       store.addSource(pid, source);
       console.log(`  STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
       const lang = req.body.lang || 'fr';
       triggerConsigneDetection(store, client, pid, lang);
-      triggerModeration(store, client, profileStore, pid, source.id, source.markdown);
+      if (modCats) {
+        triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+      }
       res.json(source);
     } catch (e) {
       console.error('STT error:', e);
@@ -244,7 +251,7 @@ export function sourceRoutes(
     const modCats = getModerationCategories(store, profileStore, pid);
     if (modCats) {
       const modResult = await moderateContent(client, query.trim(), modCats);
-      if (!modResult.safe) {
+      if (modResult.status !== 'safe') {
         res.status(400).json({ error: 'moderation.blocked' });
         return;
       }
@@ -261,13 +268,16 @@ export function sourceRoutes(
         markdown: text,
         uploadedAt: new Date().toISOString(),
         sourceType: 'websearch',
+        moderation: modCats ? pendingModeration() : undefined,
       };
       store.addSource(pid, source);
       console.log(
         `  Web search OK: "${query.trim()}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
       );
       triggerConsigneDetection(store, client, pid, lang);
-      triggerModeration(store, client, profileStore, pid, source.id, source.markdown);
+      if (modCats) {
+        triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+      }
       res.json(source);
     } catch (e) {
       console.error('Web search error:', e);
@@ -301,8 +311,10 @@ export function sourceRoutes(
       const lang = req.body.lang || 'fr';
       const markdown = getMarkdown(project.sources);
       const result = await detectConsigne(client, markdown, undefined, lang);
-      project.consigne = result;
-      store.saveProject(pid, project);
+      if (!store.setConsigne(pid, result)) {
+        res.status(404).json({ error: 'Projet introuvable' });
+        return;
+      }
       res.json(result);
     } catch (e) {
       console.error('Consigne detection error:', e);

@@ -1,7 +1,14 @@
 import { randomUUID } from 'crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync } from 'fs';
 import { join } from 'path';
-import type { ProjectMeta, ProjectData, Source, Generation } from './types.js';
+import type {
+  ProjectMeta,
+  ProjectData,
+  Source,
+  Generation,
+  ChatMessage,
+  ModerationResult,
+} from './types.js';
 
 export class ProjectStore {
   private baseDir: string;
@@ -89,6 +96,7 @@ export class ProjectStore {
     try {
       const data = JSON.parse(readFileSync(path, 'utf-8')) as ProjectData;
       this.migrateResultsFormat(data);
+      this.migrateModerationFormat(data);
       return data;
     } catch {
       return null;
@@ -142,6 +150,55 @@ export class ProjectStore {
     this.saveProject(projectId, data);
   }
 
+  appendChatMessage(
+    projectId: string,
+    message: ChatMessage,
+    maxMessages = 50,
+  ): ChatMessage[] | null {
+    const data = this.getProject(projectId);
+    if (!data) return null;
+    if (!data.chat) data.chat = { messages: [] };
+    data.chat.messages.push(message);
+    if (data.chat.messages.length > maxMessages) {
+      data.chat.messages = data.chat.messages.slice(-maxMessages);
+    }
+    this.saveProject(projectId, data);
+    return data.chat.messages;
+  }
+
+  clearChat(projectId: string): boolean {
+    const data = this.getProject(projectId);
+    if (!data) return false;
+    data.chat = { messages: [] };
+    this.saveProject(projectId, data);
+    return true;
+  }
+
+  setConsigne(
+    projectId: string,
+    consigne: ProjectData['consigne'],
+  ): ProjectData['consigne'] | null {
+    const data = this.getProject(projectId);
+    if (!data) return null;
+    data.consigne = consigne;
+    this.saveProject(projectId, data);
+    return data.consigne ?? null;
+  }
+
+  setSourceModeration(
+    projectId: string,
+    sourceId: string,
+    moderation: Source['moderation'],
+  ): Source | null {
+    const data = this.getProject(projectId);
+    if (!data) return null;
+    const source = data.sources.find((s) => s.id === sourceId);
+    if (!source) return null;
+    source.moderation = moderation;
+    this.saveProject(projectId, data);
+    return source;
+  }
+
   deleteGeneration(projectId: string, generationId: string): void {
     const data = this.getProject(projectId);
     if (!data) return;
@@ -170,6 +227,34 @@ export class ProjectStore {
   }
 
   // --- Migration: old flat format -> generations[] ---
+
+  private normalizeModeration(
+    moderation:
+      | Source['moderation']
+      | { safe?: boolean; categories?: Record<string, boolean> }
+      | undefined,
+  ): ModerationResult | undefined {
+    if (!moderation) return undefined;
+    if ('status' in moderation && moderation.status) {
+      return {
+        status: moderation.status,
+        categories: moderation.categories ?? {},
+      };
+    }
+    if ('safe' in moderation) {
+      return {
+        status: moderation.safe ? 'safe' : 'unsafe',
+        categories: moderation.categories ?? {},
+      };
+    }
+    return { status: 'error', categories: {} };
+  }
+
+  private migrateModerationFormat(data: ProjectData): void {
+    for (const source of data.sources) {
+      source.moderation = this.normalizeModeration(source.moderation as any);
+    }
+  }
 
   private migrateResultsFormat(data: ProjectData): void {
     const r = data.results as any;

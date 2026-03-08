@@ -2,18 +2,28 @@ import { getLocale } from '../i18n/index';
 
 export function createGenerate() {
   return {
-    hasUnsafeSources(this: any): boolean {
+    blockedModerationStatus(this: any): string | null {
       const selected =
         this.selectedIds.length > 0
           ? this.sources.filter((s: any) => this.selectedIds.includes(s.id))
           : this.sources;
-      return selected.some((s: any) => s.moderation && !s.moderation.safe);
+      return (
+        selected.find((s: any) => s.moderation && s.moderation.status !== 'safe')?.moderation
+          ?.status ?? null
+      );
+    },
+
+    moderationBlockedMessage(this: any, status: string | null): string {
+      if (status === 'pending') return this.t('moderation.pending');
+      if (status === 'error') return this.t('moderation.error');
+      return this.t('moderation.blocked');
     },
 
     async generate(this: any, type: string) {
       if (!this.currentProjectId || this.loading[type]) return;
-      if (this.currentProfile?.useModeration && this.hasUnsafeSources()) {
-        this.showToast(this.t('moderation.blocked'), 'error');
+      const moderationStatus = this.blockedModerationStatus();
+      if (this.currentProfile?.useModeration && moderationStatus) {
+        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
         return;
       }
       const projectId = this.currentProjectId;
@@ -74,8 +84,9 @@ export function createGenerate() {
 
     async generateAll(this: any) {
       if (!this.currentProjectId) return;
-      if (this.currentProfile?.useModeration && this.hasUnsafeSources()) {
-        this.showToast(this.t('moderation.blocked'), 'error');
+      const moderationStatus = this.blockedModerationStatus();
+      if (this.currentProfile?.useModeration && moderationStatus) {
+        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
         return;
       }
       const projectId = this.currentProjectId;
@@ -134,8 +145,9 @@ export function createGenerate() {
 
     async generateAuto(this: any) {
       if (!this.currentProjectId) return;
-      if (this.currentProfile?.useModeration && this.hasUnsafeSources()) {
-        this.showToast(this.t('moderation.blocked'), 'error');
+      const moderationStatus = this.blockedModerationStatus();
+      if (this.currentProfile?.useModeration && moderationStatus) {
+        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
         return;
       }
       const projectId = this.currentProjectId;

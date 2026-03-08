@@ -60,6 +60,8 @@ export const fr: Record<string, string> = {
   'common.noSourcesYet': "Ajoute des sources d'abord",
   'common.readAloud': 'Lire a voix haute',
   'common.regenerate': 'Regenerer',
+  'common.generateAudio': "Generer l'audio",
+  'common.regenerateAudio': "Regenerer l'audio",
   'common.generatingInProgress': 'Generation en cours...',
 
   // No project selected
@@ -312,6 +314,8 @@ export const fr: Record<string, string> = {
   'toast.reviewError': 'Erreur generation de revision',
   // Moderation
   'moderation.blocked': 'Ce contenu a ete signale comme inapproprie. La generation est bloquee.',
+  'moderation.pending': 'Moderation en cours',
+  'moderation.error': 'Moderation indisponible',
   'moderation.unsafe': 'Contenu signale',
   'moderation.safe': 'Contenu verifie',
 

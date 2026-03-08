@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import express from 'express';
 import { mkdirSync } from 'fs';
 import { join, dirname } from 'path';
@@ -14,6 +14,8 @@ import { generationCrudRoutes } from './routes/generations.js';
 import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore } from './profiles.js';
+
+dotenv.config({ override: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 

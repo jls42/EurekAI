@@ -73,7 +73,7 @@
         </div>
         <div
           x-data="quizVocalComponent(gen)"
-          x-init="$watch(() => openGens[gen.id], (open) => { if (open && !finished && !audioPlaying) $nextTick(() => playQuestion()) })"
+          x-init="$watch(() => openGens[gen.id], (open) => { if (!open) stopQuestion(); else if (!finished) $nextTick(() => playQuestion()) })"
         >
           <template x-if="!finished">
             <div>
@@ -98,20 +98,31 @@
                   ></template>
                 </div>
               </div>
-              <div class="flex items-center gap-3 mb-4">
+              <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
                 <button
                   @click="playQuestion()"
-                  :disabled="audioPlaying"
-                  class="min-h-touch px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
+                  :disabled="!currentAudioUrl()"
+                  class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
                 >
                   <i data-lucide="play" class="w-5 h-5"></i>
-                  <span x-show="!audioPlaying" x-text="t('quiz.listen')"></span>
-                  <span
-                    x-show="audioPlaying"
-                    class="animate-pulse"
-                    x-text="t('quiz.listening')"
-                  ></span>
+                  <span x-text="t('quiz.listen')"></span>
                 </button>
+                <audio
+                  x-show="currentAudioUrl()"
+                  x-ref="questionAudio"
+                  controls
+                  preload="metadata"
+                  class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
+                  :src="currentAudioUrl()"
+                  @play="audioPlaying = true"
+                  @pause="audioPlaying = false"
+                  @ended="audioPlaying = false"
+                ></audio>
+                <span
+                  x-show="audioPlaying"
+                  class="text-sm text-text-secondary animate-pulse"
+                  x-text="t('quiz.listening')"
+                ></span>
               </div>
               <template x-if="!feedback">
                 <button
