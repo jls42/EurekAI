@@ -97,6 +97,7 @@ export function chatRoutes(
       // Process tool calls — generate content
       const generatedIds: string[] = [];
       const generatedGens: Generation[] = [];
+      const failedTools: string[] = [];
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
         const markdown = getMarkdown(project.sources);
         const sourceIds = project.sources.map((s) => s.id);
@@ -159,6 +160,7 @@ export function chatRoutes(
             }
           } catch (err) {
             console.error(`  Chat tool ${call} failed:`, err);
+            failedTools.push(call);
           }
         }
       }
@@ -176,6 +178,7 @@ export function chatRoutes(
         reply: result.reply,
         generatedIds,
         generations: generatedGens,
+        ...(failedTools.length > 0 && { failedTools }),
       });
     } catch (e) {
       console.error('Chat error:', e);

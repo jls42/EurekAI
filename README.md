@@ -192,7 +192,7 @@ Six types of generated learning material:
 
 A conversational tutor with full access to course documents:
 
-- Uses `mistral-large-latest` (256K token context window)
+- Uses `mistral-large-latest` (128K token context window)
 - **Tool calling**: can generate summaries, flashcards, or quizzes inline during conversation
 - 50-message history per course
 - Content moderation for age-appropriate profiles

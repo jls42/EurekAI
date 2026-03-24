@@ -6,7 +6,9 @@ export function createProfiles() {
       try {
         const res = await fetch('/api/profiles');
         if (res.ok) this.profiles = await res.json();
-      } catch {}
+      } catch (e: any) {
+        console.error('Failed to load profiles:', e);
+      }
       // Restore last selected profile
       const saved = localStorage.getItem('sf-profileId');
       if (saved && this.profiles.find((p: any) => p.id === saved)) {
@@ -69,7 +71,10 @@ export function createProfiles() {
           this.newProfilePinConfirm = '';
           this.showProfileForm = false;
         }
-      } catch {}
+      } catch (e: any) {
+        console.error('Failed to create profile:', e);
+        this.showToast(this.t('toast.error', { error: e.message }), 'error');
+      }
     },
 
     async deleteProfile(this: any, id: string) {
@@ -102,7 +107,10 @@ export function createProfiles() {
                 }
               }
               this.showToast(this.t('toast.profileDeleted'), 'success');
-            } catch {}
+            } catch (e: any) {
+              console.error('Failed to delete profile:', e);
+              this.showToast(this.t('toast.error', { error: e.message }), 'error');
+            }
           });
         });
         return;
@@ -128,7 +136,10 @@ export function createProfiles() {
             }
           }
           this.showToast(this.t('toast.profileDeleted'), 'success');
-        } catch {}
+        } catch (e: any) {
+          console.error('Failed to delete profile:', e);
+          this.showToast(this.t('toast.error', { error: e.message }), 'error');
+        }
       });
     },
 
@@ -149,7 +160,10 @@ export function createProfiles() {
           const err = await res.json();
           if (err.error) this.showToast(err.error, 'error');
         }
-      } catch {}
+      } catch (e: any) {
+        console.error('Failed to update profile:', e);
+        this.showToast(this.t('toast.error', { error: e.message }), 'error');
+      }
     },
 
     startEditProfile(this: any, id: string) {
@@ -168,7 +182,9 @@ export function createProfiles() {
               this.showToast(this.t('profile.pinWrong'), 'error');
               return;
             }
-          } catch {
+          } catch (e: any) {
+            console.error('Failed to verify PIN:', e);
+            this.showToast(this.t('toast.error', { error: e.message }), 'error');
             return;
           }
           this.editingProfile = { ...profile, locale: profile.locale || 'fr', _verifiedPin: pin };

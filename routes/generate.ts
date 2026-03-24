@@ -107,8 +107,9 @@ function handleGeneration(
       const lang = req.body.lang || 'fr';
       const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
       const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
-      const markdown = applyConsigne(rawMarkdown, project.consigne);
-      const hasConsigne = !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+      const useConsigne = req.body.useConsigne !== false;
+      const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+      const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
       const sourceIds = resolveSourceIds(req.body, project.sources);
 
@@ -365,11 +366,10 @@ export function generateRoutes(
       }
       const lang = req.body.lang || 'fr';
       const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const markdown = applyConsigne(
-        getMarkdown(project.sources, req.body.sourceIds),
-        project.consigne,
-      );
-      const hasConsigne = !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+      const useConsigneAuto = req.body.useConsigne !== false;
+      const rawAutoMarkdown = getMarkdown(project.sources, req.body.sourceIds);
+      const markdown = useConsigneAuto ? applyConsigne(rawAutoMarkdown, project.consigne) : rawAutoMarkdown;
+      const hasConsigne = useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
 
       console.log('  Smart routing: analyzing content...');

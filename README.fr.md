@@ -192,7 +192,7 @@ Six types de matériel d'apprentissage généré :
 
 Un tuteur conversationnel avec accès complet aux documents de cours :
 
-- Utilise `mistral-large-latest` (fenêtre de contexte de 256K tokens)
+- Utilise `mistral-large-latest` (fenêtre de contexte de 128K tokens)
 - **Appel d'outils** : peut générer des fiches, flashcards ou quiz en ligne pendant la conversation
 - Historique de 50 messages par cours
 - Modération du contenu pour les profils selon l'âge

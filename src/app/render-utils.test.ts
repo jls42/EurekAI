@@ -23,6 +23,48 @@ describe('sanitizeRenderedHtml', () => {
     );
   });
 
+  it('bloque javascript: encode en entites HTML', () => {
+    const html = '<a href="java&#x09;script:alert(1)">x</a>';
+    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
+  it('bloque le protocole data:', () => {
+    const html = '<a href="data:text/html,<script>alert(1)</script>">x</a>';
+    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
+  it('bloque le protocole vbscript:', () => {
+    const html = '<a href="vbscript:MsgBox(1)">x</a>';
+    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
+  it('supprime les balises iframe, style, object, embed', () => {
+    expect(sanitizeRenderedHtml('<iframe src="evil.com"></iframe>')).toBe('');
+    expect(sanitizeRenderedHtml('<style>body{display:none}</style>')).not.toContain('<style');
+    expect(sanitizeRenderedHtml('<object data="x"></object>')).toBe('');
+    expect(sanitizeRenderedHtml('<embed src="x">')).toBe('');
+  });
+
+  it('supprime les attributs style inline', () => {
+    const html = '<div style="background:url(evil.com)">x</div>';
+    expect(sanitizeRenderedHtml(html)).toBe('<div>x</div>');
+  });
+
+  it('sanitise src avec javascript: sur img', () => {
+    const html = '<img src="javascript:alert(1)">';
+    expect(sanitizeRenderedHtml(html)).toBe('<img>');
+  });
+
+  it('sanitise les attributs URL avec simple quotes', () => {
+    const html = "<a href='javascript:alert(1)'>x</a>";
+    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
+  it('sanitise les attributs URL sans quotes', () => {
+    const html = '<a href=javascript:alert(1)>x</a>';
+    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
+  });
+
   it('protege un rendu markdown complet contre le HTML brut', () => {
     const html = marked.parse(escapeMarkdownHtml('Bonjour <script>alert(1)</script> **monde**'), {
       breaks: true,

@@ -28,7 +28,8 @@ export class ProjectStore {
     if (existsSync(this.indexPath)) {
       try {
         return JSON.parse(readFileSync(this.indexPath, 'utf-8'));
-      } catch {
+      } catch (e) {
+        console.error(`Failed to read project index at ${this.indexPath}:`, e);
         return [];
       }
     }
@@ -98,7 +99,8 @@ export class ProjectStore {
       this.migrateResultsFormat(data);
       this.migrateModerationFormat(data);
       return data;
-    } catch {
+    } catch (e) {
+      console.error(`Failed to read project ${id} at ${path}:`, e);
       return null;
     }
   }
@@ -329,7 +331,8 @@ export class ProjectStore {
     let sources: Source[];
     try {
       sources = JSON.parse(readFileSync(legacyPath, 'utf-8'));
-    } catch {
+    } catch (e) {
+      console.error(`Failed to read legacy sources at ${legacyPath}:`, e);
       return;
     }
     if (!Array.isArray(sources) || sources.length === 0) return;

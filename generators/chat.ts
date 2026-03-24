@@ -42,7 +42,7 @@ export async function chatWithSources(
   ageGroup: import('../types.js').AgeGroup = 'enfant',
 ): Promise<ChatResult> {
   const docsLabel = lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
-  const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 500000)}`;
+  const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
 
   const apiMessages: any[] = [
     { role: 'system', content: systemContent },

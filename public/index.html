@@ -2175,14 +2175,14 @@
                             <i data-lucide="volume-2" class="w-5 h-5"></i>
                             <span
                               x-show="!gen._generatingVoice && !(gen.data.audioUrl || gen._audioUrl)"
-                              >Generer l'audio</span
+                              x-text="t('common.generateAudio')"></span
                             >
                             <span
                               x-show="!gen._generatingVoice && (gen.data.audioUrl || gen._audioUrl)"
-                              >Regenerer l'audio</span
+                              x-text="t('common.regenerateAudio')"></span
                             >
                             <span x-show="gen._generatingVoice" class="animate-pulse"
-                              >Generation...</span
+                              x-text="t('common.generatingInProgress')"></span
                             >
                           </button>
                           <audio
@@ -2465,13 +2465,13 @@
                           >
                             <i data-lucide="volume-2" class="w-5 h-5"></i>
                             <span x-show="!gen._generatingVoice && !gen._audioUrl"
-                              >Generer l'audio</span
+                              x-text="t('common.generateAudio')"></span
                             >
                             <span x-show="!gen._generatingVoice && gen._audioUrl"
-                              >Regenerer l'audio</span
+                              x-text="t('common.regenerateAudio')"></span
                             >
                             <span x-show="gen._generatingVoice" class="animate-pulse"
-                              >Generation...</span
+                              x-text="t('common.generatingInProgress')"></span
                             >
                           </button>
                           <audio
@@ -2795,17 +2795,17 @@
                                 :disabled="reviewing"
                                 class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring disabled:opacity-50"
                               >
-                                <span x-show="!reviewing">Reviser mes erreurs</span>
+                                <span x-show="!reviewing" x-text="t('quiz.reviewErrors')"></span>
                                 <span x-show="reviewing" class="flex items-center gap-2"
                                   ><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
-                                  Generation...</span
+                                  <span x-text="t('common.generatingInProgress')"></span></span
                                 >
                               </button>
                               <button
                                 @click="resetQuiz()"
                                 class="bg-gray-200 text-text-primary px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                                x-text="t('quiz.restart')"
                               >
-                                Recommencer
                               </button>
                             </div>
                           </div>
@@ -2911,7 +2911,7 @@
                                 class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
                               >
                                 <i data-lucide="play" class="w-5 h-5"></i>
-                                <span>Ecouter</span>
+                                <span x-text="t('quiz.listen')"></span>
                               </button>
                               <audio
                                 x-show="currentAudioUrl()"
@@ -2927,7 +2927,7 @@
                               <span
                                 x-show="audioPlaying"
                                 class="text-sm text-text-secondary animate-pulse"
-                                >Lecture...</span
+                                x-text="t('quiz.listening')"></span
                               >
                             </div>
                             <template x-if="!feedback">
@@ -2995,8 +2995,8 @@
                             <button
                               @click="resetVocalQuiz()"
                               class="bg-gen-quizvocal text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                              x-text="t('quiz.restart')"
                             >
-                              Recommencer
                             </button>
                           </div>
                         </template>

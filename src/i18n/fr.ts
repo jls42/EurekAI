@@ -244,6 +244,11 @@ export const fr: Record<string, string> = {
   'consigne.subtitle': 'Les generations seront ciblees sur ces points',
   'consigne.reAnalyze': 'Re-analyser',
   'consigne.understood': 'Compris !',
+  'consigne.dismiss': 'Ignorer',
+  'consigne.dismissed': 'Consigne ignoree — les generations ne seront plus ciblees',
+  'consigne.dismissedLabel': 'Consigne de revision ignoree',
+  'consigne.reEnable': 'Reactiver',
+  'consigne.reEnabled': 'Consigne reactivee — les generations seront ciblees',
 
   // Scores tab
   'scores.heading': 'Mes Scores',
@@ -297,6 +302,7 @@ export const fr: Record<string, string> = {
   'toast.generationDone': '{type} genere !',
   'toast.generationError': 'Erreur generation: {error}',
   'toast.allGenerated': 'Tout genere !',
+  'toast.partialGenerated': '{count}/3 generations reussies',
   'toast.magicDone': 'Magie terminee !',
   'toast.autoError': 'Erreur generation auto: {error}',
   'toast.audioDone': 'Audio genere !',

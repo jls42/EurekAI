@@ -37,6 +37,7 @@ export function createGenerate() {
           sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
           lang: getLocale(),
           ageGroup: this.currentProfile?.ageGroup || 'enfant',
+          useConsigne: this.useConsigne,
         };
         const res = await fetch('/api/projects/' + projectId + '/generate/' + type, {
           method: 'POST',
@@ -99,6 +100,7 @@ export function createGenerate() {
         sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
         lang: getLocale(),
         ageGroup: this.currentProfile?.ageGroup || 'enfant',
+        useConsigne: this.useConsigne,
       };
       const makeOpts = () => ({
         method: 'POST',
@@ -114,6 +116,7 @@ export function createGenerate() {
           fetch(base + '/generate/quiz', makeOpts()),
         ]);
         if (this.currentProjectId !== projectId) return;
+        let failures = 0;
         for (const r of [summaryRes, flashcardsRes, quizRes]) {
           if (r.ok) {
             const gen = await r.json();
@@ -125,12 +128,20 @@ export function createGenerate() {
             this.initGenProps(gen);
             this.generations.push(gen);
             this.openGens[gen.id] = true;
+          } else {
+            failures++;
           }
         }
-        this.showToast(this.t('toast.allGenerated'), 'success', null, {
-          label: this.t('toast.view'),
-          fn: () => this.goToView('dashboard'),
-        });
+        if (failures > 0 && failures < 3) {
+          this.showToast(this.t('toast.partialGenerated', { count: 3 - failures }), 'warning');
+        } else if (failures >= 3) {
+          this.showToast(this.t('toast.generationError', { error: 'all' }), 'error');
+        } else {
+          this.showToast(this.t('toast.allGenerated'), 'success', null, {
+            label: this.t('toast.view'),
+            fn: () => this.goToView('dashboard'),
+          });
+        }
       } catch (e: any) {
         if (e.name === 'AbortError') return;
         this.showToast(this.t('toast.generationError', { error: e.message }), 'error', () =>
@@ -161,6 +172,7 @@ export function createGenerate() {
           sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
           lang: getLocale(),
           ageGroup: this.currentProfile?.ageGroup || 'enfant',
+          useConsigne: this.useConsigne,
         };
         const res = await fetch('/api/projects/' + projectId + '/generate/auto', {
           method: 'POST',
@@ -231,6 +243,13 @@ export function createGenerate() {
               audioEl.play().catch(() => {});
             }
           });
+        } else {
+          const err = await res.json().catch(() => ({}));
+          this.showToast(
+            this.t('toast.error', { error: err.error || res.statusText }),
+            'error',
+            () => this.generateVoice(gen),
+          );
         }
       } catch {
         this.showToast(this.t('toast.audioError'), 'error', () => this.generateVoice(gen));
