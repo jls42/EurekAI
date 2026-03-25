@@ -182,12 +182,6 @@
               </div>
               <div class="flex gap-3 justify-center mt-4 flex-wrap">
                 <button
-                  x-show="!submitted"
-                  @click="submitAttempt()"
-                  class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
-                  x-text="t('quiz.saveScore')"
-                ></button>
-                <button
                   x-show="submitted && score() < questions().length"
                   @click="reviewErrors()"
                   :disabled="reviewing"

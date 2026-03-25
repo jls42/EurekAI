@@ -16,6 +16,9 @@ export function quizComponent(gen: any) {
 
     answer(qi: number, ci: number) {
       this.answers[qi] = ci;
+      if (this.allAnswered() && !this.submitted) {
+        this.submitAttempt();
+      }
     },
 
     allAnswered() {
