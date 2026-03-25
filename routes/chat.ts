@@ -9,6 +9,7 @@ import { getMarkdown } from './generate.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz } from '../generators/quiz.js';
+import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 
@@ -17,6 +18,8 @@ function autoTitle(type: string, data: any, lang = 'fr'): string {
   if (type === 'summary' && data?.title) return `${en ? 'Note' : 'Fiche'} — ${data.title}`;
   if (type === 'flashcards') return `Flashcards (${Array.isArray(data) ? data.length : '?'})`;
   if (type === 'quiz') return `Quiz (${Array.isArray(data) ? data.length : '?'} questions)`;
+  if (type === 'fill-blank')
+    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
   return type;
 }
 
@@ -148,6 +151,22 @@ export function chatRoutes(
                 createdAt: new Date().toISOString(),
                 sourceIds,
                 type: 'quiz',
+                data,
+              };
+            } else if (type === 'fill-blank') {
+              const data = await generateFillBlank(
+                client,
+                markdown,
+                config.models.flashcards,
+                lang,
+                ageGroup,
+              );
+              gen = {
+                id: randomUUID(),
+                title: autoTitle('fill-blank', data, lang),
+                createdAt: new Date().toISOString(),
+                sourceIds,
+                type: 'fill-blank',
                 data,
               };
             }

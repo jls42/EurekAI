@@ -19,6 +19,14 @@ export function createHelpers() {
       return '/api/projects/' + this.currentProjectId;
     },
 
+    iconChipClass(type: string) {
+      const map: Record<string, string> = {
+        'quiz-vocal': 'icon-chip-quizvocal',
+        'fill-blank': 'icon-chip-fillblank',
+      };
+      return map[type] || `icon-chip-${type}`;
+    },
+
     genIcon(type: string) {
       const icons: Record<string, string> = {
         summary: 'file-text',
@@ -187,16 +195,10 @@ export function createHelpers() {
 
     dashboardStats(this: any) {
       const stats: Record<string, number> = {};
-      for (const cat of [
-        'summary',
-        'flashcards',
-        'quiz',
-        'quiz-vocal',
-        'podcast',
-        'image',
-        'chat',
-      ]) {
-        stats[cat] = this.generations.filter((g: any) => g.type === cat).length;
+      for (const cat of this.categories) {
+        if (!['dashboard', 'sources'].includes(cat.key)) {
+          stats[cat.key] = this.generations.filter((g: any) => g.type === cat.key).length;
+        }
       }
       return stats;
     },

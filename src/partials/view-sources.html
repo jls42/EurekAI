@@ -35,86 +35,25 @@
       </div>
     </div>
     <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 mb-3">
-      <button
-        @click="generate('summary')"
-        :disabled="loading.summary"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #0077b6"
+      <template
+        x-for="cat in categories.filter(c => !['dashboard','sources','chat'].includes(c.key))"
+        :key="cat.key"
       >
-        <i x-show="!loading.summary" data-lucide="file-text" class="w-4 h-4"></i>
-        <span
-          x-show="loading.summary"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
-        ></span>
-        <span x-text="loading.summary ? '...' : t('gen.summary')"></span>
-      </button>
-      <button
-        @click="generate('flashcards')"
-        :disabled="loading.flashcards"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #f3722c"
-      >
-        <i x-show="!loading.flashcards" data-lucide="layers" class="w-4 h-4"></i>
-        <span
-          x-show="loading.flashcards"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-flashcards border-t-transparent"
-        ></span>
-        <span x-text="loading.flashcards ? '...' : t('gen.flashcards')"></span>
-      </button>
-      <button
-        @click="generate('quiz')"
-        :disabled="loading.quiz"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #8549ba"
-      >
-        <i x-show="!loading.quiz" data-lucide="brain" class="w-4 h-4"></i>
-        <span
-          x-show="loading.quiz"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-quiz border-t-transparent"
-        ></span>
-        <span x-text="loading.quiz ? '...' : t('gen.quiz')"></span>
-      </button>
-      <button
-        @click="generate('podcast')"
-        :disabled="loading.podcast || !apiStatus.elevenlabs"
-        :title="!apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #2a9d8f"
-      >
-        <i x-show="!loading.podcast" data-lucide="headphones" class="w-4 h-4"></i>
-        <span
-          x-show="loading.podcast"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-podcast border-t-transparent"
-        ></span>
-        <span x-text="loading.podcast ? '...' : t('gen.podcast')"></span>
-      </button>
-      <button
-        @click="generate('quiz-vocal')"
-        :disabled="loading['quiz-vocal'] || !apiStatus.elevenlabs"
-        :title="!apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #e76f51"
-      >
-        <i x-show="!loading['quiz-vocal']" data-lucide="mic" class="w-4 h-4"></i>
-        <span
-          x-show="loading['quiz-vocal']"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-quizvocal border-t-transparent"
-        ></span>
-        <span x-text="loading['quiz-vocal'] ? '...' : t('gen.quiz-vocal')"></span>
-      </button>
-      <button
-        @click="generate('image')"
-        :disabled="loading.image"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #e9c46a"
-      >
-        <i x-show="!loading.image" data-lucide="image" class="w-4 h-4"></i>
-        <span
-          x-show="loading.image"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-image border-t-transparent"
-        ></span>
-        <span x-text="loading.image ? '...' : t('gen.image')"></span>
-      </button>
+        <button
+          @click="generate(cat.key)"
+          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs)"
+          :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
+          class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
+          :style="'color:' + cat.color"
+        >
+          <i x-show="!loading[cat.key]" :data-lucide="cat.icon" class="w-4 h-4"></i>
+          <span
+            x-show="loading[cat.key]"
+            class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+          ></span>
+          <span x-text="loading[cat.key] ? '...' : t('gen.' + cat.key)"></span>
+        </button>
+      </template>
     </div>
     <button
       @click="generateAuto()"
@@ -277,7 +216,7 @@
       <i data-lucide="target" class="w-4 h-4 text-text-secondary shrink-0"></i>
       <span class="text-sm text-text-secondary flex-1" x-text="t('consigne.dismissedLabel')"></span>
       <button
-        @click="useConsigne = true; showToast(t('consigne.reEnabled'), 'success'); $nextTick(() => refreshIcons())"
+        @click="useConsigne = true; localStorage.removeItem(`consigne-dismissed-${currentProjectId}`); showToast(t('consigne.reEnabled'), 'success'); $nextTick(() => refreshIcons())"
         class="text-sm font-semibold text-primary hover:text-primary-dark focus-ring rounded px-2 py-1"
         x-text="t('consigne.reEnable')"
       ></button>

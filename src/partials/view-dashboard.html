@@ -114,14 +114,7 @@
           <div class="flex items-center gap-2.5 mb-2">
             <span
               class="icon-chip shrink-0"
-              :class="{
-                          'icon-chip-summary': gen.type === 'summary',
-                          'icon-chip-flashcards': gen.type === 'flashcards',
-                          'icon-chip-quiz': gen.type === 'quiz',
-                          'icon-chip-podcast': gen.type === 'podcast',
-                          'icon-chip-quizvocal': gen.type === 'quiz-vocal',
-                          'icon-chip-image': gen.type === 'image'
-                        }"
+              :class="iconChipClass(gen.type)"
               ><i
                 :data-lucide="genIcon(gen.type)"
                 class="w-4 h-4"

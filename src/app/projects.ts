@@ -61,6 +61,7 @@ export function createProjects() {
         this.selectedIds = this.sources.map((s: any) => s.id);
         this.generations = project.results?.generations || [];
         this.consigne = project.consigne || null;
+        this.useConsigne = localStorage.getItem(`consigne-dismissed-${id}`) !== 'true';
         this.chatMessages = project.chat?.messages || [];
         for (const gen of this.generations) {
           if (gen.type === 'summary' && gen.data) {

@@ -26,6 +26,14 @@ const TOOLS = [
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'generate_fill-blank',
+      description: 'Genere des exercices a trous (phrases avec mots manquants a completer)',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
 ];
 
 export interface ChatResult {

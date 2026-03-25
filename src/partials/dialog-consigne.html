@@ -38,7 +38,7 @@
       <!-- Buttons — always visible -->
       <div class="flex gap-2 shrink-0">
         <button
-          @click="useConsigne = false; $refs.consigneDialog?.close(); showToast(t('consigne.dismissed'), 'info'); $nextTick(() => refreshIcons())"
+          @click="useConsigne = false; localStorage.setItem(`consigne-dismissed-${currentProjectId}`, 'true'); $refs.consigneDialog?.close(); showToast(t('consigne.dismissed'), 'info'); $nextTick(() => refreshIcons())"
           class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-red-50 text-red-600 hover:bg-red-100 card-lift btn-press focus-ring flex items-center justify-center gap-1.5"
         >
           <i data-lucide="x" class="w-4 h-4"></i>
