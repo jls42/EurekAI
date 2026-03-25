@@ -1,0 +1,287 @@
+<!-- ======================== FILL-IN-THE-BLANKS ======================== -->
+<div x-show="activeView === 'fill-blank'">
+  <div class="flex items-center justify-between mb-4">
+    <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+    <h2 class="font-heading font-bold text-xl title-gradient" x-text="t('fillBlank.heading')">
+      Fill in the Blanks
+    </h2>
+    <button
+      @click="generate('fill-blank')"
+      :disabled="loading['fill-blank'] || sources.length === 0"
+      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-fillblank/10 text-gen-fillblank hover:bg-gen-fillblank/20 disabled:opacity-50"
+    >
+      <i x-show="!loading['fill-blank']" data-lucide="plus" class="w-4 h-4"></i>
+      <span
+        x-show="loading['fill-blank']"
+        class="w-4 h-4 animate-spin rounded-full border-2 border-gen-fillblank border-t-transparent"
+      ></span>
+      <span x-text="loading['fill-blank'] ? t('common.loading') : t('fillBlank.new')"></span>
+    </button>
+  </div>
+
+  <!-- Empty state -->
+  <div
+    x-show="generationsByType('fill-blank').length === 0 && !loading['fill-blank']"
+    class="text-center py-12"
+  >
+    <div
+      class="w-16 h-16 mx-auto mb-3 bg-green-50 rounded-[1rem] border border-gen-fillblank/20 flex items-center justify-center"
+    >
+      <i data-lucide="pencil-line" class="w-8 h-8 text-gen-fillblank"></i>
+    </div>
+    <p class="text-text-primary font-semibold mb-1" x-text="t('fillBlank.emptyTitle')"></p>
+    <p
+      class="text-text-secondary text-body-sm mb-4"
+      x-text="sources.length === 0 ? t('common.noSourcesYet') : t('fillBlank.emptyWithSources')"
+    ></p>
+    <button
+      x-show="sources.length === 0"
+      @click="goToView('sources')"
+      class="bg-accent text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+      x-text="t('common.addSources')"
+    ></button>
+  </div>
+
+  <!-- Generation list -->
+  <div class="space-y-3">
+    <template x-for="gen in generationsByType('fill-blank')" :key="gen.id">
+      <div class="gen-card border-l-4 border-l-gen-fillblank animate-slide-up">
+        <!-- Collapse header -->
+        <button
+          @click="toggleGen(gen.id)"
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors focus-ring text-left"
+          :aria-expanded="openGens[gen.id] ? 'true' : 'false'"
+        >
+          <span class="icon-chip icon-chip-fillblank shrink-0"
+            ><i data-lucide="pencil-line" class="w-4 h-4 text-gen-fillblank"></i
+          ></span>
+          <div class="flex-1 min-w-0">
+            <template x-if="editingTitle !== gen.id">
+              <span
+                class="font-semibold text-body-sm text-text-primary truncate block"
+                x-text="gen.title"
+                @dblclick.stop="startEditTitle(gen)"
+              ></span>
+            </template>
+            <template x-if="editingTitle === gen.id">
+              <input
+                x-model="editTitleValue"
+                @click.stop
+                @keydown.enter="saveTitle(gen)"
+                @keydown.escape="editingTitle = null"
+                @blur="saveTitle(gen)"
+                class="w-full border-2 border-primary rounded-button px-2 py-0.5 text-body-sm focus-ring"
+                x-ref="titleInput"
+              />
+            </template>
+            <span
+              class="text-sm text-text-secondary"
+              x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
+            ></span>
+          </div>
+          <template x-if="gen.stats && gen.stats.attempts.length > 0">
+            <span
+              class="text-xs px-2.5 py-1 rounded-badge font-bold shrink-0"
+              :class="gen.stats.attempts[gen.stats.attempts.length-1].score === gen.stats.attempts[gen.stats.attempts.length-1].total ? 'bg-success-light text-success-dark' : 'bg-warning-light text-warning-dark'"
+              x-text="gen.stats.attempts[gen.stats.attempts.length-1].score + '/' + gen.stats.attempts[gen.stats.attempts.length-1].total"
+            ></span>
+          </template>
+          <i
+            data-lucide="chevron-down"
+            class="w-5 h-5 text-text-secondary shrink-0 transition-transform"
+            :class="openGens[gen.id] && 'rotate-180'"
+          ></i>
+        </button>
+
+        <!-- Expanded content -->
+        <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
+          <div class="flex items-center gap-2 mt-3 mb-3 flex-wrap">
+            <div class="flex-1"></div>
+            <button
+              @click.stop="startEditTitle(gen)"
+              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded"
+              :aria-label="t('common.rename')"
+            >
+              <i data-lucide="pencil" class="w-4 h-4"></i>
+            </button>
+            <button
+              @click.stop="confirmDelete('generation', () => deleteGen(gen))"
+              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded"
+              :aria-label="t('common.delete')"
+            >
+              <i data-lucide="trash-2" class="w-4 h-4"></i>
+            </button>
+          </div>
+
+          <!-- Interactive fill-blank component -->
+          <div x-data="fillBlankComponent(gen)" x-init="initFillBlank()">
+            <!-- Attempt history -->
+            <div
+              x-show="gen.stats && gen.stats.attempts.length > 0"
+              class="mb-4 flex flex-wrap gap-2"
+            >
+              <template x-for="(att, ai) in (gen.stats?.attempts || [])" :key="ai">
+                <span
+                  class="text-sm px-2.5 py-1 rounded-badge font-semibold"
+                  :class="att.score === att.total ? 'bg-success-light text-success-dark' : 'bg-gray-100 text-text-secondary'"
+                  x-text="'T' + (ai+1) + ': ' + att.score + '/' + att.total"
+                ></span>
+              </template>
+            </div>
+
+            <!-- Exercises -->
+            <div class="space-y-4">
+              <template x-for="(ex, qi) in exercises()" :key="qi">
+                <div
+                  class="bg-gray-50 rounded-card p-4"
+                  :class="{
+                    'ring-2 ring-success/40': results && results[qi] === true,
+                    'ring-2 ring-danger/40': results && results[qi] === false
+                  }"
+                >
+                  <!-- Category badge -->
+                  <div class="flex items-center gap-2 mb-2">
+                    <span
+                      class="text-xs px-2 py-0.5 rounded-badge bg-gen-fillblank/10 text-gen-fillblank font-semibold"
+                      x-text="ex.category"
+                    ></span>
+                    <span class="text-xs text-text-secondary" x-text="'#' + (qi+1)"></span>
+                  </div>
+
+                  <!-- Sentence with inline input -->
+                  <div class="text-body-sm text-text-primary leading-relaxed">
+                    <template x-for="(part, pi) in ex.sentence.split('___')" :key="pi">
+                      <span>
+                        <span x-text="part"></span>
+                        <template x-if="pi < ex.sentence.split('___').length - 1">
+                          <span class="inline-block align-baseline mx-1">
+                            <input
+                              type="text"
+                              class="w-28 sm:w-36 min-h-[2.5rem] text-center text-base font-semibold border-b-2 bg-transparent rounded-t-lg px-2 py-1 focus-ring transition-colors"
+                              :class="{
+                                'border-success bg-success-light/50 text-success-dark': results && results[qi] === true,
+                                'border-danger bg-danger-light/50 text-danger-dark': results && results[qi] === false,
+                                'border-gen-fillblank focus:border-gen-fillblank': !results
+                              }"
+                              x-model="answers[qi]"
+                              :disabled="submitted && results && results[qi]"
+                              placeholder="..."
+                              @keydown.enter="allFilled() && !submitted && submitAttempt()"
+                              autocomplete="off"
+                              spellcheck="false"
+                            />
+                          </span>
+                        </template>
+                      </span>
+                    </template>
+                  </div>
+
+                  <!-- Hint + feedback -->
+                  <div class="mt-2 space-y-1">
+                    <div class="flex items-center gap-2">
+                      <button
+                        x-show="!results"
+                        @click="toggleHint(qi)"
+                        class="text-xs text-text-secondary hover:text-gen-fillblank flex items-center gap-1 focus-ring rounded px-1.5 py-0.5"
+                      >
+                        <i data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
+                        <span
+                          x-text="showHint[qi] ? t('fillBlank.hideHint') : t('fillBlank.showHint')"
+                        ></span>
+                      </button>
+                      <!-- Show correct answer when wrong -->
+                      <span
+                        x-show="results && results[qi] === false"
+                        class="text-xs text-danger-dark font-semibold"
+                        x-text="t('fillBlank.correctAnswer', { answer: ex.answer })"
+                      ></span>
+                      <!-- Checkmark when correct -->
+                      <span
+                        x-show="results && results[qi] === true"
+                        class="text-xs text-success-dark font-semibold flex items-center gap-1"
+                      >
+                        <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                      </span>
+                    </div>
+                    <!-- Hint text displayed below -->
+                    <p
+                      x-show="showHint[qi] && !results"
+                      x-transition
+                      class="text-xs text-gen-fillblank/80 italic pl-1 flex items-center gap-1"
+                    >
+                      <i data-lucide="lightbulb" class="w-3 h-3 shrink-0"></i>
+                      <span x-text="ex.hint"></span>
+                    </p>
+                  </div>
+                </div>
+              </template>
+            </div>
+
+            <!-- Submit button -->
+            <div x-show="allFilled() && !submitted" class="mt-6 text-center">
+              <button
+                @click="submitAttempt()"
+                class="bg-gen-fillblank text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
+              >
+                <i data-lucide="check-circle" class="w-5 h-5"></i>
+                <span x-text="t('fillBlank.submit')"></span>
+              </button>
+            </div>
+
+            <!-- Score + actions -->
+            <div x-show="submitted" class="mt-6 text-center">
+              <div
+                class="inline-block px-8 py-4 rounded-card"
+                :class="score() === exercises().length ? 'bg-success-light' : 'bg-warning-light'"
+              >
+                <p
+                  class="font-heading font-bold text-2xl"
+                  :class="score() === exercises().length ? 'text-success-dark' : 'text-warning-dark'"
+                >
+                  <span x-text="score()"></span> / <span x-text="exercises().length"></span>
+                </p>
+                <p
+                  class="text-body-sm font-medium"
+                  :class="score() === exercises().length ? 'text-success-dark' : 'text-warning-dark'"
+                  x-text="score() === exercises().length ? t('fillBlank.perfect') : t('fillBlank.keepGoing')"
+                ></p>
+              </div>
+              <div class="flex gap-3 justify-center mt-4 flex-wrap">
+                <button
+                  x-show="score() < exercises().length"
+                  @click="retryWrong()"
+                  class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                  x-text="t('fillBlank.retryWrong')"
+                ></button>
+                <button
+                  @click="resetExercise()"
+                  class="bg-gray-200 text-text-primary px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                  x-text="t('fillBlank.restart')"
+                ></button>
+              </div>
+            </div>
+
+            <!-- Source references -->
+            <div
+              x-show="gen.sourceIds && gen.sourceIds.length > 0"
+              class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100"
+            >
+              <span class="text-sm text-text-secondary flex items-center gap-1">
+                <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+                <span x-text="t('common.sources') + ' :'"></span>
+              </span>
+              <template x-for="(src, srcIdx) in genSources(gen)" :key="src.id">
+                <button
+                  @click.stop="openSourceDialog(src)"
+                  :class="['source-badge', !isSourceReferenced(gen, srcIdx) && 'source-badge-dim']"
+                  :title="src.filename"
+                  x-text="srcIdx + 1"
+                ></button>
+              </template>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</div>

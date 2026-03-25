@@ -11,6 +11,7 @@ export const fr: Record<string, string> = {
   'nav.quiz': 'Quiz',
   'nav.quiz-vocal': 'Quiz vocal',
   'nav.podcast': 'Podcasts',
+  'nav.fill-blank': 'Textes à trous',
   'nav.image': 'Illustrations',
   'nav.courses': 'Cours',
   'nav.magic': 'Magie',
@@ -23,6 +24,7 @@ export const fr: Record<string, string> = {
   'gen.quiz': 'Quiz',
   'gen.podcast': 'Podcast',
   'gen.quiz-vocal': 'Quiz vocal',
+  'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
   'gen.needsElevenLabs': 'Necessite une cle API ElevenLabs',
 
@@ -238,6 +240,20 @@ export const fr: Record<string, string> = {
   'image.emptyTitle': "Pas encore d'illustration",
   'image.emptyWithSources': 'Genere une illustration educative a partir de tes sources',
   'image.prompt': 'Prompt utilise',
+
+  // Fill-in-the-blanks
+  'fillBlank.heading': 'Textes à trous',
+  'fillBlank.new': 'Nouveau texte à trous',
+  'fillBlank.emptyTitle': 'Pas encore de texte à trous',
+  'fillBlank.emptyWithSources': 'Clique sur Nouveau texte à trous pour commencer',
+  'fillBlank.showHint': 'Indice',
+  'fillBlank.hideHint': "Masquer l'indice",
+  'fillBlank.submit': 'Verifier mes reponses',
+  'fillBlank.perfect': 'Parfait ! Tout juste !',
+  'fillBlank.keepGoing': 'Bien joue ! Continue comme ca !',
+  'fillBlank.retryWrong': 'Corriger mes erreurs',
+  'fillBlank.restart': 'Recommencer',
+  'fillBlank.correctAnswer': 'Reponse : {answer}',
 
   // Consigne dialog
   'consigne.title': 'Consigne de revision',

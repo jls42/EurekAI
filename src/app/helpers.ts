@@ -27,6 +27,7 @@ export function createHelpers() {
         podcast: 'headphones',
         'quiz-vocal': 'mic',
         image: 'image',
+        'fill-blank': 'pencil-line',
         auto: 'sparkles',
       };
       return icons[type] || 'sparkles';
@@ -144,6 +145,9 @@ export function createHelpers() {
         qs.forEach((q: any) => extract(q.sourceRefs || (q.sourceRef ? [q.sourceRef] : [])));
       } else if (gen.type === 'podcast') {
         extract(gen.data?.sourceRefs);
+      } else if (gen.type === 'fill-blank') {
+        const items = Array.isArray(gen.data) ? gen.data : [];
+        items.forEach((item: any) => extract(item.sourceRefs));
       } else if (gen.type === 'summary') {
         const d = gen.data || {};
         (d.citations || []).forEach((cit: any) => {
@@ -170,6 +174,7 @@ export function createHelpers() {
         podcast: 'var(--color-gen-podcast)',
         'quiz-vocal': 'var(--color-gen-quizvocal)',
         image: 'var(--color-gen-image)',
+        'fill-blank': 'var(--color-gen-fillblank)',
       };
       return colors[type] || 'var(--color-primary)';
     },

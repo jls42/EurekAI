@@ -14,6 +14,7 @@ import { generatePodcastScript } from '../generators/podcast.js';
 import { generateAudio } from '../generators/tts.js';
 import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
+import { generateFillBlank } from '../generators/fill-blank.js';
 import { routeRequest } from '../generators/router.js';
 
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
@@ -43,6 +44,8 @@ function autoTitle(type: string, data: any, lang = 'fr'): string {
     return `${en ? 'Vocal Quiz' : 'Quiz Vocal'} (${Array.isArray(data) ? data.length : '?'} questions)`;
   if (type === 'podcast') return `Podcast`;
   if (type === 'image') return 'Illustration';
+  if (type === 'fill-blank')
+    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
   return type;
 }
 
@@ -351,6 +354,31 @@ export function generateRoutes(
     }),
   );
 
+  // --- Fill-in-the-blanks ---
+  router.post(
+    '/:pid/generate/fill-blank',
+    handleGeneration(store, profileStore, async (ctx) => {
+      console.log(
+        `[fill-blank] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+      );
+      const data = await generateFillBlank(
+        client,
+        ctx.markdown,
+        ctx.config.models.quiz,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle('fill-blank', data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: 'fill-blank',
+        data,
+      };
+    }),
+  );
+
   // --- Smart Routing (Auto) — structure multi-generation, non factorisable ---
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
@@ -423,6 +451,22 @@ export function generateRoutes(
               createdAt: new Date().toISOString(),
               sourceIds,
               type: 'quiz',
+              data,
+            };
+          } else if (step.agent === 'fill-blank') {
+            const data = await generateFillBlank(
+              client,
+              markdown,
+              config.models.quiz,
+              lang,
+              ageGroup,
+            );
+            gen = {
+              id: randomUUID(),
+              title: autoTitle('fill-blank', data, lang),
+              createdAt: new Date().toISOString(),
+              sourceIds,
+              type: 'fill-blank',
               data,
             };
           } else if (step.agent === 'podcast') {

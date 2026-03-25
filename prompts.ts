@@ -271,3 +271,35 @@ export const WEBSEARCH_INSTRUCTIONS = websearchInstructions('fr', 'enfant');
 export function websearchInput(query: string, lang = 'fr'): string {
   return `Recherche des informations sur : ${query}. Donne un resume structure avec les points cles.${langInstruction(lang)}`;
 }
+
+// ── Fill-in-the-blanks ────────────────────────────────────────────────
+
+export function fillBlankSystem(ageGroup: AgeGroup = 'enfant'): string {
+  return `Tu es un expert en pedagogie specialise dans les exercices a trous.
+${ageInstruction(ageGroup)}
+Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
+L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
+
+REGLES :
+- Chaque phrase doit etre auto-suffisante et comprehensible seule.
+- Le mot a trouver doit etre un terme CLE du cours (pas un mot vide ou generique).
+- UN SEUL trou par phrase.
+- La phrase doit donner suffisamment de contexte pour deviner la reponse.
+- IMPORTANT : si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et PAS "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
+- Le hint doit aider sans donner la reponse : premiere lettre, nombre de lettres, categorie ou indice contextuel.
+- category parmi : "vocabulaire", "date", "nom propre", "definition", "concept", "lieu", "nombre".
+- Varie les types de blanks : melange vocabulaire, dates, noms, definitions.
+- Ordonne du plus simple au plus difficile.
+
+${sourceRefsInstruction('exercice')}
+Reponds UNIQUEMENT en JSON valide.`;
+}
+
+export function fillBlankUser(markdown: string, count: number, lang = 'fr'): string {
+  return `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
+
+Format JSON :
+{"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
+
+Contenu :\n\n${markdown}${langInstruction(lang)}`;
+}

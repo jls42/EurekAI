@@ -40,12 +40,14 @@
   --color-gen-podcast: #2a9d8f;
   --color-gen-quizvocal: #e76f51;
   --color-gen-image: #e91e63;
+  --color-gen-fillblank: #43a047;
   --color-gen-summary-rgb: 0, 119, 182;
   --color-gen-flashcards-rgb: 243, 114, 44;
   --color-gen-quiz-rgb: 133, 73, 186;
   --color-gen-podcast-rgb: 42, 157, 143;
   --color-gen-quizvocal-rgb: 231, 111, 81;
   --color-gen-image-rgb: 233, 30, 99;
+  --color-gen-fillblank-rgb: 67, 160, 71;
 
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.72);
@@ -121,6 +123,8 @@
   --color-gen-podcast-rgb: 94, 198, 184;
   --color-gen-quizvocal-rgb: 255, 149, 128;
   --color-gen-image-rgb: 244, 143, 177;
+  --color-gen-fillblank: #81c784;
+  --color-gen-fillblank-rgb: 129, 199, 132;
 
   --glass-bg: rgba(15, 26, 46, 0.75);
   --glass-border: rgba(61, 100, 160, 0.3);

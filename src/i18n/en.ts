@@ -9,6 +9,7 @@ export const en: Record<string, string> = {
   'nav.quiz': 'Quiz',
   'nav.quiz-vocal': 'Vocal Quiz',
   'nav.podcast': 'Podcasts',
+  'nav.fill-blank': 'Fill in the blanks',
   'nav.image': 'Illustrations',
   'nav.courses': 'Courses',
   'nav.magic': 'Magic',
@@ -20,6 +21,7 @@ export const en: Record<string, string> = {
   'gen.quiz': 'Quiz',
   'gen.podcast': 'Podcast',
   'gen.quiz-vocal': 'Vocal Quiz',
+  'gen.fill-blank': 'Fill-in-the-blanks',
   'gen.image': 'Image',
   'gen.needsElevenLabs': 'Requires an ElevenLabs API key',
 
@@ -219,6 +221,20 @@ export const en: Record<string, string> = {
   'image.emptyTitle': 'No illustrations yet',
   'image.emptyWithSources': 'Generate an educational illustration from your sources',
   'image.prompt': 'Prompt used',
+
+  // Fill-in-the-blanks
+  'fillBlank.heading': 'Fill in the Blanks',
+  'fillBlank.new': 'New fill-in-the-blanks',
+  'fillBlank.emptyTitle': 'No fill-in-the-blanks yet',
+  'fillBlank.emptyWithSources': 'Click New fill-in-the-blanks to get started',
+  'fillBlank.showHint': 'Hint',
+  'fillBlank.hideHint': 'Hide hint',
+  'fillBlank.submit': 'Check my answers',
+  'fillBlank.perfect': 'Perfect! All correct!',
+  'fillBlank.keepGoing': 'Well done! Keep it up!',
+  'fillBlank.retryWrong': 'Fix my mistakes',
+  'fillBlank.restart': 'Start over',
+  'fillBlank.correctAnswer': 'Answer: {answer}',
 
   'consigne.title': 'Study instructions',
   'consigne.subtitle': 'Generations will focus on these points',

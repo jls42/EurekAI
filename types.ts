@@ -109,13 +109,42 @@ export interface ImageGeneration extends GenerationMeta {
   data: { imageUrl: string; prompt: string };
 }
 
+export interface FillBlankItem {
+  sentence: string;
+  answer: string;
+  hint: string;
+  category: string;
+  sourceRefs?: string[];
+}
+
+export interface FillBlankAttempt {
+  date: string;
+  answers: Record<number, string>;
+  results: Record<number, boolean>;
+  score: number;
+  total: number;
+}
+
+export interface FillBlankStats {
+  attempts: FillBlankAttempt[];
+  questionStats: Record<number, { correct: number; wrong: number }>;
+}
+
+export interface FillBlankGeneration extends GenerationMeta {
+  type: 'fill-blank';
+  data: FillBlankItem[];
+  dataEN?: FillBlankItem[];
+  stats?: FillBlankStats;
+}
+
 export type Generation =
   | SummaryGeneration
   | FlashcardsGeneration
   | QuizGeneration
   | PodcastGeneration
   | QuizVocalGeneration
-  | ImageGeneration;
+  | ImageGeneration
+  | FillBlankGeneration;
 
 // --- Quiz adaptive learning ---
 

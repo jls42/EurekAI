@@ -7,6 +7,7 @@ import { en } from './i18n/en';
 import { app } from './app/index';
 import { quizComponent } from './components/quiz';
 import { quizVocalComponent } from './components/quiz-vocal';
+import { fillBlankComponent } from './components/fill-blank';
 
 // Register i18n locales before Alpine starts
 registerLocale('fr', fr);
@@ -16,6 +17,7 @@ registerLocale('en', en);
 Alpine.data('app', app);
 Alpine.data('quizComponent', quizComponent);
 Alpine.data('quizVocalComponent', quizVocalComponent);
+Alpine.data('fillBlankComponent', fillBlankComponent);
 
 Alpine.start();
 
