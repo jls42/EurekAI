@@ -34,7 +34,7 @@ async function concatMp3(segments: Buffer[]): Promise<Buffer> {
     const outputPath = join(tmpDir, 'output.mp3');
     tempFiles.push(outputPath);
 
-    await execFileAsync(ffmpegPath!, [
+    await execFileAsync(ffmpegPath as string, [
       '-y',
       '-f',
       'concat',

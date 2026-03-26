@@ -158,9 +158,9 @@
         <!-- Mistral voice selectors (dynamic from API) -->
         <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
             <div>
-              <label class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
+              <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
               <select
-                x-model="configDraft.mistralVoices.host"
+                id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host"
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
@@ -169,9 +169,9 @@
               </select>
             </div>
             <div>
-              <label class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
+              <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
               <select
-                x-model="configDraft.mistralVoices.guest"
+                id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest"
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="'g-'+v.id">

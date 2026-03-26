@@ -12,7 +12,7 @@ export function createConfig() {
         await this.loadMistralVoices();
         if (configRes.ok) {
           const config = await configRes.json();
-          this.configDraft = JSON.parse(JSON.stringify(config));
+          this.configDraft = structuredClone(config);
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
       } catch (e) {
@@ -51,7 +51,7 @@ export function createConfig() {
       const voice = this.mistralVoicesList.find((v: any) => v.lang === lang);
       const country = (voice?.langFull?.split('_')[1] || lang).toUpperCase();
       if (!/^[A-Z]{2}$/.test(country)) return '';
-      return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+      return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.codePointAt(0) - 65));
     },
 
     async saveSettings(this: any) {
@@ -85,7 +85,7 @@ export function createConfig() {
         });
         if (res.ok) {
           const saved = await res.json();
-          this.configDraft = JSON.parse(JSON.stringify(saved));
+          this.configDraft = structuredClone(saved);
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) this.apiStatus = await statusRes.json();
@@ -104,7 +104,7 @@ export function createConfig() {
         const res = await fetch('/api/config/reset', { method: 'POST' });
         if (res.ok) {
           const saved = await res.json();
-          this.configDraft = JSON.parse(JSON.stringify(saved));
+          this.configDraft = structuredClone(saved);
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
