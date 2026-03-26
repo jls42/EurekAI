@@ -46,6 +46,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ## Workflow
 
+- **Toujours utiliser le skill `/commit` pour creer les commits** (mandatory)
 - Verifier visuellement chaque modif UI (navigateur ou Claude in Chrome)
 - Lancer `npm run test` apres chaque modification
 - Quand une erreur ou mauvaise approche est identifiee, ajouter une regle ici ou dans `.claude/rules/`
