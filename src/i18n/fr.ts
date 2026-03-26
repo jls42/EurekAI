@@ -11,6 +11,7 @@ export const fr: Record<string, string> = {
   'nav.quiz': 'Quiz',
   'nav.quiz-vocal': 'Quiz vocal',
   'nav.podcast': 'Podcasts',
+  'nav.fill-blank': 'Textes à trous',
   'nav.image': 'Illustrations',
   'nav.courses': 'Cours',
   'nav.magic': 'Magie',
@@ -23,7 +24,9 @@ export const fr: Record<string, string> = {
   'gen.quiz': 'Quiz',
   'gen.podcast': 'Podcast',
   'gen.quiz-vocal': 'Quiz vocal',
+  'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
+  'gen.questionCount': 'Nombre :',
   'gen.needsElevenLabs': 'Necessite une cle API ElevenLabs',
 
   // Header
@@ -60,6 +63,8 @@ export const fr: Record<string, string> = {
   'common.noSourcesYet': "Ajoute des sources d'abord",
   'common.readAloud': 'Lire a voix haute',
   'common.regenerate': 'Regenerer',
+  'common.generateAudio': "Generer l'audio",
+  'common.regenerateAudio': "Regenerer l'audio",
   'common.generatingInProgress': 'Generation en cours...',
 
   // No project selected
@@ -170,6 +175,9 @@ export const fr: Record<string, string> = {
   'flashcards.emptyTitle': 'Pas encore de flashcards',
   'flashcards.emptyWithSources': 'Clique sur Nouvelles flashcards pour commencer',
   'flashcards.tapToFlip': 'Touche pour retourner',
+  'flashcards.flip': 'Retourner',
+  'flashcards.knew': 'Je savais',
+  'flashcards.didntKnow': 'Je ne savais pas',
 
   // Quiz view
   'quiz.heading': 'Quiz',
@@ -237,11 +245,36 @@ export const fr: Record<string, string> = {
   'image.emptyWithSources': 'Genere une illustration educative a partir de tes sources',
   'image.prompt': 'Prompt utilise',
 
+  // Fill-in-the-blanks
+  'fillBlank.heading': 'Textes à trous',
+  'fillBlank.new': 'Nouveau texte à trous',
+  'fillBlank.emptyTitle': 'Pas encore de texte à trous',
+  'fillBlank.emptyWithSources': 'Clique sur Nouveau texte à trous pour commencer',
+  'fillBlank.showHint': 'Indice',
+  'fillBlank.hideHint': "Masquer l'indice",
+  'fillBlank.submit': 'Verifier mes reponses',
+  'fillBlank.perfect': 'Parfait ! Tout juste !',
+  'fillBlank.keepGoing': 'Bien joue ! Continue comme ca !',
+  'fillBlank.retryWrong': 'Corriger mes erreurs',
+  'fillBlank.restart': 'Recommencer',
+  'fillBlank.correctAnswer': 'Reponse : {answer}',
+
+  // Step-by-step (shared)
+  'step.questionOf': 'Exercice {current}/{total}',
+  'step.check': 'Verifier',
+  'step.next': 'Suivante',
+  'step.retryWrong': 'Revoir les erreurs',
+
   // Consigne dialog
   'consigne.title': 'Consigne de revision',
   'consigne.subtitle': 'Les generations seront ciblees sur ces points',
   'consigne.reAnalyze': 'Re-analyser',
   'consigne.understood': 'Compris !',
+  'consigne.dismiss': 'Ignorer',
+  'consigne.dismissed': 'Consigne ignoree — les generations ne seront plus ciblees',
+  'consigne.dismissedLabel': 'Consigne de revision ignoree',
+  'consigne.reEnable': 'Reactiver',
+  'consigne.reEnabled': 'Consigne reactivee — les generations seront ciblees',
 
   // Scores tab
   'scores.heading': 'Mes Scores',
@@ -295,6 +328,7 @@ export const fr: Record<string, string> = {
   'toast.generationDone': '{type} genere !',
   'toast.generationError': 'Erreur generation: {error}',
   'toast.allGenerated': 'Tout genere !',
+  'toast.partialGenerated': '{count}/3 generations reussies',
   'toast.magicDone': 'Magie terminee !',
   'toast.autoError': 'Erreur generation auto: {error}',
   'toast.audioDone': 'Audio genere !',
@@ -312,6 +346,8 @@ export const fr: Record<string, string> = {
   'toast.reviewError': 'Erreur generation de revision',
   // Moderation
   'moderation.blocked': 'Ce contenu a ete signale comme inapproprie. La generation est bloquee.',
+  'moderation.pending': 'Moderation en cours',
+  'moderation.error': 'Moderation indisponible',
   'moderation.unsafe': 'Contenu signale',
   'moderation.safe': 'Contenu verifie',
 

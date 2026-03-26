@@ -16,7 +16,7 @@ export function timer(): () => number {
 }
 
 /**
- * Unwrap un resultat JSON de traduction qui peut etre `[...]` ou `{"key": [...]}`.
+ * Unwrap un resultat JSON qui peut etre `[...]` ou `{"key": [...]}`.
  * Retourne toujours le tableau.
  */
 export function unwrapJsonArray<T>(data: unknown): T[] {

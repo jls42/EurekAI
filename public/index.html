@@ -15,10 +15,12 @@
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- NOSONAR(S5725) — Google Fonts CSS is generated dynamically per browser, SRI not applicable -->
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
       rel="stylesheet"
     />
+    <!-- NOSONAR(S5725) — Tailwind Play CDN is an unversioned JIT compiler, SRI not applicable -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -70,9 +72,22 @@
         },
       };
     </script>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/marked@15.0.7/marked.min.js"
+      integrity="sha384-H+hy9ULve6xfxRkWIh/YOtvDdpXgV2fmAGQkIDTxIgZwNoaoBal14Di2YTMR6MzR"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"
+      integrity="sha384-9Ax3MmS9AClxJyd5/zafcXXjxmwFhZCdsT6HJoJjarvCaAkJlk5QDzjLJm+Wdx5F"
+      crossorigin="anonymous"
+    ></script>
+    <script
+      src="https://unpkg.com/lucide@0.474.0/dist/umd/lucide.min.js"
+      integrity="sha384-wkxmY9HYHJVzx0oZ7k8stpLQ7g7ogSqBha75ozCZmxFadwtaIw5dzXKVWWfi9I36"
+      crossorigin="anonymous"
+    ></script>
     <style>
       [x-cloak] {
         display: none !important;
@@ -1921,11 +1936,36 @@
                             class="font-medium text-body-sm truncate"
                             x-text="src.filename"
                           ></span>
-                          <span x-show="src.moderation && src.moderation.safe" class="shrink-0">
+                          <span
+                            x-show="src.moderation?.status === 'safe'"
+                            class="shrink-0"
+                            :title="t('moderation.safe')"
+                          >
                             <i data-lucide="shield-check" class="w-4 h-4 text-success"></i>
                           </span>
-                          <span x-show="src.moderation && !src.moderation.safe" class="shrink-0">
+                          <span
+                            x-show="src.moderation?.status === 'unsafe'"
+                            class="shrink-0"
+                            :title="t('moderation.unsafe')"
+                          >
                             <i data-lucide="shield-alert" class="w-4 h-4 text-danger"></i>
+                          </span>
+                          <span
+                            x-show="src.moderation?.status === 'pending'"
+                            class="shrink-0"
+                            :title="t('moderation.pending')"
+                          >
+                            <i
+                              data-lucide="loader-circle"
+                              class="w-4 h-4 text-primary animate-spin"
+                            ></i>
+                          </span>
+                          <span
+                            x-show="src.moderation?.status === 'error'"
+                            class="shrink-0"
+                            :title="t('moderation.error')"
+                          >
+                            <i data-lucide="shield-x" class="w-4 h-4 text-warning-dark"></i>
                           </span>
                         </div>
                         <p
@@ -2126,29 +2166,30 @@
                           </button>
                         </div>
                         <!-- Summary rich content -->
-                        <div class="flex items-center gap-2 mb-4 flex-wrap">
+                        <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
                           <button
                             @click="generateVoice(gen)"
                             :disabled="gen._generatingVoice === true"
-                            class="min-h-touch px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
+                            class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
                           >
                             <i data-lucide="volume-2" class="w-5 h-5"></i>
                             <span
                               x-show="!gen._generatingVoice && !(gen.data.audioUrl || gen._audioUrl)"
-                              >Lire a voix haute</span
+                              x-text="t('common.generateAudio')"></span
                             >
                             <span
                               x-show="!gen._generatingVoice && (gen.data.audioUrl || gen._audioUrl)"
-                              >Regenerer</span
+                              x-text="t('common.regenerateAudio')"></span
                             >
                             <span x-show="gen._generatingVoice" class="animate-pulse"
-                              >Generation...</span
+                              x-text="t('common.generatingInProgress')"></span
                             >
                           </button>
                           <audio
                             x-show="gen.data.audioUrl || gen._audioUrl"
                             controls
-                            class="h-10 max-w-xs"
+                            preload="metadata"
+                            class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
                             :src="gen.data.audioUrl || gen._audioUrl"
                             :data-gen-id="gen.id"
                           ></audio>
@@ -2220,7 +2261,10 @@
                                   class="text-accent-dark text-body-sm"
                                   x-text="v.word"
                                 ></strong>
-                                <p class="text-text-primary text-sm" x-text="v.definition"></p>
+                                <p
+                                  class="text-text-primary text-sm chat-markdown"
+                                  x-html="renderWithSources(v.definition, gen)"
+                                ></p>
                               </div>
                             </template>
                           </div>
@@ -2413,25 +2457,28 @@
                           </button>
                         </div>
                         <!-- Voice -->
-                        <div class="flex items-center gap-2 mb-4 flex-wrap">
+                        <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
                           <button
                             @click="generateVoice(gen)"
                             :disabled="gen._generatingVoice === true"
-                            class="min-h-touch px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-flashcards/10 text-gen-flashcards hover:bg-gen-flashcards/20 disabled:opacity-50"
+                            class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-flashcards/10 text-gen-flashcards hover:bg-gen-flashcards/20 disabled:opacity-50"
                           >
                             <i data-lucide="volume-2" class="w-5 h-5"></i>
                             <span x-show="!gen._generatingVoice && !gen._audioUrl"
-                              >Lire a voix haute</span
+                              x-text="t('common.generateAudio')"></span
                             >
-                            <span x-show="!gen._generatingVoice && gen._audioUrl">Regenerer</span>
+                            <span x-show="!gen._generatingVoice && gen._audioUrl"
+                              x-text="t('common.regenerateAudio')"></span
+                            >
                             <span x-show="gen._generatingVoice" class="animate-pulse"
-                              >Generation...</span
+                              x-text="t('common.generatingInProgress')"></span
                             >
                           </button>
                           <audio
                             x-show="gen._audioUrl"
                             controls
-                            class="h-10 max-w-xs"
+                            preload="metadata"
+                            class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
                             :src="gen._audioUrl"
                             :data-gen-id="gen.id"
                           ></audio>
@@ -2748,17 +2795,17 @@
                                 :disabled="reviewing"
                                 class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring disabled:opacity-50"
                               >
-                                <span x-show="!reviewing">Reviser mes erreurs</span>
+                                <span x-show="!reviewing" x-text="t('quiz.reviewErrors')"></span>
                                 <span x-show="reviewing" class="flex items-center gap-2"
                                   ><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
-                                  Generation...</span
+                                  <span x-text="t('common.generatingInProgress')"></span></span
                                 >
                               </button>
                               <button
                                 @click="resetQuiz()"
                                 class="bg-gray-200 text-text-primary px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                                x-text="t('quiz.restart')"
                               >
-                                Recommencer
                               </button>
                             </div>
                           </div>
@@ -2826,7 +2873,10 @@
                           <i data-lucide="trash-2" class="w-4 h-4"></i>
                         </button>
                       </div>
-                      <div x-data="quizVocalComponent(gen)">
+                      <div
+                        x-data="quizVocalComponent(gen)"
+                        x-init="$watch(() => openGens[gen.id], (open) => { if (!open) stopQuestion(); else if (!finished) $nextTick(() => playQuestion()) })"
+                      >
                         <template x-if="!finished">
                           <div>
                             <div class="flex items-center gap-2 mb-3">
@@ -2852,16 +2902,33 @@
                                 ></template>
                               </div>
                             </div>
-                            <div class="flex items-center gap-3 mb-4">
+                            <div
+                              class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center"
+                            >
                               <button
                                 @click="playQuestion()"
-                                :disabled="audioPlaying"
-                                class="min-h-touch px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
+                                :disabled="!currentAudioUrl()"
+                                class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
                               >
                                 <i data-lucide="play" class="w-5 h-5"></i>
-                                <span x-show="!audioPlaying">Ecouter</span>
-                                <span x-show="audioPlaying" class="animate-pulse">Lecture...</span>
+                                <span x-text="t('quiz.listen')"></span>
                               </button>
+                              <audio
+                                x-show="currentAudioUrl()"
+                                x-ref="questionAudio"
+                                controls
+                                preload="metadata"
+                                class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
+                                :src="currentAudioUrl()"
+                                @play="audioPlaying = true"
+                                @pause="audioPlaying = false"
+                                @ended="audioPlaying = false"
+                              ></audio>
+                              <span
+                                x-show="audioPlaying"
+                                class="text-sm text-text-secondary animate-pulse"
+                                x-text="t('quiz.listening')"></span
+                              >
                             </div>
                             <template x-if="!feedback">
                               <button
@@ -2928,8 +2995,8 @@
                             <button
                               @click="resetVocalQuiz()"
                               class="bg-gen-quizvocal text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                              x-text="t('quiz.restart')"
                             >
-                              Recommencer
                             </button>
                           </div>
                         </template>
@@ -3212,8 +3279,13 @@
                           </button>
                         </div>
                         <!-- Podcast player + script -->
-                        <div x-show="gen.data.audioUrl" class="mb-4">
-                          <audio controls class="w-full" :src="gen.data.audioUrl"></audio>
+                        <div x-show="gen.data.audioUrl" class="mb-4 max-w-2xl">
+                          <audio
+                            controls
+                            preload="metadata"
+                            class="w-full max-w-full"
+                            :src="gen.data.audioUrl"
+                          ></audio>
                         </div>
                         <button
                           @click="gen._scriptOpen = !gen._scriptOpen"
@@ -3865,9 +3937,6 @@
                 >
                   <option value="mistral-large-latest">mistral-large-latest</option>
                   <option value="mistral-small-latest">mistral-small-latest</option>
-                  <option value="magistral-medium-latest">magistral-medium-latest</option>
-                  <option value="magistral-small-latest">magistral-small-latest</option>
-                  <option value="mistral-ocr-latest">mistral-ocr-latest</option>
                 </select>
               </div>
             </template>

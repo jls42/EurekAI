@@ -14,6 +14,7 @@ import { generatePodcastScript } from '../generators/podcast.js';
 import { generateAudio } from '../generators/tts.js';
 import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
+import { generateFillBlank } from '../generators/fill-blank.js';
 import { routeRequest } from '../generators/router.js';
 
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
@@ -43,6 +44,8 @@ function autoTitle(type: string, data: any, lang = 'fr'): string {
     return `${en ? 'Vocal Quiz' : 'Quiz Vocal'} (${Array.isArray(data) ? data.length : '?'} questions)`;
   if (type === 'podcast') return `Podcast`;
   if (type === 'image') return 'Illustration';
+  if (type === 'fill-blank')
+    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
   return type;
 }
 
@@ -67,8 +70,8 @@ function checkModeration(
     sourceIds && sourceIds.length > 0
       ? project.sources.filter((s) => sourceIds.includes(s.id))
       : project.sources;
-  const unsafe = selected.find((s) => s.moderation && !s.moderation.safe);
-  if (unsafe) return unsafe.filename;
+  const blocked = selected.find((s) => s.moderation && s.moderation.status !== 'safe');
+  if (blocked) return blocked.filename;
   return null;
 }
 
@@ -81,6 +84,7 @@ interface GenContext {
   config: ReturnType<typeof getConfig>;
   hasConsigne: boolean;
   sourceIds: string[];
+  count?: number;
   pid: string;
   req: Request;
   res: Response;
@@ -107,10 +111,13 @@ function handleGeneration(
       const lang = req.body.lang || 'fr';
       const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
       const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
-      const markdown = applyConsigne(rawMarkdown, project.consigne);
-      const hasConsigne = !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+      const useConsigne = req.body.useConsigne !== false;
+      const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+      const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
       const sourceIds = resolveSourceIds(req.body, project.sources);
+      const rawCount = req.body.count ? Number(req.body.count) : undefined;
+      const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       const gen = await generatorFn({
         project,
@@ -121,6 +128,7 @@ function handleGeneration(
         config,
         hasConsigne,
         sourceIds,
+        count,
         pid,
         req,
         res,
@@ -181,6 +189,7 @@ export function generateRoutes(
         ctx.config.models.flashcards,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       return {
         id: randomUUID(),
@@ -202,6 +211,7 @@ export function generateRoutes(
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       return {
         id: randomUUID(),
@@ -294,6 +304,7 @@ export function generateRoutes(
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       console.log(`  Quiz OK: ${data.length} questions`);
 
@@ -350,6 +361,32 @@ export function generateRoutes(
     }),
   );
 
+  // --- Fill-in-the-blanks ---
+  router.post(
+    '/:pid/generate/fill-blank',
+    handleGeneration(store, profileStore, async (ctx) => {
+      console.log(
+        `[fill-blank] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+      );
+      const data = await generateFillBlank(
+        client,
+        ctx.markdown,
+        ctx.config.models.quiz,
+        ctx.lang,
+        ctx.ageGroup,
+        ctx.count,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle('fill-blank', data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: 'fill-blank',
+        data,
+      };
+    }),
+  );
+
   // --- Smart Routing (Auto) — structure multi-generation, non factorisable ---
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
@@ -365,18 +402,20 @@ export function generateRoutes(
       }
       const lang = req.body.lang || 'fr';
       const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const markdown = applyConsigne(
-        getMarkdown(project.sources, req.body.sourceIds),
-        project.consigne,
-      );
-      const hasConsigne = !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+      const useConsigneAuto = req.body.useConsigne !== false;
+      const rawAutoMarkdown = getMarkdown(project.sources, req.body.sourceIds);
+      const markdown = useConsigneAuto ? applyConsigne(rawAutoMarkdown, project.consigne) : rawAutoMarkdown;
+      const hasConsigne = useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
+      const rawCount = req.body.count ? Number(req.body.count) : undefined;
+      const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       console.log('  Smart routing: analyzing content...');
       const route = await routeRequest(client, markdown);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
+      const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
 
       for (const step of route.plan) {
@@ -406,6 +445,7 @@ export function generateRoutes(
               config.models.flashcards,
               lang,
               ageGroup,
+              count,
             );
             gen = {
               id: randomUUID(),
@@ -416,13 +456,30 @@ export function generateRoutes(
               data,
             };
           } else if (step.agent === 'quiz') {
-            const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup);
+            const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup, count);
             gen = {
               id: randomUUID(),
               title: autoTitle('quiz', data, lang),
               createdAt: new Date().toISOString(),
               sourceIds,
               type: 'quiz',
+              data,
+            };
+          } else if (step.agent === 'fill-blank') {
+            const data = await generateFillBlank(
+              client,
+              markdown,
+              config.models.quiz,
+              lang,
+              ageGroup,
+              count,
+            );
+            gen = {
+              id: randomUUID(),
+              title: autoTitle('fill-blank', data, lang),
+              createdAt: new Date().toISOString(),
+              sourceIds,
+              type: 'fill-blank',
               data,
             };
           } else if (step.agent === 'podcast') {
@@ -462,10 +519,11 @@ export function generateRoutes(
           }
         } catch (err) {
           console.error(`  Auto: ${step.agent} FAILED:`, err);
+          failedSteps.push(step.agent);
         }
       }
 
-      res.json({ route: route.plan, generations });
+      res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {
       console.error('Generate auto error:', e);
       res.status(500).json({ error: String(e) });

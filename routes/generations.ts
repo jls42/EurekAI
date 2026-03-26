@@ -9,11 +9,14 @@ import type {
   QuizAttempt,
   QuizVocalGeneration,
   SummaryGeneration,
+  FillBlankGeneration,
+  FillBlankAttempt,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { getConfig } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { collectStream } from '../helpers/audio.js';
+import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -64,6 +67,62 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       res.json({ attempt, stats: quizGen.stats });
     } catch (e) {
       console.error('Quiz attempt error:', e);
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
+  // --- Fill-blank attempt (save score) ---
+  router.post('/:pid/generations/:gid/fill-blank-attempt', async (req, res) => {
+    try {
+      const { answers } = req.body;
+      if (!answers || typeof answers !== 'object') {
+        res.status(400).json({ error: 'answers requis' });
+        return;
+      }
+      const gen = store.getGeneration(req.params.pid, req.params.gid);
+      if (!gen || gen.type !== 'fill-blank') {
+        res.status(404).json({ error: 'Exercice a trous introuvable' });
+        return;
+      }
+
+      const fbGen = gen as FillBlankGeneration;
+      if (!fbGen.stats) {
+        fbGen.stats = { attempts: [], questionStats: {} };
+      }
+
+      let score = 0;
+      const total = fbGen.data.length;
+      const results: Record<number, boolean> = {};
+
+      for (const [qiStr, childAnswer] of Object.entries(answers)) {
+        const qi = Number(qiStr);
+        const correctAnswer = fbGen.data[qi]?.answer;
+        if (!correctAnswer) continue;
+
+        const { match } = validateFillBlankAnswer(childAnswer as string, correctAnswer);
+        results[qi] = match;
+        if (match) score++;
+
+        if (!fbGen.stats.questionStats[qi]) {
+          fbGen.stats.questionStats[qi] = { correct: 0, wrong: 0 };
+        }
+        if (match) fbGen.stats.questionStats[qi].correct++;
+        else fbGen.stats.questionStats[qi].wrong++;
+      }
+
+      const attempt: FillBlankAttempt = {
+        date: new Date().toISOString(),
+        answers: answers as Record<number, string>,
+        results,
+        score,
+        total,
+      };
+      fbGen.stats.attempts.push(attempt);
+
+      store.updateGeneration(req.params.pid, req.params.gid, { stats: fbGen.stats } as any);
+      res.json({ attempt, stats: fbGen.stats, results });
+    } catch (e) {
+      console.error('Fill-blank attempt error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -182,9 +241,10 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       const audioUrl = `/output/projects/${req.params.pid}/${audioFilename}`;
 
       if (gen.type === 'summary') {
-        (gen as SummaryGeneration).data.audioUrl = audioUrl;
+        store.updateGeneration(req.params.pid, req.params.gid, {
+          data: { ...(gen as SummaryGeneration).data, audioUrl },
+        } as any);
       }
-      store.updateGeneration(req.params.pid, req.params.gid, gen as any);
 
       res.json({ audioUrl });
     } catch (e) {

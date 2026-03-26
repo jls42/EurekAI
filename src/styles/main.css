@@ -31,6 +31,7 @@
   --color-gen-podcast: var(--color-gen-podcast);
   --color-gen-quizvocal: var(--color-gen-quizvocal);
   --color-gen-image: var(--color-gen-image);
+  --color-gen-fillblank: var(--color-gen-fillblank);
 
   --radius-card: 1.75rem;
   --radius-button: 1.25rem;
@@ -298,6 +299,10 @@ h6 {
 .icon-chip-image {
   background: rgba(var(--color-gen-image-rgb), 0.14);
   border: 1px solid rgba(var(--color-gen-image-rgb), 0.28);
+}
+.icon-chip-fillblank {
+  background: rgba(var(--color-gen-fillblank-rgb), 0.14);
+  border: 1px solid rgba(var(--color-gen-fillblank-rgb), 0.28);
 }
 .icon-chip-chat {
   background: rgba(var(--color-gen-summary-rgb), 0.14);

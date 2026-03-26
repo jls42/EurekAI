@@ -35,86 +35,38 @@
       </div>
     </div>
     <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 mb-3">
-      <button
-        @click="generate('summary')"
-        :disabled="loading.summary"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #0077b6"
+      <template
+        x-for="cat in categories.filter(c => !['dashboard','sources','chat'].includes(c.key))"
+        :key="cat.key"
       >
-        <i x-show="!loading.summary" data-lucide="file-text" class="w-4 h-4"></i>
-        <span
-          x-show="loading.summary"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
-        ></span>
-        <span x-text="loading.summary ? '...' : t('gen.summary')"></span>
-      </button>
-      <button
-        @click="generate('flashcards')"
-        :disabled="loading.flashcards"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #f3722c"
-      >
-        <i x-show="!loading.flashcards" data-lucide="layers" class="w-4 h-4"></i>
-        <span
-          x-show="loading.flashcards"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-flashcards border-t-transparent"
-        ></span>
-        <span x-text="loading.flashcards ? '...' : t('gen.flashcards')"></span>
-      </button>
-      <button
-        @click="generate('quiz')"
-        :disabled="loading.quiz"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #8549ba"
-      >
-        <i x-show="!loading.quiz" data-lucide="brain" class="w-4 h-4"></i>
-        <span
-          x-show="loading.quiz"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-quiz border-t-transparent"
-        ></span>
-        <span x-text="loading.quiz ? '...' : t('gen.quiz')"></span>
-      </button>
-      <button
-        @click="generate('podcast')"
-        :disabled="loading.podcast || !apiStatus.elevenlabs"
-        :title="!apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #2a9d8f"
-      >
-        <i x-show="!loading.podcast" data-lucide="headphones" class="w-4 h-4"></i>
-        <span
-          x-show="loading.podcast"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-podcast border-t-transparent"
-        ></span>
-        <span x-text="loading.podcast ? '...' : t('gen.podcast')"></span>
-      </button>
-      <button
-        @click="generate('quiz-vocal')"
-        :disabled="loading['quiz-vocal'] || !apiStatus.elevenlabs"
-        :title="!apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #e76f51"
-      >
-        <i x-show="!loading['quiz-vocal']" data-lucide="mic" class="w-4 h-4"></i>
-        <span
-          x-show="loading['quiz-vocal']"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-quizvocal border-t-transparent"
-        ></span>
-        <span x-text="loading['quiz-vocal'] ? '...' : t('gen.quiz-vocal')"></span>
-      </button>
-      <button
-        @click="generate('image')"
-        :disabled="loading.image"
-        class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
-        style="color: #e9c46a"
-      >
-        <i x-show="!loading.image" data-lucide="image" class="w-4 h-4"></i>
-        <span
-          x-show="loading.image"
-          class="w-4 h-4 animate-spin rounded-full border-2 border-gen-image border-t-transparent"
-        ></span>
-        <span x-text="loading.image ? '...' : t('gen.image')"></span>
-      </button>
+        <button
+          @click="generate(cat.key)"
+          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs)"
+          :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
+          class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
+          :style="'color:' + cat.color"
+        >
+          <i x-show="!loading[cat.key]" :data-lucide="cat.icon" class="w-4 h-4"></i>
+          <span
+            x-show="loading[cat.key]"
+            class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+          ></span>
+          <span x-text="loading[cat.key] ? '...' : t('gen.' + cat.key)"></span>
+        </button>
+      </template>
+    </div>
+    <div class="flex items-center justify-center gap-2 mb-3">
+      <span class="text-xs text-text-secondary" x-text="t('gen.questionCount')"></span>
+      <template x-for="n in countOptions" :key="n">
+        <button
+          @click="generateCount = n"
+          class="px-2.5 py-1 rounded-badge text-xs font-semibold transition-colors btn-press"
+          :class="generateCount === n
+            ? 'bg-primary text-white'
+            : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          x-text="'~' + n"
+        ></button>
+      </template>
     </div>
     <button
       @click="generateAuto()"
@@ -225,9 +177,9 @@
     </div>
   </div>
 
-  <!-- Consigne de revision detectee -->
+  <!-- Consigne de revision detectee (active) -->
   <div
-    x-show="consigne && consigne.found"
+    x-show="consigne && consigne.found && useConsigne"
     x-transition
     class="mb-4 bg-success-light border border-success/30 rounded-card p-4 animate-slide-up"
   >
@@ -257,6 +209,30 @@
       >
         <i data-lucide="eye" class="w-4 h-4"></i>
       </button>
+      <button
+        @click="useConsigne = false; localStorage.setItem(`consigne-dismissed-${currentProjectId}`, 'true'); showToast(t('consigne.dismissed'), 'info'); $nextTick(() => refreshIcons())"
+        class="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-button text-text-secondary hover:bg-red-100 hover:text-red-600 focus-ring"
+        :title="t('consigne.dismiss')"
+      >
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+  </div>
+
+  <!-- Consigne dismissed — small re-enable banner -->
+  <div
+    x-show="consigne && consigne.found && !useConsigne"
+    x-transition
+    class="mb-4 bg-gray-50 border border-gray-200 rounded-card px-4 py-2.5"
+  >
+    <div class="flex items-center gap-2">
+      <i data-lucide="target" class="w-4 h-4 text-text-secondary shrink-0"></i>
+      <span class="text-sm text-text-secondary flex-1" x-text="t('consigne.dismissedLabel')"></span>
+      <button
+        @click="useConsigne = true; localStorage.removeItem(`consigne-dismissed-${currentProjectId}`); showToast(t('consigne.reEnabled'), 'success'); $nextTick(() => refreshIcons())"
+        class="text-sm font-semibold text-primary hover:text-primary-dark focus-ring rounded px-2 py-1"
+        x-text="t('consigne.reEnable')"
+      ></button>
     </div>
   </div>
 
@@ -323,11 +299,33 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-medium text-body-sm truncate" x-text="src.filename"></span>
-            <span x-show="src.moderation && src.moderation.safe" class="shrink-0">
+            <span
+              x-show="src.moderation?.status === 'safe'"
+              class="shrink-0"
+              :title="t('moderation.safe')"
+            >
               <i data-lucide="shield-check" class="w-4 h-4 text-success"></i>
             </span>
-            <span x-show="src.moderation && !src.moderation.safe" class="shrink-0">
+            <span
+              x-show="src.moderation?.status === 'unsafe'"
+              class="shrink-0"
+              :title="t('moderation.unsafe')"
+            >
               <i data-lucide="shield-alert" class="w-4 h-4 text-danger"></i>
+            </span>
+            <span
+              x-show="src.moderation?.status === 'pending'"
+              class="shrink-0"
+              :title="t('moderation.pending')"
+            >
+              <i data-lucide="loader-circle" class="w-4 h-4 text-primary animate-spin"></i>
+            </span>
+            <span
+              x-show="src.moderation?.status === 'error'"
+              class="shrink-0"
+              :title="t('moderation.error')"
+            >
+              <i data-lucide="shield-x" class="w-4 h-4 text-warning-dark"></i>
             </span>
           </div>
           <p

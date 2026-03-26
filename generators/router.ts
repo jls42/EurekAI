@@ -6,7 +6,7 @@ export interface RoutePlan {
   context: string;
 }
 
-const VALID_AGENTS = ['summary', 'flashcards', 'quiz', 'podcast'];
+const VALID_AGENTS = ['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast'];
 
 export async function routeRequest(
   client: Mistral,
@@ -24,6 +24,7 @@ Agents disponibles:
 - "summary": cree des fiches de revision
 - "flashcards": cree des flashcards question/reponse
 - "quiz": cree un quiz QCM
+- "fill-blank": cree des exercices a trous (phrases avec mots manquants a completer)
 - "podcast": cree un script de podcast educatif
 
 Decide quels agents sont les plus pertinents pour ce contenu. N'appelle QUE ceux qui sont utiles.

@@ -106,8 +106,13 @@
             </button>
           </div>
           <!-- Podcast player + script -->
-          <div x-show="gen.data.audioUrl" class="mb-4">
-            <audio controls class="w-full" :src="gen.data.audioUrl"></audio>
+          <div x-show="gen.data.audioUrl" class="mb-4 max-w-2xl">
+            <audio
+              controls
+              preload="metadata"
+              class="w-full max-w-full"
+              :src="gen.data.audioUrl"
+            ></audio>
           </div>
           <button
             @click="gen._scriptOpen = !gen._scriptOpen"

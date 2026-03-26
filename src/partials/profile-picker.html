@@ -34,13 +34,16 @@
         class="flex flex-wrap justify-center gap-4 mb-6"
       >
         <template x-for="p in profiles" :key="p.id">
-          <!-- NOSONAR(S1082) — Alpine.js @keydown.enter + @keydown.space handlers are equivalent to native onKeyDown -->
           <div
             @click="selectProfile(p.id)"
             role="button"
             tabindex="0"
-            @keydown.enter="selectProfile(p.id)"
-            @keydown.space.prevent="selectProfile(p.id)"
+            onkeydown="
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                this.click();
+              }
+            "
             class="relative group bg-surface rounded-card p-5 shadow-card hover:shadow-float transition-all card-lift btn-press focus-ring text-center cursor-pointer w-48"
           >
             <span

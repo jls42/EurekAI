@@ -1,4 +1,5 @@
 import { t as i18nT, setLocale as i18nSetLocale, getLocale } from '../i18n/index';
+import { setProfileLocale } from './profile-locale';
 
 export function createI18n() {
   return {
@@ -13,12 +14,15 @@ export function createI18n() {
     setLocale(this: any, lang: string, skipProfileSync = false) {
       this.locale = lang;
       i18nSetLocale(lang);
-      // Sync locale to current profile (skip when called from selectProfile to avoid loop)
       if (!skipProfileSync && this.currentProfile) {
         this.currentProfile.locale = lang;
+        setProfileLocale(this.currentProfile.id, lang);
         if (!this.currentProfile.hasPin) {
           this.updateProfile(this.currentProfile.id, { locale: lang });
         }
+      } else if (this.currentProfile) {
+        this.currentProfile.locale = lang;
+        setProfileLocale(this.currentProfile.id, lang);
       }
     },
 

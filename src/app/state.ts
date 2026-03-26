@@ -50,6 +50,7 @@ export function createState() {
     viewSourceMode: 'ocr' as string,
     viewSourceZoom: 1,
     viewSourceRotation: 0,
+    viewSourceRotations: {} as Record<string, number>,
     viewSourceDragging: false,
     viewSourceDragStart: { x: 0, y: 0 },
     viewSourcePanX: 0,
@@ -73,6 +74,8 @@ export function createState() {
     useConsigne: true,
 
     // Generation state
+    generateCount: 10,
+    countOptions: [10, 20, 30, 42, 50],
     generations: [] as any[],
     openGens: {} as Record<string, boolean>,
     editingTitle: null as string | null,
@@ -86,6 +89,7 @@ export function createState() {
       podcast: false,
       'quiz-vocal': false,
       image: false,
+      'fill-blank': false,
       auto: false,
       all: false,
       voice: false,
@@ -161,6 +165,12 @@ export function createState() {
         labelKey: 'nav.podcast',
         icon: 'headphones',
         color: 'var(--color-gen-podcast)',
+      },
+      {
+        key: 'fill-blank',
+        labelKey: 'nav.fill-blank',
+        icon: 'pencil-line',
+        color: 'var(--color-gen-fillblank)',
       },
       { key: 'image', labelKey: 'nav.image', icon: 'image', color: 'var(--color-gen-image)' },
     ],

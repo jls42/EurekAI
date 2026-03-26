@@ -15,10 +15,11 @@ export async function generateFlashcards(
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
+  count?: number,
 ): Promise<Flashcard[]> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: flashcardsSystem(ageGroup) },
-    { role: 'user', content: flashcardsUser(markdown, lang) },
+    { role: 'user', content: flashcardsUser(markdown, count, lang) },
   ];
 
   const response = await client.chat.complete({

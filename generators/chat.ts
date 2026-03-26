@@ -26,6 +26,14 @@ const TOOLS = [
       parameters: { type: 'object', properties: {}, required: [] },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'generate_fill-blank',
+      description: 'Genere des exercices a trous (phrases avec mots manquants a completer)',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
 ];
 
 export interface ChatResult {
@@ -42,7 +50,7 @@ export async function chatWithSources(
   ageGroup: import('../types.js').AgeGroup = 'enfant',
 ): Promise<ChatResult> {
   const docsLabel = lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
-  const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 30000)}`;
+  const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
 
   const apiMessages: any[] = [
     { role: 'system', content: systemContent },

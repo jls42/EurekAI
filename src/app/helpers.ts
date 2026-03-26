@@ -19,6 +19,14 @@ export function createHelpers() {
       return '/api/projects/' + this.currentProjectId;
     },
 
+    iconChipClass(type: string) {
+      const map: Record<string, string> = {
+        'quiz-vocal': 'icon-chip-quizvocal',
+        'fill-blank': 'icon-chip-fillblank',
+      };
+      return map[type] || `icon-chip-${type}`;
+    },
+
     genIcon(type: string) {
       const icons: Record<string, string> = {
         summary: 'file-text',
@@ -27,6 +35,7 @@ export function createHelpers() {
         podcast: 'headphones',
         'quiz-vocal': 'mic',
         image: 'image',
+        'fill-blank': 'pencil-line',
         auto: 'sparkles',
       };
       return icons[type] || 'sparkles';
@@ -144,6 +153,9 @@ export function createHelpers() {
         qs.forEach((q: any) => extract(q.sourceRefs || (q.sourceRef ? [q.sourceRef] : [])));
       } else if (gen.type === 'podcast') {
         extract(gen.data?.sourceRefs);
+      } else if (gen.type === 'fill-blank') {
+        const items = Array.isArray(gen.data) ? gen.data : [];
+        items.forEach((item: any) => extract(item.sourceRefs));
       } else if (gen.type === 'summary') {
         const d = gen.data || {};
         (d.citations || []).forEach((cit: any) => {
@@ -170,6 +182,7 @@ export function createHelpers() {
         podcast: 'var(--color-gen-podcast)',
         'quiz-vocal': 'var(--color-gen-quizvocal)',
         image: 'var(--color-gen-image)',
+        'fill-blank': 'var(--color-gen-fillblank)',
       };
       return colors[type] || 'var(--color-primary)';
     },
@@ -182,16 +195,10 @@ export function createHelpers() {
 
     dashboardStats(this: any) {
       const stats: Record<string, number> = {};
-      for (const cat of [
-        'summary',
-        'flashcards',
-        'quiz',
-        'quiz-vocal',
-        'podcast',
-        'image',
-        'chat',
-      ]) {
-        stats[cat] = this.generations.filter((g: any) => g.type === cat).length;
+      for (const cat of this.categories) {
+        if (!['dashboard', 'sources'].includes(cat.key)) {
+          stats[cat.key] = this.generations.filter((g: any) => g.type === cat.key).length;
+        }
       }
       return stats;
     },
@@ -274,7 +281,6 @@ export function createHelpers() {
     initGenProps(gen: any) {
       gen._audioUrl = gen._audioUrl || null;
       gen._generatingVoice = gen._generatingVoice || false;
-      if (gen.type === 'flashcards') gen._flipped = gen._flipped || {};
       if (gen.type === 'podcast') gen._scriptOpen = false;
     },
   };

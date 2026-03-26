@@ -93,7 +93,7 @@ export function createSources() {
       this.viewSource = src;
       this.viewSourceMode = 'ocr';
       this.viewSourceZoom = 1;
-      this.viewSourceRotation = 0;
+      this.viewSourceRotation = this.viewSourceRotations[src.id] || 0;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
       const dialog = document.querySelector('[x-ref="sourceDialog"]') as HTMLDialogElement;
@@ -114,16 +114,19 @@ export function createSources() {
     resetZoom(this: any) {
       this.viewSourceZoom = 1;
       this.viewSourceRotation = 0;
+      if (this.viewSource) delete this.viewSourceRotations[this.viewSource.id];
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
     rotateLeft(this: any) {
       this.viewSourceRotation -= 90;
+      this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
     rotateRight(this: any) {
       this.viewSourceRotation += 90;
+      this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },

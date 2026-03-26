@@ -46,11 +46,16 @@ export function app() {
         resizeTimeout = setTimeout(() => this.checkMobile(), 150);
       });
 
-      // Global bridge for source badges in rendered HTML
-      (window as any)._openSource = (id: string) => {
-        const src = this.sources.find((s: any) => s.id === id);
+      document.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const badge = target.closest('[data-source-id]');
+        if (!badge) return;
+        const id = badge.getAttribute('data-source-id');
+        if (!id) return;
+        const src = this.sources.find((source: any) => source.id === id);
         if (src) this.openSourceDialog(src);
-      };
+      });
 
       await this.loadProfiles();
       await this.loadConfig();

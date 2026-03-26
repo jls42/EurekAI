@@ -9,6 +9,7 @@ import { getMarkdown } from './generate.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz } from '../generators/quiz.js';
+import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 
@@ -17,6 +18,8 @@ function autoTitle(type: string, data: any, lang = 'fr'): string {
   if (type === 'summary' && data?.title) return `${en ? 'Note' : 'Fiche'} — ${data.title}`;
   if (type === 'flashcards') return `Flashcards (${Array.isArray(data) ? data.length : '?'})`;
   if (type === 'quiz') return `Quiz (${Array.isArray(data) ? data.length : '?'} questions)`;
+  if (type === 'fill-blank')
+    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
   return type;
 }
 
@@ -30,7 +33,8 @@ export function chatRoutes(
   // Send message
   router.post('/:pid/chat', async (req, res) => {
     try {
-      const project = store.getProject(req.params.pid);
+      const pid = req.params.pid;
+      const project = store.getProject(pid);
       if (!project) {
         res.status(404).json({ error: 'Projet introuvable' });
         return;
@@ -57,28 +61,24 @@ export function chatRoutes(
         const categories = MODERATION_CATEGORIES[profile.ageGroup] || [];
         if (categories.length > 0) {
           const modResult = await moderateContent(client, message.trim(), categories);
-          if (!modResult.safe) {
+          if (modResult.status !== 'safe') {
             res.status(400).json({ error: 'chat.moderationBlocked' });
             return;
           }
         }
       }
 
-      // Init chat history
-      if (!project.chat) project.chat = { messages: [] };
-
-      // Add user message
+      const existingMessages = project.chat?.messages ?? [];
       const userMsg: ChatMessage = {
         role: 'user',
         content: message.trim(),
         timestamp: new Date().toISOString(),
       };
-      project.chat.messages.push(userMsg);
-
-      // Cap history at 50 messages
-      if (project.chat.messages.length > 50) {
-        project.chat.messages = project.chat.messages.slice(-50);
-      }
+      const historyForApi = [...existingMessages, userMsg].slice(-50).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+      store.appendChatMessage(pid, userMsg);
 
       // Build context
       const sourceContext =
@@ -87,10 +87,6 @@ export function chatRoutes(
           : 'Aucune source ajoutee pour le moment.';
 
       const config = getConfig();
-      const historyForApi = project.chat.messages.map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
 
       const result = await chatWithSources(
         client,
@@ -104,6 +100,7 @@ export function chatRoutes(
       // Process tool calls — generate content
       const generatedIds: string[] = [];
       const generatedGens: Generation[] = [];
+      const failedTools: string[] = [];
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
         const markdown = getMarkdown(project.sources);
         const sourceIds = project.sources.map((s) => s.id);
@@ -156,16 +153,33 @@ export function chatRoutes(
                 type: 'quiz',
                 data,
               };
+            } else if (type === 'fill-blank') {
+              const data = await generateFillBlank(
+                client,
+                markdown,
+                config.models.quiz,
+                lang,
+                ageGroup,
+              );
+              gen = {
+                id: randomUUID(),
+                title: autoTitle('fill-blank', data, lang),
+                createdAt: new Date().toISOString(),
+                sourceIds,
+                type: 'fill-blank',
+                data,
+              };
             }
 
             if (gen) {
-              store.addGeneration(req.params.pid, gen);
+              store.addGeneration(pid, gen);
               generatedIds.push(gen.id);
               generatedGens.push(gen);
               console.log(`  Chat tool: ${type} generated`);
             }
           } catch (err) {
             console.error(`  Chat tool ${call} failed:`, err);
+            failedTools.push(call);
           }
         }
       }
@@ -177,14 +191,13 @@ export function chatRoutes(
         timestamp: new Date().toISOString(),
         generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
       };
-      project.chat.messages.push(assistantMsg);
-
-      store.saveProject(req.params.pid, project);
+      store.appendChatMessage(pid, assistantMsg);
 
       res.json({
         reply: result.reply,
         generatedIds,
         generations: generatedGens,
+        ...(failedTools.length > 0 && { failedTools }),
       });
     } catch (e) {
       console.error('Chat error:', e);
@@ -209,8 +222,7 @@ export function chatRoutes(
       res.status(404).json({ error: 'Projet introuvable' });
       return;
     }
-    project.chat = { messages: [] };
-    store.saveProject(req.params.pid, project);
+    store.clearChat(req.params.pid);
     res.json({ ok: true });
   });
 

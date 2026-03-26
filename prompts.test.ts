@@ -17,6 +17,8 @@ import {
   podcastSystem,
   PODCAST_SYSTEM,
   podcastUser,
+  fillBlankSystem,
+  fillBlankUser,
   chatSystem,
   websearchInstructions,
   WEBSEARCH_INSTRUCTIONS,
@@ -52,6 +54,7 @@ const systemFns: [string, (ag: AgeGroup) => string][] = [
   ['quizSystem', quizSystem],
   ['quizReviewSystem', quizReviewSystem],
   ['podcastSystem', podcastSystem],
+  ['fillBlankSystem', fillBlankSystem],
 ];
 
 describe('system functions adapt to ageGroup', () => {
@@ -138,6 +141,21 @@ describe('PODCAST', () => {
 
   it('podcastUser inclut le markdown complet', () => {
     expect(podcastUser('b'.repeat(5000)).length).toBeGreaterThan(5000);
+  });
+});
+
+describe('FILL_BLANK', () => {
+  it('fillBlankSystem contient trous', () => {
+    expect(fillBlankSystem('enfant')).toContain('trous');
+  });
+
+  it('fillBlankUser inclut le markdown complet', () => {
+    const md = 'c'.repeat(5000);
+    expect(fillBlankUser(md, 10).length).toBeGreaterThan(5000);
+  });
+
+  it('fillBlankUser inclut le count', () => {
+    expect(fillBlankUser('content', 20)).toContain('20');
   });
 });
 
