@@ -74,6 +74,8 @@ export function createState() {
     useConsigne: true,
 
     // Generation state
+    generateCount: 10,
+    countOptions: [10, 20, 30, 42, 50],
     generations: [] as any[],
     openGens: {} as Record<string, boolean>,
     editingTitle: null as string | null,

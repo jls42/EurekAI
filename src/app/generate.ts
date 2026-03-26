@@ -38,6 +38,7 @@ export function createGenerate() {
           lang: getLocale(),
           ageGroup: this.currentProfile?.ageGroup || 'enfant',
           useConsigne: this.useConsigne,
+          count: this.generateCount,
         };
         const res = await fetch('/api/projects/' + projectId + '/generate/' + type, {
           method: 'POST',
@@ -173,6 +174,7 @@ export function createGenerate() {
           lang: getLocale(),
           ageGroup: this.currentProfile?.ageGroup || 'enfant',
           useConsigne: this.useConsigne,
+          count: this.generateCount,
         };
         const res = await fetch('/api/projects/' + projectId + '/generate/auto', {
           method: 'POST',

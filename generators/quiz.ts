@@ -72,11 +72,12 @@ export async function generateQuiz(
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
+  count?: number,
 ): Promise<QuizQuestion[]> {
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),
-    quizUser(markdown, lang),
+    quizUser(markdown, count, lang),
     'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
@@ -89,11 +90,12 @@ export async function generateQuizVocal(
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
+  count?: number,
 ): Promise<QuizQuestion[]> {
   return generateQuizWithRetry(
     client,
     quizVocalSystem(ageGroup),
-    quizVocalUser(markdown, lang),
+    quizVocalUser(markdown, count, lang),
     'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,

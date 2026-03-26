@@ -55,6 +55,19 @@
         </button>
       </template>
     </div>
+    <div class="flex items-center justify-center gap-2 mb-3">
+      <span class="text-xs text-text-secondary" x-text="t('gen.questionCount')"></span>
+      <template x-for="n in countOptions" :key="n">
+        <button
+          @click="generateCount = n"
+          class="px-2.5 py-1 rounded-badge text-xs font-semibold transition-colors btn-press"
+          :class="generateCount === n
+            ? 'bg-primary text-white'
+            : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          x-text="'~' + n"
+        ></button>
+      </template>
+    </div>
     <button
       @click="generateAuto()"
       :disabled="isGenerating()"

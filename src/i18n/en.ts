@@ -23,6 +23,7 @@ export const en: Record<string, string> = {
   'gen.quiz-vocal': 'Vocal Quiz',
   'gen.fill-blank': 'Fill-in-the-blanks',
   'gen.image': 'Image',
+  'gen.questionCount': 'Count:',
   'gen.needsElevenLabs': 'Requires an ElevenLabs API key',
 
   'header.menuProjects': 'Projects menu',

@@ -84,6 +84,7 @@ interface GenContext {
   config: ReturnType<typeof getConfig>;
   hasConsigne: boolean;
   sourceIds: string[];
+  count?: number;
   pid: string;
   req: Request;
   res: Response;
@@ -115,6 +116,7 @@ function handleGeneration(
       const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
       const sourceIds = resolveSourceIds(req.body, project.sources);
+      const count = req.body.count ? Number(req.body.count) : undefined;
 
       const gen = await generatorFn({
         project,
@@ -125,6 +127,7 @@ function handleGeneration(
         config,
         hasConsigne,
         sourceIds,
+        count,
         pid,
         req,
         res,
@@ -185,6 +188,7 @@ export function generateRoutes(
         ctx.config.models.flashcards,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       return {
         id: randomUUID(),
@@ -206,6 +210,7 @@ export function generateRoutes(
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       return {
         id: randomUUID(),
@@ -298,6 +303,7 @@ export function generateRoutes(
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       console.log(`  Quiz OK: ${data.length} questions`);
 
@@ -367,6 +373,7 @@ export function generateRoutes(
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
+        ctx.count,
       );
       return {
         id: randomUUID(),
@@ -399,6 +406,7 @@ export function generateRoutes(
       const markdown = useConsigneAuto ? applyConsigne(rawAutoMarkdown, project.consigne) : rawAutoMarkdown;
       const hasConsigne = useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
+      const count = req.body.count ? Number(req.body.count) : undefined;
 
       console.log('  Smart routing: analyzing content...');
       const route = await routeRequest(client, markdown);
@@ -434,6 +442,7 @@ export function generateRoutes(
               config.models.flashcards,
               lang,
               ageGroup,
+              count,
             );
             gen = {
               id: randomUUID(),
@@ -444,7 +453,7 @@ export function generateRoutes(
               data,
             };
           } else if (step.agent === 'quiz') {
-            const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup);
+            const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup, count);
             gen = {
               id: randomUUID(),
               title: autoTitle('quiz', data, lang),
@@ -460,6 +469,7 @@ export function generateRoutes(
               config.models.quiz,
               lang,
               ageGroup,
+              count,
             );
             gen = {
               id: randomUUID(),

@@ -99,8 +99,8 @@ Reponds UNIQUEMENT en JSON valide.`;
 // Legacy export
 export const FLASHCARDS_SYSTEM = flashcardsSystem('enfant');
 
-export function flashcardsUser(markdown: string, lang = 'fr'): string {
-  return `Genere 5 flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+export function flashcardsUser(markdown: string, count = 5, lang = 'fr'): string {
+  return `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
 }
 
 // ── Quiz ─────────────────────────────────────────────────────────────
@@ -137,8 +137,8 @@ ${VOCAL_REWRITE}
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
-export function quizVocalUser(markdown: string, lang = 'fr'): string {
-  return `Genere entre 10 et 20 questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+export function quizVocalUser(markdown: string, count = 15, lang = 'fr'): string {
+  return `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
 Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
 
@@ -150,8 +150,8 @@ Format JSON :
 Contenu :\n\n${markdown}${langInstruction(lang)}`;
 }
 
-export function quizUser(markdown: string, lang = 'fr'): string {
-  return `Genere entre 10 et 20 questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+export function quizUser(markdown: string, count = 15, lang = 'fr'): string {
+  return `Genere exactement ${count} questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
 Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
 
