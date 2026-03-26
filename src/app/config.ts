@@ -13,11 +13,16 @@ export function createConfig() {
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
         if (statusRes.ok) this.apiStatus = await statusRes.json();
-        // Load Mistral voices for settings UI
-        try {
-          const voicesRes = await fetch('/api/config/voices');
-          if (voicesRes.ok) this.mistralVoicesList = await voicesRes.json();
-        } catch {}
+        // Load Mistral voices filtered by current profile locale
+        await this.loadMistralVoices();
+      } catch {}
+    },
+
+    async loadMistralVoices(this: any) {
+      try {
+        const lang = this.currentProfile?.locale || 'fr';
+        const voicesRes = await fetch(`/api/config/voices?lang=${lang}`);
+        if (voicesRes.ok) this.mistralVoicesList = await voicesRes.json();
       } catch {}
     },
 
@@ -43,7 +48,7 @@ export function createConfig() {
           this.configDraft.ttsModel = 'voxtral-mini-tts-2603';
         } else if (
           this.configDraft.ttsProvider === 'elevenlabs' &&
-          this.configDraft.ttsModel.startsWith('mistral-tts')
+          this.configDraft.ttsModel.startsWith('voxtral')
         ) {
           this.configDraft.ttsModel = 'eleven_v3';
         }

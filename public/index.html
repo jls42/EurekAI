@@ -3992,7 +3992,7 @@
                   <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1">Voice Host</label>
                   <select id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host" class="w-full input-modern px-3 py-2 text-body-sm">
                     <template x-for="v in mistralVoicesList" :key="v.id">
-                      <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.host"></option>
+                      <option :value="v.id" x-text="v.name + ' (' + (v.languages?.[0] || '?') + ')'" :selected="v.id === configDraft.mistralVoices.host"></option>
                     </template>
                   </select>
                 </div>
@@ -4000,7 +4000,7 @@
                   <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1">Voice Guest</label>
                   <select id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest" class="w-full input-modern px-3 py-2 text-body-sm">
                     <template x-for="v in mistralVoicesList" :key="v.id">
-                      <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.guest"></option>
+                      <option :value="v.id" x-text="v.name + ' (' + (v.languages?.[0] || '?') + ')'" :selected="v.id === configDraft.mistralVoices.guest"></option>
                     </template>
                   </select>
                 </div>

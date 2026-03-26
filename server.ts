@@ -55,10 +55,12 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
-app.get('/api/config/voices', async (_req, res) => {
+app.get('/api/config/voices', async (req, res) => {
   try {
-    const result = await client.audio.voices.list({ limit: 100 });
-    res.json(result.items ?? []);
+    const lang = req.query.lang as string | undefined;
+    const { listVoices } = await import('./generators/tts-provider.js');
+    const voices = await listVoices(client, lang);
+    res.json(voices);
   } catch (e) {
     console.error('List voices error:', e);
     res.json([]);

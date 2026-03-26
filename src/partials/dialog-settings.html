@@ -181,7 +181,7 @@
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="v.id">
-                  <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.host"></option>
+                  <option :value="v.id" x-text="v.name + ' (' + (v.languages?.[0] || '?') + ')'" :selected="v.id === configDraft.mistralVoices.host"></option>
                 </template>
               </select>
             </div>
@@ -195,7 +195,7 @@
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="v.id">
-                  <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.guest"></option>
+                  <option :value="v.id" x-text="v.name + ' (' + (v.languages?.[0] || '?') + ')'" :selected="v.id === configDraft.mistralVoices.guest"></option>
                 </template>
               </select>
             </div>
