@@ -12,7 +12,7 @@ export function normalizeAnswer(text: string): string {
       .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .replace(/\s+/g, ' ')
-      .replace(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''),
+      .replace(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''), // NOSONAR(S5852) — simple char-class alternation anchored to start/end, no backtracking risk
   );
 }
 
@@ -32,6 +32,10 @@ function levenshtein(a: string, b: string): number {
     }
   }
   return dp[m][n];
+}
+
+export function validateAnswer(childAnswer: string, correctAnswer: string): boolean {
+  return validateFillBlankAnswer(childAnswer, correctAnswer).match;
 }
 
 export function validateFillBlankAnswer(

@@ -6,6 +6,7 @@ import { resolve } from 'path';
 export default defineConfig({
   plugins: [tailwindcss(), handlebars({ partialDirectory: resolve(__dirname, 'src/partials') })],
   root: 'src',
+  resolve: { alias: { '@helpers': resolve(__dirname, 'helpers') } },
   publicDir: resolve(__dirname, 'public/assets'),
   build: { outDir: '../dist' },
   server: {

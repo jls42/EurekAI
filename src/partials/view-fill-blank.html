@@ -46,69 +46,7 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('fill-blank')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-fillblank animate-slide-up">
-        <!-- Collapse header -->
-        <div
-          role="button"
-          tabindex="0"
-          @click="toggleGen(gen.id)"
-          @keydown.enter="toggleGen(gen.id)"
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors focus-ring text-left cursor-pointer"
-          :aria-expanded="openGens[gen.id] ? 'true' : 'false'"
-        >
-          <span class="icon-chip icon-chip-fillblank shrink-0"
-            ><i data-lucide="pencil-line" class="w-4 h-4 text-gen-fillblank"></i
-          ></span>
-          <div class="flex-1 min-w-0">
-            <template x-if="editingTitle !== gen.id">
-              <span
-                class="font-semibold text-body-sm text-text-primary truncate block"
-                x-text="gen.title"
-                @dblclick.stop="startEditTitle(gen)"
-              ></span>
-            </template>
-            <template x-if="editingTitle === gen.id">
-              <input
-                x-model="editTitleValue"
-                @click.stop
-                @keydown.enter="saveTitle(gen)"
-                @keydown.escape="editingTitle = null"
-                @blur="saveTitle(gen)"
-                class="w-full border-2 border-primary rounded-button px-2 py-0.5 text-body-sm focus-ring"
-                x-ref="titleInput"
-              />
-            </template>
-            <span
-              class="text-sm text-text-secondary"
-              x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
-            ></span>
-          </div>
-          <template x-if="gen.stats && gen.stats.attempts.length > 0">
-            <span
-              class="text-xs px-2.5 py-1 rounded-badge font-bold shrink-0"
-              :class="gen.stats.attempts[gen.stats.attempts.length-1].score === gen.stats.attempts[gen.stats.attempts.length-1].total ? 'bg-success-light text-success-dark' : 'bg-warning-light text-warning-dark'"
-              x-text="gen.stats.attempts[gen.stats.attempts.length-1].score + '/' + gen.stats.attempts[gen.stats.attempts.length-1].total"
-            ></span>
-          </template>
-          <button
-            @click.stop="startEditTitle(gen)"
-            class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded shrink-0"
-            :aria-label="t('common.rename')"
-          >
-            <i data-lucide="pencil" class="w-4 h-4"></i>
-          </button>
-          <button
-            @click.stop="confirmDelete('generation', () => deleteGen(gen))"
-            class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded shrink-0"
-            :aria-label="t('common.delete')"
-          >
-            <i data-lucide="trash-2" class="w-4 h-4"></i>
-          </button>
-          <i
-            data-lucide="chevron-down"
-            class="w-5 h-5 text-text-secondary shrink-0 transition-transform"
-            :class="openGens[gen.id] && 'rotate-180'"
-          ></i>
-        </div>
+        {{> gen-card-header icon="pencil-line" chipClass="icon-chip-fillblank" colorClass="gen-fillblank" hasScore=true}}
 
         <!-- Expanded content -->
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
@@ -320,24 +258,7 @@
               </div>
             </template>
 
-            <!-- Source references -->
-            <div
-              x-show="gen.sourceIds && gen.sourceIds.length > 0"
-              class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100"
-            >
-              <span class="text-sm text-text-secondary flex items-center gap-1">
-                <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                <span x-text="t('common.sources') + ' :'"></span>
-              </span>
-              <template x-for="(src, srcIdx) in genSources(gen)" :key="src.id">
-                <button
-                  @click.stop="openSourceDialog(src)"
-                  :class="['source-badge', !isSourceReferenced(gen, srcIdx) && 'source-badge-dim']"
-                  :title="src.filename"
-                  x-text="srcIdx + 1"
-                ></button>
-              </template>
-            </div>
+            {{> gen-source-refs}}
           </div>
         </div>
       </div>

@@ -1,0 +1,18 @@
+<!-- Source references (shared partial) -->
+<div
+  x-show="gen.sourceIds && gen.sourceIds.length > 0"
+  class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100"
+>
+  <span class="text-sm text-text-secondary flex items-center gap-1">
+    <i data-lucide="book-open" class="w-3.5 h-3.5"></i>
+    <span x-text="t('common.sources') + ' :'"></span>
+  </span>
+  <template x-for="(src, srcIdx) in genSources(gen)" :key="src.id">
+    <button
+      @click.stop="openSourceDialog(src)"
+      :class="['source-badge', !isSourceReferenced(gen, srcIdx) && 'source-badge-dim']"
+      :title="src.filename"
+      x-text="srcIdx + 1"
+    ></button>
+  </template>
+</div>

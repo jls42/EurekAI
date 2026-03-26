@@ -2,9 +2,9 @@ const UNSAFE_PROTOCOL_RE = /^(?:javascript|vbscript|data):/i;
 const EXPLICIT_PROTOCOL_RE = /^[a-z][a-z0-9+.-]*:/i;
 const BLOCKED_TAG_RE =
   /<\/?(?:script|style|iframe|object|embed|link|meta|form|input|textarea|select|option)[^>]*>/gi;
-const EVENT_HANDLER_RE = /\s+on[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
-const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi;
-const URL_ATTR_RE = /\s+(href|src|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi;
+const EVENT_HANDLER_RE = /\s+on[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
+const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
+const URL_ATTR_RE = /\s+(href|src|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
 
 export function escapeMarkdownHtml(content: string): string {
   return content.replace(/</g, '&lt;').replace(/>/g, '&gt;');
