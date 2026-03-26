@@ -18,6 +18,11 @@ const DEFAULT_CONFIG: AppConfig = {
     guest: { id: 'sANWqF1bCMzR6eyZbCGw', name: 'Marie' },
   },
   ttsModel: 'eleven_v3',
+  ttsProvider: 'elevenlabs',
+  mistralVoices: {
+    host: 'Oliver',
+    guest: 'Marie',
+  },
 };
 
 let configPath: string;
@@ -35,6 +40,7 @@ export function initConfig(outputDir: string): void {
         ...saved,
         models: { ...DEFAULT_CONFIG.models, ...saved.models },
         voices: { ...DEFAULT_CONFIG.voices, ...saved.voices },
+        mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
       };
     } catch {
       currentConfig = { ...DEFAULT_CONFIG };
@@ -58,13 +64,23 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.ttsModel) {
     currentConfig.ttsModel = partial.ttsModel;
   }
+  if (partial.ttsProvider) {
+    currentConfig.ttsProvider = partial.ttsProvider;
+  }
+  if (partial.mistralVoices) {
+    currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
+  }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   return currentConfig;
 }
 
-export function getApiStatus(): { mistral: boolean; elevenlabs: boolean } {
+export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean } {
+  const config = currentConfig ?? DEFAULT_CONFIG;
+  const hasMistral = !!process.env.MISTRAL_API_KEY;
+  const hasElevenlabs = !!process.env.ELEVENLABS_API_KEY;
   return {
-    mistral: !!process.env.MISTRAL_API_KEY,
-    elevenlabs: !!process.env.ELEVENLABS_API_KEY,
+    mistral: hasMistral,
+    elevenlabs: hasElevenlabs,
+    ttsAvailable: config.ttsProvider === 'mistral' ? hasMistral : hasElevenlabs,
   };
 }

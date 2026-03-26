@@ -1,27 +1,16 @@
 import { Mistral } from '@mistralai/mistralai';
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { safeParseJson } from '../helpers/index.js';
-import { collectStream } from '../helpers/audio.js';
+import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { langInstruction } from '../prompts.js';
 import type { QuizQuestion } from '../types.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
   voiceId: string,
-  ttsModel: string,
+  ttsOptions: TtsOptions,
 ): Promise<Buffer> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error('ELEVENLABS_API_KEY non defini');
-
-  const client = new ElevenLabsClient({ apiKey });
   const text = `${question.question} ${question.choices.join('. ')}`;
-
-  const audioStream = await client.textToSpeech.convert(voiceId, {
-    text,
-    modelId: ttsModel,
-    outputFormat: 'mp3_44100_128',
-  });
-  return collectStream(audioStream as any);
+  return textToSpeech(text, voiceId, ttsOptions);
 }
 
 export async function transcribeAudio(

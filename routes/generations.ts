@@ -3,7 +3,6 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import type {
   QuizGeneration,
   QuizAttempt,
@@ -15,7 +14,7 @@ import type {
 import type { ProjectStore } from '../store.js';
 import { getConfig } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
-import { collectStream } from '../helpers/audio.js';
+import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -205,12 +204,6 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         return;
       }
 
-      const apiKey = process.env.ELEVENLABS_API_KEY;
-      if (!apiKey) {
-        res.status(400).json({ error: 'ELEVENLABS_API_KEY non defini' });
-        return;
-      }
-
       let text = '';
       if (gen.type === 'summary') {
         const d = (gen as SummaryGeneration).data;
@@ -227,13 +220,15 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       }
 
       const config = getConfig();
-      const ttsClient = new ElevenLabsClient({ apiKey });
-      const audioStream = await ttsClient.textToSpeech.convert(config.voices.host.id, {
-        text: text.slice(0, 5000),
-        modelId: config.ttsModel,
-        outputFormat: 'mp3_44100_128',
+      const voiceId =
+        config.ttsProvider === 'mistral'
+          ? config.mistralVoices.host
+          : config.voices.host.id;
+      const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, {
+        provider: config.ttsProvider,
+        model: config.ttsModel,
+        mistralClient: client,
       });
-      const audioBuffer = await collectStream(audioStream as any);
 
       const audioFilename = `read-aloud-${gen.id.slice(0, 8)}-${Date.now()}.mp3`;
       const projectDir = store.getProjectDir(req.params.pid);

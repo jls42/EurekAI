@@ -30,6 +30,18 @@ export function createConfig() {
           chat: mainModel,
           ocr: 'mistral-ocr-latest',
         };
+        // Set default TTS model when switching providers
+        if (
+          this.configDraft.ttsProvider === 'mistral' &&
+          this.configDraft.ttsModel.startsWith('eleven')
+        ) {
+          this.configDraft.ttsModel = 'mistral-tts-latest';
+        } else if (
+          this.configDraft.ttsProvider === 'elevenlabs' &&
+          this.configDraft.ttsModel.startsWith('mistral-tts')
+        ) {
+          this.configDraft.ttsModel = 'eleven_v3';
+        }
         const res = await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -39,6 +51,9 @@ export function createConfig() {
           const saved = await res.json();
           this.configDraft = JSON.parse(JSON.stringify(saved));
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
+          // Reload API status (ttsAvailable may have changed)
+          const statusRes = await fetch('/api/config/status');
+          if (statusRes.ok) this.apiStatus = await statusRes.json();
           this.$refs.settingsDialog?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         }

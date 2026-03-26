@@ -101,11 +101,13 @@ export function createState() {
 
     // Settings
     showSettings: false,
-    apiStatus: { mistral: false, elevenlabs: false },
+    apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
       voices: { host: { id: '', name: '' }, guest: { id: '', name: '' } },
       ttsModel: '',
+      ttsProvider: 'elevenlabs' as string,
+      mistralVoices: { host: 'Oliver', guest: 'Marie' },
     },
 
     // Theme

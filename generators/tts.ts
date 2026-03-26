@@ -4,21 +4,15 @@ import { writeFile, readFile, unlink, mkdtemp } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import ffmpegPath from 'ffmpeg-static';
-import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { collectStream } from '../helpers/audio.js';
+import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
 
 const execFileAsync = promisify(execFile);
 
 export interface TtsVoiceConfig {
-  host: { id: string; name: string };
-  guest: { id: string; name: string };
+  host: string;
+  guest: string;
 }
-
-const DEFAULT_VOICES: TtsVoiceConfig = {
-  host: { id: 'JdwJ7jL68CWmQZuo7KgG', name: 'Voix info IA' },
-  guest: { id: 'sANWqF1bCMzR6eyZbCGw', name: 'Marie' },
-};
 
 async function concatMp3(segments: Buffer[]): Promise<Buffer> {
   if (segments.length === 1) return segments[0];
@@ -64,24 +58,14 @@ async function concatMp3(segments: Buffer[]): Promise<Buffer> {
 
 export async function generateAudio(
   script: PodcastLine[],
-  ttsModel = 'eleven_v3',
-  voices?: TtsVoiceConfig,
+  voices: TtsVoiceConfig,
+  ttsOptions: TtsOptions,
 ): Promise<Buffer> {
-  const apiKey = process.env.ELEVENLABS_API_KEY;
-  if (!apiKey) throw new Error('ELEVENLABS_API_KEY non defini');
-
-  const v = voices ?? DEFAULT_VOICES;
-  const client = new ElevenLabsClient({ apiKey });
   const segments: Buffer[] = [];
 
   for (const line of script) {
-    const voice = line.speaker === 'host' ? v.host : v.guest;
-    const audioStream = await client.textToSpeech.convert(voice.id, {
-      text: line.text,
-      modelId: ttsModel,
-      outputFormat: 'mp3_44100_128',
-    });
-    const audioBytes = await collectStream(audioStream as any);
+    const voiceId = line.speaker === 'host' ? voices.host : voices.guest;
+    const audioBytes = await textToSpeech(line.text, voiceId, ttsOptions);
     segments.push(audioBytes);
   }
 

@@ -25,6 +25,7 @@ export const en: Record<string, string> = {
   'gen.image': 'Image',
   'gen.questionCount': 'Count:',
   'gen.needsElevenLabs': 'Requires an ElevenLabs API key',
+  'gen.needsTts': 'Requires a configured TTS provider',
 
   'header.menuProjects': 'Projects menu',
   'header.switchToLight': 'Switch to light mode',
@@ -79,8 +80,10 @@ export const en: Record<string, string> = {
   'settings.aiModelHint': 'Used for notes, flashcards, quiz, podcast and chat',
   'settings.recommended': 'Recommended',
   'settings.voiceTts': 'Voice & TTS',
+  'settings.ttsProvider': 'TTS Provider',
   'settings.ttsModel': 'TTS Model',
-  'settings.ttsModelHint': 'ElevenLabs text-to-speech model',
+  'settings.ttsModelHint': 'Text-to-speech model',
+  'settings.mistralVoicesHint': 'Mistral voices: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Note',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -218,6 +221,7 @@ export const en: Record<string, string> = {
   'podcast.lines': '({count} lines)',
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noElevenLabs': 'Configure ELEVENLABS_API_KEY in your .env file to enable audio podcasts',
+  'podcast.noTts': 'Configure a TTS provider (Mistral or ElevenLabs) to enable audio podcasts',
 
   // Image view
   'image.heading': 'Illustrations',

@@ -40,7 +40,7 @@ export async function moderateContent(
   let categories: Record<string, boolean> = {};
 
   for (const chunk of chunks) {
-    const response = await (client.classifiers as any).moderate({
+    const response = await client.classifiers.moderate({
       model: 'mistral-moderation-latest',
       inputs: [chunk],
     });

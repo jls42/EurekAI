@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.36.0",
-    "@mistralai/mistralai": "^1.14.0",
+    "@mistralai/mistralai": "^2.1.2",
     "alpinejs": "^3.15.8",
     "dotenv": "^16.4.0",
     "express": "^4.21.0",

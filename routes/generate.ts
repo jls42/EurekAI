@@ -238,10 +238,13 @@ export function generateRoutes(
       console.log(`  Script OK: ${podcastResult.script.length} lines`);
 
       console.log('  Generating audio...');
+      const voices = ctx.config.ttsProvider === 'mistral'
+        ? ctx.config.mistralVoices
+        : { host: ctx.config.voices.host.id, guest: ctx.config.voices.guest.id };
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        ctx.config.ttsModel,
-        ctx.config.voices,
+        voices,
+        { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client },
       );
       const audioFilename = `podcast-${Date.now()}.mp3`;
       const projectDir = store.getProjectDir(ctx.pid);
@@ -311,11 +314,15 @@ export function generateRoutes(
       console.log('  Generating TTS for each question...');
       const audioUrls: string[] = [];
       const projectDir = store.getProjectDir(ctx.pid);
+      const hostVoice = ctx.config.ttsProvider === 'mistral'
+        ? ctx.config.mistralVoices.host
+        : ctx.config.voices.host.id;
+      const ttsOpts = { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client } as const;
       for (let i = 0; i < data.length; i++) {
         const audioBuffer = await ttsQuestion(
           data[i],
-          ctx.config.voices.host.id,
-          ctx.config.ttsModel,
+          hostVoice,
+          ttsOpts,
         );
         const audioFilename = `quiz-vocal-q${i}-${Date.now()}.mp3`;
         writeFileSync(join(projectDir, audioFilename), audioBuffer);
@@ -490,10 +497,13 @@ export function generateRoutes(
               lang,
               ageGroup,
             );
+            const autoVoices = config.ttsProvider === 'mistral'
+              ? config.mistralVoices
+              : { host: config.voices.host.id, guest: config.voices.guest.id };
             const audioBuffer = await generateAudio(
               podcastResult.script,
-              config.ttsModel,
-              config.voices,
+              autoVoices,
+              { provider: config.ttsProvider, model: config.ttsModel, mistralClient: client },
             );
             const audioFilename = `podcast-${Date.now()}.mp3`;
             const projectDir = store.getProjectDir(req.params.pid);
