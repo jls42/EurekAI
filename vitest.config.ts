@@ -4,5 +4,12 @@ export default defineConfig({
     globals: true,
     include: ['**/*.test.ts'],
     exclude: ['node_modules', 'dist', 'public'],
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'lcov'],
+      reportsDirectory: 'coverage',
+      include: ['src/**/*.ts', 'routes/**/*.ts', 'generators/**/*.ts', 'helpers/**/*.ts', '*.ts'],
+      exclude: ['**/*.test.ts', 'src/i18n/**', 'node_modules/**', 'dist/**', 'vitest.config.ts', 'vite.config.ts', 'vite-env.d.ts', 'src/env.d.ts'],
+    },
   },
 });

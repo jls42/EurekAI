@@ -1,6 +1,8 @@
 node_modules/
 dist/
 output/
+coverage/
+.scannerwork/
 .env
 *.mp3
 *.mp4
