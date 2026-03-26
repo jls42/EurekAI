@@ -50,6 +50,7 @@ export function createState() {
     viewSourceMode: 'ocr' as string,
     viewSourceZoom: 1,
     viewSourceRotation: 0,
+    viewSourceRotations: {} as Record<string, number>,
     viewSourceDragging: false,
     viewSourceDragStart: { x: 0, y: 0 },
     viewSourcePanX: 0,

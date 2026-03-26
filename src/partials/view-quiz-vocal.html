@@ -80,12 +80,19 @@
               <div class="flex items-center gap-2 mb-3">
                 <span
                   class="text-body-sm font-semibold text-gen-quizvocal"
-                  x-text="t('quiz.questionOf', { current: currentQ + 1, total: questions().length })"
+                  x-text="t('quiz.questionOf', { current: currentQ + 1, total: total() })"
                 ></span>
                 <span
                   class="text-sm bg-gen-quizvocal/10 text-gen-quizvocal px-2.5 py-1 rounded-badge font-semibold"
                   x-text="t('quiz.score', { score: score })"
                 ></span>
+              </div>
+              <!-- Progress bar -->
+              <div class="h-2 rounded-full bg-gray-200 mb-4">
+                <div
+                  class="h-2 rounded-full bg-gen-quizvocal transition-all duration-500"
+                  :style="'width:' + progress() + '%'"
+                ></div>
               </div>
               <div class="bg-gray-50 rounded-card p-4 mb-4">
                 <p
@@ -173,12 +180,12 @@
             <div class="text-center py-8">
               <p
                 class="font-heading font-bold text-3xl mb-2"
-                :class="score === questions().length ? 'text-success-dark' : 'text-warning-dark'"
-                x-text="score + '/' + questions().length"
+                :class="score === total() ? 'text-success-dark' : 'text-warning-dark'"
+                x-text="score + '/' + total()"
               ></p>
               <p
                 class="text-text-primary text-body-sm mb-4"
-                x-text="score === questions().length ? t('quiz.perfect') : t('quiz.keepGoing')"
+                x-text="score === total() ? t('quiz.perfect') : t('quiz.keepGoing')"
               ></p>
               <button
                 @click="resetVocalQuiz()"

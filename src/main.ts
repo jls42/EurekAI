@@ -8,6 +8,7 @@ import { app } from './app/index';
 import { quizComponent } from './components/quiz';
 import { quizVocalComponent } from './components/quiz-vocal';
 import { fillBlankComponent } from './components/fill-blank';
+import { flashcardsComponent } from './components/flashcards';
 
 // Register i18n locales before Alpine starts
 registerLocale('fr', fr);
@@ -18,6 +19,7 @@ Alpine.data('app', app);
 Alpine.data('quizComponent', quizComponent);
 Alpine.data('quizVocalComponent', quizVocalComponent);
 Alpine.data('fillBlankComponent', fillBlankComponent);
+Alpine.data('flashcardsComponent', flashcardsComponent);
 
 Alpine.start();
 

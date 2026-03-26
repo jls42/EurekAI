@@ -43,17 +43,5 @@ export function createRender() {
       return r;
     },
 
-    flashcardsData(gen: any) {
-      return gen.data || [];
-    },
-
-    toggleFlip(gen: any, idx: number) {
-      if (!gen._flipped) gen._flipped = {};
-      gen._flipped[idx] = !gen._flipped[idx];
-    },
-
-    isFlipped(gen: any, idx: number) {
-      return gen._flipped && gen._flipped[idx];
-    },
-  };
+};
 }

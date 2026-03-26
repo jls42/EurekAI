@@ -281,7 +281,6 @@ export function createHelpers() {
     initGenProps(gen: any) {
       gen._audioUrl = gen._audioUrl || null;
       gen._generatingVoice = gen._generatingVoice || false;
-      if (gen.type === 'flashcards') gen._flipped = gen._flipped || {};
       if (gen.type === 'podcast') gen._scriptOpen = false;
     },
   };

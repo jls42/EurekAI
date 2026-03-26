@@ -159,6 +159,9 @@ export const en: Record<string, string> = {
   'flashcards.emptyTitle': 'No flashcards yet',
   'flashcards.emptyWithSources': 'Click New flashcards to get started',
   'flashcards.tapToFlip': 'Tap to flip',
+  'flashcards.flip': 'Flip',
+  'flashcards.knew': 'I knew it',
+  'flashcards.didntKnow': "I didn't know",
 
   'quiz.heading': 'Quiz',
   'quiz.new': 'New quiz',
@@ -235,6 +238,12 @@ export const en: Record<string, string> = {
   'fillBlank.retryWrong': 'Fix my mistakes',
   'fillBlank.restart': 'Start over',
   'fillBlank.correctAnswer': 'Answer: {answer}',
+
+  // Step-by-step (shared)
+  'step.questionOf': 'Exercise {current}/{total}',
+  'step.check': 'Check',
+  'step.next': 'Next',
+  'step.retryWrong': 'Retry mistakes',
 
   'consigne.title': 'Study instructions',
   'consigne.subtitle': 'Generations will focus on these points',

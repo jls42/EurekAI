@@ -1,20 +1,18 @@
+import { stepByStep } from './step-by-step';
+
 export function quizVocalComponent(gen: any) {
   return {
-    gen,
-    currentQ: 0,
+    ...stepByStep(gen),
     audioPlaying: false,
     vocalRecording: false,
     vocalRecorder: null as MediaRecorder | null,
-    feedback: null as any,
-    score: 0,
-    finished: false,
 
     questions() {
-      return this.gen.data || [];
+      return this.items();
     },
 
-    currentAudioUrl() {
-      return this.gen.audioUrls?.[this.currentQ] || '';
+    currentAudioUrl(this: any) {
+      return this.gen.audioUrls?.[this.currentIndex()] || '';
     },
 
     questionAudio(this: any): HTMLAudioElement | null {
@@ -70,11 +68,11 @@ export function quizVocalComponent(gen: any) {
 
     async submitVocalAnswer(this: any, blob: Blob) {
       const pid = this.currentProjectId;
-      this.feedback = { loading: true };
+      this.feedback = { loading: true, correct: false };
       try {
         const formData = new FormData();
         formData.append('audio', blob, 'answer.webm');
-        formData.append('questionIndex', String(this.currentQ));
+        formData.append('questionIndex', String(this.currentIndex()));
         formData.append('lang', document.documentElement.lang || 'fr');
         const res = await fetch(
           '/api/projects/' + pid + '/generations/' + this.gen.id + '/vocal-answer',
@@ -82,7 +80,7 @@ export function quizVocalComponent(gen: any) {
         );
         if (res.ok) {
           const result = await res.json();
-          this.feedback = result;
+          this.feedback = { correct: result.correct, ...result };
           if (result.correct) this.score++;
         } else {
           this.feedback = {
@@ -100,23 +98,26 @@ export function quizVocalComponent(gen: any) {
       }
     },
 
+    // Override nextQuestion to stop audio before advancing
     nextQuestion(this: any) {
       this.stopQuestion();
       this.feedback = null;
       this.currentQ++;
-      if (this.currentQ >= this.questions().length) {
+      if (this.currentQ >= this.total()) {
         this.finished = true;
+        this.onFinish?.();
       } else {
         this.$nextTick(() => this.playQuestion());
       }
     },
 
+    onFinish() {
+      // Score displayed on finished screen, no backend persist
+    },
+
     resetVocalQuiz(this: any) {
       this.stopQuestion();
-      this.currentQ = 0;
-      this.score = 0;
-      this.finished = false;
-      this.feedback = null;
+      this.resetAll();
       this.$nextTick(() => this.playQuestion());
     },
   };

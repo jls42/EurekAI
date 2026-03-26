@@ -1,40 +1,41 @@
+import { stepByStep } from './step-by-step';
+import { validateAnswer } from './fill-blank-validate';
+
 export function fillBlankComponent(gen: any) {
   return {
-    gen,
+    ...stepByStep(gen),
+    answer: '',
     answers: {} as Record<number, string>,
-    results: null as Record<number, boolean> | null,
-    submitted: false,
-    showHint: {} as Record<number, boolean>,
+    results: {} as Record<number, boolean>,
+    showHint: false,
 
-    initFillBlank() {
-      this.answers = {};
-      this.results = null;
-      this.submitted = false;
-      this.showHint = {};
+    currentExercise() {
+      return this.items()[this.currentIndex()];
     },
 
-    exercises() {
-      return this.gen.data || [];
+    checkAnswer(this: any) {
+      const idx = this.currentIndex();
+      const ex = this.currentExercise();
+      const correct = validateAnswer(this.answer, ex.answer);
+      this.answers[idx] = this.answer;
+      this.results[idx] = correct;
+      if (correct) this.score++;
+      this.feedback = { correct, correctAnswer: ex.answer };
     },
 
-    toggleHint(qi: number) {
-      this.showHint[qi] = !this.showHint[qi];
+    onNextReady(this: any) {
+      this.answer = '';
+      this.showHint = false;
+      this.$nextTick(() => {
+        this.$refs.blankInput?.focus();
+      });
     },
 
-    allFilled() {
-      return (
-        this.exercises().length > 0 &&
-        Object.keys(this.answers).length === this.exercises().length &&
-        Object.values(this.answers).every((a: any) => (a as string).trim().length > 0)
-      );
+    onFinish(this: any) {
+      this.submitFullAttempt();
     },
 
-    score() {
-      if (!this.results) return 0;
-      return Object.values(this.results).filter(Boolean).length;
-    },
-
-    async submitAttempt(this: any) {
+    async submitFullAttempt(this: any) {
       const pid = this.currentProjectId;
       try {
         const res = await fetch(
@@ -47,29 +48,46 @@ export function fillBlankComponent(gen: any) {
         );
         if (res.ok) {
           const result = await res.json();
-          this.results = result.results;
           this.gen.stats = result.stats;
-          this.submitted = true;
           this.showToast(this.t('toast.scoreSaved'), 'success');
         }
       } catch {
-        this.showToast(this.t('toast.scoreError'), 'error', () => this.submitAttempt());
+        this.showToast(this.t('toast.scoreError'), 'error');
       }
     },
 
-    retryWrong(this: any) {
-      if (!this.results) return;
-      for (const [qi, correct] of Object.entries(this.results)) {
-        if (!correct) {
-          this.answers[Number(qi)] = '';
-        }
-      }
-      this.submitted = false;
-      this.results = null;
+    retryWrongExercises(this: any) {
+      const wrong = Object.entries(this.results)
+        .filter(([, v]) => !v)
+        .map(([k]) => Number(k));
+      this.answers = {};
+      this.results = {};
+      this.answer = '';
+      this.showHint = false;
+      this.retryWrong(wrong);
+      this.$nextTick(() => {
+        this.$refs.blankInput?.focus();
+      });
     },
 
-    resetExercise() {
-      this.initFillBlank();
+    resetExercise(this: any) {
+      this.answers = {};
+      this.results = {};
+      this.answer = '';
+      this.showHint = false;
+      this.resetAll();
+      this.$nextTick(() => {
+        this.$refs.blankInput?.focus();
+      });
+    },
+
+    handleKey(this: any, e: KeyboardEvent) {
+      if (e.key !== 'Enter') return;
+      if (this.feedback) {
+        this.nextQuestion();
+      } else if (this.answer.trim()) {
+        this.checkAnswer();
+      }
     },
   };
 }

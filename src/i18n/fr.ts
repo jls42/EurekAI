@@ -174,6 +174,9 @@ export const fr: Record<string, string> = {
   'flashcards.emptyTitle': 'Pas encore de flashcards',
   'flashcards.emptyWithSources': 'Clique sur Nouvelles flashcards pour commencer',
   'flashcards.tapToFlip': 'Touche pour retourner',
+  'flashcards.flip': 'Retourner',
+  'flashcards.knew': 'Je savais',
+  'flashcards.didntKnow': 'Je ne savais pas',
 
   // Quiz view
   'quiz.heading': 'Quiz',
@@ -254,6 +257,12 @@ export const fr: Record<string, string> = {
   'fillBlank.retryWrong': 'Corriger mes erreurs',
   'fillBlank.restart': 'Recommencer',
   'fillBlank.correctAnswer': 'Reponse : {answer}',
+
+  // Step-by-step (shared)
+  'step.questionOf': 'Exercice {current}/{total}',
+  'step.check': 'Verifier',
+  'step.next': 'Suivante',
+  'step.retryWrong': 'Revoir les erreurs',
 
   // Consigne dialog
   'consigne.title': 'Consigne de revision',

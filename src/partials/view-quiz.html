@@ -39,9 +39,12 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('quiz')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-quiz animate-slide-up">
-        <button
+        <div
+          role="button"
+          tabindex="0"
           @click="toggleGen(gen.id)"
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors focus-ring text-left"
+          @keydown.enter="toggleGen(gen.id)"
+          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors focus-ring text-left cursor-pointer"
           :aria-expanded="openGens[gen.id] ? 'true' : 'false'"
         >
           <span class="icon-chip icon-chip-quiz shrink-0"
@@ -78,31 +81,30 @@
               x-text="gen.stats.attempts[gen.stats.attempts.length-1].score + '/' + gen.stats.attempts[gen.stats.attempts.length-1].total"
             ></span>
           </template>
+          <button
+            @click.stop="startEditTitle(gen)"
+            class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded shrink-0"
+            :aria-label="t('common.rename')"
+          >
+            <i data-lucide="pencil" class="w-4 h-4"></i>
+          </button>
+          <button
+            @click.stop="confirmDelete('generation', () => deleteGen(gen))"
+            class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded shrink-0"
+            :aria-label="t('common.delete')"
+          >
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+          </button>
           <i
             data-lucide="chevron-down"
             class="w-5 h-5 text-text-secondary shrink-0 transition-transform"
             :class="openGens[gen.id] && 'rotate-180'"
           ></i>
-        </button>
+        </div>
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
-          <div class="flex items-center gap-2 mt-3 mb-3 flex-wrap">
-            <div class="flex-1"></div>
-            <button
-              @click.stop="startEditTitle(gen)"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded"
-              :aria-label="t('common.rename')"
-            >
-              <i data-lucide="pencil" class="w-4 h-4"></i>
-            </button>
-            <button
-              @click.stop="confirmDelete('generation', () => deleteGen(gen))"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded"
-              :aria-label="t('common.delete')"
-            >
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-          </div>
-          <div x-data="quizComponent(gen)" x-init="initQuiz()">
+          <!-- Interactive step-by-step quiz -->
+          <div x-data="quizComponent(gen)">
+            <!-- Attempt history -->
             <div
               x-show="gen.stats && gen.stats.attempts.length > 0"
               class="mb-4 flex flex-wrap gap-2"
@@ -115,42 +117,82 @@
                 ></span>
               </template>
             </div>
-            <div class="space-y-4">
-              <template x-for="(q, qi) in questions()" :key="qi">
-                <div class="bg-gray-50 rounded-card p-4">
+
+            <!-- Active question (step-by-step) -->
+            <template x-if="!finished">
+              <div>
+                <!-- Progress header -->
+                <div class="flex items-center gap-2 mb-2">
+                  <span
+                    class="text-body-sm font-semibold text-gen-quiz"
+                    x-text="t('step.questionOf', { current: currentQ + 1, total: total() })"
+                  ></span>
+                  <span
+                    class="text-sm bg-gen-quiz/10 text-gen-quiz px-2.5 py-1 rounded-badge font-semibold"
+                    x-text="t('quiz.score', { score: score })"
+                  ></span>
+                </div>
+                <!-- Progress bar -->
+                <div class="h-2 rounded-full bg-gray-200 mb-4">
+                  <div
+                    class="h-2 rounded-full bg-gen-quiz transition-all duration-500"
+                    :style="'width:' + progress() + '%'"
+                  ></div>
+                </div>
+
+                <!-- Question card -->
+                <div class="bg-gray-50 rounded-card p-5 mb-4">
                   <p
-                    class="font-heading font-semibold text-body-sm mb-3 text-text-primary"
-                    x-text="'Q' + (qi+1) + '. ' + q.question"
+                    class="font-heading font-semibold text-body-sm mb-4 text-text-primary"
+                    x-text="'Q' + (currentIndex() + 1) + '. ' + currentQuestion()?.question"
                   ></p>
                   <div class="space-y-2">
-                    <template x-for="(choice, ci) in q.choices" :key="ci">
+                    <template x-for="(choice, ci) in currentQuestion()?.choices || []" :key="ci">
                       <button
                         class="w-full text-left px-4 py-3 rounded-button text-body-sm border-2 transition-all btn-press focus-ring"
                         :class="{
-                                    'border-success bg-success-light font-semibold text-success-dark': answers[qi] !== undefined && ci === q.correct,
-                                    'border-danger bg-danger-light text-danger-dark': answers[qi] === ci && ci !== q.correct,
-                                    'border-gray-200 bg-surface hover:border-primary': answers[qi] === undefined
-                                  }"
-                        @click="answer(qi, ci)"
-                        :disabled="answers[qi] !== undefined"
+                          'border-success bg-success-light font-semibold text-success-dark': feedback && ci === currentQuestion()?.correct,
+                          'border-danger bg-danger-light text-danger-dark': feedback && selectedChoice === ci && ci !== currentQuestion()?.correct,
+                          'border-gray-200 bg-surface hover:border-primary hover:bg-primary-light': !feedback
+                        }"
+                        @click="selectChoice(ci)"
+                        :disabled="!!feedback"
                         x-text="choice"
                       ></button>
                     </template>
                   </div>
+                </div>
+
+                <!-- Feedback (after selecting a choice) -->
+                <div x-show="feedback" x-transition>
                   <div
-                    x-show="answers[qi] !== undefined"
-                    class="mt-3 bg-accent-light rounded-button p-3"
+                    class="p-4 rounded-card mb-3"
+                    :class="feedback?.correct
+                      ? 'bg-success-light border-2 border-success animate-correct'
+                      : 'bg-danger-light border-2 border-danger animate-wrong'"
                   >
-                    <p class="text-body-sm text-accent-dark" x-text="q.explanation"></p>
+                    <p
+                      class="font-heading font-bold text-body-sm"
+                      :class="feedback?.correct ? 'text-success-dark' : 'text-danger-dark'"
+                      x-text="feedback?.correct ? t('quiz.correct') : t('quiz.incorrect')"
+                    ></p>
+                    <p
+                      class="text-body-sm mt-1 text-text-primary"
+                      x-text="currentQuestion()?.explanation"
+                    ></p>
+                    <!-- Source refs for this question -->
                     <div
-                      x-show="questionSources(gen, q).length > 0"
-                      class="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-accent/20"
+                      x-show="questionSources(gen, currentQuestion()).length > 0"
+                      class="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-current/10"
                     >
-                      <span class="text-xs text-accent-dark/70 flex items-center gap-1"
+                      <span class="text-xs opacity-70 flex items-center gap-1"
                         ><i data-lucide="book-open" class="w-3 h-3"></i>
                         <span x-text="t('quiz.verify')"></span
                       ></span>
-                      <template x-for="src in questionSources(gen, q)" :key="src.id">
+                      <template
+                        x-for="src in questionSources(gen, currentQuestion())"
+                        :key="src.id"
+                      >
                         <button
                           @click.stop="openSourceDialog(src)"
                           class="source-badge text-[0.65em]"
@@ -160,46 +202,66 @@
                       </template>
                     </div>
                   </div>
+                  <div class="text-center">
+                    <button
+                      @click="nextQuestion()"
+                      class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
+                    >
+                      <span x-text="t('step.next')"></span>
+                      <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                    </button>
+                  </div>
                 </div>
-              </template>
-            </div>
-            <div x-show="allAnswered()" class="mt-6 text-center">
-              <div
-                class="inline-block px-8 py-4 rounded-card"
-                :class="score() === questions().length ? 'bg-success-light' : 'bg-warning-light'"
-              >
-                <p
-                  class="font-heading font-bold text-2xl"
-                  :class="score() === questions().length ? 'text-success-dark' : 'text-warning-dark'"
-                >
-                  <span x-text="score()"></span> / <span x-text="questions().length"></span>
-                </p>
-                <p
-                  class="text-body-sm font-medium"
-                  :class="score() === questions().length ? 'text-success-dark' : 'text-warning-dark'"
-                  x-text="score() === questions().length ? t('quiz.perfect') : t('quiz.keepGoing')"
-                ></p>
               </div>
-              <div class="flex gap-3 justify-center mt-4 flex-wrap">
-                <button
-                  x-show="submitted && score() < questions().length"
-                  @click="reviewErrors()"
-                  :disabled="reviewing"
-                  class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring disabled:opacity-50"
+            </template>
+
+            <!-- Finished screen -->
+            <template x-if="finished">
+              <div class="text-center py-8">
+                <div
+                  class="inline-block px-8 py-4 rounded-card mb-4"
+                  :class="score === items().length ? 'bg-success-light' : 'bg-warning-light'"
                 >
-                  <span x-show="!reviewing" x-text="t('quiz.reviewErrors')"></span>
-                  <span x-show="reviewing" class="flex items-center gap-2"
-                    ><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
-                    <span x-text="t('common.generating')"></span
-                  ></span>
-                </button>
-                <button
-                  @click="resetQuiz()"
-                  class="bg-gray-200 text-text-primary px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
-                  x-text="t('quiz.restart')"
-                ></button>
+                  <p
+                    class="font-heading font-bold text-3xl"
+                    :class="score === items().length ? 'text-success-dark' : 'text-warning-dark'"
+                    x-text="score + '/' + items().length"
+                  ></p>
+                  <p
+                    class="text-body-sm font-medium mt-1"
+                    :class="score === items().length ? 'text-success-dark' : 'text-warning-dark'"
+                    x-text="score === items().length ? t('quiz.perfect') : t('quiz.keepGoing')"
+                  ></p>
+                </div>
+                <div class="flex gap-3 justify-center flex-wrap">
+                  <button
+                    x-show="score < items().length"
+                    @click="reviewErrors()"
+                    :disabled="reviewing"
+                    class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring disabled:opacity-50"
+                  >
+                    <span x-show="!reviewing" x-text="t('quiz.reviewErrors')"></span>
+                    <span x-show="reviewing" class="flex items-center gap-2"
+                      ><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
+                      <span x-text="t('common.generating')"></span
+                    ></span>
+                  </button>
+                  <button
+                    x-show="score < items().length"
+                    @click="retryWrongQuestions()"
+                    class="bg-gen-quiz text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                    x-text="t('step.retryWrong')"
+                  ></button>
+                  <button
+                    @click="resetQuiz()"
+                    class="bg-gray-200 text-text-primary px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                    x-text="t('quiz.restart')"
+                  ></button>
+                </div>
               </div>
-            </div>
+            </template>
+
+            <!-- Source references -->
             <div
               x-show="gen.sourceIds && gen.sourceIds.length > 0"
               class="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-100"
