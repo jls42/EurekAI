@@ -47,7 +47,7 @@ export function createGenerate() {
           signal: controller.signal,
         });
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           this.showToast(
             this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
             'error',
@@ -131,6 +131,8 @@ export function createGenerate() {
             this.openGens[gen.id] = true;
           } else {
             failures++;
+            const err = await r.json().catch(() => ({}));
+            console.error(`generateAll failed (${r.status}):`, err.error || r.statusText);
           }
         }
         if (failures > 0 && failures < 3) {
@@ -183,7 +185,7 @@ export function createGenerate() {
           signal: controller.signal,
         });
         if (!res.ok) {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           this.showToast(
             this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
             'error',
@@ -242,7 +244,7 @@ export function createGenerate() {
             ) as HTMLAudioElement;
             if (audioEl) {
               audioEl.load();
-              audioEl.play().catch(() => {});
+              audioEl.play().catch((e) => console.warn('Auto-play blocked:', e.message));
             }
           });
         } else {
@@ -253,7 +255,8 @@ export function createGenerate() {
             () => this.generateVoice(gen),
           );
         }
-      } catch {
+      } catch (e) {
+        console.error('Voice generation error:', e);
         this.showToast(this.t('toast.audioError'), 'error', () => this.generateVoice(gen));
       } finally {
         gen._generatingVoice = false;

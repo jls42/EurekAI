@@ -35,8 +35,9 @@ export function quizVocalComponent(gen: any) {
       audio.currentTime = 0;
       audio.load();
       this.audioPlaying = true;
-      audio.play().catch(() => {
+      audio.play().catch((e) => {
         this.audioPlaying = false;
+        console.warn('Question audio play failed:', e.message);
       });
     },
 

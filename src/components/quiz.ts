@@ -44,6 +44,9 @@ export function quizComponent(gen: any) {
           const result = await res.json();
           this.gen.stats = result.stats;
           this.showToast(this.t('toast.scoreSaved'), 'success');
+        } else {
+          console.error('Quiz attempt failed:', res.status);
+          this.showToast(this.t('toast.scoreError'), 'error');
         }
       } catch {
         this.showToast(this.t('toast.scoreError'), 'error');
@@ -72,6 +75,9 @@ export function quizComponent(gen: any) {
           this.generations.push(newGen);
           this.openGens[newGen.id] = true;
           this.showToast(this.t('toast.reviewGenerated'), 'success');
+        } else {
+          console.error('Quiz review failed:', res.status);
+          this.showToast(this.t('toast.reviewError'), 'error');
         }
       } catch {
         this.showToast(this.t('toast.reviewError'), 'error');

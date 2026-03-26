@@ -1,8 +1,8 @@
 <!-- ======================== QUIZ ======================== -->
 <div x-show="activeView === 'quiz'">
   <div class="flex items-center justify-between mb-4">
-    <h2 class="font-heading font-bold text-xl title-gradient" x-text="t('quiz.heading')">Quiz</h2>
     <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+    <h2 class="font-heading font-bold text-xl title-gradient" x-text="t('quiz.heading')">Quiz</h2>
     <button
       @click="generate('quiz')"
       :disabled="loading.quiz || sources.length === 0"

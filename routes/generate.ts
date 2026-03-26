@@ -116,7 +116,8 @@ function handleGeneration(
       const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
       const sourceIds = resolveSourceIds(req.body, project.sources);
-      const count = req.body.count ? Number(req.body.count) : undefined;
+      const rawCount = req.body.count ? Number(req.body.count) : undefined;
+      const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       const gen = await generatorFn({
         project,
@@ -406,13 +407,15 @@ export function generateRoutes(
       const markdown = useConsigneAuto ? applyConsigne(rawAutoMarkdown, project.consigne) : rawAutoMarkdown;
       const hasConsigne = useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
-      const count = req.body.count ? Number(req.body.count) : undefined;
+      const rawCount = req.body.count ? Number(req.body.count) : undefined;
+      const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       console.log('  Smart routing: analyzing content...');
       const route = await routeRequest(client, markdown);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
+      const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
 
       for (const step of route.plan) {
@@ -516,10 +519,11 @@ export function generateRoutes(
           }
         } catch (err) {
           console.error(`  Auto: ${step.agent} FAILED:`, err);
+          failedSteps.push(step.agent);
         }
       }
 
-      res.json({ route: route.plan, generations });
+      res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {
       console.error('Generate auto error:', e);
       res.status(500).json({ error: String(e) });

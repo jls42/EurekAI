@@ -249,6 +249,7 @@ export class ProjectStore {
         categories: moderation.categories ?? {},
       };
     }
+    console.warn('Unknown moderation format during migration:', JSON.stringify(moderation));
     return { status: 'error', categories: {} };
   }
 

@@ -210,7 +210,7 @@
         <i data-lucide="eye" class="w-4 h-4"></i>
       </button>
       <button
-        @click="useConsigne = false; showToast(t('consigne.dismissed'), 'info'); $nextTick(() => refreshIcons())"
+        @click="useConsigne = false; localStorage.setItem(`consigne-dismissed-${currentProjectId}`, 'true'); showToast(t('consigne.dismissed'), 'info'); $nextTick(() => refreshIcons())"
         class="min-w-[36px] min-h-[36px] flex items-center justify-center rounded-button text-text-secondary hover:bg-red-100 hover:text-red-600 focus-ring"
         :title="t('consigne.dismiss')"
       >

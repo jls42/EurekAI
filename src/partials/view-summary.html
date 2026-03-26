@@ -1,10 +1,10 @@
 <!-- ======================== FICHES (SUMMARY) ======================== -->
 <div x-show="activeView === 'summary'">
   <div class="flex items-center justify-between mb-4">
+    <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <h2 class="font-heading font-bold text-xl title-gradient" x-text="t('summary.heading')">
       Summary
     </h2>
-    <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <button
       @click="generate('summary')"
       :disabled="loading.summary || sources.length === 0"

@@ -15,7 +15,8 @@ function readProfileLocales(storage: StorageLike): Record<string, string> {
         (entry): entry is [string, string] => typeof entry[1] === 'string',
       ),
     );
-  } catch {
+  } catch (e) {
+    console.warn('Failed to parse profile locales:', e);
     return {};
   }
 }

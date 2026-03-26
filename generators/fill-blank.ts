@@ -3,6 +3,14 @@ import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { fillBlankSystem, fillBlankUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
 
+function extractContent(response: any): string {
+  const choices = response.choices;
+  if (!choices?.length || !choices[0].message?.content) {
+    throw new Error("Le modele IA n'a retourne aucune reponse. Veuillez reessayer.");
+  }
+  return choices[0].message.content as string;
+}
+
 function isValidFillBlank(data: FillBlankItem[]): boolean {
   return (
     data.length > 0 &&
@@ -36,7 +44,7 @@ export async function generateFillBlank(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = extractContent(response);
   const data = unwrapJsonArray<FillBlankItem>(safeParseJson(raw));
 
   if (isValidFillBlank(data)) return data;
@@ -57,7 +65,7 @@ export async function generateFillBlank(
     responseFormat: { type: 'json_object' },
   });
   const retryData = unwrapJsonArray<FillBlankItem>(
-    safeParseJson(retry.choices![0].message.content as string),
+    safeParseJson(extractContent(retry)),
   );
 
   if (!isValidFillBlank(retryData)) {

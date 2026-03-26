@@ -50,6 +50,9 @@ export function fillBlankComponent(gen: any) {
           const result = await res.json();
           this.gen.stats = result.stats;
           this.showToast(this.t('toast.scoreSaved'), 'success');
+        } else {
+          console.error('Fill-blank attempt failed:', res.status);
+          this.showToast(this.t('toast.scoreError'), 'error');
         }
       } catch {
         this.showToast(this.t('toast.scoreError'), 'error');

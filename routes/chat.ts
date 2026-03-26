@@ -157,7 +157,7 @@ export function chatRoutes(
               const data = await generateFillBlank(
                 client,
                 markdown,
-                config.models.flashcards,
+                config.models.quiz,
                 lang,
                 ageGroup,
               );
