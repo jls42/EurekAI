@@ -6,13 +6,15 @@ export function createConfig() {
           fetch('/api/config'),
           fetch('/api/config/status'),
         ]);
+        if (statusRes.ok) this.apiStatus = await statusRes.json();
+        // Load voices BEFORE setting configDraft so options exist
+        // when Alpine renders the x-if="ttsProvider === 'mistral'" selects
+        await this.loadMistralVoices();
         if (configRes.ok) {
           const config = await configRes.json();
           this.configDraft = JSON.parse(JSON.stringify(config));
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
-        if (statusRes.ok) this.apiStatus = await statusRes.json();
-        await this.loadMistralVoices();
       } catch {}
     },
 
@@ -34,6 +36,10 @@ export function createConfig() {
           };
         });
       } catch {}
+    },
+
+    translateEmotion(this: any, emotion: string): string {
+      return this.t('emotion.' + emotion) || emotion;
     },
 
     langToFlag(this: any, lang: string): string {

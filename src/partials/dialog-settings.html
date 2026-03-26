@@ -171,7 +171,7 @@
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
-                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + v.emotion"></option>
+                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
                 </template>
               </select>
             </div>
@@ -182,7 +182,7 @@
                 class="w-full input-modern px-3 py-2 text-body-sm"
               >
                 <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
-                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + v.emotion"></option>
+                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
                 </template>
               </select>
             </div>
