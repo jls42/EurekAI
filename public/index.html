@@ -3970,7 +3970,7 @@
               </template>
               <template x-if="configDraft.ttsProvider === 'mistral'">
                 <select id="cfg-tts-model" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
-                  <option value="mistral-tts-latest">mistral-tts-latest</option>
+                  <option value="voxtral-mini-tts-2603">voxtral-mini-tts-2603</option>
                 </select>
               </template>
             </div>
@@ -3991,25 +3991,17 @@
                 <div>
                   <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1">Voice Host</label>
                   <select id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host" class="w-full input-modern px-3 py-2 text-body-sm">
-                    <option value="Oliver">Oliver</option>
-                    <option value="Marie">Marie</option>
-                    <option value="Nick">Nick</option>
-                    <option value="Margaret">Margaret</option>
-                    <option value="Angele">Angele</option>
-                    <option value="Gustavo">Gustavo</option>
-                    <option value="Patrick">Patrick</option>
+                    <template x-for="v in mistralVoicesList" :key="v.id">
+                      <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.host"></option>
+                    </template>
                   </select>
                 </div>
                 <div>
                   <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1">Voice Guest</label>
                   <select id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest" class="w-full input-modern px-3 py-2 text-body-sm">
-                    <option value="Marie">Marie</option>
-                    <option value="Oliver">Oliver</option>
-                    <option value="Nick">Nick</option>
-                    <option value="Margaret">Margaret</option>
-                    <option value="Angele">Angele</option>
-                    <option value="Gustavo">Gustavo</option>
-                    <option value="Patrick">Patrick</option>
+                    <template x-for="v in mistralVoicesList" :key="v.id">
+                      <option :value="v.id" x-text="v.name" :selected="v.id === configDraft.mistralVoices.guest"></option>
+                    </template>
                   </select>
                 </div>
               </div>

@@ -55,6 +55,15 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
+app.get('/api/config/voices', async (_req, res) => {
+  try {
+    const result = await client.audio.voices.list({ limit: 100 });
+    res.json(result.items ?? []);
+  } catch (e) {
+    console.error('List voices error:', e);
+    res.json([]);
+  }
+});
 
 // --- Routes ---
 app.use('/api/profiles', profileRoutes(outputDir, store));

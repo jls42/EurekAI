@@ -20,8 +20,8 @@ const DEFAULT_CONFIG: AppConfig = {
   ttsModel: 'eleven_v3',
   ttsProvider: 'elevenlabs',
   mistralVoices: {
-    host: 'Oliver',
-    guest: 'Marie',
+    host: 'e3596645-b1af-469e-b857-f18ddedc7652',
+    guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
   },
 };
 

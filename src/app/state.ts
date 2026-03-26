@@ -102,6 +102,7 @@ export function createState() {
     // Settings
     showSettings: false,
     apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    mistralVoicesList: [] as Array<{ id: string; name: string }>,
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
       voices: { host: { id: '', name: '' }, guest: { id: '', name: '' } },

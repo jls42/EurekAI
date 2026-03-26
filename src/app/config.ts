@@ -13,6 +13,11 @@ export function createConfig() {
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
         if (statusRes.ok) this.apiStatus = await statusRes.json();
+        // Load Mistral voices for settings UI
+        try {
+          const voicesRes = await fetch('/api/config/voices');
+          if (voicesRes.ok) this.mistralVoicesList = await voicesRes.json();
+        } catch {}
       } catch {}
     },
 
@@ -35,7 +40,7 @@ export function createConfig() {
           this.configDraft.ttsProvider === 'mistral' &&
           this.configDraft.ttsModel.startsWith('eleven')
         ) {
-          this.configDraft.ttsModel = 'mistral-tts-latest';
+          this.configDraft.ttsModel = 'voxtral-mini-tts-2603';
         } else if (
           this.configDraft.ttsProvider === 'elevenlabs' &&
           this.configDraft.ttsModel.startsWith('mistral-tts')
