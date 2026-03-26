@@ -107,7 +107,7 @@ export function createState() {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
       voices: { host: { id: '', name: '' }, guest: { id: '', name: '' } },
       ttsModel: '',
-      ttsProvider: 'elevenlabs' as string,
+      ttsProvider: 'mistral' as string,
       mistralVoices: { host: 'Oliver', guest: 'Marie' },
     },
 

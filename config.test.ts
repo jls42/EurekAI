@@ -21,7 +21,8 @@ describe('initConfig', () => {
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('mistral-large-latest');
     expect(cfg.models.quizVerify).toBe('mistral-large-latest');
-    expect(cfg.ttsModel).toBe('eleven_v3');
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-2603');
+    expect(cfg.ttsProvider).toBe('mistral');
   });
 
   it('avec fichier existant merge avec les defauts', () => {
