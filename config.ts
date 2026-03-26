@@ -54,6 +54,12 @@ export function getConfig(): AppConfig {
   return currentConfig;
 }
 
+export function resetConfig(): AppConfig {
+  currentConfig = { ...DEFAULT_CONFIG };
+  writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  return currentConfig;
+}
+
 export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };

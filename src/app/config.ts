@@ -9,26 +9,41 @@ export function createConfig() {
         if (configRes.ok) {
           const config = await configRes.json();
           this.configDraft = JSON.parse(JSON.stringify(config));
-          // Derive single model selector from per-task models
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
         if (statusRes.ok) this.apiStatus = await statusRes.json();
-        // Load Mistral voices filtered by current profile locale
         await this.loadMistralVoices();
       } catch {}
     },
 
     async loadMistralVoices(this: any) {
       try {
-        const lang = this.currentProfile?.locale || 'fr';
-        const voicesRes = await fetch(`/api/config/voices?lang=${lang}`);
-        if (voicesRes.ok) this.mistralVoicesList = await voicesRes.json();
+        const voicesRes = await fetch('/api/config/voices');
+        if (!voicesRes.ok) return;
+        const raw = await voicesRes.json();
+        this.mistralVoicesList = raw.map((v: any) => {
+          const parts = (v.name || '').split(' - ');
+          const langFull = v.languages?.[0] || '';
+          return {
+            id: v.id,
+            name: v.name,
+            speaker: parts[0] || v.name,
+            emotion: parts[1] || '',
+            lang: langFull.split('_')[0] || '',
+            langFull,
+          };
+        });
       } catch {}
+    },
+
+    langToFlag(this: any, lang: string): string {
+      const voice = this.mistralVoicesList.find((v: any) => v.lang === lang);
+      const country = (voice?.langFull?.split('_')[1] || lang).toUpperCase();
+      return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
     },
 
     async saveSettings(this: any) {
       try {
-        // Propagate single model selector to all non-OCR tasks
         const mainModel = this.configDraft._mainModel || 'mistral-large-latest';
         this.configDraft.models = {
           summary: mainModel,
@@ -40,7 +55,6 @@ export function createConfig() {
           chat: mainModel,
           ocr: 'mistral-ocr-latest',
         };
-        // Set default TTS model when switching providers
         if (
           this.configDraft.ttsProvider === 'mistral' &&
           this.configDraft.ttsModel.startsWith('eleven')
@@ -61,7 +75,6 @@ export function createConfig() {
           const saved = await res.json();
           this.configDraft = JSON.parse(JSON.stringify(saved));
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
-          // Reload API status (ttsAvailable may have changed)
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) this.apiStatus = await statusRes.json();
           this.$refs.settingsDialog?.close();
@@ -69,6 +82,20 @@ export function createConfig() {
         }
       } catch {
         this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
+      }
+    },
+
+    async resetSettings(this: any) {
+      try {
+        const res = await fetch('/api/config/reset', { method: 'POST' });
+        if (res.ok) {
+          const saved = await res.json();
+          this.configDraft = JSON.parse(JSON.stringify(saved));
+          this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
+          this.showToast(this.t('toast.settingsReset'), 'success');
+        }
+      } catch {
+        this.showToast(this.t('toast.settingsError'), 'error');
       }
     },
 

@@ -27,8 +27,6 @@ export function createProfiles() {
       this.showProfilePicker = false;
       localStorage.setItem('sf-profileId', id);
       this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
-      // Reload Mistral voices for the new locale
-      this.loadMistralVoices?.();
       // Reset project state and reload projects for this profile
       this.currentProjectId = null;
       this.currentProject = null;

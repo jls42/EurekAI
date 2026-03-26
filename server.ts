@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
-import { initConfig, getConfig, saveConfig, getApiStatus } from './config.js';
+import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus } from './config.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
@@ -55,6 +55,7 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
+app.post('/api/config/reset', (_req, res) => res.json(resetConfig()));
 app.get('/api/config/voices', async (req, res) => {
   try {
     const lang = req.query.lang as string | undefined;
