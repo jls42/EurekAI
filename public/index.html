@@ -3954,21 +3954,16 @@
             </div>
             <div>
               <label for="cfg-tts-model" class="text-sm text-text-secondary block mb-1">Modele TTS</label>
-              <template x-if="configDraft.ttsProvider === 'elevenlabs'">
-                <select id="cfg-tts-model" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
-                  <option value="eleven_v3">eleven_v3</option>
-                  <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
-                  <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
-                </select>
-              </template>
-              <template x-if="configDraft.ttsProvider === 'mistral'">
-                <select id="cfg-tts-model" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
-                  <option value="voxtral-mini-tts-2603">voxtral-mini-tts-2603</option>
-                </select>
-              </template>
+              <select x-show="configDraft.ttsProvider === 'elevenlabs'" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
+                <option value="eleven_v3">eleven_v3</option>
+                <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
+                <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
+              </select>
+              <select x-show="configDraft.ttsProvider === 'mistral'" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
+                <option value="voxtral-mini-tts-2603">voxtral-mini-tts-2603</option>
+              </select>
             </div>
-            <template x-if="configDraft.ttsProvider === 'elevenlabs'">
-              <div class="grid grid-cols-2 gap-3">
+            <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
                 <div>
                   <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1">Voice Host ID</label>
                   <input id="cfg-voice-host" x-model="configDraft.voices.host.id" class="w-full input-modern px-3 py-2 text-body-sm" />
@@ -3977,10 +3972,8 @@
                   <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1">Voice Guest ID</label>
                   <input id="cfg-voice-guest" x-model="configDraft.voices.guest.id" class="w-full input-modern px-3 py-2 text-body-sm" />
                 </div>
-              </div>
-            </template>
-            <template x-if="configDraft.ttsProvider === 'mistral'">
-              <div class="grid grid-cols-2 gap-3">
+            </div>
+            <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
                 <div>
                   <label class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
                   <select x-model="configDraft.mistralVoices.host" class="w-full input-modern px-3 py-2 text-body-sm">
@@ -3998,7 +3991,6 @@
                   </select>
                 </div>
               </div>
-            </template>
           </div>
         </div>
         <div class="flex gap-3">
