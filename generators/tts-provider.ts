@@ -1,15 +1,12 @@
 import type { Mistral } from '@mistralai/mistralai';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { collectStream } from '../helpers/audio.js';
-import type { TtsProvider } from '../types.js';
 
 // --- Types ---
 
-export interface TtsOptions {
-  provider: TtsProvider;
-  model: string;
-  mistralClient?: Mistral;
-}
+export type TtsOptions =
+  | { provider: 'mistral'; model: string; mistralClient: Mistral }
+  | { provider: 'elevenlabs'; model: string };
 
 export interface MistralVoice {
   id: string;
@@ -22,6 +19,7 @@ export interface MistralVoice {
 
 export interface CreateVoiceOptions {
   name: string;
+  /** Base64-encoded audio file */
   sampleAudio: string;
   sampleFilename?: string;
   languages?: string[];
@@ -29,16 +27,20 @@ export interface CreateVoiceOptions {
   tags?: string[];
 }
 
+// --- TTS dispatch ---
+
 export async function textToSpeech(
   text: string,
   voiceId: string,
   options: TtsOptions,
 ): Promise<Buffer> {
   if (options.provider === 'mistral') {
-    return mistralTts(text, voiceId, options.model, options.mistralClient!);
+    return mistralTts(text, voiceId, options.model, options.mistralClient);
   }
   return elevenlabsTts(text, voiceId, options.model);
 }
+
+// --- Mistral TTS ---
 
 async function mistralTts(
   text: string,
@@ -57,20 +59,27 @@ async function mistralTts(
 
 // --- Voice management ---
 
+function toMistralVoice(v: any): MistralVoice {
+  return {
+    id: v.id ?? '',
+    name: v.name ?? '',
+    languages: v.languages ?? [],
+    gender: v.gender ?? undefined,
+    tags: v.tags ?? undefined,
+    createdAt: v.createdAt ?? undefined,
+  };
+}
+
+const MAX_VOICE_PAGES = 50;
+
 export async function listVoices(client: Mistral, lang?: string): Promise<MistralVoice[]> {
   const voices: MistralVoice[] = [];
   let offset = 0;
-  while (true) {
+  let pageCount = 0;
+  while (pageCount++ < MAX_VOICE_PAGES) {
     const page = await client.audio.voices.list({ limit: 100, offset });
     for (const v of page.items ?? []) {
-      voices.push({
-        id: v.id!,
-        name: v.name!,
-        languages: (v as any).languages ?? [],
-        gender: (v as any).gender ?? undefined,
-        tags: (v as any).tags ?? undefined,
-        createdAt: (v as any).createdAt ?? undefined,
-      });
+      voices.push(toMistralVoice(v));
     }
     if (offset + (page.items?.length ?? 0) >= page.total) break;
     offset += page.items?.length ?? 0;
@@ -81,14 +90,7 @@ export async function listVoices(client: Mistral, lang?: string): Promise<Mistra
 
 export async function getVoice(client: Mistral, voiceId: string): Promise<MistralVoice> {
   const v = await client.audio.voices.get({ voiceId });
-  return {
-    id: v.id!,
-    name: v.name!,
-    languages: (v as any).languages ?? [],
-    gender: (v as any).gender ?? undefined,
-    tags: (v as any).tags ?? undefined,
-    createdAt: (v as any).createdAt ?? undefined,
-  };
+  return toMistralVoice(v);
 }
 
 export async function createVoice(
@@ -103,14 +105,7 @@ export async function createVoice(
     gender: options.gender,
     tags: options.tags,
   });
-  return {
-    id: v.id!,
-    name: v.name!,
-    languages: (v as any).languages ?? [],
-    gender: (v as any).gender ?? undefined,
-    tags: (v as any).tags ?? undefined,
-    createdAt: (v as any).createdAt ?? undefined,
-  };
+  return toMistralVoice(v);
 }
 
 export async function deleteVoice(client: Mistral, voiceId: string): Promise<void> {

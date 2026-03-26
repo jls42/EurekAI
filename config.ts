@@ -90,3 +90,9 @@ export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvai
     ttsAvailable: config.ttsProvider === 'mistral' ? hasMistral : hasElevenlabs,
   };
 }
+
+export function resolveVoices(config: AppConfig): { host: string; guest: string } {
+  return config.ttsProvider === 'mistral'
+    ? config.mistralVoices
+    : { host: config.voices.host.id, guest: config.voices.guest.id };
+}

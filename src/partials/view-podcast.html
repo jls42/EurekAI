@@ -7,7 +7,7 @@
     <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <button
       @click="generate('podcast')"
-      :disabled="loading.podcast || sources.length === 0 || !apiStatus.elevenlabs"
+      :disabled="loading.podcast || sources.length === 0 || !apiStatus.ttsAvailable"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-podcast/10 text-gen-podcast hover:bg-gen-podcast/20 disabled:opacity-50"
     >
       <i x-show="!loading.podcast" data-lucide="plus" class="w-4 h-4"></i>
@@ -40,9 +40,9 @@
       x-text="t('common.addSources')"
     ></button>
     <p
-      x-show="!apiStatus.elevenlabs"
+      x-show="!apiStatus.ttsAvailable"
       class="text-text-secondary text-body-sm mt-2"
-      x-text="t('podcast.noElevenLabs')"
+      x-text="t('podcast.noTts')"
     ></p>
   </div>
 

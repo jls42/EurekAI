@@ -55,7 +55,14 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
-app.post('/api/config/reset', (_req, res) => res.json(resetConfig()));
+app.post('/api/config/reset', (_req, res) => {
+  try {
+    res.json(resetConfig());
+  } catch (e) {
+    console.error('Config reset error:', e);
+    res.status(500).json({ error: 'Failed to reset configuration' });
+  }
+});
 app.get('/api/config/voices', async (req, res) => {
   try {
     const lang = req.query.lang as string | undefined;
@@ -64,7 +71,7 @@ app.get('/api/config/voices', async (req, res) => {
     res.json(voices);
   } catch (e) {
     console.error('List voices error:', e);
-    res.json([]);
+    res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
   }
 });
 

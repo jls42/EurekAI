@@ -7,15 +7,17 @@ export function createConfig() {
           fetch('/api/config/status'),
         ]);
         if (statusRes.ok) this.apiStatus = await statusRes.json();
-        // Load voices BEFORE setting configDraft so options exist
-        // when Alpine renders the x-if="ttsProvider === 'mistral'" selects
+        // Load voices BEFORE setting configDraft so the voice list is populated
+        // when Alpine renders the x-show="ttsProvider === 'mistral'" selects
         await this.loadMistralVoices();
         if (configRes.ok) {
           const config = await configRes.json();
           this.configDraft = JSON.parse(JSON.stringify(config));
           this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
         }
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
     },
 
     async loadMistralVoices(this: any) {
@@ -35,7 +37,9 @@ export function createConfig() {
             langFull,
           };
         });
-      } catch {}
+      } catch (e) {
+        console.error('Failed to load Mistral voices:', e);
+      }
     },
 
     translateEmotion(this: any, emotion: string): string {
@@ -43,8 +47,10 @@ export function createConfig() {
     },
 
     langToFlag(this: any, lang: string): string {
+      if (!lang || lang.length < 2) return '';
       const voice = this.mistralVoicesList.find((v: any) => v.lang === lang);
       const country = (voice?.langFull?.split('_')[1] || lang).toUpperCase();
+      if (!/^[A-Z]{2}$/.test(country)) return '';
       return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
     },
 
@@ -85,6 +91,8 @@ export function createConfig() {
           if (statusRes.ok) this.apiStatus = await statusRes.json();
           this.$refs.settingsDialog?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
+        } else {
+          this.showToast(this.t('toast.settingsError'), 'error');
         }
       } catch {
         this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
@@ -99,6 +107,8 @@ export function createConfig() {
           this.configDraft = JSON.parse(JSON.stringify(saved));
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
           this.showToast(this.t('toast.settingsReset'), 'success');
+        } else {
+          this.showToast(this.t('toast.settingsError'), 'error');
         }
       } catch {
         this.showToast(this.t('toast.settingsError'), 'error');

@@ -12,7 +12,7 @@ import type {
   FillBlankAttempt,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
-import { getConfig } from '../config.js';
+import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
@@ -220,10 +220,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       }
 
       const config = getConfig();
-      const voiceId =
-        config.ttsProvider === 'mistral'
-          ? config.mistralVoices.host
-          : config.voices.host.id;
+      const voiceId = resolveVoices(config).host;
       const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, {
         provider: config.ttsProvider,
         model: config.ttsModel,
