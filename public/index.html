@@ -9,19 +9,14 @@
       // Anti-flash: apply theme before any rendering
       (function () {
         var t = localStorage.getItem('sf-theme');
-        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', t);
+        if (!t) t = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- NOSONAR(S5725) — Google Fonts CSS is generated dynamically per browser, SRI not applicable -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
-      rel="stylesheet"
-    />
-    <!-- NOSONAR(S5725) — Tailwind Play CDN is an unversioned JIT compiler, SRI not applicable -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet" /> <!-- NOSONAR -->
+    <script src="https://cdn.tailwindcss.com"></script> <!-- NOSONAR -->
     <script>
       tailwind.config = {
         theme: {
@@ -1121,7 +1116,7 @@
         x-transition:leave-start="opacity-100"
         x-transition:leave-end="opacity-0"
       ></div>
-      <aside
+      <aside aria-label="Navigation mobile"
         class="absolute left-0 top-0 bottom-0 w-72 glass shadow-float overflow-y-auto scrollbar-thin"
         x-transition:enter="transition ease-out duration-200"
         x-transition:enter-start="-translate-x-full"
@@ -3944,49 +3939,68 @@
         </div>
         <div>
           <h3 class="font-heading font-semibold text-sm text-text-secondary mb-2">Voix & TTS</h3>
-          <div class="grid grid-cols-2 gap-3">
+          <div class="space-y-3">
             <div>
-              <label for="cfg-tts-model" class="text-sm text-text-secondary block mb-1"
-                >Modele TTS</label
-              >
-              <select
-                id="cfg-tts-model"
-                x-model="configDraft.ttsModel"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              >
+              <label for="cfg-tts-provider" class="text-sm text-text-secondary block mb-1">Fournisseur TTS</label>
+              <select id="cfg-tts-provider" x-model="configDraft.ttsProvider" class="w-full input-modern px-3 py-2 text-body-sm">
+                <option value="elevenlabs">ElevenLabs</option>
+                <option value="mistral">Mistral (Voxtral)</option>
+              </select>
+            </div>
+            <div>
+              <label for="cfg-tts-model" class="text-sm text-text-secondary block mb-1">Modele TTS</label>
+              <select x-show="configDraft.ttsProvider === 'elevenlabs'" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
                 <option value="eleven_v3">eleven_v3</option>
                 <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
                 <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
               </select>
+              <select x-show="configDraft.ttsProvider === 'mistral'" x-model="configDraft.ttsModel" class="w-full input-modern px-3 py-2 text-body-sm">
+                <option value="voxtral-mini-tts-2603">voxtral-mini-tts-2603</option>
+              </select>
             </div>
-            <div>
-              <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1"
-                >Voice Host ID</label
-              >
-              <input
-                id="cfg-voice-host"
-                x-model="configDraft.voices.host.id"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              />
+            <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1">Voice Host ID</label>
+                  <input id="cfg-voice-host" x-model="configDraft.voices.host.id" class="w-full input-modern px-3 py-2 text-body-sm" />
+                </div>
+                <div>
+                  <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1">Voice Guest ID</label>
+                  <input id="cfg-voice-guest" x-model="configDraft.voices.guest.id" class="w-full input-modern px-3 py-2 text-body-sm" />
+                </div>
             </div>
-            <div>
-              <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1"
-                >Voice Guest ID</label
-              >
-              <input
-                id="cfg-voice-guest"
-                x-model="configDraft.voices.guest.id"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              />
-            </div>
+            <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
+                <div>
+                  <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
+                  <select id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host" class="w-full input-modern px-3 py-2 text-body-sm">
+                    <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
+                      <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                    </template>
+                  </select>
+                </div>
+                <div>
+                  <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
+                  <select id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest" class="w-full input-modern px-3 py-2 text-body-sm">
+                    <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
+                      <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                    </template>
+                  </select>
+                </div>
+              </div>
           </div>
         </div>
-        <button
-          @click="saveSettings()"
-          class="w-full bg-primary-dark text-white min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
-        >
-          Sauvegarder
-        </button>
+        <div class="flex gap-3">
+          <button
+            @click="resetSettings()"
+            class="flex-1 min-h-touch rounded-button font-semibold text-body-sm focus-ring border"
+            style="border-color: var(--color-input-border); color: var(--color-text-secondary)"
+            x-text="t('common.reset')"
+          ></button>
+          <button
+            @click="saveSettings()"
+            class="flex-1 bg-primary-dark text-white min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+            x-text="t('common.save')"
+          ></button>
+        </div>
       </div>
     </dialog>
 

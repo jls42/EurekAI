@@ -6,7 +6,7 @@ import { fileURLToPath } from 'url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
-import { initConfig, getConfig, saveConfig, getApiStatus } from './config.js';
+import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus } from './config.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
@@ -55,6 +55,25 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
+app.post('/api/config/reset', (_req, res) => {
+  try {
+    res.json(resetConfig());
+  } catch (e) {
+    console.error('Config reset error:', e);
+    res.status(500).json({ error: 'Failed to reset configuration' });
+  }
+});
+app.get('/api/config/voices', async (req, res) => {
+  try {
+    const lang = req.query.lang as string | undefined;
+    const { listVoices } = await import('./generators/tts-provider.js');
+    const voices = await listVoices(client, lang);
+    res.json(voices);
+  } catch (e) {
+    console.error('List voices error:', e);
+    res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
+  }
+});
 
 // --- Routes ---
 app.use('/api/profiles', profileRoutes(outputDir, store));
@@ -68,11 +87,11 @@ app.use('/api/projects', chatRoutes(store, client, profileStore));
 app.listen(PORT, () => {
   const projects = store.listProjects();
   const status = getApiStatus();
+  const config = getConfig();
   console.log(`\n  EurekAI — http://localhost:${PORT}`);
   console.log(`  API Mistral: ${status.mistral ? 'OK' : 'NON CONFIGURE'}`);
-  console.log(
-    `  ElevenLabs: ${status.elevenlabs ? 'OK' : 'NON CONFIGURE (podcast audio desactive)'}`,
-  );
+  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : 'NON CONFIGURE'}`);
+  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : 'NON CONFIGURE'}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();

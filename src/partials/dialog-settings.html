@@ -91,50 +91,109 @@
       <div class="space-y-3">
         <div>
           <label
+            for="cfg-tts-provider"
+            class="text-sm text-text-secondary block mb-1"
+            x-text="t('settings.ttsProvider')"
+            >TTS Provider</label
+          >
+          <select
+            id="cfg-tts-provider"
+            x-model="configDraft.ttsProvider"
+            class="w-full input-modern px-3 py-2 text-body-sm"
+          >
+            <option value="elevenlabs">ElevenLabs</option>
+            <option value="mistral" x-text="'Mistral (Voxtral) — ' + t('settings.recommended')"></option>
+          </select>
+        </div>
+        <div>
+          <label
             for="cfg-tts-model"
             class="text-sm text-text-secondary block mb-1"
             x-text="t('settings.ttsModel')"
             >TTS Model</label
           >
+          <!-- ElevenLabs models -->
           <select
-            id="cfg-tts-model"
+            x-show="configDraft.ttsProvider === 'elevenlabs'"
             x-model="configDraft.ttsModel"
             class="w-full input-modern px-3 py-2 text-body-sm"
           >
-            <option value="eleven_v3" x-text="'eleven_v3 — ' + t('settings.recommended')"></option>
+            <option value="eleven_v3">eleven_v3</option>
             <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
             <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
           </select>
+          <!-- Mistral models -->
+          <select
+            x-show="configDraft.ttsProvider === 'mistral'"
+            x-model="configDraft.ttsModel"
+            class="w-full input-modern px-3 py-2 text-body-sm"
+          >
+            <option value="voxtral-mini-tts-2603" x-text="'voxtral-mini-tts-2603 — ' + t('settings.recommended')"></option>
+          </select>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ttsModelHint')"></p>
         </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1"
-              >Voice Host ID</label
-            >
-            <input
-              id="cfg-voice-host"
-              x-model="configDraft.voices.host.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
+        <!-- ElevenLabs voice IDs -->
+        <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1"
+                x-text="t('settings.voiceHost') + ' ID'">Voice Host ID</label
+              >
+              <input
+                id="cfg-voice-host"
+                x-model="configDraft.voices.host.id"
+                class="w-full input-modern px-3 py-2 text-body-sm"
+              />
+            </div>
+            <div>
+              <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1"
+                x-text="t('settings.voiceGuest') + ' ID'">Voice Guest ID</label
+              >
+              <input
+                id="cfg-voice-guest"
+                x-model="configDraft.voices.guest.id"
+                class="w-full input-modern px-3 py-2 text-body-sm"
+              />
+            </div>
           </div>
-          <div>
-            <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1"
-              >Voice Guest ID</label
-            >
-            <input
-              id="cfg-voice-guest"
-              x-model="configDraft.voices.guest.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
+        <!-- Mistral voice selectors (dynamic from API) -->
+        <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
+            <div>
+              <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
+              <select
+                id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host"
+                class="w-full input-modern px-3 py-2 text-body-sm"
+              >
+                <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
+                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                </template>
+              </select>
+            </div>
+            <div>
+              <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
+              <select
+                id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest"
+                class="w-full input-modern px-3 py-2 text-body-sm"
+              >
+                <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
+                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                </template>
+              </select>
+            </div>
           </div>
-        </div>
       </div>
     </div>
-    <button
-      @click="saveSettings()"
-      class="w-full bg-primary-dark text-white hover:bg-primary-dark/90 min-h-touch rounded-button font-semibold text-body-sm transition-colors card-lift btn-press focus-ring"
-      x-text="t('common.save')"
-    ></button>
+    <div class="flex gap-3">
+      <button
+        @click="resetSettings()"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors focus-ring border"
+        style="border-color: var(--color-input-border); color: var(--color-text-secondary)"
+        x-text="t('common.reset')"
+      ></button>
+      <button
+        @click="saveSettings()"
+        class="flex-1 bg-primary-dark text-white hover:bg-primary-dark/90 min-h-touch rounded-button font-semibold text-body-sm transition-colors card-lift btn-press focus-ring"
+        x-text="t('common.save')"
+      ></button>
+    </div>
   </div>
 </dialog>

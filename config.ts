@@ -17,7 +17,12 @@ const DEFAULT_CONFIG: AppConfig = {
     host: { id: 'JdwJ7jL68CWmQZuo7KgG', name: 'Voix info IA' },
     guest: { id: 'sANWqF1bCMzR6eyZbCGw', name: 'Marie' },
   },
-  ttsModel: 'eleven_v3',
+  ttsModel: 'voxtral-mini-tts-2603',
+  ttsProvider: 'mistral',
+  mistralVoices: {
+    host: 'e3596645-b1af-469e-b857-f18ddedc7652',
+    guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
+  },
 };
 
 let configPath: string;
@@ -35,6 +40,7 @@ export function initConfig(outputDir: string): void {
         ...saved,
         models: { ...DEFAULT_CONFIG.models, ...saved.models },
         voices: { ...DEFAULT_CONFIG.voices, ...saved.voices },
+        mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
       };
     } catch {
       currentConfig = { ...DEFAULT_CONFIG };
@@ -48,6 +54,12 @@ export function getConfig(): AppConfig {
   return currentConfig;
 }
 
+export function resetConfig(): AppConfig {
+  currentConfig = { ...DEFAULT_CONFIG };
+  writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  return currentConfig;
+}
+
 export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
@@ -58,13 +70,29 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.ttsModel) {
     currentConfig.ttsModel = partial.ttsModel;
   }
+  if (partial.ttsProvider) {
+    currentConfig.ttsProvider = partial.ttsProvider;
+  }
+  if (partial.mistralVoices) {
+    currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
+  }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   return currentConfig;
 }
 
-export function getApiStatus(): { mistral: boolean; elevenlabs: boolean } {
+export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean } {
+  const config = currentConfig ?? DEFAULT_CONFIG;
+  const hasMistral = !!process.env.MISTRAL_API_KEY;
+  const hasElevenlabs = !!process.env.ELEVENLABS_API_KEY;
   return {
-    mistral: !!process.env.MISTRAL_API_KEY,
-    elevenlabs: !!process.env.ELEVENLABS_API_KEY,
+    mistral: hasMistral,
+    elevenlabs: hasElevenlabs,
+    ttsAvailable: config.ttsProvider === 'mistral' ? hasMistral : hasElevenlabs,
   };
+}
+
+export function resolveVoices(config: AppConfig): { host: string; guest: string } {
+  return config.ttsProvider === 'mistral'
+    ? config.mistralVoices
+    : { host: config.voices.host.id, guest: config.voices.guest.id };
 }

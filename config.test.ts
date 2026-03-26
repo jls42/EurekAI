@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { tmpdir } from 'os';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { initConfig, getConfig, saveConfig, getApiStatus } from './config.js';
 
 let tempDir: string;
@@ -21,7 +21,8 @@ describe('initConfig', () => {
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('mistral-large-latest');
     expect(cfg.models.quizVerify).toBe('mistral-large-latest');
-    expect(cfg.ttsModel).toBe('eleven_v3');
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-2603');
+    expect(cfg.ttsProvider).toBe('mistral');
   });
 
   it('avec fichier existant merge avec les defauts', () => {

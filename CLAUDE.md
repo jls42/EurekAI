@@ -1,13 +1,13 @@
 # EurekAI
 
 Application educative IA : photo/texte/voix -> fiches + flashcards + quiz + podcast + traduction.
-Concu pour un enfant de 9 ans. Powered by Mistral AI + ElevenLabs.
+Concu pour un enfant de 9 ans. Powered by Mistral AI (+ ElevenLabs optionnel).
 
 ## Stack & Lancement
 
 - **Backend** : TypeScript, Express, tsx (dev)
 - **Frontend** : Vite + HTML + TailwindCSS + Alpine.js (src/)
-- **APIs** : Mistral AI (chat, OCR, STT, agents, moderation), ElevenLabs (TTS)
+- **APIs** : Mistral AI (chat, OCR, STT, TTS Voxtral, agents, moderation), ElevenLabs (TTS alternatif)
 
 ```bash
 npm install
@@ -26,9 +26,12 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Ajouter chaque cle dans `src/i18n/fr.ts` ET `src/i18n/en.ts`
 - Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation
 
-### ElevenLabs
-- Podcast et Quiz vocal necessitent `ELEVENLABS_API_KEY`
-- Griser les boutons avec `:disabled="!apiStatus.elevenlabs"` + tooltip `t('gen.needsElevenLabs')`
+### TTS (Text-to-Speech)
+- Deux providers : Mistral (Voxtral TTS) ou ElevenLabs, configurable dans les settings
+- Mistral TTS : utilise `MISTRAL_API_KEY` (deja requis), pas de cle supplementaire
+- ElevenLabs : necessite `ELEVENLABS_API_KEY`
+- `apiStatus.ttsAvailable` indique si le provider actif est configure
+- Griser les boutons TTS avec `:disabled="!apiStatus.ttsAvailable"` + tooltip `t('gen.needsTts')`
 
 ### HTML interactif
 - Ne JAMAIS imbriquer de `<button>` dans un `<button>` (HTML invalide, casse le layout)

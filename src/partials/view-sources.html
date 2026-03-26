@@ -41,8 +41,8 @@
       >
         <button
           @click="generate(cat.key)"
-          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs)"
-          :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.elevenlabs ? t('gen.needsElevenLabs') : ''"
+          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
+          :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
           class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
           :style="'color:' + cat.color"
         >
@@ -80,6 +80,7 @@
 
   <!-- Bento Grid 2x2 -->
   <div class="grid grid-cols-2 gap-3 mb-6">
+    <!-- NOSONAR(S5765) — Alpine.js x-text fills label content at runtime -->
     <label
       class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-primary hover:bg-primary-light cursor-pointer transition-all card-lift focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
     >
