@@ -127,8 +127,8 @@ describe('quizVocalComponent', () => {
     it('does nothing if no audio element', () => {
       const comp = createVocalQuiz(sampleQuestions, sampleUrls);
       comp.$refs = {};
-      // Should not throw
       comp.playQuestion();
+      expect(comp.audioPlaying).toBe(false);
     });
   });
 

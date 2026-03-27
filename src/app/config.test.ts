@@ -87,8 +87,8 @@ describe('loadConfig', () => {
   it('handles fetch failure gracefully', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValue(new Error('Network'));
     const ctx = makeContext();
-    // Should not throw
     await config.loadConfig.call(ctx);
+    expect(ctx.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false });
   });
 });
 
