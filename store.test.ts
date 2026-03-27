@@ -361,3 +361,84 @@ describe('migrateFromLegacy', () => {
     expect(store.listProjects()).toEqual([]);
   });
 });
+
+describe('listProjects with profileId filter', () => {
+  it('filtre les projets par profileId', () => {
+    store.createProject('Projet Alice', 'profile-alice');
+    store.createProject('Projet Bob', 'profile-bob');
+    store.createProject('Projet sans profil');
+
+    const aliceProjects = store.listProjects('profile-alice');
+    expect(aliceProjects).toHaveLength(2); // profile-alice + sans profileId
+    expect(aliceProjects.some((p) => p.name === 'Projet Alice')).toBe(true);
+    expect(aliceProjects.some((p) => p.name === 'Projet sans profil')).toBe(true);
+    expect(aliceProjects.some((p) => p.name === 'Projet Bob')).toBe(false);
+
+    const bobProjects = store.listProjects('profile-bob');
+    expect(bobProjects).toHaveLength(2); // profile-bob + sans profileId
+    expect(bobProjects.some((p) => p.name === 'Projet Bob')).toBe(true);
+    expect(bobProjects.some((p) => p.name === 'Projet sans profil')).toBe(true);
+
+    const allProjects = store.listProjects();
+    expect(allProjects).toHaveLength(3);
+  });
+});
+
+describe('edge cases: non-existent project', () => {
+  it('deleteSource retourne null pour projet inexistant', () => {
+    expect(store.deleteSource('nope', 's1')).toBeNull();
+  });
+
+  it('setConsigne retourne null pour projet inexistant', () => {
+    const result = store.setConsigne('nope', {
+      found: true,
+      text: 'Test',
+      keyTopics: [],
+    });
+    expect(result).toBeNull();
+  });
+
+  it('setSourceModeration retourne null pour projet inexistant', () => {
+    const result = store.setSourceModeration('nope', 's1', {
+      status: 'safe',
+      categories: {},
+    });
+    expect(result).toBeNull();
+  });
+
+  it('setSourceModeration retourne null pour source inexistante', () => {
+    const p = store.createProject('Mod edge');
+    const result = store.setSourceModeration(p.meta.id, 'nope', {
+      status: 'safe',
+      categories: {},
+    });
+    expect(result).toBeNull();
+  });
+
+  it('clearChat retourne false pour projet inexistant', () => {
+    expect(store.clearChat('nope')).toBe(false);
+  });
+
+  it('appendChatMessage retourne null pour projet inexistant', () => {
+    const result = store.appendChatMessage('nope', {
+      role: 'user',
+      content: 'Hello',
+      timestamp: new Date().toISOString(),
+    });
+    expect(result).toBeNull();
+  });
+
+  it('getGeneration retourne null pour projet inexistant', () => {
+    expect(store.getGeneration('nope', 'g1')).toBeNull();
+  });
+
+  it('addSource retourne null pour projet inexistant', () => {
+    const result = store.addSource('nope', {
+      id: 's1',
+      filename: 'test.txt',
+      markdown: '# Hello',
+      uploadedAt: new Date().toISOString(),
+    });
+    expect(result).toBeNull();
+  });
+});
