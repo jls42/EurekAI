@@ -168,7 +168,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
 
       const config = getConfig();
       console.log('  Transcribing vocal answer...');
-      const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm');
+      const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm'); // NOSONAR(S4325) — multer middleware guarantees req.file
       console.log(`  Transcription: '${transcription}'`);
 
       const lang = req.body.lang || 'fr';

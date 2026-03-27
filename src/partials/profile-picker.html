@@ -36,7 +36,7 @@
         <template x-for="p in profiles" :key="p.id">
           <div
             @click="selectProfile(p.id)"
-            role="button" <!-- NOSONAR(S6819) — Alpine.js nested buttons workaround per CLAUDE.md -->
+            role="button"
             tabindex="0"
             onkeydown="
               if (event.key === 'Enter' || event.key === ' ') {

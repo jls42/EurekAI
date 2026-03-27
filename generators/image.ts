@@ -9,16 +9,21 @@ interface ImageResult {
   value: string;
 }
 
+function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
+  if (c.fileId) return { type: 'fileId', value: `${c.fileId}` }; // NOSONAR(S6551) — always string from Mistral API
+  if (c.file_id) return { type: 'fileId', value: `${c.file_id}` }; // NOSONAR(S6551) — always string from Mistral API
+  if (c.imageUrl) return { type: 'url', value: `${c.imageUrl}` }; // NOSONAR(S6551) — always string from Mistral API
+  if (c.url) return { type: 'url', value: `${c.url}` }; // NOSONAR(S6551) — always string from Mistral API
+  return null;
+}
+
 function extractImageRef(outputs: any[]): ImageResult | null {
   for (const output of outputs) {
     const o = output as Record<string, unknown>;
     if (!Array.isArray(o.content)) continue;
     for (const chunk of o.content) {
-      const c = chunk as Record<string, unknown>;
-      if (c.fileId) return { type: 'fileId', value: `${c.fileId}` }; // NOSONAR(S6551) — fileId is always string from Mistral API
-      if (c.file_id) return { type: 'fileId', value: `${c.file_id}` }; // NOSONAR(S6551) — file_id is always string from Mistral API
-      if (c.imageUrl) return { type: 'url', value: `${c.imageUrl}` }; // NOSONAR(S6551) — imageUrl is always string from Mistral API
-      if (c.url) return { type: 'url', value: `${c.url}` }; // NOSONAR(S6551) — url is always string from Mistral API
+      const ref = parseChunkRef(chunk as Record<string, unknown>);
+      if (ref) return ref;
     }
   }
   return null;

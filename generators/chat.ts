@@ -64,7 +64,7 @@ export async function chatWithSources(
     toolChoice: 'auto' as any,
   });
 
-  const choice = response.choices![0];
+  const choice = response.choices![0]; // NOSONAR(S4325) — choices always present in non-streaming response
   const toolCalls: string[] = [];
 
   // Handle tool calls (max 3)
@@ -90,7 +90,7 @@ export async function chatWithSources(
       tools: TOOLS,
     });
 
-    const finalContent = finalResponse.choices![0].message.content;
+    const finalContent = finalResponse.choices![0].message.content; // NOSONAR(S4325) — choices always present in non-streaming response
     return {
       reply: typeof finalContent === 'string' ? finalContent : '',
       toolCalls,
