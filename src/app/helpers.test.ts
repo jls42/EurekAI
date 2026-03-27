@@ -787,3 +787,41 @@ describe('resolveError', () => {
     expect(callWith<string>(helpers.resolveError, ctx, 'Something went wrong')).toBe('Something went wrong');
   });
 });
+
+describe('activeGenerations', () => {
+  const categories = [
+    { key: 'summary', labelKey: 'nav.summary', icon: 'file-text', color: 'var(--color-gen-summary)' },
+    { key: 'quiz', labelKey: 'nav.quiz', icon: 'brain', color: 'var(--color-gen-quiz)' },
+    { key: 'flashcards', labelKey: 'nav.flashcards', icon: 'layers', color: 'var(--color-gen-flashcards)' },
+  ];
+
+  it('returns empty array when nothing is loading', () => {
+    const ctx = { categories, loading: { summary: false, quiz: false }, t: (k: string) => k };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toEqual([]);
+  });
+
+  it('returns active generation chips for loading types', () => {
+    const ctx = { categories, loading: { summary: true, quiz: false, flashcards: true }, t: (k: string) => k };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(2);
+    expect(result[0].key).toBe('summary');
+    expect(result[0].color).toBe('var(--color-gen-summary)');
+    expect(result[1].key).toBe('flashcards');
+  });
+
+  it('includes extra keys like auto and all', () => {
+    const ctx = { categories, loading: { auto: true, summary: false }, t: (k: string) => k };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('auto');
+    expect(result[0].icon).toBe('sparkles');
+  });
+
+  it('includes voice and websearch', () => {
+    const ctx = { categories, loading: { voice: true, websearch: true }, t: (k: string) => k };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(2);
+    expect(result.map((r: any) => r.key)).toEqual(['voice', 'websearch']);
+  });
+});

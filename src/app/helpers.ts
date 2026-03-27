@@ -230,6 +230,27 @@ export function createHelpers() {
       return Object.values(this.loading).some(Boolean);
     },
 
+    activeGenerations(this: any): Array<{ key: string; label: string; color: string; icon: string }> {
+      const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
+        auto: { labelKey: 'gen.auto', icon: 'sparkles', color: 'var(--color-primary)' },
+        all: { labelKey: 'gen.all', icon: 'layers', color: 'var(--color-primary)' },
+        voice: { labelKey: 'gen.voice', icon: 'volume-2', color: 'var(--color-accent)' },
+        websearch: { labelKey: 'gen.websearch', icon: 'search', color: 'var(--color-accent)' },
+      };
+      const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
+      for (const cat of this.categories) {
+        if (this.loading[cat.key]) {
+          result.push({ key: cat.key, label: this.t('gen.' + cat.key), color: cat.color, icon: cat.icon });
+        }
+      }
+      for (const [key, meta] of Object.entries(EXTRA_KEYS)) {
+        if (this.loading[key]) {
+          result.push({ key, label: this.t(meta.labelKey), color: meta.color, icon: meta.icon });
+        }
+      }
+      return result;
+    },
+
     getQuizScores(this: any) {
       return this.generations
         .filter((g: any) => g.type === 'quiz' && g.stats && g.stats.attempts.length > 0)
