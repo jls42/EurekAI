@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
 import type {
@@ -37,9 +37,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       }
 
       const quizGen = gen as QuizGeneration;
-      if (!quizGen.stats) {
-        quizGen.stats = { attempts: [], questionStats: {} };
-      }
+      quizGen.stats ??= { attempts: [], questionStats: {} };
 
       let score = 0;
       const total = quizGen.data.length;
@@ -85,9 +83,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       }
 
       const fbGen = gen as FillBlankGeneration;
-      if (!fbGen.stats) {
-        fbGen.stats = { attempts: [], questionStats: {} };
-      }
+      fbGen.stats ??= { attempts: [], questionStats: {} };
 
       let score = 0;
       const total = fbGen.data.length;
@@ -98,7 +94,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         const correctAnswer = fbGen.data[qi]?.answer;
         if (!correctAnswer) continue;
 
-        const { match } = validateFillBlankAnswer(childAnswer as string, correctAnswer);
+        const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
         results[qi] = match;
         if (match) score++;
 
@@ -150,8 +146,8 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
   // --- Quiz vocal: verify spoken answer ---
   router.post('/:pid/generations/:gid/vocal-answer', upload.single('audio'), async (req, res) => {
     try {
-      const pid = req.params.pid as string;
-      const gid = req.params.gid as string;
+      const pid = String(req.params.pid);
+      const gid = String(req.params.gid);
       const gen = store.getGeneration(pid, gid);
       if (!gen || gen.type !== 'quiz-vocal') {
         res.status(404).json({ error: 'Quiz vocal introuvable' });
@@ -175,7 +171,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm');
       console.log(`  Transcription: '${transcription}'`);
 
-      const lang = (req.body.lang as string) || 'fr';
+      const lang = req.body.lang || 'fr';
       console.log('  Verifying answer...');
       const result = await verifyAnswer(
         client,

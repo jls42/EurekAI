@@ -1,4 +1,38 @@
 import { getLocale } from '../i18n/index';
+import { normalizeSummaryData } from './helpers';
+
+function handleChatSuccess(state: any, data: any): void {
+  state.chatMessages.push({
+    role: 'assistant',
+    content: data.reply,
+    timestamp: new Date().toISOString(),
+    generatedIds: data.generatedIds,
+  });
+  if (data.generations && data.generations.length > 0) {
+    for (const gen of data.generations) {
+      normalizeSummaryData(gen);
+      state.initGenProps(gen);
+      state.generations.push(gen);
+      state.openGens[gen.id] = true;
+    }
+    state.showToast(state.t('toast.chatGenDone'), 'success');
+  }
+}
+
+function handleChatError(state: any, err: any): void {
+  if (err.error === 'chat.moderationBlocked' || err.error === 'chat.ageRestricted') {
+    // Remove the optimistic user message
+    state.chatMessages.pop();
+    state.showToast(state.t(err.error), 'error');
+  } else {
+    state.chatMessages.push({
+      role: 'assistant',
+      content: state.t('chat.errorReply'),
+      timestamp: new Date().toISOString(),
+    });
+    state.showToast(state.t('toast.chatErrorMsg', { error: err.error || '' }), 'error');
+  }
+}
 
 export function createChat() {
   return {
@@ -33,40 +67,9 @@ export function createChat() {
           }),
         });
         if (res.ok) {
-          const data = await res.json();
-          this.chatMessages.push({
-            role: 'assistant',
-            content: data.reply,
-            timestamp: new Date().toISOString(),
-            generatedIds: data.generatedIds,
-          });
-          if (data.generations && data.generations.length > 0) {
-            for (const gen of data.generations) {
-              if (gen.type === 'summary' && gen.data) {
-                if (!gen.data.citations) gen.data.citations = [];
-                if (!gen.data.vocabulary) gen.data.vocabulary = [];
-                if (!gen.data.key_points) gen.data.key_points = [];
-              }
-              this.initGenProps(gen);
-              this.generations.push(gen);
-              this.openGens[gen.id] = true;
-            }
-            this.showToast(this.t('toast.chatGenDone'), 'success');
-          }
+          handleChatSuccess(this, await res.json());
         } else {
-          const err = await res.json();
-          if (err.error === 'chat.moderationBlocked' || err.error === 'chat.ageRestricted') {
-            // Remove the optimistic user message
-            this.chatMessages.pop();
-            this.showToast(this.t(err.error), 'error');
-          } else {
-            this.chatMessages.push({
-              role: 'assistant',
-              content: this.t('chat.errorReply'),
-              timestamp: new Date().toISOString(),
-            });
-            this.showToast(this.t('toast.chatErrorMsg', { error: err.error || '' }), 'error');
-          }
+          handleChatError(this, await res.json());
         }
       } catch {
         this.chatMessages.push({

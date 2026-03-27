@@ -33,7 +33,7 @@ function unwrapAndMerge(data: Record<string, unknown>): StudyFiche | null {
       .filter(Boolean)
       .join(' '),
     key_points: fiches.flatMap((f: any) => f.key_points || []),
-    fun_fact: fiches.map((f: any) => f.fun_fact).filter(Boolean)[0] || '',
+    fun_fact: fiches.map((f: any) => f.fun_fact).find(Boolean) || '',
     vocabulary: fiches.flatMap((f: any) => f.vocabulary || []),
     citations: fiches.flatMap((f: any) => f.citations || []),
   };
@@ -84,7 +84,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
 
   try {
     const data = extractSummary(raw);
@@ -109,7 +109,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const retryRaw = retry.choices![0].message.content as string;
+  const retryRaw = String(retry.choices![0].message.content ?? '');
   const retryData = extractSummary(retryRaw);
 
   if (!isValidSummary(retryData)) {

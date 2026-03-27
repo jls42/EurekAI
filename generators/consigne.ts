@@ -34,7 +34,7 @@ export async function detectConsigne(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
   const result = safeParseJson<ConsigneResult>(raw);
   return {
     found: result.found ?? false,

@@ -1,5 +1,14 @@
 import { createIcons, icons } from 'lucide';
 
+/** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
+export function normalizeSummaryData(gen: any): void {
+  if (gen.type === 'summary' && gen.data) {
+    if (!gen.data.citations) gen.data.citations = [];
+    if (!gen.data.vocabulary) gen.data.vocabulary = [];
+    if (!gen.data.key_points) gen.data.key_points = [];
+  }
+}
+
 export function createHelpers() {
   return {
     generationsByType(this: any, type: string) {
@@ -109,7 +118,7 @@ export function createHelpers() {
     },
 
     resolveSourceRef(ref: string, allSources: any[]) {
-      const numMatch = ref.match(/source\s*(\d+)/i);
+      const numMatch = /source\s*(\d+)/i.exec(ref);
       if (numMatch) {
         const idx = Number.parseInt(numMatch[1], 10) - 1;
         if (allSources[idx]) return allSources[idx];
@@ -141,7 +150,7 @@ export function createHelpers() {
       const nums = new Set<number>();
       const extract = (refs: string[]) => {
         (refs || []).forEach((ref: string) => {
-          const m = ref.match(/source\s*(\d+)/i);
+          const m = /source\s*(\d+)/i.exec(ref);
           if (m) nums.add(Number.parseInt(m[1], 10));
         });
       };
@@ -237,7 +246,7 @@ export function createHelpers() {
 
     resolveError(this: any, error: string): string {
       const translated = this.t(error);
-      return translated !== error ? translated : error;
+      return translated === error ? error : translated;
     },
 
     refreshIcons() {

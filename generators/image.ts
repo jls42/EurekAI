@@ -1,8 +1,28 @@
 import { Mistral } from '@mistralai/mistralai';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
 import { imageSystem, imageUser } from '../prompts.js';
+
+interface ImageResult {
+  type: 'url' | 'fileId';
+  value: string;
+}
+
+function extractImageRef(outputs: any[]): ImageResult | null {
+  for (const output of outputs) {
+    const o = output as Record<string, unknown>;
+    if (!Array.isArray(o.content)) continue;
+    for (const chunk of o.content) {
+      const c = chunk as Record<string, unknown>;
+      if (c.fileId) return { type: 'fileId', value: String(c.fileId) };
+      if (c.file_id) return { type: 'fileId', value: String(c.file_id) };
+      if (c.imageUrl) return { type: 'url', value: String(c.imageUrl) };
+      if (c.url) return { type: 'url', value: String(c.url) };
+    }
+  }
+  return null;
+}
 
 export async function generateImage(
   client: Mistral,
@@ -28,38 +48,19 @@ export async function generateImage(
       inputs: prompt,
     });
 
-    let fileId = '';
-    for (const output of response.outputs) {
-      const o = output as Record<string, unknown>;
-      if (Array.isArray(o.content)) {
-        for (const chunk of o.content) {
-          const c = chunk as Record<string, unknown>;
-          if (c.fileId) {
-            fileId = String(c.fileId);
-            break;
-          }
-          if (c.file_id) {
-            fileId = String(c.file_id);
-            break;
-          }
-          if (c.imageUrl) {
-            return { imageUrl: String(c.imageUrl), prompt };
-          }
-          if (c.url) {
-            return { imageUrl: String(c.url), prompt };
-          }
-        }
-      }
-      if (fileId) break;
-    }
+    const imageRef = extractImageRef(response.outputs);
 
-    if (!fileId) {
+    if (!imageRef) {
       console.error('    Image outputs:', JSON.stringify(response.outputs, null, 2).slice(0, 2000));
       throw new Error("Aucune image generee par l'agent");
     }
 
-    console.log(`    Image fileId: ${fileId}, downloading...`);
-    const fileStream = await client.files.download({ fileId });
+    if (imageRef.type === 'url') {
+      return { imageUrl: imageRef.value, prompt };
+    }
+
+    console.log(`    Image fileId: ${imageRef.value}, downloading...`);
+    const fileStream = await client.files.download({ fileId: imageRef.value });
     const imageBuffer = await collectStream(fileStream as any);
 
     const imageFilename = `illustration-${Date.now()}.png`;

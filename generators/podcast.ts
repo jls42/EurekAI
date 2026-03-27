@@ -48,7 +48,7 @@ export async function generatePodcastScript(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
   const result = parsePodcastResponse(raw);
 
   if (isValidPodcast(result.script)) return result;
@@ -57,19 +57,21 @@ export async function generatePodcastScript(
     'Podcast validation failed, retrying. Got:',
     JSON.stringify(result.script).slice(0, 200),
   );
-  messages.push({ role: 'assistant', content: raw });
-  messages.push({
-    role: 'user',
-    content:
-      'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.',
-  });
+  messages.push(
+    { role: 'assistant', content: raw },
+    {
+      role: 'user',
+      content:
+        'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.',
+    },
+  );
 
   const retry = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
   });
-  const retryResult = parsePodcastResponse(retry.choices![0].message.content as string);
+  const retryResult = parsePodcastResponse(String(retry.choices![0].message.content ?? ''));
 
   if (!isValidPodcast(retryResult.script)) {
     throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");

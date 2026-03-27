@@ -34,6 +34,7 @@
         class="flex flex-wrap justify-center gap-4 mb-6"
       >
         <template x-for="p in profiles" :key="p.id">
+          <!-- NOSONAR(S6819) — div with role="button" is intentional: Alpine.js nested buttons workaround per CLAUDE.md -->
           <div
             @click="selectProfile(p.id)"
             role="button"

@@ -1,4 +1,54 @@
 import { getLocale } from '../i18n/index';
+import { normalizeSummaryData } from './helpers';
+
+/** Normalize and register a generation into the app state. */
+function registerGeneration(state: any, gen: any): void {
+  normalizeSummaryData(gen);
+  state.initGenProps(gen);
+  state.generations.push(gen);
+  state.openGens[gen.id] = true;
+}
+
+/** Process responses from generateAll, returns failure count. */
+async function aggregateGenerateResults(
+  responses: Response[],
+  state: any,
+): Promise<number> {
+  let failures = 0;
+  for (const r of responses) {
+    if (r.ok) {
+      registerGeneration(state, await r.json());
+    } else {
+      failures++;
+      const err = await r.json().catch(() => ({}));
+      console.error(`generateAll failed (${r.status}):`, err.error || r.statusText);
+    }
+  }
+  return failures;
+}
+
+/** Show appropriate toast after generateAll completes. */
+function showGenerateAllResult(failures: number, total: number, state: any): void {
+  if (failures > 0 && failures < total) {
+    state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
+  } else if (failures >= total) {
+    state.showToast(state.t('toast.generationError', { error: 'all' }), 'error');
+  } else {
+    state.showToast(state.t('toast.allGenerated'), 'success', null, {
+      label: state.t('toast.view'),
+      fn: () => state.goToView('dashboard'),
+    });
+  }
+}
+
+/** Process generations from auto-generate result. */
+function processAutoGenerations(result: any, state: any): void {
+  if (result.generations) {
+    for (const gen of result.generations) {
+      registerGeneration(state, gen);
+    }
+  }
+}
 
 export function createGenerate() {
   return {
@@ -57,14 +107,7 @@ export function createGenerate() {
         }
         if (this.currentProjectId !== projectId) return;
         const gen = await res.json();
-        if (gen.type === 'summary' && gen.data) {
-          if (!gen.data.citations) gen.data.citations = [];
-          if (!gen.data.vocabulary) gen.data.vocabulary = [];
-          if (!gen.data.key_points) gen.data.key_points = [];
-        }
-        this.initGenProps(gen);
-        this.generations.push(gen);
-        this.openGens[gen.id] = true;
+        registerGeneration(this, gen);
         const viewType = type;
         this.showToast(
           this.t('toast.generationDone', { type: this.t('gen.' + type) }),
@@ -117,34 +160,9 @@ export function createGenerate() {
           fetch(base + '/generate/quiz', makeOpts()),
         ]);
         if (this.currentProjectId !== projectId) return;
-        let failures = 0;
-        for (const r of [summaryRes, flashcardsRes, quizRes]) {
-          if (r.ok) {
-            const gen = await r.json();
-            if (gen.type === 'summary' && gen.data) {
-              if (!gen.data.citations) gen.data.citations = [];
-              if (!gen.data.vocabulary) gen.data.vocabulary = [];
-              if (!gen.data.key_points) gen.data.key_points = [];
-            }
-            this.initGenProps(gen);
-            this.generations.push(gen);
-            this.openGens[gen.id] = true;
-          } else {
-            failures++;
-            const err = await r.json().catch(() => ({}));
-            console.error(`generateAll failed (${r.status}):`, err.error || r.statusText);
-          }
-        }
-        if (failures > 0 && failures < 3) {
-          this.showToast(this.t('toast.partialGenerated', { count: 3 - failures }), 'warning');
-        } else if (failures >= 3) {
-          this.showToast(this.t('toast.generationError', { error: 'all' }), 'error');
-        } else {
-          this.showToast(this.t('toast.allGenerated'), 'success', null, {
-            label: this.t('toast.view'),
-            fn: () => this.goToView('dashboard'),
-          });
-        }
+        const responses = [summaryRes, flashcardsRes, quizRes];
+        const failures = await aggregateGenerateResults(responses, this);
+        showGenerateAllResult(failures, responses.length, this);
       } catch (e: any) {
         if (e.name === 'AbortError') return;
         this.showToast(this.t('toast.generationError', { error: e.message }), 'error', () =>
@@ -195,18 +213,7 @@ export function createGenerate() {
         }
         if (this.currentProjectId !== projectId) return;
         const result = await res.json();
-        if (result.generations) {
-          for (const gen of result.generations) {
-            if (gen.type === 'summary' && gen.data) {
-              if (!gen.data.citations) gen.data.citations = [];
-              if (!gen.data.vocabulary) gen.data.vocabulary = [];
-              if (!gen.data.key_points) gen.data.key_points = [];
-            }
-            this.initGenProps(gen);
-            this.generations.push(gen);
-            this.openGens[gen.id] = true;
-          }
-        }
+        processAutoGenerations(result, this);
         this.showToast(this.t('toast.magicDone'), 'success', null, {
           label: this.t('toast.view'),
           fn: () => this.goToView('dashboard'),

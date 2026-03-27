@@ -31,7 +31,7 @@ export function createRecorder() {
     },
 
     stopRecording(this: any) {
-      if (this.recorder && this.recorder.state === 'recording') {
+      if (this.recorder?.state === 'recording') {
         this.recorder.stop();
       }
       this.recording = false;

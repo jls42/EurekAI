@@ -37,7 +37,7 @@ export function app() {
     ...createRender(),
 
     async init(this: any) {
-      document.documentElement.setAttribute('data-theme', this.theme);
+      document.documentElement.dataset.theme = this.theme;
 
       this.checkMobile();
       let resizeTimeout: ReturnType<typeof setTimeout>;
@@ -51,7 +51,7 @@ export function app() {
         if (!(target instanceof Element)) return;
         const badge = target.closest('[data-source-id]');
         if (!badge) return;
-        const id = badge.getAttribute('data-source-id');
+        const id = (badge as HTMLElement).dataset.sourceId;
         if (!id) return;
         const src = this.sources.find((source: any) => source.id === id);
         if (src) this.openSourceDialog(src);

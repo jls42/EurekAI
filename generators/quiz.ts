@@ -43,7 +43,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
   const data = unwrapJsonArray<QuizQuestion>(safeParseJson(raw));
 
   if (isValidQuiz(data)) return data;
@@ -57,7 +57,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
   });
   const retryData = unwrapJsonArray<QuizQuestion>(
-    safeParseJson(retry.choices![0].message.content as string),
+    safeParseJson(String(retry.choices![0].message.content ?? '')),
   );
 
   if (!isValidQuiz(retryData)) {

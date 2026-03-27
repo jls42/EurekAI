@@ -1,8 +1,8 @@
 import dotenv from 'dotenv';
 import express from 'express';
-import { mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
@@ -25,7 +25,7 @@ if (!process.env.MISTRAL_API_KEY) {
   process.exit(1);
 }
 
-const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY! });
+const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
 const app = express();
 app.disable('x-powered-by');
 const PORT = 3000;
@@ -65,7 +65,7 @@ app.post('/api/config/reset', (_req, res) => {
 });
 app.get('/api/config/voices', async (req, res) => {
   try {
-    const lang = req.query.lang as string | undefined;
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
     const { listVoices } = await import('./generators/tts-provider.js');
     const voices = await listVoices(client, lang);
     res.json(voices);

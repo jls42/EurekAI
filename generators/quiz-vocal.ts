@@ -69,6 +69,6 @@ Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruct
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
   return safeParseJson<{ correct: boolean; feedback: string }>(raw);
 }

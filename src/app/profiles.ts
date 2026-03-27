@@ -1,5 +1,44 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 
+/** Execute the actual profile deletion (API call + state cleanup). */
+async function executeDeleteProfile(
+  state: any,
+  id: string,
+  pin?: string,
+): Promise<void> {
+  const opts: RequestInit = { method: 'DELETE' };
+  if (pin) {
+    opts.headers = { 'Content-Type': 'application/json' };
+    opts.body = JSON.stringify({ pin });
+  }
+  try {
+    await fetch('/api/profiles/' + id, opts);
+    clearProfileLocale(id);
+    state.profiles = state.profiles.filter((p: any) => p.id !== id);
+    if (state.currentProfile?.id === id) {
+      state.currentProfile = null;
+      localStorage.removeItem('sf-profileId');
+      if (state.profiles.length > 0) {
+        state.selectProfile(state.profiles[0].id);
+      } else {
+        state.showProfilePicker = true;
+      }
+    }
+    state.showToast(state.t('toast.profileDeleted'), 'success');
+  } catch (e: any) {
+    console.error('Failed to delete profile:', e);
+    state.showToast(state.t('toast.error', { error: e.message }), 'error');
+  }
+}
+
+/** Build the confirmation message for profile deletion. */
+function deleteConfirmMessage(state: any, id: string): string {
+  const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;
+  return projectCount > 0
+    ? state.t('profile.deleteConfirm', { count: projectCount })
+    : state.t('profile.deleteConfirmNoProjects');
+}
+
 export function createProfiles() {
   return {
     async loadProfiles(this: any) {
@@ -11,7 +50,7 @@ export function createProfiles() {
       }
       // Restore last selected profile
       const saved = localStorage.getItem('sf-profileId');
-      if (saved && this.profiles.find((p: any) => p.id === saved)) {
+      if (saved && this.profiles.some((p: any) => p.id === saved)) {
         this.selectProfile(saved);
       } else if (this.profiles.length > 0) {
         this.selectProfile(this.profiles[0].id);
@@ -80,67 +119,14 @@ export function createProfiles() {
     async deleteProfile(this: any, id: string) {
       const profile = this.profiles.find((p: any) => p.id === id);
       if (!profile) return;
+      const target = deleteConfirmMessage(this, id);
       if (profile.hasPin) {
         this.requirePin(async (pin: string) => {
-          // Count projects for this profile
-          const projectCount = this.currentProfile?.id === id ? this.projects.length : 0;
-          const target =
-            projectCount > 0
-              ? this.t('profile.deleteConfirm', { count: projectCount })
-              : this.t('profile.deleteConfirmNoProjects');
-          this.confirmDelete(target, async () => {
-            try {
-              await fetch('/api/profiles/' + id, {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ pin }),
-              });
-              clearProfileLocale(id);
-              this.profiles = this.profiles.filter((p: any) => p.id !== id);
-              if (this.currentProfile?.id === id) {
-                this.currentProfile = null;
-                localStorage.removeItem('sf-profileId');
-                if (this.profiles.length > 0) {
-                  this.selectProfile(this.profiles[0].id);
-                } else {
-                  this.showProfilePicker = true;
-                }
-              }
-              this.showToast(this.t('toast.profileDeleted'), 'success');
-            } catch (e: any) {
-              console.error('Failed to delete profile:', e);
-              this.showToast(this.t('toast.error', { error: e.message }), 'error');
-            }
-          });
+          this.confirmDelete(target, () => executeDeleteProfile(this, id, pin));
         });
         return;
       }
-      // No PIN — normal flow
-      const projectCount = this.currentProfile?.id === id ? this.projects.length : 0;
-      const target =
-        projectCount > 0
-          ? this.t('profile.deleteConfirm', { count: projectCount })
-          : this.t('profile.deleteConfirmNoProjects');
-      this.confirmDelete(target, async () => {
-        try {
-          await fetch('/api/profiles/' + id, { method: 'DELETE' });
-          clearProfileLocale(id);
-          this.profiles = this.profiles.filter((p: any) => p.id !== id);
-          if (this.currentProfile?.id === id) {
-            this.currentProfile = null;
-            localStorage.removeItem('sf-profileId');
-            if (this.profiles.length > 0) {
-              this.selectProfile(this.profiles[0].id);
-            } else {
-              this.showProfilePicker = true;
-            }
-          }
-          this.showToast(this.t('toast.profileDeleted'), 'success');
-        } catch (e: any) {
-          console.error('Failed to delete profile:', e);
-          this.showToast(this.t('toast.error', { error: e.message }), 'error');
-        }
-      });
+      this.confirmDelete(target, () => executeDeleteProfile(this, id));
     },
 
     async updateProfile(this: any, id: string, updates: Record<string, any>) {

@@ -1,3 +1,24 @@
+import { normalizeSummaryData } from './helpers';
+
+/** Normalize summary data and init gen props for all generations. */
+function normalizeGenerations(state: any, generations: any[]): void {
+  for (const gen of generations) {
+    normalizeSummaryData(gen);
+    state.initGenProps(gen);
+  }
+}
+
+/** Find the latest generation per type and return their ids. */
+function buildLatestByType(generations: any[]): string[] {
+  const latestByType: Record<string, any> = {};
+  for (const gen of generations) {
+    if (!latestByType[gen.type] || gen.createdAt > latestByType[gen.type].createdAt) {
+      latestByType[gen.type] = gen;
+    }
+  }
+  return Object.values(latestByType).map((gen: any) => gen.id);
+}
+
 export function createProjects() {
   return {
     sortedProjects(this: any) {
@@ -20,7 +41,7 @@ export function createProjects() {
       } catch {}
       // Auto-restore last project (important for mobile)
       const lastId = localStorage.getItem('sf-lastProjectId');
-      if (lastId && !this.currentProjectId && this.projects.find((p: any) => p.id === lastId)) {
+      if (lastId && !this.currentProjectId && this.projects.some((p: any) => p.id === lastId)) {
         await this.selectProject(lastId);
       }
     },
@@ -63,22 +84,9 @@ export function createProjects() {
         this.consigne = project.consigne || null;
         this.useConsigne = localStorage.getItem(`consigne-dismissed-${id}`) !== 'true';
         this.chatMessages = project.chat?.messages || [];
-        for (const gen of this.generations) {
-          if (gen.type === 'summary' && gen.data) {
-            if (!gen.data.citations) gen.data.citations = [];
-            if (!gen.data.vocabulary) gen.data.vocabulary = [];
-            if (!gen.data.key_points) gen.data.key_points = [];
-          }
-          this.initGenProps(gen);
-        }
-        const latestByType: Record<string, any> = {};
-        for (const gen of this.generations) {
-          if (!latestByType[gen.type] || gen.createdAt > latestByType[gen.type].createdAt) {
-            latestByType[gen.type] = gen;
-          }
-        }
-        for (const gen of Object.values(latestByType)) {
-          this.openGens[(gen as any).id] = true;
+        normalizeGenerations(this, this.generations);
+        for (const genId of buildLatestByType(this.generations)) {
+          this.openGens[genId] = true;
         }
         if (this.sources.length === 0) {
           this.activeView = 'sources';

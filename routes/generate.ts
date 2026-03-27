@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
-import { randomUUID } from 'crypto';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { randomUUID } from 'node:crypto';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { Mistral } from '@mistralai/mistralai';
 import type { Source, Generation, QuizQuestion, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -31,22 +31,26 @@ function applyConsigne(
   consigne?: { found: boolean; text: string; keyTopics: string[] },
 ): string {
   if (!consigne?.found || consigne.keyTopics.length === 0) return markdown;
-  const header = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :\n${consigne.keyTopics.map((t) => `- ${t}`).join('\n')}\n\nConcentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.\n\n---\n\n`;
+  const topicsList = consigne.keyTopics.map((t) => `- ${t}`).join('\n');
+  const header = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :\n${topicsList}\n\nConcentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.\n\n---\n\n`;
   return header + markdown;
 }
 
+const arrayLen = (data: any): string | number => (Array.isArray(data) ? data.length : '?');
+
+const TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
+  summary: (data, lang) => (data?.title ? `${lang === 'en' ? 'Note' : 'Fiche'} — ${data.title}` : 'summary'),
+  flashcards: (data) => `Flashcards (${arrayLen(data)})`,
+  quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
+  'quiz-vocal': (data, lang) => `${lang === 'en' ? 'Vocal Quiz' : 'Quiz Vocal'} (${arrayLen(data)} questions)`,
+  podcast: () => 'Podcast',
+  image: () => 'Illustration',
+  'fill-blank': (data, lang) => `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
+};
+
 function autoTitle(type: string, data: any, lang = 'fr'): string {
-  const en = lang === 'en';
-  if (type === 'summary' && data?.title) return `${en ? 'Note' : 'Fiche'} — ${data.title}`;
-  if (type === 'flashcards') return `Flashcards (${Array.isArray(data) ? data.length : '?'})`;
-  if (type === 'quiz') return `Quiz (${Array.isArray(data) ? data.length : '?'} questions)`;
-  if (type === 'quiz-vocal')
-    return `${en ? 'Vocal Quiz' : 'Quiz Vocal'} (${Array.isArray(data) ? data.length : '?'} questions)`;
-  if (type === 'podcast') return `Podcast`;
-  if (type === 'image') return 'Illustration';
-  if (type === 'fill-blank')
-    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
-  return type;
+  const formatter = TITLE_FORMATTERS[type];
+  return formatter ? formatter(data, lang) : type;
 }
 
 function resolveSourceIds(body: any, sources: Source[]): string[] {
@@ -65,12 +69,12 @@ function checkModeration(
   const profileId = project.meta.profileId;
   if (!profileId) return null;
   const profile = profileStore.get(profileId);
-  if (!profile || !profile.useModeration) return null;
+  if (!profile?.useModeration) return null;
   const selected =
     sourceIds && sourceIds.length > 0
       ? project.sources.filter((s) => sourceIds.includes(s.id))
       : project.sources;
-  const blocked = selected.find((s) => s.moderation && s.moderation.status !== 'safe');
+  const blocked = selected.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
   if (blocked) return blocked.filename;
   return null;
 }
@@ -389,7 +393,59 @@ export function generateRoutes(
     }),
   );
 
-  // --- Smart Routing (Auto) — structure multi-generation, non factorisable ---
+  // --- Smart Routing (Auto) — structure multi-generation ---
+  interface AutoCtx {
+    client: Mistral;
+    markdown: string;
+    config: ReturnType<typeof getConfig>;
+    hasConsigne: boolean;
+    lang: string;
+    ageGroup: AgeGroup;
+    sourceIds: string[];
+    count?: number;
+    pid: string;
+    store: ProjectStore;
+  }
+
+  function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
+    return {
+      id: randomUUID(),
+      title: autoTitle(type, data, ctx.lang),
+      createdAt: new Date().toISOString(),
+      sourceIds: ctx.sourceIds,
+      type,
+      data,
+    } as Generation;
+  }
+
+  const AUTO_EXECUTORS: Record<string, (ctx: AutoCtx) => Promise<Generation>> = {
+    summary: async (ctx) => {
+      const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, ctx.hasConsigne, ctx.lang, ctx.ageGroup);
+      return makeGen('summary', data, ctx);
+    },
+    flashcards: async (ctx) => {
+      const data = await generateFlashcards(ctx.client, ctx.markdown, ctx.config.models.flashcards, ctx.lang, ctx.ageGroup, ctx.count);
+      return makeGen('flashcards', data, ctx);
+    },
+    quiz: async (ctx) => {
+      const data = await generateQuiz(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count);
+      return makeGen('quiz', data, ctx);
+    },
+    'fill-blank': async (ctx) => {
+      const data = await generateFillBlank(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count);
+      return makeGen('fill-blank', data, ctx);
+    },
+    podcast: async (ctx) => {
+      const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup);
+      const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
+      const audioFilename = `podcast-${Date.now()}.mp3`;
+      const projectDir = ctx.store.getProjectDir(ctx.pid);
+      writeFileSync(join(projectDir, audioFilename), audioBuffer);
+      const audioUrl = `/output/projects/${ctx.pid}/${audioFilename}`;
+      return makeGen('podcast', { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs }, ctx);
+    },
+  };
+
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
       const project = store.getProject(req.params.pid);
@@ -419,102 +475,13 @@ export function generateRoutes(
       const generations: Generation[] = [];
       const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
+      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store };
 
       for (const step of route.plan) {
         try {
-          let gen: Generation | null = null;
-          if (step.agent === 'summary') {
-            const data = await generateSummary(
-              client,
-              markdown,
-              config.models.summary,
-              hasConsigne,
-              lang,
-              ageGroup,
-            );
-            gen = {
-              id: randomUUID(),
-              title: autoTitle('summary', data, lang),
-              createdAt: new Date().toISOString(),
-              sourceIds,
-              type: 'summary',
-              data,
-            };
-          } else if (step.agent === 'flashcards') {
-            const data = await generateFlashcards(
-              client,
-              markdown,
-              config.models.flashcards,
-              lang,
-              ageGroup,
-              count,
-            );
-            gen = {
-              id: randomUUID(),
-              title: autoTitle('flashcards', data, lang),
-              createdAt: new Date().toISOString(),
-              sourceIds,
-              type: 'flashcards',
-              data,
-            };
-          } else if (step.agent === 'quiz') {
-            const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup, count);
-            gen = {
-              id: randomUUID(),
-              title: autoTitle('quiz', data, lang),
-              createdAt: new Date().toISOString(),
-              sourceIds,
-              type: 'quiz',
-              data,
-            };
-          } else if (step.agent === 'fill-blank') {
-            const data = await generateFillBlank(
-              client,
-              markdown,
-              config.models.quiz,
-              lang,
-              ageGroup,
-              count,
-            );
-            gen = {
-              id: randomUUID(),
-              title: autoTitle('fill-blank', data, lang),
-              createdAt: new Date().toISOString(),
-              sourceIds,
-              type: 'fill-blank',
-              data,
-            };
-          } else if (step.agent === 'podcast') {
-            const podcastResult = await generatePodcastScript(
-              client,
-              markdown,
-              config.models.podcast,
-              lang,
-              ageGroup,
-            );
-            const audioBuffer = await generateAudio(
-              podcastResult.script,
-              resolveVoices(config),
-              { provider: config.ttsProvider, model: config.ttsModel, mistralClient: client },
-            );
-            const audioFilename = `podcast-${Date.now()}.mp3`;
-            const projectDir = store.getProjectDir(req.params.pid);
-            writeFileSync(join(projectDir, audioFilename), audioBuffer);
-            const audioUrl = `/output/projects/${req.params.pid}/${audioFilename}`;
-            gen = {
-              id: randomUUID(),
-              title: autoTitle('podcast', null, lang),
-              createdAt: new Date().toISOString(),
-              sourceIds,
-              type: 'podcast',
-              data: {
-                script: podcastResult.script,
-                audioUrl,
-                sourceRefs: podcastResult.sourceRefs,
-              },
-            };
-          }
-          if (gen) {
+          const executor = AUTO_EXECUTORS[step.agent];
+          if (executor) {
+            const gen = await executor(autoCtx);
             store.addGeneration(req.params.pid, gen);
             generations.push(gen);
             console.log(`  Auto: ${step.agent} OK`);

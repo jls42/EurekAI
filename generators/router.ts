@@ -6,7 +6,7 @@ export interface RoutePlan {
   context: string;
 }
 
-const VALID_AGENTS = ['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast'];
+const VALID_AGENTS = new Set(['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast']);
 
 export async function routeRequest(
   client: Mistral,
@@ -40,8 +40,8 @@ Reponds en JSON strict:
     temperature: 0.3,
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = String(response.choices![0].message.content ?? '');
   const parsed = safeParseJson<RoutePlan>(raw);
-  parsed.plan = (parsed.plan ?? []).filter((step) => VALID_AGENTS.includes(step.agent));
+  parsed.plan = (parsed.plan ?? []).filter((step) => VALID_AGENTS.has(step.agent));
   return parsed;
 }
