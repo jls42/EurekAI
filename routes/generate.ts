@@ -39,7 +39,10 @@ function applyConsigne(
 const arrayLen = (data: any): string | number => (Array.isArray(data) ? data.length : '?');
 
 const TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
-  summary: (data, lang) => (data?.title ? `${lang === 'en' ? 'Note' : 'Fiche'} — ${data.title}` : 'summary'),
+  summary: (data, lang) => {
+    const prefix = lang === 'en' ? 'Note' : 'Fiche';
+    return data?.title ? `${prefix} — ${data.title}` : 'summary';
+  },
   flashcards: (data) => `Flashcards (${arrayLen(data)})`,
   quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
   'quiz-vocal': (data, lang) => `${lang === 'en' ? 'Vocal Quiz' : 'Quiz Vocal'} (${arrayLen(data)} questions)`,
@@ -273,7 +276,7 @@ export function generateRoutes(
         return null;
       }
       const originalGen = store.getGeneration(ctx.pid, generationId);
-      if (!originalGen || originalGen.type !== 'quiz') {
+      if (originalGen?.type !== 'quiz') {
         ctx.res.status(404).json({ error: 'Quiz original introuvable' });
         return null;
       }

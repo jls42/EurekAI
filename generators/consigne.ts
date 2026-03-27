@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson } from '../helpers/index.js';
+import { getContent, safeParseJson } from '../helpers/index.js';
 import { langInstruction } from '../prompts.js';
 
 export interface ConsigneResult {
@@ -34,7 +34,7 @@ export async function detectConsigne(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
   const result = safeParseJson<ConsigneResult>(raw);
   return {
     found: result.found ?? false,

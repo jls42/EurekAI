@@ -15,13 +15,28 @@ function extractImageRef(outputs: any[]): ImageResult | null {
     if (!Array.isArray(o.content)) continue;
     for (const chunk of o.content) {
       const c = chunk as Record<string, unknown>;
-      if (c.fileId) return { type: 'fileId', value: String(c.fileId) };
-      if (c.file_id) return { type: 'fileId', value: String(c.file_id) };
-      if (c.imageUrl) return { type: 'url', value: String(c.imageUrl) };
-      if (c.url) return { type: 'url', value: String(c.url) };
+      if (c.fileId) return { type: 'fileId', value: `${c.fileId}` }; // NOSONAR(S6551) — fileId is always string from Mistral API
+      if (c.file_id) return { type: 'fileId', value: `${c.file_id}` }; // NOSONAR(S6551) — file_id is always string from Mistral API
+      if (c.imageUrl) return { type: 'url', value: `${c.imageUrl}` }; // NOSONAR(S6551) — imageUrl is always string from Mistral API
+      if (c.url) return { type: 'url', value: `${c.url}` }; // NOSONAR(S6551) — url is always string from Mistral API
     }
   }
   return null;
+}
+
+async function downloadAndSaveImage(
+  client: Mistral,
+  fileId: string,
+  projectDir: string,
+  pid: string,
+): Promise<string> {
+  console.log(`    Image fileId: ${fileId}, downloading...`);
+  const fileStream = await client.files.download({ fileId });
+  const imageBuffer = await collectStream(fileStream as any);
+  const imageFilename = `illustration-${Date.now()}.png`;
+  writeFileSync(join(projectDir, imageFilename), imageBuffer);
+  console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
+  return `/output/projects/${pid}/${imageFilename}`;
 }
 
 export async function generateImage(
@@ -42,12 +57,7 @@ export async function generateImage(
 
   try {
     const prompt = imageUser(lang, markdown);
-
-    const response = await client.beta.conversations.start({
-      agentId: agent.id,
-      inputs: prompt,
-    });
-
+    const response = await client.beta.conversations.start({ agentId: agent.id, inputs: prompt });
     const imageRef = extractImageRef(response.outputs);
 
     if (!imageRef) {
@@ -55,19 +65,10 @@ export async function generateImage(
       throw new Error("Aucune image generee par l'agent");
     }
 
-    if (imageRef.type === 'url') {
-      return { imageUrl: imageRef.value, prompt };
-    }
-
-    console.log(`    Image fileId: ${imageRef.value}, downloading...`);
-    const fileStream = await client.files.download({ fileId: imageRef.value });
-    const imageBuffer = await collectStream(fileStream as any);
-
-    const imageFilename = `illustration-${Date.now()}.png`;
-    writeFileSync(join(projectDir, imageFilename), imageBuffer);
-    const imageUrl = `/output/projects/${pid}/${imageFilename}`;
-    console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-
+    const imageUrl =
+      imageRef.type === 'url'
+        ? imageRef.value
+        : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
     return { imageUrl, prompt };
   } finally {
     await client.beta.agents.delete({ agentId: agent.id }).catch(() => {});

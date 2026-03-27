@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { podcastSystem, podcastUser } from '../prompts.js';
 import type { PodcastLine, AgeGroup } from '../types.js';
 
@@ -48,7 +48,7 @@ export async function generatePodcastScript(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
   const result = parsePodcastResponse(raw);
 
   if (isValidPodcast(result.script)) return result;
@@ -71,7 +71,7 @@ export async function generatePodcastScript(
     messages,
     responseFormat: { type: 'json_object' },
   });
-  const retryResult = parsePodcastResponse(String(retry.choices![0].message.content ?? ''));
+  const retryResult = parsePodcastResponse(getContent(retry));
 
   if (!isValidPodcast(retryResult.script)) {
     throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");

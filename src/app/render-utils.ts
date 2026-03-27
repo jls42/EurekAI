@@ -55,7 +55,7 @@ export function sanitizeRenderedHtml(html: string): string {
   let safe = html.replaceAll(BLOCKED_TAG_RE, '');
   safe = safe.replaceAll(EVENT_HANDLER_RE, '');
   safe = safe.replaceAll(STYLE_ATTR_RE, '');
-  safe = safe.replace(
+  safe = safe.replaceAll(
     URL_ATTR_RE,
     (_match, attr: string, dq?: string, sq?: string, bare?: string) => {
       const raw = dq ?? sq ?? bare ?? '';

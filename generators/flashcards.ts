@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { flashcardsSystem, flashcardsUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
 
@@ -28,7 +28,7 @@ export async function generateFlashcards(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
   const data = unwrapJsonArray<Flashcard>(safeParseJson(raw));
 
   if (isValidFlashcards(data)) return data;
@@ -48,7 +48,7 @@ export async function generateFlashcards(
     messages,
     responseFormat: { type: 'json_object' },
   });
-  const retryRaw = String(retry.choices![0].message.content ?? '');
+  const retryRaw = getContent(retry);
   const retryData = unwrapJsonArray<Flashcard>(safeParseJson(retryRaw));
 
   if (!isValidFlashcards(retryData)) {

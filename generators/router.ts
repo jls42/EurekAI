@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson } from '../helpers/index.js';
+import { getContent, safeParseJson } from '../helpers/index.js';
 
 export interface RoutePlan {
   plan: Array<{ agent: string; reason: string }>;
@@ -40,7 +40,7 @@ Reponds en JSON strict:
     temperature: 0.3,
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
   const parsed = safeParseJson<RoutePlan>(raw);
   parsed.plan = (parsed.plan ?? []).filter((step) => VALID_AGENTS.has(step.agent));
   return parsed;

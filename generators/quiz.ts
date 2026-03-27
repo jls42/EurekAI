@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import {
   quizSystem,
   quizUser,
@@ -43,7 +43,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
   const data = unwrapJsonArray<QuizQuestion>(safeParseJson(raw));
 
   if (isValidQuiz(data)) return data;
@@ -57,7 +57,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
   });
   const retryData = unwrapJsonArray<QuizQuestion>(
-    safeParseJson(String(retry.choices![0].message.content ?? '')),
+    safeParseJson(getContent(retry)),
   );
 
   if (!isValidQuiz(retryData)) {

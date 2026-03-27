@@ -31,12 +31,12 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
-      if (!gen || gen.type !== 'quiz') {
+      if (gen?.type !== 'quiz') {
         res.status(404).json({ error: 'Quiz introuvable' });
         return;
       }
 
-      const quizGen = gen as QuizGeneration;
+      const quizGen = gen as QuizGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz' guard
       quizGen.stats ??= { attempts: [], questionStats: {} };
 
       let score = 0;
@@ -77,12 +77,12 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
-      if (!gen || gen.type !== 'fill-blank') {
+      if (gen?.type !== 'fill-blank') {
         res.status(404).json({ error: 'Exercice a trous introuvable' });
         return;
       }
 
-      const fbGen = gen as FillBlankGeneration;
+      const fbGen = gen as FillBlankGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'fill-blank' guard
       fbGen.stats ??= { attempts: [], questionStats: {} };
 
       let score = 0;
@@ -149,12 +149,12 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       const pid = String(req.params.pid);
       const gid = String(req.params.gid);
       const gen = store.getGeneration(pid, gid);
-      if (!gen || gen.type !== 'quiz-vocal') {
+      if (gen?.type !== 'quiz-vocal') {
         res.status(404).json({ error: 'Quiz vocal introuvable' });
         return;
       }
       const questionIndex = Number(req.body.questionIndex ?? 0);
-      const quizGen = gen as QuizVocalGeneration;
+      const quizGen = gen as QuizVocalGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz-vocal' guard
       const question = quizGen.data[questionIndex];
       if (!question) {
         res.status(400).json({ error: 'Index de question invalide' });
@@ -202,11 +202,11 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
 
       let text = '';
       if (gen.type === 'summary') {
-        const d = (gen as SummaryGeneration).data;
+        const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
         text = `${d.title}. ${d.summary}. Points cles: ${d.key_points.join('. ')}.`;
         if (d.fun_fact) text += ` Le savais-tu ? ${d.fun_fact}`;
       } else if (gen.type === 'flashcards') {
-        const cards = gen.data as Array<{ question: string; answer: string }>;
+        const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
         text = cards
           .map((c, i) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`)
           .join(' ');
@@ -230,7 +230,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
 
       if (gen.type === 'summary') {
         store.updateGeneration(req.params.pid, req.params.gid, {
-          data: { ...(gen as SummaryGeneration).data, audioUrl },
+          data: { ...(gen as SummaryGeneration).data, audioUrl }, // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
         } as any);
       }
 

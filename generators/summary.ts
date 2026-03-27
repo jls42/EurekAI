@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson } from '../helpers/index.js';
+import { getContent, safeParseJson } from '../helpers/index.js';
 import { summarySystem, summaryUser } from '../prompts.js';
 import type { StudyFiche, AgeGroup } from '../types.js';
 
@@ -84,7 +84,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = String(response.choices![0].message.content ?? '');
+  const raw = getContent(response);
 
   try {
     const data = extractSummary(raw);
@@ -109,7 +109,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const retryRaw = String(retry.choices![0].message.content ?? '');
+  const retryRaw = getContent(retry);
   const retryData = extractSummary(retryRaw);
 
   if (!isValidSummary(retryData)) {
