@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson } from '../helpers/index.js';
+import { getContent, safeParseJson } from '../helpers/index.js';
 import { summarySystem, summaryUser } from '../prompts.js';
 import type { StudyFiche, AgeGroup } from '../types.js';
 
@@ -33,7 +33,7 @@ function unwrapAndMerge(data: Record<string, unknown>): StudyFiche | null {
       .filter(Boolean)
       .join(' '),
     key_points: fiches.flatMap((f: any) => f.key_points || []),
-    fun_fact: fiches.map((f: any) => f.fun_fact).filter(Boolean)[0] || '',
+    fun_fact: fiches.map((f: any) => f.fun_fact).find(Boolean) || '',
     vocabulary: fiches.flatMap((f: any) => f.vocabulary || []),
     citations: fiches.flatMap((f: any) => f.citations || []),
   };
@@ -84,7 +84,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = getContent(response);
 
   try {
     const data = extractSummary(raw);
@@ -109,7 +109,7 @@ export async function generateSummary(
     responseFormat: { type: 'json_object' },
   });
 
-  const retryRaw = retry.choices![0].message.content as string;
+  const retryRaw = getContent(retry);
   const retryData = extractSummary(retryRaw);
 
   if (!isValidSummary(retryData)) {

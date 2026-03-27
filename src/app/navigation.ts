@@ -2,7 +2,7 @@ export function createNavigation() {
   return {
     goToView(this: any, view: string) {
       if (view === 'chat' && !this.currentProfile?.chatEnabled) return;
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const prefersReducedMotion = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
       if (document.startViewTransition && !prefersReducedMotion) {
         document.startViewTransition(() => {
           this.activeView = view;
@@ -21,7 +21,7 @@ export function createNavigation() {
 
     toggleTheme(this: any) {
       this.theme = this.theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', this.theme);
+      document.documentElement.dataset.theme = this.theme;
       localStorage.setItem('sf-theme', this.theme);
       this.$nextTick(() => this.refreshIcons());
     },

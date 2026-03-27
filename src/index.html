@@ -9,18 +9,17 @@
       // Anti-flash: apply theme before any rendering
       (function () {
         var t = localStorage.getItem('sf-theme');
-        if (!t) t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-        document.documentElement.setAttribute('data-theme', t);
+        if (!t) t = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        document.documentElement.dataset.theme = t;
         document.documentElement.lang = localStorage.getItem('sf-lang') || 'fr';
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- NOSONAR(S5725) — Google Fonts CSS is generated dynamically per browser, SRI not applicable -->
     <link
       href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap"
       rel="stylesheet"
-    />
+    /> <!-- NOSONAR(S5725) — Google Fonts CSS is generated dynamically per browser, SRI not applicable -->
   </head>
   <body class="bg-canvas min-h-screen" x-data="app()" x-init="init()" x-cloak>
     <a

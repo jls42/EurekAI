@@ -7,7 +7,7 @@ export function createI18n() {
 
     t(this: any, key: string, params?: Record<string, string | number>): string {
       // Read this.locale to create Alpine reactivity dependency
-      void this.locale;
+      this.locale; // NOSONAR(S3735) — Alpine.js reactive dependency trigger
       return i18nT(key, params);
     },
 

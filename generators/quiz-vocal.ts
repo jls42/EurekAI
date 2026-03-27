@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson } from '../helpers/index.js';
+import { getContent, safeParseJson } from '../helpers/index.js';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { langInstruction } from '../prompts.js';
 import type { QuizQuestion } from '../types.js';
@@ -69,6 +69,6 @@ Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruct
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = getContent(response);
   return safeParseJson<{ correct: boolean; feedback: string }>(raw);
 }

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
 import type { Source } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -81,7 +81,7 @@ export function sourceRoutes(
   const dynamicUpload = multer({
     storage: multer.diskStorage({
       destination: (req, _file, cb) => {
-        const pid = req.params.pid as string;
+        const pid = String(req.params.pid);
         cb(null, store.getUploadDir(pid));
       },
       filename: (_req, file, cb) => cb(null, `${randomUUID()}-${file.originalname}`),
@@ -96,7 +96,7 @@ export function sourceRoutes(
 
   // Upload files (OCR)
   router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
-    const pid = req.params.pid as string;
+    const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
       res.status(404).json({ error: 'Projet introuvable' });
@@ -187,7 +187,7 @@ export function sourceRoutes(
 
   // Voice input (Voxtral STT)
   router.post('/:pid/sources/voice', memoryUpload.single('audio'), async (req, res) => {
-    const pid = req.params.pid as string;
+    const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
       res.status(404).json({ error: 'Projet introuvable' });
@@ -235,7 +235,7 @@ export function sourceRoutes(
 
   // Web search source
   router.post('/:pid/sources/websearch', async (req, res) => {
-    const pid = req.params.pid as string;
+    const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
       res.status(404).json({ error: 'Projet introuvable' });
@@ -297,7 +297,7 @@ export function sourceRoutes(
 
   // Consigne detection (manual trigger)
   router.post('/:pid/detect-consigne', async (req, res) => {
-    const pid = req.params.pid as string;
+    const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
       res.status(404).json({ error: 'Projet introuvable' });

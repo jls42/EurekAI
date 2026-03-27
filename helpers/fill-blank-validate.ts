@@ -9,17 +9,17 @@ export function normalizeAnswer(text: string): string {
     text
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+      .replaceAll(/[\u0300-\u036f]/g, '')
       .trim()
-      .replace(/\s+/g, ' ')
-      .replace(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''), // NOSONAR(S5852) — simple char-class alternation anchored to start/end, no backtracking risk
+      .replaceAll(/\s+/g, ' ')
+      .replaceAll(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''), // NOSONAR(S5852) — simple char-class alternation anchored to start/end, no backtracking risk
   );
 }
 
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
-  const dp: number[][] = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+  const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
   for (let i = 0; i <= m; i++) dp[i][0] = i;
   for (let j = 0; j <= n; j++) dp[0][j] = j;
   for (let i = 1; i <= m; i++) {
@@ -48,7 +48,10 @@ export function validateFillBlankAnswer(
   if (norm === expected) return { match: true, distance: 0 };
 
   const distance = levenshtein(norm, expected);
-  const threshold = expected.length <= 5 ? 1 : expected.length <= 12 ? 2 : 3;
+  let threshold: number;
+  if (expected.length <= 5) threshold = 1;
+  else if (expected.length <= 12) threshold = 2;
+  else threshold = 3;
 
   return { match: distance <= threshold, distance };
 }

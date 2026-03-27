@@ -1,3 +1,9 @@
+/** Extract text content from a Mistral chat completion response choice. */
+export function getContent(response: { choices?: Array<{ message: { content?: unknown } }> }): string {
+  const content = response.choices?.[0]?.message?.content;
+  return typeof content === 'string' ? content : '';
+}
+
 /** Retire les blocs ```json ``` autour du JSON retourne par les LLMs */
 export function stripJsonMarkdown(text: string): string {
   return text.replace(/```json\s*|\s*```/g, '').trim(); // NOSONAR — bounded by literal backticks, input from LLM only

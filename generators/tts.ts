@@ -1,8 +1,8 @@
-import { execFile } from 'child_process';
-import { promisify } from 'util';
-import { writeFile, readFile, unlink, mkdtemp } from 'fs/promises';
-import { tmpdir } from 'os';
-import { join } from 'path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { writeFile, readFile, unlink, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';

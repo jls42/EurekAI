@@ -1,14 +1,12 @@
 export function createConfirm() {
   return {
     confirmDelete(this: any, target: string, callback: () => void) {
-      this.confirmTarget =
-        target === 'projet'
-          ? this.t('confirm.project')
-          : target === 'source'
-            ? this.t('confirm.source')
-            : target === 'generation'
-              ? this.t('confirm.generation')
-              : target;
+      const confirmLabels: Record<string, string> = {
+        projet: 'confirm.project',
+        source: 'confirm.source',
+        generation: 'confirm.generation',
+      };
+      this.confirmTarget = confirmLabels[target] ? this.t(confirmLabels[target]) : target;
       this.confirmCallback = callback;
       this.confirmTrigger = document.activeElement as HTMLElement;
       this.$refs.confirmDialog?.showModal();

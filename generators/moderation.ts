@@ -6,7 +6,7 @@ export const MODERATION_CHUNK_SIZE = 20_000;
 function isUnsafe(categories: Record<string, boolean>, blockedCategories?: string[]): boolean {
   return blockedCategories && blockedCategories.length > 0
     ? blockedCategories.some((cat) => categories[cat] === true)
-    : Object.values(categories).some((value) => value === true);
+    : Object.values(categories).includes(true);
 }
 
 function mergeCategories(

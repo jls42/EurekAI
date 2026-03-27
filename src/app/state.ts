@@ -121,7 +121,7 @@ export function createState() {
     // Theme
     theme: (function () {
       const t = localStorage.getItem('sf-theme');
-      if (!t) return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (!t) return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       return t;
     })(),
 

@@ -52,7 +52,7 @@ Ne mets PAS systematiquement Source 1 — lis chaque source et identifie laquell
 // ── Summary ──────────────────────────────────────────────────────────
 
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
-  return `Cree UNE SEULE fiche de revision COMPLETE et structuree en JSON strict.
+  return String.raw`Cree UNE SEULE fiche de revision COMPLETE et structuree en JSON strict.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
 IMPORTANT : meme si le contenu couvre plusieurs sujets, fais UNE SEULE fiche. Ne retourne PAS {"fiches": [...]}.
 
@@ -62,7 +62,7 @@ Avant de rediger, identifie tous les themes et notions cles dans les sources.
 REGLES DE COUVERTURE :
 - Si des CONSIGNES DE REVISION sont presentes, couvre CHAQUE point mentionne sans exception.
 - Sinon, couvre chaque source en y extrayant toutes les notions essentielles.
-- summary : un vrai resume complet du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\\n\\n) pour separer les paragraphes par theme.
+- summary : un vrai resume complet du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
 - key_points : autant que necessaire pour tout couvrir (10-25 typiquement). Chaque point est une phrase complete, informative, avec les faits, dates et noms importants. Pas juste des titres.
 - vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.

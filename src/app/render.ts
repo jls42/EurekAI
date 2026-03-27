@@ -39,7 +39,7 @@ export function createRender() {
       if (!r.citations) r.citations = [];
       if (!r.vocabulary) r.vocabulary = [];
       if (!r.key_points) r.key_points = [];
-      r.key_points = r.key_points.filter((pt: string) => pt && pt.trim());
+      r.key_points = r.key_points.filter((pt: string) => pt?.trim());
       return r;
     },
 

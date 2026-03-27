@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
 import type { ProjectStore } from '../store.js';
 import type { ChatMessage, Generation, AgeGroup } from '../types.js';
@@ -13,14 +13,125 @@ import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 
+const arrayLen = (data: any): string | number => (Array.isArray(data) ? data.length : '?');
+
+const CHAT_TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
+  summary: (data, lang) => {
+    const prefix = lang === 'en' ? 'Note' : 'Fiche';
+    return data?.title ? `${prefix} — ${data.title}` : 'summary';
+  },
+  flashcards: (data) => `Flashcards (${arrayLen(data)})`,
+  quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
+  'fill-blank': (data, lang) => `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
+};
+
 function autoTitle(type: string, data: any, lang = 'fr'): string {
-  const en = lang === 'en';
-  if (type === 'summary' && data?.title) return `${en ? 'Note' : 'Fiche'} — ${data.title}`;
-  if (type === 'flashcards') return `Flashcards (${Array.isArray(data) ? data.length : '?'})`;
-  if (type === 'quiz') return `Quiz (${Array.isArray(data) ? data.length : '?'} questions)`;
-  if (type === 'fill-blank')
-    return `${en ? 'Fill-in-the-blanks' : 'Textes à trous'} (${Array.isArray(data) ? data.length : '?'})`;
-  return type;
+  const formatter = CHAT_TITLE_FORMATTERS[type];
+  return formatter ? formatter(data, lang) : type;
+}
+
+interface ChatRequestContext {
+  pid: string;
+  project: ReturnType<ProjectStore['getProject']> & {};
+  profile: ReturnType<ProfileStore['get']>;
+  message: string;
+  lang: string;
+  ageGroup: AgeGroup;
+}
+
+class ChatValidationError {
+  constructor(
+    public status: number,
+    public error: string,
+  ) {}
+}
+
+async function validateChatRequest(
+  req: { params: { pid: string }; body: any },
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+): Promise<ChatRequestContext | ChatValidationError> {
+  const pid = req.params.pid;
+  const project = store.getProject(pid);
+  if (!project) return new ChatValidationError(404, 'Projet introuvable');
+
+  const profileId = project.meta.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+  if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
+
+  const { message, lang: reqLang, ageGroup: reqAgeGroup } = req.body;
+  const lang = reqLang || 'fr';
+  const ageGroup: AgeGroup = reqAgeGroup || 'enfant';
+  if (!message || typeof message !== 'string') return new ChatValidationError(400, 'message requis');
+
+  if (profile?.useModeration) {
+    const categories = MODERATION_CATEGORIES[profile.ageGroup] || [];
+    if (categories.length > 0) {
+      const modResult = await moderateContent(client, message.trim(), categories);
+      if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');
+    }
+  }
+
+  return { pid, project, profile, message, lang, ageGroup };
+}
+
+interface ToolCallCtx {
+  client: Mistral;
+  markdown: string;
+  config: ReturnType<typeof getConfig>;
+  lang: string;
+  ageGroup: AgeGroup;
+  sourceIds: string[];
+}
+
+const CHAT_TOOL_EXECUTORS: Record<string, (ctx: ToolCallCtx) => Promise<Generation>> = {
+  summary: async (ctx) => {
+    const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, false, ctx.lang, ctx.ageGroup);
+    return { id: randomUUID(), title: autoTitle('summary', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'summary', data };
+  },
+  flashcards: async (ctx) => {
+    const data = await generateFlashcards(ctx.client, ctx.markdown, ctx.config.models.flashcards, ctx.lang, ctx.ageGroup);
+    return { id: randomUUID(), title: autoTitle('flashcards', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'flashcards', data };
+  },
+  quiz: async (ctx) => {
+    const data = await generateQuiz(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup);
+    return { id: randomUUID(), title: autoTitle('quiz', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'quiz', data };
+  },
+  'fill-blank': async (ctx) => {
+    const data = await generateFillBlank(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup);
+    return { id: randomUUID(), title: autoTitle('fill-blank', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'fill-blank', data };
+  },
+};
+
+async function processChatToolCalls(
+  toolCalls: string[],
+  ctx: ToolCallCtx,
+  store: ProjectStore,
+  pid: string,
+): Promise<{ generatedIds: string[]; generations: Generation[]; failedTools: string[] }> {
+  const generatedIds: string[] = [];
+  const generations: Generation[] = [];
+  const failedTools: string[] = [];
+
+  for (const call of toolCalls) {
+    try {
+      const type = call.replace('generate_', '');
+      const executor = CHAT_TOOL_EXECUTORS[type];
+      if (executor) {
+        const gen = await executor(ctx);
+        store.addGeneration(pid, gen);
+        generatedIds.push(gen.id);
+        generations.push(gen);
+        console.log(`  Chat tool: ${type} generated`);
+      }
+    } catch (err) {
+      console.error(`  Chat tool ${call} failed:`, err);
+      failedTools.push(call);
+    }
+  }
+
+  return { generatedIds, generations, failedTools };
 }
 
 export function chatRoutes(
@@ -33,40 +144,12 @@ export function chatRoutes(
   // Send message
   router.post('/:pid/chat', async (req, res) => {
     try {
-      const pid = req.params.pid;
-      const project = store.getProject(pid);
-      if (!project) {
-        res.status(404).json({ error: 'Projet introuvable' });
+      const validated = await validateChatRequest(req as any, store, profileStore, client);
+      if (validated instanceof ChatValidationError) {
+        res.status(validated.status).json({ error: validated.error });
         return;
       }
-
-      // Age restriction: get profile and check age
-      const profileId = project.meta.profileId;
-      const profile = profileId ? profileStore.get(profileId) : null;
-      if (profile && profile.chatEnabled === false) {
-        res.status(403).json({ error: 'chat.ageRestricted' });
-        return;
-      }
-
-      const { message, lang: reqLang, ageGroup: reqAgeGroup } = req.body;
-      const lang = reqLang || 'fr';
-      const ageGroup: AgeGroup = reqAgeGroup || 'enfant';
-      if (!message || typeof message !== 'string') {
-        res.status(400).json({ error: 'message requis' });
-        return;
-      }
-
-      // Moderation check
-      if (profile && profile.useModeration) {
-        const categories = MODERATION_CATEGORIES[profile.ageGroup] || [];
-        if (categories.length > 0) {
-          const modResult = await moderateContent(client, message.trim(), categories);
-          if (modResult.status !== 'safe') {
-            res.status(400).json({ error: 'chat.moderationBlocked' });
-            return;
-          }
-        }
-      }
+      const { pid, project, message, lang, ageGroup } = validated;
 
       const existingMessages = project.chat?.messages ?? [];
       const userMsg: ChatMessage = {
@@ -80,7 +163,6 @@ export function chatRoutes(
       }));
       store.appendChatMessage(pid, userMsg);
 
-      // Build context
       const sourceContext =
         project.sources.length > 0
           ? getMarkdown(project.sources)
@@ -98,90 +180,21 @@ export function chatRoutes(
       );
 
       // Process tool calls — generate content
-      const generatedIds: string[] = [];
-      const generatedGens: Generation[] = [];
-      const failedTools: string[] = [];
+      let generatedIds: string[] = [];
+      let generatedGens: Generation[] = [];
+      let failedTools: string[] = [];
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
         const markdown = getMarkdown(project.sources);
         const sourceIds = project.sources.map((s) => s.id);
-
-        for (const call of result.toolCalls) {
-          try {
-            const type = call.replace('generate_', '');
-            let gen: Generation | null = null;
-
-            if (type === 'summary') {
-              const data = await generateSummary(
-                client,
-                markdown,
-                config.models.summary,
-                false,
-                lang,
-                ageGroup,
-              );
-              gen = {
-                id: randomUUID(),
-                title: autoTitle('summary', data, lang),
-                createdAt: new Date().toISOString(),
-                sourceIds,
-                type: 'summary',
-                data,
-              };
-            } else if (type === 'flashcards') {
-              const data = await generateFlashcards(
-                client,
-                markdown,
-                config.models.flashcards,
-                lang,
-                ageGroup,
-              );
-              gen = {
-                id: randomUUID(),
-                title: autoTitle('flashcards', data, lang),
-                createdAt: new Date().toISOString(),
-                sourceIds,
-                type: 'flashcards',
-                data,
-              };
-            } else if (type === 'quiz') {
-              const data = await generateQuiz(client, markdown, config.models.quiz, lang, ageGroup);
-              gen = {
-                id: randomUUID(),
-                title: autoTitle('quiz', data, lang),
-                createdAt: new Date().toISOString(),
-                sourceIds,
-                type: 'quiz',
-                data,
-              };
-            } else if (type === 'fill-blank') {
-              const data = await generateFillBlank(
-                client,
-                markdown,
-                config.models.quiz,
-                lang,
-                ageGroup,
-              );
-              gen = {
-                id: randomUUID(),
-                title: autoTitle('fill-blank', data, lang),
-                createdAt: new Date().toISOString(),
-                sourceIds,
-                type: 'fill-blank',
-                data,
-              };
-            }
-
-            if (gen) {
-              store.addGeneration(pid, gen);
-              generatedIds.push(gen.id);
-              generatedGens.push(gen);
-              console.log(`  Chat tool: ${type} generated`);
-            }
-          } catch (err) {
-            console.error(`  Chat tool ${call} failed:`, err);
-            failedTools.push(call);
-          }
-        }
+        const toolResult = await processChatToolCalls(
+          result.toolCalls,
+          { client, markdown, config, lang, ageGroup, sourceIds },
+          store,
+          pid,
+        );
+        generatedIds = toolResult.generatedIds;
+        generatedGens = toolResult.generations;
+        failedTools = toolResult.failedTools;
       }
 
       // Add assistant message

@@ -61,7 +61,7 @@ export function quizVocalComponent(gen: any) {
     },
 
     stopVocalRecording() {
-      if (this.vocalRecorder && this.vocalRecorder.state === 'recording') {
+      if (this.vocalRecorder?.state === 'recording') {
         this.vocalRecorder.stop();
       }
       this.vocalRecording = false;

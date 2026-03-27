@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
-import { randomUUID, createHash } from 'crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { randomUUID, createHash } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
 
 // --- Age group derivation ---
@@ -17,7 +17,6 @@ export function ageToGroup(age: number): AgeGroup {
 // Categories that block content per age group
 // Mistral moderation categories: sexual, hate_and_discrimination, violence_and_threats,
 // dangerous_and_criminal_content, selfharm, health, financial, law, pii
-// TODO: Allow parents (via PIN) to enable/disable individual moderation categories per profile
 // dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
 export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {
   enfant: [
@@ -68,7 +67,7 @@ export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { 
 // --- Profile store ---
 
 export class ProfileStore {
-  private filePath: string;
+  private readonly filePath: string;
 
   constructor(outputDir: string) {
     this.filePath = join(outputDir, 'profiles.json');

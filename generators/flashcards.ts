@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { flashcardsSystem, flashcardsUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
 
@@ -28,25 +28,27 @@ export async function generateFlashcards(
     responseFormat: { type: 'json_object' },
   });
 
-  const raw = response.choices![0].message.content as string;
+  const raw = getContent(response);
   const data = unwrapJsonArray<Flashcard>(safeParseJson(raw));
 
   if (isValidFlashcards(data)) return data;
 
   console.warn('Flashcards validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
-  messages.push({ role: 'assistant', content: raw });
-  messages.push({
-    role: 'user',
-    content:
-      'Ta reponse etait vide ou incomplete. Regenere les 5 flashcards avec question et answer. Reponds en JSON valide.',
-  });
+  messages.push(
+    { role: 'assistant', content: raw },
+    {
+      role: 'user',
+      content:
+        'Ta reponse etait vide ou incomplete. Regenere les 5 flashcards avec question et answer. Reponds en JSON valide.',
+    },
+  );
 
   const retry = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
   });
-  const retryRaw = retry.choices![0].message.content as string;
+  const retryRaw = getContent(retry);
   const retryData = unwrapJsonArray<Flashcard>(safeParseJson(retryRaw));
 
   if (!isValidFlashcards(retryData)) {

@@ -1,6 +1,6 @@
-import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync } from 'fs';
-import { join } from 'path';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync } from 'node:fs';
+import { join } from 'node:path';
 import type {
   ProjectMeta,
   ProjectData,
@@ -11,9 +11,9 @@ import type {
 } from './types.js';
 
 export class ProjectStore {
-  private baseDir: string;
-  private indexPath: string;
-  private projectsDir: string;
+  private readonly baseDir: string;
+  private readonly indexPath: string;
+  private readonly projectsDir: string;
 
   constructor(outputDir: string) {
     this.baseDir = outputDir;
@@ -159,7 +159,7 @@ export class ProjectStore {
   ): ChatMessage[] | null {
     const data = this.getProject(projectId);
     if (!data) return null;
-    if (!data.chat) data.chat = { messages: [] };
+    data.chat ??= { messages: [] };
     data.chat.messages.push(message);
     if (data.chat.messages.length > maxMessages) {
       data.chat.messages = data.chat.messages.slice(-maxMessages);
