@@ -23,7 +23,7 @@ export const en: Record<string, string> = {
   'gen.quiz-vocal': 'Vocal Quiz',
   'gen.fill-blank': 'Fill-in-the-blanks',
   'gen.image': 'Image',
-  'gen.auto': 'Auto',
+  'gen.auto': 'Auto — analyzing...',
   'gen.all': 'Generate all',
   'gen.voice': 'Read aloud',
   'gen.websearch': 'Web search',

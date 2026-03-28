@@ -26,7 +26,7 @@ export const fr: Record<string, string> = {
   'gen.quiz-vocal': 'Quiz vocal',
   'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
-  'gen.auto': 'Auto',
+  'gen.auto': 'Auto — analyse...',
   'gen.all': 'Tout generer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',

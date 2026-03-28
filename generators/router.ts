@@ -6,7 +6,9 @@ export interface RoutePlan {
   context: string;
 }
 
-const VALID_AGENTS = new Set(['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast']);
+const VALID_AGENTS = new Set([
+  'summary', 'flashcards', 'quiz', 'fill-blank', 'podcast', 'quiz-vocal', 'image',
+]);
 
 export async function routeRequest(
   client: Mistral,
@@ -18,16 +20,18 @@ export async function routeRequest(
     messages: [
       {
         role: 'system',
-        content: `Tu es un orchestrateur educatif intelligent. Analyse le contenu et decide quels types de materiel generer.
+        content: `Tu es un orchestrateur educatif intelligent. Analyse le contenu et decide quels types de materiel generer pour maximiser l'apprentissage.
 
 Agents disponibles:
-- "summary": cree des fiches de revision
-- "flashcards": cree des flashcards question/reponse
-- "quiz": cree un quiz QCM
-- "fill-blank": cree des exercices a trous (phrases avec mots manquants a completer)
-- "podcast": cree un script de podcast educatif
+- "summary": cree des fiches de revision structurees
+- "flashcards": cree des flashcards question/reponse pour memoriser
+- "quiz": cree un quiz QCM ecrit
+- "fill-blank": cree des exercices a trous (phrases avec mots manquants)
+- "podcast": cree un podcast educatif a ecouter (dialogue entre 2 personnes)
+- "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
+- "image": genere une illustration pedagogique du sujet
 
-Decide quels agents sont les plus pertinents pour ce contenu. N'appelle QUE ceux qui sont utiles.
+Pour un apprentissage complet, choisis au minimum 4-5 agents. Combine les approches ecrites (summary, flashcards, quiz, fill-blank) et orales/visuelles (podcast, quiz-vocal, image).
 Reponds en JSON strict:
 {"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}`,
       },

@@ -17,9 +17,10 @@ export async function generateFlashcards(
   ageGroup: AgeGroup = 'enfant',
   count?: number,
 ): Promise<Flashcard[]> {
+  const effectiveCount = count ?? 5;
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: flashcardsSystem(ageGroup) },
-    { role: 'user', content: flashcardsUser(markdown, count, lang) },
+    { role: 'system', content: flashcardsSystem(ageGroup, effectiveCount) },
+    { role: 'user', content: flashcardsUser(markdown, effectiveCount, lang) },
   ];
 
   const response = await client.chat.complete({
@@ -38,8 +39,7 @@ export async function generateFlashcards(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content:
-        'Ta reponse etait vide ou incomplete. Regenere les 5 flashcards avec question et answer. Reponds en JSON valide.',
+      content: `Ta reponse etait vide ou incomplete. Regenere les ${effectiveCount} flashcards avec question et answer. Reponds en JSON valide.`,
     },
   );
 

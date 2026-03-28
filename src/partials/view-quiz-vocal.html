@@ -106,20 +106,12 @@
                 </div>
               </div>
               <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
-                <button
-                  @click="playQuestion()"
-                  :disabled="!currentAudioUrl()"
-                  class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button font-semibold text-body-sm flex items-center gap-2 bg-gen-quizvocal/10 text-gen-quizvocal hover:bg-gen-quizvocal/20 disabled:opacity-50 btn-press focus-ring"
-                >
-                  <i data-lucide="play" class="w-5 h-5"></i>
-                  <span x-text="t('quiz.listen')"></span>
-                </button>
                 <audio
                   x-show="currentAudioUrl()"
                   x-ref="questionAudio"
                   controls
                   preload="metadata"
-                  class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
+                  class="w-full min-w-0 max-w-full sm:flex-1 sm:max-w-xl"
                   :src="currentAudioUrl()"
                   @play="audioPlaying = true"
                   @pause="audioPlaying = false"
@@ -127,7 +119,7 @@
                 ></audio>
                 <span
                   x-show="audioPlaying"
-                  class="text-sm text-text-secondary animate-pulse"
+                  class="text-sm text-text-secondary animate-pulse shrink-0"
                   x-text="t('quiz.listening')"
                 ></span>
               </div>
