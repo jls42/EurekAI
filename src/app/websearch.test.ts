@@ -97,6 +97,33 @@ describe('createWebsearch', () => {
       expect(ctx.loading.websearch).toBe(false);
     });
 
+    it('retry callback in error toast re-invokes searchWeb', async () => {
+      // Bind searchWeb to the context so `this.searchWeb()` works in the retry callback
+      ctx.searchWeb = ws.searchWeb.bind(ctx);
+
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network timeout'));
+
+      await ctx.searchWeb();
+
+      // Extract the retry callback (3rd argument to showToast)
+      const retryCallback = ctx.showToast.mock.calls[0][2];
+      expect(typeof retryCallback).toBe('function');
+
+      // When called, the retry callback should invoke searchWeb again
+      const source = { id: 's1', type: 'websearch', text: 'Results' };
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => source,
+      } as any);
+
+      // Reset query since it was preserved on error
+      ctx.webQuery = 'photosynthesis';
+      await retryCallback();
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(ctx.sources).toEqual([source]);
+    });
+
     it('sets loading.websearch during execution', async () => {
       let resolvePromise: (v: any) => void;
       vi.mocked(globalThis.fetch).mockReturnValueOnce(

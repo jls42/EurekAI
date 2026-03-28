@@ -745,6 +745,65 @@ describe('questionSources', () => {
   });
 });
 
+describe('flashcardSource', () => {
+  const sources = [
+    { id: 's1', filename: 'file1.jpg' },
+    { id: 's2', filename: 'file2.jpg' },
+  ];
+
+  it('resolves sourceRefs array', () => {
+    const ctx = {
+      genSources: () => sources,
+      resolveSourceRef: helpers.resolveSourceRef,
+    };
+    const fc = { sourceRefs: ['Source 1', 'Source 2'] };
+    const result = callWith<any[]>(helpers.flashcardSource, ctx, {}, fc);
+    expect(result).toHaveLength(2);
+    expect(result[0]).toBe(sources[0]);
+    expect(result[1]).toBe(sources[1]);
+  });
+
+  it('falls back to legacy source field', () => {
+    const ctx = {
+      genSources: () => sources,
+      resolveSourceRef: helpers.resolveSourceRef,
+    };
+    const fc = { source: 'Source 1' };
+    const result = callWith<any[]>(helpers.flashcardSource, ctx, {}, fc);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(sources[0]);
+  });
+
+  it('returns empty array when no refs', () => {
+    const ctx = {
+      genSources: () => sources,
+      resolveSourceRef: helpers.resolveSourceRef,
+    };
+    const result = callWith<any[]>(helpers.flashcardSource, ctx, {}, {});
+    expect(result).toEqual([]);
+  });
+
+  it('filters out unresolved refs', () => {
+    const ctx = {
+      genSources: () => sources,
+      resolveSourceRef: helpers.resolveSourceRef,
+    };
+    const fc = { sourceRefs: ['Source 1', 'Source 99'] };
+    const result = callWith<any[]>(helpers.flashcardSource, ctx, {}, fc);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(sources[0]);
+  });
+});
+
+describe('refreshIcons', () => {
+  it('does not propagate error when createIcons throws', () => {
+    // In the test environment, createIcons may throw because there is no DOM.
+    // refreshIcons wraps the call in try/catch and swallows the error.
+    // This test verifies the catch block prevents any error from propagating.
+    expect(() => helpers.refreshIcons()).not.toThrow();
+  });
+});
+
 describe('getQuizScores', () => {
   it('returns scores for quizzes with attempts', () => {
     const ctx = {

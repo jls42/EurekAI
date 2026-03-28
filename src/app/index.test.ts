@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Mock localStorage and matchMedia for state.ts
 const mockStorage: Record<string, string> = {};
@@ -195,5 +195,151 @@ describe('app', () => {
     const a = app();
     expect(typeof a.toggleModeration).toBe('function');
     expect(typeof a.toggleChat).toBe('function');
+  });
+});
+
+describe('init', () => {
+  let a: any;
+  let windowListeners: Record<string, Function[]>;
+  let documentListeners: Record<string, Function[]>;
+  let origDocument: any;
+  let origWindow: any;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+
+    // Track event listeners
+    windowListeners = {};
+    documentListeners = {};
+
+    // Stub window with addEventListener
+    origWindow = globalThis.window;
+    vi.stubGlobal('window', {
+      addEventListener: vi.fn((event: string, handler: Function) => {
+        (windowListeners[event] ??= []).push(handler);
+      }),
+    });
+
+    // Stub document with addEventListener and documentElement
+    origDocument = globalThis.document;
+    vi.stubGlobal('document', {
+      documentElement: { dataset: {} },
+      addEventListener: vi.fn((event: string, handler: Function) => {
+        (documentListeners[event] ??= []).push(handler);
+      }),
+    });
+
+    a = app();
+    // Mock methods that init() calls
+    a.checkMobile = vi.fn();
+    a.loadProfiles = vi.fn().mockResolvedValue(undefined);
+    a.loadConfig = vi.fn().mockResolvedValue(undefined);
+    a.refreshIcons = vi.fn();
+    a.openSourceDialog = vi.fn();
+    a.$nextTick = vi.fn((cb: () => void) => cb());
+    a.theme = 'light';
+    a.sources = [{ id: 'src-1', text: 'hello' }];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.stubGlobal('document', origDocument);
+    vi.stubGlobal('window', origWindow);
+  });
+
+  it('calls checkMobile, loadProfiles, loadConfig and refreshIcons', async () => {
+    await a.init();
+    expect(a.checkMobile).toHaveBeenCalled();
+    expect(a.loadProfiles).toHaveBeenCalled();
+    expect(a.loadConfig).toHaveBeenCalled();
+    expect(a.refreshIcons).toHaveBeenCalled();
+  });
+
+  it('sets theme on document element dataset', async () => {
+    await a.init();
+    expect((document as any).documentElement.dataset.theme).toBe('light');
+  });
+
+  it('debounces resize to checkMobile', async () => {
+    await a.init();
+    expect(windowListeners['resize']).toBeDefined();
+    const resizeHandler = windowListeners['resize'][0];
+
+    // Call resize handler multiple times
+    a.checkMobile.mockClear();
+    resizeHandler();
+    resizeHandler();
+    resizeHandler();
+
+    // Before debounce timeout, checkMobile not called again
+    expect(a.checkMobile).not.toHaveBeenCalled();
+
+    // After 150ms, should fire once
+    vi.advanceTimersByTime(150);
+    expect(a.checkMobile).toHaveBeenCalledTimes(1);
+  });
+
+  it('click handler opens source dialog for matching source', async () => {
+    await a.init();
+    expect(documentListeners['click']).toBeDefined();
+    const clickHandler = documentListeners['click'][0];
+
+    // Create a mock element that simulates a badge with data-source-id
+    const mockBadge = { dataset: { sourceId: 'src-1' } };
+    const mockTarget = {
+      closest: vi.fn().mockReturnValue(mockBadge),
+    };
+    // Make target pass instanceof Element check by using Object.create(Element.prototype)
+    // Instead, since init uses `target instanceof Element`, we create a real-like element
+    // Actually in our stubbed env, Element may not exist, so init() will return early.
+    // The check is: if (!(target instanceof Element)) return;
+    // We need to provide a target that passes this check.
+    // In Node without JSDOM, Element is not defined, so `instanceof Element` will throw.
+    // Let's stub Element too.
+    const MockElement = function () {} as any;
+    vi.stubGlobal('Element', MockElement);
+    Object.setPrototypeOf(mockTarget, MockElement.prototype);
+
+    clickHandler({ target: mockTarget });
+    expect(a.openSourceDialog).toHaveBeenCalledWith({ id: 'src-1', text: 'hello' });
+  });
+
+  it('click handler ignores non-element targets', async () => {
+    await a.init();
+    const clickHandler = documentListeners['click'][0];
+
+    const MockElement = function () {} as any;
+    vi.stubGlobal('Element', MockElement);
+
+    // Non-element target (plain string, not instanceof Element)
+    clickHandler({ target: 'not-an-element' });
+    expect(a.openSourceDialog).not.toHaveBeenCalled();
+  });
+
+  it('click handler ignores when no source-id badge found', async () => {
+    await a.init();
+    const clickHandler = documentListeners['click'][0];
+
+    const MockElement = function () {} as any;
+    vi.stubGlobal('Element', MockElement);
+    const mockTarget = { closest: vi.fn().mockReturnValue(null) };
+    Object.setPrototypeOf(mockTarget, MockElement.prototype);
+
+    clickHandler({ target: mockTarget });
+    expect(a.openSourceDialog).not.toHaveBeenCalled();
+  });
+
+  it('click handler ignores when source not found in state', async () => {
+    await a.init();
+    const clickHandler = documentListeners['click'][0];
+
+    const MockElement = function () {} as any;
+    vi.stubGlobal('Element', MockElement);
+    const mockBadge = { dataset: { sourceId: 'nonexistent-id' } };
+    const mockTarget = { closest: vi.fn().mockReturnValue(mockBadge) };
+    Object.setPrototypeOf(mockTarget, MockElement.prototype);
+
+    clickHandler({ target: mockTarget });
+    expect(a.openSourceDialog).not.toHaveBeenCalled();
   });
 });

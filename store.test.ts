@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from './store.js';
@@ -440,5 +440,178 @@ describe('edge cases: non-existent project', () => {
       uploadedAt: new Date().toISOString(),
     });
     expect(result).toBeNull();
+  });
+});
+
+describe('results format migration', () => {
+  it('migrates old flat format to generations array', () => {
+    const p = store.createProject('Flat migration');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+
+    const oldFormat = {
+      meta: p.meta,
+      sources: [],
+      results: {
+        summary: { title: 'Ma fiche', summary: 'Resume', key_points: ['a'], vocabulary: [] },
+        summaryEN: { title: 'My sheet', summary: 'Summary', key_points: ['a'], vocabulary: [] },
+        quiz: [{ question: 'Q?', choices: ['A', 'B'], answer: 0 }],
+        quizEN: [{ question: 'Q?', choices: ['A', 'B'], answer: 0 }],
+        flashcards: [{ question: 'Q', answer: 'A' }],
+        flashcardsEN: [{ question: 'Q', answer: 'A' }],
+        podcast: { script: 'Hello', audioUrl: '/audio.mp3' },
+      },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(oldFormat, null, 2));
+
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded).not.toBeNull();
+    expect(Array.isArray(loaded!.results.generations)).toBe(true);
+    expect(loaded!.results.generations.length).toBe(4);
+
+    const types = loaded!.results.generations.map((g) => g.type);
+    expect(types).toContain('summary');
+    expect(types).toContain('quiz');
+    expect(types).toContain('flashcards');
+    expect(types).toContain('podcast');
+
+    const summaryGen = loaded!.results.generations.find((g) => g.type === 'summary');
+    expect(summaryGen!.title).toBe('Ma fiche');
+    expect((summaryGen as any).dataEN).toBeDefined();
+
+    const quizGen = loaded!.results.generations.find((g) => g.type === 'quiz');
+    expect((quizGen as any).dataEN).toBeDefined();
+  });
+
+  it('does not re-migrate if generations array already exists', () => {
+    const p = store.createProject('Already migrated');
+    const gen: Generation = {
+      id: 'g-existing',
+      title: 'Quiz',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'quiz',
+      data: [],
+    };
+    store.addGeneration(p.meta.id, gen);
+
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded!.results.generations).toHaveLength(1);
+    expect(loaded!.results.generations[0].id).toBe('g-existing');
+  });
+});
+
+describe('moderation normalization', () => {
+  it('normalizes old safe:true format to status:safe', () => {
+    const p = store.createProject('Mod norm safe');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+
+    const data = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-old-safe',
+          filename: 'safe.txt',
+          markdown: 'contenu safe',
+          uploadedAt: new Date().toISOString(),
+          moderation: { safe: true },
+        },
+      ],
+      results: { generations: [] },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(data, null, 2));
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded!.sources[0].moderation).toEqual({ status: 'safe', categories: {} });
+  });
+
+  it('normalizes old safe:false with categories to status:unsafe', () => {
+    const p = store.createProject('Mod norm unsafe');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+
+    const data = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-old-unsafe',
+          filename: 'unsafe.txt',
+          markdown: 'contenu unsafe',
+          uploadedAt: new Date().toISOString(),
+          moderation: { safe: false, categories: { violence: true } },
+        },
+      ],
+      results: { generations: [] },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(data, null, 2));
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded!.sources[0].moderation).toEqual({
+      status: 'unsafe',
+      categories: { violence: true },
+    });
+  });
+
+  it('preserves already-new format moderation unchanged', () => {
+    const p = store.createProject('Mod norm new');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+
+    const data = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-new-fmt',
+          filename: 'new.txt',
+          markdown: 'nouveau format',
+          uploadedAt: new Date().toISOString(),
+          moderation: { status: 'safe', categories: {} },
+        },
+      ],
+      results: { generations: [] },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(data, null, 2));
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded!.sources[0].moderation).toEqual({ status: 'safe', categories: {} });
+  });
+
+  it('handles source without moderation field', () => {
+    const p = store.createProject('Mod norm none');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+
+    const data = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-no-mod',
+          filename: 'nomod.txt',
+          markdown: 'pas de moderation',
+          uploadedAt: new Date().toISOString(),
+        },
+      ],
+      results: { generations: [] },
+    };
+
+    writeFileSync(projectPath, JSON.stringify(data, null, 2));
+    const loaded = store.getProject(p.meta.id);
+    expect(loaded!.sources[0].moderation).toBeUndefined();
+  });
+});
+
+describe('legacy migration edge cases', () => {
+  it('migrateFromLegacy skips empty sources array', () => {
+    const legacyPath = join(tempDir, 'sources-empty.json');
+    writeFileSync(legacyPath, JSON.stringify([]));
+
+    store.migrateFromLegacy(legacyPath);
+    expect(store.listProjects()).toEqual([]);
+    expect(existsSync(legacyPath)).toBe(true); // not renamed
+  });
+
+  it('migrateFromLegacy handles invalid JSON gracefully', () => {
+    const legacyPath = join(tempDir, 'sources-bad.json');
+    writeFileSync(legacyPath, '{not valid json!!!');
+
+    store.migrateFromLegacy(legacyPath);
+    expect(store.listProjects()).toEqual([]);
   });
 });

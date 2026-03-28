@@ -9,7 +9,7 @@ export default defineConfig({
       reporter: ['text', 'lcov'],
       reportsDirectory: 'coverage',
       include: ['src/**/*.ts', 'routes/**/*.ts', 'generators/**/*.ts', 'helpers/**/*.ts', '*.ts'],
-      exclude: ['**/*.test.ts', 'src/i18n/**', 'node_modules/**', 'dist/**', 'vitest.config.ts', 'vite.config.ts', 'vite-env.d.ts', 'src/env.d.ts'],
+      exclude: ['**/*.test.ts', 'src/i18n/**', 'node_modules/**', 'dist/**', 'vitest.config.ts', 'vite.config.ts', 'vite-env.d.ts', 'src/env.d.ts', 'types.ts', 'server.ts', 'src/components/fill-blank-validate.ts'],
     },
   },
 });

@@ -994,6 +994,107 @@ describe('generateRoutes', () => {
     });
   });
 
+  // --- Route analysis endpoint ---
+
+  describe('POST /:pid/generate/route', () => {
+    it('returns 404 when project not found', async () => {
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({ params: { pid: 'nonexistent' }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    });
+
+    it('returns route plan on success', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.plan).toHaveLength(2);
+      expect(result.plan[0].agent).toBe('summary');
+      expect(result.plan[1].agent).toBe('flashcards');
+    });
+
+    it('returns 500 when routeRequest fails', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockRejectedValueOnce(new Error('Route analysis failed'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('Route analysis failed') });
+    });
+
+    it('applies consigne when present and useConsigne is not false', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.setConsigne(pid, { found: true, text: 'Focus on dates', keyTopics: ['dates'] });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      // Should succeed
+      expect(res.json).toHaveBeenCalledTimes(1);
+    });
+
+    it('skips consigne when useConsigne is false', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.setConsigne(pid, { found: true, text: 'Focus on dates', keyTopics: ['dates'] });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({ params: { pid }, body: { useConsigne: false } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // --- Auto route ---
 
   describe('POST /:pid/generate/auto', () => {
@@ -1165,6 +1266,115 @@ describe('generateRoutes', () => {
       const result = res.json.mock.calls[0][0];
       expect(result.generations).toHaveLength(0);
       expect(result.route).toHaveLength(0);
+    });
+  });
+
+  // --- Auto route: podcast step ---
+
+  describe('POST /:pid/generate/auto (podcast step)', () => {
+    it('executes podcast step with audio generation', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'podcast', reason: 'educational content' },
+        ],
+        context: 'Podcast context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content for podcast',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: { lang: 'fr' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('podcast');
+      expect(result.generations[0].data.script).toHaveLength(2);
+      expect(result.generations[0].data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
+      expect(result.generations[0].data.sourceRefs).toEqual(['ref1']);
+      expect(result.failedSteps).toBeUndefined();
+
+      // Verify stored
+      const updatedProject = store.getProject(pid);
+      expect(updatedProject!.results.generations).toHaveLength(1);
+      expect(updatedProject!.results.generations[0].type).toBe('podcast');
+    });
+
+    it('reports podcast as failed step when audio generation throws', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateAudio } = await import('../generators/tts.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'overview' },
+          { agent: 'podcast', reason: 'audio content' },
+        ],
+        context: 'Mixed context',
+      });
+      (generateAudio as any).mockRejectedValueOnce(new Error('TTS API down'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      // Summary should succeed, podcast should fail
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('summary');
+      expect(result.failedSteps).toEqual(['podcast']);
+    });
+  });
+
+  describe('POST /:pid/generate/auto (fill-blank step)', () => {
+    it('executes fill-blank step successfully', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'fill-blank', reason: 'practice exercises' },
+        ],
+        context: 'Fill-blank context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content for fill-blank',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('fill-blank');
+      expect(result.generations[0].data).toHaveLength(1);
+      expect(result.failedSteps).toBeUndefined();
     });
   });
 
