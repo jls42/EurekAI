@@ -5,19 +5,19 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Turn any content into an interactive learning experience — powered by AI.</strong>
+  <strong>Turn any content into an interactive learning experience — powered by <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-Worldwide%20Hackathon-FF7000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=" alt="Mistral AI Hackathon"></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-6%20Modèles-FF7000?style=for-the-badge" alt="Mistral AI"></a>
-  <a href="https://elevenlabs.io"><img src="https://img.shields.io/badge/ElevenLabs-TTS%20alternatif-000000?style=for-the-badge" alt="ElevenLabs"></a>
+  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Spanish</a> · <a href="README-pt.md">🇧🇷 Portuguese</a> · <a href="README-de.md">🇩🇪 German</a> · <a href="README-it.md">🇮🇹 Italian</a> · <a href="README-nl.md">🇳🇱 Dutch</a> · <a href="README-ar.md">🇸🇦 Arabic</a><br>
+  <a href="README-hi.md">🇮🇳 Hindi</a> · <a href="README-zh.md">🇨🇳 Chinese</a> · <a href="README-ja.md">🇯🇵 Japanese</a> · <a href="README-ko.md">🇰🇷 Korean</a> · <a href="README-pl.md">🇵🇱 Polish</a> · <a href="README-ro.md">🇷🇴 Romanian</a> · <a href="README-sv.md">🇸🇪 Swedish</a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI">▶️ Watch the demo on YouTube</a> · <a href="README-en.md">🇬🇧 Read in English</a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="YouTube demo"></a>
 </p>
+
+<h4 align="center">📊 Code quality</h4>
 
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Quality Gate"></a>
@@ -36,9 +36,9 @@
 
 ## The story — Why EurekAI?
 
-**EurekAI** was born during the [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([official site](https://worldwide-hackathon.mistral.ai/)) (March 2026). I needed a project — and the idea came from something very concrete: I regularly prepare tests with my daughter, and I thought it should be possible to make that more fun and interactive with AI.
+**EurekAI** was born during the [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([official site](https://worldwide-hackathon.mistral.ai/)) (March 2026). I needed a project — and the idea came from something very concrete: I regularly prepare tests with my daughter, and I thought it should be possible to make that more playful and interactive using AI.
 
-The goal: take **any input** — a photo of a textbook, copied text, a voice recording, a web search — and transform it into **study sheets, flashcards, quizzes, podcasts, cloze texts, illustrations, and more**. All powered by Mistral AI's French models, making it naturally suited for French-speaking students.
+The goal: take **any input** — a photo of the textbook, copied-and-pasted text, a voice recording, a web search — and turn it into **study notes, flashcards, quizzes, podcasts, fill-in-the-blank exercises, illustrations, and more**. All powered by Mistral AI's French models, making it a solution naturally suited to French-speaking students.
 
 Every line of code was written during the hackathon. All APIs and open-source libraries are used according to the hackathon rules.
 
@@ -52,18 +52,18 @@ Every line of code was written during the hackathon. All APIs and open-source li
 | 📝 | **Text input** | Type or paste any text directly |
 | 🎤 | **Voice input** | Record yourself — Voxtral STT transcribes your voice |
 | 🌐 | **Web search** | Ask a question — a Mistral Agent searches the web for answers |
-| 📄 | **Study sheets** | Structured notes with key points, vocabulary, quotes, anecdotes |
+| 📄 | **Study notes** | Structured notes with key points, vocabulary, quotes, anecdotes |
 | 🃏 | **Flashcards** | 5-50 Q/A cards with source references for active recall |
-| ❓ | **Multiple-choice quiz** | 5-50 multiple-choice questions with adaptive review of mistakes |
-| ✏️ | **Cloze texts** | Fill-in-the-blank exercises with hints and tolerant validation |
-| 🎙️ | **Podcast** | Mini 2-voice podcast converted to audio via Mistral Voxtral TTS |
+| ❓ | **MCQ quiz** | 5-50 multiple-choice questions with adaptive error review |
+| ✏️ | **Fill-in-the-blank** | Exercises to complete with hints and tolerant validation |
+| 🎙️ | **Podcast** | 2-voice mini-podcast converted to audio via Mistral Voxtral TTS |
 | 🖼️ | **Illustrations** | Educational images generated by a Mistral Agent |
-| 🗣️ | **Voice quiz** | Questions read aloud, spoken answer, AI checks the response |
+| 🗣️ | **Voice quiz** | Questions read aloud, spoken answer, AI verifies the response |
 | 💬 | **AI tutor** | Contextual chat with your course documents, with tool calls |
 | 🧠 | **Smart router** | AI analyzes your content and recommends the most relevant generators among the 7 available |
-| 🔒 | **Parental control** | Age moderation, parental PIN, chat restrictions |
-| 🌍 | **Multilingual** | Full interface and AI content in French and English |
-| 🔊 | **Read aloud** | Listen to study sheets and flashcards via Mistral Voxtral TTS or ElevenLabs |
+| 🔒 | **Parental control** | Age-based moderation, parental PIN, chat restrictions |
+| 🌍 | **Multilingual** | Interface and AI content fully available in French and English |
+| 🔊 | **Read aloud** | Listen to notes and flashcards via Mistral Voxtral TTS or ElevenLabs |
 
 ---
 
@@ -148,7 +148,7 @@ flowchart LR
 
 ---
 
-## User journey
+## User flow
 
 ```mermaid
 sequenceDiagram
@@ -184,35 +184,35 @@ sequenceDiagram
 
 ## Deep dive — Features
 
-### Multimodal input
+### Multi-modal input
 
 EurekAI accepts 4 types of sources, moderated according to the profile (enabled by default for child and teen):
 
 - **Upload OCR** — JPG, PNG or PDF files processed by `mistral-ocr-latest`. Handles printed text, tables and handwriting.
 - **Free text** — Type or paste any content. Moderated before storage if moderation is enabled.
-- **Voice input** — Record audio in the browser. Transcribed by `voxtral-mini-latest`. The parameter `language="fr"` optimizes recognition.
-- **Web search** — Enter a query. A temporary Mistral Agent with the tool `web_search` fetches and summarizes results.
+- **Voice input** — Record audio in the browser. Transcribed by `voxtral-mini-latest`. The `language="fr"` setting optimizes recognition.
+- **Web search** — Enter a query. A temporary Mistral Agent with the tool `web_search` retrieves and summarizes results.
 
 ### AI content generation
 
-Seven types of learning material generated:
+Seven types of generated learning material:
 
 | Generator | Model | Output |
 |---|---|---|
-| **Study sheet** | `mistral-large-latest` | Title, summary, 10-25 key points, vocabulary, quotes, anecdote |
+| **Study notes** | `mistral-large-latest` | Title, summary, 10-25 key points, vocabulary, quotes, anecdote |
 | **Flashcards** | `mistral-large-latest` | 5-50 Q/A cards with source references for active recall |
-| **Multiple-choice quiz** | `mistral-large-latest` | 5-50 questions, 4 choices each, explanations, adaptive review |
-| **Cloze texts** | `mistral-large-latest` | Sentences to complete with hints, tolerant validation (Levenshtein) |
+| **MCQ quiz** | `mistral-large-latest` | 5-50 questions, 4 choices each, explanations, adaptive review |
+| **Fill-in-the-blank** | `mistral-large-latest` | Sentences to complete with hints, tolerant validation (Levenshtein) |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | 2-voice script → MP3 audio |
 | **Illustration** | Agent `mistral-large-latest` | Educational image via tool `image_generation` |
 | **Voice quiz** | `mistral-large-latest` + Voxtral TTS + STT | TTS questions → STT answer → AI verification |
 
-### AI tutor via chat
+### AI chat tutor
 
 A conversational tutor with full access to course documents:
 
 - Uses `mistral-large-latest`
-- **Tool calls**: can generate study sheets, flashcards, quizzes or cloze texts during the conversation
+- **Tool calls**: can generate study notes, flashcards, quizzes or fill-in-the-blank exercises during the conversation
 - 50-message history per course
 - Content moderation if enabled for the profile
 
@@ -222,22 +222,22 @@ The router uses `mistral-small-latest` to analyze source content and recommend w
 
 ### Adaptive learning
 
-- **Quiz statistics**: track attempts and accuracy per question
+- **Quiz statistics**: tracks attempts and accuracy per question
 - **Quiz review**: generates 5-10 new questions targeting weak concepts
 - **Instruction detection**: detects revision instructions ("I know my lesson if I know...") and prioritizes them across all generators
 
-### Safety & parental controls
+### Security & parental control
 
 - **4 age groups**: child (≤10), teen (11-15), student (16-25), adult (26+)
-- **Content moderation**: `mistral-moderation-2603` with 5 categories blocked for child/teen (sexual, hate, violence, selfharm, jailbreaking), no restrictions for student/adult
-- **Parental PIN**: SHA-256 hash, required for profiles under 15
+- **Content moderation**: `mistral-moderation-2603` with 5 blocked categories for child/teen (sexual, hate, violence, selfharm, jailbreaking), no restriction for student/adult
+- **Parental PIN**: SHA-256 hash, required for profiles under 15 years
 - **Chat restrictions**: AI chat disabled by default for under 16, can be enabled by parents
 
 ### Multi-profile system
 
 - Multiple profiles with name, age, avatar, language preferences
-- Projects tied to profiles via `profileId`
-- Cascade deletion: deleting a profile deletes all its projects
+- Projects linked to profiles via `profileId`
+- Cascade deletion: deleting a profile removes all its projects
 
 ### Multi-provider TTS
 
@@ -270,19 +270,19 @@ The router uses `mistral-small-latest` to analyze source content and recommend w
 | **File upload** | Multer 1.4 | Multipart form handling |
 | **Audio** | ffmpeg-static | Concatenation of audio segments |
 | **Tests** | Vitest 4 | Unit tests — coverage measured by SonarCloud |
-| **Persistence** | JSON files | Storage without dependencies |
+| **Persistence** | JSON files | Storage with zero dependencies |
 
 ---
 
 ## Model reference
 
-| Model | Usage | Why |
+| Model | Use | Why |
 |---|---|---|
-| `mistral-large-latest` | Sheet, Flashcards, Podcast, Quiz, Cloze texts, Chat, Voice quiz verification, Image Agent, Web Search Agent, Instruction detection | Best multilingual + instruction following |
+| `mistral-large-latest` | Notes, Flashcards, Podcast, Quiz, Fill-in-the-blank, Chat, Voice quiz verification, Image Agent, Web Search Agent, Instruction detection | Best multilingual + instruction-following |
 | `mistral-ocr-latest` | Document OCR | Printed text, tables, handwriting |
 | `voxtral-mini-latest` | Speech recognition (STT) | Multilingual STT, optimized with `language="fr"` |
-| `voxtral-mini-tts-latest` | Speech synthesis (TTS) | Podcasts, voice quiz, read aloud |
-| `mistral-moderation-2603` | Content moderation | 5 categories blocked for child/teen (+ jailbreaking) |
+| `voxtral-mini-tts-latest` | Speech synthesis (TTS) | Podcasts, voice quizzes, read aloud |
+| `mistral-moderation-2603` | Content moderation | 5 blocked categories for child/teen (+ jailbreaking) |
 | `mistral-small-latest` | Smart router | Fast content analysis for routing decisions |
 | `eleven_v3` (ElevenLabs) | Speech synthesis (alternative TTS) | Natural voices, configurable alternative |
 
@@ -399,7 +399,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/config` | Current configuration |
 | `PUT` | `/api/config` | Modify config (models, voices, TTS provider) |
-| `GET` | `/api/config/status` | APIs status (Mistral, ElevenLabs, TTS) |
+| `GET` | `/api/config/status` | API status (Mistral, ElevenLabs, TTS) |
 | `POST` | `/api/config/reset` | Reset config to defaults |
 | `GET` | `/api/config/voices` | List Mistral TTS voices (optional `?lang=fr`) |
 
@@ -408,7 +408,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/profiles` | List all profiles |
 | `POST` | `/api/profiles` | Create a profile |
-| `PUT` | `/api/profiles/:id` | Edit a profile (PIN required for < 15 yrs) |
+| `PUT` | `/api/profiles/:id` | Edit a profile (PIN required for < 15 years) |
 | `DELETE` | `/api/profiles/:id` | Delete a profile + cascade projects |
 
 ### Projects
@@ -425,7 +425,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `POST` | `/api/projects/:pid/sources/upload` | Upload OCR (multipart files) |
 | `POST` | `/api/projects/:pid/sources/text` | Free text `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | Voice STT (multipart audio) |
+| `POST` | `/api/projects/:pid/sources/voice` | STT voice (multipart audio) |
 | `POST` | `/api/projects/:pid/sources/websearch` | Web search `{query}` |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | Delete a source |
 | `POST` | `/api/projects/:pid/moderate` | Moderate `{text}` |
@@ -434,28 +434,28 @@ output/                   — Données d'exécution (projets, config, fichiers a
 ### Generation
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | Study sheet |
+| `POST` | `/api/projects/:pid/generate/summary` | Study notes |
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
-| `POST` | `/api/projects/:pid/generate/quiz` | Multiple-choice quiz |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | Cloze texts |
+| `POST` | `/api/projects/:pid/generate/quiz` | MCQ quiz |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | Fill-in-the-blank |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustration |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Voice quiz |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptive review `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/route` | Routing analysis (plan of generators to run) |
-| `POST` | `/api/projects/:pid/generate/auto` | Auto backend generation (routing + 5 types: summary, flashcards, quiz, fill-blank, podcast) |
+| `POST` | `/api/projects/:pid/generate/auto` | Backend auto-generation (routing + 5 types: summary, flashcards, quiz, fill-blank, podcast) |
 
 All generation routes accept `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`.
 
-### Generations CRUD
+### Generation CRUD
 | Method | Endpoint | Description |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Submit quiz answers `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Submit cloze answers `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Verify a spoken answer (audio + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS read aloud (sheets/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Submit fill-in-the-blank answers `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Verify an oral answer (audio + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS read aloud (study notes/flashcards) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Rename `{title}` |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | Delete generation |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | Delete the generation |
 
 ### Chat
 | Method | Endpoint | Description |
@@ -471,20 +471,20 @@ All generation routes accept `{sourceIds?, lang?, ageGroup?, count?, useConsigne
 | Decision | Justification |
 |---|---|
 | **Alpine.js instead of React/Vue** | Minimal footprint, lightweight reactivity with TypeScript compiled by Vite. Perfect for a hackathon where speed matters. |
-| **Persistence in JSON files** | Zero dependencies, instant startup. No database to configure — start and go. |
-| **Vite + Handlebars** | The best of both worlds: fast HMR for development, HTML partials for code organization, Tailwind JIT. |
+| **Persistence in JSON files** | Zero dependencies, instant startup. No database to configure — you start and go. |
+| **Vite + Handlebars** | Best of both worlds: fast HMR for development, HTML partials for code organization, Tailwind JIT. |
 | **Centralized prompts** | All AI prompts in `prompts.ts` — easy to iterate, test and adapt by language/age group. |
-| **Multi-generation system** | Each generation is an independent object with its own ID — allows multiple worksheets, quizzes, etc. per course. |
-| **Age-adapted prompts** | 4 age groups with different vocabulary, complexity and tone — the same content is taught differently depending on the learner. |
-| **Agent-based features** | Image generation and web search use temporary Mistral Agents — isolated lifecycles with automatic cleanup. |
-| **Multi-provider TTS** | Mistral Voxtral TTS by default (no additional key required), ElevenLabs as an alternative — configurable without restart. |
+| **Multi-generation system** | Each generation is an independent object with its own ID — allows multiple notes, quizzes, etc. per course. |
+| **Age-adapted prompts** | 4 age groups with different vocabulary, complexity and tone — the same content teaches differently depending on the learner. |
+| **Agent-based features** | Image generation and web search use temporary Mistral Agents — clean lifecycle with automatic cleanup. |
+| **Multi-provider TTS** | Mistral Voxtral TTS by default (no additional key), ElevenLabs as an alternative — configurable without restarting. |
 
 ---
 
-## Credits & acknowledgments
+## Credits & acknowledgements
 
 - **[Mistral AI](https://mistral.ai)** — AI models (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
-- **[ElevenLabs](https://elevenlabs.io)** — Alternative text-to-speech engine (`eleven_v3`)
+- **[ElevenLabs](https://elevenlabs.io)** — Alternative speech synthesis engine (`eleven_v3`)
 - **[Alpine.js](https://alpinejs.dev)** — Lightweight reactive framework
 - **[TailwindCSS](https://tailwindcss.com)** — Utility-first CSS framework
 - **[Vite](https://vitejs.dev)** — Frontend build tool
