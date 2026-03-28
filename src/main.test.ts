@@ -53,7 +53,7 @@ describe('main.ts', () => {
   });
 
   it('registers i18n locales before Alpine starts', () => {
-    expect(mockRegisterLocale).toHaveBeenCalledTimes(2);
+    expect(mockRegisterLocale).toHaveBeenCalledTimes(9);
     expect(mockRegisterLocale).toHaveBeenCalledWith('fr', { hello: 'Bonjour' });
     expect(mockRegisterLocale).toHaveBeenCalledWith('en', { hello: 'Hello' });
   });

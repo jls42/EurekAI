@@ -168,27 +168,24 @@
             @click.outside="langOpen = false"
             class="input-modern w-full px-3 py-2 flex items-center gap-2 text-left rounded-button cursor-pointer"
           >
-            <span x-text="newProfileLocale === 'en' ? '🇬🇧' : '🇫🇷'"></span>
-            <span x-text="newProfileLocale === 'en' ? 'English' : 'Français'"></span>
+            <span x-text="langFlag(newProfileLocale)"></span>
+            <span x-text="langLabel(newProfileLocale)"></span>
             <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-text-secondary"></i>
           </button>
           <div
             x-show="langOpen"
             x-transition
-            class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full z-50"
+            class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full max-h-[240px] overflow-y-auto z-50"
           >
-            <button
-              @click="newProfileLocale = 'fr'; langOpen = false"
-              class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
-            >
-              🇫🇷 Français
-            </button>
-            <button
-              @click="newProfileLocale = 'en'; langOpen = false"
-              class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
-            >
-              🇬🇧 English
-            </button>
+            <template x-for="lang in uiLanguages" :key="lang.code">
+              <button
+                @click="newProfileLocale = lang.code; langOpen = false"
+                class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+              >
+                <span x-text="lang.flag"></span>
+                <span x-text="lang.label"></span>
+              </button>
+            </template>
           </div>
         </div>
 
@@ -320,27 +317,24 @@
               @click.outside="langOpen = false"
               class="input-modern w-full px-3 py-2 flex items-center gap-2 text-left rounded-button cursor-pointer"
             >
-              <span x-text="editingProfile?.locale === 'en' ? '🇬🇧' : '🇫🇷'"></span>
-              <span x-text="editingProfile?.locale === 'en' ? 'English' : 'Français'"></span>
+              <span x-text="langFlag(editingProfile?.locale)"></span>
+              <span x-text="langLabel(editingProfile?.locale)"></span>
               <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-text-secondary"></i>
             </button>
             <div
               x-show="langOpen"
               x-transition
-              class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full z-50"
+              class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full max-h-[240px] overflow-y-auto z-50"
             >
-              <button
-                @click="editingProfile.locale = 'fr'; langOpen = false"
-                class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
-              >
-                🇫🇷 Français
-              </button>
-              <button
-                @click="editingProfile.locale = 'en'; langOpen = false"
-                class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
-              >
-                🇬🇧 English
-              </button>
+              <template x-for="lang in uiLanguages" :key="lang.code">
+                <button
+                  @click="editingProfile.locale = lang.code; langOpen = false"
+                  class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+                >
+                  <span x-text="lang.flag"></span>
+                  <span x-text="lang.label"></span>
+                </button>
+              </template>
             </div>
           </div>
 

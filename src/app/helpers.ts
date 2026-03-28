@@ -28,6 +28,18 @@ export function createHelpers() {
       return '/api/projects/' + this.currentProjectId;
     },
 
+    currentFlag(this: any): string {
+      return this.uiLanguages.find((l: any) => l.code === this.locale)?.flag || '\u{1F310}';
+    },
+
+    langLabel(this: any, code: string): string {
+      return this.uiLanguages.find((l: any) => l.code === code)?.label || code;
+    },
+
+    langFlag(this: any, code: string): string {
+      return this.uiLanguages.find((l: any) => l.code === code)?.flag || '\u{1F310}';
+    },
+
     iconChipClass(type: string) {
       const map: Record<string, string> = {
         'quiz-vocal': 'icon-chip-quizvocal',

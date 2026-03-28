@@ -50,30 +50,23 @@
             @click.outside="langOpen = false"
             class="min-h-touch min-w-[40px] sm:min-w-[44px] flex items-center justify-center focus-ring rounded-button btn-press"
           >
-            <span
-              class="text-lg"
-              x-text="locale === 'en' ? '\uD83C\uDDEC\uD83C\uDDE7' : '\uD83C\uDDEB\uD83C\uDDF7'"
-            ></span>
+            <span class="text-lg" x-text="currentFlag()"></span>
           </button>
           <div
             x-show="langOpen"
             x-transition
-            class="absolute right-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 min-w-[140px] z-50"
+            class="absolute right-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 min-w-[160px] max-h-[320px] overflow-y-auto z-50"
           >
-            <button
-              @click="setLocale('fr'); langOpen = false"
-              class="w-full px-3 py-2 text-left text-body-sm hover:bg-gray-100 flex items-center gap-2"
-              :class="locale === 'fr' && 'font-bold text-primary'"
-            >
-              <span>&#x1F1EB;&#x1F1F7;</span> Fran&ccedil;ais
-            </button>
-            <button
-              @click="setLocale('en'); langOpen = false"
-              class="w-full px-3 py-2 text-left text-body-sm hover:bg-gray-100 flex items-center gap-2"
-              :class="locale === 'en' && 'font-bold text-primary'"
-            >
-              <span>&#x1F1EC;&#x1F1E7;</span> English
-            </button>
+            <template x-for="lang in uiLanguages" :key="lang.code">
+              <button
+                @click="setLocale(lang.code); langOpen = false"
+                class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+                :class="locale === lang.code && 'font-bold text-primary'"
+              >
+                <span x-text="lang.flag"></span>
+                <span x-text="lang.label"></span>
+              </button>
+            </template>
           </div>
         </div>
 

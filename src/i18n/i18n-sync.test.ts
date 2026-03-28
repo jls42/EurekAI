@@ -1,54 +1,64 @@
 import { describe, it, expect } from 'vitest';
 import { fr } from './fr';
 import { en } from './en';
+import { es } from './es';
+import { pt } from './pt';
+import { it as itLocale } from './it';
+import { nl } from './nl';
+import { de } from './de';
+import { hi } from './hi';
+import { ar } from './ar';
+
+const locales: Record<string, Record<string, string>> = {
+  fr, en, es, pt, it: itLocale, nl, de, hi, ar,
+};
+
+const reference = fr;
+const refKeys = Object.keys(reference).sort((a, b) => a.localeCompare(b));
+const placeholderRegex = /\{(\w+)\}/g;
 
 describe('i18n dictionaries sync', () => {
-  const frKeys = Object.keys(fr).sort((a, b) => a.localeCompare(b));
-  const enKeys = Object.keys(en).sort((a, b) => a.localeCompare(b));
+  for (const [name, dict] of Object.entries(locales)) {
+    describe(`${name}.ts`, () => {
+      const dictKeys = Object.keys(dict).sort((a, b) => a.localeCompare(b));
 
-  it('en.ts should have all keys from fr.ts', () => {
-    const missingInEn = frKeys.filter((k) => !(k in en));
-    expect(missingInEn, `Missing keys in en.ts: ${missingInEn.join(', ')}`).toEqual([]);
-  });
+      it('should have all keys from fr.ts', () => {
+        const missing = refKeys.filter((k) => !(k in dict));
+        expect(missing, `Missing keys in ${name}.ts: ${missing.join(', ')}`).toEqual([]);
+      });
 
-  it('fr.ts should have all keys from en.ts', () => {
-    const missingInFr = enKeys.filter((k) => !(k in fr));
-    expect(missingInFr, `Extra keys in en.ts not in fr.ts: ${missingInFr.join(', ')}`).toEqual([]);
-  });
+      it('should not have extra keys beyond fr.ts', () => {
+        const extra = dictKeys.filter((k) => !(k in reference));
+        expect(extra, `Extra keys in ${name}.ts: ${extra.join(', ')}`).toEqual([]);
+      });
 
-  it('both dictionaries should have the same number of keys', () => {
-    expect(enKeys.length).toBe(frKeys.length);
-  });
+      it('should have the same number of keys as fr.ts', () => {
+        expect(dictKeys.length).toBe(refKeys.length);
+      });
 
-  it('no key should have an empty value in fr.ts', () => {
-    const emptyFr = frKeys.filter((k) => fr[k].trim() === '');
-    expect(emptyFr, `Empty values in fr.ts: ${emptyFr.join(', ')}`).toEqual([]);
-  });
+      it('should have no empty values', () => {
+        const empty = dictKeys.filter((k) => dict[k].trim() === '');
+        expect(empty, `Empty values in ${name}.ts: ${empty.join(', ')}`).toEqual([]);
+      });
 
-  it('no key should have an empty value in en.ts', () => {
-    const emptyEn = enKeys.filter((k) => en[k].trim() === '');
-    expect(emptyEn, `Empty values in en.ts: ${emptyEn.join(', ')}`).toEqual([]);
-  });
-
-  it('interpolation placeholders should match between fr and en', () => {
-    const placeholderRegex = /\{(\w+)\}/g;
-    const mismatches: string[] = [];
-
-    for (const key of frKeys) {
-      if (!(key in en)) continue;
-      const frPlaceholders = [...fr[key].matchAll(placeholderRegex)]
-        .map((m) => m[1])
-        .sort((a, b) => a.localeCompare(b));
-      const enPlaceholders = [...en[key].matchAll(placeholderRegex)]
-        .map((m) => m[1])
-        .sort((a, b) => a.localeCompare(b));
-      if (JSON.stringify(frPlaceholders) !== JSON.stringify(enPlaceholders)) {
-        mismatches.push(
-          `${key}: fr={${frPlaceholders.join(',')}} en={${enPlaceholders.join(',')}}`,
-        );
-      }
-    }
-
-    expect(mismatches, `Placeholder mismatches:\n${mismatches.join('\n')}`).toEqual([]);
-  });
+      it('should match interpolation placeholders with fr.ts', () => {
+        const mismatches: string[] = [];
+        for (const key of refKeys) {
+          if (!(key in dict)) continue;
+          const frPlaceholders = [...reference[key].matchAll(placeholderRegex)]
+            .map((m) => m[1])
+            .sort((a, b) => a.localeCompare(b));
+          const localePlaceholders = [...dict[key].matchAll(placeholderRegex)]
+            .map((m) => m[1])
+            .sort((a, b) => a.localeCompare(b));
+          if (JSON.stringify(frPlaceholders) !== JSON.stringify(localePlaceholders)) {
+            mismatches.push(
+              `${key}: fr={${frPlaceholders.join(',')}} ${name}={${localePlaceholders.join(',')}}`,
+            );
+          }
+        }
+        expect(mismatches, `Placeholder mismatches:\n${mismatches.join('\n')}`).toEqual([]);
+      });
+    });
+  }
 });

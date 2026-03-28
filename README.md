@@ -5,19 +5,19 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Transforme n'importe quel contenu en expérience d'apprentissage interactive — propulsé par l'IA.</strong>
+  <strong>Transforme n'importe quel contenu en expérience d'apprentissage interactive — propulsé par <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-Worldwide%20Hackathon-FF7000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=" alt="Mistral AI Hackathon"></a>
-  <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-6%20Modèles-FF7000?style=for-the-badge" alt="Mistral AI"></a>
-  <a href="https://elevenlabs.io"><img src="https://img.shields.io/badge/ElevenLabs-TTS%20alternatif-000000?style=for-the-badge" alt="ElevenLabs"></a>
+  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Español</a> · <a href="README-pt.md">🇧🇷 Português</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Nederlands</a> · <a href="README-ar.md">🇸🇦 العربية</a><br>
+  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日本語</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 Polski</a> · <a href="README-ro.md">🇷🇴 Română</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI">▶️ Voir la démo sur YouTube</a> · <a href="README-en.md">🇬🇧 Read in English</a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="Démo YouTube"></a>
 </p>
+
+<h4 align="center">📊 Qualité du code</h4>
 
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Quality Gate"></a>
@@ -36,7 +36,7 @@
 
 ## L'histoire — Pourquoi EurekAI ?
 
-**EurekAI** est né pendant le [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (mars 2026). Il me fallait un sujet — et l'idée est venue de quelque chose de très concret : je prépare régulièrement les contrôles avec ma fille, et je me suis dit qu'il devait être possible de rendre ça plus ludique et interactif grâce à l'IA.
+**EurekAI** est né pendant le [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([site officiel](https://worldwide-hackathon.mistral.ai/)) (mars 2026). Il me fallait un sujet — et l'idée est venue de quelque chose de très concret : je prépare régulièrement les contrôles avec ma fille, et je me suis dit qu'il devait être possible de rendre ça plus ludique et interactif grâce à l'IA.
 
 L'objectif : prendre **n'importe quelle entrée** — une photo du manuel, un texte copié-collé, un enregistrement vocal, une recherche web — et la transformer en **fiches de révision, flashcards, quiz, podcasts, textes à trous, illustrations, et plus encore**. Le tout propulsé par les modèles français de Mistral AI, ce qui en fait une solution naturellement adaptée aux élèves francophones.
 

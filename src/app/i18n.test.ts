@@ -97,9 +97,18 @@ describe('createI18n', () => {
       expect(i18n.dateLocale.call(ctx)).toBe('en-GB');
     });
 
-    it('returns fr-FR for any non-en locale', () => {
+    it('returns locale-specific format for other languages', () => {
       ctx.locale = 'de';
-      expect(i18n.dateLocale.call(ctx)).toBe('fr-FR');
+      expect(i18n.dateLocale.call(ctx)).toBe('de-DE');
+      ctx.locale = 'es';
+      expect(i18n.dateLocale.call(ctx)).toBe('es-ES');
+      ctx.locale = 'ar';
+      expect(i18n.dateLocale.call(ctx)).toBe('ar-SA');
+    });
+
+    it('returns raw locale code for unknown locales', () => {
+      ctx.locale = 'xx';
+      expect(i18n.dateLocale.call(ctx)).toBe('xx');
     });
   });
 });

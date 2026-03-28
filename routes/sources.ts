@@ -201,10 +201,12 @@ export function sourceRoutes(
     }
 
     try {
+      const lang = req.body.lang || 'fr';
       const { text, elapsed } = await transcribeAudio(
         client,
         file.buffer,
         file.originalname || 'audio.webm',
+        lang,
       );
       if (!text || text.trim().length === 0) {
         res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
@@ -221,7 +223,6 @@ export function sourceRoutes(
       };
       store.addSource(pid, source);
       console.log(`  STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-      const lang = req.body.lang || 'fr';
       triggerConsigneDetection(store, client, pid, lang);
       if (modCats) {
         triggerModeration(store, client, pid, source.id, source.markdown, modCats);

@@ -732,7 +732,7 @@ describe('POST /:pid/sources/voice', () => {
 
     await handler(req, res);
 
-    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('fake-audio'), 'record.webm');
+    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('fake-audio'), 'record.webm', 'fr');
     expect(res.json).toHaveBeenCalledTimes(1);
     const source = res.json.mock.calls[0][0];
     expect(source.id).toBeTruthy();
@@ -828,7 +828,7 @@ describe('POST /:pid/sources/voice', () => {
 
     await handler(req, res);
 
-    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('audio'), 'audio.webm');
+    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('audio'), 'audio.webm', 'fr');
   });
 });
 

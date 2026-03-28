@@ -166,12 +166,11 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         return;
       }
 
+      const lang = req.body.lang || 'fr';
       const config = getConfig();
       console.log('  Transcribing vocal answer...');
-      const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm'); // NOSONAR(S4325) — multer middleware guarantees req.file
+      const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
       console.log(`  Transcription: '${transcription}'`);
-
-      const lang = req.body.lang || 'fr';
       console.log('  Verifying answer...');
       const result = await verifyAnswer(
         client,
