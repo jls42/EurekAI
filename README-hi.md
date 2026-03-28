@@ -1,55 +1,69 @@
 <p align="center">
-  <img src="public/assets/logo.webp" alt="EurekAI Logo" width="120" />
+  <img src="public/assets/logo.webp" alt="EurekAI लोगो" width="120" />
 </p>
 
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>किसी भी सामग्री को एक इंटरैक्टिव सीखने के अनुभव में बदलें — एआई द्वारा संचालित।</strong>
+  <strong>किसी भी सामग्री को इंटरएक्टिव लर्निंग अनुभव में बदलें — एआई द्वारा संचालित।</strong>
 </p>
 
 <p align="center">
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-Worldwide%20Hackathon-FF7000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=" alt="Mistral AI Hackathon"></a>
+  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-Worldwide%20Hackathon-FF7000?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIGZpbGw9Im5vbmUiLz48L3N2Zz4=" alt="Mistral AI हैकाथॉन"></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5.7-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript"></a>
-  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-5%20Modèles-FF7000?style=for-the-badge" alt="Mistral AI"></a>
-  <a href="https://elevenlabs.io"><img src="https://img.shields.io/badge/ElevenLabs-TTS-000000?style=for-the-badge" alt="ElevenLabs"></a>
+  <a href="https://mistral.ai"><img src="https://img.shields.io/badge/Mistral%20AI-6%20Modèles-FF7000?style=for-the-badge" alt="Mistral AI"></a>
+  <a href="https://elevenlabs.io"><img src="https://img.shields.io/badge/ElevenLabs-TTS%20alternatif-000000?style=for-the-badge" alt="ElevenLabs"></a>
 </p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=_b1TQz2leoI">▶️ YouTube पर डेमो देखें</a> · <a href="README-en.md">🇬🇧 अंग्रेज़ी में पढ़ें</a>
 </p>
 
+<p align="center">
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="क्वालिटी गेट"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="सिक्योरिटी रेटिंग"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="रिलायबिलिटी रेटिंग"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="मेंटेनेबिलिटी रेटिंग"></a>
+</p>
+<p align="center">
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="कोवरेज"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="वल्नरेबिलिटीज"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="कोड स्मेल्स"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="पंक्तियाँ कोड की"></a>
+</p>
+
 ---
 
-## कहानी — EurekAI क्यों?
+## कहानी — क्यों EurekAI ?
 
-**EurekAI** का जन्म [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (मार्च 2026) के दौरान हुआ। मुझे एक विषय की ज़रूरत थी — और विचार बहुत व्यावहारिक चीज़ से आया: मैं नियमित रूप से अपनी बेटी के साथ परीक्षाओं की तैयारी करता हूँ, और मुझे लगा कि AI की मदद से इसे और अधिक मज़ेदार और इंटरैक्टिव बनाया जा सकता है।
+**EurekAI** का जन्म [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (मार्च 2026) के दौरान हुआ। मुझे एक विषय चाहिए था — और विचार एक बहुत ही व्यावहारिक चीज़ से आया: मैं अपनी बेटी के साथ नियमित रूप से टेस्ट की तैयारी करता हूँ, और मैंने सोचा कि इसे एआई की मदद से और अधिक मज़ेदार और इंटरएक्टिव बनाया जा सकता है।
 
-लक्ष्य: **किसी भी इनपुट** — किताब की फोटो, कॉपी-पेस्ट किया गया टेक्स्ट, वॉयस रिकॉर्डिंग, वेब खोज — को लेकर उसे **रिविज़न शीट्स, फ्लैशकार्ड्स, क्विज़, पॉडकास्ट, चित्रण, और बहुत कुछ** में बदलना। यह सब Mistral AI के फ्रांसीसी मॉडलों द्वारा संचालित है, जिससे यह स्वाभाविक रूप से फ्रेंच-भाषी छात्रों के लिए उपयुक्त समाधान बनता है।
+लक्ष्य: किसी भी इनपुट — मैनुअल की एक तस्वीर, कॉपी-पेस्ट किया हुआ टेक्स्ट, वॉइस रिकॉर्डिंग, वेब सर्च — को लेकर उसे **रिविज़न शीट्स, फ्लैशकार्ड, क्विज़, पॉडकास्ट, रिक्त स्थान भरने वाले पाठ, चित्रण, और अधिक** में बदलना। सब कुछ Mistral AI के फ्रेंच मॉडल्स द्वारा संचालित, जिससे यह फ़्रेंच-स्पीकिंग छात्रों के लिए स्वाभाविक रूप से अनुकूल समाधान बनता है।
 
-कोड की हर पंक्ति हैकाथॉन के दौरान लिखी गई थी। सभी ओपन-सोर्स APIs और लाइब्रेरीज़ का उपयोग हैकाथॉन के नियमों के अनुसार किया गया है।
+हैकाथॉन के दौरान ही हर एक कोड की लाइन लिखी गई। सभी ओपन-सोर्स APIs और लाइब्रेरीज़ हैकाथॉन के नियमों के अनुसार उपयोग की गई हैं।
 
 ---
 
-## विशेषताएँ
+## सुविधाएँ
 
-| | विशेषता | विवरण |
+| | फीचर | विवरण |
 |---|---|---|
-| 📷 | **OCR अपलोड** | अपने नोट्स या किताब की फोटो लें — Mistral OCR उससे सामग्री निकालता है |
-| 📝 | **पाठ इनपुट** | कोई भी टेक्स्ट सीधे टाइप या पेस्ट करें |
-| 🎤 | **वॉयस इनपुट** | अपनी आवाज़ रिकॉर्ड करें — Voxtral STT आपकी आवाज़ को ट्रांसक्राइब करता है |
-| 🌐 | **वेब खोज** | एक सवाल पूछें — एक Mistral Agent वेब पर जवाब खोजता है |
-| 📄 | **रिविज़न शीट्स** | मुख्य बिंदुओं, शब्दावली, उद्धरणों, और किस्सों सहित संरचित नोट्स |
-| 🃏 | **फ्लैशकार्ड्स** | सक्रिय याद करने के लिए स्रोत संदर्भों के साथ 5 प्रश्न/उत्तर कार्ड |
-| ❓ | **MCQ क्विज़** | अनुकूली त्रुटि-समीक्षा के साथ 10-20 बहुविकल्पीय प्रश्न |
-| 🎙️ | **पॉडकास्ट** | ElevenLabs के माध्यम से ऑडियो में बदला गया 2-आवाज़ों वाला छोटा पॉडकास्ट (Alex & Zoé) |
-| 🖼️ | **चित्रण** | Mistral Agent द्वारा उत्पन्न शैक्षिक चित्र |
-| 🗣️ | **वॉयस क्विज़** | प्रश्न ज़ोर से पढ़े जाते हैं, मौखिक उत्तर, AI उत्तर की जाँच करता है |
-| 💬 | **AI ट्यूटर** | आपके पाठ दस्तावेज़ों के साथ टूल कॉलिंग सहित संदर्भगत चैट |
-| 🧠 | **स्मार्ट राउटर** | AI आपकी सामग्री का विश्लेषण करता है और सर्वोत्तम जनरेटर सुझाता है |
-| 🔒 | **अभिभावकीय नियंत्रण** | आयु-आधारित मॉडरेशन, अभिभावकीय PIN, चैट प्रतिबंध |
-| 🌍 | **बहुभाषी** | फ़्रेंच और अंग्रेज़ी में पूर्ण इंटरफ़ेस और AI सामग्री |
-| 🔊 | **ज़ोर से पढ़ना** | ElevenLabs TTS के माध्यम से शीट्स और फ्लैशकार्ड्स को ज़ोर से सुनें |
+| 📷 | **Upload OCR** | अपने मैनुअल या नोट्स की फोटो लें — Mistral OCR इसमें से सामग्री निकालता है |
+| 📝 | **टेक्स्ट प्रविष्टि** | किसी भी टेक्स्ट को टाइप या पेस्ट करें |
+| 🎤 | **वॉइस इनपुट** | रिकॉर्ड करें — Voxtral STT आपकी आवाज़ का ट्रांसक्रिप्शन करता है |
+| 🌐 | **वेब खोज** | एक प्रश्न पूछें — एक Mistral एजेंट वेब पर उत्तर खोजता है |
+| 📄 | **रिविज़न शीट्स** | संरचित नोट्स: प्रमुख बिंदु, शब्दावली, उद्धरण, एनेकडोट्स |
+| 🃏 | **फ्लैशकार्ड** | 5-50 Q/A कार्ड स्रोत संदर्भों के साथ सक्रिय स्मृति के लिए |
+| ❓ | **बहुविकल्पीय क्विज़ (QCM)** | 5-50 बहुविकल्पीय प्रश्न, त्रुटियों की अनुकूल पुनरावृति के साथ |
+| ✏️ | **रिक्त स्थान वाले पाठ** | संकेतों और सहनशील सत्यापन के साथ भरने के अभ्यास |
+| 🎙️ | **पॉडकास्ट** | 2-आवाज़ वाला मिनी-पॉडकास्ट, Mistral Voxtral TTS के माध्यम से ऑडियो |
+| 🖼️ | **चित्रण** | शैक्षिक चित्र Mistral एजेंट द्वारा जनरेट |
+| 🗣️ | **वॉइस क्विज़** | प्रश्न उच्च-स्वर में पढ़े जाते हैं, मौखिक उत्तर, एआई द्वारा सत्यापन |
+| 💬 | **एआई ट्यूटर** | आपके पाठ्य दस्तावेज़ों के साथ संदर्भ-आधारित चैट, टूल कॉल करने की क्षमता के साथ |
+| 🧠 | **इंटेलिजेंट राउटर** | एआई आपकी सामग्री का विश्लेषण करता है और उपलब्ध 7 जेनरेटरों में सबसे उपयुक्त सुझाव देता है |
+| 🔒 | **पैरेंटल कंट्रोल** | आयु-आधारित मॉडरेशन, पैरेंटल PIN, चैट पर प्रतिबन्ध |
+| 🌍 | **बहुभाषी** | इंटरफ़ेस और एआई सामग्री फ़्रेंच और अंग्रेज़ी में पूरी तरह उपलब्ध |
+| 🔊 | **आवाज़ में पढ़ना** | रिविज़न शीट्स और फ्लैशकार्ड को Mistral Voxtral TTS या ElevenLabs से सुनें |
 
 ---
 
@@ -64,8 +78,8 @@ graph TD
         WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
     end
 
-    subgraph "🛡️ Sécurité (async à l'ajout de source)"
-        MOD["Modération<br/><i>mistral-moderation-latest</i>"]
+    subgraph "🛡️ Sécurité (async, si activée par profil)"
+        MOD["Modération<br/><i>mistral-moderation-2603</i>"]
         CON["Détection de consigne<br/><i>mistral-large-latest</i>"]
     end
 
@@ -73,6 +87,7 @@ graph TD
         SUM["📄 Fiche"]
         FC["🃏 Flashcards"]
         QZ["❓ Quiz QCM"]
+        FB["✏️ Textes à trous"]
         POD["🎙️ Podcast"]
         IMG["🖼️ Image"]
         QV["🗣️ Quiz vocal"]
@@ -80,17 +95,17 @@ graph TD
     end
 
     subgraph "📤 Sortie"
-        TTS["🔊 ElevenLabs TTS"]
+        TTS["🔊 TTS<br/><i>Mistral Voxtral / ElevenLabs</i>"]
         JSON["📦 Persistance JSON"]
         UI["🖥️ Interface interactive"]
     end
 
     OCR & TXT & MIC & WEB --> MOD & CON
-    MOD & CON -.->|gardes| SUM & FC & QZ & POD & IMG & QV & CHAT
+    MOD & CON -.->|gardes| SUM & FC & QZ & FB & POD & IMG & QV & CHAT
     POD --> TTS
     QV --> TTS
     SUM & FC -->|lecture à voix haute| TTS
-    SUM & FC & QZ & POD & IMG & QV & CHAT --> JSON
+    SUM & FC & QZ & FB & POD & IMG & QV & CHAT --> JSON
     JSON --> UI
     TTS --> UI
 ```
@@ -105,18 +120,20 @@ flowchart LR
         ML["mistral-large-latest"]
         MO["mistral-ocr-latest"]
         MV["voxtral-mini-latest"]
-        MMod["mistral-moderation-latest"]
+        MMod["mistral-moderation-2603"]
         MS["mistral-small-latest"]
+        MTTS["voxtral-mini-tts-latest"]
     end
 
     subgraph "Tâches"
-        T1["Fiche / Flashcards / Podcast / Chat / Quiz / Vérification quiz / Consigne"]
-        T2["OCR — 96.6% tableaux, 88.9% écriture manuscrite"]
-        T3["Reconnaissance vocale — ~4% WER, 4x plus rapide en FR"]
-        T4["Modération de contenu — 9 catégories"]
+        T1["Fiche / Flashcards / Podcast / Chat / Quiz / Textes à trous / Vérification quiz / Consigne"]
+        T2["OCR — documents, tableaux, écriture manuscrite"]
+        T3["Reconnaissance vocale — STT optimisé FR"]
+        T4["Modération de contenu — filtrage par âge"]
         T5["Routeur intelligent — analyse du contenu"]
         T6["Génération d'image — Agent + outil image_generation"]
         T7["Recherche web — Agent + outil web_search"]
+        T8["Synthèse vocale — podcasts, quiz vocal, lecture à voix haute"]
     end
 
     ML --> T1
@@ -126,26 +143,27 @@ flowchart LR
     MS --> T5
     ML --> T6
     ML --> T7
+    MTTS --> T8
 ```
 
 ---
 
-## उपयोगकर्ता प्रवाह
+## उपयोगकर्ता यात्रा
 
 ```mermaid
 sequenceDiagram
     actor Élève as Élève
     participant App as EurekAI
     participant AI as Mistral AI
-    participant TTS as ElevenLabs
+    participant TTS as TTS (Voxtral / ElevenLabs)
 
     Élève->>App: Créer un profil (nom, âge, avatar)
     Élève->>App: Créer un cours
     Élève->>App: Ajouter des sources (photo / texte / voix / web)
-    App->>AI: Modérer le contenu (9 catégories)
+    App->>AI: Modérer le contenu (si activé par profil)
     App->>AI: Détecter les consignes de révision
     Élève->>App: Générer du matériel d'étude
-    App->>AI: Fiche / Flashcards / Quiz / Podcast
+    App->>AI: Fiche / Flashcards / Quiz / Textes à trous / Podcast
     AI-->>App: Réponses JSON structurées
     App->>TTS: Convertir le script podcast en audio
     TTS-->>App: Fichier audio MP3
@@ -164,109 +182,118 @@ sequenceDiagram
 
 ---
 
-## गहराई में — विशेषताएँ
+## गहराई में — सुविधाएँ
 
-### बहु-मोडल इनपुट
+### मल्टीमॉडल इनपुट
 
-EurekAI उपचार से पहले मॉडरेट की गई 4 प्रकार की स्रोतों को स्वीकार करता है:
+EurekAI 4 प्रकार के स्रोत स्वीकार करता है, प्रोफ़ाइल के अनुसार मॉडरेट किए जाते हैं (बच्चा और किशोर के लिए डिफ़ॉल्ट सक्रिय):
 
-- **OCR अपलोड** — JPG, PNG या PDF फ़ाइलें `mistral-ocr-latest` द्वारा संसाधित। मुद्रित पाठ, तालिकाएँ (96.6% सटीकता), और हस्तलेखन (88.9% सटीकता) को संभालता है।
-- **मुक्त टेक्स्ट** — कोई भी सामग्री टाइप या पेस्ट करें। संग्रहण से पहले मॉडरेशन से गुजरता है।
-- **वॉयस इनपुट** — ब्राउज़र में ऑडियो रिकॉर्ड करें। `voxtral-mini-latest` द्वारा ~4% WER के साथ ट्रांसक्राइब। `language="fr"` पैरामीटर इसे 4x तेज़ बनाता है।
-- **वेब खोज** — एक क्वेरी दर्ज करें। `web_search` टूल वाला एक अस्थायी Mistral Agent परिणामों को प्राप्त और सारांशित करता है।
+- **Upload OCR** — JPG, PNG या PDF फ़ाइलें `mistral-ocr-latest` द्वारा प्रोसेस की जाती हैं। मुद्रित टेक्स्ट, तालिकाएँ और हस्तलिखित लेखन संभालता है।
+- **खुला टेक्स्ट** — किसी भी सामग्री को टाइप या पेस्ट करें। संग्रह से पहले मॉडरेशन सक्रिय होने पर मॉडरेट किया जाता है।
+- **वॉइस इनपुट** — ब्राउज़र में ऑडियो रिकॉर्ड करें। `voxtral-mini-latest` द्वारा ट्रांसक्राइब किया जाता है। `language="fr"` सेटिंग रिकॉग्निशन को ऑप्टिमाइज़ करती है।
+- **वेब खोज** — एक क्वेरी दर्ज करें। एक अस्थायी Mistral एजेंट टूल `web_search` का उपयोग करके परिणाम प्राप्त और सारांशित करता है।
 
-### AI सामग्री जनरेशन
+### एआई सामग्री जनरेशन
 
-उत्पन्न सीखने की सामग्री के छह प्रकार:
+जनरेट किये गए सीखने के सामग्री के सात प्रकार:
 
-| जनरेटर | मॉडल | आउटपुट |
+| जेनरेटर | मॉडल | आउटपुट |
 |---|---|---|
-| **रिविज़न शीट** | `mistral-large-latest` | शीर्षक, सारांश, 10-25 मुख्य बिंदु, शब्दावली, उद्धरण, किस्सा |
-| **फ्लैशकार्ड्स** | `mistral-large-latest` | स्रोत संदर्भों के साथ 5 प्रश्न/उत्तर कार्ड |
-| **MCQ क्विज़** | `mistral-large-latest` | 10-20 प्रश्न, प्रत्येक के 4 विकल्प, व्याख्याएँ, अनुकूली समीक्षा |
-| **पॉडकास्ट** | `mistral-large-latest` + ElevenLabs | 2-आवाज़ों वाली स्क्रिप्ट (Alex & Zoé) → MP3 ऑडियो |
-| **चित्रण** | Agent `mistral-large-latest` | `image_generation` टूल के माध्यम से शैक्षिक चित्र |
-| **वॉयस क्विज़** | `mistral-large-latest` + ElevenLabs + Voxtral | TTS प्रश्न → STT उत्तर → AI सत्यापन |
+| **रिविज़न शीट** | `mistral-large-latest` | शीर्षक, सारांश, 10-25 प्रमुख बिंदु, शब्दावली, उद्धरण, एनेकडोट |
+| **फ्लैशकार्ड** | `mistral-large-latest` | 5-50 Q/A कार्ड स्रोत संदर्भों के साथ सक्रिय स्मृति हेतु |
+| **बहुविकल्पीय क्विज़** | `mistral-large-latest` | 5-50 प्रश्न, प्रत्येक में 4 विकल्प, व्याख्याएँ, अनुकूल पुनरावृति |
+| **रिक्त स्थान वाले पाठ** | `mistral-large-latest` | संकेतों के साथ पूरा करने के लिए वाक्य, सहनशील सत्यापन (Levenshtein) |
+| **पॉडकास्ट** | `mistral-large-latest` + Voxtral TTS | 2-आवाज़ स्क्रिप्ट → MP3 ऑडियो |
+| **चित्रण** | एजेंट `mistral-large-latest` | टूल `image_generation` के माध्यम से शैक्षिक छवि |
+| **वॉइस क्विज़** | `mistral-large-latest` + Voxtral TTS + STT | प्रश्न TTS → उत्तर STT → एआई सत्यापन |
 
-### चैट-आधारित AI ट्यूटर
+### चैट द्वारा एआई ट्यूटर
 
-पाठ दस्तावेज़ों तक पूर्ण पहुँच वाला एक संवादात्मक ट्यूटर:
+दस्तावेज़ों तक पूर्ण पहुँच वाले एक संवादात्मक ट्यूटर:
 
-- `mistral-large-latest` का उपयोग करता है (128K टोकन संदर्भ विंडो)
-- **टूल कॉलिंग**: बातचीत के दौरान तुरंत शीट्स, फ्लैशकार्ड्स, या क्विज़ बना सकता है
-- प्रति पाठ 50 संदेशों का इतिहास
-- आयु के अनुसार प्रोफाइल के लिए सामग्री मॉडरेशन
+- `mistral-large-latest` का उपयोग करता है
+- **टूल कॉल्स**: बातचीत के दौरान फ़िश, फ्लैशकार्ड, क्विज़ या रिक्त-स्थान पाठ जनरेट कर सकता है
+- प्रति कोर्स 50 संदेशों का इतिहास
+- यदि प्रोफ़ाइल के लिए सक्रिय है तो सामग्री मॉडरेशन लागू
 
-### बुद्धिमान स्वचालित राउटर
+### स्वचालित इंटेलिजेंट राउटर
 
-राउटर स्रोत सामग्री का विश्लेषण करने और यह सिफारिश करने के लिए `mistral-small-latest` का उपयोग करता है कि कौन से जनरेटर सबसे प्रासंगिक हैं — ताकि छात्रों को मैन्युअल रूप से चुनना न पड़े।
+राउटर `mistral-small-latest` का उपयोग करके स्रोत सामग्री का विश्लेषण करता है और उपलब्ध 7 जेनरेटरों में सबसे उपयुक्त सिफारिशें देता है — ताकि विद्यार्थियों को मैन्युअल रूप से चुनना न पड़े। इंटरफ़ेस रीयल-टाइम प्रगति दिखाता है: पहले विश्लेषण, फिर व्यक्तिगत जेनरेशन्स के साथ तत्काल रद्दीकरण संभव।
 
-### अनुकूली सीखना
+### अनुकूलनशील अधिगम
 
-- **क्विज़ आँकड़े**: प्रत्येक प्रश्न के लिए प्रयासों और सटीकता का ट्रैक
-- **क्विज़ समीक्षा**: कमजोर अवधारणाओं को लक्षित करने वाले 5-10 नए प्रश्न उत्पन्न करता है
-- **निर्देश पहचान**: रिविज़न निर्देशों ("मैं अपना पाठ तब जानता हूँ जब मैं...") को पहचानता है और सभी जनरेटरों में प्राथमिकता देता है
+- **क्विज़ आँकड़े**: प्रश्नों के प्रयासों और सटीकता का ट्रैक
+- **क्विज़ रिव्यू**: कमजोर अवधारणाओं को लक्षित करते हुए 5-10 नए प्रश्न जनरेट करता है
+- **निर्देश पहचान**: ("मैं अपनी पाठ याद हूँ अगर मैं ... जानता हूँ") जैसी पुनरावृति निर्देशों का पता लगाकर सभी जेनरेटरों में प्राथमिकता देता है
 
-### सुरक्षा और अभिभावकीय नियंत्रण
+### सुरक्षा और पैरेंटल कंट्रोल
 
-- **4 आयु समूह**: बच्चा (6-10), किशोर (11-15), छात्र (16+), वयस्क
-- **सामग्री मॉडरेशन**: `mistral-moderation-latest` के माध्यम से 9 श्रेणियाँ, आयु समूह के अनुसार समायोजित सीमाएँ
-- **अभिभावकीय PIN**: SHA-256 हैश, 15 वर्ष से कम आयु के प्रोफाइल के लिए आवश्यक
-- **चैट प्रतिबंध**: AI चैट केवल 15 वर्ष और उससे अधिक आयु के प्रोफाइल के लिए उपलब्ध
+- **4 आयु समूह**: बच्चा (≤10 साल), किशोर (11-15), छात्र (16-25), वयस्क (26+)
+- **सामग्री मॉडरेशन**: `mistral-moderation-2603` — बच्चे/किशोर के लिए 5 श्रेणियाँ ब्लॉक की जाती हैं (यौन, घृणा, हिंसा, आत्महानि, jailbreaking), छात्र/वयस्क के लिए कोई प्रतिबंध नहीं
+- **पैरेंटल PIN**: SHA-256 हैश, 15 साल से कम प्रोफाइल के लिए आवश्यक
+- **चैट प्रतिबंध**: 16 से कम आयु वालों के लिए डिफ़ॉल्ट रूप से एआई चैट अक्षम, माता-पिता द्वारा सक्रिय किया जा सकता है
 
-### बहु-प्रोफ़ाइल सिस्टम
+### मल्टी-प्रोफ़ाइल सिस्टम
 
-- नाम, आयु, अवतार, भाषा प्राथमिकताओं के साथ कई प्रोफाइल
-- `profileId` के माध्यम से प्रोफाइल से जुड़े प्रोजेक्ट
-- कैस्केड डिलीशन: एक प्रोफ़ाइल हटाने पर उसके सभी प्रोजेक्ट्स हट जाते हैं
+- कई प्रोफ़ाइल्स नाम, आयु, अवतार, भाषा प्राथमिकताएँ के साथ
+- प्रोफाइल से जुड़े प्रोजेक्ट्स `profileId` के माध्यम से
+- कैस्केड डिलीट: एक प्रोफ़ाइल हटाने पर उसके सभी प्रोजेक्ट्स हटते हैं
 
-### अंतर्राष्ट्रीयकरण
+### TTS मल्टी-प्रोवाइडर
 
-- पूर्ण इंटरफ़ेस फ़्रेंच और अंग्रेज़ी में उपलब्ध
-- AI प्रॉम्प्ट आज 2 भाषाओं (FR, EN) का समर्थन करते हैं, और 15 (es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv) के लिए तैयार आर्किटेक्चर है
-- प्रोफ़ाइल के अनुसार भाषा कॉन्फ़िगर की जा सकती है
+- **Mistral Voxtral TTS** (डिफ़ॉल्ट): `voxtral-mini-tts-latest`, अतिरिक्त कुंजी की आवश्यकता नहीं
+- **ElevenLabs** (वैकल्पिक): `eleven_v3`, नेचुरल वॉइसेज़, आवश्यकता: `ELEVENLABS_API_KEY`
+- प्रोवाइडर एप्लिकेशन सेटिंग्स में कॉन्फ़िगर करने योग्य
+
+### अंतरराष्ट्रीयकरण
+
+- इंटरफ़ेस पूरी तरह फ़्रेंच और अंग्रेज़ी में उपलब्ध
+- एआई प्रॉम्प्ट आज 2 भाषाएँ सपोर्ट करते हैं (FR, EN) और आर्किटेक्चर 15 भाषाओं के लिए तैयार है (es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
+- भाषा प्रोफ़ाइल द्वारा कॉन्फ़िगर की जा सकती है
 
 ---
 
-## तकनीकी स्टैक
+## टेक स्टैक
 
-| परत | तकनीक | भूमिका |
+| परत | टेक्नोलॉजी | भूमिका |
 |---|---|---|
 | **रनटाइम** | Node.js + TypeScript 5.7 | सर्वर और टाइप सुरक्षा |
 | **बैकएंड** | Express 4.21 | REST API |
-| **डेव सर्वर** | Vite 7.3 + tsx | HMR, Handlebars partials, proxy |
-| **फ्रंटएंड** | HTML + TailwindCSS 4.2 + Alpine.js 3.15 | प्रतिक्रियाशील इंटरफ़ेस, Vite द्वारा संकलित TypeScript |
-| **टेम्पलेटिंग** | vite-plugin-handlebars | partials द्वारा HTML संयोजन |
-| **AI** | Mistral AI SDK 1.14 | चैट, OCR, STT, Agents, मॉडरेशन |
-| **TTS** | ElevenLabs SDK 2.36 | पॉडकास्ट और वॉयस क्विज़ के लिए वॉयस सिंथेसिस |
-| **आइकन** | Lucide 0.575 | SVG आइकन लाइब्रेरी |
-| **Markdown** | Marked 17 | चैट में markdown रेंडरिंग |
-| **फ़ाइल अपलोड** | Multer 1.4 | multipart फ़ॉर्म हैंडलिंग |
-| **ऑडियो** | ffmpeg-static | ऑडियो प्रोसेसिंग |
-| **परीक्षण** | Vitest 4 | यूनिट परीक्षण |
-| **स्थायित्व** | JSON फ़ाइलें | निर्भरता-रहित संग्रहण |
+| **डेव सर्वर** | Vite 7.3 + tsx | HMR, हैंडलबार्स partials, प्रॉक्सी |
+| **फ्रंटएंड** | HTML + TailwindCSS 4.2 + Alpine.js 3.15 | प्रतिक्रियाशील UI, Vite द्वारा TypeScript संकलन |
+| **टेम्पलेटिंग** | vite-plugin-handlebars | partials द्वारा HTML कंपोजिशन |
+| **एआई** | Mistral AI SDK 2.1 | चैट, OCR, STT, TTS, एजेंट्स, मॉडरेशन |
+| **TTS (डिफ़ॉल्ट)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, अंतर्निहित स्पीच सिन्थेसिस |
+| **TTS (वैकल्पिक)** | ElevenLabs SDK 2.36 | `eleven_v3`, प्राकृतिक आवाज़ें |
+| **आइकॉन्स** | Lucide 0.575 | SVG आइकन लाइब्रेरी |
+| **Markdown** | Marked 17 | चैट में Markdown रेंडरिंग |
+| **फाइल अपलोड** | Multer 1.4 | मल्टीपार्ट फॉर्म हैंडलिंग |
+| **ऑडियो** | ffmpeg-static | ऑडियो सेगमेंट्स का संयोजन |
+| **टेस्टिंग** | Vitest 4 | यूनिट टेस्ट — कवरेज SonarCloud द्वारा मापा गया |
+| **पर्सिस्टेंस** | JSON फाइलें | कोई बाहरी निर्भरता नहीं, फाइल-आधारित स्टोरेज |
 
 ---
 
-## मॉडलों का संदर्भ
+## मॉडल संदर्भ
 
 | मॉडल | उपयोग | क्यों |
 |---|---|---|
-| `mistral-large-latest` | शीट, फ्लैशकार्ड्स, पॉडकास्ट, MCQ क्विज़, चैट, क्विज़ सत्यापन, इमेज एजेंट, वेब सर्च एजेंट, निर्देश पहचान | सर्वोत्तम multilingual + निर्देश पालन |
-| `mistral-ocr-latest` | दस्तावेज़ OCR | तालिकाएँ 96.6% सटीक, हस्तलेखन 88.9% सटीक |
-| `voxtral-mini-latest` | वॉयस पहचान | ~4% WER, `language="fr"` 4x+ गति देता है |
-| `mistral-moderation-latest` | सामग्री मॉडरेशन | 9 श्रेणियाँ, बच्चों की सुरक्षा |
-| `mistral-small-latest` | स्मार्ट राउटर | रूटिंग निर्णयों के लिए सामग्री का तेज़ विश्लेषण |
-| `eleven_v3` (ElevenLabs) | वॉयस सिंथेसिस | पॉडकास्ट और वॉयस क्विज़ के लिए प्राकृतिक फ्रेंच आवाज़ें |
+| `mistral-large-latest` | रिविज़न शीट, फ्लैशकार्ड, पॉडकास्ट, क्विज़, रिक्त स्थान पाठ, चैट, वॉइस क्विज़ सत्यापन, इमेज एजेंट, वेब सर्च एजेंट, निर्देश पहचान | बहु-भाषी में श्रेष्ठ + इंस्ट्रक्शन फ़ॉलो में अच्छा |
+| `mistral-ocr-latest` | दस्तावेज़ OCR | मुद्रित टेक्स्ट, तालिकाएँ, हस्तलिखित लेखन |
+| `voxtral-mini-latest` | वॉइस रिकॉग्निशन (STT) | बहुभाषी STT, `language="fr"` के साथ ऑप्टिमाइज़्ड |
+| `voxtral-mini-tts-latest` | स्पीच सिन्थेसिस (TTS) | पॉडकास्ट, वॉइस क्विज़, वॉइस रीडिंग |
+| `mistral-moderation-2603` | कंटेंट मॉडरेशन | बच्चा/किशोर के लिए 5 श्रेणियाँ ब्लॉक करना (+ jailbreaking) |
+| `mistral-small-latest` | इंटेलिजेंट राउटर | रूटिंग निर्णयों के लिए तेजी से कंटेंट विश्लेषण |
+| `eleven_v3` (ElevenLabs) | स्पीच सिन्थेसिस (वैकल्पिक TTS) | प्राकृतिक आवाज़ें, वैकल्पिक कॉन्फ़िगर करने योग्य |
 
 ---
 
-## त्वरित शुरुआत
+## त्वरित आरंभ
 
 ```bash
 # Cloner le dépôt
-git clone https://github.com/your-username/eurekai.git
-cd eurekai
+git clone https://github.com/jls42/EurekAI.git
+cd EurekAI
 
 # Installer les dépendances
 npm install
@@ -274,8 +301,8 @@ npm install
 # Configurer les clés API
 cp .env.example .env
 # Éditez .env avec vos clés :
-#   MISTRAL_API_KEY=votre_clé_ici
-#   ELEVENLABS_API_KEY=votre_clé_ici  (optionnel, pour les fonctions audio)
+#   MISTRAL_API_KEY=votre_clé_ici           (requis)
+#   ELEVENLABS_API_KEY=votre_clé_ici        (optionnel, TTS alternatif)
 
 # Lancer le développement
 npm run dev
@@ -283,47 +310,50 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **नोट** : ElevenLabs वैकल्पिक है। इस कुंजी के बिना, पॉडकास्ट और वॉयस क्विज़ सुविधाएँ स्क्रिप्ट बनाएँगी लेकिन ऑडियो सिंथेसाइज़ नहीं करेंगी।
+> **नोट** : Mistral Voxtral TTS डिफ़ॉल्ट प्रोवाइडर है — `MISTRAL_API_KEY` के अलावा कोई अतिरिक्त कुंजी आवश्यक नहीं। ElevenLabs वैकल्पिक TTS प्रोवाइडर है जिसे सेटिंग्स में कॉन्फ़िगर किया जा सकता है।
 
 ---
 
-## परियोजना संरचना
+## प्रोजेक्ट संरचना
 
 ```
 server.ts                 — Point d'entrée Express, monte les routes + config
-config.ts                 — Config runtime (modèles, voix, TTS), persistée dans output/config.json
+config.ts                 — Config runtime (modèles, voix, TTS provider), persistée dans output/config.json
 store.ts                  — ProjectStore : CRUD projets/sources/générations, persistance JSON
 profiles.ts               — ProfileStore : gestion des profils, hachage PIN
-types.ts                  — Types TypeScript : Source, Generation (6 types), QuizStats, Profile
+types.ts                  — Types TypeScript : Source, Generation (7 types), QuizStats, Profile
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, FR/EN)
 
 generators/
   ocr.ts                  — Upload + OCR via Mistral (JPG, PNG, PDF)
   summary.ts              — Génération de fiche de révision (JSON structuré)
-  flashcards.ts           — 5 flashcards Q/R
-  quiz.ts                 — Quiz QCM (10-20 questions) + révision adaptative
-  podcast.ts              — Script podcast 2 voix (Alex + Zoé)
+  flashcards.ts           — Flashcards Q/R (5-50, configurable)
+  quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
+  fill-blank.ts           — Exercices à trous avec validation tolérante
+  podcast.ts              — Script podcast 2 voix
   quiz-vocal.ts           — Quiz vocal : questions TTS + réponses STT + vérification IA
   image.ts                — Génération d'image via Agent Mistral (outil image_generation)
   chat.ts                 — Tuteur IA par chat avec appel d'outils
   router.ts               — Routeur automatique intelligent (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
-  tts.ts                  — ElevenLabs TTS (eleven_v3, concaténation de segments)
+  tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
+  tts.ts                  — Génération audio podcast (concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search
-  moderation.ts           — Modération de contenu (9 catégories)
+  moderation.ts           — Modération de contenu (filtrage par âge)
 
 routes/
   projects.ts             — CRUD projets
-  sources.ts              — Upload OCR, texte libre, voix STT, recherche web, modération
-  generate.ts             — Endpoints de génération (fiche/flashcards/quiz/podcast/image/vocal)
-  generations.ts          — Tentatives de quiz, réponses vocales, lecture à voix haute, renommage, suppression
-  chat.ts                 — Chat IA avec appel d'outils
   profiles.ts             — CRUD profils avec gestion du PIN
+  sources.ts              — Upload OCR, texte libre, voix STT, recherche web, modération
+  generate.ts             — Endpoints de génération (7 types + auto + route)
+  generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
+  chat.ts                 — Chat IA avec appel d'outils
 
 helpers/
   index.ts                — safeParseJson, unwrapJsonArray, extractAllText, timer
   audio.ts                — collectStream (ReadableStream → Buffer)
+  fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
 
 src/                      — Frontend (Vite + Handlebars)
   index.html              — Point d'entrée HTML principal
@@ -334,15 +364,19 @@ src/                      — Frontend (Vite + Handlebars)
     profiles.ts           — Logique du sélecteur de profils
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
-    generate.ts           — Déclencheurs de génération
+    generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
+    config.ts             — Interface de configuration (modèles, voix, TTS provider)
     render.ts             — Helpers de rendu HTML
     i18n.ts               — Changement de langue
     ...
   components/
     quiz.ts               — Composant quiz interactif
     quiz-vocal.ts         — Composant quiz vocal
+    fill-blank.ts         — Composant textes à trous
+    flashcards.ts         — Composant flashcards avec retournement
+    step-by-step.ts       — Mixin navigation pas-à-pas (quiz, fill-blank, flashcards)
   i18n/
     fr.ts                 — Traductions françaises
     en.ts                 — Traductions anglaises
@@ -361,95 +395,103 @@ output/                   — Données d'exécution (projets, config, fichiers a
 ## API संदर्भ
 
 ### कॉन्फ़िग
-| विधि | एंडपॉइंट | विवरण |
+| मेथड | Endpoint | विवरण |
 |---|---|---|
-| `GET` | `/api/config` | वर्तमान कॉन्फ़िगरेशन |
-| `PUT` | `/api/config` | कॉन्फ़िग बदलें (मॉडल, आवाज़ें, TTS) |
-| `GET` | `/api/config/status` | APIs की स्थिति (Mistral, ElevenLabs) |
+| `GET` | `/api/config` | वर्तमान कॉन्फ़िग |
+| `PUT` | `/api/config` | कॉन्फ़िग बदलें (मॉडल्स, वॉइसेज़, TTS प्रोवाइडर) |
+| `GET` | `/api/config/status` | APIs का स्टेटस (Mistral, ElevenLabs, TTS) |
+| `POST` | `/api/config/reset` | डिफ़ॉल्ट कॉन्फ़िग रीसेट करें |
+| `GET` | `/api/config/voices` | Mistral TTS वॉइसेज़ की सूची (वैकल्पिक `?lang=fr`) |
 
-### प्रोफ़ाइल
-| विधि | एंडपॉइंट | विवरण |
+### प्रोफाइल्स
+| मेथड | Endpoint | विवरण |
 |---|---|---|
-| `GET` | `/api/profiles` | सभी प्रोफ़ाइल सूचीबद्ध करें |
-| `POST` | `/api/profiles` | प्रोफ़ाइल बनाएँ |
-| `PUT` | `/api/profiles/:id` | प्रोफ़ाइल संशोधित करें (15 वर्ष से कम के लिए PIN आवश्यक) |
-| `DELETE` | `/api/profiles/:id` | प्रोफ़ाइल + कैस्केड प्रोजेक्ट्स हटाएँ |
+| `GET` | `/api/profiles` | सभी प्रोफाइल सूचीबद्ध करें |
+| `POST` | `/api/profiles` | एक प्रोफाइल बनाएं |
+| `PUT` | `/api/profiles/:id` | प्रोफाइल संशोधित करें (15 साल से कम के लिए PIN आवश्यक) |
+| `DELETE` | `/api/profiles/:id` | प्रोफाइल हटाएँ + प्रोजेक्ट्स कैस्केड हटाएँ |
 
 ### प्रोजेक्ट्स
-| विधि | एंडपॉइंट | विवरण |
+| मेथड | Endpoint | विवरण |
 |---|---|---|
 | `GET` | `/api/projects` | प्रोजेक्ट्स सूचीबद्ध करें |
-| `POST` | `/api/projects` | `{name, profileId}` प्रोजेक्ट बनाएँ |
+| `POST` | `/api/projects` | एक प्रोजेक्ट बनाएं `{name, profileId}` |
 | `GET` | `/api/projects/:pid` | प्रोजेक्ट विवरण |
-| `PUT` | `/api/projects/:pid` | `{name}` का नाम बदलें |
+| `PUT` | `/api/projects/:pid` | नाम बदलें `{name}` |
 | `DELETE` | `/api/projects/:pid` | प्रोजेक्ट हटाएँ |
 
 ### स्रोत
-| विधि | एंडपॉइंट | विवरण |
+| मेथड | Endpoint | विवरण |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | OCR अपलोड (multipart फ़ाइलें) |
-| `POST` | `/api/projects/:pid/sources/text` | मुक्त टेक्स्ट `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | STT आवाज़ (multipart ऑडियो) |
-| `POST` | `/api/projects/:pid/sources/websearch` | वेब खोज `{query}` |
+| `POST` | `/api/projects/:pid/sources/upload` | Upload OCR (मल्टीपार्ट फ़ाइलें) |
+| `POST` | `/api/projects/:pid/sources/text` | खुला टेक्स्ट `{text}` |
+| `POST` | `/api/projects/:pid/sources/voice` | वॉइस STT (मल्टीपार्ट ऑडियो) |
+| `POST` | `/api/projects/:pid/sources/websearch` | वेब सर्च `{query}` |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | एक स्रोत हटाएँ |
-| `POST` | `/api/projects/:pid/moderate` | `{text}` को मॉडरेट करें |
-| `POST` | `/api/projects/:pid/detect-consigne` | रिविज़न निर्देशों का पता लगाएँ |
+| `POST` | `/api/projects/:pid/moderate` | मॉडरेट करें `{text}` |
+| `POST` | `/api/projects/:pid/detect-consigne` | रिविजन निर्देशों का पता लगाएँ |
 
-### जनरेशन
-| विधि | एंडपॉइंट | विवरण |
+### जेनरेशन
+| मेथड | Endpoint | विवरण |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | रिविज़न शीट `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/flashcards` | फ्लैशकार्ड्स `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/quiz` | MCQ क्विज़ `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/podcast` | पॉडकास्ट `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/image` | चित्रण `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/quiz-vocal` | वॉयस क्विज़ `{sourceIds?}` |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | अनुकूली समीक्षा `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/auto` | राउटर द्वारा स्वचालित जनरेशन |
+| `POST` | `/api/projects/:pid/generate/summary` | रिविज़न शीट |
+| `POST` | `/api/projects/:pid/generate/flashcards` | फ्लैशकार्ड |
+| `POST` | `/api/projects/:pid/generate/quiz` | बहुविकल्पीय क्विज़ |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | रिक्त स्थान वाले पाठ |
+| `POST` | `/api/projects/:pid/generate/podcast` | पॉडकास्ट |
+| `POST` | `/api/projects/:pid/generate/image` | चित्रण |
+| `POST` | `/api/projects/:pid/generate/quiz-vocal` | वॉइस क्विज़ |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | अनुकूलनशील रिविजन `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/route` | रूटिंग विश्लेषण (किस जेनरेटर को चलाना है) |
+| `POST` | `/api/projects/:pid/generate/auto` | ऑटो बैकएंड जेनरेशन (रूटिंग + 5 प्रकार : summary, flashcards, quiz, fill-blank, podcast) |
 
-### CRUD जनरेशन
-| विधि | एंडपॉइंट | विवरण |
+सभी जेनरेशन रूट्स `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` स्वीकार करते हैं।
+
+### CRUD जेनरेशन्स
+| मेथड | Endpoint | विवरण |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | उत्तर सबमिट करें `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | मौखिक उत्तर सत्यापित करें (multipart ऑडियो + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS को ज़ोर से पढ़ें (शीट्स/फ्लैशकार्ड्स) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` का नाम बदलें |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | जनरेशन हटाएँ |
+| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | क्विज़ उत्तर सबमिट करें `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | रिक्त-स्थान उत्तर सबमिट करें `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | मौखिक उत्तर जाँचें (ऑडियो + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS द्वारा उच्च-स्वर पर पढ़ना (रिविज़न शीट/फ्लैशकार्ड) |
+| `PUT` | `/api/projects/:pid/generations/:gid` | नाम बदलें `{title}` |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | जेनरेशन हटाएँ |
 
 ### चैट
-| विधि | एंडपॉइंट | विवरण |
+| मेथड | Endpoint | विवरण |
 |---|---|---|
 | `GET` | `/api/projects/:pid/chat` | चैट इतिहास प्राप्त करें |
-| `POST` | `/api/projects/:pid/chat` | एक संदेश भेजें `{message}` |
-| `DELETE` | `/api/projects/:pid/chat` | चैट इतिहास साफ़ करें |
+| `POST` | `/api/projects/:pid/chat` | एक संदेश भेजें `{message, lang, ageGroup}` |
+| `DELETE` | `/api/projects/:pid/chat` | चैट इतिहास मिटाएँ |
 
 ---
 
-## वास्तु संबंधी निर्णय
+## आर्किटेक्चरल निर्णय
 
 | निर्णय | औचित्य |
 |---|---|
-| **React/Vue के बजाय Alpine.js** | न्यूनतम फ़ुटप्रिंट, Vite द्वारा संकलित TypeScript के साथ हल्की प्रतिक्रियाशीलता। हैकाथॉन के लिए उपयुक्त जहाँ गति मायने रखती है। |
-| **JSON फ़ाइलों में स्थायित्व** | शून्य निर्भरता, तुरंत शुरूआत। कॉन्फ़िगर करने के लिए कोई डेटाबेस नहीं — बस शुरू करें और चल पड़ें। |
-| **Vite + Handlebars** | दोनों दुनियाओं का सर्वोत्तम: विकास के लिए तेज़ HMR, संगठन के लिए HTML partials, Tailwind JIT। |
-| **केंद्रीकृत प्रॉम्प्ट्स** | सभी AI प्रॉम्प्ट `prompts.ts` में — भाषा/आयु समूह के अनुसार दोहराने, परीक्षण करने और अनुकूलित करने में आसान। |
-| **बहु-जनरेशन प्रणाली** | प्रत्येक जनरेशन अपना अलग ID वाला स्वतंत्र ऑब्जेक्ट है — प्रति पाठ कई शीट्स, क्विज़ आदि की अनुमति देता है। |
-| **आयु-अनुकूलित प्रॉम्प्ट्स** | 4 आयु समूह, अलग शब्दावली, जटिलता और टोन के साथ — वही सामग्री सीखने वाले के अनुसार अलग तरह से सिखाती है। |
-| **एजेंट-आधारित सुविधाएँ** | इमेज जनरेशन और वेब खोज अस्थायी Mistral Agents का उपयोग करते हैं — स्वचालित सफ़ाई के साथ साफ़ जीवनचक्र। |
+| **Alpine.js React/Vue के बजाय** | कम प्रचलन, Vite द्वारा संकलित TypeScript के साथ हल्की प्रतिक्रियाशीलता। हैकाथॉन में गति मायने रखती है इसलिए उपयुक्त। |
+| **JSON फाइल पर्सिस्टेंस** | ज़ीरो डिपेंडेंसी, त्वरित स्टार्टअप। किसी DB को कॉन्फ़िगर करने की ज़रूरत नहीं — तुरंत चालू हो जाए। |
+| **Vite + Handlebars** | दोनों का सर्वश्रेष्ठ: तेज HMR विकास के लिए, HTML partials कोड के संगठन के लिए, Tailwind JIT के साथ। |
+| **केंद्रीकृत प्रॉम्प्ट्स** | सभी एआई प्रॉम्प्ट्स `prompts.ts` में — भाषा/आयु समूह के अनुसार आसानी से परिवर्तनीय और परीक्षण योग्य। |
+| **मल्टी-जनरेशन सिस्टम** | प्रत्येक जनरेशन एक स्वतंत्र ऑब्जेक्ट है जिसका अपना ID होता है — यह प्रति कोर्स कई फ्लैशकार्ड, क्विज़ आदि की अनुमति देता है। |
+| **आयु-विशिष्ट प्रॉम्प्ट** | 4 आयु समूह अलग शब्दावली, जटिलता और लहजे के साथ — वही सामग्री सीखने वाले के अनुसार अलग तरीके से पढ़ाती है। |
+| **एजेंट-आधारित सुविधाएँ** | इमेज जेनरेशन और वेब खोज अस्थायी Mistral एजेंट्स का उपयोग करती हैं — स्वयं का लाइफसाइकल और स्वचालित क्लीनअप। |
+| **कई-प्रदाता TTS** | डिफ़ॉल्ट रूप से Mistral Voxtral TTS (कोई अतिरिक्त कुंजी आवश्यक नहीं), वैकल्पिक रूप में ElevenLabs — बिना पुनरारंभ के कॉन्फ़िगर करने योग्य। |
 
 ---
 
 ## श्रेय और आभार
 
-- **[Mistral AI](https://mistral.ai)** — AI मॉडल (Large, OCR, Voxtral, Moderation, Small) + Worldwide Hackathon
-- **[ElevenLabs](https://elevenlabs.io)** — वॉयस सिंथेसिस इंजन (`eleven_v3`)
-- **[Alpine.js](https://alpinejs.dev)** — हल्का प्रतिक्रियाशील फ्रेमवर्क
-- **[TailwindCSS](https://tailwindcss.com)** — यूटिलिटी CSS फ्रेमवर्क
+- **[Mistral AI](https://mistral.ai)** — एआई मॉडल (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
+- **[ElevenLabs](https://elevenlabs.io)** — वैकल्पिक वॉयस सिंथेसिस इंजन (`eleven_v3`)
+- **[Alpine.js](https://alpinejs.dev)** — हल्का रिएक्टिव फ्रेमवर्क
+- **[TailwindCSS](https://tailwindcss.com)** — यूटिलिटी-आधारित CSS फ्रेमवर्क
 - **[Vite](https://vitejs.dev)** — फ्रंटएंड बिल्ड टूल
 - **[Lucide](https://lucide.dev)** — आइकन लाइब्रेरी
 - **[Marked](https://marked.js.org)** — Markdown पार्सर
 
-मार्च 2026 में Mistral AI Worldwide Hackathon के दौरान सावधानी से बनाया गया।
+Mistral AI Worldwide Hackathon, मार्च 2026 में सावधानीपूर्वक बनाया गया।
 
 ---
 
@@ -459,7 +501,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 ## लाइसेंस
 
-[AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
+[AGPL-3.0](LICENSE) — कॉपीराइट (C) 2026 Julien LS
 
-**इस दस्तावेज़ का अनुवाद fr संस्करण से hi भाषा में gpt-5.4-mini मॉडल का उपयोग करके किया गया है। अनुवाद प्रक्रिया के बारे में अधिक जानकारी के लिए, https://gitlab.com/jls42/ai-powered-markdown-translator देखें**
+**यह दस्तावेज़ fr संस्करण से hi भाषा में gpt-5-mini मॉडल का उपयोग करके अनुवादित किया गया है। अनुवाद प्रक्रिया के बारे में अधिक जानकारी के लिए, देखें https://gitlab.com/jls42/ai-powered-markdown-translator**
 

@@ -24,7 +24,7 @@ describe('moderateContent', () => {
 
     expect(moderate).toHaveBeenCalledTimes(1);
     expect(moderate).toHaveBeenCalledWith({
-      model: 'mistral-moderation-latest',
+      model: 'mistral-moderation-2603',
       inputs: ['bonjour'],
     });
     expect(result).toEqual({
@@ -68,6 +68,17 @@ describe('moderateContent', () => {
     expect(result).toEqual({
       status: 'unsafe',
       categories: { violence_and_threats: true, self_harm: false },
+    });
+  });
+
+  it('treats all flagged categories as safe when blockedCategories is empty', async () => {
+    const { client } = createClient([{ self_harm: true, sexual: true }]);
+
+    const result = await moderateContent(client, 'texte', []);
+
+    expect(result).toEqual({
+      status: 'safe',
+      categories: { self_harm: true, sexual: true },
     });
   });
 

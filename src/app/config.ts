@@ -71,7 +71,7 @@ export function createConfig() {
           this.configDraft.ttsProvider === 'mistral' &&
           this.configDraft.ttsModel.startsWith('eleven')
         ) {
-          this.configDraft.ttsModel = 'voxtral-mini-tts-2603';
+          this.configDraft.ttsModel = 'voxtral-mini-tts-latest';
         } else if (
           this.configDraft.ttsProvider === 'elevenlabs' &&
           this.configDraft.ttsModel.startsWith('voxtral')

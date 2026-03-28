@@ -17,7 +17,7 @@ const DEFAULT_CONFIG: AppConfig = {
     host: { id: 'JdwJ7jL68CWmQZuo7KgG', name: 'Voix info IA' },
     guest: { id: 'sANWqF1bCMzR6eyZbCGw', name: 'Marie' },
   },
-  ttsModel: 'voxtral-mini-tts-2603',
+  ttsModel: 'voxtral-mini-tts-latest',
   ttsProvider: 'mistral',
   mistralVoices: {
     host: 'e3596645-b1af-469e-b857-f18ddedc7652',

@@ -4,9 +4,10 @@ import type { ModerationResult } from '../types.js';
 export const MODERATION_CHUNK_SIZE = 20_000;
 
 function isUnsafe(categories: Record<string, boolean>, blockedCategories?: string[]): boolean {
-  return blockedCategories && blockedCategories.length > 0
-    ? blockedCategories.some((cat) => categories[cat] === true)
-    : Object.values(categories).includes(true);
+  if (blockedCategories) {
+    return blockedCategories.length > 0 && blockedCategories.some((cat) => categories[cat] === true);
+  }
+  return Object.values(categories).includes(true);
 }
 
 function mergeCategories(
@@ -41,7 +42,7 @@ export async function moderateContent(
 
   for (const chunk of chunks) {
     const response = await client.classifiers.moderate({
-      model: 'mistral-moderation-latest',
+      model: 'mistral-moderation-2603',
       inputs: [chunk],
     });
 
