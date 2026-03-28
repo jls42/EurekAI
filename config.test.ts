@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { initConfig, getConfig, saveConfig, getApiStatus } from './config.js';
+import { initConfig, getConfig, saveConfig, getApiStatus, resetConfig, resolveVoices } from './config.js';
 
 let tempDir: string;
 
@@ -90,5 +90,101 @@ describe('getApiStatus', () => {
     const status = getApiStatus();
     expect(status.mistral).toBe(false);
     expect(status.elevenlabs).toBe(false);
+  });
+
+  it('ttsAvailable vrai quand provider mistral et MISTRAL_API_KEY presente', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsProvider: 'mistral' });
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    vi.stubEnv('ELEVENLABS_API_KEY', '');
+    const status = getApiStatus();
+    expect(status.ttsAvailable).toBe(true);
+  });
+
+  it('ttsAvailable faux quand provider mistral et MISTRAL_API_KEY absente', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsProvider: 'mistral' });
+    vi.stubEnv('MISTRAL_API_KEY', '');
+    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
+    const status = getApiStatus();
+    expect(status.ttsAvailable).toBe(false);
+  });
+
+  it('ttsAvailable vrai quand provider elevenlabs et ELEVENLABS_API_KEY presente', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsProvider: 'elevenlabs' });
+    vi.stubEnv('MISTRAL_API_KEY', '');
+    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
+    const status = getApiStatus();
+    expect(status.ttsAvailable).toBe(true);
+  });
+
+  it('ttsAvailable faux quand provider elevenlabs et ELEVENLABS_API_KEY absente', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsProvider: 'elevenlabs' });
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    vi.stubEnv('ELEVENLABS_API_KEY', '');
+    const status = getApiStatus();
+    expect(status.ttsAvailable).toBe(false);
+  });
+});
+
+describe('resetConfig', () => {
+  it('remet les valeurs par defaut et persiste', () => {
+    initConfig(tempDir);
+    saveConfig({ models: { summary: 'custom' } as any });
+    const reset = resetConfig();
+    expect(reset.models.summary).toBe('mistral-large-latest');
+    // Check persisted on disk
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.models.summary).toBe('mistral-large-latest');
+  });
+});
+
+describe('resolveVoices', () => {
+  it('retourne mistralVoices quand provider est mistral', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    const voices = resolveVoices(cfg);
+    expect(voices).toEqual(cfg.mistralVoices);
+  });
+
+  it('retourne elevenlabs voices quand provider est elevenlabs', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'elevenlabs';
+    const voices = resolveVoices(cfg);
+    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
+  });
+});
+
+describe('saveConfig (additional fields)', () => {
+  it('persiste ttsModel', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsModel: 'custom-tts-model' });
+    const cfg = getConfig();
+    expect(cfg.ttsModel).toBe('custom-tts-model');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.ttsModel).toBe('custom-tts-model');
+  });
+
+  it('persiste ttsProvider', () => {
+    initConfig(tempDir);
+    saveConfig({ ttsProvider: 'elevenlabs' });
+    const cfg = getConfig();
+    expect(cfg.ttsProvider).toBe('elevenlabs');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.ttsProvider).toBe('elevenlabs');
+  });
+
+  it('merge partiel mistralVoices', () => {
+    initConfig(tempDir);
+    saveConfig({ mistralVoices: { host: 'new-host-voice' } as any });
+    const cfg = getConfig();
+    expect(cfg.mistralVoices.host).toBe('new-host-voice');
+    expect(cfg.mistralVoices.guest).toBeTruthy(); // guest preserve
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.mistralVoices.host).toBe('new-host-voice');
   });
 });
