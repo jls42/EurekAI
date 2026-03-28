@@ -26,6 +26,10 @@ export const fr: Record<string, string> = {
   'gen.quiz-vocal': 'Quiz vocal',
   'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
+  'gen.auto': 'Auto — analyse...',
+  'gen.all': 'Tout generer',
+  'gen.voice': 'Lecture vocale',
+  'gen.websearch': 'Recherche web',
   'gen.questionCount': 'Nombre :',
   'gen.needsElevenLabs': 'Necessite une cle API ElevenLabs',
   'gen.needsTts': 'Necessite un fournisseur TTS configure',
@@ -51,6 +55,7 @@ export const fr: Record<string, string> = {
 
   // Common
   'common.cancel': 'Annuler',
+  'common.cancelAll': 'Tout annuler',
   'common.delete': 'Supprimer',
   'common.close': 'Fermer',
   'common.retry': 'Reessayer',
@@ -362,6 +367,7 @@ export const fr: Record<string, string> = {
   'toast.chatError': 'Erreur chat',
   'toast.chatCleared': 'Conversation effacee',
   'toast.cancelledGeneration': 'Generation annulee',
+  'toast.cancelledOne': '{type} annule(e)',
   'toast.scoreSaved': 'Score enregistre !',
   'toast.scoreError': 'Erreur enregistrement du score',
   'toast.reviewGenerated': 'Quiz de revision genere !',

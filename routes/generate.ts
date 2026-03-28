@@ -449,6 +449,26 @@ export function generateRoutes(
     },
   };
 
+  // --- Route analysis only (for 2-phase auto) ---
+  router.post('/:pid/generate/route', async (req, res) => {
+    try {
+      const project = store.getProject(req.params.pid);
+      if (!project) {
+        res.status(404).json({ error: 'Projet introuvable' });
+        return;
+      }
+      const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
+      const useConsigneRoute = req.body.useConsigne !== false;
+      const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+      const route = await routeRequest(client, markdown);
+      console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
+      res.json(route);
+    } catch (e) {
+      console.error('Route analysis error:', e);
+      res.status(500).json({ error: String(e) });
+    }
+  });
+
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
       const project = store.getProject(req.params.pid);

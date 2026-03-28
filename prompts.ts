@@ -88,8 +88,8 @@ ${markdown}${langInstruction(lang)}`;
 
 // ── Flashcards ───────────────────────────────────────────────────────
 
-export function flashcardsSystem(ageGroup: AgeGroup = 'enfant'): string {
-  return `Genere exactement 5 flashcards educatives en JSON strict.
+export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): string {
+  return `Genere exactement ${count} flashcards educatives en JSON strict.
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 Reponses courtes (1-2 phrases). ${ageInstruction(ageGroup)} Questions variees.
 ${sourceRefsInstruction('flashcard')}

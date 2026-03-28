@@ -20,6 +20,8 @@ import {
   fillBlankSystem,
   fillBlankUser,
   chatSystem,
+  imageSystem,
+  imageUser,
   websearchInstructions,
   WEBSEARCH_INSTRUCTIONS,
   websearchInput,
@@ -203,5 +205,42 @@ describe('chatSystem', () => {
 
   it("chatSystem('fr') ne contient pas d'instruction de langue", () => {
     expect(chatSystem('fr')).not.toContain('IMPORTANT: Generate ALL content');
+  });
+});
+
+// ── imageSystem / imageUser ────────────────────────────────────────────
+
+describe('imageSystem', () => {
+  it('returns string containing illustration instructions for FR enfant', () => {
+    const result = imageSystem('fr', 'enfant');
+    expect(result).toContain('illustrateur');
+    expect(result).toContain('6-10 ans');
+    expect(result).not.toContain('IMPORTANT: Generate ALL content');
+  });
+
+  it('returns string containing illustration instructions for EN adult', () => {
+    const result = imageSystem('en', 'adulte');
+    expect(result).toContain('illustrateur');
+    expect(result).toContain('professionnel');
+    expect(result).toContain('English');
+  });
+});
+
+describe('imageUser', () => {
+  it('returns truncated markdown (max 1500 chars) with lang context', () => {
+    const longMd = 'a'.repeat(3000);
+    const result = imageUser('fr', longMd);
+    // The content portion is sliced to 1500 chars max
+    expect(result.length).toBeLessThan(3000);
+    expect(result).toContain('français');
+    expect(result).toContain('illustration pedagogique');
+    expect(result).toContain('INTERDICTION TOTALE DE TEXTE');
+  });
+
+  it('filters out lines starting with "# Source "', () => {
+    const md = '# Source 1\nImportant content\n# Source 2\nMore content';
+    const result = imageUser('en', md);
+    expect(result).not.toContain('# Source 1');
+    expect(result).toContain('Important content');
   });
 });

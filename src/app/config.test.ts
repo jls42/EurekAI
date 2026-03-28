@@ -250,7 +250,7 @@ describe('saveSettings', () => {
 
     const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
     const sentBody = JSON.parse(putCall[1].body as string);
-    expect(sentBody.ttsModel).toBe('voxtral-mini-tts-2603');
+    expect(sentBody.ttsModel).toBe('voxtral-mini-tts-latest');
   });
 
   it('auto-corrects ttsModel: elevenlabs provider with voxtral model', async () => {

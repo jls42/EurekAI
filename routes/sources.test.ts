@@ -383,6 +383,34 @@ describe('POST /:pid/detect-consigne', () => {
     expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'fr');
   });
 
+  it('retourne 404 quand setConsigne echoue (projet supprime entre temps)', async () => {
+    const project = store.createProject('P1');
+    const pid = project.meta.id;
+    store.addSource(pid, {
+      id: 'src-1',
+      filename: 'test.txt',
+      markdown: 'contenu',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'text',
+    });
+
+    // Mock setConsigne to return false (simulates project deleted between check and save)
+    const origSetConsigne = store.setConsigne.bind(store);
+    vi.spyOn(store, 'setConsigne').mockReturnValueOnce(null);
+
+    const handler = getHandler(router, 'post', '/:pid/detect-consigne');
+    const req = mockReq({ params: { pid }, body: { lang: 'fr' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+
+    // Restore
+    vi.mocked(store.setConsigne).mockRestore();
+  });
+
   it('retourne 500 quand detectConsigne echoue', async () => {
     const project = store.createProject('P1');
     store.addSource(project.meta.id, {
@@ -931,5 +959,148 @@ describe('POST /:pid/sources/upload', () => {
 
     const results = res.json.mock.calls[0][0];
     expect(results[0].moderation).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// Background triggers (consigne detection + moderation)
+// =============================================================================
+
+describe('Background triggers after source addition', () => {
+  it('text source triggers background consigne detection', async () => {
+    vi.useFakeTimers();
+    try {
+      const project = store.createProject('P1');
+      store.addSource(project.meta.id, {
+        id: 'existing-src',
+        filename: 'existing.txt',
+        markdown: 'Existing content',
+        uploadedAt: new Date().toISOString(),
+        sourceType: 'text',
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/sources/text');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: { text: 'Reviser les dates importantes', lang: 'en' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalledTimes(1);
+      // Consigne detection runs via setTimeout(100)
+      expect(detectConsigne).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(150);
+
+      expect(detectConsigne).toHaveBeenCalledWith(
+        client,
+        '# Combined markdown',
+        undefined,
+        'en',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('voice source triggers background consigne detection', async () => {
+    vi.useFakeTimers();
+    try {
+      const project = store.createProject('P1');
+      const handler = getHandler(router, 'post', '/:pid/sources/voice');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: { lang: 'fr' },
+        file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalledTimes(1);
+      expect(detectConsigne).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(150);
+
+      expect(detectConsigne).toHaveBeenCalledWith(
+        client,
+        '# Combined markdown',
+        undefined,
+        'fr',
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('voice source triggers background moderation when profile has moderation enabled', async () => {
+    vi.useFakeTimers();
+    try {
+      const { project } = createProjectWithProfile({ useModeration: true });
+
+      const handler = getHandler(router, 'post', '/:pid/sources/voice');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: {},
+        file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const source = res.json.mock.calls[0][0];
+      expect(source.moderation).toEqual({ status: 'pending', categories: {} });
+
+      // moderateContent not yet called (runs in setTimeout)
+      const callsBefore = vi.mocked(moderateContent).mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(150);
+
+      // After timer fires, moderation should have been called for the voice source
+      expect(vi.mocked(moderateContent).mock.calls.length).toBeGreaterThan(callsBefore);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('upload source triggers background consigne detection and moderation', async () => {
+    vi.useFakeTimers();
+    try {
+      const { project } = createProjectWithProfile({ useModeration: true });
+
+      const handler = getHandler(router, 'post', '/:pid/sources/upload');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: { lang: 'fr' },
+        files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalledTimes(1);
+      const results = res.json.mock.calls[0][0];
+      expect(results[0].moderation).toEqual({ status: 'pending', categories: {} });
+
+      // Background tasks not yet fired
+      expect(detectConsigne).not.toHaveBeenCalled();
+      const modCallsBefore = vi.mocked(moderateContent).mock.calls.length;
+
+      await vi.advanceTimersByTimeAsync(150);
+
+      // Consigne detection should have been triggered
+      expect(detectConsigne).toHaveBeenCalledWith(
+        client,
+        '# Combined markdown',
+        undefined,
+        'fr',
+      );
+      // Moderation should have been triggered for the uploaded source
+      expect(vi.mocked(moderateContent).mock.calls.length).toBeGreaterThan(modCallsBefore);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

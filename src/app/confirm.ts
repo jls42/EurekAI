@@ -41,6 +41,17 @@ export function createConfirm() {
       }
     },
 
+    cancelOne(this: any, key: string) {
+      const controller = this.abortControllers[key];
+      if (controller) {
+        controller.abort();
+        delete this.abortControllers[key];
+      }
+      this.loading[key] = false;
+      const label = this.t('gen.' + key) || key;
+      this.showToast(this.t('toast.cancelledOne', { type: label }), 'info');
+    },
+
     cancelGeneration(this: any) {
       for (const controller of Object.values(this.abortControllers) as AbortController[]) {
         controller.abort();

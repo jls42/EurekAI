@@ -41,15 +41,6 @@ function showGenerateAllResult(failures: number, total: number, state: any): voi
   }
 }
 
-/** Process generations from auto-generate result. */
-function processAutoGenerations(result: any, state: any): void {
-  if (result.generations) {
-    for (const gen of result.generations) {
-      registerGeneration(state, gen);
-    }
-  }
-}
-
 export function createGenerate() {
   return {
     blockedModerationStatus(this: any): string | null {
@@ -135,10 +126,12 @@ export function createGenerate() {
         return;
       }
       const projectId = this.currentProjectId;
-      this.loading.all = true;
-
+      const allTypes = ['summary', 'flashcards', 'quiz'];
       const controller = new AbortController();
-      this.abortControllers.all = controller;
+      for (const type of allTypes) {
+        this.loading[type] = true;
+        this.abortControllers[type] = controller;
+      }
 
       const body = {
         sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
@@ -169,8 +162,10 @@ export function createGenerate() {
           this.generateAll(),
         );
       } finally {
-        this.loading.all = false;
-        delete this.abortControllers.all;
+        for (const type of allTypes) {
+          this.loading[type] = false;
+          delete this.abortControllers[type];
+        }
         this.$nextTick(() => this.refreshIcons());
       }
     },
@@ -187,6 +182,7 @@ export function createGenerate() {
 
       const controller = new AbortController();
       this.abortControllers.auto = controller;
+      const plannedTypes: string[] = [];
 
       try {
         const body = {
@@ -196,28 +192,64 @@ export function createGenerate() {
           useConsigne: this.useConsigne,
           count: this.generateCount,
         };
-        const res = await fetch('/api/projects/' + projectId + '/generate/auto', {
+        const fetchOpts = () => ({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
           signal: controller.signal,
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
+
+        // Phase 1: route analysis — shows "Auto — analyse..." chip
+        const routeRes = await fetch('/api/projects/' + projectId + '/generate/route', fetchOpts());
+        if (!routeRes.ok) {
+          const err = await routeRes.json().catch(() => ({}));
           this.showToast(
-            this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
+            this.t('toast.error', { error: this.resolveError(err.error || routeRes.statusText) }),
             'error',
             () => this.generateAuto(),
           );
           return;
         }
         if (this.currentProjectId !== projectId) return;
-        const result = await res.json();
-        processAutoGenerations(result, this);
-        this.showToast(this.t('toast.magicDone'), 'success', null, {
-          label: this.t('toast.view'),
-          fn: () => this.goToView('dashboard'),
-        });
+        const route = await routeRes.json();
+
+        // Phase 2: switch to individual type chips (skip TTS types if unavailable)
+        const ttsTypes = new Set(['podcast', 'quiz-vocal']);
+        this.loading.auto = false;
+        delete this.abortControllers.auto;
+        for (const step of route.plan) {
+          if (ttsTypes.has(step.agent) && !this.apiStatus.ttsAvailable) continue;
+          plannedTypes.push(step.agent);
+          this.loading[step.agent] = true;
+          this.abortControllers[step.agent] = controller;
+        }
+
+        // Launch individual generations in parallel
+        const base = '/api/projects/' + projectId;
+        const responses = await Promise.all(
+          plannedTypes.map((type) => fetch(base + '/generate/' + type, fetchOpts())),
+        );
+        if (this.currentProjectId !== projectId) return;
+
+        let failures = 0;
+        for (const r of responses) {
+          if (r.ok) {
+            registerGeneration(this, await r.json());
+          } else {
+            failures++;
+          }
+        }
+
+        if (failures > 0 && failures < plannedTypes.length) {
+          this.showToast(this.t('toast.partialGenerated', { count: plannedTypes.length - failures }), 'warning');
+        } else if (failures >= plannedTypes.length) {
+          this.showToast(this.t('toast.generationError', { error: 'all' }), 'error');
+        } else {
+          this.showToast(this.t('toast.magicDone'), 'success', null, {
+            label: this.t('toast.view'),
+            fn: () => this.goToView('dashboard'),
+          });
+        }
       } catch (e: any) {
         if (e.name === 'AbortError') return;
         this.showToast(this.t('toast.autoError', { error: e.message }), 'error', () =>
@@ -226,6 +258,10 @@ export function createGenerate() {
       } finally {
         this.loading.auto = false;
         delete this.abortControllers.auto;
+        for (const type of plannedTypes) {
+          this.loading[type] = false;
+          delete this.abortControllers[type];
+        }
         this.$nextTick(() => this.refreshIcons());
       }
     },

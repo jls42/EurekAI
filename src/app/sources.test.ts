@@ -288,4 +288,212 @@ describe('createSources', () => {
       expect(globalThis.fetch).not.toHaveBeenCalled();
     });
   });
+
+  describe('handleFiles', () => {
+    function makeFileList(...files: File[]) {
+      const fl: any = {
+        length: files.length,
+        [Symbol.iterator]: function* () {
+          for (let i = 0; i < this.length; i++) yield this[i];
+        },
+      };
+      files.forEach((f, i) => (fl[i] = f));
+      return fl as FileList;
+    }
+
+    it('returns early if fileList is null', async () => {
+      await src.handleFiles.call(ctx, null);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('returns early if fileList is empty', async () => {
+      const emptyList = makeFileList();
+      await src.handleFiles.call(ctx, emptyList);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('returns early if no currentProjectId', async () => {
+      ctx.currentProjectId = '';
+      const fileList = makeFileList(new File(['content'], 'test.pdf', { type: 'application/pdf' }));
+      await src.handleFiles.call(ctx, fileList);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('single file upload success', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      const newSource = { id: 's1', text: 'ocr result' };
+      mockFetchOk([newSource]);
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      const [url, opts] = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(url).toBe('/api/projects/pid-1/sources/upload');
+      expect(opts?.method).toBe('POST');
+      expect(opts?.body).toBeInstanceOf(FormData);
+
+      expect(ctx.sources).toEqual([newSource]);
+      expect(ctx.selectedIds).toEqual(['s1']);
+      expect(ctx.uploading).toBe(false);
+      expect(ctx.uploadProgress).toEqual({ current: 0, total: 0, filename: '' });
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
+    });
+
+    it('multiple files uploaded sequentially with progress tracking', async () => {
+      const file1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
+      const file2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file1, file2);
+
+      const src1 = { id: 's1', text: 'ocr1' };
+      const src2 = { id: 's2', text: 'ocr2' };
+      mockFetchOk([src1]);
+      mockFetchOk([src2]);
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(ctx.sources).toEqual([src1, src2]);
+      expect(ctx.selectedIds).toEqual(['s1', 's2']);
+      expect(ctx.uploading).toBe(false);
+      expect(ctx.uploadProgress).toEqual({ current: 0, total: 0, filename: '' });
+    });
+
+    it('one file fails (res.ok=false) then continues to next file', async () => {
+      const file1 = new File(['a'], 'fail.pdf', { type: 'application/pdf' });
+      const file2 = new File(['b'], 'ok.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file1, file2);
+
+      mockFetchErr('OCR failed');
+      const src2 = { id: 's2', text: 'ocr2' };
+      mockFetchOk([src2]);
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.sources).toEqual([src2]);
+      expect(ctx.selectedIds).toEqual(['s2']);
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('network exception on one file then continues to next', async () => {
+      const file1 = new File(['a'], 'fail.pdf', { type: 'application/pdf' });
+      const file2 = new File(['b'], 'ok.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file1, file2);
+
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network down'));
+      const src2 = { id: 's2', text: 'ocr2' };
+      mockFetchOk([src2]);
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.uploadError', 'error');
+      expect(ctx.sources).toEqual([src2]);
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('schedules refreshConsigne and refreshModeration after uploads', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchOk([{ id: 's1', text: 'ocr' }]);
+
+      // Replace refreshConsigne/refreshModeration with fresh mocks to track setTimeout calls
+      ctx.refreshConsigne = vi.fn();
+      ctx.refreshModeration = vi.fn();
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(ctx.refreshConsigne).not.toHaveBeenCalled();
+      expect(ctx.refreshModeration).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(2000);
+      expect(ctx.refreshModeration).toHaveBeenCalled();
+      expect(ctx.refreshConsigne).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1000);
+      expect(ctx.refreshConsigne).toHaveBeenCalled();
+    });
+  });
+
+  describe('startDrag / onDrag / stopDrag', () => {
+    it('startDrag returns early when zoom<=1 and rotation%360===0', () => {
+      ctx.viewSourceZoom = 1;
+      ctx.viewSourceRotation = 0;
+      const event = { clientX: 100, clientY: 200, preventDefault: vi.fn() } as unknown as MouseEvent;
+
+      src.startDrag.call(ctx, event);
+
+      expect(ctx.viewSourceDragging).toBe(false);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('startDrag activates dragging and records position with MouseEvent', () => {
+      ctx.viewSourceZoom = 2;
+      ctx.viewSourcePanX = 10;
+      ctx.viewSourcePanY = 20;
+      const event = { clientX: 100, clientY: 200, preventDefault: vi.fn() } as unknown as MouseEvent;
+
+      src.startDrag.call(ctx, event);
+
+      expect(ctx.viewSourceDragging).toBe(true);
+      expect(ctx.viewSourceDragStart).toEqual({ x: 100, y: 200 });
+      expect(ctx.viewSourcePanStart).toEqual({ x: 10, y: 20 });
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('startDrag works with TouchEvent', () => {
+      ctx.viewSourceZoom = 1.5;
+      ctx.viewSourcePanX = 5;
+      ctx.viewSourcePanY = 15;
+      const event = {
+        touches: [{ clientX: 150, clientY: 250 }],
+        preventDefault: vi.fn(),
+      } as unknown as TouchEvent;
+
+      src.startDrag.call(ctx, event);
+
+      expect(ctx.viewSourceDragging).toBe(true);
+      expect(ctx.viewSourceDragStart).toEqual({ x: 150, y: 250 });
+      expect(ctx.viewSourcePanStart).toEqual({ x: 5, y: 15 });
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('onDrag updates panX/panY based on mouse delta', () => {
+      ctx.viewSourceDragging = true;
+      ctx.viewSourceDragStart = { x: 100, y: 200 };
+      ctx.viewSourcePanStart = { x: 10, y: 20 };
+      const event = { clientX: 130, clientY: 250, preventDefault: vi.fn() } as unknown as MouseEvent;
+
+      src.onDrag.call(ctx, event);
+
+      expect(ctx.viewSourcePanX).toBe(40); // 10 + (130 - 100)
+      expect(ctx.viewSourcePanY).toBe(70); // 20 + (250 - 200)
+      expect(event.preventDefault).toHaveBeenCalled();
+    });
+
+    it('onDrag returns early when not dragging', () => {
+      ctx.viewSourceDragging = false;
+      ctx.viewSourcePanX = 0;
+      ctx.viewSourcePanY = 0;
+      const event = { clientX: 130, clientY: 250, preventDefault: vi.fn() } as unknown as MouseEvent;
+
+      src.onDrag.call(ctx, event);
+
+      expect(ctx.viewSourcePanX).toBe(0);
+      expect(ctx.viewSourcePanY).toBe(0);
+      expect(event.preventDefault).not.toHaveBeenCalled();
+    });
+
+    it('stopDrag sets dragging to false', () => {
+      ctx.viewSourceDragging = true;
+
+      src.stopDrag.call(ctx);
+
+      expect(ctx.viewSourceDragging).toBe(false);
+    });
+  });
 });

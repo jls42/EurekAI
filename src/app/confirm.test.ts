@@ -25,7 +25,7 @@ function makeContext(overrides: any = {}) {
       voice: false,
       websearch: false,
     } as Record<string, boolean>,
-    t: vi.fn((key: string) => key),
+    t: vi.fn((key: string, p?: any) => (p ? `${key}:${JSON.stringify(p)}` : key)),
     showToast: vi.fn(),
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: {
@@ -123,6 +123,35 @@ describe('createConfirm', () => {
 
       expect(fakeButton.focus).toHaveBeenCalled();
       expect(ctx.confirmTrigger).toBeNull();
+    });
+  });
+
+  describe('cancelOne', () => {
+    it('aborts the controller for the given key and clears loading', () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      ctx.abortControllers = { summary: ctrl };
+      ctx.loading.summary = true;
+      ctx.loading.quiz = true;
+
+      confirm.cancelOne.call(ctx, 'summary');
+
+      expect((ctrl as any).abort).toHaveBeenCalled();
+      expect(ctx.abortControllers.summary).toBeUndefined();
+      expect(ctx.loading.summary).toBe(false);
+      expect(ctx.loading.quiz).toBe(true); // untouched
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        expect.stringContaining('toast.cancelledOne'),
+        'info',
+      );
+    });
+
+    it('handles missing controller gracefully', () => {
+      ctx.loading.summary = true;
+
+      confirm.cancelOne.call(ctx, 'summary');
+
+      expect(ctx.loading.summary).toBe(false);
+      expect(ctx.showToast).toHaveBeenCalled();
     });
   });
 

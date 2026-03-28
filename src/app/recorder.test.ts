@@ -166,4 +166,90 @@ describe('createRecorder', () => {
       expect(ctx.loading.voice).toBe(false);
     });
   });
+
+  describe('startRecording', () => {
+    let mockStart: ReturnType<typeof vi.fn>;
+    let mockStop: ReturnType<typeof vi.fn>;
+    let onDataAvailable: ((e: any) => void) | null = null;
+    let onStop: (() => void) | null = null;
+    let mockTrackStop: ReturnType<typeof vi.fn>;
+    let mockStream: { getTracks: () => { stop: ReturnType<typeof vi.fn> }[] };
+
+    beforeEach(() => {
+      onDataAvailable = null;
+      onStop = null;
+      mockStart = vi.fn();
+      mockStop = vi.fn();
+
+      class FakeMediaRecorder {
+        start = mockStart;
+        stop = mockStop;
+        state = 'recording';
+        set ondataavailable(fn: any) { onDataAvailable = fn; }
+        set onstop(fn: any) { onStop = fn; }
+      }
+
+      mockTrackStop = vi.fn();
+      mockStream = { getTracks: () => [{ stop: mockTrackStop }] };
+      vi.stubGlobal('navigator', {
+        mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      });
+      vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    });
+
+    it('successful recording start', async () => {
+      const promise = rec.startRecording.call(ctx);
+      await vi.advanceTimersByTimeAsync(0);
+      await promise;
+
+      expect(ctx.recording).toBe(true);
+      expect(ctx.recordingDuration).toBe(0);
+      expect(ctx.recorder).toBeDefined();
+      expect(mockStart).toHaveBeenCalled();
+      expect(ctx.recordingTimer).not.toBeNull();
+    });
+
+    it('timer increments recordingDuration', async () => {
+      const promise = rec.startRecording.call(ctx);
+      await vi.advanceTimersByTimeAsync(0);
+      await promise;
+
+      expect(ctx.recordingDuration).toBe(0);
+      vi.advanceTimersByTime(3000);
+      expect(ctx.recordingDuration).toBe(3);
+    });
+
+    it('onstop callback creates blob and calls uploadVoice', async () => {
+      ctx.uploadVoice = vi.fn();
+      const promise = rec.startRecording.call(ctx);
+      await vi.advanceTimersByTimeAsync(0);
+      await promise;
+
+      // Simulate data available
+      onDataAvailable!({ data: new Blob(['chunk1']) });
+      onDataAvailable!({ data: new Blob(['chunk2']) });
+
+      // Trigger onstop
+      await onStop!();
+
+      expect(mockTrackStop).toHaveBeenCalled();
+      expect(ctx.uploadVoice).toHaveBeenCalledWith(expect.any(Blob));
+    });
+
+    it('getUserMedia rejection shows error toast', async () => {
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
+        new Error('Permission denied'),
+      );
+
+      const promise = rec.startRecording.call(ctx);
+      await vi.advanceTimersByTimeAsync(0);
+      await promise;
+
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        'toast.micError',
+        'error',
+      );
+      expect(ctx.recording).toBe(false);
+    });
+  });
 });

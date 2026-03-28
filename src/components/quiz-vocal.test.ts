@@ -238,4 +238,112 @@ describe('quizVocalComponent', () => {
       });
     });
   });
+
+  describe('startVocalRecording', () => {
+    let mockStart: ReturnType<typeof vi.fn>;
+    let mockStop: ReturnType<typeof vi.fn>;
+    let onDataAvailable: ((e: any) => void) | null = null;
+    let onStop: (() => void) | null = null;
+    let mockTrackStop: ReturnType<typeof vi.fn>;
+    let mockStream: { getTracks: () => { stop: ReturnType<typeof vi.fn> }[] };
+
+    beforeEach(() => {
+      onDataAvailable = null;
+      onStop = null;
+      mockStart = vi.fn();
+      mockStop = vi.fn();
+
+      class FakeMediaRecorder {
+        start = mockStart;
+        stop = mockStop;
+        state = 'recording';
+        set ondataavailable(fn: any) { onDataAvailable = fn; }
+        set onstop(fn: any) { onStop = fn; }
+      }
+
+      mockTrackStop = vi.fn();
+      mockStream = { getTracks: () => [{ stop: mockTrackStop }] };
+      vi.stubGlobal('navigator', {
+        mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(mockStream) },
+      });
+      vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+    });
+
+    it('calls stopQuestion, creates MediaRecorder, sets vocalRecording=true', async () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      const stopSpy = vi.spyOn(comp, 'stopQuestion');
+
+      await comp.startVocalRecording();
+
+      expect(stopSpy).toHaveBeenCalled();
+      expect(mockStart).toHaveBeenCalled();
+      expect(comp.vocalRecorder).toBeDefined();
+      expect(comp.vocalRecording).toBe(true);
+    });
+
+    it('on mic error, shows toast', async () => {
+      vi.mocked(navigator.mediaDevices.getUserMedia).mockRejectedValueOnce(
+        new Error('Permission denied'),
+      );
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+
+      await comp.startVocalRecording();
+
+      expect(comp.showToast).toHaveBeenCalledWith('toast.micError', 'error');
+      expect(comp.vocalRecording).toBe(false);
+    });
+
+    it('onstop calls submitVocalAnswer with blob', async () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      comp.submitVocalAnswer = vi.fn();
+
+      await comp.startVocalRecording();
+
+      // Simulate data chunks
+      onDataAvailable!({ data: new Blob(['chunk1']) });
+      onDataAvailable!({ data: new Blob(['chunk2']) });
+
+      // Trigger onstop
+      await onStop!();
+
+      expect(mockTrackStop).toHaveBeenCalled();
+      expect(comp.submitVocalAnswer).toHaveBeenCalledWith(expect.any(Blob));
+    });
+  });
+
+  describe('stopVocalRecording', () => {
+    it('stops recorder when recording', () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      const mockRecorderStop = vi.fn();
+      comp.vocalRecorder = { state: 'recording', stop: mockRecorderStop } as any;
+      comp.vocalRecording = true;
+
+      comp.stopVocalRecording();
+
+      expect(mockRecorderStop).toHaveBeenCalled();
+      expect(comp.vocalRecording).toBe(false);
+    });
+
+    it('sets vocalRecording=false even when recorder is null', () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      comp.vocalRecorder = null;
+      comp.vocalRecording = true;
+
+      comp.stopVocalRecording();
+
+      expect(comp.vocalRecording).toBe(false);
+    });
+
+    it('does not call stop when recorder state is not recording', () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      const mockRecorderStop = vi.fn();
+      comp.vocalRecorder = { state: 'inactive', stop: mockRecorderStop } as any;
+      comp.vocalRecording = true;
+
+      comp.stopVocalRecording();
+
+      expect(mockRecorderStop).not.toHaveBeenCalled();
+      expect(comp.vocalRecording).toBe(false);
+    });
+  });
 });

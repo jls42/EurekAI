@@ -40,4 +40,26 @@ describe('profile locale storage', () => {
 
     expect(getProfileLocale('profile-1', 'fr', storage)).toBe('fr');
   });
+
+  it('returns fallback when stored JSON is invalid', () => {
+    const storage = new MemoryStorage();
+    // Write invalid JSON directly
+    storage.setItem('sf-profile-locales', '{not valid json!!!');
+
+    expect(getProfileLocale('profile-1', 'fr', storage)).toBe('fr');
+  });
+
+  it('filters out non-string values from stored locales', () => {
+    const storage = new MemoryStorage();
+    // Store an object where one value is not a string
+    storage.setItem('sf-profile-locales', JSON.stringify({
+      'profile-1': 'en',
+      'profile-2': 42,
+      'profile-3': null,
+    }));
+
+    expect(getProfileLocale('profile-1', 'fr', storage)).toBe('en');
+    expect(getProfileLocale('profile-2', 'fr', storage)).toBe('fr');
+    expect(getProfileLocale('profile-3', 'fr', storage)).toBe('fr');
+  });
 });

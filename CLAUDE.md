@@ -52,6 +52,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Toujours utiliser le skill `/commit` pour creer les commits** (mandatory)
 - Verifier visuellement chaque modif UI (navigateur ou Claude in Chrome)
 - Lancer `npm run test` apres chaque modification
+- **Si le commit contient des modifications de `README.md`** : lancer `./scripts/translate-readme.sh` avant de committer pour regenerer les 14 traductions (README-en.md, README-de.md, etc.)
 - Quand une erreur ou mauvaise approche est identifiee, ajouter une regle ici ou dans `.claude/rules/`
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)

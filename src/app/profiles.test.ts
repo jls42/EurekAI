@@ -24,7 +24,7 @@ vi.stubGlobal(
   }),
 );
 
-function makeCtx(overrides: Record<string, any> = {}) {
+function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
   return {
     profiles: [] as any[],
     currentProfile: null as any,
@@ -268,6 +268,168 @@ describe('createProfiles', () => {
       expect(ctx.confirmDelete).not.toHaveBeenCalled();
       expect(ctx.requirePin).not.toHaveBeenCalled();
     });
+
+    it('executeDeleteProfile removes profile from state and clears locale', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [
+          { id: 'p1', name: 'Alice', hasPin: false },
+          { id: 'p2', name: 'Bob', hasPin: false },
+        ],
+        currentProfile: { id: 'p1', name: 'Alice' },
+        // confirmDelete immediately calls the callback
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+      ctx.selectProfile = vi.fn();
+
+      await callMethod('deleteProfile', ctx, 'p1');
+      // Wait for the async executeDeleteProfile to complete
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalledWith('toast.profileDeleted', 'success');
+      });
+
+      expect(clearProfileLocale).toHaveBeenCalledWith('p1');
+      expect(ctx.profiles).toHaveLength(1);
+      expect(ctx.profiles[0].id).toBe('p2');
+      // Since deleted profile was current, it should select the remaining one
+      expect(ctx.selectProfile).toHaveBeenCalledWith('p2');
+    });
+
+    it('executeDeleteProfile shows picker when last profile is deleted', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
+        currentProfile: { id: 'p1', name: 'Alice' },
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+
+      await callMethod('deleteProfile', ctx, 'p1');
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalledWith('toast.profileDeleted', 'success');
+      });
+
+      expect(ctx.currentProfile).toBeNull();
+      expect(ctx.showProfilePicker).toBe(true);
+    });
+
+    it('executeDeleteProfile shows error toast on fetch failure', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('Network error')),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+
+      await callMethod('deleteProfile', ctx, 'p1');
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalled();
+      });
+
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+    });
+
+    it('executeDeleteProfile does not clear currentProfile when deleting a different profile', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [
+          { id: 'p1', name: 'Alice', hasPin: false },
+          { id: 'p2', name: 'Bob', hasPin: false },
+        ],
+        currentProfile: { id: 'p1', name: 'Alice' },
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+
+      await callMethod('deleteProfile', ctx, 'p2');
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalledWith('toast.profileDeleted', 'success');
+      });
+
+      // currentProfile should remain unchanged
+      expect(ctx.currentProfile).toEqual({ id: 'p1', name: 'Alice' });
+      expect(ctx.profiles).toHaveLength(1);
+    });
+
+    it('executeDeleteProfile sends PIN for profile with PIN', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+      // requirePin immediately invokes the callback with a PIN
+      ctx.requirePin = vi.fn((cb: Function) => cb('1234'));
+
+      await callMethod('deleteProfile', ctx, 'p1');
+      await vi.waitFor(() => {
+        expect(fetch).toHaveBeenCalled();
+      });
+
+      const [url, opts] = (fetch as any).mock.calls[0];
+      expect(url).toBe('/api/profiles/p1');
+      expect(opts.method).toBe('DELETE');
+      expect(JSON.parse(opts.body)).toEqual({ pin: '1234' });
+    });
+
+    it('deleteConfirmMessage includes project count when deleting current profile with projects', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
+        currentProfile: { id: 'p1', name: 'Alice' },
+        projects: [{ id: 'proj1' }, { id: 'proj2' }],
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+
+      await callMethod('deleteProfile', ctx, 'p1');
+
+      // confirmDelete is called with the message from deleteConfirmMessage
+      const target = ctx.confirmDelete.mock.calls[0][0];
+      // t('profile.deleteConfirm', { count: 2 }) returns the key in mock
+      expect(target).toBe('profile.deleteConfirm');
+    });
+
+    it('deleteConfirmMessage uses no-projects message for non-current profile', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({ ok: true }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [
+          { id: 'p1', name: 'Alice', hasPin: false },
+          { id: 'p2', name: 'Bob', hasPin: false },
+        ],
+        currentProfile: { id: 'p1', name: 'Alice' },
+        projects: [{ id: 'proj1' }],
+        confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
+      });
+
+      await callMethod('deleteProfile', ctx, 'p2');
+
+      const target = ctx.confirmDelete.mock.calls[0][0];
+      expect(target).toBe('profile.deleteConfirmNoProjects');
+    });
   });
 
   // --- updateProfile ---
@@ -386,6 +548,83 @@ describe('createProfiles', () => {
 
       expect(ctx.editingProfile).toBeNull();
       expect(ctx.requirePin).not.toHaveBeenCalled();
+    });
+
+    it('with PIN, sets editingProfile with _verifiedPin on successful verification', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({}),
+        }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true, locale: 'en' }],
+      });
+      // Make requirePin immediately invoke the callback with a test PIN
+      ctx.requirePin = vi.fn((cb: Function) => cb('1234'));
+
+      callMethod('startEditProfile', ctx, 'p1');
+
+      // Wait for the async callback inside requirePin
+      await vi.waitFor(() => {
+        expect(ctx.editingProfile).not.toBeNull();
+      });
+
+      expect(ctx.editingProfile).toEqual({
+        id: 'p1',
+        name: 'Alice',
+        hasPin: true,
+        locale: 'en',
+        _verifiedPin: '1234',
+      });
+      expect(ctx.showProfileForm).toBe(false);
+    });
+
+    it('with PIN, shows pinWrong toast when verification fails', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          json: () => Promise.resolve({ error: 'Bad PIN' }),
+        }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
+      });
+      ctx.requirePin = vi.fn((cb: Function) => cb('9999'));
+
+      callMethod('startEditProfile', ctx, 'p1');
+
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalled();
+      });
+
+      expect(ctx.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
+      expect(ctx.editingProfile).toBeNull();
+    });
+
+    it('with PIN, shows error toast on network failure', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockRejectedValue(new Error('Network fail')),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
+      });
+      ctx.requirePin = vi.fn((cb: Function) => cb('1234'));
+
+      callMethod('startEditProfile', ctx, 'p1');
+
+      await vi.waitFor(() => {
+        expect(ctx.showToast).toHaveBeenCalled();
+      });
+
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.editingProfile).toBeNull();
     });
   });
 
@@ -659,6 +898,36 @@ describe('createProfiles', () => {
 
       expect(fetch).not.toHaveBeenCalled();
       expect(ctx.requirePin).not.toHaveBeenCalled();
+    });
+
+    it('with PIN, invokes requirePin callback then calls updateProfile with pin', async () => {
+      const updated = { id: 'p1', name: 'Alice', useModeration: true };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve(updated),
+        }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true, useModeration: false }],
+        currentProfile: { id: 'p1', name: 'Alice', useModeration: false },
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      // requirePin immediately invokes the callback with a test PIN
+      ctx.requirePin = vi.fn((cb: Function) => cb('4321'));
+
+      await callMethod('_toggleProfileProp', ctx, 'p1', 'useModeration');
+
+      // Wait for the async callback to complete
+      await vi.waitFor(() => {
+        expect(fetch).toHaveBeenCalled();
+      });
+
+      const body = JSON.parse((fetch as any).mock.calls[0][1].body);
+      expect(body.useModeration).toBe(true);
+      expect(body.pin).toBe('4321');
     });
   });
 
