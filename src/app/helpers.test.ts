@@ -795,6 +795,59 @@ describe('flashcardSource', () => {
   });
 });
 
+describe('currentFlag', () => {
+  const uiLanguages = [
+    { code: 'fr', flag: '\u{1F1EB}\u{1F1F7}', label: 'Français' },
+    { code: 'en', flag: '\u{1F1EC}\u{1F1E7}', label: 'English' },
+    { code: 'ar', flag: '\u{1F1F8}\u{1F1E6}', label: 'العربية' },
+  ];
+
+  it('returns flag for current locale', () => {
+    const ctx = { uiLanguages, locale: 'fr' };
+    expect(callWith<string>(helpers.currentFlag, ctx)).toBe('\u{1F1EB}\u{1F1F7}');
+  });
+
+  it('returns globe emoji for unknown locale', () => {
+    const ctx = { uiLanguages, locale: 'xx' };
+    expect(callWith<string>(helpers.currentFlag, ctx)).toBe('\u{1F310}');
+  });
+});
+
+describe('langLabel', () => {
+  const uiLanguages = [
+    { code: 'fr', flag: '\u{1F1EB}\u{1F1F7}', label: 'Français' },
+    { code: 'en', flag: '\u{1F1EC}\u{1F1E7}', label: 'English' },
+  ];
+
+  it('returns label for known code', () => {
+    const ctx = { uiLanguages };
+    expect(callWith<string>(helpers.langLabel, ctx, 'fr')).toBe('Français');
+    expect(callWith<string>(helpers.langLabel, ctx, 'en')).toBe('English');
+  });
+
+  it('returns code as fallback for unknown language', () => {
+    const ctx = { uiLanguages };
+    expect(callWith<string>(helpers.langLabel, ctx, 'xx')).toBe('xx');
+  });
+});
+
+describe('langFlag', () => {
+  const uiLanguages = [
+    { code: 'fr', flag: '\u{1F1EB}\u{1F1F7}', label: 'Français' },
+    { code: 'en', flag: '\u{1F1EC}\u{1F1E7}', label: 'English' },
+  ];
+
+  it('returns flag for known code', () => {
+    const ctx = { uiLanguages };
+    expect(callWith<string>(helpers.langFlag, ctx, 'fr')).toBe('\u{1F1EB}\u{1F1F7}');
+  });
+
+  it('returns globe emoji for unknown code', () => {
+    const ctx = { uiLanguages };
+    expect(callWith<string>(helpers.langFlag, ctx, 'xx')).toBe('\u{1F310}');
+  });
+});
+
 describe('refreshIcons', () => {
   it('does not propagate error when createIcons throws', () => {
     // In the test environment, createIcons may throw because there is no DOM.

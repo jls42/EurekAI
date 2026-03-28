@@ -11,6 +11,7 @@ function makeContext(overrides: any = {}) {
     sources: [] as any[],
     selectedIds: [] as string[],
     loading: { websearch: false } as Record<string, boolean>,
+    locale: 'fr',
     currentProfile: { ageGroup: 'enfant' },
     t: vi.fn((key: string) => key),
     showToast: vi.fn(),
@@ -64,7 +65,7 @@ describe('createWebsearch', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/sources/websearch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: 'photosynthesis', ageGroup: 'enfant' }),
+        body: JSON.stringify({ query: 'photosynthesis', lang: 'fr', ageGroup: 'enfant' }),
       });
       expect(ctx.sources).toEqual([source]);
       expect(ctx.selectedIds).toEqual(['s1']);
@@ -122,6 +123,40 @@ describe('createWebsearch', () => {
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(ctx.sources).toEqual([source]);
+    });
+
+    it('uses fallback ageGroup when currentProfile is null', async () => {
+      ctx.currentProfile = null;
+      const source = { id: 's1', type: 'websearch', text: 'Results' };
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => source,
+      } as any);
+
+      await ws.searchWeb.call(ctx);
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/sources/websearch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'photosynthesis', lang: 'fr', ageGroup: 'enfant' }),
+      });
+    });
+
+    it('passes locale from context', async () => {
+      ctx.locale = 'en';
+      const source = { id: 's1', type: 'websearch', text: 'Results' };
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => source,
+      } as any);
+
+      await ws.searchWeb.call(ctx);
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/sources/websearch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: 'photosynthesis', lang: 'en', ageGroup: 'enfant' }),
+      });
     });
 
     it('sets loading.websearch during execution', async () => {
