@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { diversityParams } from '../helpers/diversity.js';
 import { fillBlankSystem, fillBlankUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
 
@@ -32,16 +33,18 @@ export async function generateFillBlank(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count = 10,
+  exclusions?: string,
 ): Promise<FillBlankItem[]> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: fillBlankSystem(ageGroup) },
-    { role: 'user', content: fillBlankUser(markdown, count, lang) },
+    { role: 'user', content: fillBlankUser(markdown, count, lang, exclusions) },
   ];
 
   const response = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('fill-blank'),
   });
 
   const raw = extractContent(response);
@@ -63,6 +66,7 @@ export async function generateFillBlank(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('fill-blank'),
   });
   const retryData = unwrapJsonArray<FillBlankItem>(
     safeParseJson(extractContent(retry)),

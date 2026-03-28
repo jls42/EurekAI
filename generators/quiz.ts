@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { diversityParams } from '../helpers/diversity.js';
 import {
   quizSystem,
   quizUser,
@@ -31,6 +32,7 @@ async function generateQuizWithRetry(
   retryMsg: string,
   errorMsg: string,
   model: string,
+  type = 'quiz',
 ): Promise<QuizQuestion[]> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: systemPrompt },
@@ -41,6 +43,7 @@ async function generateQuizWithRetry(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams(type),
   });
 
   const raw = getContent(response);
@@ -55,6 +58,7 @@ async function generateQuizWithRetry(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams(type),
   });
   const retryData = unwrapJsonArray<QuizQuestion>(
     safeParseJson(getContent(retry)),
@@ -73,11 +77,12 @@ export async function generateQuiz(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
+  exclusions?: string,
 ): Promise<QuizQuestion[]> {
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),
-    quizUser(markdown, count, lang),
+    quizUser(markdown, count, lang, exclusions),
     'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
@@ -91,14 +96,16 @@ export async function generateQuizVocal(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
+  exclusions?: string,
 ): Promise<QuizQuestion[]> {
   return generateQuizWithRetry(
     client,
     quizVocalSystem(ageGroup),
-    quizVocalUser(markdown, count, lang),
+    quizVocalUser(markdown, count, lang, exclusions),
     'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,
+    'quiz-vocal',
   );
 }
 

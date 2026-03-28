@@ -375,6 +375,7 @@ describe('generateRoutes', () => {
         false, // hasConsigne
         'fr', // default lang
         'enfant', // default ageGroup
+        '', // exclusions (no previous generations)
       );
     });
 
@@ -406,6 +407,7 @@ describe('generateRoutes', () => {
         false,
         'en',
         'ado',
+        '', // exclusions
       );
     });
 
@@ -436,6 +438,7 @@ describe('generateRoutes', () => {
         true, // hasConsigne = true
         'fr',
         'enfant',
+        '', // exclusions
       );
     });
 
@@ -465,6 +468,7 @@ describe('generateRoutes', () => {
         false,
         'fr',
         'enfant',
+        '', // exclusions
       );
     });
 
@@ -486,13 +490,14 @@ describe('generateRoutes', () => {
       const req1 = mockReq({ params: { pid }, body: { count: 100 } });
       const res1 = mockRes();
       await handler(req1, res1);
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 50);
+      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 50, '');
 
       // Test count < 1 clamped to 1
       const req2 = mockReq({ params: { pid }, body: { count: -5 } });
       const res2 = mockRes();
       await handler(req2, res2);
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 1);
+      // 2nd call has exclusions from 1st generation stored in project
+      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 1, expect.any(String));
     });
 
     it('passes undefined count when not provided', async () => {
@@ -512,7 +517,7 @@ describe('generateRoutes', () => {
       const res = mockRes();
       await handler(req, res);
 
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', undefined);
+      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', undefined, '');
     });
 
     it('filters sources by sourceIds', async () => {
@@ -549,6 +554,7 @@ describe('generateRoutes', () => {
         false,
         'fr',
         'enfant',
+        '', // exclusions
       );
       // Markdown should not contain source 1
       const calledMarkdown = (generateSummary as any).mock.calls[0][1] as string;
