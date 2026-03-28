@@ -36,7 +36,7 @@
 
 ## A história — Por que o EurekAI ?
 
-**EurekAI** nasceu durante o [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (março de 2026). Eu precisava de um tema — e a ideia veio de algo muito concreto: eu frequentemente preparo provas com minha filha, e pensei que deveria ser possível tornar isso mais lúdico e interativo graças à IA.
+**EurekAI** nasceu durante o [Mistral AI Worldwide Hackathon](https://worldwide-hackathon.mistral.ai/) (março de 2026). Eu precisava de um tema — e a ideia veio de algo muito concreto: eu frequentemente preparo provas com minha filha, e pensei que deveria ser possível tornar isso mais lúdico e interativo graças à IA.
 
 O objetivo: pegar **qualquer entrada** — uma foto do manual, um texto copiado e colado, uma gravação de voz, uma pesquisa na web — e transformá-la em **fichas de revisão, flashcards, quizzes, podcasts, textos com lacunas, ilustrações e muito mais**. Tudo isso alimentado pelos modelos franceses da Mistral AI, o que o torna uma solução naturalmente adaptada aos alunos francófonos.
 

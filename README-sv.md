@@ -36,7 +36,7 @@
 
 ## Historien — Varför EurekAI?
 
-**EurekAI** föddes under [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (mars 2026). Jag behövde ett ämne — och idén kom från något mycket konkret: jag förbereder regelbundet prov med min dotter, och jag tänkte att det borde gå att göra det roligare och mer interaktivt tack vare AI.
+**EurekAI** föddes under [Mistral AI Worldwide Hackathon](https://worldwide-hackathon.mistral.ai/) (mars 2026). Jag behövde ett ämne — och idén kom från något mycket konkret: jag förbereder regelbundet prov med min dotter, och jag tänkte att det borde gå att göra det roligare och mer interaktivt tack vare AI.
 
 Målet: ta emot **vilken indata som helst** — ett foto av läroboken, en kopierad text, en röstinspelning, en webbsökning — och omvandla det till **revisionsblad, flashcards, quiz, podcasts, lucktexter, illustrationer och mer**. Allt drivs av Mistral AIs modeller, vilket gör det naturligt anpassat för fransktalande elever.
 

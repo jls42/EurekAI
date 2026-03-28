@@ -36,7 +36,7 @@
 
 ## The story — Why EurekAI?
 
-**EurekAI** was born during the [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/) (March 2026). I needed a project — and the idea came from something very concrete: I regularly prepare tests with my daughter, and I thought it should be possible to make that more fun and interactive with AI.
+**EurekAI** was born during the [Mistral AI Worldwide Hackathon](https://worldwide-hackathon.mistral.ai/) (March 2026). I needed a project — and the idea came from something very concrete: I regularly prepare tests with my daughter, and I thought it should be possible to make that more fun and interactive with AI.
 
 The goal: take **any input** — a photo of a textbook, copied-and-pasted text, a voice recording, a web search — and transform it into **revision notes, flashcards, quizzes, podcasts, fill-in-the-blank texts, illustrations, and more**. All powered by Mistral AI's French models, making it a solution naturally suited to French-speaking students.
 

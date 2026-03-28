@@ -36,7 +36,7 @@
 
 ## 故事 — 为什么是 EurekAI？
 
-**EurekAI** 诞生于 [Mistral AI Worldwide Hackathon](https://worldwidehackathon.mistral.ai/)（2026 年 3 月）。我需要一个项目主题——这个想法来源于一个非常具体的场景：我经常和女儿一起准备测验，我想有没有可能借助 AI 把复习变得更有趣、更互动。
+**EurekAI** 诞生于 [Mistral AI Worldwide Hackathon](https://worldwide-hackathon.mistral.ai/)（2026 年 3 月）。我需要一个项目主题——这个想法来源于一个非常具体的场景：我经常和女儿一起准备测验，我想有没有可能借助 AI 把复习变得更有趣、更互动。
 
 目标：接受各种“任意输入”——手册的照片、复制粘贴的文本、语音录音、网页搜索——并将其转换为**复习要点、抽认卡、测验、播客、填空题、插图，以及更多**。所有功能都由 Mistral AI 的模型驱动，因此对法语学生来说是天然适配的解决方案。
 
