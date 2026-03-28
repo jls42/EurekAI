@@ -11,7 +11,9 @@
         var t = localStorage.getItem('sf-theme');
         if (!t) t = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
         document.documentElement.dataset.theme = t;
-        document.documentElement.lang = localStorage.getItem('sf-lang') || 'fr';
+        var lang = localStorage.getItem('sf-lang') || 'fr';
+        document.documentElement.lang = lang;
+        document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
       })();
     </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />

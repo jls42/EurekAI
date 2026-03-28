@@ -17,11 +17,12 @@ export async function transcribeAudio(
   client: Mistral,
   buffer: Buffer,
   filename: string,
+  lang = 'fr',
 ): Promise<string> {
   const result = await client.audio.transcriptions.complete({
     model: 'voxtral-mini-latest',
     file: { fileName: filename, content: new Uint8Array(buffer) },
-    language: 'fr',
+    language: lang,
   });
   return result.text;
 }

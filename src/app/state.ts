@@ -1,5 +1,10 @@
+import { UI_LANGUAGES } from '../i18n/languages';
+
 export function createState() {
   return {
+    // Supported UI languages
+    uiLanguages: UI_LANGUAGES,
+
     // Profile state
     profiles: [] as any[],
     currentProfile: null as any,

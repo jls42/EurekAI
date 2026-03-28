@@ -568,7 +568,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
 
     await handler(req, res);
 
-    expect(transcribeAudio).toHaveBeenCalledWith(client, audioBuffer, 'answer.webm');
+    expect(transcribeAudio).toHaveBeenCalledWith(client, audioBuffer, 'answer.webm', 'fr');
     expect(verifyAnswer).toHaveBeenCalledWith(
       client,
       'Quelle est la capitale ?',
