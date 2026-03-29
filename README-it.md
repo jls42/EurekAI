@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/assets/logo.webp" alt="EurekAI Logo" width="120" />
+  <img src="public/assets/logo.webp" alt="Logo EurekAI" width="120" />
 </p>
 
 <h1 align="center">EurekAI</h1>
@@ -9,38 +9,38 @@
 </p>
 
 <p align="center">
-  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Español</a> · <a href="README-pt.md">🇧🇷 Português</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Nederlands</a> · <a href="README-ar.md">🇸🇦 العربية</a><br>
-  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日本語</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 Polski</a> · <a href="README-ro.md">🇷🇴 Română</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
+  <a href="README-en.md">🇬🇧 Inglese</a> · <a href="README-es.md">🇪🇸 Spagnolo</a> · <a href="README-pt.md">🇧🇷 Portoghese</a> · <a href="README-de.md">🇩🇪 Tedesco</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Olandese</a> · <a href="README-ar.md">🇸🇦 Arabo</a><br>
+  <a href="README-hi.md">🇮🇳 Hindi</a> · <a href="README-zh.md">🇨🇳 Cinese</a> · <a href="README-ja.md">🇯🇵 Giapponese</a> · <a href="README-ko.md">🇰🇷 Coreano</a> · <a href="README-pl.md">🇵🇱 Polacco</a> · <a href="README-ro.md">🇷🇴 Romeno</a> · <a href="README-sv.md">🇸🇪 Svedese</a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="Demo YouTube"></a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="Guarda la demo"></a>
 </p>
 
 <h4 align="center">📊 Qualità del codice</h4>
 
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Quality Gate"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Security Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Reliability Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Maintainability Rating"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Gate di qualità"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Valutazione sicurezza"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Valutazione affidabilità"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Valutazione manutenibilità"></a>
 </p>
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Coverage"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Vulnerabilities"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Copertura"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Vulnerabilità"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Code Smells"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Lines of Code"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="Linee di codice"></a>
 </p>
 
 ---
 
-## La storia — Perché EurekAI ?
+## La storia — Perché EurekAI?
 
-**EurekAI** è nato durante l'[Hackathon mondiale Mistral AI](https://luma.com/mistralhack-online) ([sito ufficiale](https://worldwide-hackathon.mistral.ai/)) (marzo 2026). Avevo bisogno di un tema — e l'idea è venuta da qualcosa di molto concreto: preparo regolarmente le verifiche con mia figlia, e ho pensato che fosse possibile rendere questo più ludico e interattivo grazie all'IA.
+**EurekAI** è nato durante il [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([sito ufficiale](https://worldwide-hackathon.mistral.ai/)) (marzo 2026). Avevo bisogno di un argomento — e l'idea è venuta da qualcosa di molto concreto: preparo regolarmente le verifiche con mia figlia, e ho pensato che dovrebbe essere possibile rendere tutto più divertente e interattivo grazie all'IA.
 
-L'obiettivo: prendere **qualsiasi sorgente** — una foto della lezione, un testo copiato e incollato, una registrazione vocale, una ricerca web — e trasformarla in **schede di revisione, flashcard, quiz, podcast, testi con spazi da completare, illustrazioni e altro ancora**. Il tutto alimentato dai modelli francesi di Mistral AI, rendendolo naturalmente adatto agli studenti francofoni.
+L'obiettivo: prendere **qualsiasi input** — una foto della lezione, un testo copiato-incollato, una registrazione vocale, una ricerca web — e trasformarlo in **schede di revisione, flashcard, quiz, podcast, testi a riempimento, illustrazioni e altro ancora**. Il tutto alimentato dai modelli francesi di Mistral AI, il che rende la soluzione naturalmente adatta agli studenti francofoni.
 
-Il progetto è stato sviluppato durante l'hackathon sul [repo d'origine](https://github.com/jls42/worldwide-hackathon.mistral.ai), poi proseguito e arricchito qui. L'intero codice è generato dall'IA — principalmente [Claude Code](https://code.claude.com/), con alcuni contributi tramite [Codex](https://openai.com/codex/) e [Gemini CLI](https://geminicli.com/).
+Il [prototype iniziale](https://github.com/jls42/worldwide-hackathon.mistral.ai) è stato concepito in 48h durante l'hackathon come proof of concept attorno ai servizi Mistral — già funzionante, ma limitato. Da allora, EurekAI è diventato un vero progetto: testi a riempimento, navigazione negli esercizi, scraping web, moderazione parentale configurabile, revisione del codice approfondita e molto altro. L'intero codice è generato dall'IA — principalmente con [Claude Code](https://code.claude.com/), con alcuni contributi tramite [Codex](https://openai.com/codex/) e [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -48,22 +48,22 @@ Il progetto è stato sviluppato durante l'hackathon sul [repo d'origine](https:/
 
 | | Funzionalità | Descrizione |
 |---|---|---|
-| 📷 | **Importazione di file** | Importa le tue lezioni — foto, PDF (via Mistral OCR) o file di testo (TXT, MD) |
+| 📷 | **Importazione file** | Importa le lezioni — foto, PDF (via Mistral OCR) o file di testo (TXT, MD) |
 | 📝 | **Inserimento testo** | Digita o incolla qualsiasi testo direttamente |
 | 🎤 | **Inserimento vocale** | Registrati — Voxtral STT trascrive la tua voce |
-| 🌐 | **Ricerca web** | Fai una domanda — un Agent Mistral cerca le risposte sul web |
+| 🌐 | **Web / URL** | Incolla un URL (scraping diretto via Readability + Lightpanda) o digita una ricerca (Agent Mistral web_search) |
 | 📄 | **Schede di revisione** | Appunti strutturati con punti chiave, vocabolario, citazioni, aneddoti |
 | 🃏 | **Flashcard** | Carte Q/R con riferimenti alle fonti per la memorizzazione attiva (numero configurabile) |
 | ❓ | **Quiz a scelta multipla** | Domande a scelta multipla con revisione adattativa degli errori (numero configurabile) |
-| ✏️ | **Testi con spazi da completare** | Esercizi da completare con indizi e validazione tollerante |
-| 🎙️ | **Podcast** | Mini-podcast a 2 voci convertito in audio via Mistral Voxtral TTS |
+| ✏️ | **Testi a riempimento** | Esercizi da completare con indizi e validazione tollerante |
+| 🎙️ | **Podcast** | Mini-podcast a 2 voci in audio — voce Mistral di default o voci personalizzate (dei genitori!) |
 | 🖼️ | **Illustrazioni** | Immagini educative generate da un Agent Mistral |
-| 🗣️ | **Quiz vocale** | Domande lette ad alta voce, risposta orale, l'IA verifica la risposta |
-| 💬 | **Tutor IA** | Chat contestuale con i tuoi documenti di corso, con chiamata di strumenti |
+| 🗣️ | **Quiz vocale** | Domande lette ad alta voce (voce custom possibile), risposta orale, verifica IA |
+| 💬 | **Tutor IA** | Chat contestuale con i tuoi documenti di corso, con richiamo agli strumenti |
 | 🧠 | **Router automatico** | Un router basato su `mistral-small-latest` analizza il contenuto e propone una combinazione di generatori tra i 7 tipi disponibili |
-| 🔒 | **Controllo parentale** | Moderazione configurabile per profilo (categorie personalizzabili), PIN genitore, restrizioni della chat |
-| 🌍 | **Multilingue** | Interfaccia disponibile in 9 lingue; generazione IA gestibile in 15 lingue tramite i prompt |
-| 🔊 | **Lettura ad alta voce** | Ascolta le schede e le flashcard via Mistral Voxtral TTS o ElevenLabs |
+| 🔒 | **Controllo parentale** | Moderazione configurabile per profilo (categorie personalizzabili), PIN parentale, restrizioni della chat |
+| 🌍 | **Multilingue** | Interfaccia disponibile in 9 lingue; generazione IA controllabile in 15 lingue tramite i prompt |
+| 🔊 | **Lettura ad alta voce** | Ascolta schede e flashcard tramite Mistral Voxtral TTS o ElevenLabs |
 
 ---
 
@@ -75,7 +75,7 @@ graph TD
         OCR["📷 Import fichiers<br/><i>OCR / texte brut</i>"]
         TXT["📝 Saisie texte"]
         MIC["🎤 Voix STT<br/><i>voxtral-mini-latest</i>"]
-        WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
+        WEB["🌐 Web / URL<br/><i>Readability + Lightpanda<br/>ou Agent Mistral</i>"]
     end
 
     subgraph "🛡️ Modération (async, si activée par profil)"
@@ -135,7 +135,7 @@ flowchart LR
         T4["Modération de contenu — filtrage par âge"]
         T5["Routeur automatique — analyse du contenu"]
         T6["Génération d'image — Agent + outil image_generation"]
-        T7["Recherche web — Agent + outil web_search"]
+        T7["Web / URL — Scraping direct ou Agent web_search"]
         T8["Synthèse vocale — podcasts, quiz vocal, lecture à voix haute"]
     end
 
@@ -191,62 +191,65 @@ sequenceDiagram
 
 EurekAI accetta 4 tipi di sorgenti, moderate in base al profilo (attivato di default per bambino e adolescente):
 
-- **Importazione di file** — File JPG, PNG o PDF elaborati da `mistral-ocr-latest` (testo stampato, tabelle, scrittura a mano), o file di testo (TXT, MD) importati direttamente.
+- **Importazione file** — File JPG, PNG o PDF processati da `mistral-ocr-latest` (testo stampato, tabelle, scrittura a mano), o file di testo (TXT, MD) importati direttamente.
 - **Testo libero** — Digita o incolla qualsiasi contenuto. Moderato prima della memorizzazione se la moderazione è attiva.
-- **Input vocale** — Registra audio nel browser. Trascritto da `voxtral-mini-latest`. Il parametro `language="fr"` ottimizza il riconoscimento.
-- **Ricerca web** — Inserisci una query. Un Agent Mistral temporaneo con lo strumento `web_search` recupera e riassume i risultati.
+- **Inserimento vocale** — Registra audio nel browser. Trascritto da `voxtral-mini-latest`. Il parametro `language="fr"` ottimizza il riconoscimento.
+- **Web / URL** — Incolla una o più URL per fare scraping del contenuto direttamente (Readability + Lightpanda per pagine JS), o digita parole chiave per una ricerca web tramite Agent Mistral. Il campo unico accetta entrambi — URL e parole chiave sono separati automaticamente, ogni risultato crea una sorgente indipendente.
 
 ### Generazione di contenuto IA
 
-Sette tipi di materiale didattico generato:
+Sette tipi di materiale di apprendimento generato:
 
-| Generatore | Modello | Uscita |
+| Generatore | Modello | Output |
 |---|---|---|
-| **Scheda di revisione** | `mistral-large-latest` | Titolo, riepilogo, punti chiave, vocabolario, citazioni, aneddoto |
+| **Scheda di revisione** | `mistral-large-latest` | Titolo, riassunto, punti chiave, vocabolario, citazioni, aneddoto |
 | **Flashcard** | `mistral-large-latest` | Carte Q/R con riferimenti alle fonti (numero configurabile) |
 | **Quiz a scelta multipla** | `mistral-large-latest` | Domande a scelta multipla, spiegazioni, revisione adattativa (numero configurabile) |
-| **Testi con spazi da completare** | `mistral-large-latest` | Frasi da completare con indizi, validazione tollerante (Levenshtein) |
+| **Testi a riempimento** | `mistral-large-latest` | Frasi da completare con indizi, validazione tollerante (Levenshtein) |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | Script a 2 voci → audio MP3 |
 | **Illustrazione** | Agent `mistral-large-latest` | Immagine educativa tramite lo strumento `image_generation` |
 | **Quiz vocale** | `mistral-large-latest` + Voxtral TTS + STT | Domande TTS → risposta STT → verifica IA |
 
 ### Tutor IA via chat
 
-Un tutor conversazionale con accesso completo ai documenti del corso:
+Un tutor conversazionale con accesso completo ai documenti di corso:
 
 - Usa `mistral-large-latest`
-- **Chiamata di strumenti**: può generare schede, flashcard, quiz o testi da completare durante la conversazione
+- **Richiamo di strumenti** : può generare schede, flashcard, quiz o testi a riempimento durante la conversazione
 - Storico di 50 messaggi per corso
 - Moderazione del contenuto se attivata per il profilo
 
 ### Router automatico
 
-Il router utilizza `mistral-small-latest` per analizzare il contenuto delle sorgenti e proporre i generatori più pertinenti tra i 7 disponibili. L'interfaccia mostra il progresso in tempo reale: prima una fase di analisi, poi le generazioni individuali con possibilità di annullamento.
+Il router utilizza `mistral-small-latest` per analizzare il contenuto delle sorgenti e proporre i generatori più pertinenti tra i 7 disponibili. L'interfaccia mostra il progresso in tempo reale: prima una fase di analisi, poi le generazioni individuali con annullamento possibile.
 
-### Apprendimento adattativo
+### Apprendimento adattivo
 
-- **Statistiche dei quiz**: monitoraggio dei tentativi e della precisione per domanda
-- **Revisione del quiz**: genera 5-10 nuove domande mirate ai concetti deboli
-- **Rilevamento delle consegne**: rileva le istruzioni di revisione ("So la mia lezione se so...") e le dà priorità nei generatori testuali compatibili (scheda, flashcard, quiz, testi da completare)
+- **Statistiche del quiz** : monitoraggio dei tentativi e della precisione per domanda
+- **Revisione del quiz** : genera 5-10 nuove domande mirate ai concetti deboli
+- **Rilevamento delle istruzioni** : individua le istruzioni di studio ("So la mia lezione se so...") e le prioritizza nei generatori testuali compatibili (scheda, flashcard, quiz, testi a riempimento)
 
 ### Sicurezza e controllo parentale
 
-- **4 fasce d'età**: bambino (≤10 anni), adolescente (11-15), studente (16-25), adulto (26+)
-- **Moderazione del contenuto**: `mistral-moderation-latest` con 10 categorie disponibili, 5 bloccate di default per bambino/adolescente (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Categorie personalizzabili per profilo nelle impostazioni.
-- **PIN genitore**: hash SHA-256, richiesto per i profili sotto i 15 anni. Per un deployment in produzione, prevedere un hash lento con salt (Argon2id, bcrypt).
-- **Restrizioni della chat**: chat IA disattivata di default per i minori di 16 anni, attivabile dai genitori
+- **4 gruppi d'età** : bambino (≤10 anni), adolescente (11-15), studente (16-25), adulto (26+)
+- **Moderazione del contenuto** : `mistral-moderation-latest` con 10 categorie disponibili, 5 bloccate per default per bambino/adolescente (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Categorie personalizzabili per profilo nelle impostazioni.
+- **PIN parentale** : hash SHA-256, richiesto per i profili sotto i 15 anni. Per un deployment in produzione, prevedere un hash lento con salt (Argon2id, bcrypt).
+- **Restrizioni della chat** : chat IA disattivata di default per i minori di 16 anni, attivabile dai genitori
 
 ### Sistema multi-profili
 
 - Profili multipli con nome, età, avatar, preferenze di lingua
 - Progetti legati ai profili via `profileId`
-- Eliminazione a cascata: eliminare un profilo rimuove tutti i suoi progetti
+- Cancellazione a cascata: eliminare un profilo cancella tutti i suoi progetti
 
-### TTS multi-provider
+### TTS multi-provider e voci personalizzate
 
-- **Mistral Voxtral TTS** (predefinito): `voxtral-mini-tts-latest`, nessuna chiave aggiuntiva necessaria
-- **ElevenLabs** (alternativo): `eleven_v3`, voci naturali, richiede `ELEVENLABS_API_KEY`
+- **Mistral Voxtral TTS** (default) : `voxtral-mini-tts-latest`, nessuna chiave aggiuntiva necessaria
+- **ElevenLabs** (alternativo) : `eleven_v3`, voci naturali, richiede `ELEVENLABS_API_KEY`
 - Provider configurabile nelle impostazioni dell'applicazione
+- **Voci personalizzate** : i genitori possono creare le proprie voci tramite l'API Mistral Voices (a partire da un campione audio) e assegnarle ai ruoli host/guest — i podcast e i quiz vocali vengono quindi riprodotti con la voce di un genitore, rendendo l'esperienza ancora più immersiva per il bambino
+- Due ruoli vocali configurabili: **host** (narratore principale) e **guest** (seconda voce del podcast)
+- Catalogo completo delle voci Mistral disponibile nelle impostazioni, filtrabile per lingua
 
 ### Internazionalizzazione
 
@@ -256,7 +259,7 @@ Il router utilizza `mistral-small-latest` per analizzare il contenuto delle sorg
 
 ---
 
-## Stack tecnico
+## Stack tecnologico
 
 | Livello | Tecnologia | Ruolo |
 |---|---|---|
@@ -266,9 +269,11 @@ Il router utilizza `mistral-small-latest` per analizzare il contenuto delle sorg
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Interfaccia reattiva, TypeScript compilato da Vite |
 | **Templating** | vite-plugin-handlebars | Composizione HTML tramite partials |
 | **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Moderazione |
-| **TTS (predefinito)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, sintesi vocale integrata |
+| **TTS (default)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, sintesi vocale integrata |
 | **TTS (alternativo)** | ElevenLabs SDK 2.x | `eleven_v3`, voci naturali |
 | **Icone** | Lucide 1.x | Libreria di icone SVG |
+| **Scraping web** | Readability + linkedom | Estrazione del contenuto principale delle pagine web (tecnologia Firefox Reader View) |
+| **Headless browser** | Lightpanda | Browser headless ultra-leggero (Zig + V8) per pagine JS/SPA — fallback scraping |
 | **Markdown** | Marked | Rendering markdown nella chat |
 | **Upload file** | Multer 2.x | Gestione dei form multipart |
 | **Audio** | ffmpeg-static | Concatenazione di segmenti audio |
@@ -281,11 +286,11 @@ Il router utilizza `mistral-small-latest` per analizzare il contenuto delle sorg
 
 | Modello | Utilizzo | Perché |
 |---|---|---|
-| `mistral-large-latest` | Scheda, Flashcards, Podcast, Quiz, Testi da completare, Chat, Verifica quiz vocale, Agent Immagine, Agent Ricerca Web, Rilevamento consegne | Migliore multilingua + follow delle istruzioni |
+| `mistral-large-latest` | Scheda, Flashcards, Podcast, Quiz, Testi a riempimento, Chat, Verifica quiz vocale, Agent Immagine, Agent Web Search, Rilevamento istruzioni | Migliore multilingual + follow delle istruzioni |
 | `mistral-ocr-latest` | OCR di documenti | Testo stampato, tabelle, scrittura a mano |
 | `voxtral-mini-latest` | Riconoscimento vocale (STT) | STT multilingue, ottimizzato con `language="fr"` |
 | `voxtral-mini-tts-latest` | Sintesi vocale (TTS) | Podcast, quiz vocale, lettura ad alta voce |
-| `mistral-moderation-latest` | Moderazione del contenuto | 5 categorie bloccate per bambino/adolescente (+ jailbreaking) |
+| `mistral-moderation-latest` | Moderazione dei contenuti | 5 categorie bloccate per bambino/adolescente (+ jailbreaking) |
 | `mistral-small-latest` | Router automatico | Analisi rapida del contenuto per decisioni di routing |
 | `eleven_v3` (ElevenLabs) | Sintesi vocale (TTS alternativo) | Voci naturali, alternativa configurabile |
 
@@ -343,13 +348,13 @@ generators/
   tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
   tts.ts                  — Génération audio podcast (concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
-  websearch.ts            — Agent Mistral avec outil web_search
+  websearch.ts            — Agent Mistral avec outil web_search (fallback)
   moderation.ts           — Modération de contenu (filtrage par âge)
 
 routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
-  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, recherche web, modération
+  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, scraping URL + recherche web, modération
   generate.ts             — Endpoints de génération (7 types + auto + route)
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
@@ -417,7 +422,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/profiles` | Elencare tutti i profili |
 | `POST` | `/api/profiles` | Creare un profilo |
 | `PUT` | `/api/profiles/:id` | Modificare un profilo (PIN richiesto per < 15 anni) |
-| `DELETE` | `/api/profiles/:id` | Eliminare un profilo + cascade progetti `{pin?}` → `{ok, deletedProjects}` |
+| `DELETE` | `/api/profiles/:id` | Eliminare un profilo + cancellazione a cascata dei progetti `{pin?}` → `{ok, deletedProjects}` |
 
 ### Progetti
 | Metodo | Endpoint | Descrizione |
@@ -425,7 +430,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/projects` | Elencare i progetti (`?profileId=` opzionale) |
 | `POST` | `/api/projects` | Creare un progetto `{name, profileId}` |
 | `GET` | `/api/projects/:pid` | Dettagli del progetto |
-| `PUT` | `/api/projects/:pid` | Rinomina `{name}` |
+| `PUT` | `/api/projects/:pid` | Rinominare `{name}` |
 | `DELETE` | `/api/projects/:pid` | Eliminare il progetto |
 
 ### Sorgenti
@@ -434,24 +439,22 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/sources/upload` | Import file multipart (OCR per JPG/PNG/PDF, lettura diretta per TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | Testo libero `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | Voce STT (audio multipart) |
-| `POST` | `/api/projects/:pid/sources/websearch` | Ricerca web `{query}` |
+| `POST` | `/api/projects/:pid/sources/websearch` | Scraping URL o ricerca web `{query}` — restituisce un array di sorgenti |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | Eliminare una sorgente |
 | `POST` | `/api/projects/:pid/moderate` | Moderare `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | Rilevare le istruzioni di revisione |
-
-### Generazione
+| `POST` | `/api/projects/:pid/detect-consigne` | Rilevare le istruzioni di revisione | ### Generazione
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generate/summary` | Scheda di revisione |
-| `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
+| `POST` | `/api/projects/:pid/generate/flashcards` | Flashcard |
 | `POST` | `/api/projects/:pid/generate/quiz` | Quiz a scelta multipla |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | Testi da completare |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | Testi a completamento |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustrazione |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz vocale |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | Revisione adattativa `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/route` | Analisi di routing (piano dei generatori da lanciare) |
-| `POST` | `/api/projects/:pid/generate/auto` | Generazione auto backend (routing + 5 tipi: summary, flashcards, quiz, fill-blank, podcast) |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | Revisione adattiva `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/route` | Analisi di routing (piano dei generatori da avviare) |
+| `POST` | `/api/projects/:pid/generate/auto` | Generazione automatica backend (routing + 5 tipi : summary, flashcards, quiz, fill-blank, podcast) |
 
 Tutte le route di generazione accettano `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` richiede inoltre `{generationId, weakQuestions}`.
 
@@ -459,45 +462,50 @@ Tutte le route di generazione accettano `{sourceIds?, lang?, ageGroup?, count?, 
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Inviare le risposte del quiz `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Inviare le risposte dei testi da completare `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Inviare le risposte dei testi a completamento `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Verificare una risposta orale (audio + questionIndex) |
 | `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Lettura TTS ad alta voce (schede/flashcard) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | Rinomina `{title}` |
+| `PUT` | `/api/projects/:pid/generations/:gid` | Rinominare `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | Eliminare la generazione |
 
 ### Chat
 | Metodo | Endpoint | Descrizione |
 |---|---|---|
-| `GET` | `/api/projects/:pid/chat` | Recuperare lo storico della chat |
+| `GET` | `/api/projects/:pid/chat` | Recuperare la cronologia della chat |
 | `POST` | `/api/projects/:pid/chat` | Inviare un messaggio `{message, lang, ageGroup}` |
-| `DELETE` | `/api/projects/:pid/chat` | Cancellare lo storico della chat |
+| `DELETE` | `/api/projects/:pid/chat` | Cancellare la cronologia della chat |
 
 ---
 
-## Decisioni architetturali | Décision | Justification |
+## Decisioni architetturali
+
+| Decisione | Giustificazione |
 |---|---|
-| **Alpine.js plutôt que React/Vue** | Impronta minima, reattività leggera con TypeScript compilato da Vite. Perfetto per un hackathon dove la velocità conta. |
-| **Persistance en fichiers JSON** | Zero dipendenze, avvio istantaneo. Nessun database da configurare — si parte subito. |
-| **Vite + Handlebars** | Il meglio di entrambi i mondi: HMR veloce per lo sviluppo, partials HTML per organizzare il codice, Tailwind JIT. |
-| **Prompts centralisés** | Tutti i prompt IA in `prompts.ts` — facile iterare, testare e adattare per lingua/fascia d'età. |
-| **Système multi-générations** | Ogni generazione è un oggetto indipendente con il proprio ID — permette più schede, quiz, ecc. per corso. |
-| **Prompts adaptés par âge** | 4 fasce d'età con vocabolario, complessità e tono diversi — lo stesso contenuto insegna in modo differente a seconda dell'apprendente. |
-| **Fonctionnalités basées sur les Agents** | La generazione di immagini e la ricerca web usano Agent Mistral temporanei — ciclo di vita pulito con pulizia automatica. |
-| **TTS multi-provider** | Mistral Voxtral TTS di default (nessuna chiave aggiuntiva), ElevenLabs come alternativa — configurabile senza riavvio. |
+| **Alpine.js invece di React/Vue** | Impronta minima, reattività leggera con TypeScript compilato da Vite. Perfetto per un hackathon dove la velocità conta. |
+| **Persistenza in file JSON** | Zero dipendenze, avvio istantaneo. Nessun database da configurare — si parte subito. |
+| **Vite + Handlebars** | Il meglio dei due mondi: HMR veloce per lo sviluppo, partials HTML per l'organizzazione del codice, Tailwind JIT. |
+| **Prompt centralizzati** | Tutti i prompt IA in `prompts.ts` — facile da iterare, testare e adattare per lingua/gruppo d'età. |
+| **Sistema multi-generazioni** | Ogni generazione è un oggetto indipendente con il proprio ID — permette più schede, quiz, ecc. per corso. |
+| **Prompt adattati per età** | 4 gruppi di età con vocabolario, complessità e tono diversi — lo stesso contenuto insegna in modo diverso a seconda dell'apprendente. |
+| **Funzionalità basate sugli Agenti** | La generazione di immagini e la ricerca web utilizzano Agenti Mistral temporanei — ciclo di vita pulito con pulizia automatica. |
+| **Scraping intelligente di URL** | Un unico campo accetta URL e parole chiave miste — gli URL vengono scrapeati tramite Readability (pagine statiche) con fallback Lightpanda (pagine JS/SPA), le parole chiave attivano un Agente Mistral web_search. Ogni risultato crea una fonte indipendente. |
+| **TTS multi-fornitore** | Mistral Voxtral TTS di default (nessuna chiave aggiuntiva), ElevenLabs come alternativa — configurabile senza riavvio. |
 
 ---
 
-## Crediti e ringraziamenti
+## Crediti & ringraziamenti
 
-- **[Mistral AI](https://mistral.ai)** — Modelli IA (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Hackathon mondiale
+- **[Mistral AI](https://mistral.ai)** — Modelli IA (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
 - **[ElevenLabs](https://elevenlabs.io)** — Motore di sintesi vocale alternativo (`eleven_v3`)
 - **[Alpine.js](https://alpinejs.dev)** — Framework reattivo leggero
-- **[TailwindCSS](https://tailwindcss.com)** — Framework CSS utility-first
+- **[TailwindCSS](https://tailwindcss.com)** — Framework CSS utility
 - **[Vite](https://vitejs.dev)** — Strumento di build frontend
 - **[Lucide](https://lucide.dev)** — Libreria di icone
 - **[Marked](https://marked.js.org)** — Parser Markdown
+- **[Readability](https://github.com/mozilla/readability)** — Estrazione di contenuti web (tecnologia Firefox Reader View)
+- **[Lightpanda](https://lightpanda.io)** — Browser headless ultra-leggero per lo scraping di pagine JS/SPA
 
-Iniziato durante il Mistral AI Worldwide Hackathon (marzo 2026), sviluppato interamente con IA con [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) e [Gemini CLI](https://geminicli.com/).
+Iniziato durante il Mistral AI Worldwide Hackathon (marzo 2026), sviluppato interamente dall'IA con [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) e [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -509,5 +517,5 @@ Iniziato durante il Mistral AI Worldwide Hackathon (marzo 2026), sviluppato inte
 
 [AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**Questo documento è stato tradotto dalla versione fr alla lingua it utilizzando il modello gpt-5-mini. Per maggiori informazioni sul processo di traduzione, consultate https://gitlab.com/jls42/ai-powered-markdown-translator**
+**Questo documento è stato tradotto dalla versione fr verso la lingua it utilizzando il modello gpt-5-mini. Per ulteriori informazioni sul processo di traduzione, consultate https://gitlab.com/jls42/ai-powered-markdown-translator**
 

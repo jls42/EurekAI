@@ -40,7 +40,7 @@
 
 L'objectif : prendre **n'importe quelle entrée** — une photo de la leçon, un texte copié-collé, un enregistrement vocal, une recherche web — et la transformer en **fiches de révision, flashcards, quiz, podcasts, textes à trous, illustrations, et plus encore**. Le tout propulsé par les modèles français de Mistral AI, ce qui en fait une solution naturellement adaptée aux élèves francophones.
 
-Le projet a été développé pendant le hackathon sur le [repo d'origine](https://github.com/jls42/worldwide-hackathon.mistral.ai), puis poursuivi et enrichi ici. L'intégralité du code est générée par IA — principalement [Claude Code](https://code.claude.com/), avec quelques contributions via [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
+Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) a été conçu en 48h pendant le hackathon comme preuve de concept autour des services Mistral — déjà fonctionnel, mais limité. Depuis, EurekAI est devenu un vrai projet : textes à trous, navigation dans les exercices, scraping web, modération parentale configurable, revue de code approfondie, et bien plus. L'intégralité du code est générée par IA — principalement [Claude Code](https://code.claude.com/), avec quelques contributions via [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -51,14 +51,14 @@ Le projet a été développé pendant le hackathon sur le [repo d'origine](https
 | 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR) ou fichier texte (TXT, MD) |
 | 📝 | **Saisie texte** | Tapez ou collez n'importe quel texte directement |
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
-| 🌐 | **Recherche web** | Posez une question — un Agent Mistral cherche les réponses sur le web |
+| 🌐 | **Web / URL** | Collez une URL (scraping direct via Readability + Lightpanda) ou tapez une recherche (Agent Mistral web_search) |
 | 📄 | **Fiches de révision** | Notes structurées avec points clés, vocabulaire, citations, anecdotes |
 | 🃏 | **Flashcards** | Cartes Q/R avec références aux sources pour la mémorisation active (nombre configurable) |
 | ❓ | **Quiz QCM** | Questions à choix multiples avec révision adaptative des erreurs (nombre configurable) |
 | ✏️ | **Textes à trous** | Exercices à compléter avec indices et validation tolérante |
-| 🎙️ | **Podcast** | Mini-podcast 2 voix converti en audio via Mistral Voxtral TTS |
+| 🎙️ | **Podcast** | Mini-podcast 2 voix en audio — voix Mistral par défaut ou voix personnalisées (parents !) |
 | 🖼️ | **Illustrations** | Images éducatives générées par un Agent Mistral |
-| 🗣️ | **Quiz vocal** | Questions lues à haute voix, réponse orale, l'IA vérifie la réponse |
+| 🗣️ | **Quiz vocal** | Questions lues à voix haute (voix custom possible), réponse orale, vérification IA |
 | 💬 | **Tuteur IA** | Chat contextuel avec vos documents de cours, avec appel d'outils |
 | 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 7 types disponibles |
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
@@ -75,7 +75,7 @@ graph TD
         OCR["📷 Import fichiers<br/><i>OCR / texte brut</i>"]
         TXT["📝 Saisie texte"]
         MIC["🎤 Voix STT<br/><i>voxtral-mini-latest</i>"]
-        WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
+        WEB["🌐 Web / URL<br/><i>Readability + Lightpanda<br/>ou Agent Mistral</i>"]
     end
 
     subgraph "🛡️ Modération (async, si activée par profil)"
@@ -135,7 +135,7 @@ flowchart LR
         T4["Modération de contenu — filtrage par âge"]
         T5["Routeur automatique — analyse du contenu"]
         T6["Génération d'image — Agent + outil image_generation"]
-        T7["Recherche web — Agent + outil web_search"]
+        T7["Web / URL — Scraping direct ou Agent web_search"]
         T8["Synthèse vocale — podcasts, quiz vocal, lecture à voix haute"]
     end
 
@@ -194,7 +194,7 @@ EurekAI accepte 4 types de sources, modérées selon le profil (activé par déf
 - **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par `mistral-ocr-latest` (texte imprimé, tableaux, écriture manuscrite), ou fichiers texte (TXT, MD) importés directement.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
-- **Recherche web** — Entrez une requête. Un Agent Mistral temporaire avec l'outil `web_search` récupère et résume les résultats.
+- **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
 
 ### Génération de contenu IA
 
@@ -242,11 +242,14 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 - Projets liés aux profils via `profileId`
 - Suppression en cascade : supprimer un profil supprime tous ses projets
 
-### TTS multi-provider
+### TTS multi-provider & voix personnalisées
 
 - **Mistral Voxtral TTS** (défaut) : `voxtral-mini-tts-latest`, pas de clé supplémentaire nécessaire
 - **ElevenLabs** (alternatif) : `eleven_v3`, voix naturelles, nécessite `ELEVENLABS_API_KEY`
 - Provider configurable dans les paramètres de l'application
+- **Voix personnalisées** : les parents peuvent créer leurs propres voix via l'API Mistral Voices (à partir d'un échantillon audio) et les assigner aux rôles hôte/invité — les podcasts et quiz vocaux sont alors lus avec la voix d'un parent, rendant l'expérience encore plus immersive pour l'enfant
+- Deux rôles vocaux configurables : **hôte** (narrateur principal) et **invité** (deuxième voix du podcast)
+- Catalogue complet des voix Mistral disponible dans les paramètres, filtrable par langue
 
 ### Internationalisation
 
@@ -269,6 +272,8 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 | **TTS (défaut)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, synthèse vocale intégrée |
 | **TTS (alternatif)** | ElevenLabs SDK 2.x | `eleven_v3`, voix naturelles |
 | **Icônes** | Lucide 1.x | Bibliothèque d'icônes SVG |
+| **Scraping web** | Readability + linkedom | Extraction du contenu principal des pages web (techno Firefox Reader View) |
+| **Headless browser** | Lightpanda | Navigateur headless ultra-léger (Zig + V8) pour les pages JS/SPA — fallback scraping |
 | **Markdown** | Marked | Rendu markdown dans le chat |
 | **Upload fichiers** | Multer 2.x | Gestion des formulaires multipart |
 | **Audio** | ffmpeg-static | Concaténation de segments audio |
@@ -343,13 +348,13 @@ generators/
   tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
   tts.ts                  — Génération audio podcast (concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
-  websearch.ts            — Agent Mistral avec outil web_search
+  websearch.ts            — Agent Mistral avec outil web_search (fallback)
   moderation.ts           — Modération de contenu (filtrage par âge)
 
 routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
-  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, recherche web, modération
+  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, scraping URL + recherche web, modération
   generate.ts             — Endpoints de génération (7 types + auto + route)
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
@@ -434,7 +439,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/sources/upload` | Import fichiers multipart (OCR pour JPG/PNG/PDF, lecture directe pour TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | Texte libre `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | Voix STT (audio multipart) |
-| `POST` | `/api/projects/:pid/sources/websearch` | Recherche web `{query}` |
+| `POST` | `/api/projects/:pid/sources/websearch` | Scraping URL ou recherche web `{query}` — retourne un tableau de sources |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | Supprimer une source |
 | `POST` | `/api/projects/:pid/moderate` | Modérer `{text}` |
 | `POST` | `/api/projects/:pid/detect-consigne` | Détecter les consignes de révision |
@@ -485,6 +490,7 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 | **Système multi-générations** | Chaque génération est un objet indépendant avec son propre ID — permet plusieurs fiches, quiz, etc. par cours. |
 | **Prompts adaptés par âge** | 4 groupes d'âge avec vocabulaire, complexité et ton différents — le même contenu enseigne différemment selon l'apprenant. |
 | **Fonctionnalités basées sur les Agents** | La génération d'images et la recherche web utilisent des Agents Mistral temporaires — cycle de vie propre avec nettoyage automatique. |
+| **Scraping intelligent d'URL** | Un champ unique accepte URLs et mots-clés mélangés — les URLs sont scrapées via Readability (pages statiques) avec fallback Lightpanda (pages JS/SPA), les mots-clés déclenchent un Agent Mistral web_search. Chaque résultat crée une source indépendante. |
 | **TTS multi-provider** | Mistral Voxtral TTS par défaut (pas de clé supplémentaire), ElevenLabs en alternatif — configurable sans redémarrage. |
 
 ---
@@ -498,6 +504,8 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 - **[Vite](https://vitejs.dev)** — Outil de build frontend
 - **[Lucide](https://lucide.dev)** — Bibliothèque d'icônes
 - **[Marked](https://marked.js.org)** — Parseur Markdown
+- **[Readability](https://github.com/mozilla/readability)** — Extraction de contenu web (techno Firefox Reader View)
+- **[Lightpanda](https://lightpanda.io)** — Navigateur headless ultra-léger pour le scraping de pages JS/SPA
 
 Initié pendant le Mistral AI Worldwide Hackathon (mars 2026), développé intégralement par IA avec [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
 
