@@ -53,6 +53,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Verifier visuellement chaque modif UI (navigateur ou Claude in Chrome)
 - Lancer `npm run test` apres chaque modification
 - **Si le commit contient des modifications de `README.md`** : lancer `./scripts/translate-readme.sh` avant de committer pour regenerer les 14 traductions (README-en.md, README-de.md, etc.)
+- **Verifier regulierement les dependances** : lancer `./scripts/check-deps.sh` pour detecter les mises a jour SDK (Mistral, ElevenLabs) et les modeles deprecies. A lancer avant chaque release ou quand une API renvoie des erreurs inattendues.
 - Quand une erreur ou mauvaise approche est identifiee, ajouter une regle ici ou dans `.claude/rules/`
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)

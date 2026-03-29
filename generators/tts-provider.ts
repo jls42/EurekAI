@@ -42,34 +42,19 @@ export async function textToSpeech(
 
 // --- Mistral TTS ---
 
-const TTS_MAX_RETRIES = 3;
-const TTS_RETRY_DELAY_MS = 1000;
-
 async function mistralTts(
   text: string,
   voiceId: string,
   model: string,
   client: Mistral,
 ): Promise<Buffer> {
-  for (let attempt = 1; attempt <= TTS_MAX_RETRIES; attempt++) {
-    try {
-      const response = await client.audio.speech.complete({
-        input: text,
-        model,
-        voiceId,
-        responseFormat: 'mp3',
-      });
-      return Buffer.from(response.audioData, 'base64');
-    } catch (err: any) {
-      if (attempt < TTS_MAX_RETRIES && err.statusCode === 500) {
-        console.warn(`  TTS attempt ${attempt}/${TTS_MAX_RETRIES} failed (500), retrying in ${TTS_RETRY_DELAY_MS}ms...`);
-        await new Promise((r) => setTimeout(r, TTS_RETRY_DELAY_MS * attempt));
-        continue;
-      }
-      throw err;
-    }
-  }
-  throw new Error('TTS: unreachable');
+  const response = await client.audio.speech.complete({
+    input: text,
+    model,
+    voiceId,
+    responseFormat: 'mp3',
+  });
+  return Buffer.from(response.audioData, 'base64');
 }
 
 // --- Voice management ---
