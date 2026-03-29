@@ -114,7 +114,9 @@ export function sourceRoutes(
     const TEXT_EXTS = ['.txt', '.md'];
     for (const file of files) {
       try {
-        const ext = file.originalname.toLowerCase().replace(/.*(\.\w+)$/, '$1');
+        const name = file.originalname.toLowerCase();
+        const dotIdx = name.lastIndexOf('.');
+        const ext = dotIdx !== -1 ? name.slice(dotIdx) : '';
         const isText = TEXT_EXTS.includes(ext);
         let markdown: string;
         let elapsed: number;
