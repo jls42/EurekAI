@@ -187,6 +187,18 @@ describe('langInstruction', () => {
   it.each([
     ['en', 'English'],
     ['es', 'español'],
+    ['de', 'Deutsch'],
+    ['it', 'italiano'],
+    ['pt', 'português'],
+    ['nl', 'Nederlands'],
+    ['ja', '日本語'],
+    ['zh', '中文'],
+    ['ko', '한국어'],
+    ['ar', 'العربية'],
+    ['hi', 'हिन्दी'],
+    ['pl', 'polski'],
+    ['ro', 'română'],
+    ['sv', 'svenska'],
   ])('%s contient %s', (lang, expected) => {
     expect(langInstruction(lang)).toContain(expected);
   });

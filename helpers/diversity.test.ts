@@ -128,4 +128,58 @@ describe('buildExclusionContext', () => {
     const gens = [{ type: 'image', data: { imageUrl: 'x', prompt: 'y' } }] as unknown as Generation[];
     expect(buildExclusionContext(gens, 'image')).toBe('');
   });
+
+  it('extracts quiz-vocal questions using same extractor as quiz', () => {
+    const gens = [{
+      type: 'quiz-vocal',
+      data: [{ question: 'QV1?' }, { question: 'QV2?' }],
+    }] as unknown as Generation[];
+    const result = buildExclusionContext(gens, 'quiz-vocal');
+    expect(result).toContain('QUESTIONS DEJA GENEREES');
+    expect(result).toContain('- QV1?');
+    expect(result).toContain('- QV2?');
+  });
+
+  it('returns empty when extractor yields no items', () => {
+    const gens = [{
+      type: 'quiz',
+      data: { quiz: [{ noQuestion: true }] },
+    }] as unknown as Generation[];
+    expect(buildExclusionContext(gens, 'quiz')).toBe('');
+  });
+
+  it('extracts flashcards from array data format', () => {
+    const gens = [{
+      type: 'flashcards',
+      data: [{ question: 'FC-array?' }],
+    }] as unknown as Generation[];
+    const result = buildExclusionContext(gens, 'flashcards');
+    expect(result).toContain('- FC-array?');
+  });
+
+  it('handles podcast with no script gracefully', () => {
+    const gens = [{
+      type: 'podcast',
+      data: { noScript: true },
+    }] as unknown as Generation[];
+    expect(buildExclusionContext(gens, 'podcast')).toBe('');
+  });
+
+  it('handles podcast with no host speaker', () => {
+    const gens = [{
+      type: 'podcast',
+      data: { script: [{ speaker: 'guest', text: 'Only guest' }] },
+    }] as unknown as Generation[];
+    expect(buildExclusionContext(gens, 'podcast')).toBe('');
+  });
+
+  it('limits summary key_points to 5 per generation', () => {
+    const gens = [{
+      type: 'summary',
+      data: { key_points: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6', 'P7'] },
+    }] as unknown as Generation[];
+    const result = buildExclusionContext(gens, 'summary');
+    expect(result).toContain('- P5');
+    expect(result).not.toContain('- P6');
+  });
 });
