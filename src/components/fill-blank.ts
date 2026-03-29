@@ -13,7 +13,12 @@ export function fillBlankComponent(gen: any) {
       return this.items()[this.currentIndex()];
     },
 
+    isCurrentAnswered(this: any): boolean {
+      return this.results[this.currentIndex()] !== undefined;
+    },
+
     checkAnswer(this: any) {
+      if (this.isReviewing()) return;
       const idx = this.currentIndex();
       const ex = this.currentExercise();
       const correct = validateAnswer(this.answer, ex.answer);
@@ -24,11 +29,27 @@ export function fillBlankComponent(gen: any) {
     },
 
     onNextReady(this: any) {
-      this.answer = '';
+      this.restoreState();
+    },
+
+    onPrevReady(this: any) {
+      this.restoreState();
+    },
+
+    restoreState(this: any) {
+      const idx = this.currentIndex();
       this.showHint = false;
-      this.$nextTick(() => {
-        this.$refs.blankInput?.focus();
-      });
+      if (this.answers[idx] !== undefined) {
+        this.answer = this.answers[idx];
+        const ex = this.items()[idx];
+        this.feedback = { correct: this.results[idx], correctAnswer: ex?.answer };
+      } else {
+        this.answer = '';
+        this.feedback = null;
+        this.$nextTick(() => {
+          this.$refs.blankInput?.focus();
+        });
+      }
     },
 
     onFinish(this: any) {
@@ -86,6 +107,7 @@ export function fillBlankComponent(gen: any) {
 
     handleKey(this: any, e: KeyboardEvent) {
       if (e.key !== 'Enter') return;
+      if (this.isReviewing()) return;
       if (this.feedback) {
         this.nextQuestion();
       } else if (this.answer.trim()) {

@@ -13,6 +13,8 @@ const config = createConfig();
 function makeContext(overrides: any = {}) {
   return {
     apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    allModerationCategories: [] as string[],
+    moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as any[],
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
@@ -70,9 +72,12 @@ describe('loadConfig', () => {
       { id: 'v1', name: 'Oliver - Neutral', languages: ['en_US'] },
     ];
 
-    // loadConfig calls: config, status (parallel), then loadMistralVoices (voices)
+    const modCatsData = { all: ['sexual', 'violence_and_threats'], defaults: { enfant: ['sexual'] } };
+
+    // loadConfig calls: config, status, moderation-categories (parallel), then loadMistralVoices (voices)
     mockFetchOk(configData);      // /api/config
     mockFetchOk(statusData);      // /api/config/status
+    mockFetchOk(modCatsData);     // /api/moderation-categories
     mockFetchOk(voicesData);      // /api/config/voices (called by loadMistralVoices)
 
     const ctx = makeContext();
@@ -82,6 +87,8 @@ describe('loadConfig', () => {
     expect(ctx.configDraft.ttsModel).toBe('voxtral-mini-tts-2603');
     expect(ctx.configDraft._mainModel).toBe('mistral-large-latest');
     expect(ctx.mistralVoicesList).toHaveLength(1);
+    expect(ctx.allModerationCategories).toEqual(['sexual', 'violence_and_threats']);
+    expect(ctx.moderationDefaults).toEqual({ enfant: ['sexual'] });
   });
 
   it('handles fetch failure gracefully', async () => {

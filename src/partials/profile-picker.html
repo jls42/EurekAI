@@ -380,6 +380,34 @@
             </div>
           </div>
 
+          <!-- Moderation categories (when moderation is enabled) -->
+          <div
+            x-show="editingProfile?.useModeration && allModerationCategories.length > 0"
+            x-transition
+            class="mb-3 p-3 bg-gray-50 rounded-card"
+          >
+            <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"></span>
+            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')"></p>
+            <div class="space-y-1.5">
+              <template x-for="cat in allModerationCategories" :key="cat">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="checkbox"
+                    :value="cat"
+                    x-model="editingProfile.moderationCategories"
+                    class="w-4 h-4 rounded text-primary accent-primary focus-ring"
+                  />
+                  <span x-text="t('moderation.cat.' + cat)"></span>
+                </label>
+              </template>
+            </div>
+            <button
+              @click="editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup)"
+              class="text-xs text-primary mt-2 hover:underline"
+              x-text="t('profile.moderationResetDefaults')"
+            ></button>
+          </div>
+
           <!-- Chat toggle -->
           <div class="mb-4 p-3 bg-gray-50 rounded-card">
             <div class="flex items-center justify-between">

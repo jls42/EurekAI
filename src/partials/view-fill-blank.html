@@ -69,12 +69,26 @@
             <!-- Active exercise (step-by-step) -->
             <template x-if="!finished">
               <div>
-                <!-- Progress header -->
+                <!-- Progress header with nav -->
                 <div class="flex items-center gap-2 mb-2">
+                  <button
+                    @click="prevQuestion()"
+                    :disabled="!canGoPrev()"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-gen-fillblank hover:bg-gen-fillblank/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring"
+                  >
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  </button>
                   <span
                     class="text-body-sm font-semibold text-gen-fillblank"
                     x-text="t('step.questionOf', { current: currentQ + 1, total: total() })"
                   ></span>
+                  <button
+                    @click="nextQuestion()"
+                    x-show="canGoNext()"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-gen-fillblank hover:bg-gen-fillblank/10 transition-colors focus-ring"
+                  >
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
                   <span
                     class="text-sm bg-gen-fillblank/10 text-gen-fillblank px-2.5 py-1 rounded-badge font-semibold"
                     x-text="t('quiz.score', { score: score })"
@@ -159,8 +173,8 @@
                   </p>
                 </div>
 
-                <!-- Check button (before feedback) -->
-                <div x-show="!feedback" class="text-center">
+                <!-- Check button (before feedback, not when reviewing) -->
+                <div x-show="!feedback && !isCurrentAnswered()" class="text-center">
                   <button
                     @click="checkAnswer()"
                     :disabled="!answer.trim()"
@@ -211,7 +225,7 @@
                       </template>
                     </div>
                   </div>
-                  <div class="text-center mt-3">
+                  <div x-show="!isReviewing()" class="text-center mt-3">
                     <button
                       @click="nextQuestion()"
                       class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"

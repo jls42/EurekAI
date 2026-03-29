@@ -13,7 +13,7 @@ import { generateRoutes } from './routes/generate.js';
 import { generationCrudRoutes } from './routes/generations.js';
 import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
-import { ProfileStore } from './profiles.js';
+import { ProfileStore, ALL_MODERATION_CATEGORIES, MODERATION_CATEGORIES } from './profiles.js';
 
 dotenv.config({ override: true, quiet: true });
 
@@ -81,6 +81,11 @@ app.get('/api/config/voices', async (req, res) => {
     res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
   }
 });
+
+// --- Moderation categories API ---
+app.get('/api/moderation-categories', (_req, res) =>
+  res.json({ all: [...ALL_MODERATION_CATEGORIES], defaults: MODERATION_CATEGORIES }),
+);
 
 // --- Routes ---
 app.use('/api/profiles', profileRoutes(outputDir, store));

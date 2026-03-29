@@ -107,6 +107,8 @@ export function createState() {
     // Settings
     showSettings: false,
     apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    allModerationCategories: [] as string[],
+    moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as Array<{
       id: string;
       name: string;

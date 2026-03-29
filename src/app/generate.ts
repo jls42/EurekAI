@@ -43,21 +43,24 @@ function showGenerateAllResult(failures: number, total: number, state: any): voi
 
 export function createGenerate() {
   return {
-    blockedModerationStatus(this: any): string | null {
+    blockedModerationSource(this: any): any | null {
       const selected =
         this.selectedIds.length > 0
           ? this.sources.filter((s: any) => this.selectedIds.includes(s.id))
           : this.sources;
-      return (
-        selected.find((s: any) => s.moderation && s.moderation.status !== 'safe')?.moderation
-          ?.status ?? null
-      );
+      return selected.find((s: any) => s.moderation && s.moderation.status !== 'safe') ?? null;
+    },
+
+    blockedModerationStatus(this: any): string | null {
+      return this.blockedModerationSource()?.moderation?.status ?? null;
     },
 
     moderationBlockedMessage(this: any, status: string | null): string {
       if (status === 'pending') return this.t('moderation.pending');
       if (status === 'error') return this.t('moderation.error');
-      return this.t('moderation.blocked');
+      const src = this.blockedModerationSource();
+      const cats = src ? this.flaggedCategoryLabels(src) : '';
+      return this.t('moderation.blocked') + (cats ? ` (${cats})` : '');
     },
 
     async generate(this: any, type: string) {

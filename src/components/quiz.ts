@@ -11,8 +11,12 @@ export function quizComponent(gen: any) {
       return this.items()[this.currentIndex()];
     },
 
+    isCurrentAnswered(this: any): boolean {
+      return this.answers[this.currentIndex()] !== undefined;
+    },
+
     selectChoice(this: any, ci: number) {
-      if (this.feedback) return;
+      if (this.feedback || this.isReviewing()) return;
       this.selectedChoice = ci;
       const q = this.currentQuestion();
       const correct = ci === q.correct;
@@ -22,7 +26,23 @@ export function quizComponent(gen: any) {
     },
 
     onNextReady(this: any) {
-      this.selectedChoice = null;
+      this.restoreState();
+    },
+
+    onPrevReady(this: any) {
+      this.restoreState();
+    },
+
+    restoreState(this: any) {
+      const idx = this.currentIndex();
+      if (this.answers[idx] !== undefined) {
+        this.selectedChoice = this.answers[idx];
+        const q = this.items()[idx];
+        this.feedback = { correct: this.answers[idx] === q?.correct };
+      } else {
+        this.selectedChoice = null;
+        this.feedback = null;
+      }
     },
 
     onFinish(this: any) {

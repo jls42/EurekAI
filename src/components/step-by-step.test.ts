@@ -196,5 +196,132 @@ describe('stepByStep', () => {
       s.resetAll();
       expect(s.total()).toBe(5);
     });
+
+    it('reset highWaterMark a 0', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.nextQuestion();
+      expect(s.highWaterMark).toBe(2);
+      s.resetAll();
+      expect(s.highWaterMark).toBe(0);
+    });
+  });
+
+  describe('highWaterMark', () => {
+    it('commence a 0', () => {
+      const s = createMixin(5);
+      expect(s.highWaterMark).toBe(0);
+    });
+
+    it('avance avec nextQuestion', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      expect(s.highWaterMark).toBe(1);
+      s.nextQuestion();
+      expect(s.highWaterMark).toBe(2);
+    });
+
+    it('ne recule pas quand on navigue en arriere puis en avant', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.nextQuestion(); // hwm=2
+      s.prevQuestion(); // currentQ=1
+      s.nextQuestion(); // currentQ=2, hwm reste 2
+      expect(s.highWaterMark).toBe(2);
+    });
+
+    it('retryWrong reset highWaterMark', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.nextQuestion();
+      s.retryWrong([1, 3]);
+      expect(s.highWaterMark).toBe(0);
+    });
+  });
+
+  describe('prevQuestion()', () => {
+    it('decremente currentQ', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.prevQuestion();
+      expect(s.currentQ).toBe(0);
+    });
+
+    it('ne descend pas en dessous de 0', () => {
+      const s = createMixin(5) as any;
+      s.prevQuestion();
+      expect(s.currentQ).toBe(0);
+    });
+
+    it('reset feedback a null', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.feedback = { correct: true };
+      s.prevQuestion();
+      expect(s.feedback).toBeNull();
+    });
+
+    it('appelle onPrevReady', () => {
+      const s = createMixin(5) as any;
+      s.onPrevReady = vi.fn();
+      s.nextQuestion();
+      s.prevQuestion();
+      expect(s.onPrevReady).toHaveBeenCalledOnce();
+    });
+
+    it('n appelle pas onPrevReady si currentQ est 0', () => {
+      const s = createMixin(5) as any;
+      s.onPrevReady = vi.fn();
+      s.prevQuestion();
+      expect(s.onPrevReady).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('isReviewing()', () => {
+    it('retourne false au debut', () => {
+      const s = createMixin(5);
+      expect(s.isReviewing()).toBe(false);
+    });
+
+    it('retourne true quand on revient en arriere', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.nextQuestion(); // hwm=2
+      s.prevQuestion(); // currentQ=1
+      expect(s.isReviewing()).toBe(true);
+    });
+
+    it('retourne false a la frontiere', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion(); // hwm=1, currentQ=1
+      expect(s.isReviewing()).toBe(false);
+    });
+  });
+
+  describe('canGoPrev() / canGoNext()', () => {
+    it('canGoPrev false au debut', () => {
+      const s = createMixin(5);
+      expect(s.canGoPrev()).toBe(false);
+    });
+
+    it('canGoPrev true apres avance', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      expect(s.canGoPrev()).toBe(true);
+    });
+
+    it('canGoNext false a la frontiere', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      expect(s.canGoNext()).toBe(false);
+    });
+
+    it('canGoNext true quand on a recule', () => {
+      const s = createMixin(5) as any;
+      s.nextQuestion();
+      s.nextQuestion();
+      s.prevQuestion();
+      expect(s.canGoNext()).toBe(true);
+    });
   });
 });

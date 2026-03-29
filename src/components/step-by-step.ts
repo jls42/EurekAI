@@ -7,6 +7,7 @@ export function stepByStep(gen: any) {
   return {
     gen,
     currentQ: 0,
+    highWaterMark: 0,
     score: 0,
     finished: false,
     feedback: null as { correct: boolean } | null,
@@ -34,6 +35,25 @@ export function stepByStep(gen: any) {
       return ((this.currentQ + (this.finished ? 1 : 0)) / t) * 100;
     },
 
+    isReviewing() {
+      return this.currentQ < this.highWaterMark;
+    },
+
+    canGoPrev() {
+      return this.currentQ > 0;
+    },
+
+    canGoNext() {
+      return this.currentQ < this.highWaterMark;
+    },
+
+    prevQuestion(this: any) {
+      if (this.currentQ <= 0) return;
+      this.feedback = null;
+      this.currentQ--;
+      this.onPrevReady?.();
+    },
+
     nextQuestion(this: any) {
       this.feedback = null;
       this.currentQ++;
@@ -41,6 +61,9 @@ export function stepByStep(gen: any) {
         this.finished = true;
         this.onFinish?.();
       } else {
+        if (this.currentQ > this.highWaterMark) {
+          this.highWaterMark = this.currentQ;
+        }
         this.onNextReady?.();
       }
     },
@@ -49,6 +72,7 @@ export function stepByStep(gen: any) {
       if (wrongIndices.length === 0) return;
       this.queue = wrongIndices;
       this.currentQ = 0;
+      this.highWaterMark = 0;
       this.score = 0;
       this.finished = false;
       this.feedback = null;
@@ -57,6 +81,7 @@ export function stepByStep(gen: any) {
     resetAll() {
       this.queue = null;
       this.currentQ = 0;
+      this.highWaterMark = 0;
       this.score = 0;
       this.finished = false;
       this.feedback = null;

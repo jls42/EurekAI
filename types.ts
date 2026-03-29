@@ -10,6 +10,7 @@ export interface Profile {
   avatar: string;
   locale: string;
   useModeration: boolean;
+  moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
   pinHash?: string;

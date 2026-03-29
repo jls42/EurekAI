@@ -2,11 +2,17 @@ export function createConfig() {
   return {
     async loadConfig(this: any) {
       try {
-        const [configRes, statusRes] = await Promise.all([
+        const [configRes, statusRes, modCatsRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/config/status'),
+          fetch('/api/moderation-categories'),
         ]);
         if (statusRes.ok) this.apiStatus = await statusRes.json();
+        if (modCatsRes.ok) {
+          const modData = await modCatsRes.json();
+          this.allModerationCategories = modData.all || [];
+          this.moderationDefaults = modData.defaults || {};
+        }
         // Load voices BEFORE setting configDraft so the voice list is populated
         // when Alpine renders the x-show="ttsProvider === 'mistral'" selects
         await this.loadMistralVoices();

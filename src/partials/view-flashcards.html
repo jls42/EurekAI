@@ -83,12 +83,26 @@
             <!-- Active card (step-by-step) -->
             <template x-if="!finished">
               <div>
-                <!-- Progress header -->
+                <!-- Progress header with nav -->
                 <div class="flex items-center gap-2 mb-2">
+                  <button
+                    @click="prevQuestion()"
+                    :disabled="!canGoPrev()"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-gen-flashcards hover:bg-gen-flashcards/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring"
+                  >
+                    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  </button>
                   <span
                     class="text-body-sm font-semibold text-gen-flashcards"
                     x-text="t('step.questionOf', { current: currentQ + 1, total: total() })"
                   ></span>
+                  <button
+                    @click="nextQuestion()"
+                    x-show="canGoNext()"
+                    class="w-8 h-8 rounded-full flex items-center justify-center text-gen-flashcards hover:bg-gen-flashcards/10 transition-colors focus-ring"
+                  >
+                    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                  </button>
                   <span
                     class="text-sm bg-gen-flashcards/10 text-gen-flashcards px-2.5 py-1 rounded-badge font-semibold"
                     x-text="t('quiz.score', { score: score })"
@@ -161,8 +175,8 @@
                   </button>
                 </div>
 
-                <!-- Self-evaluation buttons (after flip, before feedback) -->
-                <div x-show="flipped && !feedback" x-transition class="flex gap-3 justify-center mt-4">
+                <!-- Self-evaluation buttons (after flip, before feedback, not when reviewing) -->
+                <div x-show="flipped && !feedback && !isCurrentAnswered()" x-transition class="flex gap-3 justify-center mt-4">
                   <button
                     @click="rate(false)"
                     class="flex-1 max-w-[200px] min-h-touch bg-danger-light text-danger-dark rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center justify-center gap-2"
@@ -179,16 +193,7 @@
                   </button>
                 </div>
 
-                <!-- Next button (after rating) -->
-                <div x-show="feedback" x-transition class="text-center mt-4">
-                  <button
-                    @click="nextQuestion()"
-                    class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
-                  >
-                    <span x-text="t('step.next')"></span>
-                    <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                  </button>
-                </div>
+                <!-- Auto-advance: rate() calls nextQuestion() after 600ms delay -->
               </div>
             </template>
 
