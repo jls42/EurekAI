@@ -36,7 +36,7 @@ export function flashcardsComponent(gen: any) {
 
     restoreState(this: any) {
       const idx = this.currentIndex();
-      if (this.results[idx] !== undefined) {
+      if (idx in this.results) {
         this.flipped = true;
         this.feedback = { correct: this.results[idx] };
       } else {

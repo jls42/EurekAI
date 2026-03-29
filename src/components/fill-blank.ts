@@ -39,7 +39,7 @@ export function fillBlankComponent(gen: any) {
     restoreState(this: any) {
       const idx = this.currentIndex();
       this.showHint = false;
-      if (this.answers[idx] !== undefined) {
+      if (idx in this.answers) {
         this.answer = this.answers[idx];
         const ex = this.items()[idx];
         this.feedback = { correct: this.results[idx], correctAnswer: ex?.answer };

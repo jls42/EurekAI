@@ -35,7 +35,7 @@ export function quizComponent(gen: any) {
 
     restoreState(this: any) {
       const idx = this.currentIndex();
-      if (this.answers[idx] !== undefined) {
+      if (idx in this.answers) {
         this.selectedChoice = this.answers[idx];
         const q = this.items()[idx];
         this.feedback = { correct: this.answers[idx] === q?.correct };
