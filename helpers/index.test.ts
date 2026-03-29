@@ -178,6 +178,30 @@ describe('fetchPageContent', () => {
     expect(result.engine).toBe('readability');
     vi.unstubAllGlobals();
   });
+
+  it('throws when readability mode returns empty content', async () => {
+    const html = '<html><body><script>app.init()</script></body></html>';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
+    );
+    await expect(fetchPageContent('https://spa.example.com', 'readability')).rejects.toThrow(
+      'Readability could not extract content',
+    );
+    vi.unstubAllGlobals();
+  });
+
+  it('returns short readability content in readability mode', async () => {
+    const html = '<html><body><article><p>Short.</p></article></body></html>';
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
+    );
+    const result = await fetchPageContent('https://example.com', 'readability');
+    expect(result.engine).toBe('readability');
+    expect(result.text).toContain('Short');
+    vi.unstubAllGlobals();
+  });
 });
 
 describe('timer', () => {
