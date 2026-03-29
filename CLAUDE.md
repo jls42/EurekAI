@@ -49,6 +49,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ## Workflow
 
+- **Ne JAMAIS committer directement sur `main`** — toujours creer une branche (`feat/`, `fix/`, `chore/`, etc.) et merger via PR
 - **Toujours utiliser le skill `/commit` pour creer les commits** (mandatory)
 - Verifier visuellement chaque modif UI (navigateur ou Claude in Chrome)
 - Lancer `npm run test` apres chaque modification

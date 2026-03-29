@@ -53,8 +53,8 @@ Le projet a été initié pendant le hackathon, puis repris et enrichi en dehors
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
 | 🌐 | **Recherche web** | Posez une question — un Agent Mistral cherche les réponses sur le web |
 | 📄 | **Fiches de révision** | Notes structurées avec points clés, vocabulaire, citations, anecdotes |
-| 🃏 | **Flashcards** | 5-50 cartes Q/R avec références aux sources pour la mémorisation active |
-| ❓ | **Quiz QCM** | 5-50 questions à choix multiples avec révision adaptative des erreurs |
+| 🃏 | **Flashcards** | Cartes Q/R avec références aux sources pour la mémorisation active (nombre configurable) |
+| ❓ | **Quiz QCM** | Questions à choix multiples avec révision adaptative des erreurs (nombre configurable) |
 | ✏️ | **Textes à trous** | Exercices à compléter avec indices et validation tolérante |
 | 🎙️ | **Podcast** | Mini-podcast 2 voix converti en audio via Mistral Voxtral TTS |
 | 🖼️ | **Illustrations** | Images éducatives générées par un Agent Mistral |
@@ -78,10 +78,11 @@ graph TD
         WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
     end
 
-    subgraph "🛡️ Sécurité (async, si activée par profil)"
+    subgraph "🛡️ Modération (async, si activée par profil)"
         MOD["Modération<br/><i>mistral-moderation-latest</i>"]
-        CON["Détection de consigne<br/><i>mistral-large-latest</i>"]
     end
+
+    CON["📋 Détection de consigne<br/><i>mistral-large-latest</i>"]
 
     subgraph "🧠 Générateurs IA"
         SUM["📄 Fiche"]
@@ -100,8 +101,10 @@ graph TD
         UI["🖥️ Interface interactive"]
     end
 
-    OCR & TXT & MIC & WEB --> MOD & CON
-    MOD & CON -.->|gardes| SUM & FC & QZ & FB & POD & IMG & QV & CHAT
+    OCR & TXT & MIC & WEB --> MOD
+    OCR & TXT & MIC & WEB --> CON
+    MOD -.->|garde| SUM & FC & QZ & FB & POD & IMG & QV & CHAT
+    CON -.->|consigne| SUM & FC & QZ & FB
     POD --> TTS
     QV --> TTS
     SUM & FC -->|lecture à voix haute| TTS
@@ -126,7 +129,7 @@ flowchart LR
     end
 
     subgraph "Tâches"
-        T1["Fiche / Flashcards / Podcast / Chat / Quiz / Textes à trous / Vérification quiz / Consigne"]
+        T1["Fiche / Flashcards / Podcast / Chat / Quiz / Quiz vocal / Textes à trous / Vérification quiz / Consigne"]
         T2["OCR — documents, tableaux, écriture manuscrite"]
         T3["Reconnaissance vocale — STT optimisé FR"]
         T4["Modération de contenu — filtrage par âge"]
@@ -199,9 +202,9 @@ Sept types de matériel d'apprentissage généré :
 
 | Générateur | Modèle | Sortie |
 |---|---|---|
-| **Fiche de révision** | `mistral-large-latest` | Titre, résumé, 10-25 points clés, vocabulaire, citations, anecdote |
-| **Flashcards** | `mistral-large-latest` | 5-50 cartes Q/R avec références aux sources pour la mémorisation active |
-| **Quiz QCM** | `mistral-large-latest` | 5-50 questions, 4 choix chacune, explications, révision adaptative |
+| **Fiche de révision** | `mistral-large-latest` | Titre, résumé, points clés, vocabulaire, citations, anecdote |
+| **Flashcards** | `mistral-large-latest` | Cartes Q/R avec références aux sources (nombre configurable) |
+| **Quiz QCM** | `mistral-large-latest` | Questions à choix multiples, explications, révision adaptative (nombre configurable) |
 | **Textes à trous** | `mistral-large-latest` | Phrases à compléter avec indices, validation tolérante (Levenshtein) |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | Script 2 voix → audio MP3 |
 | **Illustration** | Agent `mistral-large-latest` | Image éducative via l'outil `image_generation` |
@@ -229,7 +232,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-latest` avec 5 catégories bloquées pour enfant/ado (sexual, hate, violence, selfharm, jailbreaking), aucune restriction pour étudiant/adulte
+- **Modération du contenu** : `mistral-moderation-latest` avec 5 catégories bloquées pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`), aucune restriction pour étudiant/adulte
 - **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
@@ -257,17 +260,17 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 
 | Couche | Technologie | Rôle |
 |---|---|---|
-| **Runtime** | Node.js + TypeScript 5.x | Serveur et sûreté des types |
-| **Backend** | Express 4.x | API REST |
-| **Serveur de dev** | Vite 7.x + tsx | HMR, partials Handlebars, proxy |
+| **Runtime** | Node.js + TypeScript 6.x | Serveur et sûreté des types |
+| **Backend** | Express 5.x | API REST |
+| **Serveur de dev** | Vite 8.x (Rolldown) + tsx | HMR, partials Handlebars, proxy |
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Interface réactive, TypeScript compilé par Vite |
 | **Templating** | vite-plugin-handlebars | Composition HTML par partials |
 | **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Modération |
 | **TTS (défaut)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, synthèse vocale intégrée |
 | **TTS (alternatif)** | ElevenLabs SDK 2.x | `eleven_v3`, voix naturelles |
-| **Icônes** | Lucide | Bibliothèque d'icônes SVG |
+| **Icônes** | Lucide 1.x | Bibliothèque d'icônes SVG |
 | **Markdown** | Marked | Rendu markdown dans le chat |
-| **Upload fichiers** | Multer 1.4 LTS | Gestion des formulaires multipart |
+| **Upload fichiers** | Multer 2.x | Gestion des formulaires multipart |
 | **Audio** | ffmpeg-static | Concaténation de segments audio |
 | **Tests** | Vitest | Tests unitaires — couverture mesurée par SonarCloud |
 | **Persistance** | Fichiers JSON | Stockage sans dépendance |
@@ -352,9 +355,10 @@ routes/
   chat.ts                 — Chat IA avec appel d'outils
 
 helpers/
-  index.ts                — safeParseJson, unwrapJsonArray, extractAllText, timer
+  index.ts                — getContent, stripJsonMarkdown, safeParseJson, unwrapJsonArray, extractAllText, timer
   audio.ts                — collectStream (ReadableStream → Buffer)
   fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
+  diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, randomSeed)
 
 src/                      — Frontend (Vite + Handlebars)
   index.html              — Point d'entrée HTML principal
