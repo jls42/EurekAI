@@ -6,7 +6,14 @@ import type { Flashcard, AgeGroup } from '../types.js';
 
 function isValidFlashcards(data: Flashcard[]): boolean {
   return (
-    data.length > 0 && data.every((f) => typeof f.question === 'string' && f.question.length > 0)
+    data.length > 0 &&
+    data.every(
+      (f) =>
+        typeof f.question === 'string' &&
+        f.question.length > 0 &&
+        typeof f.answer === 'string' &&
+        f.answer.length > 0,
+    )
   );
 }
 

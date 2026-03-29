@@ -27,7 +27,7 @@ export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
     .join('\n\n---\n\n');
 }
 
-function applyConsigne(
+export function applyConsigne(
   markdown: string,
   consigne?: { found: boolean; text: string; keyTopics: string[] },
 ): string {
@@ -317,7 +317,7 @@ export function generateRoutes(
       const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz-vocal');
       const data = await generateQuizVocal(
         client,
-        ctx.rawMarkdown,
+        ctx.markdown,
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
@@ -476,10 +476,12 @@ export function generateRoutes(
         res.status(404).json({ error: 'Projet introuvable' });
         return;
       }
+      const lang = req.body.lang || 'fr';
+      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
       const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
       const useConsigneRoute = req.body.useConsigne !== false;
       const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-      const route = await routeRequest(client, markdown);
+      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json(route);
     } catch (e) {
@@ -511,7 +513,7 @@ export function generateRoutes(
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       console.log('  Smart routing: analyzing content...');
-      const route = await routeRequest(client, markdown);
+      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
