@@ -35,7 +35,7 @@ const client = new Mistral({
 });
 const app = express();
 app.disable('x-powered-by');
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json({ limit: '5mb' }));
 
