@@ -291,11 +291,57 @@ export function sourceRoutes(
     }
   }
 
+  /** Perform a keyword web search via Mistral agent. */
+  async function searchByKeywords(
+    searchQuery: string,
+    lang: string,
+    ageGroup: import('../types.js').AgeGroup,
+    modCats: string[] | null,
+    now: string,
+  ): Promise<Source> {
+    const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
+    const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
+    console.log(`  Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+    return {
+      id: randomUUID(),
+      filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
+      markdown: text,
+      uploadedAt: now,
+      sourceType: 'websearch',
+      moderation: modCats ? pendingModeration() : undefined,
+    };
+  }
+
+  /** Collect sources from URLs and/or keyword search. */
+  async function collectWebSources(req: any, pid: string, modCats: string[] | null): Promise<Source[]> {
+    const lang = req.body.lang || 'fr';
+    const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
+    const { urls, searchQuery } = parseWebInput(req.body.query.trim());
+    const scrapeMode = req.body.scrapeMode || 'auto';
+    const sources: Source[] = [];
+    const now = new Date().toISOString();
+
+    for (const url of urls) {
+      const source = await scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now);
+      if (source) {
+        store.addSource(pid, source);
+        sources.push(source);
+      }
+    }
+
+    if (searchQuery) {
+      const source = await searchByKeywords(searchQuery, lang, ageGroup, modCats, now);
+      store.addSource(pid, source);
+      sources.push(source);
+    }
+
+    return sources;
+  }
+
   // Web search / URL scrape source
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
-    const project = store.getProject(pid);
-    if (!project) {
+    if (!store.getProject(pid)) {
       res.status(404).json({ error: 'Projet introuvable' });
       return;
     }
@@ -316,42 +362,12 @@ export function sourceRoutes(
     }
 
     try {
-      const lang = req.body.lang || 'fr';
-      const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
-      const { urls, searchQuery } = parseWebInput(query.trim());
-      const scrapeMode = req.body.scrapeMode || 'auto';
-      const sources: Source[] = [];
-      const now = new Date().toISOString();
-
-      for (const url of urls) {
-        const source = await scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now);
-        if (source) {
-          store.addSource(pid, source);
-          sources.push(source);
-        }
-      }
-
-      if (searchQuery) {
-        const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
-        const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
-        const source: Source = {
-          id: randomUUID(),
-          filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
-          markdown: text,
-          uploadedAt: now,
-          sourceType: 'websearch',
-          moderation: modCats ? pendingModeration() : undefined,
-        };
-        store.addSource(pid, source);
-        sources.push(source);
-        console.log(`  Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
-      }
-
+      const sources = await collectWebSources(req, pid, modCats);
       if (sources.length === 0) {
         res.status(500).json({ error: 'Aucune source extraite' });
         return;
       }
-
+      const lang = req.body.lang || 'fr';
       triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {
         if (modCats) triggerModeration(store, client, pid, s.id, s.markdown, modCats);
