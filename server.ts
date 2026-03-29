@@ -15,7 +15,7 @@ import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore } from './profiles.js';
 
-dotenv.config({ override: true });
+dotenv.config({ override: true, quiet: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
