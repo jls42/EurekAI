@@ -24,7 +24,7 @@ describe('moderateContent', () => {
 
     expect(moderate).toHaveBeenCalledTimes(1);
     expect(moderate).toHaveBeenCalledWith({
-      model: 'mistral-moderation-2603',
+      model: 'mistral-moderation-latest',
       inputs: ['bonjour'],
     });
     expect(result).toEqual({

@@ -79,7 +79,7 @@ graph TD
     end
 
     subgraph "🛡️ Sécurité (async, si activée par profil)"
-        MOD["Modération<br/><i>mistral-moderation-2603</i>"]
+        MOD["Modération<br/><i>mistral-moderation-latest</i>"]
         CON["Détection de consigne<br/><i>mistral-large-latest</i>"]
     end
 
@@ -120,7 +120,7 @@ flowchart LR
         ML["mistral-large-latest"]
         MO["mistral-ocr-latest"]
         MV["voxtral-mini-latest"]
-        MMod["mistral-moderation-2603"]
+        MMod["mistral-moderation-latest"]
         MS["mistral-small-latest"]
         MTTS["voxtral-mini-tts-latest"]
     end
@@ -229,7 +229,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-2603` avec 5 catégories bloquées pour enfant/ado (sexual, hate, violence, selfharm, jailbreaking), aucune restriction pour étudiant/adulte
+- **Modération du contenu** : `mistral-moderation-latest` avec 5 catégories bloquées pour enfant/ado (sexual, hate, violence, selfharm, jailbreaking), aucune restriction pour étudiant/adulte
 - **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
@@ -282,7 +282,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 | `mistral-ocr-latest` | OCR de documents | Texte imprimé, tableaux, écriture manuscrite |
 | `voxtral-mini-latest` | Reconnaissance vocale (STT) | STT multilingue, optimisé avec `language="fr"` |
 | `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
-| `mistral-moderation-2603` | Modération de contenu | 5 catégories bloquées pour enfant/ado (+ jailbreaking) |
+| `mistral-moderation-latest` | Modération de contenu | 5 catégories bloquées pour enfant/ado (+ jailbreaking) |
 | `mistral-small-latest` | Routeur automatique | Analyse rapide du contenu pour décisions de routage |
 | `eleven_v3` (ElevenLabs) | Synthèse vocale (TTS alternatif) | Voix naturelles, alternative configurable |
 
