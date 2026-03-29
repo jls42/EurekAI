@@ -390,11 +390,11 @@
             <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')"></p>
             <div class="space-y-1.5">
               <template x-for="cat in allModerationCategories" :key="cat">
-                <!-- NOSONAR(S5765) — Alpine.js x-text fills label content at runtime -->
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox"
                     :value="cat"
+                    :aria-label="t('moderation.cat.' + cat)"
                     x-model="editingProfile.moderationCategories"
                     class="w-4 h-4 rounded text-primary accent-primary focus-ring"
                   />
