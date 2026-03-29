@@ -1,0 +1,26 @@
+<!-- Step progress header with prev/next navigation (shared partial) -->
+<!-- Params: colorClass (e.g. "gen-flashcards", "gen-quiz") -->
+<div class="flex items-center gap-2 mb-2">
+  <button
+    @click="prevQuestion()"
+    :disabled="!canGoPrev()"
+    class="w-8 h-8 rounded-full flex items-center justify-center text-{{colorClass}} hover:bg-{{colorClass}}/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring"
+  >
+    <i data-lucide="chevron-left" class="w-4 h-4"></i>
+  </button>
+  <span
+    class="text-body-sm font-semibold text-{{colorClass}}"
+    x-text="t('step.questionOf', { current: currentQ + 1, total: total() })"
+  ></span>
+  <button
+    @click="nextQuestion()"
+    x-show="canGoNext()"
+    class="w-8 h-8 rounded-full flex items-center justify-center text-{{colorClass}} hover:bg-{{colorClass}}/10 transition-colors focus-ring"
+  >
+    <i data-lucide="chevron-right" class="w-4 h-4"></i>
+  </button>
+  <span
+    class="text-sm bg-{{colorClass}}/10 text-{{colorClass}} px-2.5 py-1 rounded-badge font-semibold"
+    x-text="t('quiz.score', { score: score })"
+  ></span>
+</div>

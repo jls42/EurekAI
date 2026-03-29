@@ -77,30 +77,7 @@
         >
           <template x-if="!finished">
             <div>
-              <div class="flex items-center gap-2 mb-3">
-                <button
-                  @click="prevQuestion()"
-                  :disabled="!canGoPrev()"
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-gen-quizvocal hover:bg-gen-quizvocal/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors focus-ring"
-                >
-                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                </button>
-                <span
-                  class="text-body-sm font-semibold text-gen-quizvocal"
-                  x-text="t('quiz.questionOf', { current: currentQ + 1, total: total() })"
-                ></span>
-                <button
-                  @click="nextQuestion()"
-                  x-show="canGoNext()"
-                  class="w-8 h-8 rounded-full flex items-center justify-center text-gen-quizvocal hover:bg-gen-quizvocal/10 transition-colors focus-ring"
-                >
-                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-                <span
-                  class="text-sm bg-gen-quizvocal/10 text-gen-quizvocal px-2.5 py-1 rounded-badge font-semibold"
-                  x-text="t('quiz.score', { score: score })"
-                ></span>
-              </div>
+              {{> step-progress-nav colorClass="gen-quizvocal"}}
               <!-- Progress bar -->
               <div class="h-2 rounded-full bg-gray-200 mb-4">
                 <div
