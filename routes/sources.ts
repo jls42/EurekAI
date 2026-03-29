@@ -111,26 +111,40 @@ export function sourceRoutes(
 
     const results: Source[] = [];
     const modCats = getModerationCategories(store, profileStore, pid);
+    const TEXT_EXTS = ['.txt', '.md'];
     for (const file of files) {
       try {
-        const { markdown, elapsed } = await ocrFile(client, file.path, file.originalname);
+        const ext = file.originalname.toLowerCase().replace(/.*(\.\w+)$/, '$1');
+        const isText = TEXT_EXTS.includes(ext);
+        let markdown: string;
+        let elapsed: number;
+        if (isText) {
+          const stop = (await import('../helpers/index.js')).timer();
+          markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
+          elapsed = stop();
+          console.log(
+            `  TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
+          );
+        } else {
+          ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
+          console.log(
+            `  OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
+          );
+        }
         const source: Source = {
           id: randomUUID(),
           filename: file.originalname,
           markdown,
           uploadedAt: new Date().toISOString(),
-          sourceType: 'ocr',
+          sourceType: isText ? 'text' : 'ocr',
           filePath: `projects/${pid}/uploads/${file.filename}`,
           moderation: modCats ? pendingModeration() : undefined,
         };
         store.addSource(pid, source);
         results.push(source);
-        console.log(
-          `  OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
-        );
       } catch (e) {
-        console.error(`  OCR FAIL: ${file.originalname} — ${e}`);
-        res.status(500).json({ error: `OCR echoue pour ${file.originalname}: ${e}` });
+        console.error(`  Upload FAIL: ${file.originalname} — ${e}`);
+        res.status(500).json({ error: `Echec pour ${file.originalname}: ${e}` });
         return;
       }
     }

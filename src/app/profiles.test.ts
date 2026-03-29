@@ -533,13 +533,15 @@ describe('createProfiles', () => {
       expect(ctx.editingProfile.locale).toBe('fr');
     });
 
-    it('calls requirePin for profile with PIN', () => {
+    it('opens directly even for profile with PIN (no PIN required for basic edits)', () => {
       const ctx = makeCtx({
-        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
+        profiles: [{ id: 'p1', name: 'Alice', hasPin: true, locale: 'en' }],
       });
       callMethod('startEditProfile', ctx, 'p1');
 
-      expect(ctx.requirePin).toHaveBeenCalled();
+      expect(ctx.editingProfile).not.toBeNull();
+      expect(ctx.editingProfile.name).toBe('Alice');
+      expect(ctx.requirePin).not.toHaveBeenCalled();
     });
 
     it('does nothing if profile not found', () => {
@@ -547,10 +549,28 @@ describe('createProfiles', () => {
       callMethod('startEditProfile', ctx, 'nonexistent');
 
       expect(ctx.editingProfile).toBeNull();
+    });
+  });
+
+  describe('requireParentalAccess', () => {
+    it('calls callback directly if profile has no PIN', () => {
+      const ctx = makeCtx();
+      ctx.editingProfile = { id: 'p1', name: 'Alice', hasPin: false };
+      const cb = vi.fn();
+      callMethod('requireParentalAccess', ctx, cb);
+      expect(cb).toHaveBeenCalled();
       expect(ctx.requirePin).not.toHaveBeenCalled();
     });
 
-    it('with PIN, sets editingProfile with _verifiedPin on successful verification', async () => {
+    it('calls callback directly if PIN already verified', () => {
+      const ctx = makeCtx();
+      ctx.editingProfile = { id: 'p1', name: 'Alice', hasPin: true, _verifiedPin: '1234' };
+      const cb = vi.fn();
+      callMethod('requireParentalAccess', ctx, cb);
+      expect(cb).toHaveBeenCalled();
+    });
+
+    it('prompts for PIN and calls callback on success', async () => {
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue({
@@ -559,30 +579,19 @@ describe('createProfiles', () => {
         }),
       );
 
-      const ctx = makeCtx({
-        profiles: [{ id: 'p1', name: 'Alice', hasPin: true, locale: 'en' }],
-      });
-      // Make requirePin immediately invoke the callback with a test PIN
-      ctx.requirePin = vi.fn((cb: Function) => cb('1234'));
+      const ctx = makeCtx();
+      ctx.editingProfile = { id: 'p1', name: 'Alice', hasPin: true };
+      ctx.requirePin = vi.fn((cb: Function) => cb('4242'));
+      const cb = vi.fn();
+      callMethod('requireParentalAccess', ctx, cb);
 
-      callMethod('startEditProfile', ctx, 'p1');
-
-      // Wait for the async callback inside requirePin
       await vi.waitFor(() => {
-        expect(ctx.editingProfile).not.toBeNull();
+        expect(cb).toHaveBeenCalled();
       });
-
-      expect(ctx.editingProfile).toEqual({
-        id: 'p1',
-        name: 'Alice',
-        hasPin: true,
-        locale: 'en',
-        _verifiedPin: '1234',
-      });
-      expect(ctx.showProfileForm).toBe(false);
+      expect(ctx.editingProfile._verifiedPin).toBe('4242');
     });
 
-    it('with PIN, shows pinWrong toast when verification fails', async () => {
+    it('shows pinWrong toast on bad PIN', async () => {
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue({
@@ -591,40 +600,17 @@ describe('createProfiles', () => {
         }),
       );
 
-      const ctx = makeCtx({
-        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
-      });
+      const ctx = makeCtx();
+      ctx.editingProfile = { id: 'p1', name: 'Alice', hasPin: true };
       ctx.requirePin = vi.fn((cb: Function) => cb('9999'));
-
-      callMethod('startEditProfile', ctx, 'p1');
+      const cb = vi.fn();
+      callMethod('requireParentalAccess', ctx, cb);
 
       await vi.waitFor(() => {
         expect(ctx.showToast).toHaveBeenCalled();
       });
-
       expect(ctx.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
-      expect(ctx.editingProfile).toBeNull();
-    });
-
-    it('with PIN, shows error toast on network failure', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network fail')),
-      );
-
-      const ctx = makeCtx({
-        profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
-      });
-      ctx.requirePin = vi.fn((cb: Function) => cb('1234'));
-
-      callMethod('startEditProfile', ctx, 'p1');
-
-      await vi.waitFor(() => {
-        expect(ctx.showToast).toHaveBeenCalled();
-      });
-
-      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
-      expect(ctx.editingProfile).toBeNull();
+      expect(cb).not.toHaveBeenCalled();
     });
   });
 

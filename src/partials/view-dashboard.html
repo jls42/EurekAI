@@ -110,7 +110,20 @@
     </div>
     <div class="dashboard-grid">
       <template x-for="gen in recentGenerations()" :key="gen.id">
-        <button @click="goToView(gen.type)" class="gen-card p-4 text-left focus-ring">
+        <div
+          role="button"
+          tabindex="0"
+          @click="goToView(gen.type)"
+          @keydown.enter="goToView(gen.type)"
+          class="gen-card p-4 text-left focus-ring cursor-pointer relative group"
+        >
+          <button
+            @click.stop="confirmDelete('generation', () => deleteGen(gen))"
+            class="absolute top-2 right-2 w-7 h-7 flex items-center justify-center rounded text-text-secondary hover:text-danger hover:bg-danger/10 opacity-0 group-hover:opacity-100 transition-opacity focus-ring"
+            :aria-label="t('common.delete')"
+          >
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
           <div class="flex items-center gap-2.5 mb-2">
             <span
               class="icon-chip shrink-0"
@@ -140,7 +153,7 @@
             class="text-sm text-text-secondary mt-0.5"
             x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"
           ></p>
-        </button>
+        </div>
       </template>
     </div>
   </div>

@@ -38,9 +38,9 @@
 
 **EurekAI** est né pendant le [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([site officiel](https://worldwide-hackathon.mistral.ai/)) (mars 2026). Il me fallait un sujet — et l'idée est venue de quelque chose de très concret : je prépare régulièrement les contrôles avec ma fille, et je me suis dit qu'il devait être possible de rendre ça plus ludique et interactif grâce à l'IA.
 
-L'objectif : prendre **n'importe quelle entrée** — une photo du manuel, un texte copié-collé, un enregistrement vocal, une recherche web — et la transformer en **fiches de révision, flashcards, quiz, podcasts, textes à trous, illustrations, et plus encore**. Le tout propulsé par les modèles français de Mistral AI, ce qui en fait une solution naturellement adaptée aux élèves francophones.
+L'objectif : prendre **n'importe quelle entrée** — une photo de la leçon, un texte copié-collé, un enregistrement vocal, une recherche web — et la transformer en **fiches de révision, flashcards, quiz, podcasts, textes à trous, illustrations, et plus encore**. Le tout propulsé par les modèles français de Mistral AI, ce qui en fait une solution naturellement adaptée aux élèves francophones.
 
-Le projet a été initié pendant le hackathon, puis repris et enrichi en dehors. L'intégralité du code est générée par IA — principalement [Claude Code](https://docs.anthropic.com/en/docs/claude-code), avec quelques contributions via [Codex](https://openai.com/index/introducing-codex/).
+Le projet a été développé pendant le hackathon sur le [repo d'origine](https://github.com/jls42/worldwide-hackathon.mistral.ai), puis poursuivi et enrichi ici. L'intégralité du code est générée par IA — principalement [Claude Code](https://code.claude.com/), avec quelques contributions via [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -48,7 +48,7 @@ Le projet a été initié pendant le hackathon, puis repris et enrichi en dehors
 
 | | Fonctionnalité | Description |
 |---|---|---|
-| 📷 | **Upload OCR** | Prenez en photo votre manuel ou vos notes — Mistral OCR en extrait le contenu |
+| 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR) ou fichier texte (TXT, MD) |
 | 📝 | **Saisie texte** | Tapez ou collez n'importe quel texte directement |
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
 | 🌐 | **Recherche web** | Posez une question — un Agent Mistral cherche les réponses sur le web |
@@ -61,7 +61,7 @@ Le projet a été initié pendant le hackathon, puis repris et enrichi en dehors
 | 🗣️ | **Quiz vocal** | Questions lues à haute voix, réponse orale, l'IA vérifie la réponse |
 | 💬 | **Tuteur IA** | Chat contextuel avec vos documents de cours, avec appel d'outils |
 | 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 7 types disponibles |
-| 🔒 | **Contrôle parental** | Modération par âge, PIN parental, restrictions du chat |
+| 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
 | 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards via Mistral Voxtral TTS ou ElevenLabs |
 
@@ -72,7 +72,7 @@ Le projet a été initié pendant le hackathon, puis repris et enrichi en dehors
 ```mermaid
 graph TD
     subgraph "📥 Sources d'entrée"
-        OCR["📷 Upload OCR<br/><i>mistral-ocr-latest</i>"]
+        OCR["📷 Import fichiers<br/><i>OCR / texte brut</i>"]
         TXT["📝 Saisie texte"]
         MIC["🎤 Voix STT<br/><i>voxtral-mini-latest</i>"]
         WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
@@ -130,7 +130,7 @@ flowchart LR
 
     subgraph "Tâches"
         T1["Fiche / Flashcards / Podcast / Chat / Quiz / Quiz vocal / Textes à trous / Vérification quiz / Consigne"]
-        T2["OCR — documents, tableaux, écriture manuscrite"]
+        T2["OCR — documents, tableaux, écriture manuscrite (JPG, PNG, PDF)"]
         T3["Reconnaissance vocale — STT optimisé FR"]
         T4["Modération de contenu — filtrage par âge"]
         T5["Routeur automatique — analyse du contenu"]
@@ -191,7 +191,7 @@ sequenceDiagram
 
 EurekAI accepte 4 types de sources, modérées selon le profil (activé par défaut pour enfant et ado) :
 
-- **Upload OCR** — Fichiers JPG, PNG ou PDF traités par `mistral-ocr-latest`. Gère le texte imprimé, les tableaux et l'écriture manuscrite.
+- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par `mistral-ocr-latest` (texte imprimé, tableaux, écriture manuscrite), ou fichiers texte (TXT, MD) importés directement.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
 - **Recherche web** — Entrez une requête. Un Agent Mistral temporaire avec l'outil `web_search` récupère et résume les résultats.
@@ -232,7 +232,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-latest` avec 5 catégories bloquées pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`), aucune restriction pour étudiant/adulte
+- **Modération du contenu** : `mistral-moderation-latest` avec 10 catégories disponibles, 5 bloquées par défaut pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Catégories personnalisables par profil dans les paramètres.
 - **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
@@ -329,7 +329,7 @@ types.ts                  — Types TypeScript : Source, Generation (7 types), Q
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, 15 langues)
 
 generators/
-  ocr.ts                  — Upload + OCR via Mistral (JPG, PNG, PDF)
+  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF)
   summary.ts              — Génération de fiche de révision (JSON structuré)
   flashcards.ts           — Flashcards Q/R (5-50, configurable)
   quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
@@ -349,7 +349,7 @@ generators/
 routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
-  sources.ts              — Upload OCR, texte libre, voix STT, recherche web, modération
+  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, recherche web, modération
   generate.ts             — Endpoints de génération (7 types + auto + route)
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
@@ -409,6 +409,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/config/status` | Statut des APIs (Mistral, ElevenLabs, TTS) |
 | `POST` | `/api/config/reset` | Réinitialiser la config par défaut |
 | `GET` | `/api/config/voices` | Lister les voix Mistral TTS (optionnel `?lang=fr`) |
+| `GET` | `/api/moderation-categories` | Catégories de modération disponibles + défauts par âge |
 
 ### Profils
 | Méthode | Endpoint | Description |
@@ -430,7 +431,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 ### Sources
 | Méthode | Endpoint | Description |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | Upload OCR (fichiers multipart) |
+| `POST` | `/api/projects/:pid/sources/upload` | Import fichiers multipart (OCR pour JPG/PNG/PDF, lecture directe pour TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | Texte libre `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | Voix STT (audio multipart) |
 | `POST` | `/api/projects/:pid/sources/websearch` | Recherche web `{query}` |
@@ -498,7 +499,7 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 - **[Lucide](https://lucide.dev)** — Bibliothèque d'icônes
 - **[Marked](https://marked.js.org)** — Parseur Markdown
 
-Initié pendant le Mistral AI Worldwide Hackathon (mars 2026), développé intégralement par IA avec Claude Code et Codex.
+Initié pendant le Mistral AI Worldwide Hackathon (mars 2026), développé intégralement par IA avec [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
 
 ---
 

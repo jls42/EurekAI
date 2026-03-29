@@ -82,15 +82,17 @@
   <div class="grid grid-cols-2 gap-3 mb-6">
     <label
       class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-primary hover:bg-primary-light cursor-pointer transition-all card-lift focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+      :title="t('sources.importHint')"
     >
-      <i data-lucide="camera" class="w-8 h-8 text-primary"></i>
-      <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.photo')"></span>
+      <i data-lucide="upload" class="w-8 h-8 text-primary"></i>
+      <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.import')"></span>
+      <span class="text-[0.65rem] text-text-secondary" x-text="t('sources.importFormats')"></span>
       <input
         type="file"
         multiple
-        accept=".jpg,.jpeg,.png,.pdf"
+        accept=".jpg,.jpeg,.png,.pdf,.txt,.md"
         class="sr-only"
-        :aria-label="t('sources.photo')"
+        :aria-label="t('sources.import')"
         @change="handleFiles($event.target.files)"
       />
     </label>

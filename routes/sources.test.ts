@@ -924,7 +924,7 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'OCR echoue pour bad.jpg: Error: OCR failed' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Echec pour bad.jpg: Error: OCR failed' });
   });
 
   it('ajoute la moderation pending quand le profil a la moderation activee', async () => {

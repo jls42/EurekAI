@@ -368,7 +368,7 @@
                 ></p>
               </div>
               <button
-                @click="editingProfile.useModeration = !editingProfile.useModeration"
+                @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration })"
                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring"
                 :class="editingProfile?.useModeration ? 'bg-green-500' : 'bg-gray-300'"
               >
@@ -420,7 +420,7 @@
                 ></p>
               </div>
               <button
-                @click="editingProfile.chatEnabled = !editingProfile.chatEnabled"
+                @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled })"
                 class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring"
                 :class="editingProfile?.chatEnabled ? 'bg-blue-500' : 'bg-gray-300'"
               >

@@ -5,12 +5,12 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>将任何内容转化为互动学习体验 — 由 <a href="https://mistral.ai">Mistral AI</a> 提供支持。</strong>
+  <strong>将任何内容转换为互动学习体验 — 由 <a href="https://mistral.ai">Mistral AI</a> 提供动力。</strong>
 </p>
 
 <p align="center">
   <a href="README-en.md">🇬🇧 英语</a> · <a href="README-es.md">🇪🇸 西班牙语</a> · <a href="README-pt.md">🇧🇷 葡萄牙语</a> · <a href="README-de.md">🇩🇪 德语</a> · <a href="README-it.md">🇮🇹 意大利语</a> · <a href="README-nl.md">🇳🇱 荷兰语</a> · <a href="README-ar.md">🇸🇦 阿拉伯语</a><br>
-  <a href="README-hi.md">🇮🇳 印地语</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日语</a> · <a href="README-ko.md">🇰🇷 朝鲜语</a> · <a href="README-pl.md">🇵🇱 波兰语</a> · <a href="README-ro.md">🇷🇴 罗马尼亚语</a> · <a href="README-sv.md">🇸🇪 瑞典语</a>
+  <a href="README-hi.md">🇮🇳 印地语</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日语</a> · <a href="README-ko.md">🇰🇷 韩语</a> · <a href="README-pl.md">🇵🇱 波兰语</a> · <a href="README-ro.md">🇷🇴 罗马尼亚语</a> · <a href="README-sv.md">🇸🇪 瑞典语</a>
 </p>
 
 <p align="center">
@@ -20,10 +20,10 @@
 <h4 align="center">📊 代码质量</h4>
 
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="质量门"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="安全评分"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="可靠性评分"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="可维护性评分"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="质量门禁"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="安全等级"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="可靠性等级"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="可维护性等级"></a>
 </p>
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage&token=c8f6207cabba0e2841b2ec04126d7fd6687397e8" alt="覆盖率"></a>
@@ -34,36 +34,36 @@
 
 ---
 
-## 背景 — 为什么是 EurekAI？
+## 故事 — 为什么是 EurekAI？
 
-**EurekAI** 诞生于 [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online)（[官方网站](https://worldwide-hackathon.mistral.ai/)）（2026年3月）。我需要一个项目主题——灵感来自一个非常现实的场景：我经常和女儿一起准备测验，我想能否借助 AI 把这个过程变得更有趣、更互动。
+**EurekAI** 源于 [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online)（[官方网站](https://worldwide-hackathon.mistral.ai/)）（2026 年 3 月）。我需要一个题目 —— 想法来自非常现实的需求：我经常和我的女儿一起准备考试，我觉得应该有办法通过人工智能让这个过程更有趣、更互动。
 
-目标：接受 **任何输入** —— 教材的照片、复制粘贴的文本、语音录音、网络搜索 —— 并将其转化为 **复习笔记、抽认卡、测验、播客、填空题、插图，等等**。所有功能由 Mistral AI 的法国模型驱动，因此天然适合法语学生。
+目标：接受 **任何输入** —— 一张课本照片、复制粘贴的文本、语音记录、网络搜索 —— 并将其转换为 **复习卡片、抽认卡、测验、播客、完形填空、插图，等等**。全部由 Mistral AI 的法国模型驱动，因此对法语学生自然更加适配。
 
-该项目在黑客松期间启动，随后在外部持续改进。全部代码主要由 AI 生成 —— 以 [Claude Code](https://docs.anthropic.com/en/docs/claude-code) 为主，也有部分通过 [Codex](https://openai.com/index/introducing-codex/) 贡献。
+该项目在黑客松期间在 [原始仓库](https://github.com/jls42/worldwide-hackathon.mistral.ai) 上开发，随后在此处继续完善并扩展。全部代码由 AI 生成 —— 主要使用 [Claude Code](https://code.claude.com/)，并有少量来自 [Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/) 的贡献。
 
 ---
 
 ## 功能
 
-| | 功能 | 说明 |
+| | 功能 | 描述 |
 |---|---|---|
-| 📷 | **上传 OCR** | 拍摄教材或笔记的照片 —— Mistral OCR 提取内容 |
+| 📷 | **导入文件** | 导入你的课程资料 —— 照片、PDF（通过 Mistral OCR）或文本文件（TXT、MD） |
 | 📝 | **文本输入** | 直接键入或粘贴任何文本 |
-| 🎤 | **语音输入** | 录音 —— Voxtral STT 转写你的语音 |
-| 🌐 | **网络搜索** | 提出问题 —— 一个 Mistral Agent 在网络上查找答案 |
-| 📄 | **复习笔记** | 结构化笔记：关键点、词汇、引用、轶事 |
-| 🃏 | **抽认卡** | 问答卡片并带来源引用以便主动记忆（数量可配置） |
-| ❓ | **多项选择测验 (QCM)** | 选择题并带错误的自适应复习（数量可配置） |
-| ✏️ | **填空题** | 带提示和容错验证的填空练习 |
-| 🎙️ | **播客** | 由两种声音合成的迷你播客，通过 Mistral Voxtral TTS 转为音频 |
-| 🖼️ | **插图** | 由 Mistral Agent 生成的教育图像 |
-| 🗣️ | **语音测验** | 题目以语音读出，口头回答，AI 进行验证 |
-| 💬 | **AI 导师** | 基于课程文档的上下文聊天，并可调用工具 |
-| 🧠 | **自动路由** | 基于 `mistral-small-latest` 的路由器分析内容并在可用的 7 种生成器中推荐组合 |
-| 🔒 | **家长控制** | 按年龄分级的审核、家长 PIN、聊天限制 |
+| 🎤 | **语音输入** | 录制语音 —— Voxtral STT 转录你的声音 |
+| 🌐 | **网络搜索** | 提出问题 —— 一个 Mistral 代理在网络上查找答案 |
+| 📄 | **复习卡** | 结构化笔记，包含要点、词汇、引用、趣闻 |
+| 🃏 | **抽认卡** | 问答卡片并带有来源引用以便主动记忆（数量可配置） |
+| ❓ | **选择题测验** | 多项选择题，带有错误的自适应复习（数量可配置） |
+| ✏️ | **完形填空** | 带提示和容错校验的填空练习 |
+| 🎙️ | **播客** | 双声迷你播客，通过 Mistral Voxtral TTS 转为音频 |
+| 🖼️ | **插图** | 由 Mistral 代理生成的教育图像 |
+| 🗣️ | **语音测验** | 朗读问题，口头回答，由 AI 验证答案 |
+| 💬 | **AI 导师** | 可访问你的课程文档的上下文聊天，支持工具调用 |
+| 🧠 | **自动路由器** | 基于 `mistral-small-latest` 的路由器分析内容并在 7 种生成器中推荐组合 |
+| 🔒 | **家长控制** | 按配置文件可定制的审核（可定制类别）、家长 PIN、聊天限制 |
 | 🌍 | **多语言** | 界面支持 9 种语言；AI 生成通过提示支持 15 种语言 |
-| 🔊 | **语音朗读** | 通过 Mistral Voxtral TTS 或 ElevenLabs 收听复习笔记和抽认卡 |
+| 🔊 | **语音朗读** | 通过 Mistral Voxtral TTS 或 ElevenLabs 收听卡片和抽认卡 |
 
 ---
 
@@ -72,7 +72,7 @@
 ```mermaid
 graph TD
     subgraph "📥 Sources d'entrée"
-        OCR["📷 Upload OCR<br/><i>mistral-ocr-latest</i>"]
+        OCR["📷 Import fichiers<br/><i>OCR / texte brut</i>"]
         TXT["📝 Saisie texte"]
         MIC["🎤 Voix STT<br/><i>voxtral-mini-latest</i>"]
         WEB["🌐 Recherche web<br/><i>Agent Mistral</i>"]
@@ -115,7 +115,7 @@ graph TD
 
 ---
 
-## 模型使用概览
+## 模型使用地图
 
 ```mermaid
 flowchart LR
@@ -130,7 +130,7 @@ flowchart LR
 
     subgraph "Tâches"
         T1["Fiche / Flashcards / Podcast / Chat / Quiz / Quiz vocal / Textes à trous / Vérification quiz / Consigne"]
-        T2["OCR — documents, tableaux, écriture manuscrite"]
+        T2["OCR — documents, tableaux, écriture manuscrite (JPG, PNG, PDF)"]
         T3["Reconnaissance vocale — STT optimisé FR"]
         T4["Modération de contenu — filtrage par âge"]
         T5["Routeur automatique — analyse du contenu"]
@@ -185,92 +185,92 @@ sequenceDiagram
 
 ---
 
-## 深入探讨 — 功能
+## 深入——功能
 
 ### 多模态输入
 
-EurekAI 接受 4 种来源类型，按档案进行审核（默认对儿童和青少年启用）：
+EurekAI 接受 4 种来源，按配置文件进行审核（儿童和青少年默认启用）：
 
-- **上传 OCR** — JPG、PNG 或 PDF 文件由 `mistral-ocr-latest` 处理。支持印刷文本、表格和手写文字。
-- **自由文本** — 键入或粘贴任何内容。如启用审核，存储前会进行审核。
-- **语音输入** — 在浏览器中录制音频。由 `voxtral-mini-latest` 转写。参数 `language="fr"` 优化识别效果。
-- **网络搜索** — 输入查询。一个临时的 Mistral Agent 使用工具 `web_search` 检索并总结结果。
+- **导入文件** —— JPG、PNG 或 PDF 文件由 `mistral-ocr-latest` 处理（印刷文本、表格、手写），或直接导入文本文件（TXT、MD）。
+- **自由文本** —— 键入或粘贴任何内容。若启用审核，存储前会进行审核。
+- **语音输入** —— 在浏览器中录制音频。由 `voxtral-mini-latest` 转录。参数 `language="fr"` 优化识别。
+- **网络搜索** —— 输入查询。一个临时的 Mistral 代理会使用工具 `web_search` 检索并总结结果。
 
 ### AI 内容生成
 
-生成七种类型的学习材料：
+生成七类学习材料：
 
 | 生成器 | 模型 | 输出 |
 |---|---|---|
-| **复习笔记** | `mistral-large-latest` | 标题、摘要、关键点、词汇、引用、轶事 |
-| **抽认卡** | `mistral-large-latest` | 问答卡片并带来源引用（数量可配置） |
-| **多项选择题 (QCM)** | `mistral-large-latest` | 选择题、解释、自适应复习（数量可配置） |
-| **填空题** | `mistral-large-latest` | 带提示的完形填空句子，容错验证（Levenshtein） |
-| **播客** | `mistral-large-latest` + Voxtral TTS | 二声部脚本 → MP3 音频 |
+| **复习卡** | `mistral-large-latest` | 标题、摘要、要点、词汇、引用、趣闻 |
+| **抽认卡** | `mistral-large-latest` | 带来源引用的问答卡片（数量可配置） |
+| **选择题测验** | `mistral-large-latest` | 多项选择题、解析、自适应复习（数量可配置） |
+| **完形填空** | `mistral-large-latest` | 带提示的填空句子，容错校验（Levenshtein） |
+| **播客** | `mistral-large-latest` + Voxtral TTS | 双声剧本 → MP3 音频 |
 | **插图** | Agent `mistral-large-latest` | 通过工具 `image_generation` 生成教育图像 |
-| **语音测验** | `mistral-large-latest` + Voxtral TTS + STT | TTS 读题 → STT 回答 → AI 验证 |
+| **语音测验** | `mistral-large-latest` + Voxtral TTS + STT | TTS 提问 → STT 回答 → AI 验证 |
 
-### 基于聊天的 AI 导师
+### 聊天式 AI 导师
 
-一个可完全访问课程文档的会话式导师：
+一个能完全访问课程文档的对话式导师：
 
 - 使用 `mistral-large-latest`
-- 调用工具：可在对话中生成复习笔记、抽认卡、测验或填空题
-- 每门课程保存 50 条消息的历史
-- 如档案启用了审核，则会对内容进行审核
+- **工具调用**：可在对话中生成复习卡、抽认卡、测验或完形填空
+- 每门课程保留 50 条消息的历史
+- 若为启用审核的配置文件，则对话内容会被审核
 
-### 自动路由
+### 自动路由器
 
-路由器使用 `mistral-small-latest` 来分析来源内容并在 7 种可用生成器中推荐最相关的生成器。界面显示实时进度：先是分析阶段，然后是各项生成，支持取消单项生成。
+路由器使用 `mistral-small-latest` 分析来源内容，并在 7 种可用生成器中推荐最相关的生成器。界面显示实时进度：先是分析阶段，然后逐个生成并可取消。
 
 ### 自适应学习
 
-- 测验统计：跟踪每题的尝试次数和正确率
-- 测验复习：生成 5-10 道针对弱项概念的新题
-- 检测学习指令：识别复习指令（例如“如果我知道我的课程……就算会了”）并在兼容的文本生成器中优先处理（复习笔记、抽认卡、测验、填空题）
+- **测验统计**：跟踪每题的尝试次数和正确率
+- **测验复习**：生成 5–10 道新题，针对薄弱概念
+- **指令检测**：检测复习指令（“如果我会…就说明我掌握了”）并在兼容的文本生成器（复习卡、抽认卡、测验、完形填空）中优先处理
 
 ### 安全与家长控制
 
-- 4 个年龄组：儿童 (≤10 岁)、青少年 (11-15)、学生 (16-25)、成人 (26+)
-- 内容审核：使用 `mistral-moderation-latest`，对儿童/青少年阻止 5 类内容（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`selfharm`、`jailbreaking`），学生/成人则不受限制
-- 家长 PIN：SHA-256 哈希，15 岁以下档案必需。生产部署建议使用带盐的慢哈希（Argon2id、bcrypt）。
-- 聊天限制：16 岁以下默认禁用 AI 聊天，可由家长启用
+- **4 个年龄组**：儿童（≤10 岁）、青少年（11–15）、学生（16–25）、成人（26+）
+- **内容审核**：`mistral-moderation-latest` 提供 10 个可选类别，儿童/青少年默认屏蔽 5 类（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`selfharm`、`jailbreaking`）。类别可在配置文件设置中自定义。
+- **家长 PIN**：使用 SHA-256 哈希，对 15 岁以下配置文件必需。生产部署应使用带盐的慢哈希（Argon2id、bcrypt）。
+- **聊天限制**：默认对 16 岁以下禁用 AI 聊天，可由家长启用
 
-### 多档案系统
+### 多配置文件系统
 
-- 多个档案，包含姓名、年龄、头像、语言偏好
-- 项目与档案关联，使用 `profileId`
-- 级联删除：删除档案将删除其所有项目
+- 多个配置文件，包含姓名、年龄、头像、语言偏好
+- 项目与配置文件关联，通过 `profileId`
+- 级联删除：删除配置文件将删除其所有项目
 
-### 多 TTS 提供商
+### 多供应商 TTS
 
 - **Mistral Voxtral TTS**（默认）：`voxtral-mini-tts-latest`，无需额外密钥
-- **ElevenLabs**（可选）：`eleven_v3`，自然语音，需要 `ELEVENLABS_API_KEY`
-- 可在应用设置中配置提供商
+- **ElevenLabs**（可选）：`eleven_v3`，自然音色，需 `ELEVENLABS_API_KEY`
+- 提供商可在应用设置中配置
 
 ### 国际化
 
 - 界面支持 9 种语言：fr、en、es、pt、it、nl、de、hi、ar
 - AI 提示支持 15 种语言（fr、en、es、de、it、pt、nl、ja、zh、ko、ar、hi、pl、ro、sv）
-- 语言可按档案配置
+- 语言可在配置文件中配置
 
 ---
 
 ## 技术栈
 
-| 层 | 技术 | 角色 |
+| 层 | 技术 | 作用 |
 |---|---|---|
 | **运行时** | Node.js + TypeScript 6.x | 服务器与类型安全 |
 | **后端** | Express 5.x | REST API |
-| **开发服务器** | Vite 8.x (Rolldown) + tsx | HMR、Handlebars partials、代理 |
+| **开发服务器** | Vite 8.x (Rolldown) + tsx | HMR、Handlebars 片段、代理 |
 | **前端** | HTML + TailwindCSS 4.x + Alpine.js 3.x | 响应式界面，TypeScript 由 Vite 编译 |
-| **模板** | vite-plugin-handlebars | 通过 partials 组合 HTML |
-| **AI** | Mistral AI SDK 2.x | 聊天、OCR、STT、TTS、Agents、审核 |
-| **TTS（默认）** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`，内置语音合成 |
+| **模板** | vite-plugin-handlebars | 通过部分模板组合 HTML |
+| **AI** | Mistral AI SDK 2.x | 聊天、OCR、STT、TTS、代理、审核 |
+| **TTS（默认）** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`，集成语音合成 |
 | **TTS（可选）** | ElevenLabs SDK 2.x | `eleven_v3`，自然语音 |
 | **图标** | Lucide 1.x | SVG 图标库 |
 | **Markdown** | Marked | 聊天中的 Markdown 渲染 |
-| **文件上传** | Multer 2.x | multipart 表单处理 |
+| **文件上传** | Multer 2.x | Multipart 表单处理 |
 | **音频** | ffmpeg-static | 音频片段拼接 |
 | **测试** | Vitest | 单元测试 — 覆盖率由 SonarCloud 测量 |
 | **持久化** | JSON 文件 | 无外部依赖的存储 |
@@ -281,13 +281,13 @@ EurekAI 接受 4 种来源类型，按档案进行审核（默认对儿童和青
 
 | 模型 | 用途 | 为什么 |
 |---|---|---|
-| `mistral-large-latest` | 复习笔记、抽认卡、播客、测验、填空题、聊天、语音测验验证、图像 Agent、网络搜索 Agent、学习指令检测 | 最佳的多语言能力 + 指令跟随 |
+| `mistral-large-latest` | 复习卡、抽认卡、播客、测验、完形填空、聊天、语音测验验证、图像代理、网络搜索代理、指令检测 | 最佳多语种支持 + 指令跟随能力 |
 | `mistral-ocr-latest` | 文档 OCR | 印刷文本、表格、手写识别 |
-| `voxtral-mini-latest` | 语音识别 (STT) | 多语言 STT，配合 `language="fr"` 优化 |
-| `voxtral-mini-tts-latest` | 语音合成 (TTS) | 播客、语音测验、语音朗读 |
-| `mistral-moderation-latest` | 内容审核 | 对儿童/青少年阻止 5 类内容（含越狱） |
-| `mistral-small-latest` | 自动路由器 | 快速分析内容以做路由决策 |
-| `eleven_v3` (ElevenLabs) | 语音合成（TTS 可选） | 自然语音，作为可配置的替代方案 |
+| `voxtral-mini-latest` | 语音识别（STT） | 多语种 STT，配合 `language="fr"` 优化 |
+| `voxtral-mini-tts-latest` | 语音合成（TTS） | 播客、语音测验、朗读 |
+| `mistral-moderation-latest` | 内容审核 | 对儿童/青少年默认屏蔽 5 类（+ 越狱检测） |
+| `mistral-small-latest` | 自动路由器 | 快速分析内容以决定路由 |
+| `eleven_v3` (ElevenLabs) | 语音合成（TTS 可选） | 自然音色，可作为可配置替代品 |
 
 ---
 
@@ -314,7 +314,7 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **说明**：Mistral Voxtral TTS 是默认提供商 —— 除了 `MISTRAL_API_KEY` 外无需额外密钥。ElevenLabs 是可在设置中配置的可选 TTS 提供商。
+> **注意**：Mistral Voxtral TTS 是默认提供商 —— 除了 `MISTRAL_API_KEY` 外无需额外密钥。ElevenLabs 是可在设置中配置的可选 TTS 提供商。
 
 ---
 
@@ -329,7 +329,7 @@ types.ts                  — Types TypeScript : Source, Generation (7 types), Q
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, 15 langues)
 
 generators/
-  ocr.ts                  — Upload + OCR via Mistral (JPG, PNG, PDF)
+  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF)
   summary.ts              — Génération de fiche de révision (JSON structuré)
   flashcards.ts           — Flashcards Q/R (5-50, configurable)
   quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
@@ -349,7 +349,7 @@ generators/
 routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
-  sources.ts              — Upload OCR, texte libre, voix STT, recherche web, modération
+  sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, recherche web, modération
   generate.ts             — Endpoints de génération (7 types + auto + route)
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
@@ -409,19 +409,20 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/config/status` | API 状态（Mistral、ElevenLabs、TTS） |
 | `POST` | `/api/config/reset` | 重置为默认配置 |
 | `GET` | `/api/config/voices` | 列出 Mistral TTS 的语音（可选 `?lang=fr`） |
+| `GET` | `/api/moderation-categories` | 可用审核类别 + 各年龄默认设置 |
 
-### 档案
+### 配置文件
 | 方法 | 端点 | 描述 |
 |---|---|---|
-| `GET` | `/api/profiles` | 列出所有档案 |
-| `POST` | `/api/profiles` | 创建档案 |
-| `PUT` | `/api/profiles/:id` | 修改档案（< 15 岁需 PIN） |
-| `DELETE` | `/api/profiles/:id` | 删除档案 + 级联删除项目 `{pin?}` → `{ok, deletedProjects}` |
+| `GET` | `/api/profiles` | 列出所有配置文件 |
+| `POST` | `/api/profiles` | 创建配置文件 |
+| `PUT` | `/api/profiles/:id` | 修改配置文件（< 15 岁需 PIN） |
+| `DELETE` | `/api/profiles/:id` | 删除配置文件 + 级联删除项目 `{pin?}` → `{ok, deletedProjects}` |
 
 ### 项目
 | 方法 | 端点 | 描述 |
 |---|---|---|
-| `GET` | `/api/projects` | 列出项目（可选 `?profileId=`） |
+| `GET` | `/api/projects` | 列出项目（`?profileId=` 可选） |
 | `POST` | `/api/projects` | 创建项目 `{name, profileId}` |
 | `GET` | `/api/projects/:pid` | 项目详情 |
 | `PUT` | `/api/projects/:pid` | 重命名 `{name}` |
@@ -430,37 +431,37 @@ output/                   — Données d'exécution (projets, config, fichiers a
 ### 来源
 | 方法 | 端点 | 描述 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | 上传 OCR（multipart 文件） |
+| `POST` | `/api/projects/:pid/sources/upload` | 导入 multipart 文件（JPG/PNG/PDF OCR，TXT/MD 直接读取） |
 | `POST` | `/api/projects/:pid/sources/text` | 自由文本 `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | 语音 STT（multipart 音频） |
 | `POST` | `/api/projects/:pid/sources/websearch` | 网络搜索 `{query}` |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | 删除来源 |
 | `POST` | `/api/projects/:pid/moderate` | 审核 `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | 检测学习指令 |
+| `POST` | `/api/projects/:pid/detect-consigne` | 检测复习指令 |
 
 ### 生成
 | 方法 | 端点 | 描述 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | 生成复习笔记 |
+| `POST` | `/api/projects/:pid/generate/summary` | 生成复习卡 |
 | `POST` | `/api/projects/:pid/generate/flashcards` | 生成抽认卡 |
-| `POST` | `/api/projects/:pid/generate/quiz` | 生成多项选择测验 |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | 生成填空题 |
+| `POST` | `/api/projects/:pid/generate/quiz` | 生成选择题测验 |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | 生成完形填空 |
 | `POST` | `/api/projects/:pid/generate/podcast` | 生成播客 |
 | `POST` | `/api/projects/:pid/generate/image` | 生成插图 |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | 生成语音测验 |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | 自适应复习 `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/route` | 路由分析（计划要启动的生成器） |
-| `POST` | `/api/projects/:pid/generate/auto` | 后端自动生成（路由 + 5 种类型：summary、flashcards、quiz、fill-blank、podcast） |
+| `POST` | `/api/projects/:pid/generate/route` | 路由分析（推荐要启动的生成器计划） |
+| `POST` | `/api/projects/:pid/generate/auto` | 后端自动生成（路由 + 5 类：summary、flashcards、quiz、fill-blank、podcast） |
 
-所有生成路由接受 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`。`quiz-review` 还需要 `{generationId, weakQuestions}`。
+所有生成路由均接受 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`。`quiz-review` 还需要 `{generationId, weakQuestions}`。
 
-### CRUD 生成
+### 生成 CRUD
 | 方法 | 端点 | 描述 |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | 提交测验答案 `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 提交填空题答案 `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 验证口头答案（音频 + questionIndex） |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 朗读（复习笔记/抽认卡） |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 提交完形填空答案 `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 验证口头回答（音频 + questionIndex） |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 朗读（复习卡/抽认卡） |
 | `PUT` | `/api/projects/:pid/generations/:gid` | 重命名 `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | 删除生成内容 |
 
@@ -473,31 +474,30 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 ---
 
-## 架构决策
-
-| 决策 | 理由 |
+## 架构决策 | 决策 | 理由 |
 |---|---|
-| **使用 Alpine.js 而非 React/Vue** | 体积小、响应性轻量，TypeScript 由 Vite 编译。适合以速度为先的黑客松场景。 |
-| **以 JSON 文件持久化** | 零依赖，快速启动。无需配置数据库——开箱即可运行。 | **Vite + Handlebars** | 两全其美：开发时快速的 HMR、用于代码组织的 HTML partials、Tailwind JIT。 |
-| **Prompts centralisés** | 所有 AI 提示词都在 `prompts.ts` — 便于按语言/年龄组迭代、测试和调整。 |
-| **Système multi-générations** | 每次生成都是一个独立对象，拥有自己的 ID — 允许每门课程有多份讲义、测验等。 |
-| **Prompts adaptés par âge** | 4 个年龄组，词汇、复杂度和语气各不相同 — 相同内容根据学习者以不同方式呈现。 |
-| **Fonctionnalités basées sur les Agents** | 图像生成和网页搜索使用临时的 Mistral 代理 — 独立生命周期并自动清理。 |
-| **TTS multi-provider** | 默认使用 Mistral Voxtral TTS（无需额外密钥），可选 ElevenLabs — 可在不重启的情况下配置。 |
+| **使用 Alpine.js 而非 React/Vue** | 占用最小，轻量响应性，TypeScript 由 Vite 编译。非常适合注重速度的黑客松。 |
+| **使用 JSON 文件持久化** | 零依赖，瞬间启动。无需配置数据库 — 开箱即用。 |
+| **Vite + Handlebars** | 两全其美：开发时快速的 HMR，使用 HTML partials 组织代码，Tailwind JIT。 |
+| **提示集中管理** | 所有 AI 提示集中在 `prompts.ts` — 易于按语言/年龄组迭代、测试和调整。 |
+| **多代生成系统** | 每次生成都是一个独立对象并拥有自己的 ID — 允许每门课程生成多份讲义、测验等。 |
+| **按年龄调整的提示** | 4 个年龄组，词汇、复杂度和语气不同 — 同一内容可根据学习者以不同方式呈现。 |
+| **基于 Agents 的功能** | 图像生成和网页搜索使用临时 Mistral Agents — 生命周期清晰并自动清理。 |
+| **多提供商 TTS** | 默认使用 Mistral Voxtral TTS（无需额外密钥），ElevenLabs 作为备选 — 可在不重启的情况下配置。 |
 
 ---
 
-## 致谢与鸣谢
+## 鸣谢
 
-- **[Mistral AI](https://mistral.ai)** — AI 模型（Large、OCR、Voxtral STT、Voxtral TTS、Moderation、Small）+ 全球黑客松
-- **[ElevenLabs](https://elevenlabs.io)** — 可替代的语音合成引擎（`eleven_v3`）
-- **[Alpine.js](https://alpinejs.dev)** — 轻量级响应式框架
-- **[TailwindCSS](https://tailwindcss.com)** — 实用型 CSS 框架
+- **[Mistral AI](https://mistral.ai)** — AI 模型（Large、OCR、Voxtral STT、Voxtral TTS、Moderation、Small）+ Worldwide Hackathon
+- **[ElevenLabs](https://elevenlabs.io)** — 备选语音合成引擎 (`eleven_v3`)
+- **[Alpine.js](https://alpinejs.dev)** — 轻量响应式框架
+- **[TailwindCSS](https://tailwindcss.com)** — 实用类 CSS 框架
 - **[Vite](https://vitejs.dev)** — 前端构建工具
 - **[Lucide](https://lucide.dev)** — 图标库
 - **[Marked](https://marked.js.org)** — Markdown 解析器
 
-在 Mistral AI 全球黑客松（2026 年 3 月）期间发起，全由 AI 使用 Claude Code 和 Codex 完成开发。
+于 Mistral AI Worldwide Hackathon（2026 年 3 月）期间启动，由 AI 完全开发，使用 [Claude Code](https://code.claude.com/)、[Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/)。
 
 ---
 
@@ -507,7 +507,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 ## 许可证
 
-[AGPL-3.0](LICENSE) — 版权所有 (C) 2026 Julien LS
+[AGPL-3.0](LICENSE) — 版权 (C) 2026 Julien LS
 
-**本文件已使用模型 gpt-5-mini 将法语（fr）版本翻译为中文（zh）。有关翻译过程的更多信息，请参阅 https://gitlab.com/jls42/ai-powered-markdown-translator**
+**本文件已使用 gpt-5-mini 模型将 fr 版本翻译为 zh 语言。如需了解更多关于翻译过程的信息，请参阅 https://gitlab.com/jls42/ai-powered-markdown-translator**
 
