@@ -107,12 +107,63 @@ describe('flashcardsComponent', () => {
     });
   });
 
-  describe('onNextReady()', () => {
-    it('reset flipped a false', () => {
+  describe('isCurrentAnswered()', () => {
+    it('returns false when no result for current index', () => {
+      const comp = createFlashcards(sampleCards);
+      expect(comp.isCurrentAnswered()).toBe(false);
+    });
+
+    it('returns true when result exists for current index', () => {
+      const comp = createFlashcards(sampleCards);
+      comp.results[0] = true;
+      expect(comp.isCurrentAnswered()).toBe(true);
+    });
+  });
+
+  describe('rate() with reviewing guard', () => {
+    it('does not rate when reviewing', () => {
+      const comp = createFlashcards(sampleCards);
+      comp.highWaterMark = 1;
+      comp.currentQ = 0; // reviewing (< highWaterMark)
+      comp.rate(true);
+      expect(comp.score).toBe(0);
+      expect(comp.results[0]).toBeUndefined();
+    });
+  });
+
+  describe('restoreState()', () => {
+    it('restores answered state (flipped + feedback)', () => {
+      const comp = createFlashcards(sampleCards);
+      comp.results[0] = true;
+      comp.restoreState();
+      expect(comp.flipped).toBe(true);
+      expect(comp.feedback).toEqual({ correct: true });
+    });
+
+    it('resets to unanswered state', () => {
+      const comp = createFlashcards(sampleCards);
+      comp.flipped = true;
+      comp.feedback = { correct: false };
+      comp.restoreState();
+      expect(comp.flipped).toBe(false);
+      expect(comp.feedback).toBeNull();
+    });
+  });
+
+  describe('onNextReady / onPrevReady', () => {
+    it('onNextReady calls restoreState', () => {
       const comp = createFlashcards(sampleCards);
       comp.flipped = true;
       comp.onNextReady();
       expect(comp.flipped).toBe(false);
+    });
+
+    it('onPrevReady restores answered state', () => {
+      const comp = createFlashcards(sampleCards);
+      comp.results[0] = false;
+      comp.onPrevReady();
+      expect(comp.flipped).toBe(true);
+      expect(comp.feedback).toEqual({ correct: false });
     });
   });
 

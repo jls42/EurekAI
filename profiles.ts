@@ -14,9 +14,21 @@ export function ageToGroup(age: number): AgeGroup {
 
 // --- Defaults per age group ---
 
-// Categories that block content per age group
-// mistral-moderation-latest categories: sexual, hate_and_discrimination, violence_and_threats,
-// dangerous_and_criminal_content, selfharm, health, financial, law, pii, jailbreaking
+// All categories available from mistral-moderation-latest
+export const ALL_MODERATION_CATEGORIES = [
+  'sexual',
+  'hate_and_discrimination',
+  'violence_and_threats',
+  'dangerous_and_criminal_content',
+  'selfharm',
+  'health',
+  'financial',
+  'law',
+  'pii',
+  'jailbreaking',
+] as const;
+
+// Default blocked categories per age group
 // dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
 export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {
   enfant: [
@@ -90,6 +102,10 @@ export class ProfileStore {
           p.chatEnabled = p.age >= 15;
           migrated = true;
         }
+        if (!p.moderationCategories) {
+          p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
+          migrated = true;
+        }
       }
       if (migrated) this.save(profiles);
       return profiles;
@@ -119,6 +135,7 @@ export class ProfileStore {
       avatar,
       locale,
       useModeration: defaults.moderationDefault,
+      moderationCategories: [...MODERATION_CATEGORIES[ageGroup]],
       useConsigne: defaults.consigneDefault,
       chatEnabled: defaults.chatDefault,
       createdAt: new Date().toISOString(),
@@ -139,7 +156,14 @@ export class ProfileStore {
     updates: Partial<
       Pick<
         Profile,
-        'name' | 'age' | 'avatar' | 'locale' | 'useModeration' | 'useConsigne' | 'chatEnabled'
+        | 'name'
+        | 'age'
+        | 'avatar'
+        | 'locale'
+        | 'useModeration'
+        | 'moderationCategories'
+        | 'useConsigne'
+        | 'chatEnabled'
       >
     >,
   ): Profile | null {
@@ -151,6 +175,12 @@ export class ProfileStore {
     if (updates.avatar !== undefined) profile.avatar = updates.avatar;
     if (updates.locale !== undefined) profile.locale = updates.locale;
     if (updates.useModeration !== undefined) profile.useModeration = updates.useModeration;
+    if (updates.moderationCategories !== undefined) {
+      const valid = updates.moderationCategories.filter((c) =>
+        (ALL_MODERATION_CATEGORIES as readonly string[]).includes(c),
+      );
+      profile.moderationCategories = valid;
+    }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
     if (updates.age !== undefined) {

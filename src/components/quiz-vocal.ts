@@ -6,6 +6,7 @@ export function quizVocalComponent(gen: any) {
     audioPlaying: false,
     vocalRecording: false,
     vocalRecorder: null as MediaRecorder | null,
+    storedFeedback: {} as Record<number, any>,
 
     questions() {
       return this.items();
@@ -67,7 +68,12 @@ export function quizVocalComponent(gen: any) {
       this.vocalRecording = false;
     },
 
+    isCurrentAnswered(this: any): boolean {
+      return this.storedFeedback[this.currentIndex()] !== undefined;
+    },
+
     async submitVocalAnswer(this: any, blob: Blob) {
+      if (this.isReviewing()) return;
       const pid = this.currentProjectId;
       this.feedback = { loading: true, correct: false };
       try {
@@ -82,6 +88,7 @@ export function quizVocalComponent(gen: any) {
         if (res.ok) {
           const result = await res.json();
           this.feedback = { correct: result.correct, ...result };
+          this.storedFeedback[this.currentIndex()] = this.feedback;
           if (result.correct) this.score++;
         } else {
           this.feedback = {
@@ -108,8 +115,37 @@ export function quizVocalComponent(gen: any) {
         this.finished = true;
         this.onFinish?.();
       } else {
-        this.$nextTick(() => this.playQuestion());
+        if (this.currentQ > this.highWaterMark) {
+          this.highWaterMark = this.currentQ;
+        }
+        this.onNextReady?.();
       }
+    },
+
+    prevQuestion(this: any) {
+      if (this.currentQ <= 0) return;
+      this.stopQuestion();
+      this.feedback = null;
+      this.currentQ--;
+      this.onPrevReady?.();
+    },
+
+    onNextReady(this: any) {
+      this.restoreOrPlay();
+    },
+
+    onPrevReady(this: any) {
+      this.restoreOrPlay();
+    },
+
+    restoreOrPlay(this: any) {
+      const idx = this.currentIndex();
+      if (this.storedFeedback[idx]) {
+        this.feedback = this.storedFeedback[idx];
+        return;
+      }
+      this.feedback = null;
+      this.$nextTick(() => this.playQuestion());
     },
 
     onFinish() {

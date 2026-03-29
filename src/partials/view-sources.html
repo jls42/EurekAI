@@ -80,7 +80,6 @@
 
   <!-- Bento Grid 2x2 -->
   <div class="grid grid-cols-2 gap-3 mb-6">
-    <!-- NOSONAR(S5765) — Alpine.js x-text fills label content at runtime -->
     <label
       class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-primary hover:bg-primary-light cursor-pointer transition-all card-lift focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
     >
@@ -91,6 +90,7 @@
         multiple
         accept=".jpg,.jpeg,.png,.pdf"
         class="sr-only"
+        :aria-label="t('sources.photo')"
         @change="handleFiles($event.target.files)"
       />
     </label>
@@ -310,7 +310,7 @@
             <span
               x-show="src.moderation?.status === 'unsafe'"
               class="shrink-0"
-              :title="t('moderation.unsafe')"
+              :title="t('moderation.unsafe') + (flaggedCategoryLabels(src) ? ' — ' + flaggedCategoryLabels(src) : '')"
             >
               <i data-lucide="shield-alert" class="w-4 h-4 text-danger"></i>
             </span>

@@ -60,17 +60,7 @@
             <!-- Active question (step-by-step) -->
             <template x-if="!finished">
               <div>
-                <!-- Progress header -->
-                <div class="flex items-center gap-2 mb-2">
-                  <span
-                    class="text-body-sm font-semibold text-gen-quiz"
-                    x-text="t('step.questionOf', { current: currentQ + 1, total: total() })"
-                  ></span>
-                  <span
-                    class="text-sm bg-gen-quiz/10 text-gen-quiz px-2.5 py-1 rounded-badge font-semibold"
-                    x-text="t('quiz.score', { score: score })"
-                  ></span>
-                </div>
+                {{> step-progress-nav colorClass="gen-quiz"}}
                 <!-- Progress bar -->
                 <div class="h-2 rounded-full bg-gray-200 mb-4">
                   <div
@@ -141,7 +131,7 @@
                       </template>
                     </div>
                   </div>
-                  <div class="text-center">
+                  <div x-show="!isReviewing()" class="text-center">
                     <button
                       @click="nextQuestion()"
                       class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"

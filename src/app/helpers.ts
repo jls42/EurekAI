@@ -324,5 +324,22 @@ export function createHelpers() {
       gen._generatingVoice = gen._generatingVoice || false;
       if (gen.type === 'podcast') gen._scriptOpen = false;
     },
+
+    flaggedCategories(src: any): string[] {
+      if (!src?.moderation?.categories) return [];
+      return Object.entries(src.moderation.categories)
+        .filter(([, flagged]) => flagged)
+        .map(([cat]) => cat);
+    },
+
+    flaggedCategoryLabels(this: any, src: any): string {
+      return this.flaggedCategories(src)
+        .map((cat: string) => this.t(`moderation.cat.${cat}`))
+        .join(', ');
+    },
+
+    defaultModerationCategories(this: any, ageGroup: string): string[] {
+      return [...(this.moderationDefaults?.[ageGroup] || [])];
+    },
   };
 }

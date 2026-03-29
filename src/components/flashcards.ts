@@ -14,14 +14,35 @@ export function flashcardsComponent(gen: any) {
       this.flipped = true;
     },
 
+    isCurrentAnswered(this: any): boolean {
+      return this.currentIndex() in this.results;
+    },
+
     rate(this: any, correct: boolean) {
+      if (this.isReviewing()) return;
       this.results[this.currentIndex()] = correct;
       if (correct) this.score++;
       this.feedback = { correct };
+      setTimeout(() => this.nextQuestion(), 600);
     },
 
     onNextReady(this: any) {
-      this.flipped = false;
+      this.restoreState();
+    },
+
+    onPrevReady(this: any) {
+      this.restoreState();
+    },
+
+    restoreState(this: any) {
+      const idx = this.currentIndex();
+      if (idx in this.results) {
+        this.flipped = true;
+        this.feedback = { correct: this.results[idx] };
+      } else {
+        this.flipped = false;
+        this.feedback = null;
+      }
     },
 
     onFinish() {

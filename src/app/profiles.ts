@@ -184,10 +184,27 @@ export function createProfiles() {
 
     async saveEditProfile(this: any) {
       if (!this.editingProfile) return;
-      const { id, name, age, avatar, locale, useModeration, chatEnabled, _verifiedPin } =
-        this.editingProfile;
+      const {
+        id,
+        name,
+        age,
+        avatar,
+        locale,
+        useModeration,
+        moderationCategories,
+        chatEnabled,
+        _verifiedPin,
+      } = this.editingProfile;
       if (!name?.trim() || !age || age < 4 || age > 120) return;
-      const updates: any = { name: name.trim(), age, avatar, locale, useModeration, chatEnabled };
+      const updates: any = {
+        name: name.trim(),
+        age,
+        avatar,
+        locale,
+        useModeration,
+        moderationCategories,
+        chatEnabled,
+      };
       if (_verifiedPin) updates.pin = _verifiedPin;
       await this.updateProfile(id, updates);
       // Apply locale if editing the current profile

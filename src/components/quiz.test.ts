@@ -303,4 +303,56 @@ describe('quizComponent', () => {
       expect(comp.submitAttempt).toHaveBeenCalledOnce();
     });
   });
+
+  describe('isCurrentAnswered()', () => {
+    it('returns false when unanswered', () => {
+      const comp = createQuiz(sampleQuestions);
+      expect(comp.isCurrentAnswered()).toBe(false);
+    });
+
+    it('returns true when answered', () => {
+      const comp = createQuiz(sampleQuestions);
+      comp.answers[0] = 1;
+      expect(comp.isCurrentAnswered()).toBe(true);
+    });
+  });
+
+  describe('selectChoice() reviewing guard', () => {
+    it('does not select when reviewing', () => {
+      const comp = createQuiz(sampleQuestions);
+      comp.highWaterMark = 1;
+      comp.currentQ = 0;
+      comp.selectChoice(2);
+      expect(comp.selectedChoice).toBeNull();
+    });
+  });
+
+  describe('restoreState()', () => {
+    it('restores answered question state', () => {
+      const comp = createQuiz(sampleQuestions);
+      comp.answers[0] = 1;
+      comp.restoreState();
+      expect(comp.selectedChoice).toBe(1);
+      expect(comp.feedback).toEqual({ correct: true });
+    });
+
+    it('resets to unanswered state', () => {
+      const comp = createQuiz(sampleQuestions);
+      comp.selectedChoice = 2;
+      comp.feedback = { correct: false };
+      comp.restoreState();
+      expect(comp.selectedChoice).toBeNull();
+      expect(comp.feedback).toBeNull();
+    });
+  });
+
+  describe('onPrevReady()', () => {
+    it('restores state for answered question', () => {
+      const comp = createQuiz(sampleQuestions);
+      comp.answers[0] = 0;
+      comp.onPrevReady();
+      expect(comp.selectedChoice).toBe(0);
+      expect(comp.feedback).toEqual({ correct: false });
+    });
+  });
 });

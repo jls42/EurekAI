@@ -275,4 +275,73 @@ describe('fillBlankComponent', () => {
       expect(comp.submitFullAttempt).toHaveBeenCalledOnce();
     });
   });
+
+  describe('isCurrentAnswered()', () => {
+    it('returns false when unanswered', () => {
+      const comp = createFillBlank(sampleExercises);
+      expect(comp.isCurrentAnswered()).toBe(false);
+    });
+
+    it('returns true when answered', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.results[0] = true;
+      expect(comp.isCurrentAnswered()).toBe(true);
+    });
+  });
+
+  describe('checkAnswer() reviewing guard', () => {
+    it('does not check when reviewing', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.highWaterMark = 1;
+      comp.currentQ = 0;
+      comp.answer = 'test';
+      comp.checkAnswer();
+      expect(comp.feedback).toBeNull();
+    });
+  });
+
+  describe('handleKey() reviewing guard', () => {
+    it('ignores Enter when reviewing', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.highWaterMark = 1;
+      comp.currentQ = 0;
+      comp.answer = 'test';
+      comp.handleKey({ key: 'Enter' });
+      expect(comp.feedback).toBeNull();
+    });
+  });
+
+  describe('restoreState()', () => {
+    it('restores answered exercise state', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.answers[0] = 'ciel';
+      comp.results[0] = true;
+      comp.restoreState();
+      expect(comp.answer).toBe('ciel');
+      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel' });
+      expect(comp.showHint).toBe(false);
+    });
+
+    it('resets to unanswered state', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.answer = 'old';
+      comp.feedback = { correct: false };
+      comp.$nextTick = (cb: () => void) => cb();
+      comp.$refs = { blankInput: { focus: () => {} } };
+      comp.restoreState();
+      expect(comp.answer).toBe('');
+      expect(comp.feedback).toBeNull();
+    });
+  });
+
+  describe('onPrevReady()', () => {
+    it('restores answered state', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.answers[0] = 'ciel';
+      comp.results[0] = true;
+      comp.onPrevReady();
+      expect(comp.answer).toBe('ciel');
+      expect(comp.feedback?.correct).toBe(true);
+    });
+  });
 });

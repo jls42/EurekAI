@@ -77,16 +77,7 @@
         >
           <template x-if="!finished">
             <div>
-              <div class="flex items-center gap-2 mb-3">
-                <span
-                  class="text-body-sm font-semibold text-gen-quizvocal"
-                  x-text="t('quiz.questionOf', { current: currentQ + 1, total: total() })"
-                ></span>
-                <span
-                  class="text-sm bg-gen-quizvocal/10 text-gen-quizvocal px-2.5 py-1 rounded-badge font-semibold"
-                  x-text="t('quiz.score', { score: score })"
-                ></span>
-              </div>
+              {{> step-progress-nav colorClass="gen-quizvocal"}}
               <!-- Progress bar -->
               <div class="h-2 rounded-full bg-gray-200 mb-4">
                 <div
@@ -123,7 +114,7 @@
                   x-text="t('quiz.listening')"
                 ></span>
               </div>
-              <template x-if="!feedback">
+              <template x-if="!feedback && !isCurrentAnswered()">
                 <button
                   @click="vocalRecording ? stopVocalRecording() : startVocalRecording()"
                   class="w-full min-h-[80px] rounded-card font-bold text-lg flex items-center justify-center gap-3 btn-press focus-ring transition-colors"
@@ -159,6 +150,7 @@
                       x-text="t('quiz.youSaid', { text: feedback.transcription })"
                     ></p>
                     <button
+                      x-show="!isReviewing()"
                       @click="nextQuestion()"
                       class="mt-3 bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
                       x-text="t('quiz.nextQuestion')"

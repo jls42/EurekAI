@@ -937,3 +937,68 @@ describe('activeGenerations', () => {
     expect(result.map((r: any) => r.key)).toEqual(['voice', 'websearch']);
   });
 });
+
+// --- Moderation helpers ---
+
+describe('flaggedCategories', () => {
+  it('returns empty array when no moderation', () => {
+    expect(helpers.flaggedCategories({})).toEqual([]);
+    expect(helpers.flaggedCategories(null)).toEqual([]);
+    expect(helpers.flaggedCategories({ moderation: {} })).toEqual([]);
+  });
+
+  it('returns flagged category keys', () => {
+    const src = {
+      moderation: {
+        status: 'unsafe',
+        categories: { sexual: true, violence_and_threats: false, selfharm: true },
+      },
+    };
+    expect(helpers.flaggedCategories(src)).toEqual(['sexual', 'selfharm']);
+  });
+
+  it('returns empty array when all categories are false', () => {
+    const src = { moderation: { categories: { sexual: false, pii: false } } };
+    expect(helpers.flaggedCategories(src)).toEqual([]);
+  });
+});
+
+describe('flaggedCategoryLabels', () => {
+  it('translates and joins flagged categories', () => {
+    const ctx = { t: (key: string) => key, ...helpers };
+    const src = {
+      moderation: { categories: { sexual: true, selfharm: true } },
+    };
+    const result = callWith<string>(helpers.flaggedCategoryLabels, ctx, src);
+    expect(result).toBe('moderation.cat.sexual, moderation.cat.selfharm');
+  });
+
+  it('returns empty string when no flagged categories', () => {
+    const ctx = { t: (key: string) => key, ...helpers };
+    const result = callWith<string>(helpers.flaggedCategoryLabels, ctx, {});
+    expect(result).toBe('');
+  });
+});
+
+describe('defaultModerationCategories', () => {
+  it('returns copy of defaults for known age group', () => {
+    const ctx = { moderationDefaults: { enfant: ['sexual', 'selfharm'] }, ...helpers };
+    const result = callWith<string[]>(helpers.defaultModerationCategories, ctx, 'enfant');
+    expect(result).toEqual(['sexual', 'selfharm']);
+    // Verify it's a copy
+    result.push('test');
+    expect(ctx.moderationDefaults.enfant).toHaveLength(2);
+  });
+
+  it('returns empty array for unknown age group', () => {
+    const ctx = { moderationDefaults: {}, ...helpers };
+    const result = callWith<string[]>(helpers.defaultModerationCategories, ctx, 'unknown');
+    expect(result).toEqual([]);
+  });
+
+  it('returns empty array when moderationDefaults is undefined', () => {
+    const ctx = { moderationDefaults: undefined, ...helpers };
+    const result = callWith<string[]>(helpers.defaultModerationCategories, ctx, 'enfant');
+    expect(result).toEqual([]);
+  });
+});

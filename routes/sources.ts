@@ -48,7 +48,7 @@ function getModerationCategories(
   if (!profileId) return null;
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
-  return MODERATION_CATEGORIES[profile.ageGroup] || null;
+  return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
 }
 
 function triggerModeration(
