@@ -11,8 +11,20 @@ export function parseWebInput(input: string): { urls: string[]; searchQuery: str
 
 const MIN_CONTENT_LENGTH = 200;
 
-/** Fetch a URL and extract its main text content using Readability. */
-export async function fetchPageContent(url: string): Promise<string> {
+export type ScrapeMode = 'auto' | 'readability' | 'lightpanda';
+export type ScrapeEngine = 'readability' | 'lightpanda';
+
+/** Fetch a URL and extract its main text content. */
+export async function fetchPageContent(
+  url: string,
+  mode: ScrapeMode = 'auto',
+): Promise<{ text: string; engine: ScrapeEngine }> {
+  if (mode === 'lightpanda') {
+    const text = await fetchWithLightpanda(url);
+    return { text, engine: 'lightpanda' };
+  }
+
+  // Readability path (mode 'readability' or 'auto')
   const res = await fetch(url, {
     headers: {
       'User-Agent':
@@ -23,19 +35,22 @@ export async function fetchPageContent(url: string): Promise<string> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
 
-  // Try Readability first
   const { document } = parseHTML(html);
   const reader = new Readability(document);
   const article = reader.parse();
   const text = article?.textContent?.trim() || '';
-  if (text.length >= MIN_CONTENT_LENGTH) return text;
 
-  // Fallback: Lightpanda headless browser for JS-rendered pages
+  if (mode === 'readability' || text.length >= MIN_CONTENT_LENGTH) {
+    if (text.length > 0) return { text, engine: 'readability' };
+    throw new Error('Readability could not extract content');
+  }
+
+  // Auto mode: fallback to Lightpanda if content too short
   try {
-    return await fetchWithLightpanda(url);
+    const lpText = await fetchWithLightpanda(url);
+    return { text: lpText, engine: 'lightpanda' };
   } catch {
-    // If Lightpanda fails too, return whatever Readability got (or throw)
-    if (text.length > 0) return text;
+    if (text.length > 0) return { text, engine: 'readability' };
     throw new Error('Could not extract content from page');
   }
 }

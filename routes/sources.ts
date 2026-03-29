@@ -279,6 +279,7 @@ export function sourceRoutes(
       const lang = req.body.lang || 'fr';
       const ageGroup = req.body.ageGroup || 'enfant';
       const { urls, searchQuery } = parseWebInput(query.trim());
+      const scrapeMode = req.body.scrapeMode || 'auto';
       const sources: Source[] = [];
       const now = new Date().toISOString();
 
@@ -286,19 +287,20 @@ export function sourceRoutes(
       for (const url of urls) {
         try {
           const stop = startTimer();
-          const text = await fetchPageContent(url);
+          const result = await fetchPageContent(url, scrapeMode);
           const elapsed = stop();
           const source: Source = {
             id: randomUUID(),
             filename: url.slice(0, 80),
-            markdown: text,
+            markdown: result.text,
             uploadedAt: now,
             sourceType: 'websearch',
+            scrapeEngine: result.engine,
             moderation: modCats ? pendingModeration() : undefined,
           };
           store.addSource(pid, source);
           sources.push(source);
-          console.log(`  URL scraped: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+          console.log(`  URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
         } catch (scrapeErr) {
           // Fallback: use Mistral web_search for this URL
           console.log(`  URL scrape failed for "${url}", falling back to web search`);
@@ -310,11 +312,12 @@ export function sourceRoutes(
               markdown: text,
               uploadedAt: now,
               sourceType: 'websearch',
+              scrapeEngine: 'mistral',
               moderation: modCats ? pendingModeration() : undefined,
             };
             store.addSource(pid, source);
             sources.push(source);
-            console.log(`  URL fallback OK: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+            console.log(`  URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
           } catch (fallbackErr) {
             console.error(`  URL failed completely: "${url}"`, fallbackErr);
           }

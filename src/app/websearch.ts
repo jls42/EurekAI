@@ -8,7 +8,7 @@ export function createWebsearch() {
         const res = await fetch(this.apiBase() + '/sources/websearch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query, lang: this.locale, ageGroup: this.currentProfile?.ageGroup || 'enfant' }),
+          body: JSON.stringify({ query, lang: this.locale, ageGroup: this.currentProfile?.ageGroup || 'enfant', scrapeMode: this.scrapeMode }),
         });
         if (!res.ok) {
           const err = await res.json();

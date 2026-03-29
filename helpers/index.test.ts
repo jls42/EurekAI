@@ -141,9 +141,10 @@ describe('fetchPageContent', () => {
       'fetch',
       vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
     );
-    const text = await fetchPageContent('https://example.com');
-    expect(text).toContain('Content paragraph');
-    expect(text.length).toBeGreaterThan(200);
+    const result = await fetchPageContent('https://example.com');
+    expect(result.text).toContain('Content paragraph');
+    expect(result.text.length).toBeGreaterThan(200);
+    expect(result.engine).toBe('readability');
     vi.unstubAllGlobals();
   });
 
@@ -153,6 +154,28 @@ describe('fetchPageContent', () => {
       vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve('') }),
     );
     await expect(fetchPageContent('https://example.com/404')).rejects.toThrow('HTTP 404');
+    vi.unstubAllGlobals();
+  });
+
+  it('returns engine readability when mode is readability', async () => {
+    const html = `<html><body><article><p>${'Long content. '.repeat(20)}</p></article></body></html>`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
+    );
+    const result = await fetchPageContent('https://example.com', 'readability');
+    expect(result.engine).toBe('readability');
+    vi.unstubAllGlobals();
+  });
+
+  it('returns engine readability in auto mode with sufficient content', async () => {
+    const html = `<html><body><article><p>${'Enough content here. '.repeat(15)}</p></article></body></html>`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
+    );
+    const result = await fetchPageContent('https://example.com', 'auto');
+    expect(result.engine).toBe('readability');
     vi.unstubAllGlobals();
   });
 });
