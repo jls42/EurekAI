@@ -28,6 +28,14 @@ vi.mock('../generators/consigne.js', () => ({
   detectConsigne: vi.fn().mockResolvedValue({ found: true, text: 'Reviser les dates', keyTopics: ['dates'] }),
 }));
 
+vi.mock('../helpers/index.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../helpers/index.js')>();
+  return {
+    ...actual,
+    fetchPageContent: vi.fn().mockResolvedValue({ text: 'scraped page content', engine: 'readability' }),
+  };
+});
+
 vi.mock('./generate.js', () => ({
   getMarkdown: vi.fn(() => '# Combined markdown'),
 }));
@@ -37,6 +45,7 @@ import { moderateContent } from '../generators/moderation.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
+import { fetchPageContent } from '../helpers/index.js';
 
 // --- Helpers ---
 
@@ -572,7 +581,10 @@ describe('POST /:pid/sources/websearch', () => {
 
     expect(webSearchEnrich).toHaveBeenCalledWith(client, 'Revolution francaise', 'fr', 'enfant');
     expect(res.json).toHaveBeenCalledTimes(1);
-    const source = res.json.mock.calls[0][0];
+    const sources = res.json.mock.calls[0][0];
+    expect(Array.isArray(sources)).toBe(true);
+    expect(sources).toHaveLength(1);
+    const source = sources[0];
     expect(source.id).toBeTruthy();
     expect(source.filename).toBe('Recherche web: Revolution francaise');
     expect(source.markdown).toBe('search result text');
@@ -595,8 +607,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    const source = res.json.mock.calls[0][0];
-    expect(source.filename).toBe('Web search: French Revolution');
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].filename).toBe('Web search: French Revolution');
   });
 
   it('utilise les valeurs par defaut pour lang et ageGroup', async () => {
@@ -650,8 +662,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     expect(moderateContent).toHaveBeenCalledTimes(1);
     expect(webSearchEnrich).toHaveBeenCalledTimes(1);
-    const source = res.json.mock.calls[0][0];
-    expect(source.moderation).toEqual({ status: 'pending', categories: {} });
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].moderation).toEqual({ status: 'pending', categories: {} });
   });
 
   it('tronque le nom de la source a 50 caracteres', async () => {
@@ -666,8 +678,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    const source = res.json.mock.calls[0][0];
-    expect(source.filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
   });
 
   it('retourne 500 quand webSearchEnrich echoue', async () => {
@@ -685,6 +697,114 @@ describe('POST /:pid/sources/websearch', () => {
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({ error: 'Recherche web echouee: Error: network error' });
+  });
+
+  it('scrape une URL directement via fetchPageContent', async () => {
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com/page' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(fetchPageContent).toHaveBeenCalledWith('https://example.com/page', 'auto');
+    expect(webSearchEnrich).not.toHaveBeenCalled();
+    const sources = res.json.mock.calls[0][0];
+    expect(sources).toHaveLength(1);
+    expect(sources[0].filename).toBe('https://example.com/page');
+    expect(sources[0].markdown).toBe('scraped page content');
+    expect(sources[0].scrapeEngine).toBe('readability');
+  });
+
+  it('passe le scrapeMode au fetchPageContent', async () => {
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com', scrapeMode: 'lightpanda' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(fetchPageContent).toHaveBeenCalledWith('https://example.com', 'lightpanda');
+  });
+
+  it('gere un mix URL + mots-cles', async () => {
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com les energies' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(fetchPageContent).toHaveBeenCalledTimes(1);
+    expect(webSearchEnrich).toHaveBeenCalledTimes(1);
+    const sources = res.json.mock.calls[0][0];
+    expect(sources).toHaveLength(2);
+    expect(sources[0].scrapeEngine).toBe('readability');
+    expect(sources[1].filename).toContain('Recherche web');
+  });
+
+  it('fallback Mistral quand le scrape echoue', async () => {
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com/broken' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(webSearchEnrich).toHaveBeenCalledTimes(1);
+    const sources = res.json.mock.calls[0][0];
+    expect(sources).toHaveLength(1);
+    expect(sources[0].scrapeEngine).toBe('mistral');
+  });
+
+  it('retourne 500 quand scrape et fallback echouent tous les deux', async () => {
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
+    vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('mistral failed'));
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com/dead' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Aucune source extraite' });
+  });
+
+  it('gere plusieurs URLs avec succes partiel', async () => {
+    vi.mocked(fetchPageContent)
+      .mockResolvedValueOnce({ text: 'page 1 content', engine: 'readability' })
+      .mockRejectedValueOnce(new Error('scrape failed'));
+    vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('fallback failed'));
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://a.com https://b.com' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const sources = res.json.mock.calls[0][0];
+    expect(sources).toHaveLength(1);
+    expect(sources[0].markdown).toBe('page 1 content');
   });
 });
 
@@ -924,7 +1044,7 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'OCR echoue pour bad.jpg: Error: OCR failed' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Echec pour bad.jpg: Error: OCR failed' });
   });
 
   it('ajoute la moderation pending quand le profil a la moderation activee', async () => {

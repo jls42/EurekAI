@@ -82,15 +82,17 @@
   <div class="grid grid-cols-2 gap-3 mb-6">
     <label
       class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-primary hover:bg-primary-light cursor-pointer transition-all card-lift focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2"
+      :title="t('sources.importHint')"
     >
-      <i data-lucide="camera" class="w-8 h-8 text-primary"></i>
-      <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.photo')"></span>
+      <i data-lucide="upload" class="w-8 h-8 text-primary"></i>
+      <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.import')"></span>
+      <span class="text-[0.65rem] text-text-secondary" x-text="t('sources.importFormats')"></span>
       <input
         type="file"
         multiple
-        accept=".jpg,.jpeg,.png,.pdf"
+        accept=".jpg,.jpeg,.png,.pdf,.txt,.md"
         class="sr-only"
-        :aria-label="t('sources.photo')"
+        :aria-label="t('sources.import')"
         @change="handleFiles($event.target.files)"
       />
     </label>
@@ -158,7 +160,7 @@
 
   <!-- Web search input -->
   <div x-show="showWebInput" x-transition class="mb-4">
-    <div class="bg-surface rounded-card shadow-card p-4">
+    <div class="bg-surface rounded-card shadow-card p-4 space-y-2">
       <div class="flex gap-2">
         <input
           x-model="webQuery"
@@ -173,6 +175,37 @@
         >
           <i data-lucide="search" class="w-4 h-4"></i>
           <span x-text="loading.websearch ? t('sources.searching') : t('sources.search')"></span>
+        </button>
+      </div>
+      <!-- Scrape engine selector -->
+      <div class="flex items-center gap-1 text-xs">
+        <span class="text-text-secondary mr-1" x-text="t('sources.scrapeEngine')"></span>
+        <button
+          @click="scrapeMode = 'auto'"
+          :class="scrapeMode === 'auto' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
+          :title="t('sources.scrapeAutoTip')"
+        >
+          <i data-lucide="wand" class="w-3 h-3"></i>
+          Auto
+        </button>
+        <button
+          @click="scrapeMode = 'readability'"
+          :class="scrapeMode === 'readability' ? 'bg-success text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
+          :title="t('sources.scrapeReadabilityTip')"
+        >
+          <i data-lucide="file-text" class="w-3 h-3"></i>
+          R
+        </button>
+        <button
+          @click="scrapeMode = 'lightpanda'"
+          :class="scrapeMode === 'lightpanda' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
+          :title="t('sources.scrapeLightpandaTip')"
+        >
+          <i data-lucide="globe" class="w-3 h-3"></i>
+          LP
         </button>
       </div>
     </div>
@@ -300,6 +333,22 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-medium text-body-sm truncate" x-text="src.filename"></span>
+            <!-- Scrape engine badge -->
+            <span
+              x-show="src.scrapeEngine === 'readability'"
+              class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success-light text-success-dark"
+              title="Readability"
+            >R</span>
+            <span
+              x-show="src.scrapeEngine === 'lightpanda'"
+              class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-primary-light text-primary"
+              title="Lightpanda"
+            >LP</span>
+            <span
+              x-show="src.scrapeEngine === 'mistral'"
+              class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700"
+              title="Mistral web_search"
+            >AI</span>
             <span
               x-show="src.moderation?.status === 'safe'"
               class="shrink-0"

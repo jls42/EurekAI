@@ -11,10 +11,16 @@
     </button>
 
     <div class="flex items-center gap-1.5 sm:gap-2.5 flex-1 min-w-0">
-      <img src="/logo.webp" alt="EurekAI" class="w-8 h-8 lg:w-14 lg:h-14 shrink-0" />
-      <h1 class="font-heading text-base sm:text-xl lg:text-2xl font-bold truncate title-gradient">
-        EurekAI
-      </h1>
+      <button
+        @click="openProfilePicker()"
+        class="flex items-center gap-1.5 sm:gap-2.5 focus-ring rounded-button btn-press hover:opacity-80 transition-opacity"
+        :title="t('profile.switchProfile')"
+      >
+        <img src="/logo.webp" alt="EurekAI" class="w-8 h-8 lg:w-14 lg:h-14 shrink-0" />
+        <h1 class="font-heading text-base sm:text-xl lg:text-2xl font-bold truncate title-gradient">
+          EurekAI
+        </h1>
+      </button>
       <span
         x-show="currentProject"
         class="hidden sm:inline text-sm opacity-80 truncate max-w-[150px]"
@@ -27,9 +33,9 @@
       <!-- Profile indicator -->
       <button
         x-show="currentProfile"
-        @click="openProfilePicker()"
+        @click="startEditProfile(currentProfile.id)"
         class="shrink-0 min-h-touch flex items-center gap-1.5 sm:gap-2 px-1.5 sm:px-2 rounded-button focus-ring btn-press hover:bg-gray-100 transition-colors"
-        :title="t('profile.switchProfile')"
+        :title="t('profile.editProfile')"
       >
         <span
           class="w-8 h-8 sm:w-9 sm:h-9 rounded-full inline-block shrink-0"

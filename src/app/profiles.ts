@@ -155,31 +155,39 @@ export function createProfiles() {
     startEditProfile(this: any, id: string) {
       const profile = this.profiles.find((p: any) => p.id === id);
       if (!profile) return;
-      if (profile.hasPin) {
-        this.requirePin(async (pin: string) => {
-          // Verify PIN via a lightweight PUT
-          try {
-            const res = await fetch('/api/profiles/' + id, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ pin }),
-            });
-            if (!res.ok) {
-              this.showToast(this.t('profile.pinWrong'), 'error');
-              return;
-            }
-          } catch (e: any) {
-            console.error('Failed to verify PIN:', e);
-            this.showToast(this.t('toast.error', { error: e.message }), 'error');
-            return;
-          }
-          this.editingProfile = { ...profile, locale: profile.locale || 'fr', _verifiedPin: pin };
-          this.showProfileForm = false;
-        });
+      this.editingProfile = { ...profile, locale: profile.locale || 'fr' };
+      this.showProfilePicker = true;
+      this.showProfileForm = false;
+    },
+
+    /** Verify PIN before allowing parental settings changes. */
+    requireParentalAccess(this: any, callback: () => void) {
+      if (!this.editingProfile?.hasPin) {
+        callback();
         return;
       }
-      this.editingProfile = { ...profile, locale: profile.locale || 'fr' };
-      this.showProfileForm = false;
+      if (this.editingProfile._verifiedPin) {
+        callback();
+        return;
+      }
+      this.requirePin(async (pin: string) => {
+        try {
+          const res = await fetch('/api/profiles/' + this.editingProfile.id, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ pin }),
+          });
+          if (!res.ok) {
+            this.showToast(this.t('profile.pinWrong'), 'error');
+            return;
+          }
+        } catch (e: any) {
+          this.showToast(this.t('toast.error', { error: e.message }), 'error');
+          return;
+        }
+        this.editingProfile._verifiedPin = pin;
+        callback();
+      });
     },
 
     async saveEditProfile(this: any) {

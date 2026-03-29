@@ -33,6 +33,7 @@ export interface Source {
   uploadedAt: string;
   moderation?: ModerationResult;
   sourceType?: 'ocr' | 'text' | 'voice' | 'websearch';
+  scrapeEngine?: 'readability' | 'lightpanda' | 'mistral';
   filePath?: string;
 }
 

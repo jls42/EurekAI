@@ -64,6 +64,7 @@ export function createState() {
     viewSourceCompareVertical: true,
     textInput: '',
     webQuery: '',
+    scrapeMode: 'auto' as 'auto' | 'readability' | 'lightpanda',
     showTextInput: false,
     showWebInput: false,
 
