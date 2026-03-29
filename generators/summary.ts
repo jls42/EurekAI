@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
+import { diversityParams } from '../helpers/diversity.js';
 import { summarySystem, summaryUser } from '../prompts.js';
 import type { StudyFiche, AgeGroup } from '../types.js';
 
@@ -72,16 +73,18 @@ export async function generateSummary(
   hasConsigne = false,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
+  exclusions?: string,
 ): Promise<StudyFiche> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: summarySystem(ageGroup) },
-    { role: 'user', content: summaryUser(markdown, hasConsigne, lang) },
+    { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions) },
   ];
 
   const response = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('summary'),
   });
 
   const raw = getContent(response);
@@ -107,6 +110,7 @@ export async function generateSummary(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('summary'),
   });
 
   const retryRaw = getContent(retry);

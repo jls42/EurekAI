@@ -75,15 +75,17 @@ Reponds UNIQUEMENT en JSON valide.`;
 // Legacy export
 export const SUMMARY_SYSTEM = summarySystem('enfant');
 
-export function summaryUser(markdown: string, hasConsigne = false, lang = 'fr'): string {
+export function summaryUser(markdown: string, hasConsigne = false, lang = 'fr', exclusions?: string): string {
   const consigneBlock = hasConsigne
     ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
     : `Aucune consigne specifique n'est fournie. Fais une synthese complete de TOUTES les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec cette seule fiche.`;
 
-  return `Cree une fiche de revision COMPLETE. Les sources sont numerotees (# Source 1, # Source 2, etc.).
+  let prompt = `Cree une fiche de revision COMPLETE. Les sources sont numerotees (# Source 1, # Source 2, etc.).
 ${consigneBlock}
 
 ${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }
 
 // ── Flashcards ───────────────────────────────────────────────────────
@@ -93,14 +95,17 @@ export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): stri
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 Reponses courtes (1-2 phrases). ${ageInstruction(ageGroup)} Questions variees.
 ${sourceRefsInstruction('flashcard')}
+Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
 // Legacy export
 export const FLASHCARDS_SYSTEM = flashcardsSystem('enfant');
 
-export function flashcardsUser(markdown: string, count = 5, lang = 'fr'): string {
-  return `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+export function flashcardsUser(markdown: string, count = 5, lang = 'fr', exclusions?: string): string {
+  let prompt = `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }
 
 // ── Quiz ─────────────────────────────────────────────────────────────
@@ -110,6 +115,7 @@ export function quizSystem(ageGroup: AgeGroup = 'enfant'): string {
 ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
@@ -133,12 +139,13 @@ export function quizVocalSystem(ageGroup: AgeGroup = 'enfant'): string {
 ${ageInstruction(ageGroup)}
 Tu generes des QCM qui seront lus a voix haute : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${VOCAL_REWRITE}
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
-export function quizVocalUser(markdown: string, count = 15, lang = 'fr'): string {
-  return `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+export function quizVocalUser(markdown: string, count = 15, lang = 'fr', exclusions?: string): string {
+  let prompt = `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
 Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
 
@@ -148,10 +155,12 @@ Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
 Contenu :\n\n${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }
 
-export function quizUser(markdown: string, count = 15, lang = 'fr'): string {
-  return `Genere exactement ${count} questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+export function quizUser(markdown: string, count = 15, lang = 'fr', exclusions?: string): string {
+  let prompt = `Genere exactement ${count} questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
 Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
 
@@ -159,6 +168,8 @@ Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
 Contenu :\n\n${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }
 
 export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
@@ -195,14 +206,17 @@ Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "t
 Commence par une accroche, termine par un resume fun.
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
+Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle COMPLETEMENT DIFFERENT : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
 // Legacy export
 export const PODCAST_SYSTEM = podcastSystem('enfant');
 
-export function podcastUser(markdown: string, lang = 'fr'): string {
-  return `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+export function podcastUser(markdown: string, lang = 'fr', exclusions?: string): string {
+  let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }
 
 // ── Image ───────────────────────────────────────────────────────────
@@ -277,6 +291,7 @@ export function websearchInput(query: string, lang = 'fr'): string {
 export function fillBlankSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie specialise dans les exercices a trous.
 ${ageInstruction(ageGroup)}
+Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices COMPLETEMENT DIFFERENTS : nouveaux mots cles, nouvelles phrases, nouveaux angles.
 Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
 L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
 
@@ -295,11 +310,13 @@ ${sourceRefsInstruction('exercice')}
 Reponds UNIQUEMENT en JSON valide.`;
 }
 
-export function fillBlankUser(markdown: string, count: number, lang = 'fr'): string {
-  return `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
+export function fillBlankUser(markdown: string, count: number, lang = 'fr', exclusions?: string): string {
+  let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
 
 Format JSON :
 {"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
 
 Contenu :\n\n${markdown}${langInstruction(lang)}`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt;
 }

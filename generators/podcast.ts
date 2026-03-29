@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { diversityParams } from '../helpers/diversity.js';
 import { podcastSystem, podcastUser } from '../prompts.js';
 import type { PodcastLine, AgeGroup } from '../types.js';
 
@@ -36,16 +37,18 @@ export async function generatePodcastScript(
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
+  exclusions?: string,
 ): Promise<PodcastResult> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: podcastSystem(ageGroup) },
-    { role: 'user', content: podcastUser(markdown, lang) },
+    { role: 'user', content: podcastUser(markdown, lang, exclusions) },
   ];
 
   const response = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('podcast'),
   });
 
   const raw = getContent(response);
@@ -70,6 +73,7 @@ export async function generatePodcastScript(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('podcast'),
   });
   const retryResult = parsePodcastResponse(getContent(retry));
 

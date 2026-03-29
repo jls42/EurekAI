@@ -344,6 +344,73 @@ describe('POST /:pid/chat', () => {
     );
   });
 
+  it('propage la consigne dans les tool calls quand le projet en a une', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'Voici ta fiche !',
+      toolCalls: ['generate_summary'],
+    });
+
+    const project = store.createProject('Test');
+    addSource(project.meta.id);
+    store.setConsigne(project.meta.id, {
+      found: true,
+      text: 'Reviser chapitre 3',
+      keyTopics: ['energie', 'electricite'],
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { message: 'Fais moi une fiche' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    // Verify consigne was applied to markdown
+    expect(generateSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.stringContaining('CONSIGNE DE REVISION'),
+      expect.anything(),
+      true, // hasConsigne = true
+      'fr',
+      'enfant',
+    );
+  });
+
+  it('ne propage pas la consigne quand le projet n en a pas', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'Voici ta fiche !',
+      toolCalls: ['generate_summary'],
+    });
+
+    const project = store.createProject('Test');
+    addSource(project.meta.id);
+    // No consigne set
+
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { message: 'Fais moi une fiche' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(generateSummary).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.not.stringContaining('CONSIGNE DE REVISION'),
+      expect.anything(),
+      false, // hasConsigne = false
+      'fr',
+      'enfant',
+    );
+  });
+
   it('ignore les tool calls quand il n y a pas de sources', async () => {
     const { chatWithSources } = await import('../generators/chat.js');
     (chatWithSources as any).mockResolvedValueOnce({

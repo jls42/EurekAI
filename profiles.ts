@@ -15,7 +15,7 @@ export function ageToGroup(age: number): AgeGroup {
 // --- Defaults per age group ---
 
 // Categories that block content per age group
-// mistral-moderation-2603 categories: sexual, hate_and_discrimination, violence_and_threats,
+// mistral-moderation-latest categories: sexual, hate_and_discrimination, violence_and_threats,
 // dangerous_and_criminal_content, selfharm, health, financial, law, pii, jailbreaking
 // dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
 export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {

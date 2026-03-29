@@ -1,11 +1,19 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { diversityParams } from '../helpers/diversity.js';
 import { flashcardsSystem, flashcardsUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
 
 function isValidFlashcards(data: Flashcard[]): boolean {
   return (
-    data.length > 0 && data.every((f) => typeof f.question === 'string' && f.question.length > 0)
+    data.length > 0 &&
+    data.every(
+      (f) =>
+        typeof f.question === 'string' &&
+        f.question.length > 0 &&
+        typeof f.answer === 'string' &&
+        f.answer.length > 0,
+    )
   );
 }
 
@@ -16,17 +24,19 @@ export async function generateFlashcards(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
+  exclusions?: string,
 ): Promise<Flashcard[]> {
   const effectiveCount = count ?? 5;
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: flashcardsSystem(ageGroup, effectiveCount) },
-    { role: 'user', content: flashcardsUser(markdown, effectiveCount, lang) },
+    { role: 'user', content: flashcardsUser(markdown, effectiveCount, lang, exclusions) },
   ];
 
   const response = await client.chat.complete({
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('flashcards'),
   });
 
   const raw = getContent(response);
@@ -47,6 +57,7 @@ export async function generateFlashcards(
     model,
     messages,
     responseFormat: { type: 'json_object' },
+    ...diversityParams('flashcards'),
   });
   const retryRaw = getContent(retry);
   const retryData = unwrapJsonArray<Flashcard>(safeParseJson(retryRaw));

@@ -15,7 +15,7 @@ import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore } from './profiles.js';
 
-dotenv.config({ override: true });
+dotenv.config({ override: true, quiet: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -25,7 +25,14 @@ if (!process.env.MISTRAL_API_KEY) {
   process.exit(1);
 }
 
-const client = new Mistral({ apiKey: process.env.MISTRAL_API_KEY });
+const client = new Mistral({
+  apiKey: process.env.MISTRAL_API_KEY,
+  retryConfig: {
+    strategy: 'backoff',
+    backoff: { initialInterval: 500, maxInterval: 10_000, exponent: 1.5, maxElapsedTime: 60_000 },
+    retryConnectionErrors: true,
+  },
+});
 const app = express();
 app.disable('x-powered-by');
 const PORT = 3000;

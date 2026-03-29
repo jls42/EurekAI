@@ -5,7 +5,7 @@ import type { ProjectStore } from '../store.js';
 import type { ChatMessage, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
 import { chatWithSources } from '../generators/chat.js';
-import { getMarkdown } from './generate.js';
+import { getMarkdown, applyConsigne } from './generate.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz } from '../generators/quiz.js';
@@ -83,11 +83,12 @@ interface ToolCallCtx {
   lang: string;
   ageGroup: AgeGroup;
   sourceIds: string[];
+  hasConsigne: boolean;
 }
 
 const CHAT_TOOL_EXECUTORS: Record<string, (ctx: ToolCallCtx) => Promise<Generation>> = {
   summary: async (ctx) => {
-    const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, false, ctx.lang, ctx.ageGroup);
+    const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, ctx.hasConsigne, ctx.lang, ctx.ageGroup);
     return { id: randomUUID(), title: autoTitle('summary', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'summary', data };
   },
   flashcards: async (ctx) => {
@@ -184,11 +185,13 @@ export function chatRoutes(
       let generatedGens: Generation[] = [];
       let failedTools: string[] = [];
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
-        const markdown = getMarkdown(project.sources);
+        const rawMarkdown = getMarkdown(project.sources);
+        const markdown = applyConsigne(rawMarkdown, project.consigne);
+        const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
         const sourceIds = project.sources.map((s) => s.id);
         const toolResult = await processChatToolCalls(
           result.toolCalls,
-          { client, markdown, config, lang, ageGroup, sourceIds },
+          { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
           store,
           pid,
         );

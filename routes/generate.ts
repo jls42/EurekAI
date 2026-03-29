@@ -16,6 +16,7 @@ import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { routeRequest } from '../generators/router.js';
+import { buildExclusionContext } from '../helpers/diversity.js';
 
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
   const selected =
@@ -26,7 +27,7 @@ export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
     .join('\n\n---\n\n');
 }
 
-function applyConsigne(
+export function applyConsigne(
   markdown: string,
   consigne?: { found: boolean; text: string; keyTopics: string[] },
 ): string {
@@ -165,6 +166,7 @@ export function generateRoutes(
       console.log(
         `[summary] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
       );
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
       const data = await generateSummary(
         client,
         ctx.markdown,
@@ -172,6 +174,7 @@ export function generateRoutes(
         ctx.hasConsigne,
         ctx.lang,
         ctx.ageGroup,
+        exclusions,
       );
       console.log(
         `[summary] result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
@@ -190,6 +193,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/flashcards',
     handleGeneration(store, profileStore, async (ctx) => {
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'flashcards');
       const data = await generateFlashcards(
         client,
         ctx.markdown,
@@ -197,6 +201,7 @@ export function generateRoutes(
         ctx.lang,
         ctx.ageGroup,
         ctx.count,
+        exclusions,
       );
       return {
         id: randomUUID(),
@@ -212,6 +217,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/quiz',
     handleGeneration(store, profileStore, async (ctx) => {
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz');
       const data = await generateQuiz(
         client,
         ctx.markdown,
@@ -219,6 +225,7 @@ export function generateRoutes(
         ctx.lang,
         ctx.ageGroup,
         ctx.count,
+        exclusions,
       );
       return {
         id: randomUUID(),
@@ -235,12 +242,14 @@ export function generateRoutes(
     '/:pid/generate/podcast',
     handleGeneration(store, profileStore, async (ctx) => {
       console.log('  Generating podcast script...');
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'podcast');
       const podcastResult = await generatePodcastScript(
         client,
         ctx.markdown,
         ctx.config.models.podcast,
         ctx.lang,
         ctx.ageGroup,
+        exclusions,
       );
       console.log(`  Script OK: ${podcastResult.script.length} lines`);
 
@@ -305,13 +314,15 @@ export function generateRoutes(
     '/:pid/generate/quiz-vocal',
     handleGeneration(store, profileStore, async (ctx) => {
       console.log('  Generating quiz for vocal (TTS-friendly)...');
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz-vocal');
       const data = await generateQuizVocal(
         client,
-        ctx.rawMarkdown,
+        ctx.markdown,
         ctx.config.models.quiz,
         ctx.lang,
         ctx.ageGroup,
         ctx.count,
+        exclusions,
       );
       console.log(`  Quiz OK: ${data.length} questions`);
 
@@ -377,6 +388,7 @@ export function generateRoutes(
       console.log(
         `[fill-blank] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
       );
+      const exclusions = buildExclusionContext(ctx.project.results.generations, 'fill-blank');
       const data = await generateFillBlank(
         client,
         ctx.markdown,
@@ -384,6 +396,7 @@ export function generateRoutes(
         ctx.lang,
         ctx.ageGroup,
         ctx.count,
+        exclusions,
       );
       return {
         id: randomUUID(),
@@ -408,6 +421,7 @@ export function generateRoutes(
     count?: number;
     pid: string;
     store: ProjectStore;
+    generations: Generation[];
   }
 
   function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
@@ -423,23 +437,28 @@ export function generateRoutes(
 
   const AUTO_EXECUTORS: Record<string, (ctx: AutoCtx) => Promise<Generation>> = {
     summary: async (ctx) => {
-      const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, ctx.hasConsigne, ctx.lang, ctx.ageGroup);
+      const excl = buildExclusionContext(ctx.generations, 'summary');
+      const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, ctx.hasConsigne, ctx.lang, ctx.ageGroup, excl);
       return makeGen('summary', data, ctx);
     },
     flashcards: async (ctx) => {
-      const data = await generateFlashcards(ctx.client, ctx.markdown, ctx.config.models.flashcards, ctx.lang, ctx.ageGroup, ctx.count);
+      const excl = buildExclusionContext(ctx.generations, 'flashcards');
+      const data = await generateFlashcards(ctx.client, ctx.markdown, ctx.config.models.flashcards, ctx.lang, ctx.ageGroup, ctx.count, excl);
       return makeGen('flashcards', data, ctx);
     },
     quiz: async (ctx) => {
-      const data = await generateQuiz(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count);
+      const excl = buildExclusionContext(ctx.generations, 'quiz');
+      const data = await generateQuiz(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count, excl);
       return makeGen('quiz', data, ctx);
     },
     'fill-blank': async (ctx) => {
-      const data = await generateFillBlank(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count);
+      const excl = buildExclusionContext(ctx.generations, 'fill-blank');
+      const data = await generateFillBlank(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup, ctx.count, excl);
       return makeGen('fill-blank', data, ctx);
     },
     podcast: async (ctx) => {
-      const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup);
+      const excl = buildExclusionContext(ctx.generations, 'podcast');
+      const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup, excl);
       const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
       const audioFilename = `podcast-${Date.now()}.mp3`;
       const projectDir = ctx.store.getProjectDir(ctx.pid);
@@ -457,10 +476,12 @@ export function generateRoutes(
         res.status(404).json({ error: 'Projet introuvable' });
         return;
       }
+      const lang = req.body.lang || 'fr';
+      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
       const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
       const useConsigneRoute = req.body.useConsigne !== false;
       const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-      const route = await routeRequest(client, markdown);
+      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json(route);
     } catch (e) {
@@ -492,13 +513,13 @@ export function generateRoutes(
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       console.log('  Smart routing: analyzing content...');
-      const route = await routeRequest(client, markdown);
+      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
       console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
       const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
-      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store };
+      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations };
 
       for (const step of route.plan) {
         try {
