@@ -1,10 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   stripJsonMarkdown,
   safeParseJson,
   unwrapJsonArray,
   extractAllText,
   timer,
+  parseWebInput,
+  fetchPageContent,
 } from './index.js';
 
 describe('stripJsonMarkdown', () => {
@@ -82,6 +84,76 @@ describe('extractAllText', () => {
 
   it('gere un array vide', () => {
     expect(extractAllText([])).toBe('');
+  });
+});
+
+describe('parseWebInput', () => {
+  it('extracts URLs from input', () => {
+    const result = parseWebInput('https://example.com');
+    expect(result.urls).toEqual(['https://example.com']);
+    expect(result.searchQuery).toBe('');
+  });
+
+  it('extracts search query without URLs', () => {
+    const result = parseWebInput('les energies renouvelables');
+    expect(result.urls).toEqual([]);
+    expect(result.searchQuery).toBe('les energies renouvelables');
+  });
+
+  it('separates URLs and search query', () => {
+    const result = parseWebInput('https://a.com https://b.com les energies');
+    expect(result.urls).toEqual(['https://a.com', 'https://b.com']);
+    expect(result.searchQuery).toBe('les energies');
+  });
+
+  it('handles multiple URLs without keywords', () => {
+    const result = parseWebInput('https://a.com https://b.com');
+    expect(result.urls).toEqual(['https://a.com', 'https://b.com']);
+    expect(result.searchQuery).toBe('');
+  });
+
+  it('handles http URLs', () => {
+    const result = parseWebInput('http://old-site.org/page');
+    expect(result.urls).toEqual(['http://old-site.org/page']);
+  });
+
+  it('handles empty input', () => {
+    const result = parseWebInput('');
+    expect(result.urls).toEqual([]);
+    expect(result.searchQuery).toBe('');
+  });
+
+  it('handles URL with path and query params', () => {
+    const result = parseWebInput('https://site.com/path?q=test&lang=fr');
+    expect(result.urls).toEqual(['https://site.com/path?q=test&lang=fr']);
+    expect(result.searchQuery).toBe('');
+  });
+});
+
+describe('fetchPageContent', () => {
+  it('extracts text from HTML using Readability', async () => {
+    const html = `<html><head><title>Test</title></head><body>
+      <nav>Menu</nav>
+      <article><h1>Title</h1><p>${'Content paragraph. '.repeat(20)}</p></article>
+      <footer>Footer</footer>
+    </body></html>`;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: true, text: () => Promise.resolve(html) }),
+    );
+    const text = await fetchPageContent('https://example.com');
+    expect(text).toContain('Content paragraph');
+    expect(text.length).toBeGreaterThan(200);
+    vi.unstubAllGlobals();
+  });
+
+  it('throws on HTTP error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 404, text: () => Promise.resolve('') }),
+    );
+    await expect(fetchPageContent('https://example.com/404')).rejects.toThrow('HTTP 404');
+    vi.unstubAllGlobals();
   });
 });
 

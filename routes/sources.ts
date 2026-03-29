@@ -11,6 +11,7 @@ import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
+import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -121,7 +122,7 @@ export function sourceRoutes(
         let markdown: string;
         let elapsed: number;
         if (isText) {
-          const stop = (await import('../helpers/index.js')).timer();
+          const stop = startTimer();
           markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
           elapsed = stop();
           console.log(
@@ -250,7 +251,7 @@ export function sourceRoutes(
     }
   });
 
-  // Web search source
+  // Web search / URL scrape source
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
@@ -277,25 +278,78 @@ export function sourceRoutes(
     try {
       const lang = req.body.lang || 'fr';
       const ageGroup = req.body.ageGroup || 'enfant';
-      const { text, elapsed } = await webSearchEnrich(client, query.trim(), lang, ageGroup);
-      const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
-      const source: Source = {
-        id: randomUUID(),
-        filename: `${webLabel}: ${query.trim().slice(0, 50)}`,
-        markdown: text,
-        uploadedAt: new Date().toISOString(),
-        sourceType: 'websearch',
-        moderation: modCats ? pendingModeration() : undefined,
-      };
-      store.addSource(pid, source);
-      console.log(
-        `  Web search OK: "${query.trim()}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
-      );
+      const { urls, searchQuery } = parseWebInput(query.trim());
+      const sources: Source[] = [];
+      const now = new Date().toISOString();
+
+      // Scrape each URL
+      for (const url of urls) {
+        try {
+          const stop = startTimer();
+          const text = await fetchPageContent(url);
+          const elapsed = stop();
+          const source: Source = {
+            id: randomUUID(),
+            filename: url.slice(0, 80),
+            markdown: text,
+            uploadedAt: now,
+            sourceType: 'websearch',
+            moderation: modCats ? pendingModeration() : undefined,
+          };
+          store.addSource(pid, source);
+          sources.push(source);
+          console.log(`  URL scraped: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+        } catch (scrapeErr) {
+          // Fallback: use Mistral web_search for this URL
+          console.log(`  URL scrape failed for "${url}", falling back to web search`);
+          try {
+            const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
+            const source: Source = {
+              id: randomUUID(),
+              filename: url.slice(0, 80),
+              markdown: text,
+              uploadedAt: now,
+              sourceType: 'websearch',
+              moderation: modCats ? pendingModeration() : undefined,
+            };
+            store.addSource(pid, source);
+            sources.push(source);
+            console.log(`  URL fallback OK: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+          } catch (fallbackErr) {
+            console.error(`  URL failed completely: "${url}"`, fallbackErr);
+          }
+        }
+      }
+
+      // Web search for remaining keywords
+      if (searchQuery) {
+        const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
+        const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
+        const source: Source = {
+          id: randomUUID(),
+          filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
+          markdown: text,
+          uploadedAt: now,
+          sourceType: 'websearch',
+          moderation: modCats ? pendingModeration() : undefined,
+        };
+        store.addSource(pid, source);
+        sources.push(source);
+        console.log(`  Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+      }
+
+      if (sources.length === 0) {
+        res.status(500).json({ error: 'Aucune source extraite' });
+        return;
+      }
+
       triggerConsigneDetection(store, client, pid, lang);
       if (modCats) {
-        triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+        for (const s of sources) {
+          triggerModeration(store, client, pid, s.id, s.markdown, modCats);
+        }
       }
-      res.json(source);
+      res.json(sources);
     } catch (e) {
       console.error('Web search error:', e);
       res.status(500).json({ error: `Recherche web echouee: ${e}` });

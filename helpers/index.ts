@@ -1,3 +1,53 @@
+import { Readability } from '@mozilla/readability';
+import { parseHTML } from 'linkedom';
+
+/** Parse web input: separate URLs from search keywords. */
+export function parseWebInput(input: string): { urls: string[]; searchQuery: string } {
+  const urlPattern = /https?:\/\/[^\s]+/gi;
+  const urls = input.match(urlPattern) || [];
+  const searchQuery = input.replace(urlPattern, '').trim();
+  return { urls, searchQuery };
+}
+
+const MIN_CONTENT_LENGTH = 200;
+
+/** Fetch a URL and extract its main text content using Readability. */
+export async function fetchPageContent(url: string): Promise<string> {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+
+  // Try Readability first
+  const { document } = parseHTML(html);
+  const reader = new Readability(document);
+  const article = reader.parse();
+  const text = article?.textContent?.trim() || '';
+  if (text.length >= MIN_CONTENT_LENGTH) return text;
+
+  // Fallback: Lightpanda headless browser for JS-rendered pages
+  try {
+    return await fetchWithLightpanda(url);
+  } catch {
+    // If Lightpanda fails too, return whatever Readability got (or throw)
+    if (text.length > 0) return text;
+    throw new Error('Could not extract content from page');
+  }
+}
+
+/** Fallback: use Lightpanda headless browser for JS-rendered content. */
+async function fetchWithLightpanda(url: string): Promise<string> {
+  const { lightpanda } = await import('@lightpanda/browser');
+  const result = await lightpanda.fetch(url, { dump: true, dumpOptions: { type: 'markdown' } });
+  const text = typeof result === 'string' ? result : result.toString('utf-8');
+  return text.trim();
+}
+
 /** Extract text content from a Mistral chat completion response choice. */
 export function getContent(response: { choices?: Array<{ message: { content?: unknown } }> }): string {
   const content = response.choices?.[0]?.message?.content;

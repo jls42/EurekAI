@@ -572,7 +572,10 @@ describe('POST /:pid/sources/websearch', () => {
 
     expect(webSearchEnrich).toHaveBeenCalledWith(client, 'Revolution francaise', 'fr', 'enfant');
     expect(res.json).toHaveBeenCalledTimes(1);
-    const source = res.json.mock.calls[0][0];
+    const sources = res.json.mock.calls[0][0];
+    expect(Array.isArray(sources)).toBe(true);
+    expect(sources).toHaveLength(1);
+    const source = sources[0];
     expect(source.id).toBeTruthy();
     expect(source.filename).toBe('Recherche web: Revolution francaise');
     expect(source.markdown).toBe('search result text');
@@ -595,8 +598,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    const source = res.json.mock.calls[0][0];
-    expect(source.filename).toBe('Web search: French Revolution');
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].filename).toBe('Web search: French Revolution');
   });
 
   it('utilise les valeurs par defaut pour lang et ageGroup', async () => {
@@ -650,8 +653,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     expect(moderateContent).toHaveBeenCalledTimes(1);
     expect(webSearchEnrich).toHaveBeenCalledTimes(1);
-    const source = res.json.mock.calls[0][0];
-    expect(source.moderation).toEqual({ status: 'pending', categories: {} });
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].moderation).toEqual({ status: 'pending', categories: {} });
   });
 
   it('tronque le nom de la source a 50 caracteres', async () => {
@@ -666,8 +669,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    const source = res.json.mock.calls[0][0];
-    expect(source.filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
+    const sources = res.json.mock.calls[0][0];
+    expect(sources[0].filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
   });
 
   it('retourne 500 quand webSearchEnrich echoue', async () => {
