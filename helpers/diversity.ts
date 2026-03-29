@@ -5,13 +5,13 @@ const PARAMS: Record<string, { temperature: number; presencePenalty: number }> =
   'quiz-vocal': { temperature: 0.9, presencePenalty: 0.3 },
   flashcards: { temperature: 0.9, presencePenalty: 0.3 },
   'fill-blank': { temperature: 0.9, presencePenalty: 0.3 },
-  podcast: { temperature: 1.0, presencePenalty: 0.2 },
+  podcast: { temperature: 1, presencePenalty: 0.2 },
   summary: { temperature: 0.4, presencePenalty: 0 },
 };
 
 export function diversityParams(type: string) {
   const p = PARAMS[type] || { temperature: 0.7, presencePenalty: 0 };
-  return { temperature: p.temperature, presencePenalty: p.presencePenalty, randomSeed: Math.floor(Math.random() * 1_000_000) };
+  return { temperature: p.temperature, presencePenalty: p.presencePenalty, randomSeed: Math.floor(Math.random() * 1_000_000) }; // NOSONAR(S2245) — seed for AI prompt diversity, not security
 }
 
 function extractQuizQuestions(gens: Generation[]): string[] {
