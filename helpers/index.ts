@@ -5,7 +5,7 @@ import { parseHTML } from 'linkedom';
 export function parseWebInput(input: string): { urls: string[]; searchQuery: string } {
   const urlPattern = /https?:\/\/[^\s]+/gi;
   const urls = input.match(urlPattern) || [];
-  const searchQuery = input.replace(urlPattern, '').trim();
+  const searchQuery = input.replaceAll(urlPattern, '').trim();
   return { urls, searchQuery };
 }
 

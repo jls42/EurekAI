@@ -95,6 +95,40 @@ export function sourceRoutes(
     limits: { fileSize: 25 * 1024 * 1024, files: 1 },
   });
 
+  const TEXT_EXTS = new Set(['.txt', '.md']);
+
+  /** Process a single uploaded file (OCR or text read). */
+  async function processUploadedFile(
+    file: Express.Multer.File,
+    pid: string,
+    modCats: string[] | null,
+  ): Promise<Source> {
+    const name = file.originalname.toLowerCase();
+    const dotIdx = name.lastIndexOf('.');
+    const ext = dotIdx >= 0 ? name.slice(dotIdx) : '';
+    const isText = TEXT_EXTS.has(ext);
+    let markdown: string;
+    let elapsed: number;
+    if (isText) {
+      const stop = startTimer();
+      markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
+      elapsed = stop();
+      console.log(`  TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+    } else {
+      ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
+      console.log(`  OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+    }
+    return {
+      id: randomUUID(),
+      filename: file.originalname,
+      markdown,
+      uploadedAt: new Date().toISOString(),
+      sourceType: isText ? 'text' : 'ocr',
+      filePath: `projects/${pid}/uploads/${file.filename}`,
+      moderation: modCats ? pendingModeration() : undefined,
+    };
+  }
+
   // Upload files (OCR)
   router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
     const pid = String(req.params.pid);
@@ -112,37 +146,9 @@ export function sourceRoutes(
 
     const results: Source[] = [];
     const modCats = getModerationCategories(store, profileStore, pid);
-    const TEXT_EXTS = ['.txt', '.md'];
     for (const file of files) {
       try {
-        const name = file.originalname.toLowerCase();
-        const dotIdx = name.lastIndexOf('.');
-        const ext = dotIdx !== -1 ? name.slice(dotIdx) : '';
-        const isText = TEXT_EXTS.includes(ext);
-        let markdown: string;
-        let elapsed: number;
-        if (isText) {
-          const stop = startTimer();
-          markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
-          elapsed = stop();
-          console.log(
-            `  TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
-          );
-        } else {
-          ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
-          console.log(
-            `  OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
-          );
-        }
-        const source: Source = {
-          id: randomUUID(),
-          filename: file.originalname,
-          markdown,
-          uploadedAt: new Date().toISOString(),
-          sourceType: isText ? 'text' : 'ocr',
-          filePath: `projects/${pid}/uploads/${file.filename}`,
-          moderation: modCats ? pendingModeration() : undefined,
-        };
+        const source = await processUploadedFile(file, pid, modCats);
         store.addSource(pid, source);
         results.push(source);
       } catch (e) {
@@ -155,9 +161,7 @@ export function sourceRoutes(
     const lang = req.body.lang || 'fr';
     triggerConsigneDetection(store, client, pid, lang);
     for (const src of results) {
-      if (modCats) {
-        triggerModeration(store, client, pid, src.id, src.markdown, modCats);
-      }
+      if (modCats) triggerModeration(store, client, pid, src.id, src.markdown, modCats);
     }
     res.json(results);
   });
@@ -251,6 +255,42 @@ export function sourceRoutes(
     }
   });
 
+  /** Scrape a single URL, falling back to Mistral web_search on failure. */
+  async function scrapeUrl(
+    url: string,
+    scrapeMode: string,
+    lang: string,
+    ageGroup: import('../types.js').AgeGroup,
+    modCats: string[] | null,
+    now: string,
+  ): Promise<Source | null> {
+    try {
+      const stop = startTimer();
+      const result = await fetchPageContent(url, scrapeMode as any);
+      const elapsed = stop();
+      console.log(`  URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
+      return {
+        id: randomUUID(), filename: url.slice(0, 80), markdown: result.text,
+        uploadedAt: now, sourceType: 'websearch', scrapeEngine: result.engine,
+        moderation: modCats ? pendingModeration() : undefined,
+      };
+    } catch {
+      console.log(`  URL scrape failed for "${url}", falling back to web search`);
+    }
+    try {
+      const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
+      console.log(`  URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+      return {
+        id: randomUUID(), filename: url.slice(0, 80), markdown: text,
+        uploadedAt: now, sourceType: 'websearch', scrapeEngine: 'mistral',
+        moderation: modCats ? pendingModeration() : undefined,
+      };
+    } catch (e) {
+      console.error(`  URL failed completely: "${url}"`, e);
+      return null;
+    }
+  }
+
   // Web search / URL scrape source
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
@@ -277,54 +317,20 @@ export function sourceRoutes(
 
     try {
       const lang = req.body.lang || 'fr';
-      const ageGroup = req.body.ageGroup || 'enfant';
+      const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
       const { urls, searchQuery } = parseWebInput(query.trim());
       const scrapeMode = req.body.scrapeMode || 'auto';
       const sources: Source[] = [];
       const now = new Date().toISOString();
 
-      // Scrape each URL
       for (const url of urls) {
-        try {
-          const stop = startTimer();
-          const result = await fetchPageContent(url, scrapeMode);
-          const elapsed = stop();
-          const source: Source = {
-            id: randomUUID(),
-            filename: url.slice(0, 80),
-            markdown: result.text,
-            uploadedAt: now,
-            sourceType: 'websearch',
-            scrapeEngine: result.engine,
-            moderation: modCats ? pendingModeration() : undefined,
-          };
+        const source = await scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now);
+        if (source) {
           store.addSource(pid, source);
           sources.push(source);
-          console.log(`  URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
-        } catch (scrapeErr) {
-          // Fallback: use Mistral web_search for this URL
-          console.log(`  URL scrape failed for "${url}", falling back to web search`);
-          try {
-            const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
-            const source: Source = {
-              id: randomUUID(),
-              filename: url.slice(0, 80),
-              markdown: text,
-              uploadedAt: now,
-              sourceType: 'websearch',
-              scrapeEngine: 'mistral',
-              moderation: modCats ? pendingModeration() : undefined,
-            };
-            store.addSource(pid, source);
-            sources.push(source);
-            console.log(`  URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
-          } catch (fallbackErr) {
-            console.error(`  URL failed completely: "${url}"`, fallbackErr);
-          }
         }
       }
 
-      // Web search for remaining keywords
       if (searchQuery) {
         const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
         const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
@@ -347,10 +353,8 @@ export function sourceRoutes(
       }
 
       triggerConsigneDetection(store, client, pid, lang);
-      if (modCats) {
-        for (const s of sources) {
-          triggerModeration(store, client, pid, s.id, s.markdown, modCats);
-        }
+      for (const s of sources) {
+        if (modCats) triggerModeration(store, client, pid, s.id, s.markdown, modCats);
       }
       res.json(sources);
     } catch (e) {
