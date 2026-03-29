@@ -12,7 +12,7 @@ export function quizComponent(gen: any) {
     },
 
     isCurrentAnswered(this: any): boolean {
-      return this.answers[this.currentIndex()] !== undefined;
+      return this.currentIndex() in this.answers;
     },
 
     selectChoice(this: any, ci: number) {

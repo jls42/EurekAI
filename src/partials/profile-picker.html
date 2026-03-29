@@ -389,6 +389,7 @@
             <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"></span>
             <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')"></p>
             <div class="space-y-1.5">
+              <!-- NOSONAR(S5765) — Alpine.js x-text fills label content at runtime -->
               <template x-for="cat in allModerationCategories" :key="cat">
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input

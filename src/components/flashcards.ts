@@ -15,7 +15,7 @@ export function flashcardsComponent(gen: any) {
     },
 
     isCurrentAnswered(this: any): boolean {
-      return this.results[this.currentIndex()] !== undefined;
+      return this.currentIndex() in this.results;
     },
 
     rate(this: any, correct: boolean) {

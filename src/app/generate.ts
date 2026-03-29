@@ -43,7 +43,7 @@ function showGenerateAllResult(failures: number, total: number, state: any): voi
 
 export function createGenerate() {
   return {
-    blockedModerationSource(this: any): any | null {
+    blockedModerationSource(this: any) {
       const selected =
         this.selectedIds.length > 0
           ? this.sources.filter((s: any) => this.selectedIds.includes(s.id))

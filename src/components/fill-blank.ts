@@ -14,7 +14,7 @@ export function fillBlankComponent(gen: any) {
     },
 
     isCurrentAnswered(this: any): boolean {
-      return this.results[this.currentIndex()] !== undefined;
+      return this.currentIndex() in this.results;
     },
 
     checkAnswer(this: any) {

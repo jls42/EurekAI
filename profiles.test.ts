@@ -9,6 +9,7 @@ import {
   verifyPin,
   profileToPublic,
   MODERATION_CATEGORIES,
+  ALL_MODERATION_CATEGORIES,
   AGE_GROUP_CONFIG,
   ProfileStore,
 } from './profiles.js';
@@ -423,5 +424,73 @@ describe('ProfileStore legacy migration', () => {
     const list = freshStore.list();
     // age 9 < 15, so chatEnabled should be false
     expect(list[0].chatEnabled).toBe(false);
+  });
+
+  it('adds missing moderationCategories field on read', () => {
+    store.create('Legacy4', 9);
+    const filePath = join(tempDir, 'profiles.json');
+    const profiles = JSON.parse(readFileSync(filePath, 'utf-8'));
+    delete profiles[0].moderationCategories;
+    writeFileSync(filePath, JSON.stringify(profiles));
+
+    const freshStore = new ProfileStore(tempDir);
+    const list = freshStore.list();
+    expect(list[0].moderationCategories).toEqual(MODERATION_CATEGORIES.enfant);
+  });
+
+  it('adds empty moderationCategories for adulte on migration', () => {
+    store.create('Legacy5', 30);
+    const filePath = join(tempDir, 'profiles.json');
+    const profiles = JSON.parse(readFileSync(filePath, 'utf-8'));
+    delete profiles[0].moderationCategories;
+    writeFileSync(filePath, JSON.stringify(profiles));
+
+    const freshStore = new ProfileStore(tempDir);
+    const list = freshStore.list();
+    expect(list[0].moderationCategories).toEqual([]);
+  });
+});
+
+describe('ALL_MODERATION_CATEGORIES', () => {
+  it('contains 10 categories', () => {
+    expect(ALL_MODERATION_CATEGORIES).toHaveLength(10);
+  });
+
+  it('includes all default enfant categories', () => {
+    for (const cat of MODERATION_CATEGORIES.enfant) {
+      expect(ALL_MODERATION_CATEGORIES).toContain(cat);
+    }
+  });
+});
+
+describe('ProfileStore.create moderationCategories', () => {
+  it('sets moderationCategories from enfant defaults', () => {
+    const p = store.create('Kid', 9);
+    expect(p.moderationCategories).toEqual(MODERATION_CATEGORIES.enfant);
+  });
+
+  it('sets empty moderationCategories for adulte', () => {
+    const p = store.create('Adult', 30);
+    expect(p.moderationCategories).toEqual([]);
+  });
+});
+
+describe('ProfileStore.update moderationCategories', () => {
+  it('updates moderationCategories with valid values', () => {
+    const p = store.create('Test', 9);
+    const updated = store.update(p.id, { moderationCategories: ['sexual', 'selfharm'] });
+    expect(updated!.moderationCategories).toEqual(['sexual', 'selfharm']);
+  });
+
+  it('filters out invalid categories on update', () => {
+    const p = store.create('Test2', 9);
+    const updated = store.update(p.id, { moderationCategories: ['sexual', 'fake_category'] });
+    expect(updated!.moderationCategories).toEqual(['sexual']);
+  });
+
+  it('allows empty array to disable all categories', () => {
+    const p = store.create('Test3', 9);
+    const updated = store.update(p.id, { moderationCategories: [] });
+    expect(updated!.moderationCategories).toEqual([]);
   });
 });
