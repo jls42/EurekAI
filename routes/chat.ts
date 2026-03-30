@@ -12,23 +12,7 @@ import { generateQuiz } from '../generators/quiz.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
-
-const arrayLen = (data: any): string | number => (Array.isArray(data) ? data.length : '?');
-
-const CHAT_TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
-  summary: (data, lang) => {
-    const prefix = lang === 'en' ? 'Note' : 'Fiche';
-    return data?.title ? `${prefix} — ${data.title}` : 'summary';
-  },
-  flashcards: (data) => `Flashcards (${arrayLen(data)})`,
-  quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
-  'fill-blank': (data, lang) => `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
-};
-
-function autoTitle(type: string, data: any, lang = 'fr'): string {
-  const formatter = CHAT_TITLE_FORMATTERS[type];
-  return formatter ? formatter(data, lang) : type;
-}
+import { autoTitle } from '../helpers/auto-title.js';
 
 interface ChatRequestContext {
   pid: string;
