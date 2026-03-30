@@ -69,119 +69,25 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 ## Vue d'ensemble de l'architecture
 
-```mermaid
-graph TD
-    subgraph "📥 Sources d'entrée"
-        OCR["📷 Import fichiers<br/><i>OCR / texte brut</i>"]
-        TXT["📝 Saisie texte"]
-        MIC["🎤 Voix STT<br/><i>voxtral-mini-latest</i>"]
-        WEB["🌐 Web / URL<br/><i>Readability + Lightpanda<br/>ou Agent Mistral</i>"]
-    end
-
-    subgraph "🛡️ Modération (async, si activée par profil)"
-        MOD["Modération<br/><i>mistral-moderation-latest</i>"]
-    end
-
-    CON["📋 Détection de consigne<br/><i>mistral-large-latest</i>"]
-
-    subgraph "🧠 Générateurs IA"
-        SUM["📄 Fiche"]
-        FC["🃏 Flashcards"]
-        QZ["❓ Quiz QCM"]
-        FB["✏️ Textes à trous"]
-        POD["🎙️ Podcast"]
-        IMG["🖼️ Illustration"]
-        QV["🗣️ Quiz vocal"]
-        CHAT["💬 Tuteur IA"]
-    end
-
-    subgraph "📤 Sortie"
-        TTS["🔊 TTS<br/><i>Mistral Voxtral / ElevenLabs</i>"]
-        JSON["📦 Persistance JSON"]
-        UI["🖥️ Interface interactive"]
-    end
-
-    OCR & TXT & MIC & WEB --> MOD
-    OCR & TXT & MIC & WEB --> CON
-    MOD -.->|garde| SUM & FC & QZ & FB & POD & IMG & QV & CHAT
-    CON -.->|consigne| SUM & FC & QZ & FB
-    POD --> TTS
-    QV --> TTS
-    SUM & FC -->|lecture à voix haute| TTS
-    SUM & FC & QZ & FB & POD & IMG & QV & CHAT --> JSON
-    JSON --> UI
-    TTS --> UI
-```
+<p align="center">
+  <img src="public/assets/architecture-overview.webp" alt="Architecture Overview" width="800" />
+</p>
 
 ---
 
 ## Carte d'utilisation des modèles
 
-```mermaid
-flowchart LR
-    subgraph "Modèles Mistral"
-        ML["mistral-large-latest"]
-        MO["mistral-ocr-latest"]
-        MV["voxtral-mini-latest"]
-        MMod["mistral-moderation-latest"]
-        MS["mistral-small-latest"]
-        MTTS["voxtral-mini-tts-latest"]
-    end
-
-    subgraph "Tâches"
-        T1["Fiche / Flashcards / Podcast / Chat / Quiz / Quiz vocal / Textes à trous / Vérification quiz / Consigne"]
-        T2["OCR — documents, tableaux, écriture manuscrite (JPG, PNG, PDF)"]
-        T3["Reconnaissance vocale — STT optimisé FR"]
-        T4["Modération de contenu — filtrage par âge"]
-        T5["Routeur automatique — analyse du contenu"]
-        T6["Génération d'image — Agent + outil image_generation"]
-        T7["Web / URL — Scraping direct ou Agent web_search"]
-        T8["Synthèse vocale — podcasts, quiz vocal, lecture à voix haute"]
-    end
-
-    ML --> T1
-    MO --> T2
-    MV --> T3
-    MMod --> T4
-    MS --> T5
-    ML --> T6
-    ML --> T7
-    MTTS --> T8
-```
+<p align="center">
+  <img src="public/assets/model-map.webp" alt="AI Model-to-Task Mapping" width="800" />
+</p>
 
 ---
 
 ## Parcours utilisateur
 
-```mermaid
-sequenceDiagram
-    actor Élève as Élève
-    participant App as EurekAI
-    participant AI as Mistral AI
-    participant TTS as TTS (Voxtral / ElevenLabs)
-
-    Élève->>App: Créer un profil (nom, âge, avatar)
-    Élève->>App: Créer un cours
-    Élève->>App: Ajouter des sources (photo / texte / voix / web)
-    App->>AI: Modérer le contenu (si activé par profil)
-    App->>AI: Détecter les consignes de révision
-    Élève->>App: Générer du matériel d'étude
-    App->>AI: Fiche / Flashcards / Quiz / Textes à trous / Podcast
-    AI-->>App: Réponses JSON structurées
-    App->>TTS: Convertir le script podcast en audio
-    TTS-->>App: Fichier audio MP3
-    Élève->>App: Écouter une fiche ou des flashcards
-    App->>TTS: Synthèse TTS du contenu
-    TTS-->>App: Audio MP3
-    Élève->>App: Passer le quiz
-    App->>AI: Réviser les erreurs → nouvelles questions
-    Élève->>App: Passer le quiz vocal
-    App->>TTS: TTS lit la question à voix haute
-    Élève->>App: Répondre à voix haute
-    App->>AI: Transcription STT + vérification IA
-    Élève->>App: Discuter avec le tuteur IA
-    App->>AI: Chat contextuel avec appel d'outils
-```
+<p align="center">
+  <img src="public/assets/user-journey.webp" alt="Student Learning Journey" width="800" />
+</p>
 
 ---
 

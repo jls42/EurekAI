@@ -1,16 +1,8 @@
 import { Mistral } from '@mistralai/mistralai';
-import { safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { fillBlankSystem, fillBlankUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
-
-function extractContent(response: any): string {
-  const choices = response.choices;
-  if (!choices?.length || !choices[0].message?.content) {
-    throw new Error("Le modele IA n'a retourne aucune reponse. Veuillez reessayer.");
-  }
-  return choices[0].message.content as string;
-}
 
 function isValidFillBlank(data: FillBlankItem[]): boolean {
   return (
@@ -47,7 +39,7 @@ export async function generateFillBlank(
     ...diversityParams('fill-blank'),
   });
 
-  const raw = extractContent(response);
+  const raw = getContent(response);
   const data = unwrapJsonArray<FillBlankItem>(safeParseJson(raw));
 
   if (isValidFillBlank(data)) return data;
@@ -69,7 +61,7 @@ export async function generateFillBlank(
     ...diversityParams('fill-blank'),
   });
   const retryData = unwrapJsonArray<FillBlankItem>(
-    safeParseJson(extractContent(retry)),
+    safeParseJson(getContent(retry)),
   );
 
   if (!isValidFillBlank(retryData)) {

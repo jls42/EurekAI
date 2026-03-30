@@ -55,27 +55,23 @@ describe('generateFillBlank', () => {
     );
   });
 
-  it('handles response without choices property', async () => {
+  it('throws when response has empty choices', async () => {
     const client = {
       chat: {
         complete: vi.fn().mockResolvedValue({ choices: [] }),
       },
     } as any;
 
-    await expect(generateFillBlank(client, 'content')).rejects.toThrow(
-      /aucune reponse/,
-    );
+    await expect(generateFillBlank(client, 'content')).rejects.toThrow();
   });
 
-  it('extractContent throws when response has no choices', async () => {
+  it('throws when response has no choices', async () => {
     const client = {
       chat: {
         complete: vi.fn().mockResolvedValue({}),
       },
     } as any;
 
-    await expect(generateFillBlank(client, 'content')).rejects.toThrow(
-      /aucune reponse/,
-    );
+    await expect(generateFillBlank(client, 'content')).rejects.toThrow();
   });
 });

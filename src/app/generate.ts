@@ -100,14 +100,12 @@ export function createGenerate() {
           return;
         }
         if (this.currentProjectId !== projectId) return;
-        const gen = await res.json();
-        registerGeneration(this, gen);
-        const viewType = type;
+        registerGeneration(this, await res.json());
         this.showToast(
           this.t('toast.generationDone', { type: this.t('gen.' + type) }),
           'success',
           null,
-          { label: this.t('toast.view'), fn: () => this.goToView(viewType) },
+          { label: this.t('toast.view'), fn: () => this.goToView(type) },
         );
       } catch (e: any) {
         if (e.name === 'AbortError') return;
@@ -234,14 +232,7 @@ export function createGenerate() {
         );
         if (this.currentProjectId !== projectId) return;
 
-        let failures = 0;
-        for (const r of responses) {
-          if (r.ok) {
-            registerGeneration(this, await r.json());
-          } else {
-            failures++;
-          }
-        }
+        const failures = await aggregateGenerateResults(responses, this);
 
         if (failures > 0 && failures < plannedTypes.length) {
           this.showToast(this.t('toast.partialGenerated', { count: plannedTypes.length - failures }), 'warning');

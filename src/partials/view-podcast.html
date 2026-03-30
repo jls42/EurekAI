@@ -49,62 +49,8 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('podcast')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-podcast animate-slide-up">
-        <button
-          @click="toggleGen(gen.id)"
-          class="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors focus-ring text-left"
-          :aria-expanded="openGens[gen.id] ? 'true' : 'false'"
-        >
-          <span class="icon-chip icon-chip-podcast shrink-0"
-            ><i data-lucide="headphones" class="w-4 h-4 text-gen-podcast"></i
-          ></span>
-          <div class="flex-1 min-w-0">
-            <template x-if="editingTitle !== gen.id">
-              <span
-                class="font-semibold text-body-sm text-text-primary truncate block"
-                x-text="gen.title"
-                @dblclick.stop="startEditTitle(gen)"
-              ></span>
-            </template>
-            <template x-if="editingTitle === gen.id">
-              <input
-                x-model="editTitleValue"
-                @click.stop
-                @keydown.enter="saveTitle(gen)"
-                @keydown.escape="editingTitle = null"
-                @blur="saveTitle(gen)"
-                class="w-full border-2 border-primary rounded-button px-2 py-0.5 text-body-sm focus-ring"
-                x-ref="titleInput"
-              />
-            </template>
-            <span
-              class="text-sm text-text-secondary"
-              x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
-            ></span>
-          </div>
-          <i
-            data-lucide="chevron-down"
-            class="w-5 h-5 text-text-secondary shrink-0 transition-transform"
-            :class="openGens[gen.id] && 'rotate-180'"
-          ></i>
-        </button>
+        {{> gen-card-header icon="headphones" chipClass="icon-chip-podcast" colorClass="gen-podcast"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
-          <div class="flex items-center gap-2 mt-3 mb-3 flex-wrap">
-            <div class="flex-1"></div>
-            <button
-              @click.stop="startEditTitle(gen)"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded"
-              :aria-label="t('common.rename')"
-            >
-              <i data-lucide="pencil" class="w-4 h-4"></i>
-            </button>
-            <button
-              @click.stop="confirmDelete('generation', () => deleteGen(gen))"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded"
-              :aria-label="t('common.delete')"
-            >
-              <i data-lucide="trash-2" class="w-4 h-4"></i>
-            </button>
-          </div>
           <!-- Podcast player + script -->
           <div x-show="gen.data.audioUrl" class="mb-4 max-w-2xl">
             <audio

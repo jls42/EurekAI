@@ -1,5 +1,21 @@
 import { createIcons, icons } from 'lucide';
 
+/** Extract source refs from any item (quiz question, flashcard, etc.). */
+function extractItemRefs(item: any): string[] {
+  if (item.sourceRefs) return item.sourceRefs;
+  if (item.sourceRef) return [item.sourceRef];
+  if (item.source) return [item.source];
+  return [];
+}
+
+/** Resolve source references for any item against a generation's sources. */
+function resolveItemSources(ctx: any, gen: any, item: any): any[] {
+  const refs = extractItemRefs(item);
+  if (refs.length === 0) return [];
+  const allSources = ctx.genSources(gen);
+  return refs.map((ref: string) => ctx.resolveSourceRef(ref, allSources)).filter(Boolean);
+}
+
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
 export function normalizeSummaryData(gen: any): void {
   if (gen.type === 'summary' && gen.data) {
@@ -93,15 +109,8 @@ export function createHelpers() {
     },
 
     sourceTypeIcon(this: any, src: any) {
-      const t = this.inferSourceType(src);
-      return (
-        (
-          { ocr: 'scan', text: 'pencil', voice: 'mic', websearch: 'globe' } as Record<
-            string,
-            string
-          >
-        )[t] || 'file-text'
-      );
+      const icons: Record<string, string> = { ocr: 'scan', text: 'pencil', voice: 'mic', websearch: 'globe' };
+      return icons[this.inferSourceType(src)] || 'file-text';
     },
 
     sourceTypeBadge(this: any, src: any) {
@@ -116,17 +125,13 @@ export function createHelpers() {
     },
 
     sourceTypeBadgeColor(this: any, src: any) {
-      const t = this.inferSourceType(src);
-      return (
-        (
-          {
-            ocr: 'bg-blue-100 text-blue-700',
-            text: 'bg-green-100 text-green-700',
-            voice: 'bg-orange-100 text-orange-700',
-            websearch: 'bg-teal-100 text-teal-700',
-          } as Record<string, string>
-        )[t] || 'bg-gray-100 text-gray-700'
-      );
+      const colors: Record<string, string> = {
+        ocr: 'bg-blue-100 text-blue-700',
+        text: 'bg-green-100 text-green-700',
+        voice: 'bg-orange-100 text-orange-700',
+        websearch: 'bg-teal-100 text-teal-700',
+      };
+      return colors[this.inferSourceType(src)] || 'bg-gray-100 text-gray-700';
     },
 
     resolveSourceRef(ref: string, allSources: any[]) {
@@ -144,47 +149,46 @@ export function createHelpers() {
       );
     },
 
+    /** Resolve source references for any item (quiz question, flashcard, etc.). */
+    itemSources(this: any, gen: any, item: any) {
+      return resolveItemSources(this, gen, item);
+    },
+
     questionSources(this: any, gen: any, q: any) {
-      const refs = q.sourceRefs || (q.sourceRef ? [q.sourceRef] : []);
-      if (refs.length === 0) return [];
-      const allSources = this.genSources(gen);
-      return refs.map((ref: string) => this.resolveSourceRef(ref, allSources)).filter(Boolean);
+      return resolveItemSources(this, gen, q);
     },
 
     flashcardSource(this: any, gen: any, fc: any) {
-      const refs = fc.sourceRefs || (fc.source ? [fc.source] : []);
-      if (refs.length === 0) return [];
-      const allSources = this.genSources(gen);
-      return refs.map((ref: string) => this.resolveSourceRef(ref, allSources)).filter(Boolean);
+      return resolveItemSources(this, gen, fc);
     },
 
     referencedSourceNums(gen: any) {
       const nums = new Set<number>();
-      const extract = (refs: string[]) => {
-        (refs || []).forEach((ref: string) => {
+      const extractNums = (refs: string[]) => {
+        for (const ref of refs || []) {
           const m = /source\s*(\d+)/i.exec(ref);
           if (m) nums.add(Number.parseInt(m[1], 10));
-        });
+        }
       };
-      if (gen.type === 'flashcards') {
-        const fcs = gen.data?.flashcards || (Array.isArray(gen.data) ? gen.data : []);
-        fcs.forEach((fc: any) => extract(fc.sourceRefs || (fc.source ? [fc.source] : [])));
-      } else if (gen.type === 'quiz' || gen.type === 'quiz-vocal') {
-        const qs = gen.data?.quiz || (Array.isArray(gen.data) ? gen.data : []);
-        qs.forEach((q: any) => extract(q.sourceRefs || (q.sourceRef ? [q.sourceRef] : [])));
+      const DATA_KEY: Record<string, string> = { flashcards: 'flashcards', quiz: 'quiz', 'quiz-vocal': 'quiz' };
+      const dataKey = DATA_KEY[gen.type];
+      if (dataKey) {
+        const items = gen.data?.[dataKey] || (Array.isArray(gen.data) ? gen.data : []);
+        items.forEach((item: any) => extractNums(extractItemRefs(item)));
       } else if (gen.type === 'podcast') {
-        extract(gen.data?.sourceRefs);
+        extractNums(gen.data?.sourceRefs);
       } else if (gen.type === 'fill-blank') {
         const items = Array.isArray(gen.data) ? gen.data : [];
-        items.forEach((item: any) => extract(item.sourceRefs));
+        items.forEach((item: any) => extractNums(item.sourceRefs));
       } else if (gen.type === 'summary') {
         const d = gen.data || {};
-        (d.citations || []).forEach((cit: any) => {
-          if (cit.sourceRef) extract([cit.sourceRef]);
-        });
+        for (const cit of d.citations || []) {
+          if (cit.sourceRef) extractNums([cit.sourceRef]);
+        }
         const text = (d.summary || '') + ' ' + (d.key_points || []).join(' ');
-        const matches = text.matchAll(/\[Source\s*(\d+)\]/gi);
-        for (const m of matches) nums.add(Number.parseInt(m[1], 10));
+        for (const m of text.matchAll(/\[Source\s*(\d+)\]/gi)) {
+          nums.add(Number.parseInt(m[1], 10));
+        }
       }
       return nums;
     },
