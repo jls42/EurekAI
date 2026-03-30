@@ -2,7 +2,10 @@ import { createIcons, icons } from 'lucide';
 
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
 function extractItemRefs(item: any): string[] {
-  return item.sourceRefs || (item.sourceRef ? [item.sourceRef] : item.source ? [item.source] : []);
+  if (item.sourceRefs) return item.sourceRefs;
+  if (item.sourceRef) return [item.sourceRef];
+  if (item.source) return [item.source];
+  return [];
 }
 
 /** Resolve source references for any item against a generation's sources. */
