@@ -1,9 +1,14 @@
 type Level = 'info' | 'warn' | 'error';
 
+const FN: Record<Level, (...data: unknown[]) => void> = {
+  info: (...data) => console.log(...data),
+  warn: (...data) => console.warn(...data),
+  error: (...data) => console.error(...data),
+};
+
 function log(level: Level, prefix: string, ...args: unknown[]) {
   const ts = new Date().toISOString().slice(11, 23); // HH:mm:ss.SSS
-  const fn = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-  fn(`${ts} ${level.toUpperCase()} [${prefix}]`, ...args);
+  FN[level](`${ts} ${level.toUpperCase()} [${prefix}]`, ...args);
 }
 
 export const logger = {
