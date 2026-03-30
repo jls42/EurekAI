@@ -1,6 +1,4 @@
 import { Router } from 'express';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
 import type {
@@ -16,6 +14,7 @@ import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
+import { saveAudioFile } from '../helpers/audio-files.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -222,10 +221,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
         mistralClient: client,
       });
 
-      const audioFilename = `read-aloud-${gen.id.slice(0, 8)}-${Date.now()}.mp3`;
-      const projectDir = store.getProjectDir(req.params.pid);
-      writeFileSync(join(projectDir, audioFilename), audioBuffer);
-      const audioUrl = `/output/projects/${req.params.pid}/${audioFilename}`;
+      const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(req.params.pid), req.params.pid, `read-aloud-${gen.id.slice(0, 8)}`);
 
       if (gen.type === 'summary') {
         store.updateGeneration(req.params.pid, req.params.gid, {

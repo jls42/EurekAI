@@ -1,7 +1,5 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { writeFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { Mistral } from '@mistralai/mistralai';
 import type { Source, Generation, QuizQuestion, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -18,6 +16,8 @@ import { generateFillBlank } from '../generators/fill-blank.js';
 import { routeRequest } from '../generators/router.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
+import { saveAudioFile } from '../helpers/audio-files.js';
+import { logger } from '../helpers/logger.js';
 
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
   const selected =
@@ -128,7 +128,7 @@ function handleGeneration(
         res.json(gen);
       }
     } catch (e) {
-      console.error('Generate error:', e);
+      logger.error('generate', 'error:', e);
       res.status(500).json({ error: String(e) });
     }
   };
@@ -144,9 +144,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/summary',
     handleGeneration(store, profileStore, async (ctx) => {
-      console.log(
-        `[summary] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-      );
+      logger.info('summary', `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
       const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
       const data = await generateSummary(
         client,
@@ -157,9 +155,7 @@ export function generateRoutes(
         ctx.ageGroup,
         exclusions,
       );
-      console.log(
-        `[summary] result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
-      );
+      logger.info('summary', `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`);
       return {
         id: randomUUID(),
         title: autoTitle('summary', data, ctx.lang),
@@ -222,7 +218,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/podcast',
     handleGeneration(store, profileStore, async (ctx) => {
-      console.log('  Generating podcast script...');
+      logger.info('podcast', 'Generating script...');
       const exclusions = buildExclusionContext(ctx.project.results.generations, 'podcast');
       const podcastResult = await generatePodcastScript(
         client,
@@ -232,20 +228,17 @@ export function generateRoutes(
         ctx.ageGroup,
         exclusions,
       );
-      console.log(`  Script OK: ${podcastResult.script.length} lines`);
+      logger.info('podcast', `Script OK: ${podcastResult.script.length} lines`);
 
-      console.log('  Generating audio...');
+      logger.info('podcast', 'Generating audio...');
       const audioBuffer = await generateAudio(
         podcastResult.script,
         resolveVoices(ctx.config),
         { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client },
       );
-      const audioFilename = `podcast-${Date.now()}.mp3`;
-      const projectDir = store.getProjectDir(ctx.pid);
-      writeFileSync(join(projectDir, audioFilename), audioBuffer);
-      console.log(`  Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
+      const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
+      logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
 
-      const audioUrl = `/output/projects/${ctx.pid}/${audioFilename}`;
       return {
         id: randomUUID(),
         title: autoTitle('podcast', null, ctx.lang),
@@ -294,7 +287,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/quiz-vocal',
     handleGeneration(store, profileStore, async (ctx) => {
-      console.log('  Generating quiz for vocal (TTS-friendly)...');
+      logger.info('quiz-vocal', 'Generating quiz (TTS-friendly)...');
       const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz-vocal');
       const data = await generateQuizVocal(
         client,
@@ -305,9 +298,9 @@ export function generateRoutes(
         ctx.count,
         exclusions,
       );
-      console.log(`  Quiz OK: ${data.length} questions`);
+      logger.info('quiz-vocal', `Quiz OK: ${data.length} questions`);
 
-      console.log('  Generating TTS for each question...');
+      logger.info('quiz-vocal', 'Generating TTS for each question...');
       const audioUrls: string[] = [];
       const projectDir = store.getProjectDir(ctx.pid);
       const hostVoice = resolveVoices(ctx.config).host;
@@ -318,10 +311,8 @@ export function generateRoutes(
           hostVoice,
           ttsOpts,
         );
-        const audioFilename = `quiz-vocal-q${i}-${Date.now()}.mp3`;
-        writeFileSync(join(projectDir, audioFilename), audioBuffer);
-        audioUrls.push(`/output/projects/${ctx.pid}/${audioFilename}`);
-        console.log(`  Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
+        audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
+        logger.info('quiz-vocal', `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
       }
 
       return {
@@ -339,7 +330,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/image',
     handleGeneration(store, profileStore, async (ctx) => {
-      console.log(`  Generating image via agent... lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
+      logger.info('image', `Generating via agent... lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
       const projectDir = store.getProjectDir(ctx.pid);
       const data = await generateImage(
         client,
@@ -349,7 +340,7 @@ export function generateRoutes(
         ctx.lang,
         ctx.ageGroup,
       );
-      console.log(`  Image OK`);
+      logger.info('image', 'OK');
 
       return {
         id: randomUUID(),
@@ -366,9 +357,7 @@ export function generateRoutes(
   router.post(
     '/:pid/generate/fill-blank',
     handleGeneration(store, profileStore, async (ctx) => {
-      console.log(
-        `[fill-blank] sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-      );
+      logger.info('fill-blank', `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
       const exclusions = buildExclusionContext(ctx.project.results.generations, 'fill-blank');
       const data = await generateFillBlank(
         client,
@@ -441,10 +430,7 @@ export function generateRoutes(
       const excl = buildExclusionContext(ctx.generations, 'podcast');
       const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup, excl);
       const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
-      const audioFilename = `podcast-${Date.now()}.mp3`;
-      const projectDir = ctx.store.getProjectDir(ctx.pid);
-      writeFileSync(join(projectDir, audioFilename), audioBuffer);
-      const audioUrl = `/output/projects/${ctx.pid}/${audioFilename}`;
+      const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
       return makeGen('podcast', { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs }, ctx);
     },
   };
@@ -463,10 +449,10 @@ export function generateRoutes(
       const useConsigneRoute = req.body.useConsigne !== false;
       const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
       const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
-      console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
+      logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json(route);
     } catch (e) {
-      console.error('Route analysis error:', e);
+      logger.error('route', 'analysis error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -493,9 +479,9 @@ export function generateRoutes(
       const rawCount = req.body.count ? Number(req.body.count) : undefined;
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
-      console.log('  Smart routing: analyzing content...');
+      logger.info('auto', 'Smart routing: analyzing content...');
       const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
-      console.log(`  Route plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
+      logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
       const failedSteps: string[] = [];
@@ -509,17 +495,17 @@ export function generateRoutes(
             const gen = await executor(autoCtx);
             store.addGeneration(req.params.pid, gen);
             generations.push(gen);
-            console.log(`  Auto: ${step.agent} OK`);
+            logger.info('auto', `${step.agent} OK`);
           }
         } catch (err) {
-          console.error(`  Auto: ${step.agent} FAILED:`, err);
+          logger.error('auto', `${step.agent} FAILED:`, err);
           failedSteps.push(step.agent);
         }
       }
 
       res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {
-      console.error('Generate auto error:', e);
+      logger.error('auto', 'error:', e);
       res.status(500).json({ error: String(e) });
     }
   });

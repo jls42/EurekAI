@@ -66,9 +66,12 @@ describe('flashcardsComponent', () => {
       expect(comp.flipped).toBe(true);
     });
 
-    it('reste a true si appele plusieurs fois', () => {
+    it('toggle entre true et false a chaque appel', () => {
       const comp = createFlashcards(sampleCards);
       comp.flip();
+      expect(comp.flipped).toBe(true);
+      comp.flip();
+      expect(comp.flipped).toBe(false);
       comp.flip();
       expect(comp.flipped).toBe(true);
     });

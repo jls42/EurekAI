@@ -660,7 +660,8 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    expect(moderateContent).toHaveBeenCalledTimes(1);
+    // Called at least once for the query moderation check; background source moderation may add more
+    expect(moderateContent).toHaveBeenCalled();
     expect(webSearchEnrich).toHaveBeenCalledTimes(1);
     const sources = res.json.mock.calls[0][0];
     expect(sources[0].moderation).toEqual({ status: 'pending', categories: {} });
@@ -1087,140 +1088,148 @@ describe('POST /:pid/sources/upload', () => {
 // =============================================================================
 
 describe('Background triggers after source addition', () => {
+  /** Flush fire-and-forget promises (no more setTimeout, tasks run as microtasks) */
+  const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
+
   it('text source triggers background consigne detection', async () => {
-    vi.useFakeTimers();
-    try {
-      const project = store.createProject('P1');
-      store.addSource(project.meta.id, {
-        id: 'existing-src',
-        filename: 'existing.txt',
-        markdown: 'Existing content',
-        uploadedAt: new Date().toISOString(),
-        sourceType: 'text',
-      });
+    const project = store.createProject('P1');
+    store.addSource(project.meta.id, {
+      id: 'existing-src',
+      filename: 'existing.txt',
+      markdown: 'Existing content',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'text',
+    });
 
-      const handler = getHandler(router, 'post', '/:pid/sources/text');
-      const req = mockReq({
-        params: { pid: project.meta.id },
-        body: { text: 'Reviser les dates importantes', lang: 'en' },
-      });
-      const res = mockRes();
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { text: 'Reviser les dates importantes', lang: 'en' },
+    });
+    const res = mockRes();
 
-      await handler(req, res);
+    await handler(req, res);
+    await flushPromises();
 
-      expect(res.json).toHaveBeenCalledTimes(1);
-      // Consigne detection runs via setTimeout(100)
-      expect(detectConsigne).not.toHaveBeenCalled();
-
-      await vi.advanceTimersByTimeAsync(150);
-
-      expect(detectConsigne).toHaveBeenCalledWith(
-        client,
-        '# Combined markdown',
-        undefined,
-        'en',
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(detectConsigne).toHaveBeenCalledWith(
+      client,
+      '# Combined markdown',
+      undefined,
+      'en',
+    );
   });
 
   it('voice source triggers background consigne detection', async () => {
-    vi.useFakeTimers();
-    try {
-      const project = store.createProject('P1');
-      const handler = getHandler(router, 'post', '/:pid/sources/voice');
-      const req = mockReq({
-        params: { pid: project.meta.id },
-        body: { lang: 'fr' },
-        file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
-      });
-      const res = mockRes();
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/voice');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { lang: 'fr' },
+      file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
+    });
+    const res = mockRes();
 
-      await handler(req, res);
+    await handler(req, res);
+    await flushPromises();
 
-      expect(res.json).toHaveBeenCalledTimes(1);
-      expect(detectConsigne).not.toHaveBeenCalled();
-
-      await vi.advanceTimersByTimeAsync(150);
-
-      expect(detectConsigne).toHaveBeenCalledWith(
-        client,
-        '# Combined markdown',
-        undefined,
-        'fr',
-      );
-    } finally {
-      vi.useRealTimers();
-    }
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(detectConsigne).toHaveBeenCalledWith(
+      client,
+      '# Combined markdown',
+      undefined,
+      'fr',
+    );
   });
 
   it('voice source triggers background moderation when profile has moderation enabled', async () => {
-    vi.useFakeTimers();
-    try {
-      const { project } = createProjectWithProfile({ useModeration: true });
+    const { project } = createProjectWithProfile({ useModeration: true });
 
-      const handler = getHandler(router, 'post', '/:pid/sources/voice');
-      const req = mockReq({
-        params: { pid: project.meta.id },
-        body: {},
-        file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
-      });
-      const res = mockRes();
+    const handler = getHandler(router, 'post', '/:pid/sources/voice');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: {},
+      file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
+    });
+    const res = mockRes();
 
-      await handler(req, res);
+    await handler(req, res);
 
-      const source = res.json.mock.calls[0][0];
-      expect(source.moderation).toEqual({ status: 'pending', categories: {} });
+    const source = res.json.mock.calls[0][0];
+    expect(source.moderation).toEqual({ status: 'pending', categories: {} });
 
-      // moderateContent not yet called (runs in setTimeout)
-      const callsBefore = vi.mocked(moderateContent).mock.calls.length;
+    await flushPromises();
 
-      await vi.advanceTimersByTimeAsync(150);
-
-      // After timer fires, moderation should have been called for the voice source
-      expect(vi.mocked(moderateContent).mock.calls.length).toBeGreaterThan(callsBefore);
-    } finally {
-      vi.useRealTimers();
-    }
+    // Moderation should have been triggered for the voice source
+    expect(moderateContent).toHaveBeenCalled();
   });
 
   it('upload source triggers background consigne detection and moderation', async () => {
-    vi.useFakeTimers();
-    try {
-      const { project } = createProjectWithProfile({ useModeration: true });
+    const { project } = createProjectWithProfile({ useModeration: true });
 
-      const handler = getHandler(router, 'post', '/:pid/sources/upload');
-      const req = mockReq({
-        params: { pid: project.meta.id },
-        body: { lang: 'fr' },
-        files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
-      });
-      const res = mockRes();
+    const handler = getHandler(router, 'post', '/:pid/sources/upload');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { lang: 'fr' },
+      files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+    });
+    const res = mockRes();
 
-      await handler(req, res);
+    await handler(req, res);
+    await flushPromises();
 
-      expect(res.json).toHaveBeenCalledTimes(1);
-      const results = res.json.mock.calls[0][0];
-      expect(results[0].moderation).toEqual({ status: 'pending', categories: {} });
+    expect(res.json).toHaveBeenCalledTimes(1);
+    const results = res.json.mock.calls[0][0];
+    expect(results[0].moderation).toEqual({ status: 'pending', categories: {} });
 
-      // Background tasks not yet fired
-      expect(detectConsigne).not.toHaveBeenCalled();
-      const modCallsBefore = vi.mocked(moderateContent).mock.calls.length;
+    expect(detectConsigne).toHaveBeenCalledWith(
+      client,
+      '# Combined markdown',
+      undefined,
+      'fr',
+    );
+    expect(moderateContent).toHaveBeenCalled();
+  });
 
-      await vi.advanceTimersByTimeAsync(150);
+  it('consigne detection error does not crash the route', async () => {
+    vi.mocked(detectConsigne).mockRejectedValueOnce(new Error('API down'));
 
-      // Consigne detection should have been triggered
-      expect(detectConsigne).toHaveBeenCalledWith(
-        client,
-        '# Combined markdown',
-        undefined,
-        'fr',
-      );
-      // Moderation should have been triggered for the uploaded source
-      expect(vi.mocked(moderateContent).mock.calls.length).toBeGreaterThan(modCallsBefore);
-    } finally {
-      vi.useRealTimers();
-    }
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { text: 'some text', lang: 'fr' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+    await flushPromises();
+
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('moderation error does not crash the route and sets error status', async () => {
+    vi.mocked(moderateContent).mockRejectedValueOnce(new Error('Moderation API down'));
+
+    const { project } = createProjectWithProfile({ useModeration: true });
+    const handler = getHandler(router, 'post', '/:pid/sources/voice');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: {},
+      file: { buffer: Buffer.from('audio-data'), originalname: 'voice.webm' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+    await flushPromises();
+
+    expect(res.json).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+
+    // Source should have error moderation status
+    const updatedProject = store.getProject(project.meta.id);
+    const source = updatedProject!.sources.find(s => s.sourceType === 'voice');
+    expect(source?.moderation).toEqual({ status: 'error', categories: {} });
   });
 });

@@ -12,6 +12,7 @@ import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
+import { logger } from '../helpers/logger.js';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -21,21 +22,17 @@ function errorModeration(): Source['moderation'] {
   return { status: 'error', categories: {} };
 }
 
-function triggerConsigneDetection(store: ProjectStore, client: Mistral, pid: string, lang = 'fr') {
-  setTimeout(async () => {
-    try {
-      const project = store.getProject(pid);
-      if (!project || project.sources.length === 0) return;
-      const markdown = getMarkdown(project.sources);
-      const result = await detectConsigne(client, markdown, undefined, lang);
-      if (!store.setConsigne(pid, result)) return;
-      console.log(
-        `  Consigne detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`,
-      );
-    } catch (e) {
-      console.error('  Consigne detection error:', e);
-    }
-  }, 100);
+async function triggerConsigneDetection(store: ProjectStore, client: Mistral, pid: string, lang = 'fr') {
+  try {
+    const project = store.getProject(pid);
+    if (!project || project.sources.length === 0) return;
+    const markdown = getMarkdown(project.sources);
+    const result = await detectConsigne(client, markdown, undefined, lang);
+    if (!store.setConsigne(pid, result)) return;
+    logger.info('consigne', `detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`);
+  } catch (e) {
+    logger.error('consigne', 'detection error:', e);
+  }
 }
 
 function getModerationCategories(
@@ -52,7 +49,7 @@ function getModerationCategories(
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
 }
 
-function triggerModeration(
+async function triggerModeration(
   store: ProjectStore,
   client: Mistral,
   pid: string,
@@ -60,16 +57,14 @@ function triggerModeration(
   markdown: string,
   categories: string[],
 ) {
-  setTimeout(async () => {
-    try {
-      const result = await moderateContent(client, markdown, categories);
-      if (!store.setSourceModeration(pid, sourceId, result)) return;
-      console.log(`  Moderation: ${result.status.toUpperCase()} (source ${sourceId.slice(0, 8)})`);
-    } catch (e) {
-      console.error('  Moderation error:', e);
-      store.setSourceModeration(pid, sourceId, errorModeration());
-    }
-  }, 100);
+  try {
+    const result = await moderateContent(client, markdown, categories);
+    if (!store.setSourceModeration(pid, sourceId, result)) return;
+    logger.info('moderation', `${result.status.toUpperCase()} (source ${sourceId.slice(0, 8)})`);
+  } catch (e) {
+    logger.error('moderation', 'error:', e);
+    store.setSourceModeration(pid, sourceId, errorModeration());
+  }
 }
 
 export function sourceRoutes(
@@ -113,10 +108,10 @@ export function sourceRoutes(
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
       elapsed = stop();
-      console.log(`  TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+      logger.info('sources', `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
     } else {
       ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
-      console.log(`  OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
     }
     return {
       id: randomUUID(),
@@ -152,16 +147,16 @@ export function sourceRoutes(
         store.addSource(pid, source);
         results.push(source);
       } catch (e) {
-        console.error(`  Upload FAIL: ${file.originalname} — ${e}`);
+        logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
         res.status(500).json({ error: `Echec pour ${file.originalname}: ${e}` });
         return;
       }
     }
 
     const lang = req.body.lang || 'fr';
-    triggerConsigneDetection(store, client, pid, lang);
+    void triggerConsigneDetection(store, client, pid, lang);
     for (const src of results) {
-      if (modCats) triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+      if (modCats) void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
     }
     res.json(results);
   });
@@ -200,9 +195,9 @@ export function sourceRoutes(
       moderation: sourceModeration,
     };
     store.addSource(req.params.pid, source);
-    console.log(`  Texte libre ajoute: ${source.markdown.length} chars`);
+    logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
     const lang = req.body.lang || 'fr';
-    triggerConsigneDetection(store, client, req.params.pid, lang);
+    void triggerConsigneDetection(store, client, req.params.pid, lang);
     res.json(source);
   });
 
@@ -243,14 +238,14 @@ export function sourceRoutes(
         moderation: modCats ? pendingModeration() : undefined,
       };
       store.addSource(pid, source);
-      console.log(`  STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-      triggerConsigneDetection(store, client, pid, lang);
+      logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
+      void triggerConsigneDetection(store, client, pid, lang);
       if (modCats) {
-        triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+        void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
       }
       res.json(source);
     } catch (e) {
-      console.error('STT error:', e);
+      logger.error('sources', 'STT error:', e);
       res.status(500).json({ error: `Transcription echouee: ${e}` });
     }
   });
@@ -268,25 +263,25 @@ export function sourceRoutes(
       const stop = startTimer();
       const result = await fetchPageContent(url, scrapeMode as any);
       const elapsed = stop();
-      console.log(`  URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
+      logger.info('sources', `URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
       return {
         id: randomUUID(), filename: url.slice(0, 80), markdown: result.text,
         uploadedAt: now, sourceType: 'websearch', scrapeEngine: result.engine,
         moderation: modCats ? pendingModeration() : undefined,
       };
     } catch {
-      console.log(`  URL scrape failed for "${url}", falling back to web search`);
+      logger.warn('sources', `URL scrape failed for "${url}", falling back to web search`);
     }
     try {
       const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
-      console.log(`  URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+      logger.info('sources', `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
       return {
         id: randomUUID(), filename: url.slice(0, 80), markdown: text,
         uploadedAt: now, sourceType: 'websearch', scrapeEngine: 'mistral',
         moderation: modCats ? pendingModeration() : undefined,
       };
     } catch (e) {
-      console.error(`  URL failed completely: "${url}"`, e);
+      logger.error('sources', `URL failed completely: "${url}"`, e);
       return null;
     }
   }
@@ -301,7 +296,7 @@ export function sourceRoutes(
   ): Promise<Source> {
     const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
     const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
-    console.log(`  Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+    logger.info('sources', `Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
     return {
       id: randomUUID(),
       filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
@@ -368,13 +363,13 @@ export function sourceRoutes(
         return;
       }
       const lang = req.body.lang || 'fr';
-      triggerConsigneDetection(store, client, pid, lang);
+      void triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {
-        if (modCats) triggerModeration(store, client, pid, s.id, s.markdown, modCats);
+        if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
       }
       res.json(sources);
     } catch (e) {
-      console.error('Web search error:', e);
+      logger.error('sources', 'Web search error:', e);
       res.status(500).json({ error: `Recherche web echouee: ${e}` });
     }
   });
@@ -411,7 +406,7 @@ export function sourceRoutes(
       }
       res.json(result);
     } catch (e) {
-      console.error('Consigne detection error:', e);
+      logger.error('consigne', 'detection error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -427,7 +422,7 @@ export function sourceRoutes(
       const result = await moderateContent(client, text);
       res.json(result);
     } catch (e) {
-      console.error('Moderation error:', e);
+      logger.error('moderation', 'error:', e);
       res.status(500).json({ error: String(e) });
     }
   });

@@ -10,8 +10,9 @@ export function flashcardsComponent(gen: any) {
       return this.items()[this.currentIndex()];
     },
 
-    flip() {
-      this.flipped = true;
+    flip(this: any) {
+      this.flipped = !this.flipped;
+      if (!this.flipped) this.feedback = null;
     },
 
     isCurrentAnswered(this: any): boolean {
