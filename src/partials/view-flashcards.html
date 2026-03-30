@@ -96,7 +96,7 @@
                 <div
                   class="flip-card mx-auto max-w-md cursor-pointer"
                   :class="flipped && 'flipped'"
-                  @click="!flipped && flip()"
+                  @click="flip()"
                 >
                   <div class="flip-card-inner relative w-full" style="min-height: 220px">
                     <!-- Front: question -->
@@ -138,17 +138,6 @@
                       ></span>
                     </div>
                   </div>
-                </div>
-
-                <!-- Flip button (before flip) -->
-                <div x-show="!flipped && !feedback" class="text-center mt-4">
-                  <button
-                    @click="flip()"
-                    class="bg-gen-flashcards/10 text-gen-flashcards px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
-                  >
-                    <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-                    <span x-text="t('flashcards.flip')"></span>
-                  </button>
                 </div>
 
                 <!-- Self-evaluation buttons (after flip, before feedback, not when reviewing) -->
