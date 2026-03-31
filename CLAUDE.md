@@ -59,21 +59,11 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)
 
-## SonarQube — NOSONAR conventions
+## SonarQube
 
-Ce projet utilise Alpine.js qui genere du contenu dynamique invisible a l'analyse statique de SonarQube.
-Quand une remontee SonarQube est un faux positif, annoter la ligne avec le pattern :
-
-- **JS/TS** : `// NOSONAR(S1234) — raison concise du skip`
-- **HTML** : NOSONAR ne fonctionne PAS en HTML (le plugin sonar-html ne le supporte pas).
-  Pour les faux positifs HTML, utiliser un contenu statique fallback que Alpine.js remplace au runtime :
-  `<label x-text="t('key')">Fallback text</label>` au lieu de `<label x-text="t('key')"></label>`
-
-Faux positifs connus dans ce projet :
-- `S5254` Headings vides — Alpine.js `x-text` remplit le contenu au runtime → ajouter texte fallback
-- `S5765` Labels non associes — Labels avec `x-text` → ajouter texte fallback + `for`/`id`
-- `S4043` replace vs replaceAll — Regex avec flag `g` + callback avec capture groups
-- `S1082` Keyboard handlers sur div — Alpine.js `@keydown` equivalent a `onKeyDown` natif
+- **JS/TS** : `// NOSONAR(S1234) — raison concise`
+- **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text`.
+- Details, faux positifs connus et solutions dans `.claude/rules/sonarqube.md` (charge auto sur fichiers src/)
 
 ## Conventions detaillees
 
