@@ -75,6 +75,7 @@ interface GenContext {
   sourceIds: string[];
   count?: number;
   pid: string;
+  profileVoices?: { host: string; guest: string };
   req: Request;
   res: Response;
 }
@@ -107,6 +108,8 @@ function handleGeneration(
       const sourceIds = resolveSourceIds(req.body, project.sources);
       const rawCount = req.body.count ? Number(req.body.count) : undefined;
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
+      const profileId = project.meta?.profileId;
+      const profile = profileId ? profileStore.get(profileId) : null;
 
       const gen = await generatorFn({
         project,
@@ -119,6 +122,7 @@ function handleGeneration(
         sourceIds,
         count,
         pid,
+        profileVoices: profile?.mistralVoices,
         req,
         res,
       });
@@ -233,7 +237,7 @@ export function generateRoutes(
       logger.info('podcast', 'Generating audio...');
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        resolveVoices(ctx.config),
+        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang),
         { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client },
       );
       const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
@@ -303,7 +307,7 @@ export function generateRoutes(
       logger.info('quiz-vocal', 'Generating TTS for each question...');
       const audioUrls: string[] = [];
       const projectDir = store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices(ctx.config).host;
+      const hostVoice = resolveVoices(ctx.config, ctx.profileVoices, ctx.lang).host;
       const ttsOpts = { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client } as const;
       for (let i = 0; i < data.length; i++) {
         const audioBuffer = await ttsQuestion(
@@ -392,6 +396,7 @@ export function generateRoutes(
     pid: string;
     store: ProjectStore;
     generations: Generation[];
+    profileVoices?: { host: string; guest: string };
   }
 
   function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
@@ -429,7 +434,7 @@ export function generateRoutes(
     podcast: async (ctx) => {
       const excl = buildExclusionContext(ctx.generations, 'podcast');
       const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup, excl);
-      const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
+      const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config, ctx.profileVoices, ctx.lang), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
       const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
       return makeGen('podcast', { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs }, ctx);
     },
@@ -486,7 +491,9 @@ export function generateRoutes(
       const generations: Generation[] = [];
       const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
-      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations };
+      const autoProfileId = project.meta?.profileId;
+      const autoProfile = autoProfileId ? profileStore.get(autoProfileId) : null;
+      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations, profileVoices: autoProfile?.mistralVoices };
 
       for (const step of route.plan) {
         try {

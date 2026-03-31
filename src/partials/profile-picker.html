@@ -7,8 +7,8 @@
   <div
     class="w-full max-w-5xl my-auto flex flex-col lg:flex-row items-center lg:items-end gap-8 lg:gap-16"
   >
-    <!-- Left: Logo branding -->
-    <div class="shrink-0 text-center">
+    <!-- Left: Logo branding (hidden when editing) -->
+    <div x-show="!editingProfile" class="shrink-0 text-center">
       <img
         src="/logo.webp"
         alt="EurekAI"
@@ -18,8 +18,8 @@
       <p class="text-text-secondary text-body-sm mt-1" x-text="t('profile.selectOrCreate')"></p>
     </div>
 
-    <!-- Right: Profile selection -->
-    <div class="flex-1 min-w-0 w-full lg:max-w-lg">
+    <!-- Right: Profile selection (full width when editing) -->
+    <div class="flex-1 min-w-0 w-full" :class="editingProfile ? 'max-w-2xl mx-auto' : 'lg:max-w-lg'">
       <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
       <h2
         class="font-heading font-bold text-2xl title-gradient mb-6 text-center"
@@ -266,117 +266,161 @@
 
       <!-- Edit profile form -->
       <template x-if="editingProfile">
-        <div class="bg-surface rounded-card p-6 shadow-card max-w-lg mx-auto">
+        <div class="bg-surface rounded-card p-6 shadow-card max-w-2xl mx-auto">
           <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
           <h2
-            class="font-heading font-bold text-lg mb-4 text-center"
+            class="font-heading font-bold text-lg mb-5 text-center"
             x-text="t('profile.editProfile')"
           >
             Edit Profile
           </h2>
 
-          <label
-            for="edit-name"
-            class="block text-body-sm font-medium mb-1"
-            x-text="t('profile.nameLabel')"
-            >Name</label
-          >
-          <input
-            id="edit-name"
-            type="text"
-            x-model="editingProfile.name"
-            class="input-modern w-full px-3 py-2 mb-3"
-            :placeholder="t('profile.namePlaceholder')"
-            maxlength="20"
-          />
+          <!-- Section: Identity — name, age, language side by side -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <div>
+              <label for="edit-name" class="block text-body-sm font-medium mb-1" x-text="t('profile.nameLabel')">Name</label>
+              <input
+                id="edit-name" type="text" x-model="editingProfile.name" @input="autoSaveProfile()"
+                class="input-modern w-full px-3 py-2" :placeholder="t('profile.namePlaceholder')" maxlength="20"
+              />
+            </div>
+            <div>
+              <label for="edit-age" class="block text-body-sm font-medium mb-1" x-text="t('profile.ageLabel2')">Age</label>
+              <input
+                id="edit-age" type="number" inputmode="numeric" x-model.number="editingProfile.age" @change="autoSaveProfile(true)"
+                class="input-modern w-full px-3 py-2" min="4" max="120" placeholder="9"
+              />
+            </div>
+          </div>
 
-          <label
-            for="edit-age"
-            class="block text-body-sm font-medium mb-1"
-            x-text="t('profile.ageLabel2')"
-            >Age</label
-          >
-          <input
-            id="edit-age"
-            type="number"
-            inputmode="numeric"
-            x-model.number="editingProfile.age"
-            class="input-modern w-full px-3 py-2 mb-3"
-            min="4"
-            max="120"
-            placeholder="9"
-          />
-
-          <span
-            class="block text-body-sm font-medium mb-1"
-            x-text="t('profile.localeLabel')"
-          ></span>
-          <div class="relative mb-3" x-data="{ langOpen: false }">
-            <button
-              @click="langOpen = !langOpen"
-              @click.outside="langOpen = false"
-              class="input-modern w-full px-3 py-2 flex items-center gap-2 text-left rounded-button cursor-pointer"
-            >
-              <span x-text="langFlag(editingProfile?.locale)"></span>
-              <span x-text="langLabel(editingProfile?.locale)"></span>
-              <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-text-secondary"></i>
-            </button>
-            <div
-              x-show="langOpen"
-              x-transition
-              class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full max-h-[240px] overflow-y-auto z-50"
-            >
-              <template x-for="lang in uiLanguages" :key="lang.code">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <!-- Language -->
+            <div>
+              <span class="block text-body-sm font-medium mb-1" x-text="t('profile.localeLabel')"></span>
+              <div class="relative" x-data="{ langOpen: false }">
                 <button
-                  @click="editingProfile.locale = lang.code; langOpen = false"
-                  class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+                  @click="langOpen = !langOpen" @click.outside="langOpen = false"
+                  class="input-modern w-full px-3 py-2 flex items-center gap-2 text-left rounded-button cursor-pointer"
                 >
-                  <span x-text="lang.flag"></span>
-                  <span x-text="lang.label"></span>
+                  <span x-text="langFlag(editingProfile?.locale)"></span>
+                  <span x-text="langLabel(editingProfile?.locale)"></span>
+                  <i data-lucide="chevron-down" class="w-4 h-4 ml-auto text-text-secondary"></i>
+                </button>
+                <div
+                  x-show="langOpen" x-transition
+                  class="absolute left-0 top-full mt-1 bg-surface rounded-card shadow-float py-1 w-full max-h-[240px] overflow-y-auto z-50"
+                >
+                  <template x-for="lang in uiLanguages" :key="lang.code">
+                    <button
+                      @click="editingProfile.locale = lang.code; langOpen = false; autoSaveProfile(true)"
+                      class="w-full px-3 py-2 text-left text-body-sm hover:bg-primary/10 transition-colors flex items-center gap-2"
+                    >
+                      <span x-text="lang.flag"></span>
+                      <span x-text="lang.label"></span>
+                    </button>
+                  </template>
+                </div>
+              </div>
+            </div>
+            <!-- Theme -->
+            <div>
+              <label class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')"></label>
+              <select x-model="editingProfile.theme" @change="applyThemeLive()" class="w-full input-modern px-3 py-2 text-body-sm">
+                <option value="" x-text="t('profile.themeDefault')"></option>
+                <option value="dark" x-text="t('profile.themeDark')"></option>
+                <option value="light" x-text="t('profile.themeLight')"></option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Section: Avatar -->
+          <span class="block text-body-sm font-medium mb-2" x-text="t('profile.avatarLabel')"></span>
+          <div class="flex items-start gap-4 mb-5">
+            <!-- Preview -->
+            <span
+              class="w-24 sm:w-28 aspect-[4/5] rounded-2xl shrink-0 block ring-3 ring-primary shadow-float transition-all"
+              :style="avatarStyle(editingProfile?.avatar)"
+            ></span>
+            <!-- Grid -->
+            <div class="grid grid-cols-5 sm:grid-cols-8 gap-1.5 flex-1">
+              <template x-for="av in profileAvatars" :key="av">
+                <button
+                  @click="editingProfile.avatar = av; autoSaveProfile(true)"
+                  class="aspect-[4/5] rounded-lg overflow-hidden transition-all focus-ring"
+                  :class="editingProfile?.avatar === av ? 'ring-2 ring-primary scale-105 shadow-float' : 'ring-1 ring-gray-200 hover:ring-gray-300 hover:shadow-card hover:scale-105'"
+                >
+                  <span class="w-full h-full block" :style="avatarStyle(av)"></span>
                 </button>
               </template>
             </div>
           </div>
 
-          <span
-            class="block text-body-sm font-medium mb-2"
-            x-text="t('profile.avatarLabel')"
-          ></span>
-          <div class="grid grid-cols-5 gap-2 mb-4">
-            <template x-for="av in profileAvatars" :key="av">
-              <button
-                @click="editingProfile.avatar = av"
-                class="aspect-[4/5] rounded-xl overflow-hidden transition-all focus-ring"
-                :class="editingProfile?.avatar === av ? 'ring-3 ring-primary scale-105 shadow-float' : 'ring-1 ring-gray-200 hover:ring-gray-300 hover:shadow-card'"
-              >
-                <span class="w-full h-full block" :style="avatarStyle(av)"></span>
-              </button>
-            </template>
+          <!-- Section: Voice preferences -->
+          <div x-show="mistralVoicesList.length > 0" class="mb-4 p-3 bg-gray-50 rounded-card">
+            <span class="text-body-sm font-medium" x-text="t('profile.voicePreferences')"></span>
+            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.voicePreferencesHint')"></p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')"></label>
+                <select x-model="editingProfile.mistralVoices.host" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
+                  <option value="" x-text="t('profile.voiceDefault')"></option>
+                  <template x-for="v in mistralVoicesList" :key="'ph-'+v.id">
+                    <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                  </template>
+                </select>
+              </div>
+              <div>
+                <label class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')"></label>
+                <select x-model="editingProfile.mistralVoices.guest" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
+                  <option value="" x-text="t('profile.voiceDefault')"></option>
+                  <template x-for="v in mistralVoicesList" :key="'pg-'+v.id">
+                    <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
+                  </template>
+                </select>
+              </div>
+            </div>
+            <div
+              x-show="(!editingProfile.mistralVoices.host || !editingProfile.mistralVoices.guest) && defaultVoiceHint(editingProfile.locale)"
+              class="mt-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 flex items-center gap-1.5"
+            >
+              <span>🎙️</span>
+              <span x-text="t('profile.voiceCurrentDefault') + ' ' + defaultVoiceHint(editingProfile.locale)"></span>
+            </div>
           </div>
 
-          <!-- Moderation toggle -->
-          <div class="mb-3 p-3 bg-gray-50 rounded-card">
-            <div class="flex items-center justify-between">
-              <div>
-                <span
-                  class="text-body-sm font-medium"
-                  x-text="t('profile.moderationToggle')"
-                ></span>
-                <p
-                  class="text-xs text-text-secondary"
-                  x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
-                ></p>
+          <!-- Section: Safety — moderation + chat side by side toggles -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <!-- Moderation toggle -->
+            <div class="p-3 bg-gray-50 rounded-card">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-body-sm font-medium" x-text="t('profile.moderationToggle')"></span>
+                  <p class="text-xs text-text-secondary" x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"></p>
+                </div>
+                <button
+                  @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration; autoSaveParental() })"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
+                  :class="editingProfile?.useModeration ? 'bg-green-500' : 'bg-gray-300'"
+                >
+                  <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" :class="editingProfile?.useModeration ? 'translate-x-6' : 'translate-x-1'"></span>
+                </button>
               </div>
-              <button
-                @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration })"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring"
-                :class="editingProfile?.useModeration ? 'bg-green-500' : 'bg-gray-300'"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  :class="editingProfile?.useModeration ? 'translate-x-6' : 'translate-x-1'"
-                ></span>
-              </button>
+            </div>
+            <!-- Chat toggle -->
+            <div class="p-3 bg-gray-50 rounded-card">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')"></span>
+                  <p class="text-xs text-text-secondary" x-text="editingProfile?.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"></p>
+                </div>
+                <button
+                  @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled; autoSaveParental() })"
+                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
+                  :class="editingProfile?.chatEnabled ? 'bg-blue-500' : 'bg-gray-300'"
+                >
+                  <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform" :class="editingProfile?.chatEnabled ? 'translate-x-6' : 'translate-x-1'"></span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -384,18 +428,16 @@
           <div
             x-show="editingProfile?.useModeration && allModerationCategories.length > 0"
             x-transition
-            class="mb-3 p-3 bg-gray-50 rounded-card"
+            class="mb-4 p-3 bg-gray-50 rounded-card"
           >
             <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"></span>
             <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')"></p>
-            <div class="space-y-1.5">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
               <template x-for="cat in allModerationCategories" :key="cat">
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input
-                    type="checkbox"
-                    :value="cat"
-                    :aria-label="t('moderation.cat.' + cat)"
-                    x-model="editingProfile.moderationCategories"
+                    type="checkbox" :value="cat" :aria-label="t('moderation.cat.' + cat)"
+                    x-model="editingProfile.moderationCategories" @change="autoSaveParental()"
                     class="w-4 h-4 rounded text-primary accent-primary focus-ring"
                   />
                   <span x-text="t('moderation.cat.' + cat)"></span>
@@ -403,47 +445,26 @@
               </template>
             </div>
             <button
-              @click="editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup)"
+              @click="editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup); autoSaveParental()"
               class="text-xs text-primary mt-2 hover:underline"
               x-text="t('profile.moderationResetDefaults')"
             ></button>
           </div>
 
-          <!-- Chat toggle -->
-          <div class="mb-4 p-3 bg-gray-50 rounded-card">
-            <div class="flex items-center justify-between">
-              <div>
-                <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')"></span>
-                <p
-                  class="text-xs text-text-secondary"
-                  x-text="editingProfile?.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"
-                ></p>
-              </div>
-              <button
-                @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled })"
-                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring"
-                :class="editingProfile?.chatEnabled ? 'bg-blue-500' : 'bg-gray-300'"
-              >
-                <span
-                  class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                  :class="editingProfile?.chatEnabled ? 'translate-x-6' : 'translate-x-1'"
-                ></span>
-              </button>
-            </div>
-          </div>
-
+          <!-- Actions -->
           <div class="flex gap-2">
             <button
-              @click="editingProfile = null"
-              class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-gray-100 text-text-secondary hover:bg-gray-200 transition-colors btn-press focus-ring"
-              x-text="t('common.cancel')"
+              @click="resetProfileDefaults()"
+              class="min-h-touch px-4 rounded-button font-semibold text-body-sm bg-gray-100 text-text-secondary hover:bg-gray-200 transition-colors btn-press focus-ring"
+              x-text="t('profile.resetDefaults')"
             ></button>
             <button
-              @click="saveEditProfile()"
-              :disabled="!editingProfile?.name?.trim() || !editingProfile?.age"
-              class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring disabled:opacity-50"
-              x-text="t('common.save')"
-            ></button>
+              @click="closeEditProfile()"
+              class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring inline-flex items-center justify-center gap-2"
+            >
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+              <span x-text="t('profile.backToProfiles')"></span>
+            </button>
           </div>
         </div>
       </template>

@@ -10,6 +10,7 @@ import type {
   FillBlankAttempt,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
+import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech } from '../generators/tts-provider.js';
@@ -18,7 +19,7 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-export function generationCrudRoutes(store: ProjectStore, client: Mistral): Router {
+export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
   const router = Router();
 
   // --- Quiz attempt (save score) ---
@@ -214,7 +215,10 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral): Rout
       }
 
       const config = getConfig();
-      const voiceId = resolveVoices(config).host;
+      const project = store.getProject(req.params.pid);
+      const profileId = project?.meta?.profileId;
+      const profile = profileId ? profileStore.get(profileId) : null;
+      const voiceId = resolveVoices(config, profile?.mistralVoices, req.body.lang).host;
       const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, {
         provider: config.ttsProvider,
         model: config.ttsModel,

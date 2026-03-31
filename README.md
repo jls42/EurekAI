@@ -229,6 +229,38 @@ npm run dev
 
 ---
 
+## Déploiement avec conteneur
+
+L'image est publiée sur **GitHub Container Registry** :
+
+```bash
+# Télécharger l'image
+podman pull ghcr.io/jls42/eurekai:latest
+
+# Lancer EurekAI
+mkdir -p ./data
+podman run -d --name eurekai \
+  -e MISTRAL_API_KEY=votre_clé_ici \
+  -e ELEVENLABS_API_KEY=votre_clé_ici \
+  -v ./data:/app/output:U \
+  -p 3000:3000 \
+  ghcr.io/jls42/eurekai:latest
+# → http://localhost:3000
+```
+
+> **`:U`** est un flag Podman rootless qui ajuste automatiquement les permissions du volume.
+> **`ELEVENLABS_API_KEY`** est optionnel (TTS alternatif).
+
+```bash
+# Build local
+podman build -t eurekai -f Containerfile .
+
+# Publier sur ghcr.io (mainteneurs)
+./scripts/publish-ghcr.sh
+```
+
+---
+
 ## Structure du projet
 
 ```

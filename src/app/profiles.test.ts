@@ -520,7 +520,7 @@ describe('createProfiles', () => {
       });
       callMethod('startEditProfile', ctx, 'p1');
 
-      expect(ctx.editingProfile).toEqual({ id: 'p1', name: 'Alice', hasPin: false, locale: 'en' });
+      expect(ctx.editingProfile).toEqual({ id: 'p1', name: 'Alice', hasPin: false, locale: 'en', mistralVoices: { host: '', guest: '' }, theme: '' });
       expect(ctx.showProfileForm).toBe(false);
     });
 
@@ -640,14 +640,13 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
         currentProfile: { id: 'p1', name: 'Alice', locale: 'fr' },
       });
-      // Wire up updateProfile
       ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
 
       await callMethod('saveEditProfile', ctx);
 
       expect(fetch).toHaveBeenCalledWith('/api/profiles/p1', expect.objectContaining({ method: 'PUT' }));
       expect(ctx.editingProfile).toBeNull();
-      expect(ctx.showToast).toHaveBeenCalledWith('toast.profileUpdated', 'success');
     });
 
     it('includes verified PIN in updates', async () => {
@@ -671,6 +670,7 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'A' }],
       });
       ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
 
       await callMethod('saveEditProfile', ctx);
 
@@ -681,6 +681,7 @@ describe('createProfiles', () => {
     it('returns early if editingProfile is null', async () => {
       vi.stubGlobal('fetch', vi.fn());
       const ctx = makeCtx({ editingProfile: null });
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -690,6 +691,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: '   ', age: 10 },
       });
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -699,6 +701,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: 'Test', age: 3 },
       });
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -718,10 +721,10 @@ describe('createProfiles', () => {
         currentProfile: { id: 'p1', name: 'A', locale: 'fr' },
       });
       ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
 
-      await callMethod('saveEditProfile', ctx);
-
-      expect(ctx.setLocale).toHaveBeenCalledWith('en', true);
+      callMethod('autoSaveProfile', ctx, true);
+      await vi.waitFor(() => expect(ctx.setLocale).toHaveBeenCalledWith('en', true));
     });
   });
 

@@ -164,6 +164,8 @@ export class ProfileStore {
         | 'moderationCategories'
         | 'useConsigne'
         | 'chatEnabled'
+        | 'mistralVoices'
+        | 'theme'
       >
     >,
   ): Profile | null {
@@ -183,6 +185,8 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
+    if (updates.mistralVoices !== undefined) profile.mistralVoices = updates.mistralVoices;
+    if (updates.theme !== undefined) profile.theme = updates.theme || undefined;
     if (updates.age !== undefined) {
       profile.age = updates.age;
       profile.ageGroup = ageToGroup(updates.age);

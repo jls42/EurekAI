@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
-import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus } from './config.js';
+import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache } from './config.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
@@ -55,6 +55,12 @@ const store = new ProjectStore(outputDir);
 const profileStore = new ProfileStore(outputDir);
 initConfig(outputDir);
 
+// Pre-load voice cache for language-based voice defaults
+import('./generators/tts-provider.js')
+  .then(({ listVoices }) => listVoices(client))
+  .then((voices) => setVoiceCache(voices))
+  .catch(() => {});
+
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));
 
@@ -75,6 +81,7 @@ app.get('/api/config/voices', async (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
     const { listVoices } = await import('./generators/tts-provider.js');
     const voices = await listVoices(client, lang);
+    if (!lang) setVoiceCache(voices);
     res.json(voices);
   } catch (e) {
     console.error('List voices error:', e);
@@ -92,7 +99,7 @@ app.use('/api/profiles', profileRoutes(outputDir, store));
 app.use('/api/projects', projectRoutes(store));
 app.use('/api/projects', sourceRoutes(store, client, profileStore));
 app.use('/api/projects', generateRoutes(store, client, profileStore));
-app.use('/api/projects', generationCrudRoutes(store, client));
+app.use('/api/projects', generationCrudRoutes(store, client, profileStore));
 app.use('/api/projects', chatRoutes(store, client, profileStore));
 
 // --- Start ---

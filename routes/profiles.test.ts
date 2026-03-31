@@ -328,7 +328,7 @@ describe('profileRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Profil introuvable' });
     });
 
-    it('requires correct PIN for profile with PIN — missing PIN returns 403', async () => {
+    it('allows non-parental update without PIN for profile with PIN', async () => {
       const store = new ProfileStore(tmpDir);
       const created = store.create('Enfant', 9, '0', 'fr', '1234');
 
@@ -341,18 +341,35 @@ describe('profileRoutes', () => {
 
       await handler(req, res);
 
-      expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+      expect(res.json).toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].name).toBe('Updated');
     });
 
-    it('requires correct PIN for profile with PIN — wrong PIN returns 403', async () => {
+    it('requires correct PIN for parental field — missing PIN returns 403', async () => {
       const store = new ProfileStore(tmpDir);
       const created = store.create('Enfant', 9, '0', 'fr', '1234');
 
       const handler = getHandler(router, 'put', '/:id');
       const req = mockReq({
         params: { id: created.id },
-        body: { name: 'Updated', pin: '0000' },
+        body: { useModeration: false },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(403);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+    });
+
+    it('requires correct PIN for parental field — wrong PIN returns 403', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Enfant', 9, '0', 'fr', '1234');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { chatEnabled: true, pin: '0000' },
       });
       const res = mockRes();
 

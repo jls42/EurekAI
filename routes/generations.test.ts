@@ -85,7 +85,8 @@ const client = {} as any;
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-generations-route-'));
   store = new ProjectStore(tempDir);
-  router = generationCrudRoutes(store, client);
+  const profileStore = { get: vi.fn(() => null) } as any;
+  router = generationCrudRoutes(store, client, profileStore);
 
   // Create a project and populate it with various generation types
   const project = store.createProject('Test Project');

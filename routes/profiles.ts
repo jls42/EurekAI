@@ -37,18 +37,23 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
     res.json(profileToPublic(profile));
   });
 
+  const PARENTAL_FIELDS = ['useModeration', 'moderationCategories', 'chatEnabled'];
+
   router.put('/:id', (req, res) => {
     const profile = store.get(req.params.id);
     if (!profile) {
       res.status(404).json({ error: 'Profil introuvable' });
       return;
     }
-    // If profile has PIN, verify it
+    // PIN only required for parental control fields
     if (profile.pinHash) {
-      const { pin } = req.body;
-      if (!pin || !verifyPin(pin, profile.pinHash)) {
-        res.status(403).json({ error: 'Code PIN incorrect' });
-        return;
+      const hasParentalChange = PARENTAL_FIELDS.some((f) => req.body[f] !== undefined);
+      if (hasParentalChange) {
+        const { pin } = req.body;
+        if (!pin || !verifyPin(pin, profile.pinHash)) {
+          res.status(403).json({ error: 'Code PIN incorrect' });
+          return;
+        }
       }
     }
     const updated = store.update(req.params.id, req.body);

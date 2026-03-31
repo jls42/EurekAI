@@ -13,6 +13,8 @@ export interface Profile {
   moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
+  mistralVoices?: { host: string; guest: string };
+  theme?: 'dark' | 'light';
   pinHash?: string;
   createdAt: string;
 }

@@ -336,6 +336,14 @@ describe('ProfileStore.update', () => {
     expect(updated!.chatEnabled).toBe(true);
   });
 
+  it('updates mistralVoices', () => {
+    const p = store.create('VoiceUser', 12);
+    expect(p.mistralVoices).toBeUndefined();
+    const voices = { host: 'voice-host-id', guest: 'voice-guest-id' };
+    const updated = store.update(p.id, { mistralVoices: voices });
+    expect(updated!.mistralVoices).toEqual(voices);
+  });
+
   it('returns null for unknown id', () => {
     expect(store.update('nonexistent', { name: 'X' })).toBeNull();
   });
