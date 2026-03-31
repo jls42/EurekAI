@@ -324,8 +324,8 @@
             </div>
             <!-- Theme -->
             <div>
-              <label class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')"></label>
-              <select x-model="editingProfile.theme" @change="applyThemeLive()" class="w-full input-modern px-3 py-2 text-body-sm">
+              <label for="edit-theme" class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')"></label>
+              <select id="edit-theme" x-model="editingProfile.theme" @change="applyThemeLive()" class="w-full input-modern px-3 py-2 text-body-sm">
                 <option value="" x-text="t('profile.themeDefault')"></option>
                 <option value="dark" x-text="t('profile.themeDark')"></option>
                 <option value="light" x-text="t('profile.themeLight')"></option>
@@ -361,8 +361,8 @@
             <p class="text-xs text-text-secondary mb-2" x-text="t('profile.voicePreferencesHint')"></p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')"></label>
-                <select x-model="editingProfile.mistralVoices.host" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
+                <label for="edit-voice-host" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')"></label>
+                <select id="edit-voice-host" x-model="editingProfile.mistralVoices.host" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
                   <option value="" x-text="t('profile.voiceDefault')"></option>
                   <template x-for="v in mistralVoicesList" :key="'ph-'+v.id">
                     <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
@@ -370,8 +370,8 @@
                 </select>
               </div>
               <div>
-                <label class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')"></label>
-                <select x-model="editingProfile.mistralVoices.guest" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
+                <label for="edit-voice-guest" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')"></label>
+                <select id="edit-voice-guest" x-model="editingProfile.mistralVoices.guest" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
                   <option value="" x-text="t('profile.voiceDefault')"></option>
                   <template x-for="v in mistralVoicesList" :key="'pg-'+v.id">
                     <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>

@@ -7,6 +7,7 @@ import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
 import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache } from './config.js';
+import { listVoices } from './generators/tts-provider.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
@@ -56,10 +57,7 @@ const profileStore = new ProfileStore(outputDir);
 initConfig(outputDir);
 
 // Pre-load voice cache for language-based voice defaults
-import('./generators/tts-provider.js')
-  .then(({ listVoices }) => listVoices(client))
-  .then((voices) => setVoiceCache(voices))
-  .catch(() => {});
+try { setVoiceCache(await listVoices(client)); } catch { /* optional */ }
 
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));
@@ -79,7 +77,6 @@ app.post('/api/config/reset', (_req, res) => {
 app.get('/api/config/voices', async (req, res) => {
   try {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
-    const { listVoices } = await import('./generators/tts-provider.js');
     const voices = await listVoices(client, lang);
     if (!lang) setVoiceCache(voices);
     res.json(voices);

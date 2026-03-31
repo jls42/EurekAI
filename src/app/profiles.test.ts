@@ -728,6 +728,170 @@ describe('createProfiles', () => {
     });
   });
 
+  // --- autoSaveProfile ---
+
+  describe('autoSaveProfile', () => {
+    it('saves profile data immediately when immediate=true', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1', name: 'A', locale: 'fr' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        profiles: [{ id: 'p1', name: 'A' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      callMethod('autoSaveProfile', ctx, true);
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+    });
+
+    it('skips save if editingProfile is null', () => {
+      vi.stubGlobal('fetch', vi.fn());
+      const ctx = makeCtx({ editingProfile: null });
+      callMethod('autoSaveProfile', ctx, true);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('skips save if name is empty', () => {
+      vi.stubGlobal('fetch', vi.fn());
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: '  ', age: 10, avatar: '0', locale: 'fr' },
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      callMethod('autoSaveProfile', ctx, true);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+
+    it('debounces when immediate is false', () => {
+      vi.useFakeTimers();
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1', name: 'A' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        profiles: [{ id: 'p1', name: 'A' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      callMethod('autoSaveProfile', ctx);
+      expect(fetch).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(600);
+      expect(fetch).toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+  });
+
+  // --- autoSaveParental ---
+
+  describe('autoSaveParental', () => {
+    it('saves parental fields with PIN', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1', useModeration: false }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', useModeration: false, chatEnabled: true, moderationCategories: [], _verifiedPin: '1234' },
+        profiles: [{ id: 'p1' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      callMethod('autoSaveParental', ctx);
+      await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
+      const body = JSON.parse((fetch as any).mock.calls[0][1].body);
+      expect(body.pin).toBe('1234');
+      expect(body.useModeration).toBe(false);
+    });
+
+    it('skips if editingProfile is null', () => {
+      vi.stubGlobal('fetch', vi.fn());
+      const ctx = makeCtx({ editingProfile: null });
+      callMethod('autoSaveParental', ctx);
+      expect(fetch).not.toHaveBeenCalled();
+    });
+  });
+
+  // --- applyThemeLive ---
+
+  describe('applyThemeLive', () => {
+    beforeEach(() => {
+      vi.stubGlobal('document', { documentElement: { dataset: {} } });
+      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    });
+
+    it('applies profile theme when set', () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', theme: 'light', mistralVoices: { host: '', guest: '' } },
+        profiles: [{ id: 'p1' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      callMethod('applyThemeLive', ctx);
+      expect(ctx.theme).toBe('light');
+      expect((document as any).documentElement.dataset.theme).toBe('light');
+    });
+
+    it('falls back to system default when theme is empty', () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', theme: '', mistralVoices: { host: '', guest: '' } },
+        profiles: [{ id: 'p1' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      callMethod('applyThemeLive', ctx);
+      expect(['dark', 'light']).toContain(ctx.theme);
+    });
+  });
+
+  // --- closeEditProfile / resetProfileDefaults ---
+
+  describe('closeEditProfile', () => {
+    it('saves and clears editingProfile', () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        profiles: [{ id: 'p1' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      callMethod('closeEditProfile', ctx);
+      expect(ctx.editingProfile).toBeNull();
+    });
+  });
+
+  describe('resetProfileDefaults', () => {
+    beforeEach(() => {
+      vi.stubGlobal('document', { documentElement: { dataset: {} } });
+      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+    });
+
+    it('resets voices and theme to defaults', () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, json: () => Promise.resolve({ id: 'p1' }),
+      }));
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: 'x', guest: 'y' }, theme: 'dark' },
+        profiles: [{ id: 'p1' }],
+      });
+      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.applyThemeLive = profiles.applyThemeLive.bind(ctx);
+      callMethod('resetProfileDefaults', ctx);
+      expect(ctx.editingProfile.mistralVoices).toEqual({ host: '', guest: '' });
+      expect(ctx.editingProfile.theme).toBe('');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.profileReset', 'success');
+    });
+
+    it('skips if editingProfile is null', () => {
+      const ctx = makeCtx({ editingProfile: null });
+      callMethod('resetProfileDefaults', ctx);
+      expect(ctx.showToast).not.toHaveBeenCalled();
+    });
+  });
+
   // --- requirePin ---
 
   describe('requirePin', () => {

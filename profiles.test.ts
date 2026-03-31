@@ -344,6 +344,20 @@ describe('ProfileStore.update', () => {
     expect(updated!.mistralVoices).toEqual(voices);
   });
 
+  it('updates theme', () => {
+    const p = store.create('ThemeUser', 10);
+    expect(p.theme).toBeUndefined();
+    const updated = store.update(p.id, { theme: 'dark' });
+    expect(updated!.theme).toBe('dark');
+  });
+
+  it('clears theme when set to empty string', () => {
+    const p = store.create('ThemeUser2', 10);
+    store.update(p.id, { theme: 'light' });
+    const updated = store.update(p.id, { theme: '' as any });
+    expect(updated!.theme).toBeUndefined();
+  });
+
   it('returns null for unknown id', () => {
     expect(store.update('nonexistent', { name: 'X' })).toBeNull();
   });
