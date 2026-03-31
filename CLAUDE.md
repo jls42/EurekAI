@@ -65,11 +65,13 @@ Ce projet utilise Alpine.js qui genere du contenu dynamique invisible a l'analys
 Quand une remontee SonarQube est un faux positif, annoter la ligne avec le pattern :
 
 - **JS/TS** : `// NOSONAR(S1234) — raison concise du skip`
-- **HTML** : `<!-- NOSONAR(S1234) — raison concise du skip -->`
+- **HTML** : NOSONAR ne fonctionne PAS en HTML (le plugin sonar-html ne le supporte pas).
+  Pour les faux positifs HTML, utiliser un contenu statique fallback que Alpine.js remplace au runtime :
+  `<label x-text="t('key')">Fallback text</label>` au lieu de `<label x-text="t('key')"></label>`
 
 Faux positifs connus dans ce projet :
-- `S5254` Headings vides — Alpine.js `x-text` remplit le contenu au runtime
-- `S5765` Labels non associes — Labels avec `x-text` suivis d'inputs avec `x-model`
+- `S5254` Headings vides — Alpine.js `x-text` remplit le contenu au runtime → ajouter texte fallback
+- `S5765` Labels non associes — Labels avec `x-text` → ajouter texte fallback + `for`/`id`
 - `S4043` replace vs replaceAll — Regex avec flag `g` + callback avec capture groups
 - `S1082` Keyboard handlers sur div — Alpine.js `@keydown` equivalent a `onKeyDown` natif
 

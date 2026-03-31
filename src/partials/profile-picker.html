@@ -324,7 +324,7 @@
             </div>
             <!-- Theme -->
             <div>
-              <label for="edit-theme" class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')"></label> <!-- NOSONAR(S5765) — Alpine.js x-text fills label at runtime -->
+              <label for="edit-theme" class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')">Theme</label>
               <select id="edit-theme" x-model="editingProfile.theme" @change="applyThemeLive()" class="w-full input-modern px-3 py-2 text-body-sm">
                 <option value="" x-text="t('profile.themeDefault')"></option>
                 <option value="dark" x-text="t('profile.themeDark')"></option>
@@ -361,7 +361,7 @@
             <p class="text-xs text-text-secondary mb-2" x-text="t('profile.voicePreferencesHint')"></p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label for="edit-voice-host" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')"></label> <!-- NOSONAR(S5765) — Alpine.js x-text fills label at runtime -->
+                <label for="edit-voice-host" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
                 <select id="edit-voice-host" x-model="editingProfile.mistralVoices.host" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
                   <option value="" x-text="t('profile.voiceDefault')"></option>
                   <template x-for="v in mistralVoicesList" :key="'ph-'+v.id">
@@ -370,7 +370,7 @@
                 </select>
               </div>
               <div>
-                <label for="edit-voice-guest" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')"></label> <!-- NOSONAR(S5765) — Alpine.js x-text fills label at runtime -->
+                <label for="edit-voice-guest" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
                 <select id="edit-voice-guest" x-model="editingProfile.mistralVoices.guest" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
                   <option value="" x-text="t('profile.voiceDefault')"></option>
                   <template x-for="v in mistralVoicesList" :key="'pg-'+v.id">
