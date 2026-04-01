@@ -891,6 +891,16 @@ describe('resolveError', () => {
     const ctx = { t: (k: string) => k };
     expect(callWith<string>(helpers.resolveError, ctx, 'Something went wrong')).toBe('Something went wrong');
   });
+
+  it('handles context_too_large with percentage', () => {
+    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `Trop gros ${params?.pct}%` : k) };
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:95')).toBe('Trop gros 95%');
+  });
+
+  it('handles context_too_large at exactly 100%', () => {
+    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `${params?.pct}%` : k) };
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:100')).toBe('100%');
+  });
 });
 
 describe('activeGenerations', () => {

@@ -52,7 +52,7 @@ function makeContext(overrides: any = {}) {
     moderationBlockedMessage: gen.moderationBlockedMessage,
     flaggedCategoryLabels: vi.fn(() => ''),
     configDraft: { models: { summary: 'mistral-large-latest' } },
-    apiStatus: { mistral: true, elevenlabs: false, ttsAvailable: true, modelLimits: {} },
+    apiStatus: { mistral: true, elevenlabs: false, ttsAvailable: true },
     generate: gen.generate,
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,
@@ -791,5 +791,100 @@ describe('generateVoice', () => {
     mockFetchOk({ audioUrls: { intro: '/audio/retry2.mp3' } });
     await retryFn();
     expect(genObj._audioUrl_intro).toBe('/audio/retry2.mp3');
+  });
+});
+
+describe('isBatchComplete', () => {
+  it('returns false when no audio at all', () => {
+    const genObj = { data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns false when only intro exists', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns true when all required sections have audio (no optional)', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: {} };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+
+  it('returns false when fun_fact content exists but no audio', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { fun_fact: 'Wow!' } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns false when vocabulary content exists but no audio', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { vocabulary: ['w'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns true when all sections including optionals have audio', () => {
+    const genObj = {
+      _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3',
+      _audioUrl_fun_fact: '/c.mp3', _audioUrl_vocabulary: '/d.mp3',
+      data: { fun_fact: 'Wow!', vocabulary: ['w'] },
+    };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+
+  it('ignores empty vocabulary array', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { vocabulary: [] } };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+});
+
+describe('playNextSection', () => {
+  it('advances from intro to key_points', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'intro',
+      _audioUrl_key_points: '/kp.mp3',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('key_points');
+  });
+
+  it('skips sections without audio URL', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'intro',
+      _audioUrl_vocabulary: '/vocab.mp3',
+      // no key_points or fun_fact audio
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('vocabulary');
+  });
+
+  it('disables playlist at the end', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'vocabulary',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._playlistMode).toBe(false);
+  });
+
+  it('does nothing when playlist mode is off', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: false, _activeAudioSection: 'intro',
+      _audioUrl_key_points: '/kp.mp3',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('intro');
   });
 });

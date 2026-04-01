@@ -1481,4 +1481,56 @@ describe('generateRoutes', () => {
       expect(gen.sourceIds).toEqual(['src-1', 'src-2']);
     });
   });
+
+  describe('checkContextLimit integration', () => {
+    it('returns 400 when content exceeds 80% of model context limit', async () => {
+      const { getModelLimits } = await import('../config.js');
+      // Mock config models.summary = 'm', so limit must match 'm'
+      vi.mocked(getModelLimits).mockReturnValue({ m: 300 });
+
+      const project = store.createProject('ctx-test');
+      const ctxPid = project.meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      // 300 token limit × 0.8 = 240 tokens. At ~3 chars/token, 240 tokens ≈ 720 chars
+      const longContent = 'x'.repeat(800);
+      store.addSource(ctxPid, { id: 's-long', filename: 'big.txt', markdown: longContent, uploadedAt: new Date().toISOString() });
+      const req = mockReq({ params: { pid: ctxPid }, body: { sourceIds: ['s-long'] } });
+      const res = mockRes();
+      await handler(req, res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json.mock.calls[0][0].error).toMatch(/^context_too_large:\d+$/);
+
+      vi.mocked(getModelLimits).mockReturnValue({});
+    });
+
+    it('passes when content is within limit', async () => {
+      const { getModelLimits } = await import('../config.js');
+      vi.mocked(getModelLimits).mockReturnValue({ m: 100000 });
+
+      const project = store.createProject('ctx-ok');
+      const ctxPid = project.meta.id;
+      store.addSource(ctxPid, { id: 's-ok', filename: 'ok.txt', markdown: 'Short content', uploadedAt: new Date().toISOString() });
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid: ctxPid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+      expect(res.status).not.toHaveBeenCalledWith(400);
+
+      vi.mocked(getModelLimits).mockReturnValue({});
+    });
+
+    it('passes when model has no known limit', async () => {
+      const { getModelLimits } = await import('../config.js');
+      vi.mocked(getModelLimits).mockReturnValue({});
+
+      const project = store.createProject('ctx-nolimit');
+      const ctxPid = project.meta.id;
+      store.addSource(ctxPid, { id: 's-nl', filename: 'nl.txt', markdown: 'Content', uploadedAt: new Date().toISOString() });
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid: ctxPid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+      expect(res.status).not.toHaveBeenCalledWith(400);
+    });
+  });
 });

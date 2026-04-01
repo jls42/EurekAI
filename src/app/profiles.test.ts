@@ -1190,4 +1190,118 @@ describe('createProfiles', () => {
       expect(ctx.selectProfile).toHaveBeenCalledWith('p1');
     });
   });
+
+  // --- executeDeleteProfile error handling ---
+
+  describe('executeDeleteProfile error handling', () => {
+    it('does not clean up local state on HTTP error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: false, statusText: 'Forbidden',
+        json: async () => ({ error: 'Code PIN incorrect' }),
+      }));
+      const profile = { id: 'p-del', name: 'Test', hasPin: false };
+      let deletePromise: Promise<void> | undefined;
+      const ctx = makeCtx({
+        profiles: [profile],
+        currentProfile: { id: 'p-del' },
+        confirmDelete: vi.fn((_msg: string, cb: () => void) => { deletePromise = cb() as any; }),
+      });
+      callMethod('deleteProfile', ctx, 'p-del');
+      // Wait for the async delete operation
+      await deletePromise;
+      await vi.dynamicImportSettled?.() ?? new Promise((r) => setTimeout(r, 10));
+      // Profile should NOT be removed since res.ok was false
+      expect(ctx.profiles).toHaveLength(1);
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        expect.stringContaining('toast.error'),
+        'error',
+      );
+      vi.stubGlobal('fetch', vi.fn());
+    });
+  });
+
+  // --- toggleModerationCategory ---
+
+  describe('toggleModerationCategory', () => {
+    it('does not mutate categories before PIN success callback', () => {
+      const initialCats = ['violence', 'sexual'];
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', hasPin: true, moderationCategories: [...initialCats] },
+      });
+      // requireParentalAccess stores callback but doesn't call it yet
+      ctx.requireParentalAccess = vi.fn();
+      callMethod('toggleModerationCategory', ctx, 'hate_and_discrimination');
+      // Categories must NOT be mutated before callback fires
+      expect(ctx.editingProfile.moderationCategories).toEqual(initialCats);
+    });
+
+    it('adds category on PIN success', () => {
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', hasPin: true, moderationCategories: ['violence'] },
+      });
+      ctx.autoSaveParental = vi.fn();
+      // requireParentalAccess immediately calls the callback
+      ctx.requireParentalAccess = vi.fn((cb: Function) => cb());
+      callMethod('toggleModerationCategory', ctx, 'sexual');
+      expect(ctx.editingProfile.moderationCategories).toContain('sexual');
+      expect(ctx.autoSaveParental).toHaveBeenCalled();
+    });
+
+    it('removes category on PIN success if already present', () => {
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', hasPin: true, moderationCategories: ['violence', 'sexual'] },
+      });
+      ctx.autoSaveParental = vi.fn();
+      ctx.requireParentalAccess = vi.fn((cb: Function) => cb());
+      callMethod('toggleModerationCategory', ctx, 'violence');
+      expect(ctx.editingProfile.moderationCategories).not.toContain('violence');
+      expect(ctx.autoSaveParental).toHaveBeenCalled();
+    });
+
+    it('initializes empty array if moderationCategories is undefined', () => {
+      const ctx = makeCtx({
+        editingProfile: { id: 'p1', hasPin: false, moderationCategories: undefined },
+      });
+      ctx.autoSaveParental = vi.fn();
+      ctx.requireParentalAccess = vi.fn((cb: Function) => cb());
+      callMethod('toggleModerationCategory', ctx, 'violence');
+      expect(ctx.editingProfile.moderationCategories).toEqual(['violence']);
+    });
+  });
+
+  // --- autoSaveProfile partial voices ---
+
+  describe('autoSaveProfile partial voices', () => {
+    it('sends partial voice override (host only)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
+      const ctx = makeCtx({
+        editingProfile: {
+          id: 'p1', name: 'Test', age: 10, avatar: '0', locale: 'fr',
+          mistralVoices: { host: 'custom-host', guest: '' },
+          theme: '',
+        },
+        updateProfile: vi.fn(),
+      });
+      await callMethod('autoSaveProfile', ctx, true);
+      expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
+        mistralVoices: { host: 'custom-host', guest: '' },
+      }));
+      vi.stubGlobal('fetch', vi.fn());
+    });
+
+    it('sends null when both voices are empty', async () => {
+      const ctx = makeCtx({
+        editingProfile: {
+          id: 'p1', name: 'Test', age: 10, avatar: '0', locale: 'fr',
+          mistralVoices: { host: '', guest: '' },
+          theme: '',
+        },
+        updateProfile: vi.fn(),
+      });
+      await callMethod('autoSaveProfile', ctx, true);
+      expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
+        mistralVoices: null,
+      }));
+    });
+  });
 });

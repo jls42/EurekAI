@@ -263,6 +263,15 @@ export function createGenerate() {
     /** Playlist section order for summary read-aloud */
     _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],
 
+    /** Check if all expected sections for a summary have audio generated */
+    isBatchComplete(gen: any): boolean {
+      if (!gen._audioUrl_intro || !gen._audioUrl_key_points) return false;
+      const d = gen.data;
+      if (d?.fun_fact && !gen._audioUrl_fun_fact) return false;
+      if (d?.vocabulary?.length && !gen._audioUrl_vocabulary) return false;
+      return true;
+    },
+
     /** Play next section in playlist mode */
     playNextSection(this: any, gen: any) {
       if (!gen._playlistMode) return;

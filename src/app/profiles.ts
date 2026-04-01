@@ -12,7 +12,12 @@ async function executeDeleteProfile(
     opts.body = JSON.stringify({ pin });
   }
   try {
-    await fetch('/api/profiles/' + id, opts);
+    const res = await fetch('/api/profiles/' + id, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
+      return;
+    }
     clearProfileLocale(id);
     state.profiles = state.profiles.filter((p: any) => p.id !== id);
     if (state.currentProfile?.id === id) {
@@ -210,7 +215,9 @@ export function createProfiles() {
         if (!name?.trim() || !age || age < 4 || age > 120) return;
         const updates: any = {
           name: name.trim(), age, avatar, locale,
-          mistralVoices: (mistralVoices?.host && mistralVoices?.guest) ? mistralVoices : null,
+          mistralVoices: (mistralVoices?.host || mistralVoices?.guest)
+            ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
+            : null,
           theme: theme || null,
         };
         if (_verifiedPin) updates.pin = _verifiedPin;
@@ -223,12 +230,22 @@ export function createProfiles() {
       this._autoSaveTimer = setTimeout(doSave, 500);
     },
 
-    autoSaveParental(this: any) {
+    toggleModerationCategory(this: any, cat: string) {
+      this.requireParentalAccess(() => {
+        const cats = (this.editingProfile.moderationCategories ??= []);
+        const idx = cats.indexOf(cat);
+        if (idx >= 0) cats.splice(idx, 1);
+        else cats.push(cat);
+        this.autoSaveParental();
+      });
+    },
+
+    async autoSaveParental(this: any) {
       if (!this.editingProfile) return;
       const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin } = this.editingProfile;
       const updates: any = { useModeration, moderationCategories, chatEnabled };
       if (_verifiedPin) updates.pin = _verifiedPin;
-      this.updateProfile(id, updates);
+      await this.updateProfile(id, updates);
     },
 
     applyThemeLive(this: any) {

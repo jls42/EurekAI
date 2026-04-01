@@ -436,8 +436,9 @@
               <template x-for="cat in allModerationCategories" :key="cat">
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input
-                    type="checkbox" :value="cat" :aria-label="t('moderation.cat.' + cat)"
-                    x-model="editingProfile.moderationCategories" @change="requireParentalAccess(() => autoSaveParental())"
+                    type="checkbox" :aria-label="t('moderation.cat.' + cat)"
+                    :checked="(editingProfile.moderationCategories || []).includes(cat)"
+                    @click.prevent="toggleModerationCategory(cat)"
                     class="w-4 h-4 rounded text-primary accent-primary focus-ring"
                   />
                   <span x-text="t('moderation.cat.' + cat)"></span>

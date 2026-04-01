@@ -97,7 +97,7 @@ function handleGeneration(
   profileStore: ProfileStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
   modelId?: string,
-  options?: { skipContextCheck?: boolean },
+  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ) {
   return async (req: Request, res: Response) => {
     try {
@@ -121,7 +121,8 @@ function handleGeneration(
       const config = getConfig();
       const models = config.models as Record<string, string>;
       const resolvedModel = modelId ? (models[modelId] || modelId) : models.summary;
-      const ctxError = options?.skipContextCheck ? null : checkContextLimit(markdown, resolvedModel);
+      const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
+      const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
       if (ctxError) {
         res.status(400).json({ error: ctxError });
         return;
@@ -380,7 +381,7 @@ export function generateRoutes(
         type: 'image',
         data,
       };
-    }, 'mistral-large-latest'),
+    }, 'mistral-large-latest', { checkRawMarkdown: true }),
   );
 
   // --- Fill-in-the-blanks ---

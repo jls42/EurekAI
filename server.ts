@@ -57,7 +57,7 @@ const profileStore = new ProfileStore(outputDir);
 initConfig(outputDir);
 
 // Pre-load voice cache and model context limits
-try { setVoiceCache(await listVoices(client)); } catch { /* optional */ }
+try { setVoiceCache(await listVoices(client)); } catch (e: any) { console.warn('Voice cache not loaded:', e.message); }
 try {
   const models = await client.models.list();
   const limits: Record<string, number> = {};
@@ -67,7 +67,7 @@ try {
     for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
   }
   setModelLimits(limits);
-} catch { /* optional */ }
+} catch (e: any) { console.warn('Model limits not loaded:', e.message); }
 
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));

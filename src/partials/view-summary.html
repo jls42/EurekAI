@@ -54,10 +54,10 @@
             <div class="flex flex-wrap gap-1.5" :class="(gen._audioUrl_intro || gen._audioUrl_key_points || gen._audioUrl_fun_fact || gen._audioUrl_vocabulary) ? 'mb-2' : ''">
               <!-- Chip: All (batch generate or playlist) -->
               <button
-                @click="gen._audioUrl_intro ? (gen._playlistMode = true, gen._activeAudioSection = 'intro', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen)"
+                @click="isBatchComplete(gen) ? (gen._playlistMode = true, gen._activeAudioSection = 'intro', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen)"
                 :disabled="gen._generatingVoice_all === true"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_intro ? (gen._playlistMode ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
+                :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary' : isBatchComplete(gen) ? (gen._playlistMode ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
                 <i x-show="gen._generatingVoice_all !== true" data-lucide="headphones" class="w-3.5 h-3.5"></i>
                 <span x-show="gen._generatingVoice_all === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"></span>

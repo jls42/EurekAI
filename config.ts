@@ -81,7 +81,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   return currentConfig;
 }
 
-export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean; modelLimits: Record<string, number> } {
+export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean } {
   const config = currentConfig ?? DEFAULT_CONFIG;
   const hasMistral = !!process.env.MISTRAL_API_KEY;
   const hasElevenlabs = !!process.env.ELEVENLABS_API_KEY;
@@ -89,7 +89,6 @@ export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvai
     mistral: hasMistral,
     elevenlabs: hasElevenlabs,
     ttsAvailable: config.ttsProvider === 'mistral' ? hasMistral : hasElevenlabs,
-    modelLimits,
   };
 }
 
@@ -125,19 +124,25 @@ export function resolveVoices(
   profileVoices?: { host: string; guest: string },
   lang?: string,
 ): { host: string; guest: string } {
-  // Tier 1: profile-level voices
-  if (profileVoices?.host && profileVoices?.guest) return profileVoices;
-  // Tier 2: language defaults (dynamic resolution from voice cache)
-  if (config.ttsProvider === 'mistral' && lang) {
+  if (config.ttsProvider !== 'mistral') {
+    return { host: config.voices.host.id, guest: config.voices.guest.id };
+  }
+
+  // Resolve defaults first (tier 2: language defaults, tier 3: global config)
+  let defaults: { host: string; guest: string } | undefined;
+  if (lang) {
     const sel = VOICE_SELECTION[lang];
     if (sel) {
-      const host = findVoice(lang, sel.host);
-      const guest = findVoice(lang, sel.guest);
-      if (host && guest) return { host, guest };
+      const h = findVoice(lang, sel.host);
+      const g = findVoice(lang, sel.guest);
+      if (h && g) defaults = { host: h, guest: g };
     }
   }
-  // Tier 3: global config fallback
-  return config.ttsProvider === 'mistral'
-    ? config.mistralVoices
-    : { host: config.voices.host.id, guest: config.voices.guest.id };
+  defaults ??= config.mistralVoices;
+
+  // Merge profile overrides per field (partial overrides supported)
+  return {
+    host: profileVoices?.host || defaults.host,
+    guest: profileVoices?.guest || defaults.guest,
+  };
 }

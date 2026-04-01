@@ -158,6 +158,14 @@ describe('resolveVoices', () => {
     expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
   });
 
+  it('ignore les voix profil quand provider est elevenlabs', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'elevenlabs';
+    const voices = resolveVoices(cfg, { host: 'mistral-host', guest: 'mistral-guest' }, 'fr');
+    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
+  });
+
   it('tier 1: retourne les voix du profil si definies', () => {
     initConfig(tempDir);
     const cfg = getConfig();
@@ -201,14 +209,24 @@ describe('resolveVoices', () => {
     expect(voices).toEqual(cfg.mistralVoices);
   });
 
-  it('ignore voix profil partielles (host seul)', () => {
+  it('merge voix profil partielles (host seul → host custom + guest default)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
     const partial = { host: 'only-host', guest: '' };
     const voices = resolveVoices(cfg, partial, 'fr');
-    expect(voices).toEqual(cfg.mistralVoices);
+    expect(voices).toEqual({ host: 'only-host', guest: cfg.mistralVoices.guest });
+  });
+
+  it('merge voix profil partielles (guest seul → host default + guest custom)', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([]);
+    const partial = { host: '', guest: 'only-guest' };
+    const voices = resolveVoices(cfg, partial, 'fr');
+    expect(voices).toEqual({ host: cfg.mistralVoices.host, guest: 'only-guest' });
   });
 });
 
