@@ -30,6 +30,7 @@ export const nl: Record<string, string> = {
   'gen.questionCount': 'Aantal:',
   'gen.needsElevenLabs': 'Vereist een ElevenLabs API-sleutel',
   'gen.needsTts': 'Vereist een geconfigureerde TTS-provider',
+  'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
@@ -184,6 +185,11 @@ export const nl: Record<string, string> = {
   'summary.emptyWithSources': 'Klik op Nieuwe samenvatting om te beginnen',
   'summary.keyPoints': 'Belangrijkste punten',
   'summary.funFact': 'Wist je dat?',
+  'summary.audioAll': 'All',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Key points',
+  'summary.audioFunFact': 'Fun fact',
+  'summary.audioVocabulary': 'Vocabulary',
   'summary.vocabulary': 'Woordenschat',
 
   'flashcards.heading': 'Flashcards',

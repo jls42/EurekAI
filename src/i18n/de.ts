@@ -30,6 +30,7 @@ export const de: Record<string, string> = {
   'gen.questionCount': 'Anzahl:',
   'gen.needsElevenLabs': 'Erfordert einen ElevenLabs-API-Schl\u00fcssel',
   'gen.needsTts': 'Erfordert einen konfigurierten TTS-Anbieter',
+  'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',
@@ -184,6 +185,11 @@ export const de: Record<string, string> = {
   'summary.emptyWithSources': 'Klicke auf Neuer Lernzettel um loszulegen',
   'summary.keyPoints': 'Wichtige Punkte',
   'summary.funFact': 'Wusstest du schon?',
+  'summary.audioAll': 'All',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Key points',
+  'summary.audioFunFact': 'Fun fact',
+  'summary.audioVocabulary': 'Vocabulary',
   'summary.vocabulary': 'Vokabeln',
 
   'flashcards.heading': 'Lernkarten',

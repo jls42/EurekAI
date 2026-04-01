@@ -236,12 +236,10 @@ ${ageInstruction(ageGroup)}`;
 }
 
 export function imageUser(lang: string, markdown: string): string {
-  const lines = markdown.split('\n').filter((l) => l.trim());
-  const content = lines
-    .filter((l) => !l.startsWith('# Source '))
-    .slice(0, 30)
-    .join('\n')
-    .slice(0, 1500);
+  const content = markdown
+    .split('\n')
+    .filter((l) => l.trim() && !l.startsWith('# Source '))
+    .join('\n');
 
   const langLabel = lang === 'fr' ? 'français' : LANG_NAMES[lang] || lang;
   return `Genere une illustration pedagogique a partir de ce contenu (contexte ${langLabel}).

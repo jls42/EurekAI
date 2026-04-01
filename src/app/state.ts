@@ -86,7 +86,7 @@ export function createState() {
 
     // Settings
     showSettings: false,
-    apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false, modelLimits: {} as Record<string, number> },
     allModerationCategories: [] as string[],
     moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as Array<{

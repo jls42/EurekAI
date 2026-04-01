@@ -49,7 +49,7 @@ Reponds en JSON strict:
       },
       {
         role: 'user',
-        content: `Analyse ce contenu et decide quel materiel educatif generer pour ${AGE_LABELS[ageGroup]}:\n\n${markdown.slice(0, 3000)}`,
+        content: `Analyse ce contenu et decide quel materiel educatif generer pour ${AGE_LABELS[ageGroup]}:\n\n${markdown}`,
       },
     ],
     responseFormat: { type: 'json_object' },

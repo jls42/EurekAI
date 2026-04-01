@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { ProjectStore } from './store.js';
-import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache } from './config.js';
+import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache, setModelLimits } from './config.js';
 import { listVoices } from './generators/tts-provider.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
@@ -56,8 +56,18 @@ const store = new ProjectStore(outputDir);
 const profileStore = new ProfileStore(outputDir);
 initConfig(outputDir);
 
-// Pre-load voice cache for language-based voice defaults
+// Pre-load voice cache and model context limits
 try { setVoiceCache(await listVoices(client)); } catch { /* optional */ }
+try {
+  const models = await client.models.list();
+  const limits: Record<string, number> = {};
+  for (const m of models.data ?? []) {
+    const card = m as any;
+    if (card.maxContextLength) limits[card.id] = card.maxContextLength;
+    for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
+  }
+  setModelLimits(limits);
+} catch { /* optional */ }
 
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));

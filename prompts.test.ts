@@ -239,11 +239,10 @@ describe('imageSystem', () => {
 });
 
 describe('imageUser', () => {
-  it('returns truncated markdown (max 1500 chars) with lang context', () => {
+  it('sends full markdown content with lang context', () => {
     const longMd = 'a'.repeat(3000);
     const result = imageUser('fr', longMd);
-    // The content portion is sliced to 1500 chars max
-    expect(result.length).toBeLessThan(3000);
+    expect(result).toContain('a'.repeat(3000));
     expect(result).toContain('français');
     expect(result).toContain('illustration pedagogique');
     expect(result).toContain('INTERDICTION TOTALE DE TEXTE');

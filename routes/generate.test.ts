@@ -100,6 +100,7 @@ vi.mock('../config.js', () => ({
     mistralVoices: { host: 'mh', guest: 'mg' },
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
+  getModelLimits: vi.fn(() => ({})),
 }));
 
 // --- Helpers ---

@@ -437,7 +437,7 @@
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
                   <input
                     type="checkbox" :value="cat" :aria-label="t('moderation.cat.' + cat)"
-                    x-model="editingProfile.moderationCategories" @change="autoSaveParental()"
+                    x-model="editingProfile.moderationCategories" @change="requireParentalAccess(() => autoSaveParental())"
                     class="w-4 h-4 rounded text-primary accent-primary focus-ring"
                   />
                   <span x-text="t('moderation.cat.' + cat)"></span>
@@ -445,7 +445,7 @@
               </template>
             </div>
             <button
-              @click="editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup); autoSaveParental()"
+              @click="requireParentalAccess(() => { editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup); autoSaveParental() })"
               class="text-xs text-primary mt-2 hover:underline"
               x-text="t('profile.moderationResetDefaults')"
             ></button>

@@ -33,6 +33,7 @@ export const fr: Record<string, string> = {
   'gen.questionCount': 'Nombre :',
   'gen.needsElevenLabs': 'Necessite une cle API ElevenLabs',
   'gen.needsTts': 'Necessite un fournisseur TTS configure',
+  'gen.contextTooLarge': 'Contenu trop volumineux ({pct}% de la capacite du modele). Selectionnez moins de sources.',
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -198,6 +199,11 @@ export const fr: Record<string, string> = {
   'summary.emptyWithSources': 'Clique sur Nouvelle fiche pour commencer',
   'summary.keyPoints': 'Points cles',
   'summary.funFact': 'Le savais-tu ?',
+  'summary.audioAll': 'Tout',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Points cles',
+  'summary.audioFunFact': 'Savais-tu',
+  'summary.audioVocabulary': 'Vocabulaire',
   'summary.vocabulary': 'Vocabulaire',
 
   // Flashcards view

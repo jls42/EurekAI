@@ -260,25 +260,58 @@ export function createGenerate() {
       }
     },
 
-    async generateVoice(this: any, gen: any) {
-      if (gen._generatingVoice) return;
-      gen._generatingVoice = true;
+    /** Playlist section order for summary read-aloud */
+    _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],
+
+    /** Play next section in playlist mode */
+    playNextSection(this: any, gen: any) {
+      if (!gen._playlistMode) return;
+      const order = this._audioSectionOrder;
+      const idx = order.indexOf(gen._activeAudioSection);
+      for (let i = idx + 1; i < order.length; i++) {
+        if (gen[`_audioUrl_${order[i]}`]) {
+          gen._activeAudioSection = order[i];
+          this.$nextTick(() => {
+            const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
+            if (a) { a.load(); a.play().catch(() => {}); }
+          });
+          return;
+        }
+      }
+      gen._playlistMode = false;
+    },
+
+    async generateVoice(this: any, gen: any, section?: string) {
+      const key = section || 'all';
+      const busyKey = `_generatingVoice_${key}`;
+      if (gen[busyKey]) return;
+      gen[busyKey] = true;
       try {
+        const body: any = { lang: getLocale() };
+        if (section) body.section = section;
         const res = await fetch(this.apiBase() + '/generations/' + gen.id + '/read-aloud', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
         });
         if (res.ok) {
           const result = await res.json();
-          if (gen.type === 'summary') {
-            gen.data.audioUrl = result.audioUrl;
+          // Batch response (all sections)
+          if (result.audioUrls) {
+            for (const [s, url] of Object.entries(result.audioUrls)) {
+              gen[`_audioUrl_${s}`] = url;
+            }
+            gen._activeAudioSection = 'intro';
+            gen._playlistMode = true;
+          } else {
+            // Single section
+            gen[`_audioUrl_${section || 'all'}`] = result.audioUrl;
+            gen._activeAudioSection = section || 'intro';
+            gen._playlistMode = false;
           }
-          gen._audioUrl = result.audioUrl;
           this.showToast(this.t('toast.audioDone'), 'success');
           this.$nextTick(() => {
-            const audioEl = document.querySelector(
-              `audio[data-gen-id="${gen.id}"]`,
-            ) as HTMLAudioElement;
+            const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
             if (audioEl) {
               audioEl.load();
               audioEl.play().catch((e) => console.warn('Auto-play blocked:', e.message));
@@ -289,14 +322,14 @@ export function createGenerate() {
           this.showToast(
             this.t('toast.error', { error: err.error || res.statusText }),
             'error',
-            () => this.generateVoice(gen),
+            () => this.generateVoice(gen, section),
           );
         }
       } catch (e) {
         console.error('Voice generation error:', e);
-        this.showToast(this.t('toast.audioError'), 'error', () => this.generateVoice(gen));
+        this.showToast(this.t('toast.audioError'), 'error', () => this.generateVoice(gen, section));
       } finally {
-        gen._generatingVoice = false;
+        gen[busyKey] = false;
       }
     },
   };

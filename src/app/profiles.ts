@@ -70,6 +70,11 @@ export function createProfiles() {
       if (profile.theme) {
         this.theme = profile.theme;
         document.documentElement.dataset.theme = profile.theme;
+      } else {
+        const stored = localStorage.getItem('sf-theme');
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        this.theme = stored || system;
+        document.documentElement.dataset.theme = this.theme;
       }
       // Reset project state and reload projects for this profile
       this.currentProjectId = null;
@@ -180,7 +185,7 @@ export function createProfiles() {
           const res = await fetch('/api/profiles/' + this.editingProfile.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin }),
+            body: JSON.stringify({ pin, useModeration: this.editingProfile.useModeration }),
           });
           if (!res.ok) {
             this.showToast(this.t('profile.pinWrong'), 'error');
@@ -205,8 +210,8 @@ export function createProfiles() {
         if (!name?.trim() || !age || age < 4 || age > 120) return;
         const updates: any = {
           name: name.trim(), age, avatar, locale,
-          mistralVoices: (mistralVoices?.host && mistralVoices?.guest) ? mistralVoices : undefined,
-          theme: theme || undefined,
+          mistralVoices: (mistralVoices?.host && mistralVoices?.guest) ? mistralVoices : null,
+          theme: theme || null,
         };
         if (_verifiedPin) updates.pin = _verifiedPin;
         await this.updateProfile(id, updates);

@@ -95,7 +95,7 @@ describe('createState', () => {
 
     // Settings
     expect(state.showSettings).toBe(false);
-    expect(state.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false });
+    expect(state.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false, modelLimits: {} });
     expect(state.mistralVoicesList).toEqual([]);
 
     // Lightbox

@@ -30,6 +30,7 @@ export const pt: Record<string, string> = {
   'gen.questionCount': 'Quantidade:',
   'gen.needsElevenLabs': 'Requer uma chave de API do ElevenLabs',
   'gen.needsTts': 'Requer um provedor de TTS configurado',
+  'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
@@ -184,6 +185,11 @@ export const pt: Record<string, string> = {
   'summary.emptyWithSources': 'Clique em Nova ficha para come\u00e7ar',
   'summary.keyPoints': 'Pontos-chave',
   'summary.funFact': 'Voc\u00ea sabia?',
+  'summary.audioAll': 'All',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Key points',
+  'summary.audioFunFact': 'Fun fact',
+  'summary.audioVocabulary': 'Vocabulary',
   'summary.vocabulary': 'Vocabul\u00e1rio',
 
   'flashcards.heading': 'Flashcards',

@@ -81,7 +81,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   return currentConfig;
 }
 
-export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean } {
+export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean; modelLimits: Record<string, number> } {
   const config = currentConfig ?? DEFAULT_CONFIG;
   const hasMistral = !!process.env.MISTRAL_API_KEY;
   const hasElevenlabs = !!process.env.ELEVENLABS_API_KEY;
@@ -89,8 +89,16 @@ export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvai
     mistral: hasMistral,
     elevenlabs: hasElevenlabs,
     ttsAvailable: config.ttsProvider === 'mistral' ? hasMistral : hasElevenlabs,
+    modelLimits,
   };
 }
+
+// --- Model context limits cache ---
+
+let modelLimits: Record<string, number> = {};
+
+export function setModelLimits(limits: Record<string, number>): void { modelLimits = limits; }
+export function getModelLimits(): Record<string, number> { return modelLimits; }
 
 // --- Voice cache & language defaults ---
 

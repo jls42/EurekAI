@@ -281,6 +281,8 @@ export function createHelpers() {
     },
 
     resolveError(this: any, error: string): string {
+      const ctxMatch = error.match(/^context_too_large:(\d+)$/);
+      if (ctxMatch) return this.t('gen.contextTooLarge', { pct: ctxMatch[1] });
       const translated = this.t(error);
       return translated === error ? error : translated;
     },
@@ -324,8 +326,7 @@ export function createHelpers() {
     },
 
     initGenProps(gen: any) {
-      gen._audioUrl = gen._audioUrl || null;
-      gen._generatingVoice = gen._generatingVoice || false;
+      gen._generatingVoice_all = gen._generatingVoice_all || false;
       if (gen.type === 'podcast') gen._scriptOpen = false;
     },
 

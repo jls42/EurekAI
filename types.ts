@@ -47,6 +47,7 @@ export interface StudyFiche {
   vocabulary: { word: string; definition: string }[];
   citations?: Array<{ text: string; sourceRef: string }>;
   audioUrl?: string;
+  audioUrls?: Record<string, string>;
 }
 
 export interface Flashcard {

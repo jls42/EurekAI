@@ -72,6 +72,10 @@ describe('createProfiles', () => {
   // --- selectProfile ---
 
   describe('selectProfile', () => {
+    beforeEach(() => {
+      vi.stubGlobal('document', { documentElement: { dataset: {} } });
+      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+    });
     it('sets currentProfile and saves to localStorage', () => {
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],

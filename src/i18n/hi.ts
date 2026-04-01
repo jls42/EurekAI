@@ -30,6 +30,7 @@ export const hi: Record<string, string> = {
   'gen.questionCount': '\u0938\u0902\u0916\u094D\u092F\u093E:',
   'gen.needsElevenLabs': 'ElevenLabs API \u0915\u0941\u0902\u091C\u0940 \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u0948',
   'gen.needsTts': '\u090F\u0915 TTS \u092A\u094D\u0930\u0926\u093E\u0924\u093E \u0915\u0949\u0928\u094D\u092B\u093C\u093F\u0917\u0930 \u0915\u0930\u0928\u093E \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u0948',
+  'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'header.menuProjects': '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
   'header.switchToLight': '\u0932\u093E\u0907\u091F \u092E\u094B\u0921 \u092E\u0947\u0902 \u092C\u0926\u0932\u0947\u0902',
@@ -184,6 +185,11 @@ export const hi: Record<string, string> = {
   'summary.emptyWithSources': '\u0936\u0941\u0930\u0942 \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0928\u092F\u093E \u0928\u094B\u091F \u092A\u0930 \u0915\u094D\u0932\u093F\u0915 \u0915\u0930\u0947\u0902',
   'summary.keyPoints': '\u092E\u0941\u0916\u094D\u092F \u092C\u093F\u0902\u0926\u0941',
   'summary.funFact': '\u0915\u094D\u092F\u093E \u0906\u092A \u091C\u093E\u0928\u0924\u0947 \u0939\u0948\u0902?',
+  'summary.audioAll': 'All',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Key points',
+  'summary.audioFunFact': 'Fun fact',
+  'summary.audioVocabulary': 'Vocabulary',
   'summary.vocabulary': '\u0936\u092C\u094D\u0926\u093E\u0935\u0932\u0940',
 
   'flashcards.heading': 'Flashcards',

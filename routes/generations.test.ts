@@ -642,25 +642,24 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Generation introuvable' });
   });
 
-  it('genere le TTS pour un summary', async () => {
+  it('genere le TTS batch pour un summary (toutes sections)', async () => {
     const { textToSpeech } = await import('../generators/tts-provider.js');
+    (textToSpeech as any).mockClear();
+
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
     const req = mockReq({ params: { pid, gid: summaryGid }, body: {} });
     const res = mockRes();
 
     await handler(req, res);
 
-    expect(textToSpeech).toHaveBeenCalled();
-    const callArgs = (textToSpeech as any).mock.calls[0];
-    // Text should include title, summary, key_points, and fun_fact
-    expect(callArgs[0]).toContain('Mon resume');
-    expect(callArgs[0]).toContain('Un resume du sujet');
-    expect(callArgs[0]).toContain('Point 1');
-    expect(callArgs[0]).toContain('Point 2');
-    expect(callArgs[0]).toContain('Le saviez-vous ?');
-
+    // Batch mode: generates each section individually
+    expect(textToSpeech).toHaveBeenCalledTimes(4); // intro + key_points + fun_fact + vocabulary
     const result = res.json.mock.calls[0][0];
-    expect(result.audioUrl).toMatch(/^\/output\/projects\/.+\/read-aloud-.+\.mp3$/);
+    expect(result.audioUrls).toBeDefined();
+    expect(result.audioUrls.intro).toContain('read-aloud-');
+    expect(result.audioUrls.key_points).toContain('read-aloud-');
+    expect(result.audioUrls.fun_fact).toContain('read-aloud-');
+    expect(result.audioUrls.vocabulary).toContain('read-aloud-');
   });
 
   it('genere le TTS pour des flashcards', async () => {
@@ -708,16 +707,20 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Type non supporte pour la lecture' });
   });
 
-  it('met a jour la generation summary avec audioUrl', async () => {
+  it('genere une seule section quand section=intro', async () => {
+    const { textToSpeech } = await import('../generators/tts-provider.js');
+    (textToSpeech as any).mockClear();
+
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
-    const req = mockReq({ params: { pid, gid: summaryGid }, body: {} });
+    const req = mockReq({ params: { pid, gid: summaryGid }, body: { section: 'intro' } });
     const res = mockRes();
 
     await handler(req, res);
 
-    // Verify the summary generation was updated with audioUrl
-    const gen = store.getGeneration(pid, summaryGid) as SummaryGeneration;
-    expect(gen.data.audioUrl).toMatch(/^\/output\/projects\/.+\/read-aloud-.+\.mp3$/);
+    expect(textToSpeech).toHaveBeenCalledTimes(1);
+    const result = res.json.mock.calls[0][0];
+    expect(result.audioUrl).toContain('read-aloud-');
+    expect(result.audioUrl).toContain('-intro');
   });
 
   it('ne met pas a jour la generation flashcards avec audioUrl', async () => {
@@ -753,11 +756,10 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     );
   });
 
-  it('tronque le texte a 5000 caracteres', async () => {
+  it('sends full text without truncation', async () => {
     const { textToSpeech } = await import('../generators/tts-provider.js');
     (textToSpeech as any).mockClear();
 
-    // Create a summary with very long content
     const longText = 'A'.repeat(6000);
     const longSummaryGen: SummaryGeneration = {
       id: 'sum-long',
@@ -781,6 +783,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     const callArgs = (textToSpeech as any).mock.calls[0];
-    expect(callArgs[0].length).toBe(5000);
+    expect(callArgs[0].length).toBeGreaterThan(5000);
   });
+
 });
