@@ -254,9 +254,10 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
 
       // Batch mode: generate all sections individually for summaries
       if (section === 'all' && gen.type === 'summary') {
-        const { audioUrls, failedSections } = await generateBatchAudio(gen as SummaryGeneration, voiceId, ttsOpts, projectDir, req.params.pid);
+        const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
+        const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, req.params.pid);
         if (Object.keys(audioUrls).length > 0) {
-          const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
+          const d = summaryGen.data;
           store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
         }
         if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) { res.status(500).json({ error: 'TTS failed for all sections' }); return; }
