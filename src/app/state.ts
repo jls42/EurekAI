@@ -27,8 +27,11 @@ export function createState() {
     // Source state
     sources: [] as any[],
     selectedIds: [] as string[],
-    uploading: false,
-    uploadProgress: { current: 0, total: 0, filename: '' },
+    uploadSessions: [] as Array<{
+      id: string;
+      files: Array<{ name: string; status: 'pending' | 'uploading' | 'done' | 'error' }>;
+    }>,
+    get uploading(): boolean { return this.uploadSessions.length > 0; },
     dragging: false,
     viewSource: null as any,
     viewSourceMode: 'ocr' as string,

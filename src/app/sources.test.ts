@@ -9,6 +9,7 @@ const mockDialog = { showModal: vi.fn() };
 };
 
 globalThis.fetch = vi.fn();
+vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'test-session-id') });
 
 function makeContext(overrides: any = {}) {
   return {
@@ -17,8 +18,8 @@ function makeContext(overrides: any = {}) {
     selectedIds: [] as string[],
     textInput: '  hello world  ',
     showTextInput: true,
-    uploading: false,
-    uploadProgress: { current: 0, total: 0, filename: '' },
+    uploadSessions: [] as any[],
+    get uploading(): boolean { return this.uploadSessions.length > 0; },
     dragging: false,
     locale: 'fr',
     viewSource: null as any,
@@ -337,12 +338,17 @@ describe('createSources', () => {
 
       expect(ctx.sources).toEqual([newSource]);
       expect(ctx.selectedIds).toEqual(['s1']);
-      expect(ctx.uploading).toBe(false);
-      expect(ctx.uploadProgress).toEqual({ current: 0, total: 0, filename: '' });
+      // Session still visible (3s delay before cleanup)
+      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      expect(session.files[0].status).toBe('done');
       expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
+      // After 3s delay, session is cleaned up
+      vi.advanceTimersByTime(3000);
+      expect(ctx.uploadSessions).toEqual([]);
+      expect(ctx.uploading).toBe(false);
     });
 
-    it('multiple files uploaded sequentially with progress tracking', async () => {
+    it('multiple files uploaded sequentially with per-file status', async () => {
       const file1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
       const file2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
       const fileList = makeFileList(file1, file2);
@@ -357,8 +363,11 @@ describe('createSources', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(ctx.sources).toEqual([src1, src2]);
       expect(ctx.selectedIds).toEqual(['s1', 's2']);
+      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      expect(session.files[0].status).toBe('done');
+      expect(session.files[1].status).toBe('done');
+      vi.advanceTimersByTime(3000);
       expect(ctx.uploading).toBe(false);
-      expect(ctx.uploadProgress).toEqual({ current: 0, total: 0, filename: '' });
     });
 
     it('one file fails (res.ok=false) then continues to next file', async () => {
@@ -376,7 +385,9 @@ describe('createSources', () => {
       expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
       expect(ctx.sources).toEqual([src2]);
       expect(ctx.selectedIds).toEqual(['s2']);
-      expect(ctx.uploading).toBe(false);
+      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      expect(session.files[0].status).toBe('error');
+      expect(session.files[1].status).toBe('done');
     });
 
     it('network exception on one file then continues to next', async () => {
@@ -393,7 +404,9 @@ describe('createSources', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.uploadError', 'error');
       expect(ctx.sources).toEqual([src2]);
-      expect(ctx.uploading).toBe(false);
+      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      expect(session.files[0].status).toBe('error');
+      expect(session.files[1].status).toBe('done');
     });
 
     it('schedules refreshConsigne and refreshModeration after uploads', async () => {

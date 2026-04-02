@@ -23,6 +23,11 @@ vi.mock('../generators/quiz-vocal.js', () => ({
   verifyAnswer: vi.fn().mockResolvedValue({ correct: true, feedback: 'Bravo!' }),
 }));
 
+vi.mock('../generators/tts.js', () => ({
+  concatMp3: vi.fn().mockResolvedValue(Buffer.from('fake-concat-audio')),
+  generateSilence: vi.fn().mockResolvedValue(Buffer.from('fake-silence')),
+}));
+
 vi.mock('../config.js', () => ({
   getConfig: vi.fn(() => ({
     models: {
@@ -662,24 +667,42 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(result.audioUrls.vocabulary).toContain('read-aloud-');
   });
 
-  it('genere le TTS pour des flashcards', async () => {
+  it('genere le TTS dual-voice pour des flashcards', async () => {
     const { textToSpeech } = await import('../generators/tts-provider.js');
+    const { concatMp3, generateSilence } = await import('../generators/tts.js');
+    const { resolveVoices } = await import('../config.js');
     (textToSpeech as any).mockClear();
+    (concatMp3 as any).mockClear();
+    (generateSilence as any).mockClear();
+    (resolveVoices as any).mockClear();
 
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
-    const req = mockReq({ params: { pid, gid: flashcardsGid }, body: {} });
+    const req = mockReq({ params: { pid, gid: flashcardsGid }, body: { lang: 'fr' } });
     const res = mockRes();
 
     await handler(req, res);
 
-    expect(textToSpeech).toHaveBeenCalled();
-    const callArgs = (textToSpeech as any).mock.calls[0];
-    // Text should contain question/answer pairs
-    expect(callArgs[0]).toContain('Question 1');
-    expect(callArgs[0]).toContain('Qu est-ce que le soleil ?');
-    expect(callArgs[0]).toContain('Une etoile');
-    expect(callArgs[0]).toContain('Question 2');
-    expect(callArgs[0]).toContain('Un satellite');
+    // 4 TTS calls: 2 questions (host) + 2 answers (guest)
+    expect(textToSpeech).toHaveBeenCalledTimes(4);
+    const calls = (textToSpeech as any).mock.calls;
+    // Q1 with host voice
+    expect(calls[0][0]).toContain('Qu est-ce que le soleil ?');
+    expect(calls[0][1]).toBe('mh');
+    // A1 with guest voice
+    expect(calls[1][0]).toContain('Une etoile');
+    expect(calls[1][1]).toBe('mg');
+    // Q2 with host voice
+    expect(calls[2][0]).toContain('Qu est-ce que la lune ?');
+    expect(calls[2][1]).toBe('mh');
+    // A2 with guest voice
+    expect(calls[3][0]).toContain('Un satellite');
+    expect(calls[3][1]).toBe('mg');
+
+    // Silence generated once (2 cards > 1)
+    expect(generateSilence).toHaveBeenCalledWith(800);
+    // concatMp3 called with 5 segments: Q1, A1, silence, Q2, A2
+    expect(concatMp3).toHaveBeenCalledTimes(1);
+    expect((concatMp3 as any).mock.calls[0][0]).toHaveLength(5);
 
     const result = res.json.mock.calls[0][0];
     expect(result.audioUrl).toMatch(/^\/output\/projects\/.+\/read-aloud-.+\.mp3$/);

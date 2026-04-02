@@ -14,7 +14,23 @@ export interface TtsVoiceConfig {
   guest: string;
 }
 
-async function concatMp3(segments: Buffer[]): Promise<Buffer> {
+export async function generateSilence(durationMs: number): Promise<Buffer> {
+  const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-silence-'));
+  const outputPath = join(tmpDir, 'silence.mp3');
+  try {
+    await execFileAsync(ffmpegPath as string, [
+      '-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono',
+      '-t', String(durationMs / 1000),
+      '-c:a', 'libmp3lame', '-b:a', '128k', outputPath,
+    ]);
+    return await readFile(outputPath);
+  } finally {
+    await unlink(outputPath).catch(() => {});
+    await unlink(tmpDir).catch(() => {});
+  }
+}
+
+export async function concatMp3(segments: Buffer[]): Promise<Buffer> {
   if (segments.length === 1) return segments[0];
 
   const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-mp3-'));
