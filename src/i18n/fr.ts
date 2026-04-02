@@ -374,6 +374,7 @@ export const fr: Record<string, string> = {
   'toast.generationError': 'Erreur generation: {error}',
   'toast.allGenerated': 'Tout genere !',
   'toast.partialGenerated': '{count}/3 generations reussies',
+  'toast.typeReady': '{type} pret !',
   'toast.magicDone': 'Magie terminee !',
   'toast.autoError': 'Erreur generation auto: {error}',
   'toast.audioDone': 'Audio genere !',

@@ -346,6 +346,7 @@ export const nl: Record<string, string> = {
   'toast.generationError': 'Generatiefout: {error}',
   'toast.allGenerated': 'Alles gegenereerd!',
   'toast.partialGenerated': '{count}/3 generaties geslaagd',
+  'toast.typeReady': '{type} klaar!',
   'toast.magicDone': 'Magie voltooid!',
   'toast.autoError': 'Automatische generatiefout: {error}',
   'toast.audioDone': 'Audio gegenereerd!',

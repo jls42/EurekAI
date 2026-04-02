@@ -346,6 +346,7 @@ export const hi: Record<string, string> = {
   'toast.generationError': '\u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0924\u094D\u0930\u0941\u091F\u093F: {error}',
   'toast.allGenerated': '\u0938\u092C \u092C\u0928 \u0917\u090F!',
   'toast.partialGenerated': '{count}/3 \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0938\u092B\u0932 \u0939\u0941\u090F',
+  'toast.typeReady': '{type} \u0924\u0948\u092F\u093E\u0930!',
   'toast.magicDone': '\u091C\u093E\u0926\u0942 \u092A\u0942\u0930\u093E \u0939\u0941\u0906!',
   'toast.autoError': 'Auto \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0924\u094D\u0930\u0941\u091F\u093F: {error}',
   'toast.audioDone': '\u0911\u0921\u093F\u092F\u094B \u092C\u0928 \u0917\u092F\u093E!',

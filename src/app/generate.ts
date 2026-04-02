@@ -225,14 +225,33 @@ export function createGenerate() {
           this.abortControllers[step.agent] = controller;
         }
 
-        // Launch individual generations in parallel
+        // Launch individual generations in parallel, process each as it completes
         const base = '/api/projects/' + projectId;
-        const responses = await Promise.all(
-          plannedTypes.map((type) => fetch(base + '/generate/' + type, fetchOpts())),
-        );
+        let failures = 0;
+        const promises = plannedTypes.map(async (type) => {
+          try {
+            const res = await fetch(base + '/generate/' + type, fetchOpts());
+            if (this.currentProjectId !== projectId) return;
+            if (res.ok) {
+              registerGeneration(this, await res.json());
+              this.showToast(this.t('toast.typeReady', { type: this.t('gen.' + type) }), 'success');
+            } else {
+              failures++;
+              const err = await res.json().catch(() => ({}));
+              console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
+            }
+          } catch (e: any) {
+            if (e.name === 'AbortError') return;
+            failures++;
+            console.error(`auto: ${type} error:`, e.message);
+          } finally {
+            this.loading[type] = false;
+            delete this.abortControllers[type];
+            this.$nextTick(() => this.refreshIcons());
+          }
+        });
+        await Promise.all(promises);
         if (this.currentProjectId !== projectId) return;
-
-        const failures = await aggregateGenerateResults(responses, this);
 
         if (failures > 0 && failures < plannedTypes.length) {
           this.showToast(this.t('toast.partialGenerated', { count: plannedTypes.length - failures }), 'warning');
@@ -252,6 +271,8 @@ export function createGenerate() {
       } finally {
         this.loading.auto = false;
         delete this.abortControllers.auto;
+        // Individual types clean themselves up in their own finally blocks;
+        // this catches any leftovers (e.g. early abort before promises start)
         for (const type of plannedTypes) {
           this.loading[type] = false;
           delete this.abortControllers[type];
