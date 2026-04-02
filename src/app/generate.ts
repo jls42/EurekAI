@@ -234,7 +234,12 @@ export function createGenerate() {
             if (this.currentProjectId !== projectId) return;
             if (res.ok) {
               registerGeneration(this, await res.json());
-              this.showToast(this.t('toast.typeReady', { type: this.t('gen.' + type) }), 'success');
+              this.showToast(
+                this.t('toast.generationDone', { type: this.t('gen.' + type) }),
+                'success',
+                null,
+                { label: this.t('toast.view'), fn: () => this.goToView(type) },
+              );
             } else {
               failures++;
               const err = await res.json().catch(() => ({}));

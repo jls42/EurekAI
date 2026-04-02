@@ -350,7 +350,6 @@ export const en: Record<string, string> = {
   'toast.generationError': 'Generation error: {error}',
   'toast.allGenerated': 'All generated!',
   'toast.partialGenerated': '{count}/3 generations succeeded',
-  'toast.typeReady': '{type} ready!',
   'toast.magicDone': 'Magic complete!',
   'toast.autoError': 'Auto generation error: {error}',
   'toast.audioDone': 'Audio generated!',
