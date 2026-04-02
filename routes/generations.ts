@@ -19,6 +19,49 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+// --- Read Aloud (TTS) — helpers ---
+
+function sectionText(d: SummaryGeneration['data'], s: string): string {
+  if (s === 'intro') return `${d.title}. ${d.summary}`;
+  if (s === 'key_points') return d.key_points.join('. ');
+  if (s === 'fun_fact') return d.fun_fact || '';
+  if (s === 'vocabulary') return (d.vocabulary || []).map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`).join('. ');
+  return '';
+}
+
+function readAloudText(gen: any, section: string): string | null {
+  if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
+  if (gen.type === 'flashcards') {
+    const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
+    return cards.map((c: any, i: number) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`).join(' ');
+  }
+  return null;
+}
+
+async function generateBatchAudio(
+  gen: SummaryGeneration, voiceId: string, ttsOpts: any, projectDir: string, pid: string,
+): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
+  const d = gen.data;
+  const sections = ['intro', 'key_points'];
+  if (d.fun_fact) sections.push('fun_fact');
+  if (d.vocabulary?.length) sections.push('vocabulary');
+  const audioUrls: Record<string, string> = {};
+  const failedSections: string[] = [];
+  const baseId = gen.id.slice(0, 8);
+  for (const s of sections) {
+    const txt = sectionText(d, s);
+    if (!txt) continue;
+    try {
+      const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
+      audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
+    } catch (err) {
+      console.error(`TTS failed for section ${s}:`, err);
+      failedSections.push(s);
+    }
+  }
+  return { audioUrls, failedSections };
+}
+
 export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
   const router = Router();
 
@@ -189,49 +232,6 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       res.status(500).json({ error: String(e) });
     }
   });
-
-  // --- Read Aloud (TTS) — helpers ---
-
-  function sectionText(d: SummaryGeneration['data'], s: string): string {
-    if (s === 'intro') return `${d.title}. ${d.summary}`;
-    if (s === 'key_points') return d.key_points.join('. ');
-    if (s === 'fun_fact') return d.fun_fact || '';
-    if (s === 'vocabulary') return (d.vocabulary || []).map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`).join('. ');
-    return '';
-  }
-
-  async function generateBatchAudio(
-    gen: SummaryGeneration, voiceId: string, ttsOpts: any, projectDir: string, pid: string,
-  ): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
-    const d = gen.data;
-    const sections = ['intro', 'key_points'];
-    if (d.fun_fact) sections.push('fun_fact');
-    if (d.vocabulary?.length) sections.push('vocabulary');
-    const audioUrls: Record<string, string> = {};
-    const failedSections: string[] = [];
-    const baseId = gen.id.slice(0, 8);
-    for (const s of sections) {
-      const txt = sectionText(d, s);
-      if (!txt) continue;
-      try {
-        const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
-        audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
-      } catch (err) {
-        console.error(`TTS failed for section ${s}:`, err);
-        failedSections.push(s);
-      }
-    }
-    return { audioUrls, failedSections };
-  }
-
-  function readAloudText(gen: any, section: string): string | null {
-    if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
-    if (gen.type === 'flashcards') {
-      const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
-      return cards.map((c: any, i: number) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`).join(' ');
-    }
-    return null;
-  }
 
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
