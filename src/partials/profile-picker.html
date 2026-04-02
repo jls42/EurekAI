@@ -287,7 +287,7 @@
             <div>
               <label for="edit-age" class="block text-body-sm font-medium mb-1" x-text="t('profile.ageLabel2')">Age</label>
               <input
-                id="edit-age" type="number" inputmode="numeric" x-model.number="editingProfile.age" @change="autoSaveProfile(true)"
+                id="edit-age" type="number" inputmode="numeric" x-model.number="editingProfile.age" @change="requireParentalAccess(() => autoSaveProfile(true))"
                 class="input-modern w-full px-3 py-2" min="4" max="120" placeholder="9"
               />
             </div>

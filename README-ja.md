@@ -214,8 +214,8 @@ npm install
 # Configurer les clés API
 cp .env.example .env
 # Éditez .env avec vos clés :
-#   MISTRAL_API_KEY=votre_clé_ici           (requis)
-#   ELEVENLABS_API_KEY=votre_clé_ici        (optionnel, TTS alternatif)
+#   MISTRAL_API_KEY=<your_api_key>           (requis)
+#   ELEVENLABS_API_KEY=<your_api_key>        (optionnel, TTS alternatif)
 #   SONAR_TOKEN=...                          (optionnel, CI SonarCloud uniquement)
 
 # Lancer le développement
@@ -239,8 +239,8 @@ podman pull ghcr.io/jls42/eurekai:latest
 # Lancer EurekAI
 mkdir -p ./data
 podman run -d --name eurekai \
-  -e MISTRAL_API_KEY=votre_clé_ici \
-  -e ELEVENLABS_API_KEY=votre_clé_ici \
+  -e MISTRAL_API_KEY=<your_api_key> \
+  -e ELEVENLABS_API_KEY=<your_api_key> \
   -v ./data:/app/output:U \
   -p 3000:3000 \
   ghcr.io/jls42/eurekai:latest

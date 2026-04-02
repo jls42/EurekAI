@@ -460,6 +460,19 @@ describe('ProfileStore legacy migration', () => {
     expect(list[0].moderationCategories).toEqual(MODERATION_CATEGORIES.enfant);
   });
 
+  it('backfills updatedAt from createdAt on legacy profiles', () => {
+    store.create('LegacyNoUpdatedAt', 12);
+    const filePath = join(tempDir, 'profiles.json');
+    const profiles = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const createdAt = profiles[profiles.length - 1].createdAt;
+    delete profiles[profiles.length - 1].updatedAt;
+    writeFileSync(filePath, JSON.stringify(profiles));
+    const freshStore = new ProfileStore(tempDir);
+    const list = freshStore.list();
+    const migrated = list.find((p: any) => p.name === 'LegacyNoUpdatedAt');
+    expect(migrated!.updatedAt).toBe(createdAt);
+  });
+
   it('adds empty moderationCategories for adulte on migration', () => {
     store.create('Legacy5', 30);
     const filePath = join(tempDir, 'profiles.json');

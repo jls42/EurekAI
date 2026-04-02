@@ -128,17 +128,16 @@ export function resolveVoices(
     return { host: config.voices.host.id, guest: config.voices.guest.id };
   }
 
-  // Resolve defaults first (tier 2: language defaults, tier 3: global config)
-  let defaults: { host: string; guest: string } | undefined;
-  if (lang) {
+  // Resolve defaults: tier 2 = global config (user settings), tier 3 = language defaults
+  let defaults: { host: string; guest: string } = config.mistralVoices;
+  if (lang && (!defaults.host || !defaults.guest)) {
     const sel = VOICE_SELECTION[lang];
     if (sel) {
       const h = findVoice(lang, sel.host);
       const g = findVoice(lang, sel.guest);
-      if (h && g) defaults = { host: h, guest: g };
+      if (h && g) defaults = { host: defaults.host || h, guest: defaults.guest || g };
     }
   }
-  defaults ??= config.mistralVoices;
 
   // Merge profile overrides per field (partial overrides supported)
   return {

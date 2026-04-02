@@ -1285,7 +1285,7 @@ describe('createProfiles', () => {
       await callMethod('autoSaveProfile', ctx, true);
       expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
         mistralVoices: { host: 'custom-host', guest: '' },
-      }));
+      }), expect.any(AbortSignal));
       vi.stubGlobal('fetch', vi.fn());
     });
 
@@ -1301,7 +1301,7 @@ describe('createProfiles', () => {
       await callMethod('autoSaveProfile', ctx, true);
       expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
         mistralVoices: null,
-      }));
+      }), expect.any(AbortSignal));
     });
   });
 });

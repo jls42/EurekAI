@@ -200,6 +200,11 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       }
 
       const section = req.body.section || 'all';
+      const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
+      if (!VALID_SECTIONS.has(section)) {
+        res.status(400).json({ error: 'Section invalide' });
+        return;
+      }
       const config = getConfig();
       const project = store.getProject(req.params.pid);
       const profileId = project?.meta?.profileId;
@@ -226,16 +231,29 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
         if (d.vocabulary?.length) sections.push('vocabulary');
 
         const audioUrls: Record<string, string> = {};
+        const failedSections: string[] = [];
         for (const s of sections) {
           const txt = sectionText(d, s);
           if (!txt) continue;
-          const buf = await textToSpeech(txt, voiceId, ttsOpts);
-          audioUrls[s] = saveAudioFile(buf, projectDir, req.params.pid, `read-aloud-${baseId}-${s}`);
+          try {
+            const buf = await textToSpeech(txt, voiceId, ttsOpts);
+            audioUrls[s] = saveAudioFile(buf, projectDir, req.params.pid, `read-aloud-${baseId}-${s}`);
+          } catch (err) {
+            console.error(`TTS failed for section ${s}:`, err);
+            failedSections.push(s);
+          }
         }
-        store.updateGeneration(req.params.pid, req.params.gid, {
-          data: { ...(gen as SummaryGeneration).data, audioUrls }, // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
-        } as any);
-        res.json({ audioUrls });
+        // Persist successful sections even if some failed
+        if (Object.keys(audioUrls).length > 0) {
+          store.updateGeneration(req.params.pid, req.params.gid, {
+            data: { ...(gen as SummaryGeneration).data, audioUrls: { ...d.audioUrls, ...audioUrls } }, // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
+          } as any);
+        }
+        if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
+          res.status(500).json({ error: 'TTS failed for all sections' });
+          return;
+        }
+        res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
         return;
       }
 

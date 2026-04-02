@@ -345,6 +345,7 @@ export const nl: Record<string, string> = {
   'toast.magicDone': 'Magie voltooid!',
   'toast.autoError': 'Automatische generatiefout: {error}',
   'toast.audioDone': 'Audio gegenereerd!',
+  'toast.audioPartial': 'Gedeeltelijke audio: sommige secties mislukt',
   'toast.audioError': 'Fout bij het genereren van audio',
   'toast.genDeleted': 'Generatie verwijderd',
   'toast.settingsSaved': 'Instellingen opgeslagen',

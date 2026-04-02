@@ -345,6 +345,7 @@ export const it: Record<string, string> = {
   'toast.magicDone': 'Magia completata!',
   'toast.autoError': 'Errore generazione automatica: {error}',
   'toast.audioDone': 'Audio generato!',
+  'toast.audioPartial': 'Audio parziale: alcune sezioni non riuscite',
   'toast.audioError': 'Errore nella generazione audio',
   'toast.genDeleted': 'Generazione eliminata',
   'toast.settingsSaved': 'Impostazioni salvate',

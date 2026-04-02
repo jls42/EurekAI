@@ -307,11 +307,16 @@ export function createGenerate() {
           const result = await res.json();
           // Batch response (all sections)
           if (result.audioUrls) {
+            const sectionOrder = ['intro', 'key_points', 'fun_fact', 'vocabulary'];
             for (const [s, url] of Object.entries(result.audioUrls)) {
               gen[`_audioUrl_${s}`] = url;
             }
-            gen._activeAudioSection = 'intro';
+            // Pick first available section (intro may have failed)
+            gen._activeAudioSection = sectionOrder.find(s => result.audioUrls[s]) || 'intro';
             gen._playlistMode = true;
+            if (result.failedSections?.length) {
+              this.showToast(this.t('toast.audioPartial'), 'warning');
+            }
           } else {
             // Single section
             gen[`_audioUrl_${section || 'all'}`] = result.audioUrl;

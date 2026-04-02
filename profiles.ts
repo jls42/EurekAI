@@ -106,6 +106,10 @@ export class ProfileStore {
           p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
           migrated = true;
         }
+        if (!p.updatedAt) {
+          p.updatedAt = p.createdAt || new Date().toISOString();
+          migrated = true;
+        }
       }
       if (migrated) this.save(profiles);
       return profiles;
@@ -139,6 +143,7 @@ export class ProfileStore {
       useConsigne: defaults.consigneDefault,
       chatEnabled: defaults.chatDefault,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     if (pin) profile.pinHash = hashPin(pin);
     const profiles = this.list();
@@ -191,6 +196,7 @@ export class ProfileStore {
       profile.age = updates.age;
       profile.ageGroup = ageToGroup(updates.age);
     }
+    profile.updatedAt = new Date().toISOString();
     profiles[idx] = profile;
     this.save(profiles);
     return profile;

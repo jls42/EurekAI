@@ -17,6 +17,7 @@ export interface Profile {
   theme?: 'dark' | 'light';
   pinHash?: string;
   createdAt: string;
+  updatedAt?: string;
 }
 
 // --- Sources ---

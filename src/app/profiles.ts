@@ -144,24 +144,32 @@ export function createProfiles() {
       this.confirmDelete(target, () => executeDeleteProfile(this, id));
     },
 
-    async updateProfile(this: any, id: string, updates: Record<string, any>) {
+    _saveController: null as AbortController | null,
+
+    async updateProfile(this: any, id: string, updates: Record<string, any>, signal?: AbortSignal) {
       try {
         const res = await fetch('/api/profiles/' + id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
+          signal,
         });
+        if (signal?.aborted) return;
         if (res.ok) {
           const updated = await res.json();
           const idx = this.profiles.findIndex((p: any) => p.id === id);
           if (idx !== -1) this.profiles[idx] = updated;
           if (this.currentProfile?.id === id) this.currentProfile = updated;
+          if (this.editingProfile?.id === id && updated.updatedAt) {
+            this.editingProfile.updatedAt = updated.updatedAt;
+          }
           if (updated.locale) setProfileLocale(id, updated.locale);
         } else {
           const err = await res.json();
           if (err.error) this.showToast(err.error, 'error');
         }
       } catch (e: any) {
+        if (e.name === 'AbortError') return;
         console.error('Failed to update profile:', e);
         this.showToast(this.t('toast.error', { error: e.message }), 'error');
       }
@@ -190,7 +198,7 @@ export function createProfiles() {
           const res = await fetch('/api/profiles/' + this.editingProfile.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin, useModeration: this.editingProfile.useModeration }),
+            body: JSON.stringify({ pin }),
           });
           if (!res.ok) {
             this.showToast(this.t('profile.pinWrong'), 'error');
@@ -211,7 +219,7 @@ export function createProfiles() {
       if (!this.editingProfile) return;
       if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
       const doSave = async () => {
-        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin } = this.editingProfile;
+        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } = this.editingProfile;
         if (!name?.trim() || !age || age < 4 || age > 120) return;
         const updates: any = {
           name: name.trim(), age, avatar, locale,
@@ -219,9 +227,12 @@ export function createProfiles() {
             ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
             : null,
           theme: theme || null,
+          _updatedAt: updatedAt,
         };
         if (_verifiedPin) updates.pin = _verifiedPin;
-        await this.updateProfile(id, updates);
+        if (this._saveController) this._saveController.abort();
+        this._saveController = new AbortController();
+        await this.updateProfile(id, updates, this._saveController.signal);
         if (this.currentProfile?.id === id) {
           if (locale) this.setLocale(locale, true);
         }
@@ -242,10 +253,12 @@ export function createProfiles() {
 
     async autoSaveParental(this: any) {
       if (!this.editingProfile) return;
-      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin } = this.editingProfile;
-      const updates: any = { useModeration, moderationCategories, chatEnabled };
+      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } = this.editingProfile;
+      const updates: any = { useModeration, moderationCategories, chatEnabled, _updatedAt: updatedAt };
       if (_verifiedPin) updates.pin = _verifiedPin;
-      await this.updateProfile(id, updates);
+      if (this._saveController) this._saveController.abort();
+      this._saveController = new AbortController();
+      await this.updateProfile(id, updates, this._saveController.signal);
     },
 
     applyThemeLive(this: any) {

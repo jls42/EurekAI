@@ -142,7 +142,7 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
-  it('retourne mistralVoices quand provider est mistral (tier 3 fallback)', () => {
+  it('retourne mistralVoices quand provider est mistral (tier 2 global config)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.ttsProvider = 'mistral';
@@ -174,7 +174,7 @@ describe('resolveVoices', () => {
     expect(resolveVoices(cfg, profileVoices, 'fr')).toEqual(profileVoices);
   });
 
-  it('tier 2: retourne les voix par defaut de la langue si cache rempli', () => {
+  it('tier 2: retourne config globale meme si cache de voix rempli (settings utilisateur prioritaires)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.ttsProvider = 'mistral';
@@ -183,11 +183,11 @@ describe('resolveVoices', () => {
       { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
     ]);
     const voices = resolveVoices(cfg, undefined, 'fr');
-    expect(voices).toEqual({ host: 'marie-excited', guest: 'marie-curious' });
+    expect(voices).toEqual(cfg.mistralVoices);
     setVoiceCache([]); // cleanup
   });
 
-  it('tier 2: retourne les voix EN par defaut si cache rempli', () => {
+  it('tier 2: retourne config globale meme si cache EN rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.ttsProvider = 'mistral';
@@ -196,7 +196,21 @@ describe('resolveVoices', () => {
       { id: 'oliver-cheerful', name: 'Oliver - Cheerful', languages: ['en_gb'], tags: ['cheerful'] },
     ]);
     const voices = resolveVoices(cfg, undefined, 'en');
-    expect(voices).toEqual({ host: 'jane-curious', guest: 'oliver-cheerful' });
+    expect(voices).toEqual(cfg.mistralVoices);
+    setVoiceCache([]); // cleanup
+  });
+
+  it('tier 3: fallback langue si config globale vide et cache rempli', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    cfg.mistralVoices = { host: '', guest: '' };
+    setVoiceCache([
+      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
+      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'fr');
+    expect(voices).toEqual({ host: 'marie-excited', guest: 'marie-curious' });
     setVoiceCache([]); // cleanup
   });
 

@@ -452,6 +452,46 @@ describe('profileRoutes', () => {
       const profile = res.json.mock.calls[0][0];
       expect(profile.locale).toBe('en');
     });
+
+    it('PIN-only probe verifies PIN without updating store', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Enfant', 9, '0', 'fr', '1234');
+      const initialUpdatedAt = created.updatedAt;
+
+      const handler = getHandler(router, 'put', '/:id');
+
+      // Wrong PIN → 403
+      const req1 = mockReq({ params: { id: created.id }, body: { pin: '0000' } });
+      const res1 = mockRes();
+      await handler(req1, res1);
+      expect(res1.status).toHaveBeenCalledWith(403);
+
+      // Correct PIN → 200 without bumping updatedAt
+      const req2 = mockReq({ params: { id: created.id }, body: { pin: '1234' } });
+      const res2 = mockRes();
+      await handler(req2, res2);
+      expect(res2.status).not.toHaveBeenCalled();
+      const profile = res2.json.mock.calls[0][0];
+      expect(profile.name).toBe('Enfant');
+      expect(store.get(created.id)!.updatedAt).toBe(initialUpdatedAt);
+    });
+
+    it('rejects stale write via _updatedAt optimistic concurrency', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      // Simulate a first update that bumps updatedAt to a known future time
+      store.update(created.id, { name: 'Fresh' });
+      // Stale write with a timestamp clearly in the past
+      const staleTimestamp = new Date(Date.now() - 10000).toISOString();
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({ params: { id: created.id }, body: { name: 'Stale', _updatedAt: staleTimestamp } });
+      const res = mockRes();
+      await handler(req, res);
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].name).toBe('Fresh');
+      expect(store.get(created.id)!.name).toBe('Fresh');
+    });
   });
 
   // ===== DELETE /:id =====
