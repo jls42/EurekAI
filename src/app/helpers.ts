@@ -281,7 +281,7 @@ export function createHelpers() {
     },
 
     resolveError(this: any, error: string): string {
-      const ctxMatch = error.match(/^context_too_large:(\d+)$/);
+      const ctxMatch = /^context_too_large:(\d+)$/.exec(error);
       if (ctxMatch) return this.t('gen.contextTooLarge', { pct: ctxMatch[1] });
       const translated = this.t(error);
       return translated === error ? error : translated;

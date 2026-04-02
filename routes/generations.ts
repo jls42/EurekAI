@@ -190,21 +190,59 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
     }
   });
 
+  // --- Read Aloud (TTS) — helpers ---
+
+  function sectionText(d: SummaryGeneration['data'], s: string): string {
+    if (s === 'intro') return `${d.title}. ${d.summary}`;
+    if (s === 'key_points') return d.key_points.join('. ');
+    if (s === 'fun_fact') return d.fun_fact || '';
+    if (s === 'vocabulary') return (d.vocabulary || []).map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`).join('. ');
+    return '';
+  }
+
+  async function generateBatchAudio(
+    gen: SummaryGeneration, voiceId: string, ttsOpts: any, projectDir: string, pid: string,
+  ): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
+    const d = gen.data;
+    const sections = ['intro', 'key_points'];
+    if (d.fun_fact) sections.push('fun_fact');
+    if (d.vocabulary?.length) sections.push('vocabulary');
+    const audioUrls: Record<string, string> = {};
+    const failedSections: string[] = [];
+    const baseId = gen.id.slice(0, 8);
+    for (const s of sections) {
+      const txt = sectionText(d, s);
+      if (!txt) continue;
+      try {
+        const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
+        audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
+      } catch (err) {
+        console.error(`TTS failed for section ${s}:`, err);
+        failedSections.push(s);
+      }
+    }
+    return { audioUrls, failedSections };
+  }
+
+  function readAloudText(gen: any, section: string): string | null {
+    if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
+    if (gen.type === 'flashcards') {
+      const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
+      return cards.map((c: any, i: number) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`).join(' ');
+    }
+    return null;
+  }
+
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
     try {
       const gen = store.getGeneration(req.params.pid, req.params.gid);
-      if (!gen) {
-        res.status(404).json({ error: 'Generation introuvable' });
-        return;
-      }
+      if (!gen) { res.status(404).json({ error: 'Generation introuvable' }); return; }
 
       const section = req.body.section || 'all';
       const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
-      if (!VALID_SECTIONS.has(section)) {
-        res.status(400).json({ error: 'Section invalide' });
-        return;
-      }
+      if (!VALID_SECTIONS.has(section)) { res.status(400).json({ error: 'Section invalide' }); return; }
+
       const config = getConfig();
       const project = store.getProject(req.params.pid);
       const profileId = project?.meta?.profileId;
@@ -214,77 +252,31 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       const projectDir = store.getProjectDir(req.params.pid);
       const baseId = gen.id.slice(0, 8);
 
-      // Helper: get text for a summary section
-      function sectionText(d: SummaryGeneration['data'], s: string): string {
-        if (s === 'intro') return `${d.title}. ${d.summary}`;
-        if (s === 'key_points') return d.key_points.join('. ');
-        if (s === 'fun_fact') return d.fun_fact || '';
-        if (s === 'vocabulary') return (d.vocabulary || []).map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`).join('. ');
-        return '';
-      }
-
       // Batch mode: generate all sections individually for summaries
       if (section === 'all' && gen.type === 'summary') {
-        const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
-        const sections = ['intro', 'key_points'];
-        if (d.fun_fact) sections.push('fun_fact');
-        if (d.vocabulary?.length) sections.push('vocabulary');
-
-        const audioUrls: Record<string, string> = {};
-        const failedSections: string[] = [];
-        for (const s of sections) {
-          const txt = sectionText(d, s);
-          if (!txt) continue;
-          try {
-            const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
-            audioUrls[s] = saveAudioFile(buf, projectDir, req.params.pid, `read-aloud-${baseId}-${s}`);
-          } catch (err) {
-            console.error(`TTS failed for section ${s}:`, err);
-            failedSections.push(s);
-          }
-        }
-        // Persist successful sections even if some failed
+        const { audioUrls, failedSections } = await generateBatchAudio(gen as SummaryGeneration, voiceId, ttsOpts, projectDir, req.params.pid);
         if (Object.keys(audioUrls).length > 0) {
-          store.updateGeneration(req.params.pid, req.params.gid, {
-            data: { ...(gen as SummaryGeneration).data, audioUrls: { ...d.audioUrls, ...audioUrls } }, // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
-          } as any);
+          const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type === 'summary' check
+          store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
         }
-        if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
-          res.status(500).json({ error: 'TTS failed for all sections' });
-          return;
-        }
+        if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) { res.status(500).json({ error: 'TTS failed for all sections' }); return; }
         res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
         return;
       }
 
       // Single section or flashcards
-      let text = '';
-      if (gen.type === 'summary') {
-        text = sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
-      } else if (gen.type === 'flashcards') {
-        const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
-        text = cards.map((c, i) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`).join(' ');
-      } else {
-        res.status(400).json({ error: 'Type non supporte pour la lecture' });
-        return;
-      }
+      const text = readAloudText(gen, section);
+      if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return; }
+      if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return; }
 
-      if (!text.trim()) {
-        res.status(400).json({ error: 'Texte vide pour cette section' });
-        return;
-      }
       const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
       const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-${section}`);
 
       // Persist section audio URL in generation data
       if (gen.type === 'summary') {
         const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
-        const existing = d.audioUrls || {};
-        store.updateGeneration(req.params.pid, req.params.gid, {
-          data: { ...d, audioUrls: { ...existing, [section]: audioUrl } },
-        } as any);
+        store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } } } as any);
       }
-
       res.json({ audioUrl });
     } catch (e) {
       console.error('Read aloud error:', e);

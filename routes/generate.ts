@@ -493,6 +493,26 @@ export function generateRoutes(
     }
   });
 
+  async function executePlan(plan: Array<{ agent: string }>, autoCtx: AutoCtx, st: ProjectStore, pid: string, generations: Generation[], failedSteps: string[]) {
+    for (const step of plan) {
+      try {
+        const executor = AUTO_EXECUTORS[step.agent];
+        if (executor) {
+          const gen = await executor(autoCtx);
+          st.addGeneration(pid, gen);
+          generations.push(gen);
+          logger.info('auto', `${step.agent} OK`);
+        } else {
+          logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
+          failedSteps.push(step.agent);
+        }
+      } catch (err) {
+        logger.error('auto', `${step.agent} FAILED:`, err);
+        failedSteps.push(step.agent);
+      }
+    }
+  }
+
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
       const project = store.getProject(req.params.pid);
@@ -532,23 +552,7 @@ export function generateRoutes(
       const autoProfile = autoProfileId ? profileStore.get(autoProfileId) : null;
       const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations, profileVoices: autoProfile?.mistralVoices };
 
-      for (const step of route.plan) {
-        try {
-          const executor = AUTO_EXECUTORS[step.agent];
-          if (executor) {
-            const gen = await executor(autoCtx);
-            store.addGeneration(req.params.pid, gen);
-            generations.push(gen);
-            logger.info('auto', `${step.agent} OK`);
-          } else {
-            logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
-            failedSteps.push(step.agent);
-          }
-        } catch (err) {
-          logger.error('auto', `${step.agent} FAILED:`, err);
-          failedSteps.push(step.agent);
-        }
-      }
+      await executePlan(route.plan, autoCtx, store, req.params.pid, generations, failedSteps);
 
       res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {

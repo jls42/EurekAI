@@ -191,15 +191,11 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
-    if (updates.mistralVoices !== undefined) {
-      if (updates.mistralVoices === null || (typeof updates.mistralVoices === 'object' && typeof updates.mistralVoices.host === 'string' && typeof updates.mistralVoices.guest === 'string')) {
-        profile.mistralVoices = updates.mistralVoices || undefined;
-      }
+    if (updates.mistralVoices !== undefined && (updates.mistralVoices === null || (typeof updates.mistralVoices === 'object' && typeof updates.mistralVoices.host === 'string' && typeof updates.mistralVoices.guest === 'string'))) {
+      profile.mistralVoices = updates.mistralVoices || undefined;
     }
-    if (updates.theme !== undefined) {
-      if (!updates.theme || updates.theme === 'dark' || updates.theme === 'light') {
-        profile.theme = updates.theme || undefined;
-      }
+    if (updates.theme !== undefined && (!updates.theme || updates.theme === 'dark' || updates.theme === 'light')) {
+      profile.theme = updates.theme || undefined;
     }
     if (updates.age !== undefined) {
       profile.age = updates.age;

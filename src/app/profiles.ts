@@ -149,6 +149,17 @@ export function createProfiles() {
 
     _saveController: null as AbortController | null,
 
+    applyProfileUpdate(this: any, id: string, updated: any) {
+      const idx = this.profiles.findIndex((p: any) => p.id === id);
+      if (idx !== -1) this.profiles[idx] = updated;
+      if (this.currentProfile?.id === id) this.currentProfile = updated;
+      if (this.editingProfile?.id === id) {
+        if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
+        if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
+      }
+      if (updated.locale) setProfileLocale(id, updated.locale);
+    },
+
     async updateProfile(this: any, id: string, updates: Record<string, any>, signal?: AbortSignal) {
       try {
         const res = await fetch('/api/profiles/' + id, {
@@ -159,15 +170,7 @@ export function createProfiles() {
         });
         if (signal?.aborted) return;
         if (res.ok) {
-          const updated = await res.json();
-          const idx = this.profiles.findIndex((p: any) => p.id === id);
-          if (idx !== -1) this.profiles[idx] = updated;
-          if (this.currentProfile?.id === id) this.currentProfile = updated;
-          if (this.editingProfile?.id === id) {
-            if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
-            if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
-          }
-          if (updated.locale) setProfileLocale(id, updated.locale);
+          this.applyProfileUpdate(id, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
           if (err.error) this.showToast(err.error, 'error');

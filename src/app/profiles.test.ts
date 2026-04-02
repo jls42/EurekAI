@@ -51,6 +51,7 @@ function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
     confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
     requirePin: vi.fn(),
     refreshIcons: vi.fn(),
+    applyProfileUpdate: profiles.applyProfileUpdate,
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: { pinDialog: { showModal: vi.fn(), close: vi.fn() } },
     ...overrides,
