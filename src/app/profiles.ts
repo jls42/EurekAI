@@ -124,6 +124,9 @@ export function createProfiles() {
           this.newProfilePin = '';
           this.newProfilePinConfirm = '';
           this.showProfileForm = false;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
         }
       } catch (e: any) {
         console.error('Failed to create profile:', e);
@@ -160,12 +163,13 @@ export function createProfiles() {
           const idx = this.profiles.findIndex((p: any) => p.id === id);
           if (idx !== -1) this.profiles[idx] = updated;
           if (this.currentProfile?.id === id) this.currentProfile = updated;
-          if (this.editingProfile?.id === id && updated.updatedAt) {
-            this.editingProfile.updatedAt = updated.updatedAt;
+          if (this.editingProfile?.id === id) {
+            if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
+            if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
           }
           if (updated.locale) setProfileLocale(id, updated.locale);
         } else {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           if (err.error) this.showToast(err.error, 'error');
         }
       } catch (e: any) {
@@ -285,7 +289,6 @@ export function createProfiles() {
       this.editingProfile.mistralVoices = { host: '', guest: '' };
       this.editingProfile.theme = '';
       this.applyThemeLive();
-      this.autoSaveProfile(true);
       this.showToast(this.t('toast.profileReset'), 'success');
     },
 

@@ -282,12 +282,43 @@ export function createGenerate() {
           gen._activeAudioSection = order[i];
           this.$nextTick(() => {
             const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
-            if (a) { a.load(); a.play().catch(() => {}); }
+            if (a) { a.load(); a.play().catch((e: any) => console.warn('Audio play failed:', e.message)); }
           });
           return;
         }
       }
       gen._playlistMode = false;
+    },
+
+    /** Initialize audio state from persisted summary data */
+    initSummaryAudio(gen: any) {
+      if (gen.data.audioUrls) {
+        for (const [s, url] of Object.entries(gen.data.audioUrls)) {
+          gen[`_audioUrl_${s}`] = url;
+        }
+        gen._activeAudioSection = Object.keys(gen.data.audioUrls)[0];
+      } else if (gen.data.audioUrl) {
+        gen._audioUrl_intro = gen.data.audioUrl;
+        gen._activeAudioSection = 'intro';
+      }
+    },
+
+    /** Play a specific section or trigger generation if not yet available */
+    playSection(this: any, gen: any, section: string | null) {
+      if (section && gen[`_audioUrl_${section}`]) {
+        gen._playlistMode = false;
+        gen._activeAudioSection = section;
+      } else if (!section && this.isBatchComplete(gen)) {
+        gen._playlistMode = true;
+        gen._activeAudioSection = this._audioSectionOrder.find((s: string) => gen[`_audioUrl_${s}`]) || 'intro';
+      } else {
+        this.generateVoice(gen, section || undefined);
+        return;
+      }
+      this.$nextTick(() => {
+        const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
+        if (a) { a.load(); a.play().catch((e: any) => console.warn('Audio play failed:', e.message)); }
+      });
     },
 
     async generateVoice(this: any, gen: any, section?: string) {
@@ -307,12 +338,12 @@ export function createGenerate() {
           const result = await res.json();
           // Batch response (all sections)
           if (result.audioUrls) {
-            const sectionOrder = ['intro', 'key_points', 'fun_fact', 'vocabulary'];
+            const sectionOrder = this._audioSectionOrder;
             for (const [s, url] of Object.entries(result.audioUrls)) {
               gen[`_audioUrl_${s}`] = url;
             }
             // Pick first available section (intro may have failed)
-            gen._activeAudioSection = sectionOrder.find(s => result.audioUrls[s]) || 'intro';
+            gen._activeAudioSection = sectionOrder.find((s: string) => result.audioUrls[s]) || 'intro';
             gen._playlistMode = true;
             if (result.failedSections?.length) {
               this.showToast(this.t('toast.audioPartial'), 'warning');

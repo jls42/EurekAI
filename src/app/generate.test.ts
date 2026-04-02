@@ -57,6 +57,10 @@ function makeContext(overrides: any = {}) {
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,
     generateVoice: gen.generateVoice,
+    _audioSectionOrder: gen._audioSectionOrder,
+    playSection: gen.playSection,
+    initSummaryAudio: gen.initSummaryAudio,
+    isBatchComplete: gen.isBatchComplete,
     ...overrides,
   };
 }

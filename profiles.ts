@@ -113,7 +113,8 @@ export class ProfileStore {
       }
       if (migrated) this.save(profiles);
       return profiles;
-    } catch {
+    } catch (e) {
+      console.error('Failed to load profiles:', e);
       return [];
     }
   }
@@ -190,8 +191,16 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
-    if (updates.mistralVoices !== undefined) profile.mistralVoices = updates.mistralVoices;
-    if (updates.theme !== undefined) profile.theme = updates.theme || undefined;
+    if (updates.mistralVoices !== undefined) {
+      if (updates.mistralVoices === null || (typeof updates.mistralVoices === 'object' && typeof updates.mistralVoices.host === 'string' && typeof updates.mistralVoices.guest === 'string')) {
+        profile.mistralVoices = updates.mistralVoices || undefined;
+      }
+    }
+    if (updates.theme !== undefined) {
+      if (!updates.theme || updates.theme === 'dark' || updates.theme === 'light') {
+        profile.theme = updates.theme || undefined;
+      }
+    }
     if (updates.age !== undefined) {
       profile.age = updates.age;
       profile.ageGroup = ageToGroup(updates.age);

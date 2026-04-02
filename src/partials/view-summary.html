@@ -46,7 +46,7 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('summary')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-summary animate-slide-up"
-        x-init="if (gen.data.audioUrls) { for (const [s, url] of Object.entries(gen.data.audioUrls)) { gen['_audioUrl_' + s] = url }; gen._activeAudioSection = Object.keys(gen.data.audioUrls)[0] } else if (gen.data.audioUrl) { gen._audioUrl_intro = gen.data.audioUrl; gen._activeAudioSection = 'intro' }">
+        x-init="initSummaryAudio(gen)">
         {{> gen-card-header icon="file-text" chipClass="icon-chip-summary" colorClass="gen-summary"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
           <!-- Audio toolbar with section chips -->
@@ -54,8 +54,9 @@
             <div class="flex flex-wrap gap-1.5" :class="(gen._audioUrl_intro || gen._audioUrl_key_points || gen._audioUrl_fun_fact || gen._audioUrl_vocabulary) ? 'mb-2' : ''">
               <!-- Chip: All (batch generate or playlist) -->
               <button
-                @click="isBatchComplete(gen) ? (gen._playlistMode = true, gen._activeAudioSection = 'intro', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen)"
-                :disabled="gen._generatingVoice_all === true"
+                @click="playSection(gen, null)"
+                :disabled="gen._generatingVoice_all === true || !apiStatus.ttsAvailable"
+                :title="!apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary' : isBatchComplete(gen) ? (gen._playlistMode ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
@@ -65,8 +66,9 @@
               </button>
               <!-- Chip: Intro -->
               <button
-                @click="gen._audioUrl_intro ? (gen._playlistMode = false, gen._activeAudioSection = 'intro', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen, 'intro')"
-                :disabled="gen._generatingVoice_intro === true"
+                @click="playSection(gen, 'intro')"
+                :disabled="gen._generatingVoice_intro === true || !apiStatus.ttsAvailable"
+                :title="!apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_intro === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_intro ? (gen._activeAudioSection === 'intro' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
@@ -76,8 +78,9 @@
               </button>
               <!-- Chip: Key points -->
               <button
-                @click="gen._audioUrl_key_points ? (gen._playlistMode = false, gen._activeAudioSection = 'key_points', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen, 'key_points')"
-                :disabled="gen._generatingVoice_key_points === true"
+                @click="playSection(gen, 'key_points')"
+                :disabled="gen._generatingVoice_key_points === true || !apiStatus.ttsAvailable"
+                :title="!apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_key_points === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_key_points ? (gen._activeAudioSection === 'key_points' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
@@ -88,8 +91,9 @@
               <!-- Chip: Fun fact (conditional) -->
               <button
                 x-show="summaryData(gen).fun_fact"
-                @click="gen._audioUrl_fun_fact ? (gen._playlistMode = false, gen._activeAudioSection = 'fun_fact', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen, 'fun_fact')"
-                :disabled="gen._generatingVoice_fun_fact === true"
+                @click="playSection(gen, 'fun_fact')"
+                :disabled="gen._generatingVoice_fun_fact === true || !apiStatus.ttsAvailable"
+                :title="!apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_fun_fact === true ? 'border-warning/30 text-warning-dark' : gen._audioUrl_fun_fact ? (gen._activeAudioSection === 'fun_fact' ? 'bg-warning-dark text-white border-warning-dark' : 'bg-warning/15 text-warning-dark border-warning/30 hover:bg-warning/25') : 'border-gray-300 text-text-secondary hover:border-warning hover:text-warning-dark'"
               >
@@ -100,8 +104,9 @@
               <!-- Chip: Vocabulary (conditional) -->
               <button
                 x-show="summaryData(gen).vocabulary.length > 0"
-                @click="gen._audioUrl_vocabulary ? (gen._playlistMode = false, gen._activeAudioSection = 'vocabulary', $nextTick(() => { const a = document.querySelector('audio[data-gen-id=\'' + gen.id + '\']'); if (a) { a.load(); a.play().catch(() => {}) } })) : generateVoice(gen, 'vocabulary')"
-                :disabled="gen._generatingVoice_vocabulary === true"
+                @click="playSection(gen, 'vocabulary')"
+                :disabled="gen._generatingVoice_vocabulary === true || !apiStatus.ttsAvailable"
+                :title="!apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_vocabulary === true ? 'border-accent/30 text-accent-dark' : gen._audioUrl_vocabulary ? (gen._activeAudioSection === 'vocabulary' ? 'bg-accent-dark text-white border-accent-dark' : 'bg-accent/15 text-accent-dark border-accent/30 hover:bg-accent/25') : 'border-gray-300 text-text-secondary hover:border-accent hover:text-accent-dark'"
               >

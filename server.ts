@@ -56,25 +56,19 @@ const store = new ProjectStore(outputDir);
 const profileStore = new ProfileStore(outputDir);
 initConfig(outputDir);
 
-// Pre-load voice cache and model context limits
-try { setVoiceCache(await listVoices(client)); } catch (e: any) { console.warn('Voice cache not loaded:', e.message); }
-try {
-  const models = await client.models.list();
-  const limits: Record<string, number> = {};
-  for (const m of models.data ?? []) {
-    const card = m as any;
-    if (card.maxContextLength) limits[card.id] = card.maxContextLength;
-    for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
-  }
-  setModelLimits(limits);
-} catch (e: any) { console.warn('Model limits not loaded:', e.message); }
-
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));
 
 // --- Config API ---
 app.get('/api/config', (_req, res) => res.json(getConfig()));
-app.put('/api/config', (req, res) => res.json(saveConfig(req.body)));
+app.put('/api/config', (req, res) => {
+  try {
+    res.json(saveConfig(req.body));
+  } catch (e) {
+    console.error('Config save error:', e);
+    res.status(500).json({ error: 'Failed to save configuration' });
+  }
+});
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
 app.post('/api/config/reset', (_req, res) => {
   try {
@@ -121,4 +115,16 @@ app.listen(PORT, () => {
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();
+
+  // Non-blocking cache warmup (optional, app works without)
+  listVoices(client).then(setVoiceCache).catch((e: any) => console.warn('Voice cache not loaded:', e.message));
+  client.models.list().then((models) => {
+    const limits: Record<string, number> = {};
+    for (const m of models.data ?? []) {
+      const card = m as any;
+      if (card.maxContextLength) limits[card.id] = card.maxContextLength;
+      for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
+    }
+    setModelLimits(limits);
+  }).catch((e: any) => console.warn('Model limits not loaded:', e.message));
 });

@@ -45,9 +45,8 @@ function resolveSourceIds(body: any, sources: Source[]): string[] {
 
 function checkContextLimit(markdown: string, modelId: string): string | null {
   const limits = getModelLimits();
-  const limit = limits[modelId];
-  if (!limit) return null;
-  const estimatedTokens = Math.ceil(markdown.length / 3);
+  const limit = limits[modelId] ?? 128_000;
+  const estimatedTokens = Math.ceil(markdown.length / 2);
   if (estimatedTokens > limit * 0.8) {
     const pct = Math.round((estimatedTokens / limit) * 100);
     return `context_too_large:${pct}`;
@@ -541,6 +540,9 @@ export function generateRoutes(
             store.addGeneration(req.params.pid, gen);
             generations.push(gen);
             logger.info('auto', `${step.agent} OK`);
+          } else {
+            logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
+            failedSteps.push(step.agent);
           }
         } catch (err) {
           logger.error('auto', `${step.agent} FAILED:`, err);

@@ -15,7 +15,7 @@
         class="w-64 h-64 lg:w-96 lg:h-96 mx-auto drop-shadow-lg"
       />
       <h1 class="font-heading font-bold text-3xl lg:text-4xl title-gradient mt-4">EurekAI</h1>
-      <p class="text-text-secondary text-body-sm mt-1" x-text="t('profile.selectOrCreate')"></p>
+      <p class="text-text-secondary text-body-sm mt-1" x-text="t('profile.selectOrCreate')">Select or create a profile</p>
     </div>
 
     <!-- Right: Profile selection (full width when editing) -->
@@ -112,7 +112,7 @@
           class="bg-primary text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
         >
           <i data-lucide="plus" class="w-4 h-4"></i>
-          <span x-text="t('profile.addProfile')"></span>
+          <span x-text="t('profile.addProfile')">Add profile</span>
         </button>
       </div>
 
@@ -161,7 +161,7 @@
           placeholder="9"
         />
 
-        <span class="block text-body-sm font-medium mb-1" x-text="t('profile.localeLabel')"></span>
+        <span class="block text-body-sm font-medium mb-1" x-text="t('profile.localeLabel')">Language</span>
         <div class="relative mb-3" x-data="{ langOpen: false }">
           <button
             @click="langOpen = !langOpen"
@@ -194,7 +194,7 @@
           <div class="bg-amber-50 border border-amber-200 rounded-card p-3 mb-3">
             <div class="flex items-start gap-2">
               <i data-lucide="shield-alert" class="w-5 h-5 text-amber-500 shrink-0 mt-0.5"></i>
-              <p class="text-body-sm text-amber-800" x-text="t('profile.pinInfo')"></p>
+              <p class="text-body-sm text-amber-800" x-text="t('profile.pinInfo')">PIN required for children under 15</p>
             </div>
           </div>
           <label
@@ -236,7 +236,7 @@
           ></p>
         </div>
 
-        <span class="block text-body-sm font-medium mb-2" x-text="t('profile.avatarLabel')"></span>
+        <span class="block text-body-sm font-medium mb-2" x-text="t('profile.avatarLabel')">Avatar</span>
         <div class="grid grid-cols-5 gap-2 mb-4">
           <template x-for="av in profileAvatars" :key="av">
             <button
@@ -296,7 +296,7 @@
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <!-- Language -->
             <div>
-              <span class="block text-body-sm font-medium mb-1" x-text="t('profile.localeLabel')"></span>
+              <span class="block text-body-sm font-medium mb-1" x-text="t('profile.localeLabel')">Language</span>
               <div class="relative" x-data="{ langOpen: false }">
                 <button
                   @click="langOpen = !langOpen" @click.outside="langOpen = false"
@@ -326,15 +326,15 @@
             <div>
               <label for="edit-theme" class="text-body-sm font-medium block mb-1" x-text="t('profile.theme')">Theme</label>
               <select id="edit-theme" x-model="editingProfile.theme" @change="applyThemeLive()" class="w-full input-modern px-3 py-2 text-body-sm">
-                <option value="" x-text="t('profile.themeDefault')"></option>
-                <option value="dark" x-text="t('profile.themeDark')"></option>
-                <option value="light" x-text="t('profile.themeLight')"></option>
+                <option value="" x-text="t('profile.themeDefault')">System</option>
+                <option value="dark" x-text="t('profile.themeDark')">Dark</option>
+                <option value="light" x-text="t('profile.themeLight')">Light</option>
               </select>
             </div>
           </div>
 
           <!-- Section: Avatar -->
-          <span class="block text-body-sm font-medium mb-2" x-text="t('profile.avatarLabel')"></span>
+          <span class="block text-body-sm font-medium mb-2" x-text="t('profile.avatarLabel')">Avatar</span>
           <div class="flex items-start gap-4 mb-5">
             <!-- Preview -->
             <span
@@ -357,13 +357,13 @@
 
           <!-- Section: Voice preferences -->
           <div x-show="mistralVoicesList.length > 0" class="mb-4 p-3 bg-gray-50 rounded-card">
-            <span class="text-body-sm font-medium" x-text="t('profile.voicePreferences')"></span>
-            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.voicePreferencesHint')"></p>
+            <span class="text-body-sm font-medium" x-text="t('profile.voicePreferences')">Voice preferences</span>
+            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.voicePreferencesHint')">Choose custom voices for this profile</p>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label for="edit-voice-host" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
                 <select id="edit-voice-host" x-model="editingProfile.mistralVoices.host" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
-                  <option value="" x-text="t('profile.voiceDefault')"></option>
+                  <option value="" x-text="t('profile.voiceDefault')">Default</option>
                   <template x-for="v in mistralVoicesList" :key="'ph-'+v.id">
                     <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
                   </template>
@@ -372,7 +372,7 @@
               <div>
                 <label for="edit-voice-guest" class="text-xs text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
                 <select id="edit-voice-guest" x-model="editingProfile.mistralVoices.guest" @change="autoSaveProfile(true)" class="w-full input-modern px-3 py-2 text-body-sm">
-                  <option value="" x-text="t('profile.voiceDefault')"></option>
+                  <option value="" x-text="t('profile.voiceDefault')">Default</option>
                   <template x-for="v in mistralVoicesList" :key="'pg-'+v.id">
                     <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
                   </template>
@@ -394,7 +394,7 @@
             <div class="p-3 bg-gray-50 rounded-card">
               <div class="flex items-center justify-between">
                 <div>
-                  <span class="text-body-sm font-medium" x-text="t('profile.moderationToggle')"></span>
+                  <span class="text-body-sm font-medium" x-text="t('profile.moderationToggle')">Content moderation</span>
                   <p class="text-xs text-text-secondary" x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"></p>
                 </div>
                 <button
@@ -410,7 +410,7 @@
             <div class="p-3 bg-gray-50 rounded-card">
               <div class="flex items-center justify-between">
                 <div>
-                  <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')"></span>
+                  <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')">Chat</span>
                   <p class="text-xs text-text-secondary" x-text="editingProfile?.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"></p>
                 </div>
                 <button
@@ -430,8 +430,8 @@
             x-transition
             class="mb-4 p-3 bg-gray-50 rounded-card"
           >
-            <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"></span>
-            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')"></p>
+            <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')">Moderation categories</span>
+            <p class="text-xs text-text-secondary mb-2" x-text="t('profile.moderationCategoriesHint')">Select categories to moderate</p>
             <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
               <template x-for="cat in allModerationCategories" :key="cat">
                 <label class="flex items-center gap-2 text-sm cursor-pointer">
@@ -464,7 +464,7 @@
               class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring inline-flex items-center justify-center gap-2"
             >
               <i data-lucide="arrow-left" class="w-4 h-4"></i>
-              <span x-text="t('profile.backToProfiles')"></span>
+              <span x-text="t('profile.backToProfiles')">Back to profiles</span>
             </button>
           </div>
         </div>

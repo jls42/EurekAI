@@ -43,7 +43,8 @@ export function initConfig(outputDir: string): void {
         voices: { ...DEFAULT_CONFIG.voices, ...saved.voices },
         mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
       };
-    } catch {
+    } catch (e) {
+      console.error('Failed to load config, using defaults:', e);
       currentConfig = { ...DEFAULT_CONFIG };
     }
   } else {

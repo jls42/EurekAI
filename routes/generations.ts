@@ -236,7 +236,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
           const txt = sectionText(d, s);
           if (!txt) continue;
           try {
-            const buf = await textToSpeech(txt, voiceId, ttsOpts);
+            const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
             audioUrls[s] = saveAudioFile(buf, projectDir, req.params.pid, `read-aloud-${baseId}-${s}`);
           } catch (err) {
             console.error(`TTS failed for section ${s}:`, err);
@@ -269,7 +269,11 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
         return;
       }
 
-      const audioBuffer = await textToSpeech(text, voiceId, ttsOpts);
+      if (!text.trim()) {
+        res.status(400).json({ error: 'Texte vide pour cette section' });
+        return;
+      }
+      const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
       const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-${section}`);
 
       // Persist section audio URL in generation data

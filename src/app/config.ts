@@ -115,7 +115,8 @@ export function createConfig() {
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch {
+      } catch (e: any) {
+        console.error('Failed to save settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
       }
     },
@@ -131,7 +132,8 @@ export function createConfig() {
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch {
+      } catch (e: any) {
+        console.error('Failed to reset settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error');
       }
     },

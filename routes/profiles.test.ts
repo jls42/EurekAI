@@ -488,8 +488,9 @@ describe('profileRoutes', () => {
       const req = mockReq({ params: { id: created.id }, body: { name: 'Stale', _updatedAt: staleTimestamp } });
       const res = mockRes();
       await handler(req, res);
-      expect(res.status).not.toHaveBeenCalled();
-      expect(res.json.mock.calls[0][0].name).toBe('Fresh');
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json.mock.calls[0][0].error).toBe('stale');
+      expect(res.json.mock.calls[0][0].profile.name).toBe('Fresh');
       expect(store.get(created.id)!.name).toBe('Fresh');
     });
   });

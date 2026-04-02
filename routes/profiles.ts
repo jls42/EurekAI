@@ -78,7 +78,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
 
     // Optimistic concurrency: reject stale writes
     if (_updatedAt && profile.updatedAt && _updatedAt < profile.updatedAt) {
-      res.json(profileToPublic(profile));
+      res.status(409).json({ error: 'stale', profile: profileToPublic(profile) });
       return;
     }
     const updated = store.update(req.params.id, fields);

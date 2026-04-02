@@ -348,7 +348,7 @@ export const fr: Record<string, string> = {
   // Toast messages
   'toast.profileDeleted': 'Profil supprime',
   'toast.profileUpdated': 'Profil mis a jour',
-  'toast.profileReset': 'Preferences reinitialises',
+  'toast.profileReset': 'Preferences reinitialisees',
   'toast.sourcesAdded': 'Sources ajoutees !',
   'toast.textAdded': 'Texte ajoute !',
   'toast.sourceDeleted': 'Source supprimee',
