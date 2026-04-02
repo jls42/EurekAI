@@ -4,7 +4,7 @@ import { Mistral } from '@mistralai/mistralai';
 import type { Source, Generation, QuizQuestion, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
-import { getConfig, resolveVoices } from '../config.js';
+import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
@@ -43,6 +43,17 @@ function resolveSourceIds(body: any, sources: Source[]): string[] {
   return ids.length > 0 ? ids : sources.map((s) => s.id);
 }
 
+function checkContextLimit(markdown: string, modelId: string): string | null {
+  const limits = getModelLimits();
+  const limit = limits[modelId] ?? 128_000;
+  const estimatedTokens = Math.ceil(markdown.length / 2);
+  if (estimatedTokens > limit * 0.8) {
+    const pct = Math.round((estimatedTokens / limit) * 100);
+    return `context_too_large:${pct}`;
+  }
+  return null;
+}
+
 function checkModeration(
   store: ProjectStore,
   profileStore: ProfileStore,
@@ -75,6 +86,7 @@ interface GenContext {
   sourceIds: string[];
   count?: number;
   pid: string;
+  profileVoices?: { host: string; guest: string };
   req: Request;
   res: Response;
 }
@@ -83,6 +95,8 @@ function handleGeneration(
   store: ProjectStore,
   profileStore: ProfileStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
+  modelId?: string,
+  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ) {
   return async (req: Request, res: Response) => {
     try {
@@ -104,9 +118,19 @@ function handleGeneration(
       const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
       const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
+      const models = config.models as Record<string, string>;
+      const resolvedModel = modelId ? (models[modelId] || modelId) : models.summary;
+      const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
+      const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
+      if (ctxError) {
+        res.status(400).json({ error: ctxError });
+        return;
+      }
       const sourceIds = resolveSourceIds(req.body, project.sources);
       const rawCount = req.body.count ? Number(req.body.count) : undefined;
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
+      const profileId = project.meta?.profileId;
+      const profile = profileId ? profileStore.get(profileId) : null;
 
       const gen = await generatorFn({
         project,
@@ -119,6 +143,7 @@ function handleGeneration(
         sourceIds,
         count,
         pid,
+        profileVoices: profile?.mistralVoices,
         req,
         res,
       });
@@ -188,7 +213,7 @@ export function generateRoutes(
         type: 'flashcards',
         data,
       };
-    }),
+    }, 'flashcards'),
   );
 
   router.post(
@@ -212,7 +237,7 @@ export function generateRoutes(
         type: 'quiz',
         data,
       };
-    }),
+    }, 'quiz'),
   );
 
   router.post(
@@ -233,7 +258,7 @@ export function generateRoutes(
       logger.info('podcast', 'Generating audio...');
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        resolveVoices(ctx.config),
+        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang),
         { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client },
       );
       const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
@@ -247,7 +272,7 @@ export function generateRoutes(
         type: 'podcast',
         data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
       };
-    }),
+    }, 'podcast'),
   );
 
   router.post(
@@ -264,6 +289,11 @@ export function generateRoutes(
         return null;
       }
       const markdown = getMarkdown(ctx.project.sources, originalGen.sourceIds);
+      const ctxError = checkContextLimit(markdown, ctx.config.models.quiz);
+      if (ctxError) {
+        ctx.res.status(400).json({ error: ctxError });
+        return null;
+      }
       const data = await generateQuizReview(
         client,
         markdown,
@@ -281,7 +311,7 @@ export function generateRoutes(
         type: 'quiz' as const,
         data,
       };
-    }),
+    }, 'quiz', { skipContextCheck: true }),
   );
 
   router.post(
@@ -303,7 +333,7 @@ export function generateRoutes(
       logger.info('quiz-vocal', 'Generating TTS for each question...');
       const audioUrls: string[] = [];
       const projectDir = store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices(ctx.config).host;
+      const hostVoice = resolveVoices(ctx.config, ctx.profileVoices, ctx.lang).host;
       const ttsOpts = { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client } as const;
       for (let i = 0; i < data.length; i++) {
         const audioBuffer = await ttsQuestion(
@@ -324,7 +354,7 @@ export function generateRoutes(
         data,
         audioUrls,
       };
-    }),
+    }, 'quiz'),
   );
 
   router.post(
@@ -350,7 +380,7 @@ export function generateRoutes(
         type: 'image',
         data,
       };
-    }),
+    }, 'mistral-large-latest', { checkRawMarkdown: true }),
   );
 
   // --- Fill-in-the-blanks ---
@@ -376,7 +406,7 @@ export function generateRoutes(
         type: 'fill-blank',
         data,
       };
-    }),
+    }, 'quiz'),
   );
 
   // --- Smart Routing (Auto) — structure multi-generation ---
@@ -392,6 +422,7 @@ export function generateRoutes(
     pid: string;
     store: ProjectStore;
     generations: Generation[];
+    profileVoices?: { host: string; guest: string };
   }
 
   function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
@@ -429,7 +460,7 @@ export function generateRoutes(
     podcast: async (ctx) => {
       const excl = buildExclusionContext(ctx.generations, 'podcast');
       const podcastResult = await generatePodcastScript(ctx.client, ctx.markdown, ctx.config.models.podcast, ctx.lang, ctx.ageGroup, excl);
-      const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
+      const audioBuffer = await generateAudio(podcastResult.script, resolveVoices(ctx.config, ctx.profileVoices, ctx.lang), { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client });
       const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
       return makeGen('podcast', { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs }, ctx);
     },
@@ -448,6 +479,11 @@ export function generateRoutes(
       const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
       const useConsigneRoute = req.body.useConsigne !== false;
       const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+      const ctxError = checkContextLimit(markdown, 'mistral-small-latest');
+      if (ctxError) {
+        res.status(400).json({ error: ctxError });
+        return;
+      }
       const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json(route);
@@ -456,6 +492,26 @@ export function generateRoutes(
       res.status(500).json({ error: String(e) });
     }
   });
+
+  async function executePlan(plan: Array<{ agent: string }>, autoCtx: AutoCtx, st: ProjectStore, pid: string, generations: Generation[], failedSteps: string[]) {
+    for (const step of plan) {
+      try {
+        const executor = AUTO_EXECUTORS[step.agent];
+        if (executor) {
+          const gen = await executor(autoCtx);
+          st.addGeneration(pid, gen);
+          generations.push(gen);
+          logger.info('auto', `${step.agent} OK`);
+        } else {
+          logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
+          failedSteps.push(step.agent);
+        }
+      } catch (err) {
+        logger.error('auto', `${step.agent} FAILED:`, err);
+        failedSteps.push(step.agent);
+      }
+    }
+  }
 
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
@@ -476,6 +532,12 @@ export function generateRoutes(
       const markdown = useConsigneAuto ? applyConsigne(rawAutoMarkdown, project.consigne) : rawAutoMarkdown;
       const hasConsigne = useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
       const config = getConfig();
+      // Check context limit against the routing model
+      const autoCtxError = checkContextLimit(markdown, 'mistral-small-latest');
+      if (autoCtxError) {
+        res.status(400).json({ error: autoCtxError });
+        return;
+      }
       const rawCount = req.body.count ? Number(req.body.count) : undefined;
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
@@ -486,22 +548,11 @@ export function generateRoutes(
       const generations: Generation[] = [];
       const failedSteps: string[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
-      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations };
+      const autoProfileId = project.meta?.profileId;
+      const autoProfile = autoProfileId ? profileStore.get(autoProfileId) : null;
+      const autoCtx: AutoCtx = { client, markdown, config, hasConsigne, lang, ageGroup, sourceIds, count, pid: req.params.pid, store, generations: project.results.generations, profileVoices: autoProfile?.mistralVoices };
 
-      for (const step of route.plan) {
-        try {
-          const executor = AUTO_EXECUTORS[step.agent];
-          if (executor) {
-            const gen = await executor(autoCtx);
-            store.addGeneration(req.params.pid, gen);
-            generations.push(gen);
-            logger.info('auto', `${step.agent} OK`);
-          }
-        } catch (err) {
-          logger.error('auto', `${step.agent} FAILED:`, err);
-          failedSteps.push(step.agent);
-        }
-      }
+      await executePlan(route.plan, autoCtx, store, req.params.pid, generations, failedSteps);
 
       res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {

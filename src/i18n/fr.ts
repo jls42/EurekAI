@@ -33,6 +33,7 @@ export const fr: Record<string, string> = {
   'gen.questionCount': 'Nombre :',
   'gen.needsElevenLabs': 'Necessite une cle API ElevenLabs',
   'gen.needsTts': 'Necessite un fournisseur TTS configure',
+  'gen.contextTooLarge': 'Contenu trop volumineux ({pct}% de la capacite du modele). Selectionnez moins de sources.',
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -198,6 +199,11 @@ export const fr: Record<string, string> = {
   'summary.emptyWithSources': 'Clique sur Nouvelle fiche pour commencer',
   'summary.keyPoints': 'Points cles',
   'summary.funFact': 'Le savais-tu ?',
+  'summary.audioAll': 'Tout',
+  'summary.audioIntro': 'Intro',
+  'summary.audioKeyPoints': 'Points cles',
+  'summary.audioFunFact': 'Savais-tu',
+  'summary.audioVocabulary': 'Vocabulaire',
   'summary.vocabulary': 'Vocabulaire',
 
   // Flashcards view
@@ -342,6 +348,7 @@ export const fr: Record<string, string> = {
   // Toast messages
   'toast.profileDeleted': 'Profil supprime',
   'toast.profileUpdated': 'Profil mis a jour',
+  'toast.profileReset': 'Preferences reinitialisees',
   'toast.sourcesAdded': 'Sources ajoutees !',
   'toast.textAdded': 'Texte ajoute !',
   'toast.sourceDeleted': 'Source supprimee',
@@ -366,6 +373,7 @@ export const fr: Record<string, string> = {
   'toast.magicDone': 'Magie terminee !',
   'toast.autoError': 'Erreur generation auto: {error}',
   'toast.audioDone': 'Audio genere !',
+  'toast.audioPartial': 'Audio partiel : certaines sections ont echoue',
   'toast.audioError': 'Erreur generation audio',
   'toast.genDeleted': 'Generation supprimee',
   'toast.settingsSaved': 'Parametres sauvegardes',
@@ -421,6 +429,16 @@ export const fr: Record<string, string> = {
   'profile.chatToggle': 'Autoriser le chat IA',
   'profile.chatOn': 'Chat actif',
   'profile.chatOff': 'Chat desactive (recommande pour les enfants)',
+  'profile.theme': 'Theme',
+  'profile.themeDefault': 'Par defaut (navigateur)',
+  'profile.themeDark': 'Sombre',
+  'profile.themeLight': 'Clair',
+  'profile.voicePreferences': 'Voix',
+  'profile.voicePreferencesHint': 'Personnalise les voix pour le contenu audio (podcasts, quiz vocaux, lectures)',
+  'profile.voiceDefault': 'Par defaut (selon la langue)',
+  'profile.voiceCurrentDefault': 'Defaut actuel :',
+  'profile.resetDefaults': 'Reinitialiser',
+  'profile.backToProfiles': 'Retour',
 
   'toast.error': 'Erreur: {error}',
   'toast.uploadError': 'Erreur upload {filename}: {error}',

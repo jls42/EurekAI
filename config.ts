@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from './types.js';
+import { type MistralVoice } from './generators/tts-provider.js';
 
 const DEFAULT_CONFIG: AppConfig = {
   models: {
@@ -42,7 +43,8 @@ export function initConfig(outputDir: string): void {
         voices: { ...DEFAULT_CONFIG.voices, ...saved.voices },
         mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
       };
-    } catch {
+    } catch (e) {
+      console.error('Failed to load config, using defaults:', e);
       currentConfig = { ...DEFAULT_CONFIG };
     }
   } else {
@@ -91,8 +93,56 @@ export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvai
   };
 }
 
-export function resolveVoices(config: AppConfig): { host: string; guest: string } {
-  return config.ttsProvider === 'mistral'
-    ? config.mistralVoices
-    : { host: config.voices.host.id, guest: config.voices.guest.id };
+// --- Model context limits cache ---
+
+let modelLimits: Record<string, number> = {};
+
+export function setModelLimits(limits: Record<string, number>): void { modelLimits = limits; }
+export function getModelLimits(): Record<string, number> { return modelLimits; }
+
+// --- Voice cache & language defaults ---
+
+let voiceCache: MistralVoice[] = [];
+
+export function setVoiceCache(voices: MistralVoice[]): void { voiceCache = voices; }
+export function getVoiceCache(): MistralVoice[] { return voiceCache; }
+
+const VOICE_SELECTION: Record<string, { host: { speaker: string; tag: string }; guest: { speaker: string; tag: string } }> = {
+  fr: { host: { speaker: 'Marie', tag: 'excited' }, guest: { speaker: 'Marie', tag: 'curious' } },
+  en: { host: { speaker: 'Jane', tag: 'curious' }, guest: { speaker: 'Oliver', tag: 'cheerful' } },
+};
+
+function findVoice(lang: string, criteria: { speaker: string; tag: string }): string | undefined {
+  return voiceCache.find(v =>
+    v.languages.some(l => l.startsWith(lang)) &&
+    v.name.startsWith(criteria.speaker) &&
+    v.tags?.includes(criteria.tag),
+  )?.id;
+}
+
+export function resolveVoices(
+  config: AppConfig,
+  profileVoices?: { host: string; guest: string },
+  lang?: string,
+): { host: string; guest: string } {
+  if (config.ttsProvider !== 'mistral') {
+    return { host: config.voices.host.id, guest: config.voices.guest.id };
+  }
+
+  // Resolve defaults: tier 2 = global config (user settings), tier 3 = language defaults
+  let defaults: { host: string; guest: string } = config.mistralVoices;
+  if (lang && (!defaults.host || !defaults.guest)) {
+    const sel = VOICE_SELECTION[lang];
+    if (sel) {
+      const h = findVoice(lang, sel.host);
+      const g = findVoice(lang, sel.guest);
+      if (h && g) defaults = { host: defaults.host || h, guest: defaults.guest || g };
+    }
+  }
+
+  // Merge profile overrides per field (partial overrides supported)
+  return {
+    host: profileVoices?.host || defaults.host,
+    guest: profileVoices?.guest || defaults.guest,
+  };
 }

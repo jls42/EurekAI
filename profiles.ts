@@ -106,10 +106,15 @@ export class ProfileStore {
           p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
           migrated = true;
         }
+        if (!p.updatedAt) {
+          p.updatedAt = p.createdAt || new Date().toISOString();
+          migrated = true;
+        }
       }
       if (migrated) this.save(profiles);
       return profiles;
-    } catch {
+    } catch (e) {
+      console.error('Failed to load profiles:', e);
       return [];
     }
   }
@@ -139,6 +144,7 @@ export class ProfileStore {
       useConsigne: defaults.consigneDefault,
       chatEnabled: defaults.chatDefault,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     if (pin) profile.pinHash = hashPin(pin);
     const profiles = this.list();
@@ -164,6 +170,8 @@ export class ProfileStore {
         | 'moderationCategories'
         | 'useConsigne'
         | 'chatEnabled'
+        | 'mistralVoices'
+        | 'theme'
       >
     >,
   ): Profile | null {
@@ -183,10 +191,17 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
+    if (updates.mistralVoices !== undefined && (updates.mistralVoices === null || (typeof updates.mistralVoices === 'object' && typeof updates.mistralVoices.host === 'string' && typeof updates.mistralVoices.guest === 'string'))) {
+      profile.mistralVoices = updates.mistralVoices || undefined;
+    }
+    if (updates.theme !== undefined && (!updates.theme || updates.theme === 'dark' || updates.theme === 'light')) {
+      profile.theme = updates.theme || undefined;
+    }
     if (updates.age !== undefined) {
       profile.age = updates.age;
       profile.ageGroup = ageToGroup(updates.age);
     }
+    profile.updatedAt = new Date().toISOString();
     profiles[idx] = profile;
     this.save(profiles);
     return profile;

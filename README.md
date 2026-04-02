@@ -215,8 +215,8 @@ npm install
 # Configurer les clés API
 cp .env.example .env
 # Éditez .env avec vos clés :
-#   MISTRAL_API_KEY=votre_clé_ici           (requis)
-#   ELEVENLABS_API_KEY=votre_clé_ici        (optionnel, TTS alternatif)
+#   MISTRAL_API_KEY=<your_api_key>           (requis)
+#   ELEVENLABS_API_KEY=<your_api_key>        (optionnel, TTS alternatif)
 #   SONAR_TOKEN=...                          (optionnel, CI SonarCloud uniquement)
 
 # Lancer le développement
@@ -226,6 +226,38 @@ npm run dev
 ```
 
 > **Note** : Mistral Voxtral TTS est le provider par défaut — aucune clé supplémentaire nécessaire au-delà de `MISTRAL_API_KEY`. ElevenLabs est un provider TTS alternatif configurable dans les paramètres.
+
+---
+
+## Déploiement avec conteneur
+
+L'image est publiée sur **GitHub Container Registry** :
+
+```bash
+# Télécharger l'image
+podman pull ghcr.io/jls42/eurekai:latest
+
+# Lancer EurekAI
+mkdir -p ./data
+podman run -d --name eurekai \
+  -e MISTRAL_API_KEY=<your_api_key> \
+  -e ELEVENLABS_API_KEY=<your_api_key> \
+  -v ./data:/app/output:U \
+  -p 3000:3000 \
+  ghcr.io/jls42/eurekai:latest
+# → http://localhost:3000
+```
+
+> **`:U`** est un flag Podman rootless qui ajuste automatiquement les permissions du volume.
+> **`ELEVENLABS_API_KEY`** est optionnel (TTS alternatif).
+
+```bash
+# Build local
+podman build -t eurekai -f Containerfile .
+
+# Publier sur ghcr.io (mainteneurs)
+./scripts/publish-ghcr.sh
+```
 
 ---
 

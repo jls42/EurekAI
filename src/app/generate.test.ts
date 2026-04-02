@@ -51,10 +51,16 @@ function makeContext(overrides: any = {}) {
     blockedModerationStatus: gen.blockedModerationStatus,
     moderationBlockedMessage: gen.moderationBlockedMessage,
     flaggedCategoryLabels: vi.fn(() => ''),
+    configDraft: { models: { summary: 'mistral-large-latest' } },
+    apiStatus: { mistral: true, elevenlabs: false, ttsAvailable: true },
     generate: gen.generate,
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,
     generateVoice: gen.generateVoice,
+    _audioSectionOrder: gen._audioSectionOrder,
+    playSection: gen.playSection,
+    initSummaryAudio: gen.initSummaryAudio,
+    isBatchComplete: gen.isBatchComplete,
     ...overrides,
   };
 }
@@ -628,22 +634,35 @@ describe('generateAuto — additional coverage', () => {
 // --- generateVoice ---
 
 describe('generateVoice', () => {
-  it('fetches read-aloud and sets audioUrl on success', async () => {
-    mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
+  it('fetches read-aloud batch and sets section audioUrls on success', async () => {
+    mockFetchOk({ audioUrls: { intro: '/audio/intro.mp3', key_points: '/audio/kp.mp3' } });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false } as any;
 
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(genObj.data.audioUrl).toBe('/audio/gen1.mp3');
-    expect(genObj._audioUrl).toBe('/audio/gen1.mp3');
-    expect(genObj._generatingVoice).toBe(false);
+    expect(genObj._audioUrl_intro).toBe('/audio/intro.mp3');
+    expect(genObj._audioUrl_key_points).toBe('/audio/kp.mp3');
+    expect(genObj._activeAudioSection).toBe('intro');
+    expect(genObj._playlistMode).toBe(true);
+    expect(genObj._generatingVoice_all).toBe(false);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.audioDone', 'success');
+  });
+
+  it('fetches single section and sets audioUrl', async () => {
+    mockFetchOk({ audioUrl: '/audio/intro.mp3' });
+    const ctx = makeContext();
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_intro: false } as any;
+
+    await gen.generateVoice.call(ctx, genObj, 'intro');
+    expect(genObj._audioUrl_intro).toBe('/audio/intro.mp3');
+    expect(genObj._activeAudioSection).toBe('intro');
+    expect(genObj._playlistMode).toBe(false);
   });
 
   it('returns early if already generating', async () => {
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: true };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: true };
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -651,41 +670,40 @@ describe('generateVoice', () => {
   it('handles fetch error', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice: false };
+    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith(
       'toast.error',
       'error',
       expect.any(Function),
     );
-    expect(genObj._generatingVoice).toBe(false);
+    expect(genObj._generatingVoice_all).toBe(false);
   });
 
   it('handles network exception', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice: false };
+    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith(
       'toast.audioError',
       'error',
       expect.any(Function),
     );
-    expect(genObj._generatingVoice).toBe(false);
+    expect(genObj._generatingVoice_all).toBe(false);
   });
 
-  it('does not set data.audioUrl for non-summary types', async () => {
+  it('sets _audioUrl_all for non-summary types (single response)', async () => {
     mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false } as any;
 
     await gen.generateVoice.call(ctx, genObj);
-    expect(genObj.data.audioUrl).toBeUndefined();
-    expect(genObj._audioUrl).toBe('/audio/gen1.mp3');
+    expect(genObj._audioUrl_all).toBe('/audio/gen1.mp3');
   });
 
   it('loads and plays audio element when present in DOM', async () => {
-    mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
+    mockFetchOk({ audioUrls: { intro: '/audio/intro.mp3' } });
     const mockAudioEl = {
       load: vi.fn(),
       play: vi.fn().mockResolvedValue(undefined),
@@ -694,7 +712,7 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false } as any;
 
     await gen.generateVoice.call(ctx, genObj);
 
@@ -706,7 +724,7 @@ describe('generateVoice', () => {
   });
 
   it('handles play() rejection gracefully (autoplay blocked)', async () => {
-    mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
+    mockFetchOk({ audioUrls: { intro: '/audio/intro.mp3' } });
     const mockAudioEl = {
       load: vi.fn(),
       play: vi.fn().mockRejectedValue(new Error('Autoplay blocked')),
@@ -715,14 +733,14 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false } as any;
 
     // Should not throw
     await gen.generateVoice.call(ctx, genObj);
 
     expect(mockAudioEl.load).toHaveBeenCalled();
     expect(mockAudioEl.play).toHaveBeenCalled();
-    expect(genObj._audioUrl).toBe('/audio/gen1.mp3');
+    expect(genObj._audioUrl_intro).toBe('/audio/intro.mp3');
 
     document.querySelector = origQuerySelector;
   });
@@ -730,7 +748,7 @@ describe('generateVoice', () => {
   it('error response shows toast with retry callback', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false };
     await gen.generateVoice.call(ctx, genObj);
 
     // Verify the retry callback is passed as the third argument
@@ -745,7 +763,7 @@ describe('generateVoice', () => {
     // First call fails
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false, _audioUrl_intro: null as string | null };
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -753,10 +771,10 @@ describe('generateVoice', () => {
     );
     const retryFn = toastCall![2];
 
-    // Second call succeeds
-    mockFetchOk({ audioUrl: '/audio/retry.mp3' });
+    // Second call succeeds (batch)
+    mockFetchOk({ audioUrls: { intro: '/audio/retry.mp3' } });
     await retryFn();
-    expect(genObj._audioUrl).toBe('/audio/retry.mp3');
+    expect(genObj._audioUrl_intro).toBe('/audio/retry.mp3');
     expect(ctx.showToast).toHaveBeenCalledWith('toast.audioDone', 'success');
   });
 
@@ -764,7 +782,7 @@ describe('generateVoice', () => {
     // First call throws network error
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice: false, _audioUrl: null as string | null };
+    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false } as any;
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -773,9 +791,104 @@ describe('generateVoice', () => {
     expect(toastCall).toBeTruthy();
     const retryFn = toastCall![2];
 
-    // Retry succeeds
-    mockFetchOk({ audioUrl: '/audio/retry2.mp3' });
+    // Retry succeeds (batch)
+    mockFetchOk({ audioUrls: { intro: '/audio/retry2.mp3' } });
     await retryFn();
-    expect(genObj._audioUrl).toBe('/audio/retry2.mp3');
+    expect(genObj._audioUrl_intro).toBe('/audio/retry2.mp3');
+  });
+});
+
+describe('isBatchComplete', () => {
+  it('returns false when no audio at all', () => {
+    const genObj = { data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns false when only intro exists', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns true when all required sections have audio (no optional)', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: {} };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+
+  it('returns false when fun_fact content exists but no audio', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { fun_fact: 'Wow!' } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns false when vocabulary content exists but no audio', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { vocabulary: ['w'] } };
+    expect(gen.isBatchComplete(genObj)).toBe(false);
+  });
+
+  it('returns true when all sections including optionals have audio', () => {
+    const genObj = {
+      _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3',
+      _audioUrl_fun_fact: '/c.mp3', _audioUrl_vocabulary: '/d.mp3',
+      data: { fun_fact: 'Wow!', vocabulary: ['w'] },
+    };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+
+  it('ignores empty vocabulary array', () => {
+    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: { vocabulary: [] } };
+    expect(gen.isBatchComplete(genObj)).toBe(true);
+  });
+});
+
+describe('playNextSection', () => {
+  it('advances from intro to key_points', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'intro',
+      _audioUrl_key_points: '/kp.mp3',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('key_points');
+  });
+
+  it('skips sections without audio URL', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'intro',
+      _audioUrl_vocabulary: '/vocab.mp3',
+      // no key_points or fun_fact audio
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('vocabulary');
+  });
+
+  it('disables playlist at the end', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: true, _activeAudioSection: 'vocabulary',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._playlistMode).toBe(false);
+  });
+
+  it('does nothing when playlist mode is off', () => {
+    const ctx = makeContext({
+      _audioSectionOrder: gen._audioSectionOrder,
+      playNextSection: gen.playNextSection,
+    });
+    const genObj = {
+      id: 'g1', _playlistMode: false, _activeAudioSection: 'intro',
+      _audioUrl_key_points: '/kp.mp3',
+    };
+    gen.playNextSection.call(ctx, genObj);
+    expect(genObj._activeAudioSection).toBe('intro');
   });
 });

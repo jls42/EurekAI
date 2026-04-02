@@ -50,30 +50,30 @@
           <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
             <button
               @click="generateVoice(gen)"
-              :disabled="gen._generatingVoice === true"
+              :disabled="gen._generatingVoice_all === true"
               class="min-h-touch w-full sm:w-auto sm:shrink-0 justify-center px-4 rounded-button text-body-sm font-semibold flex items-center gap-2 btn-press focus-ring bg-gen-flashcards/10 text-gen-flashcards hover:bg-gen-flashcards/20 disabled:opacity-50"
             >
               <i data-lucide="volume-2" class="w-5 h-5"></i>
               <span
-                x-show="!gen._generatingVoice && !gen._audioUrl"
+                x-show="!gen._generatingVoice_all && !gen._audioUrl_all"
                 x-text="t('common.generateAudio')"
               ></span>
               <span
-                x-show="!gen._generatingVoice && gen._audioUrl"
+                x-show="!gen._generatingVoice_all && gen._audioUrl_all"
                 x-text="t('common.regenerateAudio')"
               ></span>
               <span
-                x-show="gen._generatingVoice"
+                x-show="gen._generatingVoice_all"
                 class="animate-pulse"
                 x-text="t('common.generating')"
               ></span>
             </button>
             <audio
-              x-show="gen._audioUrl"
+              x-show="gen._audioUrl_all"
               controls
               preload="metadata"
               class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
-              :src="gen._audioUrl"
+              :src="gen._audioUrl_all"
               :data-gen-id="gen.id"
             ></audio>
           </div>

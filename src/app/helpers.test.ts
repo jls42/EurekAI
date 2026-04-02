@@ -257,23 +257,16 @@ describe('projectColor', () => {
 });
 
 describe('initGenProps', () => {
-  it('initializes _audioUrl and _generatingVoice on empty gen', () => {
+  it('initializes _generatingVoice_all on empty gen', () => {
     const gen: any = { type: 'quiz' };
     helpers.initGenProps(gen);
-    expect(gen._audioUrl).toBeNull();
-    expect(gen._generatingVoice).toBe(false);
+    expect(gen._generatingVoice_all).toBe(false);
   });
 
-  it('does not overwrite existing _audioUrl', () => {
-    const gen: any = { type: 'quiz', _audioUrl: 'http://example.com/audio.mp3' };
+  it('does not overwrite existing _generatingVoice_all', () => {
+    const gen: any = { type: 'quiz', _generatingVoice_all: true };
     helpers.initGenProps(gen);
-    expect(gen._audioUrl).toBe('http://example.com/audio.mp3');
-  });
-
-  it('does not overwrite existing _generatingVoice', () => {
-    const gen: any = { type: 'quiz', _generatingVoice: true };
-    helpers.initGenProps(gen);
-    expect(gen._generatingVoice).toBe(true);
+    expect(gen._generatingVoice_all).toBe(true);
   });
 
   it('adds _scriptOpen=false for podcast type', () => {
@@ -897,6 +890,16 @@ describe('resolveError', () => {
   it('returns original error when no translation found', () => {
     const ctx = { t: (k: string) => k };
     expect(callWith<string>(helpers.resolveError, ctx, 'Something went wrong')).toBe('Something went wrong');
+  });
+
+  it('handles context_too_large with percentage', () => {
+    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `Trop gros ${params?.pct}%` : k) };
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:95')).toBe('Trop gros 95%');
+  });
+
+  it('handles context_too_large at exactly 100%', () => {
+    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `${params?.pct}%` : k) };
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:100')).toBe('100%');
   });
 });
 

@@ -203,6 +203,51 @@ describe('langToFlag', () => {
   });
 });
 
+// --- defaultVoiceHint ---
+
+describe('defaultVoiceHint', () => {
+  it('returns voice names for FR locale with matching voices in list', () => {
+    const ctx = makeContext({
+      mistralVoicesList: [
+        { id: 'v1', speaker: 'Marie', emotion: 'Excited', lang: 'fr' },
+        { id: 'v2', speaker: 'Marie', emotion: 'Curious', lang: 'fr' },
+      ],
+    });
+    const result = config.defaultVoiceHint.call(ctx, 'fr');
+    expect(result).toContain('Marie');
+    expect(result).toContain('/');
+  });
+
+  it('returns voice names for EN locale', () => {
+    const ctx = makeContext({
+      mistralVoicesList: [
+        { id: 'v1', speaker: 'Jane', emotion: 'Curious', lang: 'en' },
+        { id: 'v2', speaker: 'Oliver', emotion: 'Cheerful', lang: 'en' },
+      ],
+    });
+    const result = config.defaultVoiceHint.call(ctx, 'en');
+    expect(result).toContain('Jane');
+    expect(result).toContain('Oliver');
+  });
+
+  it('returns fallback names when voice list is empty', () => {
+    const ctx = makeContext({ mistralVoicesList: [] });
+    const result = config.defaultVoiceHint.call(ctx, 'fr');
+    expect(result).toBe('Marie - Excited / Marie - Curious');
+  });
+
+  it('returns empty string for unsupported locale', () => {
+    const ctx = makeContext({ mistralVoicesList: [] });
+    expect(config.defaultVoiceHint.call(ctx, 'ja')).toBe('');
+  });
+
+  it('defaults to fr when locale is empty', () => {
+    const ctx = makeContext({ mistralVoicesList: [] });
+    const result = config.defaultVoiceHint.call(ctx, '');
+    expect(result).toContain('Marie');
+  });
+});
+
 // --- saveSettings ---
 
 describe('saveSettings', () => {

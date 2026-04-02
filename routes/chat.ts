@@ -50,7 +50,7 @@ async function validateChatRequest(
   if (!message || typeof message !== 'string') return new ChatValidationError(400, 'message requis');
 
   if (profile?.useModeration) {
-    const categories = MODERATION_CATEGORIES[profile.ageGroup] || [];
+    const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
     if (categories.length > 0) {
       const modResult = await moderateContent(client, message.trim(), categories);
       if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { initConfig, getConfig, saveConfig, getApiStatus, resetConfig, resolveVoices } from './config.js';
+import { initConfig, getConfig, saveConfig, getApiStatus, resetConfig, resolveVoices, setVoiceCache } from './config.js';
 
 let tempDir: string;
 
@@ -142,7 +142,7 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
-  it('retourne mistralVoices quand provider est mistral', () => {
+  it('retourne mistralVoices quand provider est mistral (tier 2 global config)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.ttsProvider = 'mistral';
@@ -156,6 +156,91 @@ describe('resolveVoices', () => {
     cfg.ttsProvider = 'elevenlabs';
     const voices = resolveVoices(cfg);
     expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
+  });
+
+  it('ignore les voix profil quand provider est elevenlabs', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'elevenlabs';
+    const voices = resolveVoices(cfg, { host: 'mistral-host', guest: 'mistral-guest' }, 'fr');
+    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
+  });
+
+  it('tier 1: retourne les voix du profil si definies', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    const profileVoices = { host: 'profile-host-id', guest: 'profile-guest-id' };
+    expect(resolveVoices(cfg, profileVoices, 'fr')).toEqual(profileVoices);
+  });
+
+  it('tier 2: retourne config globale meme si cache de voix rempli (settings utilisateur prioritaires)', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([
+      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
+      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'fr');
+    expect(voices).toEqual(cfg.mistralVoices);
+    setVoiceCache([]); // cleanup
+  });
+
+  it('tier 2: retourne config globale meme si cache EN rempli', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([
+      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: 'oliver-cheerful', name: 'Oliver - Cheerful', languages: ['en_gb'], tags: ['cheerful'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'en');
+    expect(voices).toEqual(cfg.mistralVoices);
+    setVoiceCache([]); // cleanup
+  });
+
+  it('tier 3: fallback langue si config globale vide et cache rempli', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    cfg.mistralVoices = { host: '', guest: '' };
+    setVoiceCache([
+      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
+      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'fr');
+    expect(voices).toEqual({ host: 'marie-excited', guest: 'marie-curious' });
+    setVoiceCache([]); // cleanup
+  });
+
+  it('tier 3: fallback config globale si cache vide', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([]);
+    const voices = resolveVoices(cfg, undefined, 'fr');
+    expect(voices).toEqual(cfg.mistralVoices);
+  });
+
+  it('merge voix profil partielles (host seul → host custom + guest default)', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([]);
+    const partial = { host: 'only-host', guest: '' };
+    const voices = resolveVoices(cfg, partial, 'fr');
+    expect(voices).toEqual({ host: 'only-host', guest: cfg.mistralVoices.guest });
+  });
+
+  it('merge voix profil partielles (guest seul → host default + guest custom)', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    setVoiceCache([]);
+    const partial = { host: '', guest: 'only-guest' };
+    const voices = resolveVoices(cfg, partial, 'fr');
+    expect(voices).toEqual({ host: cfg.mistralVoices.host, guest: 'only-guest' });
   });
 });
 

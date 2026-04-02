@@ -17,6 +17,10 @@ RUN npm run build
 # =========================================
 FROM node:24-slim
 
+LABEL org.opencontainers.image.source=https://github.com/jls42/EurekAI
+LABEL org.opencontainers.image.description="Application éducative IA : photo/texte/voix -> fiches + flashcards + quiz + podcast + traduction"
+LABEL org.opencontainers.image.licenses=AGPL-3.0-only
+
 WORKDIR /app
 
 # Install production dependencies + tsx (needed by "npm start" = "tsx server.ts")

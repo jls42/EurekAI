@@ -12,7 +12,12 @@ async function executeDeleteProfile(
     opts.body = JSON.stringify({ pin });
   }
   try {
-    await fetch('/api/profiles/' + id, opts);
+    const res = await fetch('/api/profiles/' + id, opts);
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
+      return;
+    }
     clearProfileLocale(id);
     state.profiles = state.profiles.filter((p: any) => p.id !== id);
     if (state.currentProfile?.id === id) {
@@ -66,6 +71,16 @@ export function createProfiles() {
       this.showProfilePicker = false;
       localStorage.setItem('sf-profileId', id);
       this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
+      // Apply profile theme or fallback to localStorage/system default
+      if (profile.theme) {
+        this.theme = profile.theme;
+        document.documentElement.dataset.theme = profile.theme;
+      } else {
+        const stored = localStorage.getItem('sf-theme');
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        this.theme = stored || system;
+        document.documentElement.dataset.theme = this.theme;
+      }
       // Reset project state and reload projects for this profile
       this.currentProjectId = null;
       this.currentProject = null;
@@ -109,6 +124,9 @@ export function createProfiles() {
           this.newProfilePin = '';
           this.newProfilePinConfirm = '';
           this.showProfileForm = false;
+        } else {
+          const err = await res.json().catch(() => ({}));
+          this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
         }
       } catch (e: any) {
         console.error('Failed to create profile:', e);
@@ -129,24 +147,36 @@ export function createProfiles() {
       this.confirmDelete(target, () => executeDeleteProfile(this, id));
     },
 
-    async updateProfile(this: any, id: string, updates: Record<string, any>) {
+    _saveController: null as AbortController | null,
+
+    applyProfileUpdate(this: any, id: string, updated: any) {
+      const idx = this.profiles.findIndex((p: any) => p.id === id);
+      if (idx !== -1) this.profiles[idx] = updated;
+      if (this.currentProfile?.id === id) this.currentProfile = updated;
+      if (this.editingProfile?.id === id) {
+        if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
+        if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
+      }
+      if (updated.locale) setProfileLocale(id, updated.locale);
+    },
+
+    async updateProfile(this: any, id: string, updates: Record<string, any>, signal?: AbortSignal) {
       try {
         const res = await fetch('/api/profiles/' + id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
+          signal,
         });
+        if (signal?.aborted) return;
         if (res.ok) {
-          const updated = await res.json();
-          const idx = this.profiles.findIndex((p: any) => p.id === id);
-          if (idx !== -1) this.profiles[idx] = updated;
-          if (this.currentProfile?.id === id) this.currentProfile = updated;
-          if (updated.locale) setProfileLocale(id, updated.locale);
+          this.applyProfileUpdate(id, await res.json());
         } else {
-          const err = await res.json();
+          const err = await res.json().catch(() => ({}));
           if (err.error) this.showToast(err.error, 'error');
         }
       } catch (e: any) {
+        if (e.name === 'AbortError') return;
         console.error('Failed to update profile:', e);
         this.showToast(this.t('toast.error', { error: e.message }), 'error');
       }
@@ -155,7 +185,7 @@ export function createProfiles() {
     startEditProfile(this: any, id: string) {
       const profile = this.profiles.find((p: any) => p.id === id);
       if (!profile) return;
-      this.editingProfile = { ...profile, locale: profile.locale || 'fr' };
+      this.editingProfile = { ...profile, locale: profile.locale || 'fr', mistralVoices: profile.mistralVoices || { host: '', guest: '' }, theme: profile.theme || '' };
       this.showProfilePicker = true;
       this.showProfileForm = false;
     },
@@ -190,35 +220,85 @@ export function createProfiles() {
       });
     },
 
-    async saveEditProfile(this: any) {
+    _autoSaveTimer: null as ReturnType<typeof setTimeout> | null,
+
+    autoSaveProfile(this: any, immediate?: boolean) {
       if (!this.editingProfile) return;
-      const {
-        id,
-        name,
-        age,
-        avatar,
-        locale,
-        useModeration,
-        moderationCategories,
-        chatEnabled,
-        _verifiedPin,
-      } = this.editingProfile;
-      if (!name?.trim() || !age || age < 4 || age > 120) return;
-      const updates: any = {
-        name: name.trim(),
-        age,
-        avatar,
-        locale,
-        useModeration,
-        moderationCategories,
-        chatEnabled,
+      if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
+      const doSave = async () => {
+        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } = this.editingProfile;
+        if (!name?.trim() || !age || age < 4 || age > 120) return;
+        const updates: any = {
+          name: name.trim(), age, avatar, locale,
+          mistralVoices: (mistralVoices?.host || mistralVoices?.guest)
+            ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
+            : null,
+          theme: theme || null,
+          _updatedAt: updatedAt,
+        };
+        if (_verifiedPin) updates.pin = _verifiedPin;
+        if (this._saveController) this._saveController.abort();
+        this._saveController = new AbortController();
+        await this.updateProfile(id, updates, this._saveController.signal);
+        if (this.currentProfile?.id === id) {
+          if (locale) this.setLocale(locale, true);
+        }
       };
+      if (immediate) { doSave(); return; }
+      this._autoSaveTimer = setTimeout(doSave, 500);
+    },
+
+    toggleModerationCategory(this: any, cat: string) {
+      this.requireParentalAccess(() => {
+        const cats = (this.editingProfile.moderationCategories ??= []);
+        const idx = cats.indexOf(cat);
+        if (idx >= 0) cats.splice(idx, 1);
+        else cats.push(cat);
+        this.autoSaveParental();
+      });
+    },
+
+    async autoSaveParental(this: any) {
+      if (!this.editingProfile) return;
+      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } = this.editingProfile;
+      const updates: any = { useModeration, moderationCategories, chatEnabled, _updatedAt: updatedAt };
       if (_verifiedPin) updates.pin = _verifiedPin;
-      await this.updateProfile(id, updates);
-      // Apply locale if editing the current profile
-      if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
+      if (this._saveController) this._saveController.abort();
+      this._saveController = new AbortController();
+      await this.updateProfile(id, updates, this._saveController.signal);
+    },
+
+    applyThemeLive(this: any) {
+      const theme = this.editingProfile?.theme;
+      if (theme) {
+        this.theme = theme;
+        document.documentElement.dataset.theme = theme;
+      } else {
+        const stored = localStorage.getItem('sf-theme');
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        this.theme = stored || system;
+        document.documentElement.dataset.theme = this.theme;
+      }
+      this.autoSaveProfile(true);
+    },
+
+    closeEditProfile(this: any) {
+      this.autoSaveProfile(true);
       this.editingProfile = null;
-      this.showToast(this.t('toast.profileUpdated'), 'success');
+    },
+
+    resetProfileDefaults(this: any) {
+      if (!this.editingProfile) return;
+      this.editingProfile.mistralVoices = { host: '', guest: '' };
+      this.editingProfile.theme = '';
+      this.applyThemeLive();
+      this.showToast(this.t('toast.profileReset'), 'success');
+    },
+
+    /** @deprecated Use autoSaveProfile — kept for test compat */
+    async saveEditProfile(this: any) {
+      this.autoSaveProfile(true);
+      this.editingProfile = null;
     },
 
     async _toggleProfileProp(this: any, id: string, prop: string) {

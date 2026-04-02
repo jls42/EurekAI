@@ -60,6 +60,21 @@ export function createConfig() {
       return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.codePointAt(0) - 65));
     },
 
+    defaultVoiceHint(this: any, locale: string): string {
+      const sel: Record<string, { host: { speaker: string; tag: string }; guest: { speaker: string; tag: string } }> = {
+        fr: { host: { speaker: 'Marie', tag: 'Excited' }, guest: { speaker: 'Marie', tag: 'Curious' } },
+        en: { host: { speaker: 'Jane', tag: 'Curious' }, guest: { speaker: 'Oliver', tag: 'Cheerful' } },
+      };
+      const lang = (locale || 'fr').slice(0, 2);
+      const criteria = sel[lang];
+      if (!criteria) return '';
+      const findName = (c: { speaker: string; tag: string }) => {
+        const match = this.mistralVoicesList.find((v: any) => v.speaker === c.speaker && v.emotion === c.tag && v.lang === lang);
+        return match ? `${match.speaker} - ${this.translateEmotion(match.emotion)}` : `${c.speaker} - ${c.tag}`;
+      };
+      return `${findName(criteria.host)} / ${findName(criteria.guest)}`;
+    },
+
     async saveSettings(this: any) {
       try {
         const mainModel = this.configDraft._mainModel || 'mistral-large-latest';
@@ -100,7 +115,8 @@ export function createConfig() {
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch {
+      } catch (e: any) {
+        console.error('Failed to save settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
       }
     },
@@ -116,7 +132,8 @@ export function createConfig() {
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch {
+      } catch (e: any) {
+        console.error('Failed to reset settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error');
       }
     },

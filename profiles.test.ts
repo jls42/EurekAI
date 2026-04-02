@@ -336,6 +336,28 @@ describe('ProfileStore.update', () => {
     expect(updated!.chatEnabled).toBe(true);
   });
 
+  it('updates mistralVoices', () => {
+    const p = store.create('VoiceUser', 12);
+    expect(p.mistralVoices).toBeUndefined();
+    const voices = { host: 'voice-host-id', guest: 'voice-guest-id' };
+    const updated = store.update(p.id, { mistralVoices: voices });
+    expect(updated!.mistralVoices).toEqual(voices);
+  });
+
+  it('updates theme', () => {
+    const p = store.create('ThemeUser', 10);
+    expect(p.theme).toBeUndefined();
+    const updated = store.update(p.id, { theme: 'dark' });
+    expect(updated!.theme).toBe('dark');
+  });
+
+  it('clears theme when set to empty string', () => {
+    const p = store.create('ThemeUser2', 10);
+    store.update(p.id, { theme: 'light' });
+    const updated = store.update(p.id, { theme: '' as any });
+    expect(updated!.theme).toBeUndefined();
+  });
+
   it('returns null for unknown id', () => {
     expect(store.update('nonexistent', { name: 'X' })).toBeNull();
   });
@@ -436,6 +458,19 @@ describe('ProfileStore legacy migration', () => {
     const freshStore = new ProfileStore(tempDir);
     const list = freshStore.list();
     expect(list[0].moderationCategories).toEqual(MODERATION_CATEGORIES.enfant);
+  });
+
+  it('backfills updatedAt from createdAt on legacy profiles', () => {
+    store.create('LegacyNoUpdatedAt', 12);
+    const filePath = join(tempDir, 'profiles.json');
+    const profiles = JSON.parse(readFileSync(filePath, 'utf-8'));
+    const createdAt = profiles[profiles.length - 1].createdAt;
+    delete profiles[profiles.length - 1].updatedAt;
+    writeFileSync(filePath, JSON.stringify(profiles));
+    const freshStore = new ProfileStore(tempDir);
+    const list = freshStore.list();
+    const migrated = list.find((p: any) => p.name === 'LegacyNoUpdatedAt');
+    expect(migrated!.updatedAt).toBe(createdAt);
   });
 
   it('adds empty moderationCategories for adulte on migration', () => {

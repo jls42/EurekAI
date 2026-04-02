@@ -37,21 +37,51 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
     res.json(profileToPublic(profile));
   });
 
+  const PARENTAL_FIELDS = ['useModeration', 'moderationCategories', 'chatEnabled', 'age'];
+
   router.put('/:id', (req, res) => {
     const profile = store.get(req.params.id);
     if (!profile) {
       res.status(404).json({ error: 'Profil introuvable' });
       return;
     }
-    // If profile has PIN, verify it
-    if (profile.pinHash) {
-      const { pin } = req.body;
-      if (!pin || !verifyPin(pin, profile.pinHash)) {
+    const { pin, _updatedAt, ...fields } = req.body;
+
+    // PIN verification (always checked if provided)
+    if (profile.pinHash && pin) {
+      if (!verifyPin(pin, profile.pinHash)) {
         res.status(403).json({ error: 'Code PIN incorrect' });
         return;
       }
     }
-    const updated = store.update(req.params.id, req.body);
+
+    // PIN-only probe (no fields to update) — return current profile without touching store
+    if (Object.keys(fields).length === 0) {
+      res.json(profileToPublic(profile));
+      return;
+    }
+
+    // PIN required when a parental control field actually changes value
+    if (profile.pinHash && !pin) {
+      const hasParentalChange = PARENTAL_FIELDS.some((f) => {
+        if (fields[f] === undefined) return false;
+        if (f === 'moderationCategories') {
+          return JSON.stringify(fields[f]) !== JSON.stringify(profile[f]);
+        }
+        return fields[f] !== (profile as any)[f];
+      });
+      if (hasParentalChange) {
+        res.status(403).json({ error: 'Code PIN incorrect' });
+        return;
+      }
+    }
+
+    // Optimistic concurrency: reject stale writes
+    if (_updatedAt && profile.updatedAt && _updatedAt < profile.updatedAt) {
+      res.status(409).json({ error: 'stale', profile: profileToPublic(profile) });
+      return;
+    }
+    const updated = store.update(req.params.id, fields);
     if (!updated) {
       res.status(404).json({ error: 'Profil introuvable' });
       return;
