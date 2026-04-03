@@ -631,6 +631,94 @@ describe('generateAuto — additional coverage', () => {
   });
 });
 
+describe('generateAuto — per-type progress', () => {
+  it('shows per-type toast with view action as each generation completes', async () => {
+    const routeResult = {
+      plan: [
+        { agent: 'summary', reason: 'test' },
+        { agent: 'quiz', reason: 'test' },
+      ],
+      context: 'test context',
+    };
+    mockFetchOk(routeResult);
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    mockFetchOk({ id: 'g2', type: 'quiz' });
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    // Each successful type gets its own toast with view action
+    const doneCalls = ctx.showToast.mock.calls.filter(
+      (c: any[]) => c[0] === 'toast.generationDone' && c[1] === 'success',
+    );
+    expect(doneCalls).toHaveLength(2);
+    expect(doneCalls[0][3]).toHaveProperty('fn');
+    expect(doneCalls[0][3]).toHaveProperty('label', 'toast.view');
+  });
+
+  it('handles individual generation network error without crashing', async () => {
+    const routeResult = {
+      plan: [
+        { agent: 'summary', reason: 'test' },
+        { agent: 'quiz', reason: 'test' },
+      ],
+      context: 'test context',
+    };
+    mockFetchOk(routeResult);
+    // summary succeeds, quiz throws network error
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network down'));
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    expect(ctx.generations).toHaveLength(1);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.partialGenerated', 'warning');
+  });
+
+  it('ignores AbortError on individual generation', async () => {
+    const routeResult = {
+      plan: [{ agent: 'summary', reason: 'test' }],
+      context: 'test context',
+    };
+    mockFetchOk(routeResult);
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(
+      new DOMException('Aborted', 'AbortError'),
+    );
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    // AbortError should not count as failure — final toast is magicDone (0 failures)
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.magicDone',
+      'success',
+      null,
+      expect.objectContaining({ label: 'toast.view' }),
+    );
+  });
+
+  it('skips result if project switched during generation', async () => {
+    const routeResult = {
+      plan: [{ agent: 'summary', reason: 'test' }],
+      context: 'test context',
+    };
+    // Phase 1: route succeeds normally
+    mockFetchOk(routeResult);
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    // Phase 2: individual generation — project switches during fetch
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = 'different-project';
+      return { ok: true, json: async () => ({ id: 'g1', type: 'summary' }) } as any;
+    });
+
+    await gen.generateAuto.call(ctx);
+
+    // Generation should NOT be registered since project switched
+    expect(ctx.generations).toHaveLength(0);
+  });
+});
+
 // --- generateVoice ---
 
 describe('generateVoice', () => {

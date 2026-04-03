@@ -708,6 +708,37 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(result.audioUrl).toMatch(/^\/output\/projects\/.+\/read-aloud-.+\.mp3$/);
   });
 
+  it('single flashcard generates no silence', async () => {
+    const { textToSpeech } = await import('../generators/tts-provider.js');
+    const { concatMp3, generateSilence } = await import('../generators/tts.js');
+    (textToSpeech as any).mockClear();
+    (concatMp3 as any).mockClear();
+    (generateSilence as any).mockClear();
+
+    // Add a single-card flashcard generation
+    const singleCardGen: FlashcardsGeneration = {
+      id: 'fc-single-1',
+      title: 'Single card',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'flashcards',
+      data: [{ question: 'Seule question', answer: 'Seule reponse' }],
+    };
+    store.addGeneration(pid, singleCardGen);
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+    const req = mockReq({ params: { pid, gid: 'fc-single-1' }, body: { lang: 'fr' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(textToSpeech).toHaveBeenCalledTimes(2);
+    expect(generateSilence).not.toHaveBeenCalled();
+    expect(concatMp3).toHaveBeenCalledTimes(1);
+    expect((concatMp3 as any).mock.calls[0][0]).toHaveLength(2);
+    expect(res.json.mock.calls[0][0].audioUrl).toMatch(/read-aloud/);
+  });
+
   it('retourne 400 pour un type non supporte (quiz)', async () => {
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
     const req = mockReq({ params: { pid, gid: quizGid }, body: {} });
