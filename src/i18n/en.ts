@@ -24,6 +24,7 @@ export const en: Record<string, string> = {
   'gen.fill-blank': 'Fill-in-the-blanks',
   'gen.image': 'Image',
   'gen.auto': 'Auto — analyzing...',
+  'gen.estimatedCost': 'Estimated cost (Mistral pricing)',
   'gen.all': 'Generate all',
   'gen.voice': 'Read aloud',
   'gen.websearch': 'Web search',

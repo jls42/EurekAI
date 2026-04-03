@@ -13,6 +13,8 @@ import { generateAudio } from '../generators/tts.js';
 import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
+import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { aggregateUsage, calculateTotalCost } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
@@ -91,6 +93,54 @@ interface GenContext {
   res: Response;
 }
 
+function parseCount(raw: unknown): number | undefined {
+  const n = raw ? Number(raw) : undefined;
+  return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
+}
+
+function buildGenContext(
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  pid: string,
+  body: any,
+  modelId?: string,
+  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
+): { ok: true; ctx: Omit<GenContext, 'req' | 'res'> } | { ok: false; error: string; status: number } {
+  const project = store.getProject(pid);
+  if (!project) return { ok: false, error: 'Projet introuvable', status: 404 };
+
+  const unsafeSource = checkModeration(store, profileStore, pid, body.sourceIds);
+  if (unsafeSource) return { ok: false, error: 'moderation.blocked', status: 400 };
+
+  const rawMarkdown = getMarkdown(project.sources, body.sourceIds);
+  const useConsigne = body.useConsigne !== false;
+  const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+  const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+  const config = getConfig();
+  const models = config.models as Record<string, string>;
+  const resolvedModel = modelId ? (models[modelId] || modelId) : models.summary;
+  const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
+  const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
+  if (ctxError) return { ok: false, error: ctxError, status: 400 };
+
+  const profileId = project.meta?.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+
+  return {
+    ok: true as const,
+    ctx: {
+      project, markdown, rawMarkdown,
+      lang: body.lang || 'fr',
+      ageGroup: body.ageGroup || 'enfant',
+      config, hasConsigne,
+      sourceIds: resolveSourceIds(body, project.sources),
+      count: parseCount(body.count),
+      pid,
+      profileVoices: profile?.mistralVoices,
+    },
+  };
+}
+
 function handleGeneration(
   store: ProjectStore,
   profileStore: ProfileStore,
@@ -101,54 +151,17 @@ function handleGeneration(
   return async (req: Request, res: Response) => {
     try {
       const pid = req.params.pid as string;
-      const project = store.getProject(pid);
-      if (!project) {
-        res.status(404).json({ error: 'Projet introuvable' });
+      const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
+      if (!result.ok) {
+        res.status(result.status).json({ error: result.error });
         return;
       }
-      const unsafeSource = checkModeration(store, profileStore, pid, req.body.sourceIds);
-      if (unsafeSource) {
-        res.status(400).json({ error: `moderation.blocked` });
-        return;
-      }
-      const lang = req.body.lang || 'fr';
-      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
-      const useConsigne = req.body.useConsigne !== false;
-      const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-      const hasConsigne = useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
-      const config = getConfig();
-      const models = config.models as Record<string, string>;
-      const resolvedModel = modelId ? (models[modelId] || modelId) : models.summary;
-      const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
-      const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
-      if (ctxError) {
-        res.status(400).json({ error: ctxError });
-        return;
-      }
-      const sourceIds = resolveSourceIds(req.body, project.sources);
-      const rawCount = req.body.count ? Number(req.body.count) : undefined;
-      const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
-      const profileId = project.meta?.profileId;
-      const profile = profileId ? profileStore.get(profileId) : null;
-
-      const gen = await generatorFn({
-        project,
-        markdown,
-        rawMarkdown,
-        lang,
-        ageGroup,
-        config,
-        hasConsigne,
-        sourceIds,
-        count,
-        pid,
-        profileVoices: profile?.mistralVoices,
-        req,
-        res,
-      });
-
+      const { result: gen, usage } = await runWithUsageTracking(() => generatorFn({ ...result.ctx, req, res }));
       if (gen) {
+        if (usage.length > 0) {
+          gen.usage = aggregateUsage(usage);
+          gen.estimatedCost = calculateTotalCost(usage);
+        }
         store.addGeneration(pid, gen);
         res.json(gen);
       }
@@ -498,7 +511,11 @@ export function generateRoutes(
       try {
         const executor = AUTO_EXECUTORS[step.agent];
         if (executor) {
-          const gen = await executor(autoCtx);
+          const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+          if (usage.length > 0) {
+            gen.usage = aggregateUsage(usage);
+            gen.estimatedCost = calculateTotalCost(usage);
+          }
           st.addGeneration(pid, gen);
           generations.push(gen);
           logger.info('auto', `${step.agent} OK`);

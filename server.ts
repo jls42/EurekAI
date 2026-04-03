@@ -5,6 +5,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Mistral } from '@mistralai/mistralai';
 
+import { trackClient } from './helpers/tracked-client.js';
+import { recordUsage } from './helpers/usage-context.js';
 import { ProjectStore } from './store.js';
 import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache, setModelLimits } from './config.js';
 import { listVoices } from './generators/tts-provider.js';
@@ -34,6 +36,7 @@ const client = new Mistral({
     retryConnectionErrors: true,
   },
 });
+trackClient(client, recordUsage);
 const app = express();
 app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;

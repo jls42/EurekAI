@@ -35,6 +35,13 @@
       class="text-sm text-text-secondary"
       x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
     ></span>
+    <template x-if="gen.estimatedCost">
+      <span
+        class="text-xs text-text-secondary"
+        x-text="'~$' + gen.estimatedCost.toFixed(4)"
+        :title="t('gen.estimatedCost')"
+      >~$0.00</span>
+    </template>
   </div>
   {{#if hasScore}}
   <template x-if="gen.stats && gen.stats.attempts.length > 0">

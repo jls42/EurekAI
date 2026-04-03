@@ -24,6 +24,7 @@ export const it: Record<string, string> = {
   'gen.fill-blank': 'Testo a buchi',
   'gen.image': 'Immagine',
   'gen.auto': 'Auto \u2014 analisi...',
+  'gen.estimatedCost': 'Costo stimato (tariffe Mistral)',
   'gen.all': 'Genera tutto',
   'gen.voice': 'Lettura vocale',
   'gen.websearch': 'Ricerca web',

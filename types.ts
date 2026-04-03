@@ -78,6 +78,8 @@ export interface GenerationMeta {
   title: string;
   createdAt: string;
   sourceIds: string[];
+  usage?: import('./helpers/pricing.js').GenerationUsage;
+  estimatedCost?: number;
 }
 
 export interface SummaryGeneration extends GenerationMeta {

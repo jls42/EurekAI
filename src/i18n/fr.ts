@@ -27,6 +27,7 @@ export const fr: Record<string, string> = {
   'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
   'gen.auto': 'Auto — analyse...',
+  'gen.estimatedCost': 'Cout estime (tarifs Mistral)',
   'gen.all': 'Tout generer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',

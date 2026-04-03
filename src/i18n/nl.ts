@@ -24,6 +24,7 @@ export const nl: Record<string, string> = {
   'gen.fill-blank': 'Invuloefening',
   'gen.image': 'Afbeelding',
   'gen.auto': 'Auto \u2014 analyseren...',
+  'gen.estimatedCost': 'Geschatte kosten (Mistral-tarieven)',
   'gen.all': 'Alles genereren',
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
