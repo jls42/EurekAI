@@ -7,12 +7,19 @@ export function createSources() {
 
     async handleFiles(this: any, fileList: FileList | undefined | null) {
       if (!fileList || fileList.length === 0 || !this.currentProjectId) return;
-      this.uploading = true;
-      this.uploadProgress = { current: 0, total: fileList.length, filename: '' };
+
+      const sessionId = crypto.randomUUID();
+      const files = Array.from(fileList).map((f) => ({ name: f.name, status: 'pending' as const }));
+      this.uploadSessions.push({ id: sessionId, files });
+      this.$nextTick(() => this.refreshIcons());
+
+      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
 
       for (let i = 0; i < fileList.length; i++) {
         const f = fileList[i];
-        this.uploadProgress = { current: i + 1, total: fileList.length, filename: f.name };
+        session.files[i].status = 'uploading';
+        this.$nextTick(() => this.refreshIcons());
+
         const formData = new FormData();
         formData.append('files', f);
         formData.append('lang', this.locale);
@@ -23,6 +30,7 @@ export function createSources() {
           });
           if (!res.ok) {
             const err = await res.json();
+            session.files[i].status = 'error';
             this.showToast(
               this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
               'error',
@@ -32,18 +40,25 @@ export function createSources() {
           const newSources = await res.json();
           this.sources.push(...newSources);
           this.selectedIds.push(...newSources.map((s: any) => s.id));
+          session.files[i].status = 'done';
         } catch (e: any) {
+          session.files[i].status = 'error';
           this.showToast(
             this.t('toast.uploadError', { filename: f.name, error: e.message }),
             'error',
           );
         }
+        this.$nextTick(() => this.refreshIcons());
       }
-      this.uploading = false;
-      this.uploadProgress = { current: 0, total: 0, filename: '' };
-      if (this.sources.length > 0) {
+
+      if (session.files.some((f: any) => f.status === 'done')) {
         this.showToast(this.t('toast.sourcesAdded'), 'success');
       }
+
+      setTimeout(() => {
+        this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
+      }, 3000);
+
       this.$nextTick(() => this.refreshIcons());
       setTimeout(() => this.refreshConsigne(), 3000);
       setTimeout(() => this.refreshModeration(), 2000);
@@ -52,7 +67,10 @@ export function createSources() {
     async addText(this: any) {
       const text = this.textInput.trim();
       if (!text || !this.currentProjectId) return;
-      this.uploading = true;
+
+      const sessionId = crypto.randomUUID();
+      this.uploadSessions.push({ id: sessionId, files: [{ name: 'text', status: 'uploading' as const }] });
+
       try {
         const res = await fetch(this.apiBase() + '/sources/text', {
           method: 'POST',
@@ -78,7 +96,7 @@ export function createSources() {
       } catch (e: any) {
         this.showToast(this.t('toast.error', { error: e.message }), 'error', () => this.addText());
       } finally {
-        this.uploading = false;
+        this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
       }
     },
 

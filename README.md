@@ -53,7 +53,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
 | 🌐 | **Web / URL** | Collez une URL (scraping direct via Readability + Lightpanda) ou tapez une recherche (Agent Mistral web_search) |
 | 📄 | **Fiches de révision** | Notes structurées avec points clés, vocabulaire, citations, anecdotes |
-| 🃏 | **Flashcards** | Cartes Q/R avec références aux sources pour la mémorisation active (nombre configurable) |
+| 🃏 | **Flashcards** | Cartes Q/R interactives, lecture audio dialoguée |
 | ❓ | **Quiz QCM** | Questions à choix multiples avec révision adaptative des erreurs (nombre configurable) |
 | ✏️ | **Textes à trous** | Exercices à compléter avec indices et validation tolérante |
 | 🎙️ | **Podcast** | Mini-podcast 2 voix en audio — voix Mistral par défaut ou voix personnalisées (parents !) |
@@ -63,7 +63,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 7 types disponibles |
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
-| 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards via Mistral Voxtral TTS ou ElevenLabs |
+| 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS ou ElevenLabs |
 
 ---
 
@@ -284,7 +284,7 @@ generators/
   router.ts               — Routeur automatique (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
   tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
-  tts.ts                  — Génération audio podcast (concaténation de segments)
+  tts.ts                  — Génération audio multi-voix (podcast + flashcards, concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search (fallback)
   moderation.ts           — Modération de contenu (filtrage par âge)

@@ -21,8 +21,10 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   };
 });
 
-import { generateAudio } from './tts.js';
+import { generateAudio, generateSilence, concatMp3 } from './tts.js';
 import { textToSpeech } from './tts-provider.js';
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, unlink } from 'node:fs/promises';
 import type { TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
 
@@ -33,6 +35,41 @@ const ttsOptions: TtsOptions = {
 };
 
 const voices = { host: 'host-voice-id', guest: 'guest-voice-id' };
+
+describe('generateSilence', () => {
+  it('calls ffmpeg with correct args and returns buffer', async () => {
+    vi.mocked(execFile).mockClear();
+    vi.mocked(mkdtemp).mockClear();
+    vi.mocked(readFile).mockClear();
+
+    const result = await generateSilence(1200);
+
+    expect(mkdtemp).toHaveBeenCalled();
+    expect(execFile).toHaveBeenCalled();
+    const args = vi.mocked(execFile).mock.calls[0][1] as string[];
+    expect(args).toContain('anullsrc=r=44100:cl=mono');
+    expect(args).toContain('1.2');
+    expect(args).toContain('libmp3lame');
+    expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('cleans up temp files in finally block', async () => {
+    vi.mocked(unlink).mockClear();
+
+    await generateSilence(500);
+
+    // unlink called for output file + tmpDir
+    expect(unlink).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('concatMp3', () => {
+  it('returns single segment directly without ffmpeg', async () => {
+    const buf = Buffer.from('single');
+    const result = await concatMp3([buf]);
+    expect(result).toBe(buf);
+  });
+});
 
 describe('generateAudio', () => {
   it('returns audio buffer directly for a single-line script (no ffmpeg)', async () => {

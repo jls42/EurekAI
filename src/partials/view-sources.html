@@ -282,22 +282,22 @@
     </button>
   </div>
 
-  <!-- Upload progress -->
-  <div x-show="uploading" class="mb-4 bg-surface rounded-card shadow-card p-4">
-    <div class="flex items-center gap-3 text-primary-dark">
-      <i data-lucide="loader-2" class="w-5 h-5 animate-spin"></i>
-      <span
-        class="text-body-sm font-medium"
-        x-text="t('sources.ocrProgress', { current: uploadProgress.current, total: uploadProgress.total, filename: uploadProgress.filename })"
-      ></span>
+  <!-- Upload sessions -->
+  <template x-for="session in uploadSessions" :key="session.id">
+    <div class="mb-4 bg-surface rounded-card shadow-card p-4 space-y-1.5">
+      <template x-for="(file, idx) in session.files" :key="idx">
+        <div class="flex items-center gap-3 py-1">
+          <i x-show="file.status === 'pending'" data-lucide="circle-dashed" class="w-4 h-4 text-text-secondary shrink-0"></i>
+          <i x-show="file.status === 'uploading'" data-lucide="loader-2" class="w-4 h-4 text-primary animate-spin shrink-0"></i>
+          <i x-show="file.status === 'done'" data-lucide="check-circle" class="w-4 h-4 text-success shrink-0"></i>
+          <i x-show="file.status === 'error'" data-lucide="x-circle" class="w-4 h-4 text-danger shrink-0"></i>
+          <span class="text-body-sm truncate" x-text="file.name">File</span>
+          <span class="text-sm text-text-secondary ml-auto shrink-0"
+                x-text="t('sources.fileStatus.' + file.status)">Status</span>
+        </div>
+      </template>
     </div>
-    <div class="mt-2 w-full bg-gray-200 rounded-full h-2">
-      <div
-        class="bg-primary h-2 rounded-full transition-all duration-300"
-        :style="'width: ' + (uploadProgress.total ? (uploadProgress.current / uploadProgress.total * 100) : 0) + '%'"
-      ></div>
-    </div>
-  </div>
+  </template>
 
   <!-- Sources list -->
   <div x-show="sources.length > 0" class="space-y-2 mb-4">

@@ -211,9 +211,10 @@ describe('createState', () => {
     expect(state.theme).toBe('light');
   });
 
-  it('uploadProgress has correct default shape', () => {
+  it('uploadSessions defaults to empty array and uploading is false', () => {
     const state = createState();
-    expect(state.uploadProgress).toEqual({ current: 0, total: 0, filename: '' });
+    expect(state.uploadSessions).toEqual([]);
+    expect(state.uploading).toBe(false);
   });
 
   it('viewSourceZoom defaults to 1 and viewSourceRotation to 0', () => {

@@ -16,6 +16,7 @@ import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
+import { concatMp3, generateSilence } from '../generators/tts.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -31,10 +32,6 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
 
 function readAloudText(gen: any, section: string): string | null {
   if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
-  if (gen.type === 'flashcards') {
-    const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type === 'flashcards' check
-    return cards.map((c: any, i: number) => `Question ${i + 1}: ${c.question}. Reponse: ${c.answer}.`).join(' ');
-  }
   return null;
 }
 
@@ -60,6 +57,42 @@ async function generateBatchAudio(
     }
   }
   return { audioUrls, failedSections };
+}
+
+function handleBatchSummaryResult(
+  audioUrls: Record<string, string>,
+  failedSections: string[],
+  summaryGen: SummaryGeneration,
+  store: ProjectStore,
+  pid: string,
+  gid: string,
+  res: any,
+): void {
+  if (Object.keys(audioUrls).length > 0) {
+    const d = summaryGen.data;
+    store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
+  }
+  if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
+    res.status(500).json({ error: 'TTS failed for all sections' });
+    return;
+  }
+  res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
+}
+
+async function generateFlashcardsAudio(
+  cards: Array<{ question: string; answer: string }>,
+  voices: { host: string; guest: string },
+  ttsOpts: any,
+): Promise<Buffer> {
+  const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
+  const segments: Buffer[] = [];
+  for (let i = 0; i < cards.length; i++) {
+    const q = await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts);
+    const a = await textToSpeech(cards[i].answer.slice(0, 5000), voices.guest, ttsOpts);
+    const cardSegments = silenceBuffer && i < cards.length - 1 ? [q, a, silenceBuffer] : [q, a];
+    segments.push(...cardSegments);
+  }
+  return concatMp3(segments);
 }
 
 export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
@@ -256,16 +289,21 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       if (section === 'all' && gen.type === 'summary') {
         const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
         const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, req.params.pid);
-        if (Object.keys(audioUrls).length > 0) {
-          const d = summaryGen.data;
-          store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
-        }
-        if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) { res.status(500).json({ error: 'TTS failed for all sections' }); return; }
-        res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
+        handleBatchSummaryResult(audioUrls, failedSections, summaryGen, store, req.params.pid, req.params.gid, res);
         return;
       }
 
-      // Single section or flashcards
+      // Dual-voice flashcards: host=questions, guest=answers, silence between cards
+      if (gen.type === 'flashcards') {
+        const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
+        const voices = resolveVoices(config, profile?.mistralVoices, req.body.lang);
+        const audioBuffer = await generateFlashcardsAudio(cards, voices, ttsOpts);
+        const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-all`);
+        res.json({ audioUrl });
+        return;
+      }
+
+      // Single section (summary)
       const text = readAloudText(gen, section);
       if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return; }
       if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return; }
