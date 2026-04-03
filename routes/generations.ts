@@ -17,6 +17,7 @@ import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
+import { withCostTracking } from '../helpers/cost-middleware.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -267,7 +268,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
   });
 
   // --- Read Aloud (TTS) ---
-  router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
+  router.post('/:pid/generations/:gid/read-aloud', withCostTracking(store, async (req, res) => {
     try {
       const gen = store.getGeneration(req.params.pid, req.params.gid);
       if (!gen) { res.status(404).json({ error: 'Generation introuvable' }); return; }
@@ -321,7 +322,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       console.error('Read aloud error:', e);
       res.status(500).json({ error: String(e) });
     }
-  });
+  }));
 
   return router;
 }

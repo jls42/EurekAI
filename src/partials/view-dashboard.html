@@ -93,11 +93,15 @@
   <div x-show="generations.length > 0">
     <div class="flex items-center justify-between mb-3">
       <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-      <h3
-        class="font-heading font-semibold text-sm text-text-primary"
-        x-text="t('dashboard.recentGenerations')"
-      >
-        Recent
+      <h3 class="font-heading font-semibold text-sm text-text-primary flex items-center gap-2">
+        <span x-text="t('dashboard.recentGenerations')">Recent</span>
+        <template x-if="currentProject?.totalCost > 0">
+          <span
+            class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm"
+            x-text="t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
+            :title="t('gen.estimatedCost')"
+          >Total</span>
+        </template>
       </h3>
       <button
         @click="generateAuto()"

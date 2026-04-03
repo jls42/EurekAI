@@ -120,6 +120,7 @@ export const de: Record<string, string> = {
   'dashboard.launchMagic': 'Starte die Magie um Inhalte zu generieren',
   'dashboard.autoMagic': 'Auto \u2014 Das ist Magie!',
   'dashboard.recentGenerations': 'Letzte Generierungen',
+  'dashboard.totalCost': 'Total:',
   'dashboard.autoMagicShort': 'Auto \u2014 Magie!',
 
   'sources.heading': 'Was m\u00f6chtest du lernen?',

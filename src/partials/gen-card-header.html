@@ -39,7 +39,7 @@
       <span
         class="text-sm px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold"
         x-text="'~$' + gen.estimatedCost.toFixed(4)"
-        :title="t('gen.estimatedCost')"
+        :title="gen.usage ? (gen.usage.promptTokens + ' tokens in, ' + gen.usage.completionTokens + ' tokens out, ' + gen.usage.callCount + ' appel(s) API') : t('gen.estimatedCost')"
       >~$0.00</span>
     </template>
   </div>

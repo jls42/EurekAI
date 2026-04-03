@@ -7,6 +7,7 @@ import type {
   Source,
   Generation,
   ChatMessage,
+  CostEntry,
   ModerationResult,
 } from './types.js';
 
@@ -149,6 +150,14 @@ export class ProjectStore {
     const data = this.getProject(projectId);
     if (!data) return;
     data.results.generations.push(generation);
+    this.saveProject(projectId, data);
+  }
+
+  appendCostEntry(projectId: string, entry: CostEntry): void {
+    const data = this.getProject(projectId);
+    if (!data) return;
+    data.costLog ??= [];
+    data.costLog.push(entry);
     this.saveProject(projectId, data);
   }
 

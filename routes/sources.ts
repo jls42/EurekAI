@@ -13,6 +13,9 @@ import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
+import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { aggregateUsage, calculateTotalCost } from '../helpers/pricing.js';
+import { withCostTracking } from '../helpers/cost-middleware.js';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -143,7 +146,13 @@ export function sourceRoutes(
     const modCats = getModerationCategories(store, profileStore, pid);
     for (const file of files) {
       try {
-        const source = await processUploadedFile(file, pid, modCats);
+        const { result: source, usage } = await runWithUsageTracking(
+          () => processUploadedFile(file, pid, modCats),
+        );
+        if (usage.length > 0) {
+          source.usage = aggregateUsage(usage);
+          source.estimatedCost = calculateTotalCost(usage);
+        }
         store.addSource(pid, source);
         results.push(source);
       } catch (e) {
@@ -218,12 +227,10 @@ export function sourceRoutes(
 
     try {
       const lang = req.body.lang || 'fr';
-      const { text, elapsed } = await transcribeAudio(
-        client,
-        file.buffer,
-        file.originalname || 'audio.webm',
-        lang,
+      const { result: sttResult, usage } = await runWithUsageTracking(() =>
+        transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
       );
+      const { text, elapsed } = sttResult;
       if (!text || text.trim().length === 0) {
         res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
         return;
@@ -236,6 +243,7 @@ export function sourceRoutes(
         uploadedAt: new Date().toISOString(),
         sourceType: 'voice',
         moderation: modCats ? pendingModeration() : undefined,
+        ...(usage.length > 0 && { usage: aggregateUsage(usage), estimatedCost: calculateTotalCost(usage) }),
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
@@ -357,10 +365,20 @@ export function sourceRoutes(
     }
 
     try {
-      const sources = await collectWebSources(req, pid, modCats);
+      const { result: sources, usage } = await runWithUsageTracking(
+        () => collectWebSources(req, pid, modCats),
+      );
       if (sources.length === 0) {
         res.status(500).json({ error: 'Aucune source extraite' });
         return;
+      }
+      if (usage.length > 0) {
+        const costPerSource = calculateTotalCost(usage) / sources.length;
+        const usagePerSource = aggregateUsage(usage);
+        for (const s of sources) {
+          s.estimatedCost = costPerSource;
+          s.usage = usagePerSource;
+        }
       }
       const lang = req.body.lang || 'fr';
       void triggerConsigneDetection(store, client, pid, lang);

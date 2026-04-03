@@ -13,6 +13,7 @@ import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 import { autoTitle } from '../helpers/auto-title.js';
+import { withCostTracking } from '../helpers/cost-middleware.js';
 
 interface ChatRequestContext {
   pid: string;
@@ -127,7 +128,7 @@ export function chatRoutes(
   const router = Router();
 
   // Send message
-  router.post('/:pid/chat', async (req, res) => {
+  router.post('/:pid/chat', withCostTracking(store, async (req, res) => {
     try {
       const validated = await validateChatRequest(req as any, store, profileStore, client);
       if (validated instanceof ChatValidationError) {
@@ -203,7 +204,7 @@ export function chatRoutes(
       console.error('Chat error:', e);
       res.status(500).json({ error: String(e) });
     }
-  });
+  }));
 
   // Get chat history
   router.get('/:pid/chat', (req, res) => {

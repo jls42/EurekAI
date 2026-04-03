@@ -120,6 +120,7 @@ export const hi: Record<string, string> = {
   'dashboard.launchMagic': '\u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u092C\u0928\u093E\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u091C\u093E\u0926\u0942 \u091A\u0932\u093E\u090F\u0901',
   'dashboard.autoMagic': 'Auto \u2014 \u092F\u0939 \u091C\u093E\u0926\u0942 \u0939\u0948!',
   'dashboard.recentGenerations': '\u0939\u093E\u0932 \u0915\u0940 \u091C\u0947\u0928\u0930\u0947\u0936\u0928',
+  'dashboard.totalCost': 'Total:',
   'dashboard.autoMagicShort': 'Auto \u2014 \u091C\u093E\u0926\u0942!',
 
   'sources.heading': '\u0906\u092A \u0915\u094D\u092F\u093E \u0938\u0940\u0916\u0928\u093E \u091A\u093E\u0939\u0924\u0947 \u0939\u0948\u0902?',

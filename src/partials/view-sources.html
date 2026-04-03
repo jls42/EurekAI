@@ -333,6 +333,13 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="font-medium text-body-sm truncate" x-text="src.filename"></span>
+            <!-- Cost badge -->
+            <template x-if="src.estimatedCost">
+              <span
+                class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/15 text-accent"
+                x-text="'~$' + src.estimatedCost.toFixed(4)"
+              >$0</span>
+            </template>
             <!-- Scrape engine badge -->
             <span
               x-show="src.scrapeEngine === 'readability'"
