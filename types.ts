@@ -40,6 +40,7 @@ export interface Source {
   filePath?: string;
   estimatedCost?: number;
   usage?: import('./helpers/pricing.js').GenerationUsage;
+  costBreakdown?: string[];
 }
 
 export interface StudyFiche {
@@ -82,6 +83,7 @@ export interface GenerationMeta {
   sourceIds: string[];
   usage?: import('./helpers/pricing.js').GenerationUsage;
   estimatedCost?: number;
+  costBreakdown?: string[];
 }
 
 export interface SummaryGeneration extends GenerationMeta {

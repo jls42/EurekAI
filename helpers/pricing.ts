@@ -100,3 +100,30 @@ export function calculateTotalCost(entries: ApiUsage[]): number {
   for (const e of entries) total += calculateCost(e);
   return Math.round(total * 1_000_000) / 1_000_000;
 }
+
+function fmt(n: number): string { return n < 0.0001 ? '$0' : `$${n.toFixed(4)}`; }
+
+/** Build a human-readable cost breakdown showing the calculation per API call. */
+export function buildCostBreakdown(entries: ApiUsage[]): string[] {
+  const lines: string[] = [];
+  for (const e of entries) {
+    const pricing = resolvePricing(e.model);
+    if (!pricing) continue;
+    switch (pricing.unit) {
+      case 'tokens':
+        if (e.promptTokens) lines.push(`${e.promptTokens} tokens in × $${pricing.inputPerMillion}/M = ${fmt((e.promptTokens * pricing.inputPerMillion) / 1_000_000)}`);
+        if (e.completionTokens) lines.push(`${e.completionTokens} tokens out × $${pricing.outputPerMillion}/M = ${fmt((e.completionTokens * pricing.outputPerMillion) / 1_000_000)}`);
+        break;
+      case 'characters':
+        if (e.inputCharacters) lines.push(`${e.inputCharacters} chars × $${pricing.inputPerMillion}/M = ${fmt((e.inputCharacters * pricing.inputPerMillion) / 1_000_000)}`);
+        break;
+      case 'pages':
+        if (e.pagesProcessed) lines.push(`${e.pagesProcessed} page(s) × $${pricing.inputPerMillion / 1000}/page = ${fmt((e.pagesProcessed * pricing.inputPerMillion) / 1_000_000)}`);
+        break;
+      case 'audio-seconds':
+        if (e.promptAudioSeconds) lines.push(`${e.promptAudioSeconds.toFixed(1)}s audio × $${(pricing.inputPerMillion / 1_000_000 * 60).toFixed(4)}/min = ${fmt((e.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000)}`);
+        break;
+    }
+  }
+  return lines;
+}

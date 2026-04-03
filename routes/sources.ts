@@ -14,7 +14,7 @@ import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
-import { aggregateUsage, calculateTotalCost } from '../helpers/pricing.js';
+import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/pricing.js';
 import { withCostTracking } from '../helpers/cost-middleware.js';
 
 function pendingModeration(): Source['moderation'] {
@@ -149,9 +149,10 @@ export function sourceRoutes(
         const { result: source, usage } = await runWithUsageTracking(
           () => processUploadedFile(file, pid, modCats),
         );
+        source.estimatedCost = usage.length > 0 ? calculateTotalCost(usage) : 0;
         if (usage.length > 0) {
           source.usage = aggregateUsage(usage);
-          source.estimatedCost = calculateTotalCost(usage);
+          source.costBreakdown = buildCostBreakdown(usage);
         }
         store.addSource(pid, source);
         results.push(source);
@@ -202,6 +203,7 @@ export function sourceRoutes(
       uploadedAt: new Date().toISOString(),
       sourceType: 'text',
       moderation: sourceModeration,
+      estimatedCost: 0,
     };
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
@@ -243,7 +245,7 @@ export function sourceRoutes(
         uploadedAt: new Date().toISOString(),
         sourceType: 'voice',
         moderation: modCats ? pendingModeration() : undefined,
-        ...(usage.length > 0 && { usage: aggregateUsage(usage), estimatedCost: calculateTotalCost(usage) }),
+        ...(usage.length > 0 && { usage: aggregateUsage(usage), estimatedCost: calculateTotalCost(usage), costBreakdown: buildCostBreakdown(usage) }),
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);

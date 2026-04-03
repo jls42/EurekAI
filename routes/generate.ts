@@ -14,7 +14,7 @@ import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
-import { aggregateUsage, calculateTotalCost } from '../helpers/pricing.js';
+import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
@@ -161,6 +161,7 @@ function handleGeneration(
         if (usage.length > 0) {
           gen.usage = aggregateUsage(usage);
           gen.estimatedCost = calculateTotalCost(usage);
+          gen.costBreakdown = buildCostBreakdown(usage);
         }
         store.addGeneration(pid, gen);
         res.json(gen);
@@ -515,6 +516,7 @@ export function generateRoutes(
           if (usage.length > 0) {
             gen.usage = aggregateUsage(usage);
             gen.estimatedCost = calculateTotalCost(usage);
+            gen.costBreakdown = buildCostBreakdown(usage);
           }
           st.addGeneration(pid, gen);
           generations.push(gen);
