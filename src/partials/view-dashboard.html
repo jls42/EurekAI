@@ -152,7 +152,7 @@
           <p class="text-sm text-text-secondary mt-0.5">
             <span x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"></span>
             <template x-if="gen.estimatedCost">
-              <span class="ml-1" x-text="'~$' + gen.estimatedCost.toFixed(4)">~$0.00</span>
+              <span class="ml-1 px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm" x-text="'~$' + gen.estimatedCost.toFixed(4)">~$0.00</span>
             </template>
           </p>
         </div>

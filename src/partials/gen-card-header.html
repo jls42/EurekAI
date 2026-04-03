@@ -37,7 +37,7 @@
     ></span>
     <template x-if="gen.estimatedCost">
       <span
-        class="text-xs text-text-secondary"
+        class="text-sm px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold"
         x-text="'~$' + gen.estimatedCost.toFixed(4)"
         :title="t('gen.estimatedCost')"
       >~$0.00</span>
