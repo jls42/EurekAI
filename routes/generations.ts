@@ -59,6 +59,26 @@ async function generateBatchAudio(
   return { audioUrls, failedSections };
 }
 
+function handleBatchSummaryResult(
+  audioUrls: Record<string, string>,
+  failedSections: string[],
+  summaryGen: SummaryGeneration,
+  store: ProjectStore,
+  pid: string,
+  gid: string,
+  res: any,
+): void {
+  if (Object.keys(audioUrls).length > 0) {
+    const d = summaryGen.data;
+    store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
+  }
+  if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
+    res.status(500).json({ error: 'TTS failed for all sections' });
+    return;
+  }
+  res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
+}
+
 async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
   voices: { host: string; guest: string },
@@ -269,12 +289,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       if (section === 'all' && gen.type === 'summary') {
         const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
         const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, req.params.pid);
-        if (Object.keys(audioUrls).length > 0) {
-          const d = summaryGen.data;
-          store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
-        }
-        if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) { res.status(500).json({ error: 'TTS failed for all sections' }); return; }
-        res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
+        handleBatchSummaryResult(audioUrls, failedSections, summaryGen, store, req.params.pid, req.params.gid, res);
         return;
       }
 
