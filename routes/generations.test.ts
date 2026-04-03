@@ -699,7 +699,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(calls[3][1]).toBe('mg');
 
     // Silence generated once (2 cards > 1)
-    expect(generateSilence).toHaveBeenCalledWith(800);
+    expect(generateSilence).toHaveBeenCalledWith(1200);
     // concatMp3 called with 5 segments: Q1, A1, silence, Q2, A2
     expect(concatMp3).toHaveBeenCalledTimes(1);
     expect((concatMp3 as any).mock.calls[0][0]).toHaveLength(5);

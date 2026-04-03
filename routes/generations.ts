@@ -267,7 +267,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
         const voices = resolveVoices(config, profile?.mistralVoices, req.body.lang);
         const segments: Buffer[] = [];
-        const silenceBuffer = cards.length > 1 ? await generateSilence(800) : null;
+        const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
 
         for (let i = 0; i < cards.length; i++) {
           segments.push(await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts));
