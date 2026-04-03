@@ -59,6 +59,22 @@ async function generateBatchAudio(
   return { audioUrls, failedSections };
 }
 
+async function generateFlashcardsAudio(
+  cards: Array<{ question: string; answer: string }>,
+  voices: { host: string; guest: string },
+  ttsOpts: any,
+): Promise<Buffer> {
+  const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
+  const segments: Buffer[] = [];
+  for (let i = 0; i < cards.length; i++) {
+    const q = await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts);
+    const a = await textToSpeech(cards[i].answer.slice(0, 5000), voices.guest, ttsOpts);
+    const cardSegments = silenceBuffer && i < cards.length - 1 ? [q, a, silenceBuffer] : [q, a];
+    segments.push(...cardSegments);
+  }
+  return concatMp3(segments);
+}
+
 export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
   const router = Router();
 
@@ -266,16 +282,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       if (gen.type === 'flashcards') {
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
         const voices = resolveVoices(config, profile?.mistralVoices, req.body.lang);
-        const segments: Buffer[] = [];
-        const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
-
-        for (let i = 0; i < cards.length; i++) {
-          segments.push(await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts));
-          segments.push(await textToSpeech(cards[i].answer.slice(0, 5000), voices.guest, ttsOpts));
-          if (silenceBuffer && i < cards.length - 1) segments.push(silenceBuffer);
-        }
-
-        const audioBuffer = await concatMp3(segments);
+        const audioBuffer = await generateFlashcardsAudio(cards, voices, ttsOpts);
         const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-all`);
         res.json({ audioUrl });
         return;
