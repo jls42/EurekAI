@@ -54,10 +54,10 @@ function findMatchingPrefix(modelId: string): string | undefined {
 }
 
 /** Resolve pricing by longest prefix match on model ID. */
-export function resolvePricing(modelId: string): ModelPricing | null { // NOPMD - false positive: 3-line function, complexity misattributed
+export const resolvePricing = (modelId: string): ModelPricing | null => {
   const match = findMatchingPrefix(modelId);
   return match ? MODEL_PRICING[match] : null;
-}
+};
 
 /** Get the billable quantity for a given unit type. */
 function getQuantity(usage: ApiUsage, unit: BillingUnit): number {
