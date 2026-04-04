@@ -79,6 +79,13 @@
                 class="text-sm text-text-secondary"
                 x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
               ></span>
+              <template x-if="gen.estimatedCost">
+                <span
+                  class="text-sm px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold"
+                  x-text="t('gen.costPrefix') + ' ~$' + gen.estimatedCost.toFixed(4)"
+                  :title="gen.costBreakdown ? gen.costBreakdown.join(' · ') : t('gen.estimatedCost')"
+                >Est.</span>
+              </template>
             </div>
             <!-- Actions -->
             <button

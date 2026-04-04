@@ -53,6 +53,26 @@
             class="text-sm text-text-secondary"
             x-text="new Date(gen.createdAt).toLocaleTimeString(dateLocale())"
           ></span>
+          <template x-if="gen.estimatedCost">
+            <span class="relative" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
+              <span
+                class="text-sm px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold cursor-help"
+                x-text="t('gen.costPrefix') + ' ~$' + gen.estimatedCost.toFixed(4)"
+              >Est.</span>
+              <div
+                x-show="hover"
+                x-transition.opacity
+                class="absolute left-0 top-full mt-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
+                @click.stop
+              >
+                <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
+                <template x-for="line in (gen.costBreakdown || [])" :key="line">
+                  <div class="text-text-secondary font-mono" x-text="line"></div>
+                </template>
+                <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent" x-text="'Total: ~$' + gen.estimatedCost.toFixed(4)">Total</div>
+              </div>
+            </span>
+          </template>
         </div>
         <i
           data-lucide="chevron-down"
