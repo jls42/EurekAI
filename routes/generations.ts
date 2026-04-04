@@ -96,6 +96,24 @@ async function generateFlashcardsAudio(
   return concatMp3(segments);
 }
 
+async function generateSectionAudio(
+  gen: any, section: string, voiceId: string, ttsOpts: any,
+  projectDir: string, pid: string, baseId: string, store: ProjectStore, gid: string, res: any,
+): Promise<string | null> {
+  const text = readAloudText(gen, section);
+  if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return null; }
+  if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return null; }
+
+  const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
+  const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
+
+  if (gen.type === 'summary') {
+    const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
+    store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } } } as any);
+  }
+  return audioUrl;
+}
+
 function resolveReadAloudContext(store: ProjectStore, profileStore: ProfileStore, client: Mistral, pid: string, lang?: string) {
   const config = getConfig();
   const project = store.getProject(pid);
@@ -308,19 +326,8 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       }
 
       // Single section (summary)
-      const text = readAloudText(gen, section);
-      if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return; }
-      if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return; }
-
-      const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
-      const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-${section}`);
-
-      // Persist section audio URL in generation data
-      if (gen.type === 'summary') {
-        const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
-        store.updateGeneration(req.params.pid, req.params.gid, { data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } } } as any);
-      }
-      res.json({ audioUrl });
+      const audioUrl = await generateSectionAudio(gen, section, voiceId, ttsOpts, projectDir, req.params.pid, baseId, store, req.params.gid, res);
+      if (audioUrl) res.json({ audioUrl });
     } catch (e) {
       console.error('Read aloud error:', e);
       res.status(500).json({ error: String(e) });

@@ -46,12 +46,16 @@ export const PRICING_SOURCES: Record<string, string> = {
   'mistral-moderation': 'https://docs.mistral.ai/models/mistral-moderation-26-03',
 };
 
-// Prefixes sorted by length (longest first) for greedy matching
+// Pre-computed lookup: sorted prefixes (longest first) for greedy matching
 const SORTED_PREFIXES = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
+
+function findMatchingPrefix(modelId: string): string | undefined {
+  return SORTED_PREFIXES.find((p) => modelId.startsWith(p));
+}
 
 /** Resolve pricing by longest prefix match on model ID. */
 export function resolvePricing(modelId: string): ModelPricing | null {
-  const match = SORTED_PREFIXES.find((p) => modelId.startsWith(p));
+  const match = findMatchingPrefix(modelId);
   return match ? MODEL_PRICING[match] : null;
 }
 
