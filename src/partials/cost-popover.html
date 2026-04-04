@@ -1,0 +1,19 @@
+<!-- Single global cost popover — rendered once in the layout.
+     Reads _costHover, _costPos, _costData from Alpine root state. -->
+<div
+  x-show="_costHover && _costData"
+  x-transition.opacity.duration.150ms
+  class="fixed z-[9999] bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap pointer-events-none"
+  :style="_costPos ? (_costPos.top > 200 ? 'bottom:' + (window.innerHeight - _costPos.top + 4) + 'px' : 'top:' + (_costPos.bottom + 4) + 'px') + ';left:' + _costPos.left + 'px' : 'display:none'"
+>
+  <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
+  <template x-for="line in (_costData?.costBreakdown || [])" :key="line">
+    <div class="text-text-secondary font-mono" x-text="line"></div>
+  </template>
+  <template x-if="_costData?.usage && !(_costData?.costBreakdown || []).length">
+    <div class="text-text-secondary font-mono" x-text="_costData.usage.totalTokens + ' tokens · ' + _costData.usage.callCount + ' appel(s) API'"></div>
+  </template>
+  <template x-if="_costData?.estimatedCost">
+    <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent" x-text="'Total: ~$' + _costData.estimatedCost.toFixed(4)">Total</div>
+  </template>
+</div>

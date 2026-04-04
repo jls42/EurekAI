@@ -334,13 +334,7 @@
           <div class="flex items-center gap-2">
             <span class="font-medium text-body-sm truncate" x-text="src.filename"></span>
             <!-- Cost badge -->
-            <template x-if="src.estimatedCost != null">
-              <span
-                class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent/15 text-accent"
-                x-text="t('gen.costPrefix') + ' ~$' + src.estimatedCost.toFixed(4)"
-                :title="src.usage ? t('gen.costTooltipSource', { detail: src.usage.pagesProcessed ? src.usage.pagesProcessed + ' page(s) OCR' : src.usage.totalTokens + ' tokens' }) : t('gen.costTooltipFree')"
-              >Est.</span>
-            </template>
+            {{> cost-badge-src badgeClass="shrink-0 text-[10px] font-bold px-1.5 py-0.5"}}
             <!-- Scrape engine badge -->
             <span
               x-show="src.scrapeEngine === 'readability'"

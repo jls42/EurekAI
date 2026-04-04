@@ -179,23 +179,7 @@
           <p class="font-semibold text-body-sm text-text-primary truncate" x-text="gen.title"></p>
           <p class="text-sm text-text-secondary mt-0.5">
             <span x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"></span>
-            <template x-if="gen.estimatedCost">
-              <span class="relative inline-block" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
-                <span class="ml-1 px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-help" x-text="t('gen.costPrefix') + ' ~$' + gen.estimatedCost.toFixed(4)">Est.</span>
-                <div
-                  x-show="hover"
-                  x-transition.opacity
-                  class="absolute left-0 bottom-full mb-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
-                  @click.stop
-                >
-                  <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
-                  <template x-for="line in (gen.costBreakdown || [])" :key="line">
-                    <div class="text-text-secondary font-mono" x-text="line"></div>
-                  </template>
-                  <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent" x-text="'Total: ~$' + gen.estimatedCost.toFixed(4)">Total</div>
-                </div>
-              </span>
-            </template>
+            {{> cost-badge-gen badgeClass="ml-1 text-sm px-2 py-0.5"}}
           </p>
         </div>
       </template>

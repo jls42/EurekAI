@@ -52,6 +52,11 @@ export function createState() {
     showTextInput: false,
     showWebInput: false,
 
+    // Cost popover hover state
+    _costHover: null as string | null,
+    _costPos: null as DOMRect | null,
+    _costData: null as any,
+
     // Voice recording
     recording: false,
     recorder: null as MediaRecorder | null,
