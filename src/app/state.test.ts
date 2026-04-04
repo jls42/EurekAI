@@ -31,9 +31,8 @@ describe('createState', () => {
     prefersDark = false;
   });
 
-  it('returns an object with all expected top-level properties', () => {
+  it('initializes profile state', () => {
     const state = createState();
-    // Profile state
     expect(state.profiles).toEqual([]);
     expect(state.currentProfile).toBeNull();
     expect(state.showProfilePicker).toBe(false);
@@ -43,15 +42,19 @@ describe('createState', () => {
     expect(state.newProfileAge).toBe('');
     expect(state.newProfileAvatar).toBe('0');
     expect(state.newProfileLocale).toBe('fr');
+  });
 
-    // Project state
+  it('initializes project state', () => {
+    const state = createState();
     expect(state.projects).toEqual([]);
     expect(state.currentProjectId).toBeNull();
     expect(state.currentProject).toBeNull();
     expect(state.newProjectName).toBe('');
     expect(state.showNewProject).toBe(false);
+  });
 
-    // Source state
+  it('initializes source state', () => {
+    const state = createState();
     expect(state.sources).toEqual([]);
     expect(state.selectedIds).toEqual([]);
     expect(state.uploading).toBe(false);
@@ -61,56 +64,64 @@ describe('createState', () => {
     expect(state.webQuery).toBe('');
     expect(state.showTextInput).toBe(false);
     expect(state.showWebInput).toBe(false);
+  });
 
-    // Voice recording
+  it('initializes voice recording state', () => {
+    const state = createState();
     expect(state.recording).toBe(false);
     expect(state.recorder).toBeNull();
     expect(state.recordingDuration).toBe(0);
     expect(state.recordingTimer).toBeNull();
+  });
 
-    // Consigne
+  it('initializes consigne state', () => {
+    const state = createState();
     expect(state.consigne).toBeNull();
     expect(state.consigneLoading).toBe(false);
     expect(state.useConsigne).toBe(true);
+  });
 
-    // Generation state
+  it('initializes generation state', () => {
+    const state = createState();
     expect(state.generateCount).toBe(10);
     expect(state.countOptions).toEqual([10, 20, 30, 42, 50]);
     expect(state.generations).toEqual([]);
     expect(state.openGens).toEqual({});
     expect(state.editingTitle).toBeNull();
     expect(state.editTitleValue).toBe('');
+  });
 
-    // Navigation & layout
+  it('initializes navigation & layout state', () => {
+    const state = createState();
     expect(state.sidebarOpen).toBe(false);
     expect(state.sidebarCollapsed).toBe(false);
     expect(state.mobileTab).toBe('magic');
     expect(state.isMobile).toBe(false);
     expect(state.activeView).toBe('dashboard');
+  });
 
-    // Chat
+  it('initializes chat state', () => {
+    const state = createState();
     expect(state.chatMessages).toEqual([]);
     expect(state.chatInput).toBe('');
     expect(state.chatLoading).toBe(false);
+  });
 
-    // Settings
+  it('initializes settings state', () => {
+    const state = createState();
     expect(state.showSettings).toBe(false);
     expect(state.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false });
     expect(state.mistralVoicesList).toEqual([]);
+  });
 
-    // Lightbox
+  it('initializes lightbox, toasts, confirm and PIN dialogs', () => {
+    const state = createState();
     expect(state.lightboxUrl).toBe('');
-
-    // Toasts
     expect(state.toasts).toEqual([]);
     expect(state.toastCounter).toBe(0);
-
-    // Confirm dialog
     expect(state.confirmCallback).toBeNull();
     expect(state.confirmTarget).toBe('');
     expect(state.confirmTrigger).toBeNull();
-
-    // PIN dialog
     expect(state.newProfilePin).toBe('');
     expect(state.newProfilePinConfirm).toBe('');
     expect(state.pinVerifyInput).toBe('');
