@@ -195,6 +195,46 @@ describe('GET /:pid', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
   });
+
+  it('includes totalCost from costLog, generations and sources', () => {
+    const project = store.createProject('Cost test');
+    const pid = project.meta.id;
+
+    store.appendCostEntry(pid, {
+      timestamp: new Date().toISOString(),
+      route: 'POST /gen',
+      cost: 0.005,
+      usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150, callCount: 1 },
+    });
+
+    store.addGeneration(pid, {
+      id: 'g-cost',
+      title: 'Fiche',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      estimatedCost: 0.01,
+    } as any);
+
+    store.addSource(pid, {
+      id: 's-cost',
+      filename: 'test.txt',
+      markdown: '# Hello',
+      uploadedAt: new Date().toISOString(),
+      estimatedCost: 0.002,
+    } as any);
+
+    const handler = getHandler(router, 'get', '/:pid');
+    const req = mockReq({ params: { pid } });
+    const res = mockRes();
+
+    handler(req, res);
+
+    const result = res.json.mock.calls[0][0];
+    // 0.005 + 0.01 + 0.002 = 0.017
+    expect(result.totalCost).toBeCloseTo(0.017, 6);
+  });
 });
 
 describe('PUT /:pid', () => {

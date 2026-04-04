@@ -118,4 +118,133 @@ describe('trackClient', () => {
     expect(response.choices[0].message.content).toBe('hello');
     expect(response.usage.promptTokens).toBe(100);
   });
+
+  it('chat.complete with missing response.usage falls back to 0s', async () => {
+    const client = makeFakeClient();
+    client.chat.complete.mockResolvedValue({
+      model: 'mistral-large-2512',
+      choices: [{ message: { content: 'hi' } }],
+      // no usage field
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.chat.complete({ model: 'mistral-large-latest', messages: [] });
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].promptTokens).toBe(0);
+    expect(captured[0].completionTokens).toBe(0);
+    expect(captured[0].totalTokens).toBe(0);
+  });
+
+  it('chat.complete with missing response.model falls back to request.model', async () => {
+    const client = makeFakeClient();
+    client.chat.complete.mockResolvedValue({
+      // no model field
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      choices: [{ message: { content: 'ok' } }],
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.chat.complete({ model: 'mistral-large-latest', messages: [] });
+
+    expect(captured[0].model).toBe('mistral-large-latest');
+  });
+
+  it('chat.complete with missing both response.model and request.model falls back to empty string', async () => {
+    const client = makeFakeClient();
+    client.chat.complete.mockResolvedValue({
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      choices: [{ message: { content: 'ok' } }],
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.chat.complete({ messages: [] });
+
+    expect(captured[0].model).toBe('');
+  });
+
+  it('STT with missing usage.promptAudioSeconds reports undefined', async () => {
+    const client = makeFakeClient();
+    client.audio.transcriptions.complete.mockResolvedValue({
+      model: 'voxtral-mini-2602',
+      text: 'hello',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0 },
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.audio.transcriptions.complete({ model: 'voxtral-mini-latest', file: {} });
+
+    expect(captured[0].promptAudioSeconds).toBeUndefined();
+  });
+
+  it('STT with missing response.model falls back to request.model', async () => {
+    const client = makeFakeClient();
+    client.audio.transcriptions.complete.mockResolvedValue({
+      text: 'hello',
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, promptAudioSeconds: 5 },
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.audio.transcriptions.complete({ model: 'voxtral-mini-latest', file: {} });
+
+    expect(captured[0].model).toBe('voxtral-mini-latest');
+  });
+
+  it('OCR with missing response.usageInfo falls back to 0', async () => {
+    const client = makeFakeClient();
+    client.ocr.process.mockResolvedValue({
+      model: 'mistral-ocr-2512',
+      pages: [{ markdown: '# Doc' }],
+      // no usageInfo field
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.ocr.process({ model: 'mistral-ocr-latest', document: {} });
+
+    expect(captured[0].pagesProcessed).toBe(0);
+  });
+
+  it('OCR with missing response.model falls back to request.model', async () => {
+    const client = makeFakeClient();
+    client.ocr.process.mockResolvedValue({
+      pages: [{ markdown: '# Doc' }],
+      usageInfo: { pagesProcessed: 1, docSizeBytes: 512 },
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.ocr.process({ model: 'mistral-ocr-latest', document: {} });
+
+    expect(captured[0].model).toBe('mistral-ocr-latest');
+  });
+
+  it('TTS with non-string input reports inputCharacters as 0', async () => {
+    const client = makeFakeClient();
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.audio.speech.complete({ model: 'voxtral-mini-tts-2603', input: 12345 });
+
+    expect(captured[0].inputCharacters).toBe(0);
+  });
+
+  it('Agent conversation with no response.usage does not call onUsage', async () => {
+    const client = makeFakeClient();
+    client.beta.conversations.start.mockResolvedValue({
+      outputs: [{ type: 'message', content: 'result' }],
+      // no usage field
+    });
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.beta.conversations.start({ agentId: 'agent-1', inputs: 'test' });
+
+    expect(captured).toHaveLength(0);
+  });
 });

@@ -61,6 +61,11 @@ describe('calculateCost', () => {
     const usage: ApiUsage = { promptTokens: 1000, model: 'unknown-model' };
     expect(calculateCost(usage)).toBe(0);
   });
+
+  it('calculates 0 when promptTokens and completionTokens are undefined', () => {
+    const usage: ApiUsage = { model: 'mistral-large-2512' };
+    expect(calculateCost(usage)).toBe(0);
+  });
 });
 
 describe('aggregateUsage', () => {
