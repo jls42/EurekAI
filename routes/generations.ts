@@ -96,6 +96,16 @@ async function generateFlashcardsAudio(
   return concatMp3(segments);
 }
 
+function resolveReadAloudContext(store: ProjectStore, profileStore: ProfileStore, client: Mistral, pid: string, lang?: string) {
+  const config = getConfig();
+  const project = store.getProject(pid);
+  const profileId = project?.meta?.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+  const voices = resolveVoices(config, profile?.mistralVoices, lang);
+  const ttsOpts = { provider: config.ttsProvider, model: config.ttsModel, mistralClient: client } as const;
+  return { config, profile, voices, voiceId: voices.host, ttsOpts, projectDir: store.getProjectDir(pid) };
+}
+
 export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
   const router = Router();
 
@@ -277,13 +287,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
       if (!VALID_SECTIONS.has(section)) { res.status(400).json({ error: 'Section invalide' }); return; }
 
-      const config = getConfig();
-      const project = store.getProject(req.params.pid);
-      const profileId = project?.meta?.profileId;
-      const profile = profileId ? profileStore.get(profileId) : null;
-      const voiceId = resolveVoices(config, profile?.mistralVoices, req.body.lang).host;
-      const ttsOpts = { provider: config.ttsProvider, model: config.ttsModel, mistralClient: client } as const;
-      const projectDir = store.getProjectDir(req.params.pid);
+      const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(store, profileStore, client, req.params.pid, req.body.lang);
       const baseId = gen.id.slice(0, 8);
 
       // Batch mode: generate all sections individually for summaries
@@ -297,7 +301,6 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       // Dual-voice flashcards: host=questions, guest=answers, silence between cards
       if (gen.type === 'flashcards') {
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
-        const voices = resolveVoices(config, profile?.mistralVoices, req.body.lang);
         const audioBuffer = await generateFlashcardsAudio(cards, voices, ttsOpts);
         const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-all`);
         res.json({ audioUrl });

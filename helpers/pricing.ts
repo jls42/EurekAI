@@ -46,13 +46,13 @@ export const PRICING_SOURCES: Record<string, string> = {
   'mistral-moderation': 'https://docs.mistral.ai/models/mistral-moderation-26-03',
 };
 
+// Prefixes sorted by length (longest first) for greedy matching
+const SORTED_PREFIXES = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
+
 /** Resolve pricing by longest prefix match on model ID. */
 export function resolvePricing(modelId: string): ModelPricing | null {
-  const prefixes = Object.keys(MODEL_PRICING).sort((a, b) => b.length - a.length);
-  for (const prefix of prefixes) {
-    if (modelId.startsWith(prefix)) return MODEL_PRICING[prefix];
-  }
-  return null;
+  const match = SORTED_PREFIXES.find((p) => modelId.startsWith(p));
+  return match ? MODEL_PRICING[match] : null;
 }
 
 /** Get the billable quantity for a given unit type. */
@@ -78,7 +78,8 @@ export function calculateCost(usage: ApiUsage): number {
 }
 
 function addOptional(acc: number | undefined, val: number | undefined): number | undefined {
-  return val != null ? (acc || 0) + val : acc;
+  if (val == null) return acc;
+  return (acc || 0) + val;
 }
 
 /** Aggregate multiple API call usages into a single GenerationUsage. */
