@@ -1,15 +1,16 @@
 import type { ApiUsage, BillingUnit, ModelPricing, GenerationUsage } from './pricing.js';
 import { resolvePricing } from './pricing.js';
 
+const QUANTITY_BY_UNIT = {
+  tokens: (usage: ApiUsage) => (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
+  characters: (usage: ApiUsage) => usage.inputCharacters ?? 0,
+  pages: (usage: ApiUsage) => usage.pagesProcessed ?? 0,
+  'audio-seconds': (usage: ApiUsage) => usage.promptAudioSeconds ?? 0,
+} satisfies Record<BillingUnit, (usage: ApiUsage) => number>;
+
 /** Get the billable quantity for a given unit type. */
 function getQuantity(usage: ApiUsage, unit: BillingUnit): number {
-  switch (unit) {
-    case 'tokens': return (usage.promptTokens || 0) + (usage.completionTokens || 0);
-    case 'characters': return usage.inputCharacters || 0;
-    case 'pages': return usage.pagesProcessed || 0;
-    case 'audio-seconds': return usage.promptAudioSeconds || 0;
-    default: return 0;
-  }
+  return QUANTITY_BY_UNIT[unit](usage);
 }
 
 /** Calculate cost in USD for a single API call. */
