@@ -3,6 +3,16 @@ import type { ApiUsage } from './pricing.js';
 
 type UsageCallback = (usage: ApiUsage) => void;
 
+function extractChatUsage(response: any, request: any): ApiUsage {
+  const u = response.usage || {};
+  return {
+    promptTokens: u.promptTokens || 0,
+    completionTokens: u.completionTokens || 0,
+    totalTokens: u.totalTokens || 0,
+    model: response.model || request.model || '',
+  };
+}
+
 /**
  * Wrap billable methods on the Mistral client to capture API usage.
  * Generators remain untouched — tracking is transparent.
@@ -18,12 +28,7 @@ function wrapChatComplete(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.chat.complete.bind(client.chat);
   client.chat.complete = async (request: any, options?: any) => {
     const response = await orig(request, options);
-    onUsage({
-      promptTokens: response.usage?.promptTokens ?? 0,
-      completionTokens: response.usage?.completionTokens ?? 0,
-      totalTokens: response.usage?.totalTokens ?? 0,
-      model: response.model ?? request.model ?? '',
-    });
+    onUsage(extractChatUsage(response, request));
     return response;
   };
 }

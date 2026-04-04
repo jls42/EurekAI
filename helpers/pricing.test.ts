@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePricing, calculateCost, aggregateUsage, calculateTotalCost, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
+import { resolvePricing, calculateCost, aggregateUsage, calculateTotalCost, buildCostBreakdown, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
 import type { ApiUsage } from './pricing.js';
 
 describe('resolvePricing', () => {
@@ -107,6 +107,61 @@ describe('calculateTotalCost', () => {
     const total = calculateTotalCost(entries);
     // 0.00125 + 0.08 = 0.08125
     expect(total).toBeCloseTo(0.08125, 6);
+  });
+});
+
+describe('buildCostBreakdown', () => {
+  it('builds token breakdown lines', () => {
+    const entries: ApiUsage[] = [
+      { promptTokens: 1000, completionTokens: 500, model: 'mistral-large-2512' },
+    ];
+    const lines = buildCostBreakdown(entries);
+    expect(lines).toHaveLength(2);
+    expect(lines[0]).toContain('1000 tokens in');
+    expect(lines[0]).toContain('$0.5/M');
+    expect(lines[1]).toContain('500 tokens out');
+    expect(lines[1]).toContain('$1.5/M');
+  });
+
+  it('builds character breakdown for TTS', () => {
+    const entries: ApiUsage[] = [
+      { inputCharacters: 5000, model: 'voxtral-mini-tts-2603' },
+    ];
+    const lines = buildCostBreakdown(entries);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('5000 chars');
+  });
+
+  it('builds page breakdown for OCR', () => {
+    const entries: ApiUsage[] = [
+      { pagesProcessed: 3, model: 'mistral-ocr-2512' },
+    ];
+    const lines = buildCostBreakdown(entries);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('3 page(s)');
+  });
+
+  it('builds audio breakdown for STT', () => {
+    const entries: ApiUsage[] = [
+      { promptAudioSeconds: 60, model: 'voxtral-mini-latest' },
+    ];
+    const lines = buildCostBreakdown(entries);
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toContain('60.0s audio');
+  });
+
+  it('skips unknown models', () => {
+    const entries: ApiUsage[] = [
+      { promptTokens: 100, model: 'unknown-model' },
+    ];
+    expect(buildCostBreakdown(entries)).toHaveLength(0);
+  });
+
+  it('skips zero-quantity entries', () => {
+    const entries: ApiUsage[] = [
+      { promptTokens: 0, completionTokens: 0, model: 'mistral-large-latest' },
+    ];
+    expect(buildCostBreakdown(entries)).toHaveLength(0);
   });
 });
 

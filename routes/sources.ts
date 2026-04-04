@@ -15,7 +15,6 @@ import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers
 import { logger } from '../helpers/logger.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/pricing.js';
-import { withCostTracking } from '../helpers/cost-middleware.js';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
