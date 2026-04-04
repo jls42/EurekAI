@@ -301,21 +301,23 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', withCostTracking(store, async (req, res) => {
     try {
-      const gen = store.getGeneration(req.params.pid, req.params.gid);
+      const pid = String(req.params.pid);
+      const gid = String(req.params.gid);
+      const gen = store.getGeneration(pid, gid);
       if (!gen) { res.status(404).json({ error: 'Generation introuvable' }); return; }
 
       const section = req.body.section || 'all';
       const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
       if (!VALID_SECTIONS.has(section)) { res.status(400).json({ error: 'Section invalide' }); return; }
 
-      const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(store, profileStore, client, req.params.pid, req.body.lang);
+      const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(store, profileStore, client, pid, req.body.lang);
       const baseId = gen.id.slice(0, 8);
 
       // Batch mode: generate all sections individually for summaries
       if (section === 'all' && gen.type === 'summary') {
         const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
-        const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, req.params.pid);
-        handleBatchSummaryResult(audioUrls, failedSections, summaryGen, store, req.params.pid, req.params.gid, res);
+        const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid);
+        handleBatchSummaryResult(audioUrls, failedSections, summaryGen, store, pid, gid, res);
         return;
       }
 
@@ -323,13 +325,13 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       if (gen.type === 'flashcards') {
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
         const audioBuffer = await generateFlashcardsAudio(cards, voices, ttsOpts);
-        const audioUrl = saveAudioFile(audioBuffer, projectDir, req.params.pid, `read-aloud-${baseId}-all`);
+        const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-all`);
         res.json({ audioUrl });
         return;
       }
 
       // Single section (summary)
-      const audioUrl = await generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid: req.params.pid as string, baseId, store, gid: req.params.gid as string }, res);
+      const audioUrl = await generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid }, res);
       if (audioUrl) res.json({ audioUrl });
     } catch (e) {
       console.error('Read aloud error:', e);
