@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import type { ProjectStore } from '../store.js';
 import { runWithUsageTracking } from './usage-context.js';
-import { aggregateUsage, calculateTotalCost } from './pricing.js';
+import { aggregateUsage, calculateTotalCost } from './cost-calc.js';
 
 /**
  * Wrap an Express route handler with API cost tracking.

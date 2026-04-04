@@ -14,7 +14,7 @@ import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
-import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/pricing.js';
+import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/cost-calc.js';
 import { routeRequest } from '../generators/router.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';

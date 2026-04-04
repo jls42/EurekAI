@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePricing, calculateCost, aggregateUsage, calculateTotalCost, buildCostBreakdown, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
+import { resolvePricing, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
+import { calculateCost, aggregateUsage, calculateTotalCost, buildCostBreakdown } from './cost-calc.js';
 import type { ApiUsage } from './pricing.js';
 
 describe('resolvePricing', () => {
