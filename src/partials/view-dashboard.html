@@ -96,11 +96,35 @@
       <h3 class="font-heading font-semibold text-sm text-text-primary flex items-center gap-2">
         <span x-text="t('dashboard.recentGenerations')">Recent</span>
         <template x-if="currentProject?.totalCost > 0">
-          <span
-            class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm"
-            x-text="t('gen.costPrefix') + ' ' + t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
-            :title="t('gen.estimatedCost')"
-          >Total</span>
+          <span class="relative" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
+            <span
+              class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-help"
+              x-text="t('gen.costPrefix') + ' ' + t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
+            >Total</span>
+            <div
+              x-show="hover"
+              x-transition.opacity
+              class="absolute left-0 top-full mt-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
+            >
+              <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
+              <template x-for="gen in generations.filter(g => g.estimatedCost)" :key="gen.id">
+                <div class="text-text-secondary flex justify-between gap-4">
+                  <span x-text="t('gen.' + gen.type)"></span>
+                  <span class="font-mono" x-text="'~$' + gen.estimatedCost.toFixed(4)"></span>
+                </div>
+              </template>
+              <template x-if="sources.some(s => s.estimatedCost > 0)">
+                <div class="text-text-secondary flex justify-between gap-4">
+                  <span>Sources</span>
+                  <span class="font-mono" x-text="'~$' + sources.reduce((s, src) => s + (src.estimatedCost || 0), 0).toFixed(4)"></span>
+                </div>
+              </template>
+              <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent flex justify-between gap-4">
+                <span>Total</span>
+                <span x-text="'~$' + currentProject.totalCost.toFixed(4)"></span>
+              </div>
+            </div>
+          </span>
         </template>
       </h3>
       <button

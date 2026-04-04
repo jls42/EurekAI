@@ -32,6 +32,14 @@ function makeFakeClient() {
         usageInfo: { pagesProcessed: 2, docSizeBytes: 1024 },
       }),
     },
+    beta: {
+      conversations: {
+        start: vi.fn().mockResolvedValue({
+          outputs: [{ type: 'message', content: 'result' }],
+          usage: { promptTokens: 200, completionTokens: 150, totalTokens: 350 },
+        }),
+      },
+    },
   } as any;
 }
 
@@ -86,6 +94,19 @@ describe('trackClient', () => {
     expect(captured).toHaveLength(1);
     expect(captured[0].inputCharacters).toBe(12);
     expect(captured[0].model).toBe('voxtral-mini-tts-2603');
+  });
+
+  it('captures Agent conversation usage', async () => {
+    const client = makeFakeClient();
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+
+    await client.beta.conversations.start({ agentId: 'agent-1', inputs: 'test' });
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0].promptTokens).toBe(200);
+    expect(captured[0].completionTokens).toBe(150);
+    expect(captured[0].model).toBe('mistral-large-latest');
   });
 
   it('returns original response unchanged', async () => {

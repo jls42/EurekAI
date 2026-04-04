@@ -21,6 +21,7 @@ export function trackClient(client: Mistral, onUsage: UsageCallback): void {
   wrapChatComplete(client, onUsage);
   wrapStt(client, onUsage);
   wrapOcr(client, onUsage);
+  wrapAgent(client, onUsage);
   wrapTts(client, onUsage);
 }
 
@@ -68,6 +69,17 @@ function wrapTts(client: Mistral, onUsage: UsageCallback): void {
       inputCharacters: typeof request.input === 'string' ? request.input.length : 0,
       model: request.model ?? '',
     });
+    return response;
+  };
+}
+
+function wrapAgent(client: Mistral, onUsage: UsageCallback): void {
+  const orig = client.beta.conversations.start.bind(client.beta.conversations);
+  (client.beta.conversations as any).start = async (request: any, options?: any) => {
+    const response = await orig(request, options);
+    if (response.usage) {
+      onUsage(extractChatUsage(response, { model: 'mistral-large-latest' }));
+    }
     return response;
   };
 }
