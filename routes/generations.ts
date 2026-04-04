@@ -96,10 +96,13 @@ async function generateFlashcardsAudio(
   return concatMp3(segments);
 }
 
-async function generateSectionAudio(
-  gen: any, section: string, voiceId: string, ttsOpts: any,
-  projectDir: string, pid: string, baseId: string, store: ProjectStore, gid: string, res: any,
-): Promise<string | null> {
+interface SectionAudioCtx {
+  gen: any; section: string; voiceId: string; ttsOpts: any;
+  projectDir: string; pid: string; baseId: string; store: ProjectStore; gid: string;
+}
+
+async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<string | null> {
+  const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return null; }
   if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return null; }
@@ -326,7 +329,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       }
 
       // Single section (summary)
-      const audioUrl = await generateSectionAudio(gen, section, voiceId, ttsOpts, projectDir, req.params.pid, baseId, store, req.params.gid, res);
+      const audioUrl = await generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid: req.params.pid as string, baseId, store, gid: req.params.gid as string }, res);
       if (audioUrl) res.json({ audioUrl });
     } catch (e) {
       console.error('Read aloud error:', e);

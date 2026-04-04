@@ -54,6 +54,7 @@ function findMatchingPrefix(modelId: string): string | undefined {
 }
 
 /** Resolve pricing by longest prefix match on model ID. */
+// eslint-disable-next-line complexity -- false positive: function is 3 lines, Codacy misattributes file-level complexity
 export function resolvePricing(modelId: string): ModelPricing | null {
   const match = findMatchingPrefix(modelId);
   return match ? MODEL_PRICING[match] : null;
