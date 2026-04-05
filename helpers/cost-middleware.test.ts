@@ -126,6 +126,39 @@ describe('withCostTracking', () => {
     expect(entry.route).toBe('POST /api/projects/p1');
   });
 
+  it('records cost entry even when handler throws', async () => {
+    const usage: ApiUsage[] = [
+      { promptTokens: 800, completionTokens: 400, totalTokens: 1200, model: 'mistral-large-latest' },
+    ];
+
+    const error = new Error('handler failed');
+    (error as any).apiUsage = usage;
+
+    mockedRunWithUsageTracking.mockRejectedValue(error);
+
+    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const wrapped = withCostTracking(store as any, handler);
+
+    await expect(wrapped(makeReq(), res, next)).rejects.toThrow('handler failed');
+
+    expect(store.appendCostEntry).toHaveBeenCalledOnce();
+    const [pid, entry] = store.appendCostEntry.mock.calls[0];
+    expect(pid).toBe('p1');
+    expect(entry.cost).toBeGreaterThan(0);
+  });
+
+  it('does not call appendCostEntry when handler throws with no apiUsage', async () => {
+    mockedRunWithUsageTracking.mockRejectedValue(new Error('no usage'));
+
+    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+      .mockResolvedValue(undefined);
+    const wrapped = withCostTracking(store as any, handler);
+
+    await expect(wrapped(makeReq(), res, next)).rejects.toThrow('no usage');
+    expect(store.appendCostEntry).not.toHaveBeenCalled();
+  });
+
   it('passes correct req, res, and next to the inner handler', async () => {
     const req = makeReq();
     const capturedArgs: unknown[] = [];

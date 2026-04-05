@@ -196,7 +196,7 @@ describe('GET /:pid', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
   });
 
-  it('includes totalCost from costLog, generations and sources', () => {
+  it('computes totalCost from costLog only (not from entity estimatedCost)', () => {
     const project = store.createProject('Cost test');
     const pid = project.meta.id;
 
@@ -207,6 +207,14 @@ describe('GET /:pid', () => {
       usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150, callCount: 1 },
     });
 
+    store.appendCostEntry(pid, {
+      timestamp: new Date().toISOString(),
+      route: 'POST /sources/upload',
+      cost: 0.002,
+      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, pagesProcessed: 1, callCount: 1 },
+    });
+
+    // These estimatedCost values on entities should NOT be included in totalCost
     store.addGeneration(pid, {
       id: 'g-cost',
       title: 'Fiche',
@@ -222,7 +230,7 @@ describe('GET /:pid', () => {
       filename: 'test.txt',
       markdown: '# Hello',
       uploadedAt: new Date().toISOString(),
-      estimatedCost: 0.002,
+      estimatedCost: 0.003,
     } as any);
 
     const handler = getHandler(router, 'get', '/:pid');
@@ -232,8 +240,43 @@ describe('GET /:pid', () => {
     handler(req, res);
 
     const result = res.json.mock.calls[0][0];
-    // 0.005 + 0.01 + 0.002 = 0.017
-    expect(result.totalCost).toBeCloseTo(0.017, 6);
+    // Only costLog: 0.005 + 0.002 = 0.007 (NOT 0.005 + 0.002 + 0.01 + 0.003)
+    expect(result.totalCost).toBeCloseTo(0.007, 6);
+  });
+
+  it('totalCost survives entity deletion', () => {
+    const project = store.createProject('Deletion test');
+    const pid = project.meta.id;
+
+    store.appendCostEntry(pid, {
+      timestamp: new Date().toISOString(),
+      route: 'POST /gen',
+      cost: 0.01,
+      usage: { promptTokens: 200, completionTokens: 100, totalTokens: 300, callCount: 1 },
+    });
+
+    store.addGeneration(pid, {
+      id: 'g-del',
+      title: 'To delete',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      estimatedCost: 0.01,
+    } as any);
+
+    // Delete the generation
+    store.deleteGeneration(pid, 'g-del');
+
+    const handler = getHandler(router, 'get', '/:pid');
+    const req = mockReq({ params: { pid } });
+    const res = mockRes();
+
+    handler(req, res);
+
+    const result = res.json.mock.calls[0][0];
+    // costLog entry persists even after generation deletion
+    expect(result.totalCost).toBeCloseTo(0.01, 6);
   });
 });
 

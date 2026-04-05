@@ -14,7 +14,8 @@ import { ttsQuestion } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
-import { aggregateUsage, calculateTotalCost, buildCostBreakdown } from '../helpers/cost-calc.js';
+import { persistUsage } from '../helpers/cost-persist.js';
+import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
@@ -149,8 +150,8 @@ function handleGeneration(
   options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ) {
   return async (req: Request, res: Response) => {
+    const pid = req.params.pid as string;
     try {
-      const pid = req.params.pid as string;
       const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
       if (!result.ok) {
         res.status(result.status).json({ error: result.error });
@@ -158,15 +159,20 @@ function handleGeneration(
       }
       const { result: gen, usage } = await runWithUsageTracking(() => generatorFn({ ...result.ctx, req, res }));
       if (gen) {
-        if (usage.length > 0) {
-          gen.usage = aggregateUsage(usage);
-          gen.estimatedCost = calculateTotalCost(usage);
-          gen.costBreakdown = buildCostBreakdown(usage);
+        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/generate/${gen.type}`, usage);
+        if (persisted) {
+          gen.usage = persisted.usage;
+          gen.estimatedCost = persisted.cost;
+          gen.costBreakdown = persisted.costBreakdown;
         }
         store.addGeneration(pid, gen);
         res.json(gen);
       }
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
+      }
       logger.error('generate', 'error:', e);
       res.status(500).json({ error: String(e) });
     }
@@ -498,10 +504,18 @@ export function generateRoutes(
         res.status(400).json({ error: ctxError });
         return;
       }
-      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
+      const pid = req.params.pid as string;
+      const { result: route, usage: routeUsage } = await runWithUsageTracking(
+        () => routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
+      );
+      const routeCost = persistUsage(store, pid, `POST /api/projects/${pid}/generate/route`, routeUsage);
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
-      res.json(route);
+      res.json({ ...route, ...(routeCost && { costDelta: routeCost.cost }) });
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, req.params.pid as string, `POST /api/projects/${req.params.pid}/generate/route/failed`, failedUsage);
+      }
       logger.error('route', 'analysis error:', e);
       res.status(500).json({ error: String(e) });
     }
@@ -513,10 +527,11 @@ export function generateRoutes(
         const executor = AUTO_EXECUTORS[step.agent];
         if (executor) {
           const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
-          if (usage.length > 0) {
-            gen.usage = aggregateUsage(usage);
-            gen.estimatedCost = calculateTotalCost(usage);
-            gen.costBreakdown = buildCostBreakdown(usage);
+          const persisted = persistUsage(st, pid, `POST /api/projects/${pid}/generate/auto/${step.agent}`, usage);
+          if (persisted) {
+            gen.usage = persisted.usage;
+            gen.estimatedCost = persisted.cost;
+            gen.costBreakdown = persisted.costBreakdown;
           }
           st.addGeneration(pid, gen);
           generations.push(gen);
@@ -526,6 +541,10 @@ export function generateRoutes(
           failedSteps.push(step.agent);
         }
       } catch (err) {
+        const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+        if (failedUsage?.length) {
+          persistUsage(st, pid, `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`, failedUsage);
+        }
         logger.error('auto', `${step.agent} FAILED:`, err);
         failedSteps.push(step.agent);
       }
@@ -561,7 +580,11 @@ export function generateRoutes(
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       logger.info('auto', 'Smart routing: analyzing content...');
-      const route = await routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup);
+      const autoPid = req.params.pid as string;
+      const { result: route, usage: autoRouteUsage } = await runWithUsageTracking(
+        () => routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
+      );
+      persistUsage(store, autoPid, `POST /api/projects/${autoPid}/generate/auto/route`, autoRouteUsage);
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
       const generations: Generation[] = [];
@@ -575,6 +598,10 @@ export function generateRoutes(
 
       res.json({ route: route.plan, generations, ...(failedSteps.length > 0 && { failedSteps }) });
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, req.params.pid as string, `POST /api/projects/${req.params.pid}/generate/auto/failed`, failedUsage);
+      }
       logger.error('auto', 'error:', e);
       res.status(500).json({ error: String(e) });
     }

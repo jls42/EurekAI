@@ -1,3 +1,5 @@
+import { addCostDelta } from './cost-utils';
+
 export function createRecorder() {
   return {
     async toggleRecording(this: any) {
@@ -63,6 +65,7 @@ export function createRecorder() {
         const source = await res.json();
         this.sources.push(source);
         this.selectedIds.push(source.id);
+        addCostDelta(this, source.estimatedCost, 'sources/voice');
         this.showToast(this.t('toast.voiceTranscribed'), 'success');
         this.$nextTick(() => this.refreshIcons());
         setTimeout(() => this.refreshModeration(), 2000);

@@ -1,12 +1,16 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
+import { addCostDelta } from './cost-utils';
+
+export { addCostDelta } from './cost-utils';
 
 /** Normalize and register a generation into the app state. */
-function registerGeneration(state: any, gen: any): void {
+export function registerGeneration(state: any, gen: any): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
   state.generations.push(gen);
   state.openGens[gen.id] = true;
+  addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
 /** Process responses from generateAll, returns failure count. */
@@ -213,6 +217,7 @@ export function createGenerate() {
         }
         if (this.currentProjectId !== projectId) return;
         const route = await routeRes.json();
+        if (route.costDelta) addCostDelta(this, route.costDelta, 'generate/route');
 
         // Phase 2: switch to individual type chips (skip TTS types if unavailable)
         const ttsTypes = new Set(['podcast', 'quiz-vocal']);
@@ -380,6 +385,7 @@ export function createGenerate() {
             gen._activeAudioSection = section || 'intro';
             gen._playlistMode = false;
           }
+          if (result.costDelta) addCostDelta(this, result.costDelta, 'read-aloud');
           this.showToast(this.t('toast.audioDone'), 'success');
           this.$nextTick(() => {
             const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;

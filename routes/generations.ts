@@ -17,7 +17,9 @@ import { textToSpeech } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
-import { withCostTracking } from '../helpers/cost-middleware.js';
+import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { persistUsage } from '../helpers/cost-persist.js';
+import type { ApiUsage } from '../helpers/pricing.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -68,6 +70,7 @@ function handleBatchSummaryResult(
   pid: string,
   gid: string,
   res: any,
+  costDelta?: number,
 ): void {
   if (Object.keys(audioUrls).length > 0) {
     const d = summaryGen.data;
@@ -77,7 +80,7 @@ function handleBatchSummaryResult(
     res.status(500).json({ error: 'TTS failed for all sections' });
     return;
   }
-  res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }) });
+  res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }), ...(costDelta && { costDelta }) });
 }
 
 async function generateFlashcardsAudio(
@@ -299,9 +302,9 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
   });
 
   // --- Read Aloud (TTS) ---
-  router.post('/:pid/generations/:gid/read-aloud', withCostTracking(store, async (req, res) => {
+  router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
+    const pid = String(req.params.pid);
     try {
-      const pid = String(req.params.pid);
       const gid = String(req.params.gid);
       const gen = store.getGeneration(pid, gid);
       if (!gen) { res.status(404).json({ error: 'Generation introuvable' }); return; }
@@ -316,28 +319,41 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       // Batch mode: generate all sections individually for summaries
       if (section === 'all' && gen.type === 'summary') {
         const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
-        const { audioUrls, failedSections } = await generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid);
-        handleBatchSummaryResult(audioUrls, failedSections, summaryGen, store, pid, gid, res);
+        const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(
+          () => generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
+        );
+        const batchCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/batch`, batchUsage);
+        handleBatchSummaryResult(batchResult.audioUrls, batchResult.failedSections, summaryGen, store, pid, gid, res, batchCost?.cost);
         return;
       }
 
       // Dual-voice flashcards: host=questions, guest=answers, silence between cards
       if (gen.type === 'flashcards') {
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
-        const audioBuffer = await generateFlashcardsAudio(cards, voices, ttsOpts);
+        const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(
+          () => generateFlashcardsAudio(cards, voices, ttsOpts),
+        );
+        const fcCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/flashcards`, fcUsage);
         const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-all`);
-        res.json({ audioUrl });
+        res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
         return;
       }
 
       // Single section (summary)
-      const audioUrl = await generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid }, res);
-      if (audioUrl) res.json({ audioUrl });
+      const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(
+        () => generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid }, res),
+      );
+      const secCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/${section}`, secUsage);
+      if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
+      }
       console.error('Read aloud error:', e);
       res.status(500).json({ error: String(e) });
     }
-  }));
+  });
 
   return router;
 }

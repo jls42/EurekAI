@@ -34,6 +34,28 @@ describe('usage-context', () => {
     expect(r2.usage[0].promptTokens).toBe(200);
   });
 
+  it('attaches captured usage to thrown error', async () => {
+    const err: any = await runWithUsageTracking(async () => {
+      recordUsage({ promptTokens: 500, completionTokens: 100, totalTokens: 600, model: 'mistral-large-latest' });
+      recordUsage({ inputCharacters: 2000, model: 'voxtral-mini-tts-2603' });
+      throw new Error('generation failed');
+    }).catch((e) => e);
+
+    expect(err).toBeInstanceOf(Error);
+    expect(err.message).toBe('generation failed');
+    expect(err.apiUsage).toHaveLength(2);
+    expect(err.apiUsage[0].promptTokens).toBe(500);
+    expect(err.apiUsage[1].inputCharacters).toBe(2000);
+  });
+
+  it('attaches empty array when fn throws before any usage', async () => {
+    const err: any = await runWithUsageTracking(async () => {
+      throw new Error('immediate failure');
+    }).catch((e) => e);
+
+    expect(err.apiUsage).toEqual([]);
+  });
+
   it('silently discards usage when no context is active', () => {
     recordUsage({ promptTokens: 100, model: 'mistral-large-latest' });
     // No throw = success; verify no lingering state by running a clean tracking context

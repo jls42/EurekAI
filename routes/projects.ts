@@ -25,11 +25,7 @@ export function projectRoutes(store: ProjectStore): Router {
       res.status(404).json({ error: 'Projet introuvable' });
       return;
     }
-    const totalCost = [
-      ...(project.costLog ?? []).map((e) => e.cost),
-      ...project.results.generations.map((g) => g.estimatedCost ?? 0),
-      ...project.sources.map((s) => s.estimatedCost ?? 0),
-    ].reduce((a, b) => a + b, 0);
+    const totalCost = (project.costLog ?? []).reduce((sum, e) => sum + e.cost, 0);
     res.json({ ...project, totalCost: Math.round(totalCost * 1_000_000) / 1_000_000 });
   });
 

@@ -1,3 +1,5 @@
+import { addCostDelta } from './cost-utils';
+
 export function createSources() {
   return {
     handleDrop(this: any, e: DragEvent) {
@@ -40,7 +42,11 @@ export function createSources() {
           const newSources = await res.json();
           this.sources.push(...newSources);
           this.selectedIds.push(...newSources.map((s: any) => s.id));
+          for (const s of newSources) addCostDelta(this, s.estimatedCost, 'sources/upload');
           session.files[i].status = 'done';
+          if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
+            setTimeout(() => this.refreshModeration(), 2000);
+          }
         } catch (e: any) {
           session.files[i].status = 'error';
           this.showToast(
@@ -175,7 +181,7 @@ export function createSources() {
       this.viewSource = null;
     },
 
-    async refreshModeration(this: any) {
+    async refreshModeration(this: any, retries = 3) {
       if (!this.currentProjectId) return;
       try {
         const res = await fetch('/api/projects/' + this.currentProjectId);
@@ -188,6 +194,10 @@ export function createSources() {
             }
           }
           this.$nextTick(() => this.refreshIcons());
+          const hasPending = this.sources.some((s: any) => s.moderation?.status === 'pending');
+          if (hasPending && retries > 0) {
+            setTimeout(() => this.refreshModeration(retries - 1), 3000);
+          }
         }
       } catch {}
     },
