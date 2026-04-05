@@ -143,7 +143,7 @@ export function chatRoutes(
 
   // Send message
   router.post('/:pid/chat', async (req, res) => {
-    const pid = req.params.pid as string;
+    const pid = String(req.params.pid);
     try {
       const validated = await validateChatRequest(req as any, store, profileStore, client);
       if (validated instanceof ChatValidationError) {

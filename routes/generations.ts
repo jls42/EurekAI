@@ -62,16 +62,14 @@ async function generateBatchAudio(
   return { audioUrls, failedSections };
 }
 
-function handleBatchSummaryResult(
-  audioUrls: Record<string, string>,
-  failedSections: string[],
-  summaryGen: SummaryGeneration,
-  store: ProjectStore,
-  pid: string,
-  gid: string,
-  res: any,
-  costDelta?: number,
-): void {
+interface BatchSummaryCtx {
+  audioUrls: Record<string, string>; failedSections: string[];
+  summaryGen: SummaryGeneration; store: ProjectStore;
+  pid: string; gid: string; res: any; costDelta?: number;
+}
+
+function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
+  const { audioUrls, failedSections, summaryGen, store, pid, gid, res, costDelta } = ctx;
   if (Object.keys(audioUrls).length > 0) {
     const d = summaryGen.data;
     store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
@@ -323,7 +321,7 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
           () => generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
         );
         const batchCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/batch`, batchUsage);
-        handleBatchSummaryResult(batchResult.audioUrls, batchResult.failedSections, summaryGen, store, pid, gid, res, batchCost?.cost);
+        handleBatchSummaryResult({ audioUrls: batchResult.audioUrls, failedSections: batchResult.failedSections, summaryGen, store, pid, gid, res, costDelta: batchCost?.cost });
         return;
       }
 

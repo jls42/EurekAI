@@ -329,6 +329,29 @@ export function sourceRoutes(
     };
   }
 
+  /** Track a web source fetch, persist cost, and decorate source if non-null. */
+  async function trackWebSource(
+    pid: string, label: string, fn: () => Promise<Source | null>,
+  ): Promise<Source | null> {
+    try {
+      const { result: source, usage } = await runWithUsageTracking(fn);
+      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch`, usage);
+      if (source && persisted) {
+        source.estimatedCost = persisted.cost;
+        source.usage = persisted.usage;
+        source.costBreakdown = persisted.costBreakdown;
+      }
+      return source;
+    } catch (err) {
+      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
+      }
+      logger.error('sources', `${label} failed`, err);
+      return null;
+    }
+  }
+
   /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
   async function collectWebSources(pid: string, req: any, modCats: string[] | null): Promise<Source[]> {
     const lang = req.body.lang || 'fr';
@@ -339,48 +362,15 @@ export function sourceRoutes(
     const now = new Date().toISOString();
 
     for (const url of urls) {
-      try {
-        const { result: source, usage } = await runWithUsageTracking(
-          () => scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
-        );
-        // Persist BEFORE testing source — scrapeUrl may consume Mistral then return null
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch`, usage);
-        if (source) {
-          if (persisted) {
-            source.estimatedCost = persisted.cost;
-            source.usage = persisted.usage;
-            source.costBreakdown = persisted.costBreakdown;
-          }
-          sources.push(source);
-        }
-      } catch (err) {
-        const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
-        if (failedUsage?.length) {
-          persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
-        }
-        logger.error('sources', `URL scrape failed completely: ${url}`, err);
-      }
+      const source = await trackWebSource(pid, `URL scrape: ${url}`,
+        () => scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now));
+      if (source) sources.push(source);
     }
 
     if (searchQuery) {
-      try {
-        const { result: source, usage } = await runWithUsageTracking(
-          () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now),
-        );
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch`, usage);
-        if (persisted) {
-          source.estimatedCost = persisted.cost;
-          source.usage = persisted.usage;
-          source.costBreakdown = persisted.costBreakdown;
-        }
-        sources.push(source);
-      } catch (err) {
-        const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
-        if (failedUsage?.length) {
-          persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
-        }
-        logger.error('sources', `Keyword search failed: ${searchQuery}`, err);
-      }
+      const source = await trackWebSource(pid, `Keyword search: ${searchQuery}`,
+        () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>);
+      if (source) sources.push(source);
     }
 
     return sources;

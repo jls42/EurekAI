@@ -504,7 +504,7 @@ export function generateRoutes(
         res.status(400).json({ error: ctxError });
         return;
       }
-      const pid = req.params.pid as string;
+      const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(
         () => routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
       );
@@ -514,7 +514,7 @@ export function generateRoutes(
     } catch (e) {
       const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
       if (failedUsage?.length) {
-        persistUsage(store, req.params.pid as string, `POST /api/projects/${req.params.pid}/generate/route/failed`, failedUsage);
+        persistUsage(store, String(req.params.pid), `POST /api/projects/${req.params.pid}/generate/route/failed`, failedUsage);
       }
       logger.error('route', 'analysis error:', e);
       res.status(500).json({ error: String(e) });
@@ -580,7 +580,7 @@ export function generateRoutes(
       const count = rawCount && Number.isFinite(rawCount) ? Math.min(Math.max(Math.round(rawCount), 1), 50) : undefined;
 
       logger.info('auto', 'Smart routing: analyzing content...');
-      const autoPid = req.params.pid as string;
+      const autoPid = String(req.params.pid);
       const { result: route, usage: autoRouteUsage } = await runWithUsageTracking(
         () => routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
       );
@@ -600,7 +600,7 @@ export function generateRoutes(
     } catch (e) {
       const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
       if (failedUsage?.length) {
-        persistUsage(store, req.params.pid as string, `POST /api/projects/${req.params.pid}/generate/auto/failed`, failedUsage);
+        persistUsage(store, String(req.params.pid), `POST /api/projects/${req.params.pid}/generate/auto/failed`, failedUsage);
       }
       logger.error('auto', 'error:', e);
       res.status(500).json({ error: String(e) });
