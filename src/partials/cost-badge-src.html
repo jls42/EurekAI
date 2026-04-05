@@ -1,0 +1,13 @@
+<!-- Cost estimation badge for sources — popover rendered by global cost-popover.html -->
+<template x-if="src.estimatedCost != null">
+  <span
+    class="inline-block"
+    @mouseenter="_costPos = $el.getBoundingClientRect(); _costData = src; _costHover = src.id"
+    @mouseleave="_costHover = null"
+  >
+    <span
+      class="{{badgeClass}} rounded-badge bg-accent/15 text-accent font-semibold cursor-pointer"
+      x-text="t('gen.costPrefix') + ' ~$' + src.estimatedCost.toFixed(4)"
+    >Est.</span>
+  </span>
+</template>

@@ -1,5 +1,7 @@
 import { UI_LANGUAGES } from '../i18n/languages';
 
+const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
+
 export function createState() {
   return {
     // Supported UI languages
@@ -15,7 +17,7 @@ export function createState() {
     newProfileAge: '',
     newProfileAvatar: '0',
     newProfileLocale: 'fr',
-    profileAvatars: Array.from({ length: 20 }, (_, i) => String(i)),
+    profileAvatars: PROFILE_AVATARS,
 
     // Project state
     projects: [] as any[],
@@ -49,6 +51,11 @@ export function createState() {
     scrapeMode: 'auto' as 'auto' | 'readability' | 'lightpanda',
     showTextInput: false,
     showWebInput: false,
+
+    // Cost popover hover state
+    _costHover: null as string | null,
+    _costPos: null as DOMRect | null,
+    _costData: null as any,
 
     // Voice recording
     recording: false,

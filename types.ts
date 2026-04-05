@@ -38,6 +38,9 @@ export interface Source {
   sourceType?: 'ocr' | 'text' | 'voice' | 'websearch';
   scrapeEngine?: 'readability' | 'lightpanda' | 'mistral';
   filePath?: string;
+  estimatedCost?: number;
+  usage?: import('./helpers/pricing.js').GenerationUsage;
+  costBreakdown?: string[];
 }
 
 export interface StudyFiche {
@@ -78,6 +81,9 @@ export interface GenerationMeta {
   title: string;
   createdAt: string;
   sourceIds: string[];
+  usage?: import('./helpers/pricing.js').GenerationUsage;
+  estimatedCost?: number;
+  costBreakdown?: string[];
 }
 
 export interface SummaryGeneration extends GenerationMeta {
@@ -180,12 +186,20 @@ export interface ProjectResults {
   generations: Generation[];
 }
 
+export interface CostEntry {
+  timestamp: string;
+  route: string;
+  cost: number;
+  usage: import('./helpers/pricing.js').GenerationUsage;
+}
+
 export interface ProjectData {
   meta: ProjectMeta;
   sources: Source[];
   results: ProjectResults;
   consigne?: { found: boolean; text: string; keyTopics: string[] };
   chat?: ChatHistory;
+  costLog?: CostEntry[];
 }
 
 // --- Chat ---

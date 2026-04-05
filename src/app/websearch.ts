@@ -1,3 +1,5 @@
+import { addCostDelta } from './cost-utils';
+
 export function createWebsearch() {
   return {
     async searchWeb(this: any) {
@@ -23,6 +25,7 @@ export function createWebsearch() {
         for (const source of sources) {
           this.sources.push(source);
           this.selectedIds.push(source.id);
+          addCostDelta(this, source.estimatedCost, 'sources/websearch');
         }
         this.webQuery = '';
         this.showWebInput = false;

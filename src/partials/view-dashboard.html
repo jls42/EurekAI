@@ -93,11 +93,33 @@
   <div x-show="generations.length > 0">
     <div class="flex items-center justify-between mb-3">
       <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-      <h3
-        class="font-heading font-semibold text-sm text-text-primary"
-        x-text="t('dashboard.recentGenerations')"
-      >
-        Recent
+      <h3 class="font-heading font-semibold text-sm text-text-primary flex items-center gap-2">
+        <span x-text="t('dashboard.recentGenerations')">Recent</span>
+        <template x-if="currentProject?.totalCost > 0">
+          <span class="relative" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
+            <span
+              class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-help"
+              x-text="t('gen.costPrefix') + ' ' + t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
+            >Total</span>
+            <div
+              x-show="hover"
+              x-transition.opacity
+              class="absolute left-0 top-full mt-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
+            >
+              <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
+              <template x-for="entry in (currentProject?.costLog || []).slice(-10).reverse()" :key="entry.timestamp">
+                <div class="text-text-secondary flex justify-between gap-4">
+                  <span class="truncate max-w-[180px]" x-text="entry.route.split('/').pop()"></span>
+                  <span class="font-mono" x-text="'~$' + entry.cost.toFixed(4)"></span>
+                </div>
+              </template>
+              <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent flex justify-between gap-4">
+                <span>Total</span>
+                <span x-text="'~$' + currentProject.totalCost.toFixed(4)"></span>
+              </div>
+            </div>
+          </span>
+        </template>
       </h3>
       <button
         @click="generateAuto()"
@@ -149,10 +171,10 @@
             </template>
           </div>
           <p class="font-semibold text-body-sm text-text-primary truncate" x-text="gen.title"></p>
-          <p
-            class="text-sm text-text-secondary mt-0.5"
-            x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"
-          ></p>
+          <p class="text-sm text-text-secondary mt-0.5">
+            <span x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"></span>
+            {{> cost-badge-gen badgeClass="ml-1 text-sm px-2 py-0.5"}}
+          </p>
         </div>
       </template>
     </div>

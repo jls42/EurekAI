@@ -27,6 +27,11 @@ export const fr: Record<string, string> = {
   'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
   'gen.auto': 'Auto — analyse...',
+  'gen.estimatedCost': 'Cout estime (tarifs Mistral)',
+  'gen.costTooltip': 'Estimation \u2014 {input} tokens in + {output} tokens out \u00b7 {calls} appel(s) API \u00b7 Tarifs officiels Mistral',
+  'gen.costTooltipSource': 'Estimation \u2014 {detail} \u00b7 Tarifs officiels Mistral',
+  'gen.costTooltipFree': 'Estimation \u2014 Aucun appel API',
+  'gen.costPrefix': 'Est.',
   'gen.all': 'Tout generer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',
@@ -129,6 +134,7 @@ export const fr: Record<string, string> = {
   'dashboard.launchMagic': 'Lance la magie pour generer du contenu',
   'dashboard.autoMagic': "Auto \u2014 C'est magique !",
   'dashboard.recentGenerations': 'Dernieres generations',
+  'dashboard.totalCost': 'Total :',
   'dashboard.autoMagicShort': 'Auto \u2014 Magie !',
 
   // Sources view

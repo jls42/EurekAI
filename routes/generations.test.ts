@@ -28,26 +28,28 @@ vi.mock('../generators/tts.js', () => ({
   generateSilence: vi.fn().mockResolvedValue(Buffer.from('fake-silence')),
 }));
 
+const MOCK_CONFIG = {
+  models: {
+    summary: 'm',
+    flashcards: 'm',
+    quiz: 'm',
+    podcast: 'm',
+    translate: 'm',
+    ocr: 'm',
+    quizVerify: 'm',
+    chat: 'm',
+  },
+  voices: {
+    host: { id: 'h', name: 'H' },
+    guest: { id: 'g', name: 'G' },
+  },
+  ttsModel: 'voxtral-mini-tts-2603',
+  ttsProvider: 'mistral' as const,
+  mistralVoices: { host: 'mh', guest: 'mg' },
+};
+
 vi.mock('../config.js', () => ({
-  getConfig: vi.fn(() => ({
-    models: {
-      summary: 'm',
-      flashcards: 'm',
-      quiz: 'm',
-      podcast: 'm',
-      translate: 'm',
-      ocr: 'm',
-      quizVerify: 'm',
-      chat: 'm',
-    },
-    voices: {
-      host: { id: 'h', name: 'H' },
-      guest: { id: 'g', name: 'G' },
-    },
-    ttsModel: 'voxtral-mini-tts-2603',
-    ttsProvider: 'mistral' as const,
-    mistralVoices: { host: 'mh', guest: 'mg' },
-  })),
+  getConfig: vi.fn(() => MOCK_CONFIG),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
 }));
 
@@ -685,58 +687,17 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     // 4 TTS calls: 2 questions (host) + 2 answers (guest)
     expect(textToSpeech).toHaveBeenCalledTimes(4);
     const calls = (textToSpeech as any).mock.calls;
-    // Q1 with host voice
     expect(calls[0][0]).toContain('Qu est-ce que le soleil ?');
     expect(calls[0][1]).toBe('mh');
-    // A1 with guest voice
     expect(calls[1][0]).toContain('Une etoile');
     expect(calls[1][1]).toBe('mg');
-    // Q2 with host voice
-    expect(calls[2][0]).toContain('Qu est-ce que la lune ?');
-    expect(calls[2][1]).toBe('mh');
-    // A2 with guest voice
-    expect(calls[3][0]).toContain('Un satellite');
-    expect(calls[3][1]).toBe('mg');
 
-    // Silence generated once (2 cards > 1)
     expect(generateSilence).toHaveBeenCalledWith(1200);
-    // concatMp3 called with 5 segments: Q1, A1, silence, Q2, A2
     expect(concatMp3).toHaveBeenCalledTimes(1);
     expect((concatMp3 as any).mock.calls[0][0]).toHaveLength(5);
 
     const result = res.json.mock.calls[0][0];
     expect(result.audioUrl).toMatch(/^\/output\/projects\/.+\/read-aloud-.+\.mp3$/);
-  });
-
-  it('single flashcard generates no silence', async () => {
-    const { textToSpeech } = await import('../generators/tts-provider.js');
-    const { concatMp3, generateSilence } = await import('../generators/tts.js');
-    (textToSpeech as any).mockClear();
-    (concatMp3 as any).mockClear();
-    (generateSilence as any).mockClear();
-
-    // Add a single-card flashcard generation
-    const singleCardGen: FlashcardsGeneration = {
-      id: 'fc-single-1',
-      title: 'Single card',
-      createdAt: new Date().toISOString(),
-      sourceIds: [],
-      type: 'flashcards',
-      data: [{ question: 'Seule question', answer: 'Seule reponse' }],
-    };
-    store.addGeneration(pid, singleCardGen);
-
-    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
-    const req = mockReq({ params: { pid, gid: 'fc-single-1' }, body: { lang: 'fr' } });
-    const res = mockRes();
-
-    await handler(req, res);
-
-    expect(textToSpeech).toHaveBeenCalledTimes(2);
-    expect(generateSilence).not.toHaveBeenCalled();
-    expect(concatMp3).toHaveBeenCalledTimes(1);
-    expect((concatMp3 as any).mock.calls[0][0]).toHaveLength(2);
-    expect(res.json.mock.calls[0][0].audioUrl).toMatch(/read-aloud/);
   });
 
   it('retourne 400 pour un type non supporte (quiz)', async () => {

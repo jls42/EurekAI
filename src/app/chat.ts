@@ -1,5 +1,6 @@
 import { getLocale } from '../i18n/index';
-import { normalizeSummaryData } from './helpers';
+import { addCostDelta } from './cost-utils';
+import { registerGeneration } from './generate';
 
 function handleChatSuccess(state: any, data: any): void {
   state.chatMessages.push({
@@ -8,12 +9,10 @@ function handleChatSuccess(state: any, data: any): void {
     timestamp: new Date().toISOString(),
     generatedIds: data.generatedIds,
   });
+  addCostDelta(state, data.costDelta, 'chat');
   if (data.generations && data.generations.length > 0) {
     for (const gen of data.generations) {
-      normalizeSummaryData(gen);
-      state.initGenProps(gen);
-      state.generations.push(gen);
-      state.openGens[gen.id] = true;
+      registerGeneration(state, gen);
     }
     state.showToast(state.t('toast.chatGenDone'), 'success');
   }

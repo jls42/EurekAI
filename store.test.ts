@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from './store.js';
@@ -594,6 +594,35 @@ describe('moderation normalization', () => {
     writeFileSync(projectPath, JSON.stringify(data, null, 2));
     const loaded = store.getProject(p.meta.id);
     expect(loaded!.sources[0].moderation).toBeUndefined();
+  });
+});
+
+describe('appendCostEntry', () => {
+  it('creates costLog array and adds entry', () => {
+    const p = store.createProject('Cost test');
+    store.appendCostEntry(p.meta.id, {
+      timestamp: new Date().toISOString(),
+      route: 'POST /generate/summary',
+      cost: 0.005,
+      usage: { promptTokens: 100, completionTokens: 50, totalTokens: 150, callCount: 1 },
+    });
+
+    const found = store.getProject(p.meta.id);
+    expect(found!.costLog).toHaveLength(1);
+    expect(found!.costLog![0].cost).toBe(0.005);
+    expect(found!.costLog![0].route).toBe('POST /generate/summary');
+  });
+
+  it('does nothing for non-existent project', () => {
+    store.appendCostEntry('non-existent-id', {
+      timestamp: new Date().toISOString(),
+      route: 'POST /gen',
+      cost: 0.01,
+      usage: { promptTokens: 50, completionTokens: 25, totalTokens: 75, callCount: 1 },
+    });
+
+    // Should not throw and no project should be created
+    expect(store.getProject('non-existent-id')).toBeNull();
   });
 });
 

@@ -41,7 +41,7 @@ describe('buildExclusionContext', () => {
   });
 
   it('returns empty string when no matching type', () => {
-    const gens = [{ type: 'summary', data: { title: 'T', summary: 'S', key_points: ['a'], vocabulary: [] } }] as Generation[];
+    const gens = [{ type: 'summary', data: { title: 'T', summary: 'S', key_points: ['a'], vocabulary: [] } }] as unknown as Generation[];
     expect(buildExclusionContext(gens, 'quiz')).toBe('');
   });
 

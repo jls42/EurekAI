@@ -13,6 +13,9 @@ import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 import { autoTitle } from '../helpers/auto-title.js';
+import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { persistUsage } from '../helpers/cost-persist.js';
+import type { ApiUsage } from '../helpers/pricing.js';
 
 interface ChatRequestContext {
   pid: string;
@@ -94,29 +97,41 @@ async function processChatToolCalls(
   ctx: ToolCallCtx,
   store: ProjectStore,
   pid: string,
-): Promise<{ generatedIds: string[]; generations: Generation[]; failedTools: string[] }> {
+): Promise<{ generatedIds: string[]; generations: Generation[]; failedTools: string[]; failedCost: number }> {
   const generatedIds: string[] = [];
   const generations: Generation[] = [];
   const failedTools: string[] = [];
+  let failedCost = 0;
 
   for (const call of toolCalls) {
     try {
       const type = call.replace('generate_', '');
       const executor = CHAT_TOOL_EXECUTORS[type];
       if (executor) {
-        const gen = await executor(ctx);
+        const { result: gen, usage } = await runWithUsageTracking(() => executor(ctx));
+        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/chat/tool/${type}`, usage);
+        if (persisted) {
+          gen.usage = persisted.usage;
+          gen.estimatedCost = persisted.cost;
+          gen.costBreakdown = persisted.costBreakdown;
+        }
         store.addGeneration(pid, gen);
         generatedIds.push(gen.id);
         generations.push(gen);
         console.log(`  Chat tool: ${type} generated`);
       }
     } catch (err) {
+      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/chat/tool/${call}/failed`, failedUsage);
+        if (persisted) failedCost += persisted.cost;
+      }
       console.error(`  Chat tool ${call} failed:`, err);
       failedTools.push(call);
     }
   }
 
-  return { generatedIds, generations, failedTools };
+  return { generatedIds, generations, failedTools, failedCost };
 }
 
 export function chatRoutes(
@@ -128,13 +143,14 @@ export function chatRoutes(
 
   // Send message
   router.post('/:pid/chat', async (req, res) => {
+    const pid = String(req.params.pid);
     try {
       const validated = await validateChatRequest(req as any, store, profileStore, client);
       if (validated instanceof ChatValidationError) {
         res.status(validated.status).json({ error: validated.error });
         return;
       }
-      const { pid, project, message, lang, ageGroup } = validated;
+      const { project, message, lang, ageGroup } = validated;
 
       const existingMessages = project.chat?.messages ?? [];
       const userMsg: ChatMessage = {
@@ -155,19 +171,17 @@ export function chatRoutes(
 
       const config = getConfig();
 
-      const result = await chatWithSources(
-        client,
-        historyForApi,
-        sourceContext,
-        config.models.chat,
-        lang,
-        ageGroup,
+      // Track the main chat LLM call
+      const { result, usage: chatUsage } = await runWithUsageTracking(() =>
+        chatWithSources(client, historyForApi, sourceContext, config.models.chat, lang, ageGroup),
       );
+      const chatCost = persistUsage(store, pid, `POST /api/projects/${pid}/chat`, chatUsage);
 
-      // Process tool calls — generate content
+      // Process tool calls — each tracked individually inside processChatToolCalls
       let generatedIds: string[] = [];
       let generatedGens: Generation[] = [];
       let failedTools: string[] = [];
+      let toolCallFailedCost = 0;
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
         const rawMarkdown = getMarkdown(project.sources);
         const markdown = applyConsigne(rawMarkdown, project.consigne);
@@ -182,6 +196,7 @@ export function chatRoutes(
         generatedIds = toolResult.generatedIds;
         generatedGens = toolResult.generations;
         failedTools = toolResult.failedTools;
+        toolCallFailedCost = toolResult.failedCost;
       }
 
       // Add assistant message
@@ -193,13 +208,21 @@ export function chatRoutes(
       };
       store.appendChatMessage(pid, assistantMsg);
 
+      // costDelta = chat LLM cost + failed tool call costs
+      // (successful tool call costs are on the returned generations as estimatedCost)
+      const totalCostDelta = (chatCost?.cost ?? 0) + toolCallFailedCost;
       res.json({
         reply: result.reply,
         generatedIds,
         generations: generatedGens,
         ...(failedTools.length > 0 && { failedTools }),
+        ...(totalCostDelta > 0 && { costDelta: totalCostDelta }),
       });
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
+      }
       console.error('Chat error:', e);
       res.status(500).json({ error: String(e) });
     }

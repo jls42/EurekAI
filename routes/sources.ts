@@ -13,6 +13,9 @@ import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
+import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { persistUsage } from '../helpers/cost-persist.js';
+import type { ApiUsage } from '../helpers/pricing.js';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -143,10 +146,22 @@ export function sourceRoutes(
     const modCats = getModerationCategories(store, profileStore, pid);
     for (const file of files) {
       try {
-        const source = await processUploadedFile(file, pid, modCats);
+        const { result: source, usage } = await runWithUsageTracking(
+          () => processUploadedFile(file, pid, modCats),
+        );
+        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
+        if (persisted) {
+          source.estimatedCost = persisted.cost;
+          source.usage = persisted.usage;
+          source.costBreakdown = persisted.costBreakdown;
+        }
         store.addSource(pid, source);
         results.push(source);
       } catch (e) {
+        const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+        if (failedUsage?.length) {
+          persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
+        }
         logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
         res.status(500).json({ error: `Echec pour ${file.originalname}: ${e}` });
         return;
@@ -193,6 +208,7 @@ export function sourceRoutes(
       uploadedAt: new Date().toISOString(),
       sourceType: 'text',
       moderation: sourceModeration,
+      estimatedCost: 0,
     };
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
@@ -218,12 +234,13 @@ export function sourceRoutes(
 
     try {
       const lang = req.body.lang || 'fr';
-      const { text, elapsed } = await transcribeAudio(
-        client,
-        file.buffer,
-        file.originalname || 'audio.webm',
-        lang,
+      const { result: sttResult, usage } = await runWithUsageTracking(() =>
+        transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
       );
+      // Persist IMMEDIATELY — before business validation (empty transcription still costs)
+      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
+
+      const { text, elapsed } = sttResult;
       if (!text || text.trim().length === 0) {
         res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
         return;
@@ -236,6 +253,7 @@ export function sourceRoutes(
         uploadedAt: new Date().toISOString(),
         sourceType: 'voice',
         moderation: modCats ? pendingModeration() : undefined,
+        ...(persisted && { usage: persisted.usage, estimatedCost: persisted.cost, costBreakdown: persisted.costBreakdown }),
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
@@ -245,6 +263,10 @@ export function sourceRoutes(
       }
       res.json(source);
     } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
+      }
       logger.error('sources', 'STT error:', e);
       res.status(500).json({ error: `Transcription echouee: ${e}` });
     }
@@ -307,8 +329,31 @@ export function sourceRoutes(
     };
   }
 
-  /** Collect sources from URLs and/or keyword search. */
-  async function collectWebSources(req: any, pid: string, modCats: string[] | null): Promise<Source[]> {
+  /** Track a web source fetch, persist cost, and decorate source if non-null. */
+  async function trackWebSource(
+    pid: string, label: string, fn: () => Promise<Source | null>,
+  ): Promise<Source | null> {
+    try {
+      const { result: source, usage } = await runWithUsageTracking(fn);
+      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch`, usage);
+      if (source && persisted) {
+        source.estimatedCost = persisted.cost;
+        source.usage = persisted.usage;
+        source.costBreakdown = persisted.costBreakdown;
+      }
+      return source;
+    } catch (err) {
+      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
+      }
+      logger.error('sources', `${label} failed`, err);
+      return null;
+    }
+  }
+
+  /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
+  async function collectWebSources(pid: string, req: any, modCats: string[] | null): Promise<Source[]> {
     const lang = req.body.lang || 'fr';
     const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
@@ -317,17 +362,15 @@ export function sourceRoutes(
     const now = new Date().toISOString();
 
     for (const url of urls) {
-      const source = await scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now);
-      if (source) {
-        store.addSource(pid, source);
-        sources.push(source);
-      }
+      const source = await trackWebSource(pid, `URL scrape: ${url}`,
+        () => scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now));
+      if (source) sources.push(source);
     }
 
     if (searchQuery) {
-      const source = await searchByKeywords(searchQuery, lang, ageGroup, modCats, now);
-      store.addSource(pid, source);
-      sources.push(source);
+      const source = await trackWebSource(pid, `Keyword search: ${searchQuery}`,
+        () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>);
+      if (source) sources.push(source);
     }
 
     return sources;
@@ -357,11 +400,12 @@ export function sourceRoutes(
     }
 
     try {
-      const sources = await collectWebSources(req, pid, modCats);
+      const sources = await collectWebSources(pid, req, modCats);
       if (sources.length === 0) {
         res.status(500).json({ error: 'Aucune source extraite' });
         return;
       }
+      for (const s of sources) store.addSource(pid, s);
       const lang = req.body.lang || 'fr';
       void triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {

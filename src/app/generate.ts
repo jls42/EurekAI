@@ -1,12 +1,16 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
+import { addCostDelta } from './cost-utils';
+
+export { addCostDelta } from './cost-utils';
 
 /** Normalize and register a generation into the app state. */
-function registerGeneration(state: any, gen: any): void {
+export function registerGeneration(state: any, gen: any): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
   state.generations.push(gen);
   state.openGens[gen.id] = true;
+  addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
 /** Process responses from generateAll, returns failure count. */
@@ -39,6 +43,30 @@ function showGenerateAllResult(failures: number, total: number, state: any): voi
       fn: () => state.goToView('dashboard'),
     });
   }
+}
+
+function applyVoiceResult(state: any, gen: any, result: any, section?: string): void {
+  if (result.audioUrls) {
+    const sectionOrder = state._audioSectionOrder;
+    for (const [s, url] of Object.entries(result.audioUrls)) {
+      gen[`_audioUrl_${s}`] = url;
+    }
+    gen._activeAudioSection = sectionOrder.find((s: string) => result.audioUrls[s]) || 'intro';
+    gen._playlistMode = true;
+    if (result.failedSections?.length) {
+      state.showToast(state.t('toast.audioPartial'), 'warning');
+    }
+  } else {
+    gen[`_audioUrl_${section || 'all'}`] = result.audioUrl;
+    gen._activeAudioSection = section || 'intro';
+    gen._playlistMode = false;
+  }
+  if (result.costDelta) addCostDelta(state, result.costDelta, 'read-aloud');
+  state.showToast(state.t('toast.audioDone'), 'success');
+  state.$nextTick(() => {
+    const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
+    if (audioEl) { audioEl.load(); audioEl.play().catch((e: any) => console.warn('Auto-play blocked:', e.message)); }
+  });
 }
 
 export function createGenerate() {
@@ -213,6 +241,7 @@ export function createGenerate() {
         }
         if (this.currentProjectId !== projectId) return;
         const route = await routeRes.json();
+        if (route.costDelta) addCostDelta(this, route.costDelta, 'generate/route');
 
         // Phase 2: switch to individual type chips (skip TTS types if unavailable)
         const ttsTypes = new Set(['podcast', 'quiz-vocal']);
@@ -361,33 +390,7 @@ export function createGenerate() {
           body: JSON.stringify(body),
         });
         if (res.ok) {
-          const result = await res.json();
-          // Batch response (all sections)
-          if (result.audioUrls) {
-            const sectionOrder = this._audioSectionOrder;
-            for (const [s, url] of Object.entries(result.audioUrls)) {
-              gen[`_audioUrl_${s}`] = url;
-            }
-            // Pick first available section (intro may have failed)
-            gen._activeAudioSection = sectionOrder.find((s: string) => result.audioUrls[s]) || 'intro';
-            gen._playlistMode = true;
-            if (result.failedSections?.length) {
-              this.showToast(this.t('toast.audioPartial'), 'warning');
-            }
-          } else {
-            // Single section
-            gen[`_audioUrl_${section || 'all'}`] = result.audioUrl;
-            gen._activeAudioSection = section || 'intro';
-            gen._playlistMode = false;
-          }
-          this.showToast(this.t('toast.audioDone'), 'success');
-          this.$nextTick(() => {
-            const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
-            if (audioEl) {
-              audioEl.load();
-              audioEl.play().catch((e) => console.warn('Auto-play blocked:', e.message));
-            }
-          });
+          applyVoiceResult(this, gen, await res.json(), section);
         } else {
           const err = await res.json().catch(() => ({}));
           this.showToast(

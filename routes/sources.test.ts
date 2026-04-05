@@ -683,7 +683,7 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
   });
 
-  it('retourne 500 quand webSearchEnrich echoue', async () => {
+  it('retourne 500 quand webSearchEnrich echoue (graceful fallback)', async () => {
     const project = store.createProject('P1');
     vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('network error'));
 
@@ -696,8 +696,9 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
+    // collectWebSources catches the error per-source and returns empty array
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Recherche web echouee: Error: network error' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Aucune source extraite' });
   });
 
   it('scrape une URL directement via fetchPageContent', async () => {

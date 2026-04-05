@@ -25,7 +25,8 @@ export function projectRoutes(store: ProjectStore): Router {
       res.status(404).json({ error: 'Projet introuvable' });
       return;
     }
-    res.json(project);
+    const totalCost = (project.costLog ?? []).reduce((sum, e) => sum + e.cost, 0);
+    res.json({ ...project, totalCost: Math.round(totalCost * 1_000_000) / 1_000_000 });
   });
 
   router.put('/:pid', (req, res) => {
