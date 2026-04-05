@@ -317,7 +317,7 @@ export function sourceRoutes(
   }
 
   /** Collect sources from URLs and/or keyword search. */
-  async function collectWebSources(req: any, pid: string, modCats: string[] | null): Promise<Source[]> {
+  async function collectWebSources(req: any, modCats: string[] | null): Promise<Source[]> {
     const lang = req.body.lang || 'fr';
     const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
@@ -327,16 +327,11 @@ export function sourceRoutes(
 
     for (const url of urls) {
       const source = await scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now);
-      if (source) {
-        store.addSource(pid, source);
-        sources.push(source);
-      }
+      if (source) sources.push(source);
     }
 
     if (searchQuery) {
-      const source = await searchByKeywords(searchQuery, lang, ageGroup, modCats, now);
-      store.addSource(pid, source);
-      sources.push(source);
+      sources.push(await searchByKeywords(searchQuery, lang, ageGroup, modCats, now));
     }
 
     return sources;
@@ -367,7 +362,7 @@ export function sourceRoutes(
 
     try {
       const { result: sources, usage } = await runWithUsageTracking(
-        () => collectWebSources(req, pid, modCats),
+        () => collectWebSources(req, modCats),
       );
       if (sources.length === 0) {
         res.status(500).json({ error: 'Aucune source extraite' });
@@ -381,6 +376,7 @@ export function sourceRoutes(
           s.usage = usagePerSource;
         }
       }
+      for (const s of sources) store.addSource(pid, s);
       const lang = req.body.lang || 'fr';
       void triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {

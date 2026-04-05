@@ -29,7 +29,7 @@ export interface GenerationUsage {
 /** Model pricing keyed by prefix — `mistral-large-2512` matches `mistral-large`. */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   'mistral-large':      { inputPerMillion: 0.5,  outputPerMillion: 1.5, unit: 'tokens' },
-  'mistral-small':      { inputPerMillion: 0.1,  outputPerMillion: 0.3, unit: 'tokens' },
+  'mistral-small':      { inputPerMillion: 0.15, outputPerMillion: 0.6, unit: 'tokens' },
   'voxtral-mini-tts':   { inputPerMillion: 16,   outputPerMillion: 0,   unit: 'characters' },
   'voxtral-mini':       { inputPerMillion: 50,   outputPerMillion: 0,   unit: 'audio-seconds' },
   'mistral-ocr':        { inputPerMillion: 2000, outputPerMillion: 0,   unit: 'pages' },

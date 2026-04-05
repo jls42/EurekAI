@@ -74,7 +74,7 @@ function breakdownEntry(usage: ApiUsage, pricing: ModelPricing): string[] {
       if (usage.inputCharacters) lines.push(costLine(`${usage.inputCharacters} chars`, `$${pricing.inputPerMillion}/M`, (usage.inputCharacters * pricing.inputPerMillion) / 1_000_000));
       break;
     case 'pages':
-      if (usage.pagesProcessed) lines.push(costLine(`${usage.pagesProcessed} page(s)`, `$${pricing.inputPerMillion / 1000}/page`, (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000));
+      if (usage.pagesProcessed) lines.push(costLine(`${usage.pagesProcessed} page(s)`, `$${pricing.inputPerMillion / 1000}/1K pages`, (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000));
       break;
     case 'audio-seconds':
       if (usage.promptAudioSeconds) lines.push(costLine(`${usage.promptAudioSeconds.toFixed(1)}s audio`, `$${(pricing.inputPerMillion / 1_000_000 * 60).toFixed(4)}/min`, (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000));
