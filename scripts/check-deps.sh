@@ -1,5 +1,6 @@
 #!/bin/bash
-# Check for outdated dependencies and API model availability
+# Check for outdated dependencies, API model availability, and collect changelogs.
+# Output is structured for human reading and LLM analysis (used by /check-sdk-updates skill).
 set -euo pipefail
 
 echo "=== Outdated npm packages ==="
@@ -91,5 +92,119 @@ else
   fi
 fi
 
+# ── Changelogs with persistent state (disable strict mode for robustness) ──
+set +eo pipefail
 echo ""
-echo "Done. Run 'npm update' to apply minor/patch updates within semver ranges."
+echo "=== Changelogs (all watched packages) ==="
+
+STATE_FILE="output/.deps-checked.json"
+DEFAULT_SINCE="2025-05-01T00:00:00Z"
+MAX_PER_PKG=5
+
+# Packages to watch: "npm-name|github-owner/repo"
+WATCHED_PKGS=(
+  "@mistralai/mistralai|mistralai/client-ts"
+  "@elevenlabs/elevenlabs-js|elevenlabs/elevenlabs-js"
+  "@google/genai|googleapis/js-genai"
+  "alpinejs|alpinejs/alpine"
+  "lucide|lucide-icons/lucide"
+  "marked|markedjs/marked"
+)
+
+# Load state file
+if [ -f "$STATE_FILE" ]; then
+  state_json=$(cat "$STATE_FILE")
+else
+  state_json="{}"
+fi
+
+now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+for entry in "${WATCHED_PKGS[@]}"; do
+  IFS='|' read -r pkg repo <<< "$entry"
+
+  # Installed version
+  cur=$(node -e "try{console.log(require('$pkg/package.json').version)}catch{console.log('?')}" 2>/dev/null)
+
+  # Since date from state (or default)
+  since=$(echo "$state_json" | node -e "
+    const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+      try{const s=JSON.parse(d.join(''));console.log(s[process.argv[1]]?.checkedAt||'$DEFAULT_SINCE')}
+      catch{console.log('$DEFAULT_SINCE')}
+    })
+  " "$pkg" 2>/dev/null)
+
+  echo ""
+  echo "--- $pkg (installed: $cur, since: ${since:0:10}) ---"
+
+  # Fetch releases from GitHub API
+  releases=$(curl -sf "https://api.github.com/repos/$repo/releases?per_page=30" 2>/dev/null || echo "[]")
+
+  # Filter by date, batch, display, and write new checkedAt to temp file
+  tmp_checked=$(mktemp)
+  echo "$releases" | node -e "
+    const fs=require('fs');
+    const since=process.argv[1], max=parseInt(process.argv[2]), tmpFile=process.argv[3];
+    const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+      try{
+        const all=JSON.parse(d.join(''));
+        const newer=all.filter(r=>r.published_at&&new Date(r.published_at)>new Date(since));
+        if(!newer.length){fs.writeFileSync(tmpFile,'$now');console.log('  (no new releases since '+since.slice(0,10)+')');return;}
+        const batch=newer.slice(0,max);
+        const remaining=newer.length-batch.length;
+        for(const r of batch){
+          console.log('  ## '+r.tag_name+' ('+(r.published_at||'').slice(0,10)+')');
+          const body=(r.body||'(no notes)').slice(0,1000).split('\n').map(l=>'  '+l).join('\n');
+          console.log(body);
+        }
+        if(remaining>0) console.log('  (+'+remaining+' older releases not shown — rerun to see more)');
+        fs.writeFileSync(tmpFile,remaining>0?batch[batch.length-1].published_at:'$now');
+      }catch(e){console.log('  (error: '+e.message+')');fs.writeFileSync(tmpFile,'$since');}
+    })
+  " "$since" "$MAX_PER_PKG" "$tmp_checked" 2>/dev/null
+  new_checked_at=$(cat "$tmp_checked" 2>/dev/null || echo "$now")
+  rm -f "$tmp_checked"
+
+  # Update state in memory
+  state_json=$(echo "$state_json" | node -e "
+    const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+      try{
+        const s=JSON.parse(d.join(''));
+        s[process.argv[1]]={checkedAt:process.argv[2]};
+        console.log(JSON.stringify(s));
+      }catch{console.log(d.join(''));}
+    })
+  " "$pkg" "${new_checked_at:-$now}" 2>/dev/null)
+done
+
+# Save state file
+echo "$state_json" | node -e "
+  const fs=require('fs');
+  const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+    try{fs.writeFileSync('$STATE_FILE',JSON.stringify(JSON.parse(d.join('')),null,2));}catch{}
+  })
+" 2>/dev/null
+echo ""
+echo "  (state saved to $STATE_FILE)"
+
+set -eo pipefail
+
+# ── Codebase usage snapshot ──
+echo ""
+echo "=== Codebase usage snapshot ==="
+
+echo "--- Lucide icons in use ---"
+grep -roh 'data-lucide="[^"]*"' src/ 2>/dev/null | sort -u | sed 's/data-lucide="//;s/"//' || echo "(none)"
+
+echo ""
+echo "--- Alpine.js directives ---"
+grep -roh 'x-[a-z]*' src/ 2>/dev/null | sort | uniq -c | sort -rn | head -15 || echo "(none)"
+
+echo ""
+echo "--- SDK imports ---"
+grep -rn "from '@mistralai" generators/ helpers/ routes/ 2>/dev/null | head -15 || true
+grep -rn "from '@elevenlabs" generators/ helpers/ routes/ 2>/dev/null | head -10 || true
+grep -rn "from '@google/genai" generators/ helpers/ routes/ 2>/dev/null | head -10 || true
+
+echo ""
+echo "Done. Run 'npm update' to apply minor/patch within semver ranges."

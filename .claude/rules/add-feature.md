@@ -9,7 +9,7 @@
 7. Enregistrer le composant dans `src/main.ts` via `Alpine.data()`
 8. Creer la vue dans `src/partials/view-mon_generateur.html`
 9. Inclure le partial dans `src/index.html`
-10. Ajouter les cles i18n dans `src/i18n/fr.ts` ET `src/i18n/en.ts`
+10. Ajouter les cles i18n dans les **9 fichiers** : `src/i18n/{fr,en,es,pt,it,nl,de,hi,ar}.ts`
 11. Ajouter icon + color dans `src/app/helpers.ts` (genIcon, genColor)
 12. Ajouter le CSS icon-chip dans `src/styles/main.css` + variables dans `src/styles/theme.css`
 13. Ajouter dans `generators/router.ts` VALID_AGENTS si eligible pour le routeur auto
