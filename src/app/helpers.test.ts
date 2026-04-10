@@ -1220,6 +1220,105 @@ describe('hideMetaPopover', () => {
   });
 });
 
+const mockEl = { getBoundingClientRect: () => ({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 }) } as unknown as HTMLElement;
+
+describe('showMetaPopover', () => {
+  it('sets all popover state from config', () => {
+    const ctx: any = {};
+    callWith<void>(helpers.showMetaPopover, ctx, mockEl, {
+      title: 'Test Title',
+      lines: ['line1', 'line2'],
+      lineClass: 'custom-line',
+      footer: 'Footer text',
+      footerClass: 'custom-footer',
+    });
+    expect(ctx._metaPopoverPos).toEqual({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 });
+    expect(ctx._metaPopoverTitle).toBe('Test Title');
+    expect(ctx._metaPopoverLines).toEqual(['line1', 'line2']);
+    expect(ctx._metaPopoverLineClass).toBe('custom-line');
+    expect(ctx._metaPopoverFooter).toBe('Footer text');
+    expect(ctx._metaPopoverFooterClass).toBe('custom-footer');
+  });
+
+  it('uses defaults for missing config fields', () => {
+    const ctx: any = {};
+    callWith<void>(helpers.showMetaPopover, ctx, mockEl, {});
+    expect(ctx._metaPopoverTitle).toBe('');
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+    expect(ctx._metaPopoverFooter).toBe('');
+    expect(ctx._metaPopoverFooterClass).toBe('text-text-primary');
+  });
+});
+
+describe('showCostPopover', () => {
+  const t = (key: string) => key;
+
+  it('uses costBreakdown when available', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const item = { costBreakdown: ['line A', 'line B'], estimatedCost: 0.0123 };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, item);
+    expect(ctx._metaPopoverLines).toEqual(['line A', 'line B']);
+    expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.0123');
+  });
+
+  it('falls back to usage summary when no costBreakdown', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const item = { usage: { totalTokens: 500, callCount: 2 }, estimatedCost: 0.005 };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, item);
+    expect(ctx._metaPopoverLines).toEqual(['500 tokens · 2 gen.apiCalls']);
+    expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.0050');
+  });
+
+  it('uses empty lines and footer when no cost data', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, {});
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverFooter).toBe('');
+  });
+});
+
+describe('showOcrPopover', () => {
+  const t = (key: string) => key;
+
+  it('shows confidence percentage and tone class', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const src = { ocrConfidence: { average: 0.95 } };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, src);
+    expect(ctx._metaPopoverTitle).toBe('ocr.confidence');
+    expect(ctx._metaPopoverLines).toEqual(['95%']);
+    expect(ctx._metaPopoverLineClass).toContain('font-semibold');
+  });
+});
+
+describe('showModerationPopover', () => {
+  const t = (key: string) => key;
+
+  it('shows flagged categories when present', () => {
+    const ctx: any = {
+      ...helpers,
+      t,
+      showMetaPopover: helpers.showMetaPopover,
+      flaggedCategoryLabels: () => 'violence, sexual',
+    };
+    callWith<void>(helpers.showModerationPopover, ctx, mockEl, { moderation: { status: 'unsafe' } });
+    expect(ctx._metaPopoverLines).toEqual(['violence, sexual']);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+  });
+
+  it('shows empty lines with tone class when no categories', () => {
+    const ctx: any = {
+      ...helpers,
+      t,
+      showMetaPopover: helpers.showMetaPopover,
+      flaggedCategoryLabels: () => '',
+    };
+    callWith<void>(helpers.showModerationPopover, ctx, mockEl, { moderation: { status: 'safe' } });
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toContain('font-semibold');
+  });
+});
+
 describe('metaPopoverStyle', () => {
   it('returns display:none when no position', () => {
     const ctx = { _metaPopoverPos: null };
