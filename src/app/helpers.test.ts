@@ -1088,3 +1088,158 @@ describe('ocrConfidenceIcon', () => {
     expect(result).toBe('');
   });
 });
+
+// --- Moderation helpers ---
+
+describe('moderationStatus', () => {
+  it('returns status when present', () => {
+    expect(helpers.moderationStatus({ moderation: { status: 'safe' } })).toBe('safe');
+    expect(helpers.moderationStatus({ moderation: { status: 'unsafe' } })).toBe('unsafe');
+    expect(helpers.moderationStatus({ moderation: { status: 'pending' } })).toBe('pending');
+    expect(helpers.moderationStatus({ moderation: { status: 'error' } })).toBe('error');
+  });
+
+  it('returns null when no moderation', () => {
+    expect(helpers.moderationStatus({})).toBeNull();
+    expect(helpers.moderationStatus(null)).toBeNull();
+    expect(helpers.moderationStatus(undefined)).toBeNull();
+  });
+});
+
+describe('moderationBadgeColor', () => {
+  it('returns correct classes for each status', () => {
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'safe' } }))
+      .toBe('bg-success-light text-success-dark');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'unsafe' } }))
+      .toBe('bg-danger-light text-danger-dark');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'pending' } }))
+      .toBe('bg-primary-light text-primary');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'error' } }))
+      .toBe('bg-warning-light text-warning-dark');
+  });
+
+  it('returns empty string when no moderation', () => {
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationBadgeIcon', () => {
+  it('returns correct icons for each status', () => {
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'safe' } })).toBe('shield-check');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'unsafe' } })).toBe('shield-alert');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'pending' } })).toBe('loader-circle');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'error' } })).toBe('shield-x');
+  });
+
+  it('returns empty string when no moderation', () => {
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationBadgeIconClass', () => {
+  it('returns animate-spin for pending', () => {
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'pending' } }))
+      .toBe('animate-spin');
+  });
+
+  it('returns empty string for other statuses', () => {
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'safe' } })).toBe('');
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'unsafe' } })).toBe('');
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationToneClass', () => {
+  it('returns correct tone class for each status', () => {
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'safe' } })).toBe('text-success-dark');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'unsafe' } })).toBe('text-danger-dark');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'pending' } })).toBe('text-primary');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'error' } })).toBe('text-warning-dark');
+  });
+
+  it('returns text-text-primary when no moderation', () => {
+    expect(callWith<string>(helpers.moderationToneClass, helpers, {})).toBe('text-text-primary');
+  });
+});
+
+describe('moderationBadgeTitle', () => {
+  const t = (key: string) => key;
+
+  it('returns translated title for safe/pending/error', () => {
+    const ctx = { ...helpers, t };
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'safe' } })).toBe('moderation.safe');
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'pending' } })).toBe('moderation.pending');
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'error' } })).toBe('moderation.error');
+  });
+
+  it('returns unsafe title with flagged categories when present', () => {
+    const ctx = {
+      ...helpers,
+      t,
+      flaggedCategoryLabels: () => 'violence, sexual',
+    };
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    expect(result).toBe('moderation.unsafe — violence, sexual');
+  });
+
+  it('returns unsafe title without categories when none flagged', () => {
+    const ctx = {
+      ...helpers,
+      t,
+      flaggedCategoryLabels: () => '',
+    };
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    expect(result).toBe('moderation.unsafe');
+  });
+
+  it('returns empty string when no moderation', () => {
+    const ctx = { ...helpers, t };
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, {})).toBe('');
+  });
+});
+
+// --- Meta popover helpers ---
+
+describe('hideMetaPopover', () => {
+  it('resets all popover state', () => {
+    const ctx = {
+      _metaPopoverPos: { top: 100 },
+      _metaPopoverTitle: 'Title',
+      _metaPopoverLines: ['line1'],
+      _metaPopoverLineClass: 'custom',
+      _metaPopoverFooter: 'footer',
+      _metaPopoverFooterClass: 'custom',
+    };
+    callWith<void>(helpers.hideMetaPopover, ctx);
+    expect(ctx._metaPopoverPos).toBeNull();
+    expect(ctx._metaPopoverTitle).toBe('');
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+    expect(ctx._metaPopoverFooter).toBe('');
+    expect(ctx._metaPopoverFooterClass).toBe('text-text-primary');
+  });
+});
+
+describe('metaPopoverStyle', () => {
+  it('returns display:none when no position', () => {
+    const ctx = { _metaPopoverPos: null };
+    expect(callWith<string>(helpers.metaPopoverStyle, ctx)).toBe('display:none');
+  });
+
+  it('positions below element when near top of viewport', () => {
+    const ctx = { _metaPopoverPos: { top: 100, bottom: 130, left: 50 } };
+    const result = callWith<string>(helpers.metaPopoverStyle, ctx);
+    expect(result).toContain('top:134px');
+    expect(result).toContain('left:50px');
+  });
+
+  it('positions above element when far from top of viewport', () => {
+    const origInnerHeight = globalThis.window?.innerHeight;
+    globalThis.window = { innerHeight: 800 } as any;
+    const ctx = { _metaPopoverPos: { top: 400, bottom: 430, left: 50 } };
+    const result = callWith<string>(helpers.metaPopoverStyle, ctx);
+    expect(result).toContain('bottom:404px');
+    expect(result).toContain('left:50px');
+    if (origInnerHeight !== undefined) globalThis.window = { innerHeight: origInnerHeight } as any;
+  });
+});
