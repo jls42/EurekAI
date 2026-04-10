@@ -115,7 +115,8 @@ export function sourceRoutes(
       logger.info('sources', `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
     } else {
       ({ markdown, elapsed, confidence } = await ocrFile(client, file.path, file.originalname));
-      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : ''})`);
+      const confStr = confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : '';
+      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confStr})`);
     }
     return {
       id: randomUUID(),

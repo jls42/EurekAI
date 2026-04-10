@@ -45,7 +45,12 @@ export async function ocrFile(
 function extractConfidence(
   pages: Array<{ confidenceScores?: { averagePageConfidenceScore: number; minimumPageConfidenceScore: number } | null }>,
 ): OcrConfidence | undefined {
-  const scored = pages.filter((p) => p.confidenceScores);
+  const scored = pages.filter(
+    (p) =>
+      p.confidenceScores
+      && Number.isFinite(p.confidenceScores.averagePageConfidenceScore)
+      && Number.isFinite(p.confidenceScores.minimumPageConfidenceScore),
+  );
   if (scored.length === 0) return undefined;
   const avg = scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
   const min = Math.min(...scored.map((p) => p.confidenceScores!.minimumPageConfidenceScore));

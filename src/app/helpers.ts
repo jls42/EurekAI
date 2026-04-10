@@ -247,17 +247,14 @@ export function createHelpers() {
     },
 
     showCostPopover(this: any, el: HTMLElement, item: any) {
-      const lines =
-        item?.costBreakdown?.length
-          ? item.costBreakdown
-          : item?.usage
-            ? [`${item.usage.totalTokens} tokens · ${item.usage.callCount} appel(s) API`]
-            : [];
+      let lines: string[] = [];
+      if (item?.costBreakdown?.length) lines = item.costBreakdown;
+      else if (item?.usage) lines = [`${item.usage.totalTokens} tokens · ${item.usage.callCount} ${this.t('gen.apiCalls')}`];
       this.showMetaPopover(el, {
         title: this.t('gen.estimatedCost'),
         lines,
         lineClass: 'text-text-secondary font-mono',
-        footer: item?.estimatedCost != null ? 'Total: ~$' + item.estimatedCost.toFixed(4) : '',
+        footer: item?.estimatedCost == null ? '' : this.t('dashboard.totalCost') + ' ~$' + item.estimatedCost.toFixed(4),
         footerClass: 'text-accent',
       });
     },

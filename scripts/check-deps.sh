@@ -137,8 +137,39 @@ for entry in "${WATCHED_PKGS[@]}"; do
   echo ""
   echo "--- $pkg (installed: $cur, since: ${since:0:10}) ---"
 
-  # Fetch releases from GitHub API
-  releases=$(curl -sf "https://api.github.com/repos/$repo/releases?per_page=30" 2>/dev/null || echo "[]")
+  # Fetch all releases with pagination (GitHub max: 100/page)
+  tmp_releases=$(mktemp)
+  echo "[]" > "$tmp_releases"
+  page=1
+  fetch_failed=false
+  while true; do
+    if ! page_json=$(curl -sf "https://api.github.com/repos/$repo/releases?per_page=100&page=$page" 2>/dev/null); then
+      fetch_failed=true
+      break
+    fi
+    page_count=$(echo "$page_json" | node -e "
+      const fs=require('fs');
+      const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+        try{
+          const page=JSON.parse(d.join(''));
+          const prev=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));
+          fs.writeFileSync(process.argv[1],JSON.stringify([...prev,...page]));
+          console.log(page.length);
+        }catch{console.log('0');}
+      })
+    " "$tmp_releases" 2>/dev/null)
+    if [ "${page_count:-0}" -lt 100 ]; then break; fi
+    page=$((page + 1))
+  done
+
+  if [ "$fetch_failed" = "true" ]; then
+    echo "  (fetch failed — keeping previous cursor)"
+    rm -f "$tmp_releases"
+    continue
+  fi
+
+  releases=$(cat "$tmp_releases")
+  rm -f "$tmp_releases"
 
   # Filter by date, batch, display, and write new checkedAt to temp file
   tmp_checked=$(mktemp)

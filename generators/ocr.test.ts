@@ -67,6 +67,29 @@ describe('ocrFile', () => {
     expect(result.confidence).toBeUndefined();
   });
 
+  it('ignores pages with non-finite confidence scores', async () => {
+    const pages = [
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95, minimumPageConfidenceScore: 0.88 } },
+      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: undefined as any, minimumPageConfidenceScore: 0.7 } },
+      { markdown: '# P3', confidenceScores: { averagePageConfidenceScore: NaN, minimumPageConfidenceScore: 0.6 } },
+    ];
+    const client = createClient(pages);
+    const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(result.confidence!.average).toBeCloseTo(0.95, 5);
+    expect(result.confidence!.minimum).toBe(0.88);
+  });
+
+  it('returns undefined confidence when all scores are non-finite', async () => {
+    const pages = [
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: NaN, minimumPageConfidenceScore: Infinity } },
+    ];
+    const client = createClient(pages);
+    const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(result.confidence).toBeUndefined();
+  });
+
   it('cleans up the uploaded file after OCR', async () => {
     const client = createClient();
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');

@@ -29,8 +29,11 @@ export interface ModerationResult {
   categories: Record<string, boolean>;
 }
 
+/** Aggregated OCR confidence scores across all pages (values in 0..1 range). */
 export interface OcrConfidence {
+  /** Mean of per-page average confidence scores. */
   average: number;
+  /** Global minimum confidence score across all pages. */
   minimum: number;
 }
 

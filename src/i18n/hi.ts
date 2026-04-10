@@ -25,6 +25,7 @@ export const hi: Record<string, string> = {
   'gen.image': '\u091A\u093F\u0924\u094D\u0930',
   'gen.auto': 'Auto \u2014 \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923...',
   'gen.estimatedCost': '\u0905\u0928\u0941\u092E\u093E\u0928\u093F\u0924 \u0932\u093E\u0917\u0924 (Mistral \u0926\u0930\u0947\u0902)',
+  'gen.apiCalls': 'API \u0915\u0949\u0932',
   'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',

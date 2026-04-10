@@ -1005,3 +1005,86 @@ describe('defaultModerationCategories', () => {
     expect(result).toEqual([]);
   });
 });
+
+// --- OCR confidence helpers ---
+
+describe('ocrConfidenceTier', () => {
+  it('returns null when src has no ocrConfidence', () => {
+    expect(helpers.ocrConfidenceTier({})).toBeNull();
+    expect(helpers.ocrConfidenceTier(null)).toBeNull();
+    expect(helpers.ocrConfidenceTier(undefined)).toBeNull();
+  });
+
+  it('returns high for average >= 0.9', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.9 } })).toBe('high');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.95 } })).toBe('high');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 1.0 } })).toBe('high');
+  });
+
+  it('returns medium for 0.7 <= average < 0.9', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.7 } })).toBe('medium');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.89 } })).toBe('medium');
+  });
+
+  it('returns low for average < 0.7', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.69 } })).toBe('low');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.0 } })).toBe('low');
+  });
+});
+
+describe('ocrConfidencePercent', () => {
+  it('returns empty string when no ocrConfidence', () => {
+    expect(helpers.ocrConfidencePercent({})).toBe('');
+    expect(helpers.ocrConfidencePercent(null)).toBe('');
+  });
+
+  it('returns formatted percentage', () => {
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.934 } })).toBe('93%');
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 1.0 } })).toBe('100%');
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.0 } })).toBe('0%');
+  });
+});
+
+describe('ocrConfidenceColor', () => {
+  it('returns success classes for high tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.95 } });
+    expect(result).toBe('bg-success-light text-success-dark');
+  });
+
+  it('returns warning classes for medium tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.8 } });
+    expect(result).toBe('bg-warning-light text-warning-dark');
+  });
+
+  it('returns danger classes for low tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.5 } });
+    expect(result).toBe('bg-danger-light text-danger-dark');
+  });
+
+  it('returns empty string when no confidence', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, {});
+    expect(result).toBe('');
+  });
+});
+
+describe('ocrConfidenceIcon', () => {
+  it('returns check-circle for high tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.95 } });
+    expect(result).toBe('check-circle');
+  });
+
+  it('returns alert-circle for medium tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.8 } });
+    expect(result).toBe('alert-circle');
+  });
+
+  it('returns alert-triangle for low tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.5 } });
+    expect(result).toBe('alert-triangle');
+  });
+
+  it('returns empty string when no confidence', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, {});
+    expect(result).toBe('');
+  });
+});

@@ -1031,6 +1031,31 @@ describe('POST /:pid/sources/upload', () => {
     expect(updated!.sources).toHaveLength(2);
   });
 
+  it('propage ocrConfidence depuis ocrFile vers la source', async () => {
+    const project = store.createProject('P1');
+    vi.mocked(ocrFile).mockResolvedValueOnce({
+      markdown: '# OCR with confidence',
+      elapsed: 1.2,
+      confidence: { average: 0.95, minimum: 0.88 },
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/sources/upload');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { lang: 'fr' },
+      files: [{ path: '/tmp/file.jpg', originalname: 'scan.jpg', filename: 'uuid-scan.jpg' }],
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const results = res.json.mock.calls[0][0];
+    expect(results[0].ocrConfidence).toEqual({ average: 0.95, minimum: 0.88 });
+
+    const updated = store.getProject(project.meta.id);
+    expect(updated!.sources[0].ocrConfidence).toEqual({ average: 0.95, minimum: 0.88 });
+  });
+
   it('retourne 500 quand ocrFile echoue', async () => {
     const project = store.createProject('P1');
     vi.mocked(ocrFile).mockRejectedValueOnce(new Error('OCR failed'));

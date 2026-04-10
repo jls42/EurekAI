@@ -25,6 +25,7 @@ export const pt: Record<string, string> = {
   'gen.image': 'Imagem',
   'gen.auto': 'Auto \u2014 analisando...',
   'gen.estimatedCost': 'Custo estimado (tarifas Mistral)',
+  'gen.apiCalls': 'chamada(s) API',
   'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
