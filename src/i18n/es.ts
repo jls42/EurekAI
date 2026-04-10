@@ -188,6 +188,9 @@ export const es: Record<string, string> = {
   'sourceBadge.text': 'Texto',
   'sourceBadge.voice': 'Voz',
   'sourceBadge.web': 'Web',
+  'ocr.confidence': 'Confianza OCR',
+  'ocr.avg': 'Promedio',
+  'ocr.min': 'M\u00ednimo',
 
   'summary.heading': 'Fichas de repaso',
   'summary.new': 'Nueva ficha',

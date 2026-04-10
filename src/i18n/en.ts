@@ -188,6 +188,9 @@ export const en: Record<string, string> = {
   'sourceBadge.text': 'Text',
   'sourceBadge.voice': 'Voice',
   'sourceBadge.web': 'Web',
+  'ocr.confidence': 'OCR Confidence',
+  'ocr.avg': 'Average',
+  'ocr.min': 'Minimum',
 
   'summary.heading': 'Study Notes',
   'summary.new': 'New note',

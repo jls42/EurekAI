@@ -188,6 +188,9 @@ export const nl: Record<string, string> = {
   'sourceBadge.text': 'Tekst',
   'sourceBadge.voice': 'Stem',
   'sourceBadge.web': 'Web',
+  'ocr.confidence': 'OCR-betrouwbaarheid',
+  'ocr.avg': 'Gemiddeld',
+  'ocr.min': 'Minimum',
 
   'summary.heading': 'Samenvattingen',
   'summary.new': 'Nieuwe samenvatting',

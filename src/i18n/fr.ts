@@ -201,6 +201,9 @@ export const fr: Record<string, string> = {
   'sourceBadge.text': 'Texte',
   'sourceBadge.voice': 'Voix',
   'sourceBadge.web': 'Web',
+  'ocr.confidence': 'Confiance OCR',
+  'ocr.avg': 'Moyenne',
+  'ocr.min': 'Minimum',
 
   // Summary view
   'summary.heading': 'Fiches de revision',

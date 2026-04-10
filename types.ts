@@ -29,6 +29,11 @@ export interface ModerationResult {
   categories: Record<string, boolean>;
 }
 
+export interface OcrConfidence {
+  average: number;
+  minimum: number;
+}
+
 export interface Source {
   id: string;
   filename: string;
@@ -41,6 +46,7 @@ export interface Source {
   estimatedCost?: number;
   usage?: import('./helpers/pricing.js').GenerationUsage;
   costBreakdown?: string[];
+  ocrConfidence?: OcrConfidence;
 }
 
 export interface StudyFiche {

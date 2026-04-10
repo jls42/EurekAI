@@ -134,6 +134,35 @@ export function createHelpers() {
       return colors[this.inferSourceType(src)] || 'bg-gray-100 text-gray-700';
     },
 
+    ocrConfidenceTier(src: any): string | null {
+      if (!src?.ocrConfidence) return null;
+      const avg = src.ocrConfidence.average;
+      if (avg >= 0.9) return 'high';
+      if (avg >= 0.7) return 'medium';
+      return 'low';
+    },
+
+    ocrConfidenceColor(this: any, src: any) {
+      const tier = this.ocrConfidenceTier(src);
+      if (tier === 'high') return 'bg-success-light text-success-dark';
+      if (tier === 'medium') return 'bg-warning-light text-warning-dark';
+      if (tier === 'low') return 'bg-danger-light text-danger-dark';
+      return '';
+    },
+
+    ocrConfidencePercent(src: any) {
+      if (!src?.ocrConfidence) return '';
+      return Math.round(src.ocrConfidence.average * 100) + '%';
+    },
+
+    ocrConfidenceIcon(this: any, src: any) {
+      const tier = this.ocrConfidenceTier(src);
+      if (tier === 'high') return 'check-circle';
+      if (tier === 'medium') return 'alert-circle';
+      if (tier === 'low') return 'alert-triangle';
+      return '';
+    },
+
     resolveSourceRef(ref: string, allSources: any[]) {
       const numMatch = /source\s*(\d+)/i.exec(ref);
       if (numMatch) {

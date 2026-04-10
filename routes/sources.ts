@@ -107,14 +107,15 @@ export function sourceRoutes(
     const isText = TEXT_EXTS.has(ext);
     let markdown: string;
     let elapsed: number;
+    let confidence: import('../types.js').OcrConfidence | undefined;
     if (isText) {
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
       elapsed = stop();
       logger.info('sources', `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
     } else {
-      ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
-      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+      ({ markdown, elapsed, confidence } = await ocrFile(client, file.path, file.originalname));
+      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : ''})`);
     }
     return {
       id: randomUUID(),
@@ -124,6 +125,7 @@ export function sourceRoutes(
       sourceType: isText ? 'text' : 'ocr',
       filePath: `projects/${pid}/uploads/${file.filename}`,
       moderation: modCats ? pendingModeration() : undefined,
+      ocrConfidence: confidence,
     };
   }
 

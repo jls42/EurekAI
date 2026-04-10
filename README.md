@@ -52,7 +52,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 | | Fonctionnalité | Description |
 |---|---|---|
-| 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR) ou fichier texte (TXT, MD) |
+| 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR avec score de confiance) ou fichier texte (TXT, MD) |
 | 📝 | **Saisie texte** | Tapez ou collez n'importe quel texte directement |
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
 | 🌐 | **Web / URL** | Collez une URL (scraping direct via Readability + Lightpanda) ou tapez une recherche (Agent Mistral web_search) |

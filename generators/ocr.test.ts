@@ -31,9 +31,11 @@ describe('ocrFile', () => {
     expect(client.ocr.process).toHaveBeenCalledWith({
       model: 'mistral-ocr-latest',
       document: { fileId: 'file-123', type: 'file' },
+      confidenceScoresGranularity: 'page',
     });
     expect(result.markdown).toBe('# Page 1');
     expect(typeof result.elapsed).toBe('number');
+    expect(result.confidence).toBeUndefined();
   });
 
   it('combines multiple pages into single markdown', async () => {
@@ -41,6 +43,28 @@ describe('ocrFile', () => {
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(result.markdown).toBe('# Page 1\n\n## Page 2');
+  });
+
+  it('extracts confidence scores when available', async () => {
+    const pages = [
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95, minimumPageConfidenceScore: 0.88 } },
+      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: 0.91, minimumPageConfidenceScore: 0.82 } },
+    ];
+    const client = createClient(pages);
+    const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(result.confidence!.average).toBeCloseTo(0.93, 5);
+    expect(result.confidence!.minimum).toBe(0.82);
+  });
+
+  it('returns undefined confidence when scores are null', async () => {
+    const pages = [
+      { markdown: '# P1', confidenceScores: null },
+    ];
+    const client = createClient(pages);
+    const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(result.confidence).toBeUndefined();
   });
 
   it('cleans up the uploaded file after OCR', async () => {
