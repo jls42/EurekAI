@@ -112,6 +112,7 @@ export function createProjects() {
     resetState(this: any) {
       this.sources = [];
       this.selectedIds = [];
+      this.uploadSessions = [];
       this.generations = [];
       this.openGens = {};
       this.editingTitle = null;

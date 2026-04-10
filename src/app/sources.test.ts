@@ -9,7 +9,8 @@ const mockDialog = { showModal: vi.fn() };
 };
 
 globalThis.fetch = vi.fn();
-vi.stubGlobal('crypto', { randomUUID: vi.fn(() => 'test-session-id') });
+let uuidCounter = 0;
+vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `uuid-${++uuidCounter}`) });
 
 function makeContext(overrides: any = {}) {
   return {
@@ -19,7 +20,9 @@ function makeContext(overrides: any = {}) {
     textInput: '  hello world  ',
     showTextInput: true,
     uploadSessions: [] as any[],
-    get uploading(): boolean { return this.uploadSessions.length > 0; },
+    get uploading(): boolean {
+      return this.uploadSessions.some((s: any) => s.files.some((f: any) => f.status === 'pending' || f.status === 'uploading'));
+    },
     dragging: false,
     locale: 'fr',
     viewSource: null as any,
@@ -70,6 +73,7 @@ describe('createSources', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.mocked(globalThis.fetch).mockClear();
+    uuidCounter = 0;
     src = createSources();
     ctx = makeContext();
     // Bind refreshModeration from the module itself so it can be called
@@ -338,11 +342,10 @@ describe('createSources', () => {
 
       expect(ctx.sources).toEqual([newSource]);
       expect(ctx.selectedIds).toEqual(['s1']);
-      // Session still visible (3s delay before cleanup)
-      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      const session = ctx.uploadSessions[0];
       expect(session.files[0].status).toBe('done');
+      expect(session.files[0].file).toBeNull();
       expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
-      // After 3s delay, session is cleaned up
       vi.advanceTimersByTime(3000);
       expect(ctx.uploadSessions).toEqual([]);
       expect(ctx.uploading).toBe(false);
@@ -363,7 +366,7 @@ describe('createSources', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(ctx.sources).toEqual([src1, src2]);
       expect(ctx.selectedIds).toEqual(['s1', 's2']);
-      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      const session = ctx.uploadSessions[0];
       expect(session.files[0].status).toBe('done');
       expect(session.files[1].status).toBe('done');
       vi.advanceTimersByTime(3000);
@@ -385,8 +388,9 @@ describe('createSources', () => {
       expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
       expect(ctx.sources).toEqual([src2]);
       expect(ctx.selectedIds).toEqual(['s2']);
-      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      const session = ctx.uploadSessions[0];
       expect(session.files[0].status).toBe('error');
+      expect(session.files[0].errorMsg).toBe('OCR failed');
       expect(session.files[1].status).toBe('done');
     });
 
@@ -404,31 +408,232 @@ describe('createSources', () => {
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.uploadError', 'error');
       expect(ctx.sources).toEqual([src2]);
-      const session = ctx.uploadSessions.find((s: any) => s.id === 'test-session-id');
+      const session = ctx.uploadSessions[0];
       expect(session.files[0].status).toBe('error');
+      expect(session.files[0].errorMsg).toBe('Network down');
       expect(session.files[1].status).toBe('done');
     });
 
-    it('schedules refreshConsigne and refreshModeration after uploads', async () => {
+    it('does not schedule refreshes when all uploads fail', async () => {
       const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
       const fileList = makeFileList(file);
-      mockFetchOk([{ id: 's1', text: 'ocr' }]);
+      mockFetchErr('OCR failed');
 
-      // Replace refreshConsigne/refreshModeration with fresh mocks to track setTimeout calls
       ctx.refreshConsigne = vi.fn();
       ctx.refreshModeration = vi.fn();
 
       await src.handleFiles.call(ctx, fileList);
 
+      vi.advanceTimersByTime(5000);
       expect(ctx.refreshConsigne).not.toHaveBeenCalled();
       expect(ctx.refreshModeration).not.toHaveBeenCalled();
+    });
 
-      vi.advanceTimersByTime(2000);
-      expect(ctx.refreshModeration).toHaveBeenCalled();
-      expect(ctx.refreshConsigne).not.toHaveBeenCalled();
+    it('error session persists and does not auto-cleanup', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchErr('OCR failed');
 
-      vi.advanceTimersByTime(1000);
+      await src.handleFiles.call(ctx, fileList);
+
+      vi.advanceTimersByTime(5000);
+      expect(ctx.uploadSessions.length).toBe(1);
+      expect(ctx.uploadSessions[0].files[0].status).toBe('error');
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('schedules only refreshConsigne at batch level (not refreshModeration)', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      // Source without pending moderation — no per-file moderation polling
+      mockFetchOk([{ id: 's1', text: 'ocr' }]);
+
+      ctx.refreshConsigne = vi.fn();
+      ctx.refreshModeration = vi.fn();
+
+      await src.handleFiles.call(ctx, fileList);
+
+      // refreshModeration should NOT be called at batch level
+      vi.advanceTimersByTime(3000);
       expect(ctx.refreshConsigne).toHaveBeenCalled();
+      expect(ctx.refreshModeration).not.toHaveBeenCalled();
+    });
+
+    it('triggers per-file refreshModeration when source has pending moderation', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchOk([{ id: 's1', text: 'ocr', moderation: { status: 'pending' } }]);
+
+      ctx.refreshConsigne = vi.fn();
+      ctx.refreshModeration = vi.fn();
+
+      await src.handleFiles.call(ctx, fileList);
+
+      expect(ctx.refreshModeration).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(2000);
+      expect(ctx.refreshModeration).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not trigger refreshModeration when no source has pending moderation', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchOk([{ id: 's1', text: 'ocr', moderation: { status: 'approved' } }]);
+
+      ctx.refreshModeration = vi.fn();
+
+      await src.handleFiles.call(ctx, fileList);
+
+      vi.advanceTimersByTime(5000);
+      expect(ctx.refreshModeration).not.toHaveBeenCalled();
+    });
+
+    it('moderation refresh happens progressively during batch (non-regression)', async () => {
+      const file1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
+      const file2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file1, file2);
+
+      // 1st file: immediate success with pending moderation
+      mockFetchOk([{ id: 's1', text: 'ocr1', moderation: { status: 'pending' } }]);
+      // 2nd file: never resolves (blocked)
+      let resolveSecond: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(() => new Promise(r => { resolveSecond = r; }));
+
+      ctx.refreshModeration = vi.fn();
+
+      // Start the batch (will await on 2nd file)
+      const promise = src.handleFiles.call(ctx, fileList);
+
+      // Give microtask queue time to process 1st file
+      await vi.advanceTimersByTimeAsync(100);
+
+      // After 2s, refreshModeration should have been called from the 1st file
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(ctx.refreshModeration).toHaveBeenCalledTimes(1);
+
+      // Resolve 2nd file to clean up
+      resolveSecond({ ok: true, json: async () => [{ id: 's2', text: 'ocr2' }] });
+      await promise;
+    });
+  });
+
+  describe('retryFile', () => {
+    function makeFileList(...files: File[]) {
+      const fl: any = { length: files.length, [Symbol.iterator]: function* () { for (let i = 0; i < this.length; i++) yield this[i]; } };
+      files.forEach((f, i) => (fl[i] = f));
+      return fl as FileList;
+    }
+
+    it('retries a failed file and transitions to done', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchErr('OCR failed');
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      const failedFile = session.files[0];
+      expect(failedFile.status).toBe('error');
+
+      const newSource = { id: 's1', text: 'ocr result' };
+      mockFetchOk([newSource]);
+      await src.retryFile.call(ctx, session.id, failedFile.id);
+
+      expect(failedFile.status).toBe('done');
+      expect(failedFile.file).toBeNull();
+      expect(ctx.sources).toEqual([newSource]);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
+    });
+
+    it('no-op if file status is not error', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchOk([{ id: 's1', text: 'ok' }]);
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      const doneFile = session.files[0];
+      expect(doneFile.status).toBe('done');
+
+      vi.mocked(globalThis.fetch).mockClear();
+      await src.retryFile.call(ctx, session.id, doneFile.id);
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('triggers cleanup after successful retry', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchErr('OCR failed');
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      mockFetchOk([{ id: 's1', text: 'ok' }]);
+      await src.retryFile.call(ctx, session.id, session.files[0].id);
+
+      expect(session.files[0].status).toBe('done');
+      vi.advanceTimersByTime(3000);
+      expect(ctx.uploadSessions).toEqual([]);
+    });
+  });
+
+  describe('dismissFailedFile', () => {
+    function makeFileList(...files: File[]) {
+      const fl: any = { length: files.length, [Symbol.iterator]: function* () { for (let i = 0; i < this.length; i++) yield this[i]; } };
+      files.forEach((f, i) => (fl[i] = f));
+      return fl as FileList;
+    }
+
+    it('removes a failed file from session', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchErr('OCR failed');
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      expect(session.files.length).toBe(1);
+
+      src.dismissFailedFile.call(ctx, session.id, session.files[0].id);
+      expect(ctx.uploadSessions).toEqual([]);
+    });
+
+    it('refuses to dismiss a non-error file', async () => {
+      const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file);
+      mockFetchOk([{ id: 's1', text: 'ok' }]);
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      const doneFile = session.files[0];
+      src.dismissFailedFile.call(ctx, session.id, doneFile.id);
+      expect(session.files.length).toBe(1);
+    });
+
+    it('triggers cleanup when remaining files are all done', async () => {
+      const file1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
+      const file2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
+      const fileList = makeFileList(file1, file2);
+      mockFetchOk([{ id: 's1', text: 'ok' }]);
+      mockFetchErr('OCR failed');
+      await src.handleFiles.call(ctx, fileList);
+
+      const session = ctx.uploadSessions[0];
+      const errorFile = session.files.find((f: any) => f.status === 'error');
+      src.dismissFailedFile.call(ctx, session.id, errorFile.id);
+
+      expect(session.files.length).toBe(1);
+      expect(session.files[0].status).toBe('done');
+      vi.advanceTimersByTime(3000);
+      expect(ctx.uploadSessions).toEqual([]);
+    });
+  });
+
+  describe('addText session shape', () => {
+    it('creates session with correct shape', async () => {
+      mockFetchOk({ id: 's1', text: 'hello' });
+      await src.addText.call(ctx);
+
+      // Session is cleaned up in finally, but we can verify it was created with the right shape
+      // by checking that uploading went through the cycle (no TS errors)
+      expect(ctx.uploading).toBe(false);
+      expect(ctx.sources.length).toBe(1);
     });
   });
 

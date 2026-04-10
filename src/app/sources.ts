@@ -1,5 +1,93 @@
 import { addCostDelta } from './cost-utils';
 
+type UploadResult = 'applied' | 'ignored' | 'failed';
+
+function _isSessionActive(ctx: any, session: any): boolean {
+  return !!ctx.uploadSessions.find((s: any) => s.id === session.id)
+    && ctx.currentProjectId === session.projectId;
+}
+
+async function _uploadSingleFile(this: any, session: any, fileId: string): Promise<UploadResult> {
+  if (!_isSessionActive(this, session)) return 'ignored';
+  const file = session.files.find((f: any) => f.id === fileId);
+  if (!file || !file.file) return 'ignored';
+
+  file.status = 'uploading';
+  file.errorMsg = null;
+  this.$nextTick(() => this.refreshIcons());
+
+  const formData = new FormData();
+  formData.append('files', file.file, file.name);
+  formData.append('lang', this.locale);
+
+  try {
+    const res = await fetch(`/api/projects/${session.projectId}/sources/upload`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!_isSessionActive(this, session)) return 'ignored';
+
+    if (!res.ok) {
+      let resolved: string;
+      try {
+        const err = await res.json();
+        if (!_isSessionActive(this, session)) return 'ignored';
+        resolved = this.resolveError(err.error || res.statusText);
+      } catch {
+        if (!_isSessionActive(this, session)) return 'ignored';
+        resolved = res.statusText;
+      }
+      file.status = 'error';
+      file.errorMsg = resolved;
+      this.$nextTick(() => this.refreshIcons());
+      this.showToast(this.t('toast.error', { error: resolved }), 'error');
+      return 'failed';
+    }
+
+    const newSources = await res.json();
+    if (!_isSessionActive(this, session)) return 'ignored';
+
+    this.sources.push(...newSources);
+    this.selectedIds.push(...newSources.map((s: any) => s.id));
+    for (const s of newSources) addCostDelta(this, s.estimatedCost, 'sources/upload');
+    file.file = null;
+    file.status = 'done';
+    this.$nextTick(() => this.refreshIcons());
+    if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
+      const ctx = this;
+      setTimeout(() => { if (_isSessionActive(ctx, session)) ctx.refreshModeration(); }, 2000);
+    }
+    return 'applied';
+  } catch (e: any) {
+    if (!_isSessionActive(this, session)) return 'ignored';
+    file.status = 'error';
+    file.errorMsg = e.message;
+    this.$nextTick(() => this.refreshIcons());
+    this.showToast(
+      this.t('toast.uploadError', { filename: file.name, error: e.message }),
+      'error',
+    );
+    return 'failed';
+  }
+}
+
+function _scheduleConsigneRefresh(this: any, projectId: string) {
+  setTimeout(() => { if (this.currentProjectId === projectId) this.refreshConsigne(); }, 3000);
+}
+
+function _maybeCleanupSession(this: any, sessionId: string) {
+  const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+  if (!session || session.cleanupScheduled || session.files.length === 0) return;
+  if (session.files.every((f: any) => f.status === 'done')) {
+    session.cleanupScheduled = true;
+    setTimeout(() => {
+      this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
+      this.$nextTick(() => this.refreshIcons());
+    }, 3000);
+  }
+}
+
 export function createSources() {
   return {
     handleDrop(this: any, e: DragEvent) {
@@ -8,74 +96,73 @@ export function createSources() {
     },
 
     async handleFiles(this: any, fileList: FileList | undefined | null) {
-      if (!fileList || fileList.length === 0 || !this.currentProjectId) return;
+      const projectId = this.currentProjectId;
+      if (!fileList || fileList.length === 0 || !projectId) return;
 
       const sessionId = crypto.randomUUID();
-      const files = Array.from(fileList).map((f) => ({ name: f.name, status: 'pending' as const }));
-      this.uploadSessions.push({ id: sessionId, files });
+      const files = Array.from(fileList).map((f) => ({
+        id: crypto.randomUUID(), name: f.name, file: f as File | null,
+        status: 'pending' as const, errorMsg: null as string | null,
+      }));
+      this.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
       this.$nextTick(() => this.refreshIcons());
 
       const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+      let appliedCount = 0;
+      let interrupted = false;
 
-      for (let i = 0; i < fileList.length; i++) {
-        const f = fileList[i];
-        session.files[i].status = 'uploading';
-        this.$nextTick(() => this.refreshIcons());
-
-        const formData = new FormData();
-        formData.append('files', f);
-        formData.append('lang', this.locale);
-        try {
-          const res = await fetch(this.apiBase() + '/sources/upload', {
-            method: 'POST',
-            body: formData,
-          });
-          if (!res.ok) {
-            const err = await res.json();
-            session.files[i].status = 'error';
-            this.showToast(
-              this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
-              'error',
-            );
-            continue;
-          }
-          const newSources = await res.json();
-          this.sources.push(...newSources);
-          this.selectedIds.push(...newSources.map((s: any) => s.id));
-          for (const s of newSources) addCostDelta(this, s.estimatedCost, 'sources/upload');
-          session.files[i].status = 'done';
-          if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
-            setTimeout(() => this.refreshModeration(), 2000);
-          }
-        } catch (e: any) {
-          session.files[i].status = 'error';
-          this.showToast(
-            this.t('toast.uploadError', { filename: f.name, error: e.message }),
-            'error',
-          );
-        }
-        this.$nextTick(() => this.refreshIcons());
+      for (const fileEntry of session.files) {
+        const result = await _uploadSingleFile.call(this, session, fileEntry.id);
+        if (result === 'ignored') { interrupted = true; break; }
+        if (result === 'applied') appliedCount++;
       }
 
-      if (session.files.some((f: any) => f.status === 'done')) {
+      if (appliedCount > 0 && !interrupted && this.currentProjectId === projectId) {
         this.showToast(this.t('toast.sourcesAdded'), 'success');
+        _scheduleConsigneRefresh.call(this, projectId);
       }
+      _maybeCleanupSession.call(this, sessionId);
+    },
 
-      setTimeout(() => {
+    async retryFile(this: any, sessionId: string, fileId: string) {
+      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+      if (!session) return;
+      const file = session.files.find((f: any) => f.id === fileId);
+      if (!file || file.status !== 'error') return;
+
+      const result = await _uploadSingleFile.call(this, session, fileId);
+      if (result === 'applied') {
+        this.showToast(this.t('toast.sourcesAdded'), 'success');
+        _scheduleConsigneRefresh.call(this, session.projectId);
+      }
+      _maybeCleanupSession.call(this, sessionId);
+    },
+
+    dismissFailedFile(this: any, sessionId: string, fileId: string) {
+      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+      if (!session) return;
+      const file = session.files.find((f: any) => f.id === fileId);
+      if (!file || file.status !== 'error') return;
+
+      session.files = session.files.filter((f: any) => f.id !== fileId);
+      if (session.files.length === 0) {
         this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
-      }, 3000);
-
+      } else {
+        _maybeCleanupSession.call(this, sessionId);
+      }
       this.$nextTick(() => this.refreshIcons());
-      setTimeout(() => this.refreshConsigne(), 3000);
-      setTimeout(() => this.refreshModeration(), 2000);
     },
 
     async addText(this: any) {
       const text = this.textInput.trim();
-      if (!text || !this.currentProjectId) return;
+      const projectId = this.currentProjectId;
+      if (!text || !projectId) return;
 
       const sessionId = crypto.randomUUID();
-      this.uploadSessions.push({ id: sessionId, files: [{ name: 'text', status: 'uploading' as const }] });
+      this.uploadSessions.push({
+        id: sessionId, projectId, cleanupScheduled: false,
+        files: [{ id: crypto.randomUUID(), name: 'text', file: null, status: 'uploading' as const, errorMsg: null }],
+      });
 
       try {
         const res = await fetch(this.apiBase() + '/sources/text', {
@@ -181,6 +268,7 @@ export function createSources() {
       this.viewSource = null;
     },
 
+    /* refreshModeration is public — helpers above are internal */
     async refreshModeration(this: any, retries = 3) {
       if (!this.currentProjectId) return;
       try {

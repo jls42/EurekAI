@@ -31,9 +31,19 @@ export function createState() {
     selectedIds: [] as string[],
     uploadSessions: [] as Array<{
       id: string;
-      files: Array<{ name: string; status: 'pending' | 'uploading' | 'done' | 'error' }>;
+      projectId: string;
+      cleanupScheduled: boolean;
+      files: Array<{
+        id: string;
+        name: string;
+        file: File | null;
+        status: 'pending' | 'uploading' | 'done' | 'error';
+        errorMsg: string | null;
+      }>;
     }>,
-    get uploading(): boolean { return this.uploadSessions.length > 0; },
+    get uploading(): boolean {
+      return this.uploadSessions.some(s => s.files.some(f => f.status === 'pending' || f.status === 'uploading'));
+    },
     dragging: false,
     viewSource: null as any,
     viewSourceMode: 'ocr' as string,

@@ -148,6 +148,8 @@ describe('app', () => {
     expect(typeof a.handleFiles).toBe('function');
     expect(typeof a.addText).toBe('function');
     expect(typeof a.deleteSource).toBe('function');
+    expect(typeof a.retryFile).toBe('function');
+    expect(typeof a.dismissFailedFile).toBe('function');
   });
 
   it('includes recorder methods from createRecorder', () => {
