@@ -1030,6 +1030,10 @@ describe('ocrConfidenceTier', () => {
     expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.69 } })).toBe('low');
     expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.0 } })).toBe('low');
   });
+
+  it('returns null for NaN average', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: NaN } })).toBeNull();
+  });
 });
 
 describe('ocrConfidencePercent', () => {
@@ -1042,6 +1046,10 @@ describe('ocrConfidencePercent', () => {
     expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.934 } })).toBe('93%');
     expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 1.0 } })).toBe('100%');
     expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.0 } })).toBe('0%');
+  });
+
+  it('returns empty string for NaN average', () => {
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: NaN } })).toBe('');
   });
 });
 
@@ -1089,6 +1097,27 @@ describe('ocrConfidenceIcon', () => {
   });
 });
 
+describe('ocrConfidenceToneClass', () => {
+  it('returns success class for high tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.95 } }))
+      .toBe('text-success-dark');
+  });
+
+  it('returns warning class for medium tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.8 } }))
+      .toBe('text-warning-dark');
+  });
+
+  it('returns danger class for low tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.5 } }))
+      .toBe('text-danger-dark');
+  });
+
+  it('returns primary class when no confidence', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, {})).toBe('text-text-primary');
+  });
+});
+
 // --- Moderation helpers ---
 
 describe('moderationStatus', () => {
@@ -1103,6 +1132,10 @@ describe('moderationStatus', () => {
     expect(helpers.moderationStatus({})).toBeNull();
     expect(helpers.moderationStatus(null)).toBeNull();
     expect(helpers.moderationStatus(undefined)).toBeNull();
+  });
+
+  it('preserves empty string status instead of coercing to null', () => {
+    expect(helpers.moderationStatus({ moderation: { status: '' } })).toBe('');
   });
 });
 
@@ -1288,6 +1321,20 @@ describe('showOcrPopover', () => {
     expect(ctx._metaPopoverTitle).toBe('ocr.confidence');
     expect(ctx._metaPopoverLines).toEqual(['95%']);
     expect(ctx._metaPopoverLineClass).toContain('font-semibold');
+  });
+
+  it('uses warning tone for medium confidence', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, { ocrConfidence: { average: 0.75 } });
+    expect(ctx._metaPopoverLines).toEqual(['75%']);
+    expect(ctx._metaPopoverLineClass).toContain('text-warning-dark');
+  });
+
+  it('uses danger tone for low confidence', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, { ocrConfidence: { average: 0.5 } });
+    expect(ctx._metaPopoverLines).toEqual(['50%']);
+    expect(ctx._metaPopoverLineClass).toContain('text-danger-dark');
   });
 });
 

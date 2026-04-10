@@ -1023,6 +1023,7 @@ describe('POST /:pid/sources/upload', () => {
     expect(results[0].filename).toBe('devoir.jpg');
     expect(results[0].markdown).toBe('# OCR result');
     expect(results[0].sourceType).toBe('ocr');
+    expect(results[0].ocrConfidence).toBeUndefined();
     expect(results[0].filePath).toContain('uuid-devoir.jpg');
     expect(results[1].filename).toBe('cours.pdf');
 

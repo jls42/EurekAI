@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { Mistral } from '@mistralai/mistralai';
+import { logger } from '../helpers/logger.js';
 import { timer } from '../helpers/index.js';
 import type { OcrConfidence } from '../types.js';
 
@@ -33,11 +34,16 @@ export async function ocrFile(
 
   // Extraire les scores de confiance (graceful degradation)
   const confidence = extractConfidence(ocrResult.pages);
+  if (!confidence && ocrResult.pages.length > 0) {
+    logger.warn('ocr', `confidence scores requested but not returned for "${fileName}" (${ocrResult.pages.length} pages)`);
+  }
 
   // Cleanup fichier uploade
   try {
     await client.files.delete({ fileId: uploaded.id });
-  } catch {}
+  } catch (e) {
+    logger.warn('ocr', `file cleanup failed for ${fileName}:`, e);
+  }
 
   return { markdown, elapsed, confidence };
 }
@@ -52,7 +58,9 @@ function extractConfidence(
       && Number.isFinite(p.confidenceScores.minimumPageConfidenceScore),
   );
   if (scored.length === 0) return undefined;
-  const avg = scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
-  const min = Math.min(...scored.map((p) => p.confidenceScores!.minimumPageConfidenceScore));
+  const rawAvg = scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
+  const rawMin = Math.min(...scored.map((p) => p.confidenceScores!.minimumPageConfidenceScore));
+  const avg = Math.max(0, Math.min(1, rawAvg));
+  const min = Math.max(0, Math.min(1, rawMin));
   return { average: avg, minimum: min };
 }

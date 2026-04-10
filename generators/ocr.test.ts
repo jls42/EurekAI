@@ -5,6 +5,11 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...orig, readFileSync: vi.fn(() => Buffer.from('fake-file-content')) };
 });
 
+const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+vi.mock('../helpers/logger.js', () => ({
+  logger: { info: vi.fn(), warn: loggerWarn, error: vi.fn() },
+}));
+
 import { ocrFile } from './ocr.js';
 
 function createClient(pages = [{ markdown: '# Page 1' }]) {
@@ -104,5 +109,36 @@ describe('ocrFile', () => {
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(result.markdown).toBe('# Page 1');
+  });
+
+  it('logs warning when cleanup fails', async () => {
+    loggerWarn.mockClear();
+    const client = createClient();
+    client.files.delete.mockRejectedValue(new Error('delete failed'));
+
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(loggerWarn).toHaveBeenCalledWith('ocr', expect.stringContaining('file cleanup failed'), expect.any(Error));
+  });
+
+  it('clamps confidence scores to [0, 1] range', async () => {
+    const pages = [
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5, minimumPageConfidenceScore: -0.2 } },
+    ];
+    const client = createClient(pages);
+    const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(result.confidence!.average).toBe(1);
+    expect(result.confidence!.minimum).toBe(0);
+  });
+
+  it('logs warning when confidence scores are requested but not returned', async () => {
+    loggerWarn.mockClear();
+    const pages = [{ markdown: '# P1' }];
+    const client = createClient(pages);
+
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(loggerWarn).toHaveBeenCalledWith('ocr', expect.stringContaining('confidence scores requested but not returned'));
   });
 });

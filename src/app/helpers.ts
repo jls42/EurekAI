@@ -137,6 +137,7 @@ export function createHelpers() {
     ocrConfidenceTier(src: any): string | null {
       if (!src?.ocrConfidence) return null;
       const avg = src.ocrConfidence.average;
+      if (!Number.isFinite(avg)) return null;
       if (avg >= 0.9) return 'high';
       if (avg >= 0.7) return 'medium';
       return 'low';
@@ -151,7 +152,7 @@ export function createHelpers() {
     },
 
     ocrConfidencePercent(src: any) {
-      if (!src?.ocrConfidence) return '';
+      if (!src?.ocrConfidence || !Number.isFinite(src.ocrConfidence.average)) return '';
       return Math.round(src.ocrConfidence.average * 100) + '%';
     },
 
@@ -172,7 +173,7 @@ export function createHelpers() {
     },
 
     moderationStatus(src: any): string | null {
-      return src?.moderation?.status || null;
+      return src?.moderation?.status ?? null;
     },
 
     moderationBadgeColor(this: any, src: any) {

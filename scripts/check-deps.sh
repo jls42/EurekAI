@@ -9,7 +9,7 @@ npm outdated 2>/dev/null || true
 echo ""
 echo "=== Critical SDK versions ==="
 for pkg in @mistralai/mistralai @elevenlabs/elevenlabs-js; do
-  current=$(node -e "try{const v=require('$pkg/package.json').version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
+  current=$(node -e "try{const v=JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
   latest=$(npm view "$pkg" version 2>/dev/null | sed 's/^v//' || echo "N/A")
   if [ "$current" = "$latest" ]; then
     echo "  ✓ $pkg: $current"
@@ -124,7 +124,7 @@ for entry in "${WATCHED_PKGS[@]}"; do
   IFS='|' read -r pkg repo <<< "$entry"
 
   # Installed version
-  cur=$(node -e "try{console.log(require('$pkg/package.json').version)}catch{console.log('?')}" 2>/dev/null)
+  cur=$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version)}catch{console.log('?')}" 2>/dev/null)
 
   # Since date from state (or default)
   since=$(echo "$state_json" | node -e "
@@ -181,6 +181,7 @@ for entry in "${WATCHED_PKGS[@]}"; do
         const all=JSON.parse(d.join(''));
         const newer=all.filter(r=>r.published_at&&new Date(r.published_at)>new Date(since));
         if(!newer.length){fs.writeFileSync(tmpFile,'$now');console.log('  (no new releases since '+since.slice(0,10)+')');return;}
+        newer.sort((a,b)=>new Date(a.published_at)-new Date(b.published_at));
         const batch=newer.slice(0,max);
         const remaining=newer.length-batch.length;
         for(const r of batch){
@@ -203,18 +204,18 @@ for entry in "${WATCHED_PKGS[@]}"; do
         const s=JSON.parse(d.join(''));
         s[process.argv[1]]={checkedAt:process.argv[2]};
         console.log(JSON.stringify(s));
-      }catch{console.log(d.join(''));}
+      }catch(e){console.error('WARN: state update failed for '+process.argv[1]+': '+e.message);console.log(d.join(''));}
     })
-  " "$pkg" "${new_checked_at:-$now}" 2>/dev/null)
+  " "$pkg" "${new_checked_at:-$now}")
 done
 
 # Save state file
 echo "$state_json" | node -e "
   const fs=require('fs');
   const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
-    try{fs.writeFileSync('$STATE_FILE',JSON.stringify(JSON.parse(d.join('')),null,2));}catch{}
+    try{fs.writeFileSync('$STATE_FILE',JSON.stringify(JSON.parse(d.join('')),null,2));}catch(e){console.error('WARN: failed to save state: '+e.message);}
   })
-" 2>/dev/null
+"
 echo ""
 echo "  (state saved to $STATE_FILE)"
 
