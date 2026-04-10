@@ -52,10 +52,13 @@ export function createState() {
     showTextInput: false,
     showWebInput: false,
 
-    // Cost popover hover state
-    _costHover: null as string | null,
-    _costPos: null as DOMRect | null,
-    _costData: null as any,
+    // Shared badge popover hover state
+    _metaPopoverPos: null as DOMRect | null,
+    _metaPopoverTitle: '',
+    _metaPopoverLines: [] as string[],
+    _metaPopoverLineClass: 'text-text-secondary',
+    _metaPopoverFooter: '',
+    _metaPopoverFooterClass: 'text-text-primary',
 
     // Voice recording
     recording: false,

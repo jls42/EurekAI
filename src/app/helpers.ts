@@ -163,6 +163,122 @@ export function createHelpers() {
       return '';
     },
 
+    ocrConfidenceToneClass(src: any) {
+      const tier = this.ocrConfidenceTier(src);
+      if (tier === 'high') return 'text-success-dark';
+      if (tier === 'medium') return 'text-warning-dark';
+      if (tier === 'low') return 'text-danger-dark';
+      return 'text-text-primary';
+    },
+
+    moderationStatus(src: any): string | null {
+      return src?.moderation?.status || null;
+    },
+
+    moderationBadgeColor(this: any, src: any) {
+      const status = this.moderationStatus(src);
+      if (status === 'safe') return 'bg-success-light text-success-dark';
+      if (status === 'unsafe') return 'bg-danger-light text-danger-dark';
+      if (status === 'pending') return 'bg-primary-light text-primary';
+      if (status === 'error') return 'bg-warning-light text-warning-dark';
+      return '';
+    },
+
+    moderationBadgeIcon(this: any, src: any) {
+      const status = this.moderationStatus(src);
+      if (status === 'safe') return 'shield-check';
+      if (status === 'unsafe') return 'shield-alert';
+      if (status === 'pending') return 'loader-circle';
+      if (status === 'error') return 'shield-x';
+      return '';
+    },
+
+    moderationBadgeIconClass(this: any, src: any) {
+      return this.moderationStatus(src) === 'pending' ? 'animate-spin' : '';
+    },
+
+    moderationBadgeTitle(this: any, src: any) {
+      const status = this.moderationStatus(src);
+      if (status === 'safe') return this.t('moderation.safe');
+      if (status === 'unsafe') {
+        const labels = this.flaggedCategoryLabels(src);
+        return labels ? `${this.t('moderation.unsafe')} — ${labels}` : this.t('moderation.unsafe');
+      }
+      if (status === 'pending') return this.t('moderation.pending');
+      if (status === 'error') return this.t('moderation.error');
+      return '';
+    },
+
+    moderationToneClass(this: any, src: any) {
+      const status = this.moderationStatus(src);
+      if (status === 'safe') return 'text-success-dark';
+      if (status === 'unsafe') return 'text-danger-dark';
+      if (status === 'pending') return 'text-primary';
+      if (status === 'error') return 'text-warning-dark';
+      return 'text-text-primary';
+    },
+
+    showMetaPopover(this: any, el: HTMLElement, config: any) {
+      this._metaPopoverPos = el.getBoundingClientRect();
+      this._metaPopoverTitle = config?.title || '';
+      this._metaPopoverLines = config?.lines || [];
+      this._metaPopoverLineClass = config?.lineClass || 'text-text-secondary';
+      this._metaPopoverFooter = config?.footer || '';
+      this._metaPopoverFooterClass = config?.footerClass || 'text-text-primary';
+    },
+
+    hideMetaPopover(this: any) {
+      this._metaPopoverPos = null;
+      this._metaPopoverTitle = '';
+      this._metaPopoverLines = [];
+      this._metaPopoverLineClass = 'text-text-secondary';
+      this._metaPopoverFooter = '';
+      this._metaPopoverFooterClass = 'text-text-primary';
+    },
+
+    metaPopoverStyle(this: any) {
+      if (!this._metaPopoverPos) return 'display:none';
+      const pos = this._metaPopoverPos;
+      const vertical =
+        pos.top > 200
+          ? 'bottom:' + (window.innerHeight - pos.top + 4) + 'px'
+          : 'top:' + (pos.bottom + 4) + 'px';
+      return vertical + ';left:' + pos.left + 'px';
+    },
+
+    showCostPopover(this: any, el: HTMLElement, item: any) {
+      const lines =
+        item?.costBreakdown?.length
+          ? item.costBreakdown
+          : item?.usage
+            ? [`${item.usage.totalTokens} tokens · ${item.usage.callCount} appel(s) API`]
+            : [];
+      this.showMetaPopover(el, {
+        title: this.t('gen.estimatedCost'),
+        lines,
+        lineClass: 'text-text-secondary font-mono',
+        footer: item?.estimatedCost != null ? 'Total: ~$' + item.estimatedCost.toFixed(4) : '',
+        footerClass: 'text-accent',
+      });
+    },
+
+    showOcrPopover(this: any, el: HTMLElement, src: any) {
+      this.showMetaPopover(el, {
+        title: this.t('ocr.confidence'),
+        lines: [this.ocrConfidencePercent(src)],
+        lineClass: this.ocrConfidenceToneClass(src) + ' font-semibold',
+      });
+    },
+
+    showModerationPopover(this: any, el: HTMLElement, src: any) {
+      const labels = this.flaggedCategoryLabels(src);
+      this.showMetaPopover(el, {
+        title: this.moderationBadgeTitle(src),
+        lines: labels ? [labels] : [],
+        lineClass: labels ? 'text-text-secondary' : this.moderationToneClass(src) + ' font-semibold',
+      });
+    },
+
     resolveSourceRef(ref: string, allSources: any[]) {
       const numMatch = /source\s*(\d+)/i.exec(ref);
       if (numMatch) {

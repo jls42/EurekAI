@@ -170,6 +170,16 @@ h6 {
 }
 
 /* ====== Source badges ====== */
+.source-meta-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-badge);
+  line-height: 1;
+  vertical-align: middle;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 .source-badge {
   display: inline-flex;
   align-items: center;

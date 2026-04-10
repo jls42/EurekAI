@@ -1,0 +1,20 @@
+<!-- Moderation badge for sources -->
+<!-- Params: sourceRef, badgeClass, wrapperClass, iconClass -->
+<template x-if="{{sourceRef}}.moderation?.status">
+  <span
+    class="inline-block {{wrapperClass}}"
+    @mouseenter="showModerationPopover($el, {{sourceRef}})"
+    @mouseleave="hideMetaPopover()"
+  >
+    <span
+      class="source-meta-pill {{badgeClass}} cursor-pointer"
+      :class="moderationBadgeColor({{sourceRef}})"
+    >
+      <i
+        :data-lucide="moderationBadgeIcon({{sourceRef}})"
+        class="{{iconClass}}"
+        :class="moderationBadgeIconClass({{sourceRef}})"
+      ></i>
+    </span>
+  </span>
+</template>
