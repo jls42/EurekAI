@@ -189,7 +189,7 @@ for entry in "${WATCHED_PKGS[@]}"; do
           const body=(r.body||'(no notes)').slice(0,1000).split('\n').map(l=>'  '+l).join('\n');
           console.log(body);
         }
-        if(remaining>0) console.log('  (+'+remaining+' older releases not shown — rerun to see more)');
+        if(remaining>0) console.log('  (+'+remaining+' newer releases not shown — rerun to see more)');
         fs.writeFileSync(tmpFile,remaining>0?batch[batch.length-1].published_at:'$now');
       }catch(e){console.log('  (error: '+e.message+')');fs.writeFileSync(tmpFile,'$since');}
     })
