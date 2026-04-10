@@ -3,14 +3,37 @@ import { addCostDelta } from './cost-utils';
 type UploadResult = 'applied' | 'ignored' | 'failed';
 
 function _isSessionActive(ctx: any, session: any): boolean {
-  return !!ctx.uploadSessions.find((s: any) => s.id === session.id)
+  return ctx.uploadSessions.some((s: any) => s.id === session.id)
     && ctx.currentProjectId === session.projectId;
+}
+
+async function _resolveHttpError(ctx: any, session: any, res: Response): Promise<string | null> {
+  try {
+    const err = await res.json();
+    if (!_isSessionActive(ctx, session)) return null;
+    return ctx.resolveError(err.error || res.statusText);
+  } catch {
+    if (!_isSessionActive(ctx, session)) return null;
+    return res.statusText;
+  }
+}
+
+function _applyUploadSuccess(ctx: any, session: any, file: any, newSources: any[]) {
+  ctx.sources.push(...newSources);
+  ctx.selectedIds.push(...newSources.map((s: any) => s.id));
+  for (const s of newSources) addCostDelta(ctx, s.estimatedCost, 'sources/upload');
+  file.file = null;
+  file.status = 'done';
+  ctx.$nextTick(() => ctx.refreshIcons());
+  if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
+    setTimeout(() => { if (_isSessionActive(ctx, session)) ctx.refreshModeration(); }, 2000);
+  }
 }
 
 async function _uploadSingleFile(this: any, session: any, fileId: string): Promise<UploadResult> {
   if (!_isSessionActive(this, session)) return 'ignored';
   const file = session.files.find((f: any) => f.id === fileId);
-  if (!file || !file.file) return 'ignored';
+  if (!file?.file) return 'ignored';
 
   file.status = 'uploading';
   file.errorMsg = null;
@@ -29,15 +52,8 @@ async function _uploadSingleFile(this: any, session: any, fileId: string): Promi
     if (!_isSessionActive(this, session)) return 'ignored';
 
     if (!res.ok) {
-      let resolved: string;
-      try {
-        const err = await res.json();
-        if (!_isSessionActive(this, session)) return 'ignored';
-        resolved = this.resolveError(err.error || res.statusText);
-      } catch {
-        if (!_isSessionActive(this, session)) return 'ignored';
-        resolved = res.statusText;
-      }
+      const resolved = await _resolveHttpError(this, session, res);
+      if (resolved === null) return 'ignored';
       file.status = 'error';
       file.errorMsg = resolved;
       this.$nextTick(() => this.refreshIcons());
@@ -48,16 +64,7 @@ async function _uploadSingleFile(this: any, session: any, fileId: string): Promi
     const newSources = await res.json();
     if (!_isSessionActive(this, session)) return 'ignored';
 
-    this.sources.push(...newSources);
-    this.selectedIds.push(...newSources.map((s: any) => s.id));
-    for (const s of newSources) addCostDelta(this, s.estimatedCost, 'sources/upload');
-    file.file = null;
-    file.status = 'done';
-    this.$nextTick(() => this.refreshIcons());
-    if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
-      const ctx = this;
-      setTimeout(() => { if (_isSessionActive(ctx, session)) ctx.refreshModeration(); }, 2000);
-    }
+    _applyUploadSuccess(this, session, file, newSources);
     return 'applied';
   } catch (e: any) {
     if (!_isSessionActive(this, session)) return 'ignored';
@@ -128,7 +135,7 @@ export function createSources() {
       const session = this.uploadSessions.find((s: any) => s.id === sessionId);
       if (!session) return;
       const file = session.files.find((f: any) => f.id === fileId);
-      if (!file || file.status !== 'error') return;
+      if (file?.status !== 'error') return;
 
       const result = await _uploadSingleFile.call(this, session, fileId);
       if (result === 'applied') {
@@ -142,7 +149,7 @@ export function createSources() {
       const session = this.uploadSessions.find((s: any) => s.id === sessionId);
       if (!session) return;
       const file = session.files.find((f: any) => f.id === fileId);
-      if (!file || file.status !== 'error') return;
+      if (file?.status !== 'error') return;
 
       session.files = session.files.filter((f: any) => f.id !== fileId);
       if (session.files.length === 0) {
