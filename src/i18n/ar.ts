@@ -189,8 +189,6 @@ export const ar: Record<string, string> = {
   'sourceBadge.voice': '\u0635\u0648\u062a',
   'sourceBadge.web': '\u0648\u064a\u0628',
   'ocr.confidence': '\u062B\u0642\u0629 OCR',
-  'ocr.avg': '\u0645\u062A\u0648\u0633\u0637',
-  'ocr.min': '\u0623\u062F\u0646\u0649',
 
   'summary.heading': '\u0645\u0644\u062e\u0651\u0635\u0627\u062a \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629',
   'summary.new': '\u0645\u0644\u062e\u0651\u0635 \u062c\u062f\u064a\u062f',

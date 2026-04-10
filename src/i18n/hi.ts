@@ -189,8 +189,6 @@ export const hi: Record<string, string> = {
   'sourceBadge.voice': '\u0906\u0935\u093E\u091C\u093C',
   'sourceBadge.web': '\u0935\u0947\u092C',
   'ocr.confidence': 'OCR \u0935\u093F\u0936\u094D\u0935\u0938\u0928\u0940\u092F\u0924\u093E',
-  'ocr.avg': '\u0914\u0938\u0924',
-  'ocr.min': '\u0928\u094D\u092F\u0942\u0928\u0924\u092E',
 
   'summary.heading': '\u0905\u0927\u094D\u092F\u092F\u0928 \u0928\u094B\u091F\u094D\u0938',
   'summary.new': '\u0928\u092F\u093E \u0928\u094B\u091F',
