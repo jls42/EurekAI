@@ -42,25 +42,25 @@ export async function ocrFile(
   try {
     await client.files.delete({ fileId: uploaded.id });
   } catch (e) {
-    logger.warn('ocr', `file cleanup failed for ${fileName}:`, e);
+    logger.error('ocr', `file cleanup failed for ${fileName}:`, e);
   }
 
   return { markdown, elapsed, confidence };
 }
 
 function extractConfidence(
-  pages: Array<{ confidenceScores?: { averagePageConfidenceScore: number; minimumPageConfidenceScore: number } | null }>,
+  pages: Array<{ confidenceScores?: { averagePageConfidenceScore: number } | null }>,
 ): OcrConfidence | undefined {
   const scored = pages.filter(
     (p) =>
       p.confidenceScores
-      && Number.isFinite(p.confidenceScores.averagePageConfidenceScore)
-      && Number.isFinite(p.confidenceScores.minimumPageConfidenceScore),
+      && Number.isFinite(p.confidenceScores.averagePageConfidenceScore),
   );
   if (scored.length === 0) return undefined;
   const rawAvg = scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
-  const rawMin = Math.min(...scored.map((p) => p.confidenceScores!.minimumPageConfidenceScore));
   const avg = Math.max(0, Math.min(1, rawAvg));
-  const min = Math.max(0, Math.min(1, rawMin));
-  return { average: avg, minimum: min };
+  if (rawAvg !== avg) {
+    logger.warn('ocr', `confidence score out of [0,1] range (rawAvg=${rawAvg}), clamped to ${avg}`);
+  }
+  return { average: avg };
 }

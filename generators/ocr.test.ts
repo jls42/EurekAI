@@ -5,9 +5,12 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...orig, readFileSync: vi.fn(() => Buffer.from('fake-file-content')) };
 });
 
-const { loggerWarn } = vi.hoisted(() => ({ loggerWarn: vi.fn() }));
+const { loggerWarn, loggerError } = vi.hoisted(() => ({
+  loggerWarn: vi.fn(),
+  loggerError: vi.fn(),
+}));
 vi.mock('../helpers/logger.js', () => ({
-  logger: { info: vi.fn(), warn: loggerWarn, error: vi.fn() },
+  logger: { info: vi.fn(), warn: loggerWarn, error: loggerError },
 }));
 
 import { ocrFile } from './ocr.js';
@@ -50,16 +53,15 @@ describe('ocrFile', () => {
     expect(result.markdown).toBe('# Page 1\n\n## Page 2');
   });
 
-  it('extracts confidence scores when available', async () => {
+  it('extracts average confidence score when available', async () => {
     const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95, minimumPageConfidenceScore: 0.88 } },
-      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: 0.91, minimumPageConfidenceScore: 0.82 } },
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95 } },
+      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: 0.91 } },
     ];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(result.confidence!.average).toBeCloseTo(0.93, 5);
-    expect(result.confidence!.minimum).toBe(0.82);
   });
 
   it('returns undefined confidence when scores are null', async () => {
@@ -74,20 +76,20 @@ describe('ocrFile', () => {
 
   it('ignores pages with non-finite confidence scores', async () => {
     const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95, minimumPageConfidenceScore: 0.88 } },
-      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: undefined as any, minimumPageConfidenceScore: 0.7 } },
-      { markdown: '# P3', confidenceScores: { averagePageConfidenceScore: NaN, minimumPageConfidenceScore: 0.6 } },
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 0.95 } },
+      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: undefined as any } },
+      { markdown: '# P3', confidenceScores: { averagePageConfidenceScore: NaN } },
     ];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(result.confidence!.average).toBeCloseTo(0.95, 5);
-    expect(result.confidence!.minimum).toBe(0.88);
   });
 
   it('returns undefined confidence when all scores are non-finite', async () => {
     const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: NaN, minimumPageConfidenceScore: Infinity } },
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: NaN } },
+      { markdown: '# P2', confidenceScores: { averagePageConfidenceScore: Infinity } },
     ];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
@@ -111,25 +113,36 @@ describe('ocrFile', () => {
     expect(result.markdown).toBe('# Page 1');
   });
 
-  it('logs warning when cleanup fails', async () => {
-    loggerWarn.mockClear();
+  it('logs error when cleanup fails', async () => {
+    loggerError.mockClear();
     const client = createClient();
     client.files.delete.mockRejectedValue(new Error('delete failed'));
 
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
-    expect(loggerWarn).toHaveBeenCalledWith('ocr', expect.stringContaining('file cleanup failed'), expect.any(Error));
+    expect(loggerError).toHaveBeenCalledWith('ocr', expect.stringContaining('file cleanup failed'), expect.any(Error));
   });
 
-  it('clamps confidence scores to [0, 1] range', async () => {
+  it('clamps confidence score to [0, 1] range', async () => {
     const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5, minimumPageConfidenceScore: -0.2 } },
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } },
     ];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(result.confidence!.average).toBe(1);
-    expect(result.confidence!.minimum).toBe(0);
+  });
+
+  it('logs warning when confidence score is clamped', async () => {
+    loggerWarn.mockClear();
+    const pages = [
+      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } },
+    ];
+    const client = createClient(pages);
+
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(loggerWarn).toHaveBeenCalledWith('ocr', expect.stringContaining('out of [0,1] range'));
   });
 
   it('logs warning when confidence scores are requested but not returned', async () => {
