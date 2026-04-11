@@ -1005,3 +1005,387 @@ describe('defaultModerationCategories', () => {
     expect(result).toEqual([]);
   });
 });
+
+// --- OCR confidence helpers ---
+
+describe('ocrConfidenceTier', () => {
+  it('returns null when src has no ocrConfidence', () => {
+    expect(helpers.ocrConfidenceTier({})).toBeNull();
+    expect(helpers.ocrConfidenceTier(null)).toBeNull();
+    expect(helpers.ocrConfidenceTier(undefined)).toBeNull();
+  });
+
+  it('returns high for average >= 0.9', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.9 } })).toBe('high');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.95 } })).toBe('high');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 1.0 } })).toBe('high');
+  });
+
+  it('returns medium for 0.7 <= average < 0.9', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.7 } })).toBe('medium');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.89 } })).toBe('medium');
+  });
+
+  it('returns low for average < 0.7', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.69 } })).toBe('low');
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: 0.0 } })).toBe('low');
+  });
+
+  it('returns null for NaN average', () => {
+    expect(helpers.ocrConfidenceTier({ ocrConfidence: { average: NaN } })).toBeNull();
+  });
+});
+
+describe('ocrConfidencePercent', () => {
+  it('returns empty string when no ocrConfidence', () => {
+    expect(helpers.ocrConfidencePercent({})).toBe('');
+    expect(helpers.ocrConfidencePercent(null)).toBe('');
+  });
+
+  it('returns formatted percentage', () => {
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.934 } })).toBe('93%');
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 1.0 } })).toBe('100%');
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: 0.0 } })).toBe('0%');
+  });
+
+  it('returns empty string for NaN average', () => {
+    expect(helpers.ocrConfidencePercent({ ocrConfidence: { average: NaN } })).toBe('');
+  });
+});
+
+describe('ocrConfidenceColor', () => {
+  it('returns success classes for high tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.95 } });
+    expect(result).toBe('bg-success-light text-success-dark');
+  });
+
+  it('returns warning classes for medium tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.8 } });
+    expect(result).toBe('bg-warning-light text-warning-dark');
+  });
+
+  it('returns danger classes for low tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.5 } });
+    expect(result).toBe('bg-danger-light text-danger-dark');
+  });
+
+  it('returns empty string when no confidence', () => {
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, {});
+    expect(result).toBe('');
+  });
+});
+
+describe('ocrConfidenceIcon', () => {
+  it('returns check-circle for high tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.95 } });
+    expect(result).toBe('check-circle');
+  });
+
+  it('returns alert-circle for medium tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.8 } });
+    expect(result).toBe('alert-circle');
+  });
+
+  it('returns alert-triangle for low tier', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.5 } });
+    expect(result).toBe('alert-triangle');
+  });
+
+  it('returns empty string when no confidence', () => {
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, {});
+    expect(result).toBe('');
+  });
+});
+
+describe('ocrConfidenceToneClass', () => {
+  it('returns success class for high tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.95 } }))
+      .toBe('text-success-dark');
+  });
+
+  it('returns warning class for medium tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.8 } }))
+      .toBe('text-warning-dark');
+  });
+
+  it('returns danger class for low tier', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.5 } }))
+      .toBe('text-danger-dark');
+  });
+
+  it('returns primary class when no confidence', () => {
+    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, {})).toBe('text-text-primary');
+  });
+});
+
+// --- Moderation helpers ---
+
+describe('moderationStatus', () => {
+  it('returns status when present', () => {
+    expect(helpers.moderationStatus({ moderation: { status: 'safe' } })).toBe('safe');
+    expect(helpers.moderationStatus({ moderation: { status: 'unsafe' } })).toBe('unsafe');
+    expect(helpers.moderationStatus({ moderation: { status: 'pending' } })).toBe('pending');
+    expect(helpers.moderationStatus({ moderation: { status: 'error' } })).toBe('error');
+  });
+
+  it('returns null when no moderation', () => {
+    expect(helpers.moderationStatus({})).toBeNull();
+    expect(helpers.moderationStatus(null)).toBeNull();
+    expect(helpers.moderationStatus(undefined)).toBeNull();
+  });
+
+  it('preserves empty string status instead of coercing to null', () => {
+    expect(helpers.moderationStatus({ moderation: { status: '' } })).toBe('');
+  });
+});
+
+describe('moderationBadgeColor', () => {
+  it('returns correct classes for each status', () => {
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'safe' } }))
+      .toBe('bg-success-light text-success-dark');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'unsafe' } }))
+      .toBe('bg-danger-light text-danger-dark');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'pending' } }))
+      .toBe('bg-primary-light text-primary');
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'error' } }))
+      .toBe('bg-warning-light text-warning-dark');
+  });
+
+  it('returns empty string when no moderation', () => {
+    expect(callWith<string>(helpers.moderationBadgeColor, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationBadgeIcon', () => {
+  it('returns correct icons for each status', () => {
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'safe' } })).toBe('shield-check');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'unsafe' } })).toBe('shield-alert');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'pending' } })).toBe('loader-circle');
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'error' } })).toBe('shield-x');
+  });
+
+  it('returns empty string when no moderation', () => {
+    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationBadgeIconClass', () => {
+  it('returns animate-spin for pending', () => {
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'pending' } }))
+      .toBe('animate-spin');
+  });
+
+  it('returns empty string for other statuses', () => {
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'safe' } })).toBe('');
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'unsafe' } })).toBe('');
+    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, {})).toBe('');
+  });
+});
+
+describe('moderationToneClass', () => {
+  it('returns correct tone class for each status', () => {
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'safe' } })).toBe('text-success-dark');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'unsafe' } })).toBe('text-danger-dark');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'pending' } })).toBe('text-primary');
+    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'error' } })).toBe('text-warning-dark');
+  });
+
+  it('returns text-text-primary when no moderation', () => {
+    expect(callWith<string>(helpers.moderationToneClass, helpers, {})).toBe('text-text-primary');
+  });
+});
+
+describe('moderationBadgeTitle', () => {
+  const t = (key: string) => key;
+
+  it('returns translated title for safe/pending/error', () => {
+    const ctx = { ...helpers, t };
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'safe' } })).toBe('moderation.safe');
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'pending' } })).toBe('moderation.pending');
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'error' } })).toBe('moderation.error');
+  });
+
+  it('returns unsafe title with flagged categories when present', () => {
+    const ctx = {
+      ...helpers,
+      t,
+      flaggedCategoryLabels: () => 'violence, sexual',
+    };
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    expect(result).toBe('moderation.unsafe — violence, sexual');
+  });
+
+  it('returns unsafe title without categories when none flagged', () => {
+    const ctx = {
+      ...helpers,
+      t,
+      flaggedCategoryLabels: () => '',
+    };
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    expect(result).toBe('moderation.unsafe');
+  });
+
+  it('returns empty string when no moderation', () => {
+    const ctx = { ...helpers, t };
+    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, {})).toBe('');
+  });
+});
+
+// --- Meta popover helpers ---
+
+describe('hideMetaPopover', () => {
+  it('resets all popover state', () => {
+    const ctx = {
+      _metaPopoverPos: { top: 100 },
+      _metaPopoverTitle: 'Title',
+      _metaPopoverLines: ['line1'],
+      _metaPopoverLineClass: 'custom',
+      _metaPopoverFooter: 'footer',
+      _metaPopoverFooterClass: 'custom',
+    };
+    callWith<void>(helpers.hideMetaPopover, ctx);
+    expect(ctx._metaPopoverPos).toBeNull();
+    expect(ctx._metaPopoverTitle).toBe('');
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+    expect(ctx._metaPopoverFooter).toBe('');
+    expect(ctx._metaPopoverFooterClass).toBe('text-text-primary');
+  });
+});
+
+const mockEl = { getBoundingClientRect: () => ({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 }) } as unknown as HTMLElement;
+
+describe('showMetaPopover', () => {
+  it('sets all popover state from config', () => {
+    const ctx: any = {};
+    callWith<void>(helpers.showMetaPopover, ctx, mockEl, {
+      title: 'Test Title',
+      lines: ['line1', 'line2'],
+      lineClass: 'custom-line',
+      footer: 'Footer text',
+      footerClass: 'custom-footer',
+    });
+    expect(ctx._metaPopoverPos).toEqual({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 });
+    expect(ctx._metaPopoverTitle).toBe('Test Title');
+    expect(ctx._metaPopoverLines).toEqual(['line1', 'line2']);
+    expect(ctx._metaPopoverLineClass).toBe('custom-line');
+    expect(ctx._metaPopoverFooter).toBe('Footer text');
+    expect(ctx._metaPopoverFooterClass).toBe('custom-footer');
+  });
+
+  it('uses defaults for missing config fields', () => {
+    const ctx: any = {};
+    callWith<void>(helpers.showMetaPopover, ctx, mockEl, {});
+    expect(ctx._metaPopoverTitle).toBe('');
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+    expect(ctx._metaPopoverFooter).toBe('');
+    expect(ctx._metaPopoverFooterClass).toBe('text-text-primary');
+  });
+});
+
+describe('showCostPopover', () => {
+  const t = (key: string) => key;
+
+  it('uses costBreakdown when available', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const item = { costBreakdown: ['line A', 'line B'], estimatedCost: 0.0123 };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, item);
+    expect(ctx._metaPopoverLines).toEqual(['line A', 'line B']);
+    expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.0123');
+  });
+
+  it('falls back to usage summary when no costBreakdown', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const item = { usage: { totalTokens: 500, callCount: 2 }, estimatedCost: 0.005 };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, item);
+    expect(ctx._metaPopoverLines).toEqual(['500 tokens · 2 gen.apiCalls']);
+    expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.0050');
+  });
+
+  it('uses empty lines and footer when no cost data', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, {});
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverFooter).toBe('');
+  });
+});
+
+describe('showOcrPopover', () => {
+  const t = (key: string) => key;
+
+  it('shows confidence percentage and tone class', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    const src = { ocrConfidence: { average: 0.95 } };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, src);
+    expect(ctx._metaPopoverTitle).toBe('ocr.confidence');
+    expect(ctx._metaPopoverLines).toEqual(['95%']);
+    expect(ctx._metaPopoverLineClass).toContain('font-semibold');
+  });
+
+  it('uses warning tone for medium confidence', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, { ocrConfidence: { average: 0.75 } });
+    expect(ctx._metaPopoverLines).toEqual(['75%']);
+    expect(ctx._metaPopoverLineClass).toContain('text-warning-dark');
+  });
+
+  it('uses danger tone for low confidence', () => {
+    const ctx: any = { ...helpers, t, showMetaPopover: helpers.showMetaPopover };
+    callWith<void>(helpers.showOcrPopover, ctx, mockEl, { ocrConfidence: { average: 0.5 } });
+    expect(ctx._metaPopoverLines).toEqual(['50%']);
+    expect(ctx._metaPopoverLineClass).toContain('text-danger-dark');
+  });
+});
+
+describe('showModerationPopover', () => {
+  const t = (key: string) => key;
+
+  it('shows flagged categories when present', () => {
+    const ctx: any = {
+      ...helpers,
+      t,
+      showMetaPopover: helpers.showMetaPopover,
+      flaggedCategoryLabels: () => 'violence, sexual',
+    };
+    callWith<void>(helpers.showModerationPopover, ctx, mockEl, { moderation: { status: 'unsafe' } });
+    expect(ctx._metaPopoverLines).toEqual(['violence, sexual']);
+    expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
+  });
+
+  it('shows empty lines with tone class when no categories', () => {
+    const ctx: any = {
+      ...helpers,
+      t,
+      showMetaPopover: helpers.showMetaPopover,
+      flaggedCategoryLabels: () => '',
+    };
+    callWith<void>(helpers.showModerationPopover, ctx, mockEl, { moderation: { status: 'safe' } });
+    expect(ctx._metaPopoverLines).toEqual([]);
+    expect(ctx._metaPopoverLineClass).toContain('font-semibold');
+  });
+});
+
+describe('metaPopoverStyle', () => {
+  it('returns display:none when no position', () => {
+    const ctx = { _metaPopoverPos: null };
+    expect(callWith<string>(helpers.metaPopoverStyle, ctx)).toBe('display:none');
+  });
+
+  it('positions below element when near top of viewport', () => {
+    const ctx = { _metaPopoverPos: { top: 100, bottom: 130, left: 50 } };
+    const result = callWith<string>(helpers.metaPopoverStyle, ctx);
+    expect(result).toContain('top:134px');
+    expect(result).toContain('left:50px');
+  });
+
+  it('positions above element when far from top of viewport', () => {
+    const origInnerHeight = globalThis.window?.innerHeight;
+    globalThis.window = { innerHeight: 800 } as any;
+    const ctx = { _metaPopoverPos: { top: 400, bottom: 430, left: 50 } };
+    const result = callWith<string>(helpers.metaPopoverStyle, ctx);
+    expect(result).toContain('bottom:404px');
+    expect(result).toContain('left:50px');
+    if (origInnerHeight !== undefined) globalThis.window = { innerHeight: origInnerHeight } as any;
+  });
+});

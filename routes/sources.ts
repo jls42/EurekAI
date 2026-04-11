@@ -107,14 +107,16 @@ export function sourceRoutes(
     const isText = TEXT_EXTS.has(ext);
     let markdown: string;
     let elapsed: number;
+    let confidence: import('../types.js').OcrConfidence | undefined;
     if (isText) {
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
       elapsed = stop();
       logger.info('sources', `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
     } else {
-      ({ markdown, elapsed } = await ocrFile(client, file.path, file.originalname));
-      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+      ({ markdown, elapsed, confidence } = await ocrFile(client, file.path, file.originalname));
+      const confStr = confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : '';
+      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confStr})`);
     }
     return {
       id: randomUUID(),
@@ -124,7 +126,63 @@ export function sourceRoutes(
       sourceType: isText ? 'text' : 'ocr',
       filePath: `projects/${pid}/uploads/${file.filename}`,
       moderation: modCats ? pendingModeration() : undefined,
+      ocrConfidence: confidence,
     };
+  }
+
+  type UploadFailure = { filename: string; error: string };
+  type UploadOutcome = { source?: Source; failure?: UploadFailure };
+
+  /** Run OCR/text read for a single file, persist it, and classify as success or failure. */
+  async function attemptFileUpload(
+    file: Express.Multer.File,
+    pid: string,
+    modCats: string[] | null,
+  ): Promise<UploadOutcome> {
+    try {
+      const { result: source, usage } = await runWithUsageTracking(
+        () => processUploadedFile(file, pid, modCats),
+      );
+      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
+      if (persisted) {
+        source.estimatedCost = persisted.cost;
+        source.usage = persisted.usage;
+        source.costBreakdown = persisted.costBreakdown;
+      }
+      store.addSource(pid, source);
+      return { source };
+    } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
+      }
+      logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
+      const msg = e instanceof Error ? e.message : String(e);
+      return { failure: { filename: file.originalname, error: msg } };
+    }
+  }
+
+  /** Fire consigne detection + per-source moderation for the successfully uploaded files. */
+  function triggerUploadDownstream(pid: string, lang: string, modCats: string[] | null, results: Source[]) {
+    void triggerConsigneDetection(store, client, pid, lang);
+    if (!modCats) return;
+    for (const src of results) {
+      void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+    }
+  }
+
+  /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
+  function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
+    if (results.length === 0) {
+      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
+      res.status(500).json({ error: `Echec upload: ${aggregated}` });
+      return;
+    }
+    if (failures.length === 0) {
+      res.json(results);
+      return;
+    }
+    res.json({ sources: results, failures });
   }
 
   // Upload files (OCR)
@@ -142,38 +200,19 @@ export function sourceRoutes(
       return;
     }
 
-    const results: Source[] = [];
     const modCats = getModerationCategories(store, profileStore, pid);
+    const results: Source[] = [];
+    const failures: UploadFailure[] = [];
     for (const file of files) {
-      try {
-        const { result: source, usage } = await runWithUsageTracking(
-          () => processUploadedFile(file, pid, modCats),
-        );
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
-        if (persisted) {
-          source.estimatedCost = persisted.cost;
-          source.usage = persisted.usage;
-          source.costBreakdown = persisted.costBreakdown;
-        }
-        store.addSource(pid, source);
-        results.push(source);
-      } catch (e) {
-        const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
-        if (failedUsage?.length) {
-          persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
-        }
-        logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-        res.status(500).json({ error: `Echec pour ${file.originalname}: ${e}` });
-        return;
-      }
+      const outcome = await attemptFileUpload(file, pid, modCats);
+      if (outcome.source) results.push(outcome.source);
+      else if (outcome.failure) failures.push(outcome.failure);
     }
 
-    const lang = req.body.lang || 'fr';
-    void triggerConsigneDetection(store, client, pid, lang);
-    for (const src of results) {
-      if (modCats) void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+    if (results.length > 0) {
+      triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
     }
-    res.json(results);
+    sendUploadResponse(res, results, failures);
   });
 
   // Add text source
@@ -268,7 +307,9 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
       logger.error('sources', 'STT error:', e);
-      res.status(500).json({ error: `Transcription echouee: ${e}` });
+      res.status(500).json({
+        error: `Transcription echouee: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   });
 
@@ -414,7 +455,9 @@ export function sourceRoutes(
       res.json(sources);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
-      res.status(500).json({ error: `Recherche web echouee: ${e}` });
+      res.status(500).json({
+        error: `Recherche web echouee: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   });
 

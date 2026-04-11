@@ -93,7 +93,7 @@
         accept=".jpg,.jpeg,.png,.pdf,.txt,.md"
         class="sr-only"
         :aria-label="t('sources.import')"
-        @change="handleFiles($event.target.files)"
+        @change="handleFiles($event.target.files); $event.target.value = ''"
       />
     </label>
 
@@ -285,8 +285,8 @@
   <!-- Upload sessions -->
   <template x-for="session in uploadSessions" :key="session.id">
     <div class="mb-4 bg-surface rounded-card shadow-card p-4 space-y-1.5">
-      <template x-for="(file, idx) in session.files" :key="idx">
-        <div class="flex items-center gap-3 py-1">
+      <template x-for="file in session.files" :key="file.id">
+        <div class="flex items-center gap-3 py-1" :title="file.errorMsg || ''">
           <i x-show="file.status === 'pending'" data-lucide="circle-dashed" class="w-4 h-4 text-text-secondary shrink-0"></i>
           <i x-show="file.status === 'uploading'" data-lucide="loader-2" class="w-4 h-4 text-primary animate-spin shrink-0"></i>
           <i x-show="file.status === 'done'" data-lucide="check-circle" class="w-4 h-4 text-success shrink-0"></i>
@@ -294,6 +294,20 @@
           <span class="text-body-sm truncate" x-text="file.name">File</span>
           <span class="text-sm text-text-secondary ml-auto shrink-0"
                 x-text="t('sources.fileStatus.' + file.status)">Status</span>
+          <button x-show="file.status === 'error'"
+                  @click="retryFile(session.id, file.id)"
+                  :aria-label="t('common.retry')"
+                  :title="t('common.retry')"
+                  class="p-1 rounded hover:bg-surface-hover text-primary shrink-0">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          </button>
+          <button x-show="file.status === 'error'"
+                  @click="dismissFailedFile(session.id, file.id)"
+                  :aria-label="t('common.close')"
+                  :title="t('common.close')"
+                  class="p-1 rounded hover:bg-surface-hover text-text-secondary shrink-0">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
         </div>
       </template>
     </div>
@@ -351,34 +365,19 @@
               class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700"
               title="Mistral web_search"
             >AI</span>
-            <span
-              x-show="src.moderation?.status === 'safe'"
-              class="shrink-0"
-              :title="t('moderation.safe')"
-            >
-              <i data-lucide="shield-check" class="w-4 h-4 text-success"></i>
-            </span>
-            <span
-              x-show="src.moderation?.status === 'unsafe'"
-              class="shrink-0"
-              :title="t('moderation.unsafe') + (flaggedCategoryLabels(src) ? ' — ' + flaggedCategoryLabels(src) : '')"
-            >
-              <i data-lucide="shield-alert" class="w-4 h-4 text-danger"></i>
-            </span>
-            <span
-              x-show="src.moderation?.status === 'pending'"
-              class="shrink-0"
-              :title="t('moderation.pending')"
-            >
-              <i data-lucide="loader-circle" class="w-4 h-4 text-primary animate-spin"></i>
-            </span>
-            <span
-              x-show="src.moderation?.status === 'error'"
-              class="shrink-0"
-              :title="t('moderation.error')"
-            >
-              <i data-lucide="shield-x" class="w-4 h-4 text-warning-dark"></i>
-            </span>
+            <!-- OCR confidence badge -->
+            {{> ocr-badge-src
+              sourceRef="src"
+              wrapperClass="shrink-0"
+              badgeClass="text-[10px] font-bold px-1.5 py-0.5"
+              gapClass="gap-0.5"
+            }}
+            {{> moderation-badge-src
+              sourceRef="src"
+              wrapperClass="shrink-0"
+              badgeClass="text-[10px] px-1.5 py-0.5"
+              iconClass="w-3 h-3"
+            }}
           </div>
           <p
             class="text-sm text-text-secondary line-clamp-1"
@@ -407,7 +406,7 @@
   </div>
 
   <!-- Empty sources -->
-  <div x-show="sources.length === 0 && !uploading" class="text-center py-8">
+  <div x-show="sources.length === 0 && !uploading && uploadSessions.length === 0" class="text-center py-8">
     <div
       class="w-16 h-16 mx-auto mb-3 bg-accent-light rounded-[1rem] border border-accent/20 flex items-center justify-center"
     >

@@ -23,8 +23,8 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ### i18n frontend
 - Tous les textes UI via `t('cle.traduction')` — jamais de texte en dur dans les templates HTML
-- Ajouter chaque cle dans `src/i18n/fr.ts` ET `src/i18n/en.ts`
-- Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation
+- Ajouter chaque cle dans les **9 fichiers i18n** : `src/i18n/{fr,en,es,pt,it,nl,de,hi,ar}.ts`
+- Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation entre toutes les langues
 
 ### TTS (Text-to-Speech)
 - Deux providers : Mistral (Voxtral TTS) ou ElevenLabs, configurable dans les settings
@@ -53,11 +53,12 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Toujours utiliser le skill `/commit` pour creer les commits** (mandatory)
 - Verifier visuellement chaque modif UI (navigateur ou Claude in Chrome)
 - Lancer `npm run test` apres chaque modification
-- **Si le commit contient des modifications de `README.md`** : lancer `./scripts/translate-readme.sh` avant de committer pour regenerer les 14 traductions (README-en.md, README-de.md, etc.)
-- **Verifier regulierement les dependances** : lancer `./scripts/check-deps.sh` pour detecter les mises a jour SDK (Mistral, ElevenLabs) et les modeles deprecies. A lancer avant chaque release ou quand une API renvoie des erreurs inattendues.
+- **Si le commit contient des modifications de `README.md`** : montrer le diff README.md a l'utilisateur pour validation, puis lancer `./scripts/translate-readme.sh` avant de committer pour regenerer les 14 traductions (README-en.md, README-de.md, etc.)
+- **Verifier regulierement les dependances** : utiliser le skill `/check-sdk-updates` qui lance `check-deps.sh`, fetch les changelogs GitHub et analyse les nouvelles capabilities API. A lancer avant chaque release ou quand une API renvoie des erreurs inattendues.
 - Quand une erreur ou mauvaise approche est identifiee, ajouter une regle ici ou dans `.claude/rules/`
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)
+- **Avant chaque commit** : verifier si `CLAUDE.md`, `.claude/rules/` ou `README.md` doivent etre mis a jour pour refleter les changements. Mettre a jour si necessaire, montrer le diff README a l'utilisateur pour validation avant traduction
 
 ## SonarQube
 

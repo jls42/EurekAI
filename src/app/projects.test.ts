@@ -45,6 +45,7 @@ function makeContext(overrides: any = {}) {
     consigne: null,
     chatMessages: [],
     chatInput: '',
+    uploadSessions: [] as any[],
     useConsigne: true,
     t: vi.fn((key: string) => key),
     showToast: vi.fn(),
@@ -318,5 +319,14 @@ describe('resetState', () => {
     expect(ctx.consigne).toBeNull();
     expect(ctx.chatMessages).toEqual([]);
     expect(ctx.chatInput).toBe('');
+    expect(ctx.uploadSessions).toEqual([]);
+  });
+
+  it('clears uploadSessions', () => {
+    const ctx = makeContext({
+      uploadSessions: [{ id: 'sess1', projectId: 'p1', cleanupScheduled: false, files: [] }],
+    });
+    proj.resetState.call(ctx);
+    expect(ctx.uploadSessions).toEqual([]);
   });
 });

@@ -25,6 +25,7 @@ export const nl: Record<string, string> = {
   'gen.image': 'Afbeelding',
   'gen.auto': 'Auto \u2014 analyseren...',
   'gen.estimatedCost': 'Geschatte kosten (Mistral-tarieven)',
+  'gen.apiCalls': 'API-aanroep(en)',
   'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
@@ -188,6 +189,7 @@ export const nl: Record<string, string> = {
   'sourceBadge.text': 'Tekst',
   'sourceBadge.voice': 'Stem',
   'sourceBadge.web': 'Web',
+  'ocr.confidence': 'OCR-betrouwbaarheid',
 
   'summary.heading': 'Samenvattingen',
   'summary.new': 'Nieuwe samenvatting',

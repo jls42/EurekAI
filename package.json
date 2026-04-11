@@ -19,7 +19,7 @@
   "dependencies": {
     "@elevenlabs/elevenlabs-js": "^2.36.0",
     "@lightpanda/browser": "^1.2.0",
-    "@mistralai/mistralai": "^2.1.2",
+    "@mistralai/mistralai": "^2.2.0",
     "@mozilla/readability": "^0.6.0",
     "alpinejs": "^3.15.8",
     "dotenv": "^17.0.0",
@@ -27,7 +27,7 @@
     "ffmpeg-static": "^5.3.0",
     "linkedom": "^0.18.12",
     "lucide": "^1.0.0",
-    "marked": "^17.0.3",
+    "marked": "^18.0.0",
     "multer": "^2.0.0"
   },
   "overrides": {

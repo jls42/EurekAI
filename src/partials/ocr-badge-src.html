@@ -1,0 +1,17 @@
+<!-- OCR confidence badge for sources -->
+<!-- Params: sourceRef, badgeClass, wrapperClass, gapClass -->
+<template x-if="{{sourceRef}}.ocrConfidence">
+  <span
+    class="inline-block {{wrapperClass}}"
+    @mouseenter="showOcrPopover($el, {{sourceRef}})"
+    @mouseleave="hideMetaPopover()"
+  >
+    <span
+      class="source-meta-pill {{badgeClass}} {{gapClass}} cursor-pointer"
+      :class="ocrConfidenceColor({{sourceRef}})"
+    >
+      <i :data-lucide="ocrConfidenceIcon({{sourceRef}})" class="w-3 h-3"></i>
+      <span x-text="ocrConfidencePercent({{sourceRef}})">OCR</span>
+    </span>
+  </span>
+</template>

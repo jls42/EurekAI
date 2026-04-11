@@ -25,6 +25,7 @@ export const ar: Record<string, string> = {
   'gen.image': '\u0635\u0648\u0631\u0629',
   'gen.auto': '\u062a\u0644\u0642\u0627\u0626\u064a \u2014 \u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0644\u064a\u0644...',
   'gen.estimatedCost': '\u0627\u0644\u062a\u0643\u0644\u0641\u0629 \u0627\u0644\u062a\u0642\u062f\u064a\u0631\u064a\u0629 (\u062a\u0639\u0631\u064a\u0641\u0629 Mistral)',
+  'gen.apiCalls': '\u0627\u0633\u062a\u062f\u0639\u0627\u0621(\u0627\u062a) API',
   'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
@@ -188,6 +189,7 @@ export const ar: Record<string, string> = {
   'sourceBadge.text': '\u0646\u0635',
   'sourceBadge.voice': '\u0635\u0648\u062a',
   'sourceBadge.web': '\u0648\u064a\u0628',
+  'ocr.confidence': '\u062B\u0642\u0629 OCR',
 
   'summary.heading': '\u0645\u0644\u062e\u0651\u0635\u0627\u062a \u0627\u0644\u0645\u0631\u0627\u062c\u0639\u0629',
   'summary.new': '\u0645\u0644\u062e\u0651\u0635 \u062c\u062f\u064a\u062f',

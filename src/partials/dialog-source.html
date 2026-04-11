@@ -34,6 +34,12 @@
               :class="sourceTypeBadgeColor(viewSource)"
               x-text="sourceTypeBadge(viewSource)"
             ></span>
+            <!-- OCR confidence badge -->
+            {{> ocr-badge-src
+              sourceRef="viewSource"
+              badgeClass="text-xs px-2 py-0.5 font-semibold"
+              gapClass="gap-1"
+            }}
           </div>
         </div>
         <button

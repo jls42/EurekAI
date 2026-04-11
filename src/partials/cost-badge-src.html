@@ -2,11 +2,11 @@
 <template x-if="src.estimatedCost != null">
   <span
     class="inline-block"
-    @mouseenter="_costPos = $el.getBoundingClientRect(); _costData = src; _costHover = src.id"
-    @mouseleave="_costHover = null"
+    @mouseenter="showCostPopover($el, src)"
+    @mouseleave="hideMetaPopover()"
   >
     <span
-      class="{{badgeClass}} rounded-badge bg-accent/15 text-accent font-semibold cursor-pointer"
+      class="source-meta-pill {{badgeClass}} bg-accent/15 text-accent font-semibold cursor-pointer"
       x-text="t('gen.costPrefix') + ' ~$' + src.estimatedCost.toFixed(4)"
     >Est.</span>
   </span>

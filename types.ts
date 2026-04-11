@@ -29,6 +29,12 @@ export interface ModerationResult {
   categories: Record<string, boolean>;
 }
 
+/** Aggregated OCR confidence scores across all pages (values in 0..1 range). */
+export interface OcrConfidence {
+  /** Mean of per-page average confidence scores, clamped to [0, 1]. */
+  average: number;
+}
+
 export interface Source {
   id: string;
   filename: string;
@@ -41,6 +47,7 @@ export interface Source {
   estimatedCost?: number;
   usage?: import('./helpers/pricing.js').GenerationUsage;
   costBreakdown?: string[];
+  ocrConfidence?: OcrConfidence;
 }
 
 export interface StudyFiche {

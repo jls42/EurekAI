@@ -30,9 +30,10 @@ if (!process.env.MISTRAL_API_KEY) {
 
 const client = new Mistral({
   apiKey: process.env.MISTRAL_API_KEY,
+  timeoutMs: 120_000,
   retryConfig: {
     strategy: 'backoff',
-    backoff: { initialInterval: 500, maxInterval: 10_000, exponent: 1.5, maxElapsedTime: 60_000 },
+    backoff: { initialInterval: 500, maxInterval: 10_000, exponent: 1.5, maxElapsedTime: 120_000 },
     retryConnectionErrors: true,
   },
 });
