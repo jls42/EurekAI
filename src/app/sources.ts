@@ -170,6 +170,7 @@ export function createSources() {
         id: sessionId, projectId, cleanupScheduled: false,
         files: [{ id: crypto.randomUUID(), name: 'text', file: null, status: 'uploading' as const, errorMsg: null }],
       });
+      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
 
       try {
         const res = await fetch(this.apiBase() + '/sources/text', {
@@ -177,8 +178,10 @@ export function createSources() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text, lang: this.locale }),
         });
+        if (!_isSessionActive(this, session)) return;
         if (!res.ok) {
           const err = await res.json();
+          if (!_isSessionActive(this, session)) return;
           this.showToast(
             this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
             'error',
@@ -186,14 +189,18 @@ export function createSources() {
           return;
         }
         const source = await res.json();
+        if (!_isSessionActive(this, session)) return;
         this.sources.push(source);
         this.selectedIds.push(source.id);
         this.textInput = '';
         this.showTextInput = false;
         this.showToast(this.t('toast.textAdded'), 'success');
         this.$nextTick(() => this.refreshIcons());
-        setTimeout(() => this.refreshModeration(), 2000);
+        setTimeout(() => {
+          if (_isSessionActive(this, session)) this.refreshModeration();
+        }, 2000);
       } catch (e: any) {
+        if (!_isSessionActive(this, session)) return;
         this.showToast(this.t('toast.error', { error: e.message }), 'error', () => this.addText());
       } finally {
         this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
@@ -275,7 +282,6 @@ export function createSources() {
       this.viewSource = null;
     },
 
-    /* refreshModeration is public — helpers above are internal */
     async refreshModeration(this: any, retries = 3) {
       if (!this.currentProjectId) return;
       try {
@@ -294,7 +300,9 @@ export function createSources() {
             setTimeout(() => this.refreshModeration(retries - 1), 3000);
           }
         }
-      } catch {}
+      } catch (e) {
+        console.error('[sources] refreshModeration failed:', e);
+      }
     },
   };
 }
