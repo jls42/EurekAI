@@ -130,6 +130,61 @@ export function sourceRoutes(
     };
   }
 
+  type UploadFailure = { filename: string; error: string };
+  type UploadOutcome = { source?: Source; failure?: UploadFailure };
+
+  /** Run OCR/text read for a single file, persist it, and classify as success or failure. */
+  async function attemptFileUpload(
+    file: Express.Multer.File,
+    pid: string,
+    modCats: string[] | null,
+  ): Promise<UploadOutcome> {
+    try {
+      const { result: source, usage } = await runWithUsageTracking(
+        () => processUploadedFile(file, pid, modCats),
+      );
+      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
+      if (persisted) {
+        source.estimatedCost = persisted.cost;
+        source.usage = persisted.usage;
+        source.costBreakdown = persisted.costBreakdown;
+      }
+      store.addSource(pid, source);
+      return { source };
+    } catch (e) {
+      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
+      }
+      logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
+      const msg = e instanceof Error ? e.message : String(e);
+      return { failure: { filename: file.originalname, error: msg } };
+    }
+  }
+
+  /** Fire consigne detection + per-source moderation for the successfully uploaded files. */
+  function triggerUploadDownstream(pid: string, lang: string, modCats: string[] | null, results: Source[]) {
+    void triggerConsigneDetection(store, client, pid, lang);
+    if (!modCats) return;
+    for (const src of results) {
+      void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+    }
+  }
+
+  /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
+  function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
+    if (results.length === 0) {
+      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
+      res.status(500).json({ error: `Echec upload: ${aggregated}` });
+      return;
+    }
+    if (failures.length === 0) {
+      res.json(results);
+      return;
+    }
+    res.json({ sources: results, failures });
+  }
+
   // Upload files (OCR)
   router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
     const pid = String(req.params.pid);
@@ -145,54 +200,19 @@ export function sourceRoutes(
       return;
     }
 
-    const results: Source[] = [];
-    const failures: Array<{ filename: string; error: string }> = [];
     const modCats = getModerationCategories(store, profileStore, pid);
+    const results: Source[] = [];
+    const failures: UploadFailure[] = [];
     for (const file of files) {
-      try {
-        const { result: source, usage } = await runWithUsageTracking(
-          () => processUploadedFile(file, pid, modCats),
-        );
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
-        if (persisted) {
-          source.estimatedCost = persisted.cost;
-          source.usage = persisted.usage;
-          source.costBreakdown = persisted.costBreakdown;
-        }
-        store.addSource(pid, source);
-        results.push(source);
-      } catch (e) {
-        const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
-        if (failedUsage?.length) {
-          persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
-        }
-        const msg = e instanceof Error ? e.message : String(e);
-        logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-        failures.push({ filename: file.originalname, error: msg });
-      }
+      const outcome = await attemptFileUpload(file, pid, modCats);
+      if (outcome.source) results.push(outcome.source);
+      else if (outcome.failure) failures.push(outcome.failure);
     }
 
-    // Rien n'a reussi → 500 (preserve le comportement single-file actuel)
-    if (results.length === 0) {
-      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
-      res.status(500).json({ error: `Echec upload: ${aggregated}` });
-      return;
+    if (results.length > 0) {
+      triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
     }
-
-    // Au moins un succes → trigger downstream
-    const lang = req.body.lang || 'fr';
-    void triggerConsigneDetection(store, client, pid, lang);
-    for (const src of results) {
-      if (modCats) void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
-    }
-
-    // Full success : array plain (compat frontend actuel)
-    // Partial success : { sources, failures }
-    if (failures.length === 0) {
-      res.json(results);
-    } else {
-      res.json({ sources: results, failures });
-    }
+    sendUploadResponse(res, results, failures);
   });
 
   // Add text source
