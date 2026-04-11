@@ -918,7 +918,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Transcription echouee: Error: STT API error' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Transcription echouee: STT API error' });
   });
 
   it('ajoute la moderation pending quand le profil a la moderation activee', async () => {
@@ -1037,7 +1037,7 @@ describe('POST /:pid/sources/upload', () => {
     vi.mocked(ocrFile).mockResolvedValueOnce({
       markdown: '# OCR with confidence',
       elapsed: 1.2,
-      confidence: { average: 0.95, minimum: 0.88 },
+      confidence: { average: 0.95 },
     });
 
     const handler = getHandler(router, 'post', '/:pid/sources/upload');
@@ -1051,13 +1051,13 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     const results = res.json.mock.calls[0][0];
-    expect(results[0].ocrConfidence).toEqual({ average: 0.95, minimum: 0.88 });
+    expect(results[0].ocrConfidence).toEqual({ average: 0.95 });
 
     const updated = store.getProject(project.meta.id);
-    expect(updated!.sources[0].ocrConfidence).toEqual({ average: 0.95, minimum: 0.88 });
+    expect(updated!.sources[0].ocrConfidence).toEqual({ average: 0.95 });
   });
 
-  it('retourne 500 quand ocrFile echoue', async () => {
+  it('retourne 500 quand ocrFile echoue sur le seul fichier', async () => {
     const project = store.createProject('P1');
     vi.mocked(ocrFile).mockRejectedValueOnce(new Error('OCR failed'));
 
@@ -1072,7 +1072,66 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Echec pour bad.jpg: Error: OCR failed' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'Echec upload: bad.jpg: OCR failed' });
+  });
+
+  it('retourne { sources, failures } en partial success quand un fichier sur deux echoue', async () => {
+    const project = store.createProject('P1');
+    vi.mocked(ocrFile)
+      .mockResolvedValueOnce({ markdown: '# Good', elapsed: 1.1, confidence: { average: 0.9 } })
+      .mockRejectedValueOnce(new Error('OCR crashed'));
+
+    const handler = getHandler(router, 'post', '/:pid/sources/upload');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: {},
+      files: [
+        { path: '/tmp/good.jpg', originalname: 'good.jpg', filename: 'uuid-good.jpg' },
+        { path: '/tmp/bad.jpg', originalname: 'bad.jpg', filename: 'uuid-bad.jpg' },
+      ],
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledTimes(1);
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.sources).toHaveLength(1);
+    expect(payload.sources[0].filename).toBe('good.jpg');
+    expect(payload.failures).toEqual([{ filename: 'bad.jpg', error: 'OCR crashed' }]);
+
+    // Verifie que seul le fichier reussi est persiste dans le store
+    const updated = store.getProject(project.meta.id);
+    expect(updated!.sources).toHaveLength(1);
+    expect(updated!.sources[0].filename).toBe('good.jpg');
+  });
+
+  it('retourne 500 avec message agrege quand tous les fichiers echouent', async () => {
+    const project = store.createProject('P1');
+    vi.mocked(ocrFile)
+      .mockRejectedValueOnce(new Error('OCR down'))
+      .mockRejectedValueOnce(new Error('timeout'));
+
+    const handler = getHandler(router, 'post', '/:pid/sources/upload');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: {},
+      files: [
+        { path: '/tmp/a.jpg', originalname: 'a.jpg', filename: 'uuid-a.jpg' },
+        { path: '/tmp/b.jpg', originalname: 'b.jpg', filename: 'uuid-b.jpg' },
+      ],
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'Echec upload: a.jpg: OCR down; b.jpg: timeout',
+    });
+    const updated = store.getProject(project.meta.id);
+    expect(updated!.sources).toHaveLength(0);
   });
 
   it('ajoute la moderation pending quand le profil a la moderation activee', async () => {

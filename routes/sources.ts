@@ -146,6 +146,7 @@ export function sourceRoutes(
     }
 
     const results: Source[] = [];
+    const failures: Array<{ filename: string; error: string }> = [];
     const modCats = getModerationCategories(store, profileStore, pid);
     for (const file of files) {
       try {
@@ -165,18 +166,33 @@ export function sourceRoutes(
         if (failedUsage?.length) {
           persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
         }
+        const msg = e instanceof Error ? e.message : String(e);
         logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-        res.status(500).json({ error: `Echec pour ${file.originalname}: ${e}` });
-        return;
+        failures.push({ filename: file.originalname, error: msg });
       }
     }
 
+    // Rien n'a reussi → 500 (preserve le comportement single-file actuel)
+    if (results.length === 0) {
+      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
+      res.status(500).json({ error: `Echec upload: ${aggregated}` });
+      return;
+    }
+
+    // Au moins un succes → trigger downstream
     const lang = req.body.lang || 'fr';
     void triggerConsigneDetection(store, client, pid, lang);
     for (const src of results) {
       if (modCats) void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
     }
-    res.json(results);
+
+    // Full success : array plain (compat frontend actuel)
+    // Partial success : { sources, failures }
+    if (failures.length === 0) {
+      res.json(results);
+    } else {
+      res.json({ sources: results, failures });
+    }
   });
 
   // Add text source
@@ -271,7 +287,9 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
       logger.error('sources', 'STT error:', e);
-      res.status(500).json({ error: `Transcription echouee: ${e}` });
+      res.status(500).json({
+        error: `Transcription echouee: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   });
 
@@ -417,7 +435,9 @@ export function sourceRoutes(
       res.json(sources);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
-      res.status(500).json({ error: `Recherche web echouee: ${e}` });
+      res.status(500).json({
+        error: `Recherche web echouee: ${e instanceof Error ? e.message : String(e)}`,
+      });
     }
   });
 
