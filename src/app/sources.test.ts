@@ -514,6 +514,88 @@ describe('createSources', () => {
       resolveSecond({ ok: true, json: async () => [{ id: 's2', text: 'ocr2' }] });
       await promise;
     });
+
+    // Project switch / session invariants (C5)
+    it('aborts upload when user switches project mid-flight', async () => {
+      const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+      let resolveFetch: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () => new Promise(r => { resolveFetch = r; }),
+      );
+
+      const promise = src.handleFiles.call(ctx, makeFileList(file));
+      await vi.advanceTimersByTimeAsync(10);
+
+      // Simulate project switch mid-flight (selectProject resets both)
+      ctx.currentProjectId = 'pid-2';
+      ctx.uploadSessions = [];
+
+      resolveFetch({ ok: true, json: async () => [{ id: 's1', text: 'ocr' }] });
+      await promise;
+
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.sourcesAdded', 'success');
+      expect(ctx.refreshConsigne).not.toHaveBeenCalled();
+    });
+
+    it('ignores upload when only currentProjectId changes (session still tracked)', async () => {
+      const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+      let resolveFetch: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () => new Promise(r => { resolveFetch = r; }),
+      );
+
+      const promise = src.handleFiles.call(ctx, makeFileList(file));
+      await vi.advanceTimersByTimeAsync(10);
+
+      // currentProjectId flips but session remains in uploadSessions
+      ctx.currentProjectId = 'pid-2';
+
+      resolveFetch({ ok: true, json: async () => [{ id: 's1', text: 'ocr' }] });
+      await promise;
+
+      expect(ctx.sources).toEqual([]);
+    });
+
+    it('stops processing remaining files when project switches after first file', async () => {
+      const f1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
+      const f2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
+      const f3 = new File(['c'], 'c.pdf', { type: 'application/pdf' });
+
+      let resolve1: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () => new Promise(r => { resolve1 = r; }),
+      );
+
+      const promise = src.handleFiles.call(ctx, makeFileList(f1, f2, f3));
+      await vi.advanceTimersByTimeAsync(10);
+
+      // Switch project while 1st file is pending
+      ctx.currentProjectId = 'pid-2';
+      ctx.uploadSessions = [];
+
+      resolve1({ ok: true, json: async () => [{ id: 's1', text: 'ocr1' }] });
+      await promise;
+
+      // Only the first fetch was issued; 2nd and 3rd never started
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      // And even the first result was ignored
+      expect(ctx.sources).toEqual([]);
+    });
+
+    it('uses /api/projects/{sessionProjectId}/sources/upload, not apiBase()', async () => {
+      // Override apiBase to a wrong value — if code accidentally uses apiBase,
+      // the fetch URL will contain WRONG and the test fails.
+      ctx.apiBase = vi.fn(() => '/api/projects/WRONG');
+      const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+      mockFetchOk([{ id: 's1', text: 'ok' }]);
+
+      await src.handleFiles.call(ctx, makeFileList(file));
+
+      const [url] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, unknown];
+      expect(url).toBe('/api/projects/pid-1/sources/upload');
+      expect(url).not.toContain('WRONG');
+    });
   });
 
   describe('retryFile', () => {
@@ -634,6 +716,26 @@ describe('createSources', () => {
       // by checking that uploading went through the cycle (no TS errors)
       expect(ctx.uploading).toBe(false);
       expect(ctx.sources.length).toBe(1);
+    });
+
+    it('does not push source when user switches project mid-flight', async () => {
+      let resolveFetch: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () => new Promise(r => { resolveFetch = r; }),
+      );
+
+      const promise = src.addText.call(ctx);
+      await vi.advanceTimersByTimeAsync(10);
+
+      // Simulate project switch (selectProject resets both)
+      ctx.currentProjectId = 'pid-2';
+      ctx.uploadSessions = [];
+
+      resolveFetch({ ok: true, json: async () => ({ id: 's1', text: 'hello' }) });
+      await promise;
+
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.textAdded', 'success');
     });
   });
 
