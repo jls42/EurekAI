@@ -21,8 +21,10 @@ const DEFAULT_CONFIG: AppConfig = {
   ttsModel: 'voxtral-mini-tts-latest',
   ttsProvider: 'mistral',
   mistralVoices: {
-    host: 'e3596645-b1af-469e-b857-f18ddedc7652',
-    guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
+    // Marie - Excited (host) + Marie - Curious (guest) — voix françaises cohérentes par défaut.
+    // Pour d'autres langues, VOICE_SELECTION ci-dessous prend le relais (FR fallback sinon).
+    host: '2f62b1af-aea3-4079-9d10-7ca665ee7243',
+    guest: 'e0580ce5-e63c-4cbe-88c8-a983b80c5f1f',
   },
 };
 
