@@ -1,14 +1,11 @@
 name: Claude Code Review
 
+# Désactivé : trigger automatique sur PR retiré, lancement manuel uniquement.
+# Pour réactiver, remettre :
+#   pull_request:
+#     types: [opened, synchronize, ready_for_review, reopened]
 on:
-  pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
+  workflow_dispatch:
 
 jobs:
   claude-review:
