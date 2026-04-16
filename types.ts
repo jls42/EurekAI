@@ -121,6 +121,12 @@ export interface QuizVocalGeneration extends GenerationMeta {
   type: 'quiz-vocal';
   data: QuizQuestion[];
   audioUrls: string[];
+  // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
+  // Le `?` permet de lire les anciennes générations sans ces champs (avec fallback
+  // best-effort cf. décision produit #9), mais toute nouvelle création DOIT
+  // renseigner ces deux champs (cf. routes/generate.ts:368).
+  lang?: string;
+  ageGroup?: AgeGroup;
 }
 
 export interface ImageGeneration extends GenerationMeta {

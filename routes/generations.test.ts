@@ -141,8 +141,18 @@ beforeEach(() => {
     sourceIds: [],
     type: 'quiz-vocal',
     data: [
-      { question: 'Quelle est la capitale ?', choices: ['Paris', 'Lyon', 'Marseille', 'Nice'], correct: 0, explanation: 'Paris' },
-      { question: 'Combien font 2+2 ?', choices: ['3', '4', '5', '6'], correct: 1, explanation: '4' },
+      {
+        question: 'Quelle est la capitale ?',
+        choices: ['Paris', 'Lyon', 'Marseille', 'Nice'],
+        correct: 0,
+        explanation: 'Paris',
+      },
+      {
+        question: 'Combien font 2+2 ?',
+        choices: ['3', '4', '5', '6'],
+        correct: 1,
+        explanation: '4',
+      },
     ],
     audioUrls: ['/audio/q1.mp3', '/audio/q2.mp3'],
   };
@@ -379,8 +389,8 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     await handler(req, res);
 
     const result = res.json.mock.calls[0][0];
-    expect(result.results[0]).toBe(true);  // ciel matches ciel
-    expect(result.results[1]).toBe(true);  // terre matches terre
+    expect(result.results[0]).toBe(true); // ciel matches ciel
+    expect(result.results[1]).toBe(true); // terre matches terre
     expect(result.results[2]).toBe(false); // lune does not match soleil
   });
 
@@ -401,12 +411,18 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/fill-blank-attempt');
 
     // Premiere tentative
-    const req1 = mockReq({ params: { pid, gid: fillBlankGid }, body: { answers: { 0: 'ciel', 1: 'mauvais' } } });
+    const req1 = mockReq({
+      params: { pid, gid: fillBlankGid },
+      body: { answers: { 0: 'ciel', 1: 'mauvais' } },
+    });
     const res1 = mockRes();
     await handler(req1, res1);
 
     // Deuxieme tentative
-    const req2 = mockReq({ params: { pid, gid: fillBlankGid }, body: { answers: { 0: 'faux', 1: 'terre' } } });
+    const req2 = mockReq({
+      params: { pid, gid: fillBlankGid },
+      body: { answers: { 0: 'faux', 1: 'terre' } },
+    });
     const res2 = mockRes();
     await handler(req2, res2);
 
@@ -577,6 +593,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     await handler(req, res);
 
     expect(transcribeAudio).toHaveBeenCalledWith(client, audioBuffer, 'answer.webm', 'fr');
+    // Phase 1B.1 — verifyAnswer reçoit maintenant ageGroup (fallback 'enfant' pour quiz legacy sans ageGroup persisté).
     expect(verifyAnswer).toHaveBeenCalledWith(
       client,
       'Quelle est la capitale ?',
@@ -585,6 +602,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
       'spoken answer',
       'm',
       'fr',
+      'enfant',
     );
 
     const result = res.json.mock.calls[0][0];
@@ -605,7 +623,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
 
     await handler(req, res);
 
-    // The last argument should be 'fr' (default)
+    // Le 7ème argument doit être 'fr' (lang par défaut), le 8ème 'enfant' (ageGroup par défaut).
     expect(verifyAnswer).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
@@ -614,7 +632,46 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
       expect.anything(),
       expect.anything(),
       'fr',
+      'enfant',
     );
+  });
+
+  // Phase 1B.1 — Tests legacy critiques (cf. décision produit #9)
+  it('LEGACY: utilise ageGroup "enfant" par défaut pour quiz vocaux sans ageGroup persisté (régression assumée)', async () => {
+    const { verifyAnswer } = await import('../generators/quiz-vocal.js');
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/vocal-answer');
+    // La fixture quizVocalGen ne contient PAS ageGroup (cas legacy).
+    // Même si le profil UI était "adulte", verifyAnswer doit recevoir "enfant".
+    const req = mockReq({
+      params: { pid, gid: quizVocalGid },
+      body: { questionIndex: 0, ageGroup: 'adulte' }, // simulate UI sending adulte
+      file: { buffer: Buffer.from('audio') },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    // ageGroup figé sur la génération > body → 'enfant' (fallback car quizGen.ageGroup === undefined)
+    const lastCall = (verifyAnswer as any).mock.calls[(verifyAnswer as any).mock.calls.length - 1];
+    expect(lastCall[7]).toBe('enfant'); // 8th param = ageGroup
+  });
+
+  it('LEGACY: utilise req.body.lang en fallback pour quiz vocaux sans lang persisté (best-effort)', async () => {
+    const { transcribeAudio, verifyAnswer } = await import('../generators/quiz-vocal.js');
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/vocal-answer');
+    const req = mockReq({
+      params: { pid, gid: quizVocalGid },
+      body: { questionIndex: 0, lang: 'en' },
+      file: { buffer: Buffer.from('audio') },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    // Quiz legacy sans lang persisté → fallback sur req.body.lang = 'en'
+    expect(transcribeAudio).toHaveBeenCalledWith(client, expect.anything(), 'answer.webm', 'en');
+    const lastCall = (verifyAnswer as any).mock.calls[(verifyAnswer as any).mock.calls.length - 1];
+    expect(lastCall[6]).toBe('en'); // 7th param = lang
   });
 
   it('retourne 404 quand la generation n existe pas', async () => {
@@ -856,5 +913,4 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     // Restore default mock
     (textToSpeech as any).mockResolvedValue(Buffer.from('fake-audio'));
   });
-
 });

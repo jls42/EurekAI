@@ -2,7 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { verifyAnswerSystem } from '../prompts.js';
-import type { QuizQuestion } from '../types.js';
+import type { AgeGroup, QuizQuestion } from '../types.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
@@ -35,6 +35,7 @@ export async function verifyAnswer(
   studentAnswer: string,
   model = 'mistral-large-latest',
   lang = 'fr',
+  ageGroup: AgeGroup = 'enfant',
 ): Promise<{ correct: boolean; feedback: string }> {
   const correctAnswer = choices[correctIndex]?.replace(/^[A-D]\)\s*/, '') ?? '';
   const choicesList = choices
@@ -48,7 +49,7 @@ export async function verifyAnswer(
     messages: [
       {
         role: 'system',
-        content: verifyAnswerSystem(choicesList, correctAnswerLine, lang),
+        content: verifyAnswerSystem(choicesList, correctAnswerLine, ageGroup, lang),
       },
       {
         role: 'user',

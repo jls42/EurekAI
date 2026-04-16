@@ -160,8 +160,10 @@ describe('WEBSEARCH', () => {
 // ── langInstruction ─────────────────────────────────────────────────
 
 describe('langInstruction', () => {
-  it('retourne vide pour fr', () => {
-    expect(langInstruction('fr')).toBe('');
+  it('retourne une instruction explicite pour fr (explicite > implicite)', () => {
+    const result = langInstruction('fr');
+    expect(result).toContain('français');
+    expect(result).toContain('IMPORTANT');
   });
 
   it.each([
@@ -195,8 +197,8 @@ describe('chatSystem', () => {
     expect(chatSystem('fr', group as AgeGroup)).toContain(keyword);
   });
 
-  it("chatSystem('fr') ne contient pas d'instruction de langue", () => {
-    expect(chatSystem('fr')).not.toContain('IMPORTANT: Generate ALL content');
+  it("chatSystem('fr') contient une instruction explicite sur le français (explicite > implicite)", () => {
+    expect(chatSystem('fr')).toContain('français');
   });
 });
 
@@ -207,7 +209,7 @@ describe('imageSystem', () => {
     const result = imageSystem('fr', 'enfant');
     expect(result).toContain('illustrateur');
     expect(result).toContain('6-10 ans');
-    expect(result).not.toContain('IMPORTANT: Generate ALL content');
+    expect(result).toContain('français');
   });
 
   it('returns string containing illustration instructions for EN adult', () => {

@@ -21,9 +21,8 @@ const LANG_NAMES: Record<string, string> = {
 };
 
 export function langInstruction(lang = 'fr'): string {
-  if (lang === 'fr') return '';
   const name = LANG_NAMES[lang] || lang;
-  return `\n\nIMPORTANT: Generate ALL content in ${name}. All text, titles, explanations, vocabulary must be in ${name}.`;
+  return `\n\nIMPORTANT : génère TOUT le contenu en ${name} (textes, titres, explications, vocabulaire). Ne mélange pas les langues.`;
 }
 
 // ── Age group adaptation ─────────────────────────────────────────────
@@ -325,18 +324,39 @@ Reponds en JSON strict:
 {"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
 }
 
+// ── Feedback age instruction (verifyAnswer-specific) ────────────────
+// Helper dédié à la correction de quiz vocal — distinct de ageInstruction() qui
+// est calibré pour la GÉNÉRATION de contenu long (et pousserait un correcteur
+// adulte vers "complexité maximale, analyse critique" — inadapté au feedback binaire).
+
+export function feedbackAgeInstruction(ageGroup: AgeGroup = 'enfant'): string {
+  const byAge: Record<AgeGroup, string> = {
+    enfant:
+      'Feedback court (1-2 phrases), enthousiaste et encourageant. Utilise "Bravo !", "Super !" quand c\'est juste. Rassure et encourage avec douceur quand c\'est faux.',
+    ado: 'Feedback court et dynamique (1-2 phrases). "Bien joué !", "C\'est ça !" si juste. "Presque !" ou "Essaie encore" si faux, avec un indice court.',
+    etudiant:
+      'Feedback concis et informatif (1-2 phrases). "Correct." ou "Exact." si juste. "Incorrect." + rappel de la bonne réponse si faux, sans fioritures.',
+    adulte:
+      "Feedback factuel et neutre (1 phrase). Pas d'enthousiasme superflu. Confirmation claire si juste, rectification précise si faux.",
+  };
+  return byAge[ageGroup];
+}
+
 // ── Verify answer (quiz vocal correction) ───────────────────────────
 // Centralise (Phase 1A.2) le prompt inline historique de generators/quiz-vocal.ts.
-// Phase 1A : signature equivalente, texte verbatim, age hardcode "9 ans" preserve.
-// Le fix reel (ageGroup parametre, helper feedbackAgeInstruction) releve de Phase 1B.1.
-// `correctAnswerLine` represente le format "X) text" deja compose par l'appelant.
+// Phase 1B.1 : ageGroup ajouté au signature, le hardcode "pour enfants (9 ans)" est
+// remplacé par feedbackAgeInstruction(ageGroup). langInstruction(lang) reste
+// concaténée à la fin pour garantir la langue du feedback final.
+// `correctAnswerLine` représente le format "X) text" déjà composé par l'appelant.
 
 export function verifyAnswerSystem(
   choicesList: string,
   correctAnswerLine: string,
+  ageGroup: AgeGroup = 'enfant',
   lang = 'fr',
 ): string {
-  return `Tu es un correcteur de quiz pour enfants (9 ans). Compare la reponse de l'eleve avec la bonne reponse.
+  return `Tu es un correcteur de quiz. Compare la reponse de l'eleve avec la bonne reponse.
+${feedbackAgeInstruction(ageGroup)}
 
 Les choix disponibles sont :
 ${choicesList}
@@ -345,8 +365,8 @@ La bonne reponse est : ${correctAnswerLine}
 
 Regles strictes :
 - L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
-- Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true avec un feedback enthousiaste comme "Bravo !" ou "Excellent !".
-- Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback encourageant qui explique la bonne reponse.
+- Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
+- Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - Ne dis JAMAIS "presque bon" ou "presque correct" quand la reponse EST correcte. Soit c'est bon, soit c'est faux.
 - Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
 
