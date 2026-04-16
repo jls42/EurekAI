@@ -47,7 +47,7 @@ export async function verifyAnswer(
   options: VerifyAnswerOptions = {},
 ): Promise<{ correct: boolean; feedback: string }> {
   const { model = 'mistral-large-latest', lang = 'fr', ageGroup = 'enfant' } = options;
-  // Phase 2.5 — Aligner le strip sur LABEL_RE (via stripChoiceLabel) pour absorber
+  // Phase 2.5 — Aligner le strip sur le parseur de label (via stripChoiceLabel) pour absorber
   // les mêmes dérives typographiques que toSpokenChoice. Avant : strip strict /^[A-D]\)\s*/
   // ne reconnaissait que "A)" mais pas "A." ou "A:" — incohérent si le modèle dérive.
   const correctAnswer = choices[correctIndex] ? stripChoiceLabel(choices[correctIndex]) : '';

@@ -1,50 +1,50 @@
 import { describe, it, expect } from 'vitest';
-import { LABEL_RE, spokenChoiceLabel, toSpokenChoice, stripChoiceLabel } from './choice-labels.js';
+import { parseChoiceLabel, spokenChoiceLabel, toSpokenChoice, stripChoiceLabel } from './choice-labels.js';
 
-describe('LABEL_RE', () => {
+describe('parseChoiceLabel', () => {
   it('matches standard labels A) B) C) D)', () => {
-    expect('A) Paris'.match(LABEL_RE)).not.toBeNull();
-    expect('B) Lyon'.match(LABEL_RE)).not.toBeNull();
-    expect('C) Marseille'.match(LABEL_RE)).not.toBeNull();
-    expect('D) Toulouse'.match(LABEL_RE)).not.toBeNull();
+    expect(parseChoiceLabel('A) Paris')).toEqual({ label: 'A', text: 'Paris' });
+    expect(parseChoiceLabel('B) Lyon')).toEqual({ label: 'B', text: 'Lyon' });
+    expect(parseChoiceLabel('C) Marseille')).toEqual({ label: 'C', text: 'Marseille' });
+    expect(parseChoiceLabel('D) Toulouse')).toEqual({ label: 'D', text: 'Toulouse' });
   });
 
   it('tolerates typographic variants (different punctuation, extra spaces)', () => {
     // Different punctuation
-    expect('A. Paris'.match(LABEL_RE)).not.toBeNull();
-    expect('A: Paris'.match(LABEL_RE)).not.toBeNull();
+    expect(parseChoiceLabel('A. Paris')).toEqual({ label: 'A', text: 'Paris' });
+    expect(parseChoiceLabel('A: Paris')).toEqual({ label: 'A', text: 'Paris' });
     // Extra spaces
-    expect('A  )  Paris'.match(LABEL_RE)).not.toBeNull();
-    expect('  A) Paris  '.match(LABEL_RE)).not.toBeNull();
-    expect('A )Paris'.match(LABEL_RE)).not.toBeNull();
+    expect(parseChoiceLabel('A  )  Paris')).toEqual({ label: 'A', text: 'Paris' });
+    expect(parseChoiceLabel('  A) Paris  ')).toEqual({ label: 'A', text: 'Paris  ' });
+    expect(parseChoiceLabel('A )Paris')).toEqual({ label: 'A', text: 'Paris' });
   });
 
   it('NEVER matches words that begin with A/B/C/D but have no real separator', () => {
     // CRITICAL: these would cause catastrophic false-matches like "choix A : lice"
-    expect('Alice'.match(LABEL_RE)).toBeNull();
-    expect('Dunkerque'.match(LABEL_RE)).toBeNull();
-    expect('Berlin'.match(LABEL_RE)).toBeNull();
-    expect('Cardinal'.match(LABEL_RE)).toBeNull();
+    expect(parseChoiceLabel('Alice')).toBeNull();
+    expect(parseChoiceLabel('Dunkerque')).toBeNull();
+    expect(parseChoiceLabel('Berlin')).toBeNull();
+    expect(parseChoiceLabel('Cardinal')).toBeNull();
   });
 
   it('NEVER matches phrases starting with letter + space (no punctuation)', () => {
     // "A propos" → would otherwise become "choix A : propos de la Révolution"
-    expect('A propos de la Révolution'.match(LABEL_RE)).toBeNull();
-    expect('A Paris'.match(LABEL_RE)).toBeNull();
+    expect(parseChoiceLabel('A propos de la Révolution')).toBeNull();
+    expect(parseChoiceLabel('A Paris')).toBeNull();
   });
 
   it('NEVER matches letter + dash (volontarily excluded for "A-t-on" safety)', () => {
-    expect('A-t-on le droit de questionner ?'.match(LABEL_RE)).toBeNull();
-    expect('A-Paris'.match(LABEL_RE)).toBeNull();
+    expect(parseChoiceLabel('A-t-on le droit de questionner ?')).toBeNull();
+    expect(parseChoiceLabel('A-Paris')).toBeNull();
   });
 
   it('does not match accented A (not in [A-D])', () => {
-    expect('À Paris'.match(LABEL_RE)).toBeNull();
+    expect(parseChoiceLabel('À Paris')).toBeNull();
   });
 
   it('does not match letters outside A-D', () => {
-    expect('E) Other'.match(LABEL_RE)).toBeNull();
-    expect('a) lowercase'.match(LABEL_RE)).toBeNull();
+    expect(parseChoiceLabel('E) Other')).toBeNull();
+    expect(parseChoiceLabel('a) lowercase')).toBeNull();
   });
 });
 
@@ -98,7 +98,7 @@ describe('stripChoiceLabel', () => {
     expect(stripChoiceLabel('B) Lyon')).toBe('Lyon');
   });
 
-  it('strips typographic variants (aligned with LABEL_RE — Phase 2.5 alignment)', () => {
+  it('strips typographic variants (aligned with the label parser — Phase 2.5 alignment)', () => {
     expect(stripChoiceLabel('A. Paris')).toBe('Paris');
     expect(stripChoiceLabel('A: Paris')).toBe('Paris');
     expect(stripChoiceLabel('A  )  Paris')).toBe('Paris');

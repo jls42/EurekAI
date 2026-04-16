@@ -3,7 +3,7 @@
 // mais sont transformés en repères oraux localisés au moment du TTS.
 
 /**
- * Regex tolérante aux dérives typographiques du modèle, MAIS qui exige
+ * Parseur tolérant aux dérives typographiques du modèle, MAIS qui exige
  * une PONCTUATION OBLIGATOIRE après la lettre (avec espaces tolérés
  * avant/après). Ponctuation acceptée : `)`, `.`, `:`.
  *
@@ -19,14 +19,40 @@
  * - Si dérive vers "A Paris" sans ponctuation : pas strippé, TTS lit "A Paris" tel
  *   quel — dégradé mais pas cassé.
  *
- * Note ReDoS : SonarCloud (S5852) flag les `\s*` comme potentiellement vulnérables
- * au catastrophic backtracking. Faux positif ici : les 3 quantifiers `\s*` sont
- * suivis de classes DISJOINTES ([A-D], [).:], end-of-string), donc le moteur ne
- * peut pas backtracker ambigument. De plus, l'input est borné (un texte de choix,
- * < 200 chars) — le risque DoS réel est nul.
+ * Implémentation volontairement déterministe, sans regex multi-quantifiée,
+ * pour éviter le hotspot Sonar S5852.
  */
-// NOSONAR(S5852) — voir note ReDoS ci-dessus : classes disjointes, input borné, sûr.
-export const LABEL_RE = /^\s*([A-D])\s*[).:]\s*(.*)$/;
+const WHITESPACE_RE = /\s/u;
+const LINE_TERMINATOR_RE = /[\n\r\u2028\u2029]/u;
+
+function isWhitespace(char: string | undefined): boolean {
+  return char !== undefined && WHITESPACE_RE.test(char);
+}
+
+function skipWhitespace(raw: string, start: number): number {
+  let index = start;
+  while (index < raw.length && isWhitespace(raw[index])) index += 1;
+  return index;
+}
+
+export function parseChoiceLabel(raw: string): { label: string; text: string } | null {
+  let index = skipWhitespace(raw, 0);
+
+  const label = raw[index];
+  if (label !== 'A' && label !== 'B' && label !== 'C' && label !== 'D') return null;
+
+  index = skipWhitespace(raw, index + 1);
+
+  const punctuation = raw[index];
+  if (punctuation !== ')' && punctuation !== '.' && punctuation !== ':') return null;
+
+  index = skipWhitespace(raw, index + 1);
+
+  const text = raw.slice(index);
+  if (LINE_TERMINATOR_RE.test(text)) return null;
+
+  return { label, text };
+}
 
 const SPOKEN_LABEL_BY_LANG: Record<string, string> = {
   fr: 'choix',
@@ -54,20 +80,17 @@ export function spokenChoiceLabel(lang: string): string {
  * retourne le texte inchangé — dégradation acceptée plutôt que faux-match.
  */
 export function toSpokenChoice(raw: string, lang: string): string {
-  // NOSONAR(S6594) — String.match() est strictement équivalent à RegExp.exec() ici
-  // (pas de flag /g). Préférence stylistique de SonarCloud, pas un vrai défaut.
-  const m = raw.match(LABEL_RE);
-  if (!m) return raw;
-  return `${spokenChoiceLabel(lang)} ${m[1]} : ${m[2]}`;
+  const parsed = parseChoiceLabel(raw);
+  if (!parsed) return raw;
+  return `${spokenChoiceLabel(lang)} ${parsed.label} : ${parsed.text}`;
 }
 
 /**
  * Strippe le label A)/B)/C)/D) d'un choix pour comparaison avec une réponse
- * d'élève (utilisé par verifyAnswer). Aligné sur LABEL_RE pour absorber les
- * mêmes dérives typographiques que toSpokenChoice.
+ * d'élève (utilisé par verifyAnswer). Aligné sur le parseur de label pour
+ * absorber les mêmes dérives typographiques que toSpokenChoice.
  */
 export function stripChoiceLabel(raw: string): string {
-  // NOSONAR(S6594) — voir note dans toSpokenChoice ci-dessus.
-  const m = raw.match(LABEL_RE);
-  return m ? m[2] : raw;
+  const parsed = parseChoiceLabel(raw);
+  return parsed ? parsed.text : raw;
 }
