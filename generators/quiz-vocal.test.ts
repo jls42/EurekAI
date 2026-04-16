@@ -119,15 +119,10 @@ describe('quiz-vocal', () => {
 
     it('passes lang parameter to the system prompt', async () => {
       const client = createChatClient(true, 'Well done!');
-      await verifyAnswer(
-        client,
-        'Capital of France?',
-        ['Paris', 'London'],
-        0,
-        'Paris',
-        'mistral-large-latest',
-        'en',
-      );
+      await verifyAnswer(client, 'Capital of France?', ['Paris', 'London'], 0, 'Paris', {
+        model: 'mistral-large-latest',
+        lang: 'en',
+      });
 
       const call = client.chat.complete.mock.calls[0][0];
       expect(call.messages[0].content).toContain('English');

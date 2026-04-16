@@ -32,16 +32,21 @@ export async function transcribeAudio(
   return result.text;
 }
 
+export interface VerifyAnswerOptions {
+  model?: string;
+  lang?: string;
+  ageGroup?: AgeGroup;
+}
+
 export async function verifyAnswer(
   client: Mistral,
   question: string,
   choices: string[],
   correctIndex: number,
   studentAnswer: string,
-  model = 'mistral-large-latest',
-  lang = 'fr',
-  ageGroup: AgeGroup = 'enfant',
+  options: VerifyAnswerOptions = {},
 ): Promise<{ correct: boolean; feedback: string }> {
+  const { model = 'mistral-large-latest', lang = 'fr', ageGroup = 'enfant' } = options;
   // Phase 2.5 — Aligner le strip sur LABEL_RE (via stripChoiceLabel) pour absorber
   // les mêmes dérives typographiques que toSpokenChoice. Avant : strip strict /^[A-D]\)\s*/
   // ne reconnaissait que "A)" mais pas "A." ou "A:" — incohérent si le modèle dérive.

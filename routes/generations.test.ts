@@ -600,9 +600,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
       ['Paris', 'Lyon', 'Marseille', 'Nice'],
       0,
       'spoken answer',
-      'm',
-      'fr',
-      'enfant',
+      { model: 'm', lang: 'fr', ageGroup: 'enfant' },
     );
 
     const result = res.json.mock.calls[0][0];
@@ -623,16 +621,14 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
 
     await handler(req, res);
 
-    // Le 7ème argument doit être 'fr' (lang par défaut), le 8ème 'enfant' (ageGroup par défaut).
+    // 6ème arg = options object avec lang/ageGroup par défaut.
     expect(verifyAnswer).toHaveBeenCalledWith(
       expect.anything(),
       expect.anything(),
       expect.anything(),
       expect.anything(),
       expect.anything(),
-      expect.anything(),
-      'fr',
-      'enfant',
+      expect.objectContaining({ lang: 'fr', ageGroup: 'enfant' }),
     );
   });
 
@@ -653,7 +649,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
 
     // ageGroup figé sur la génération > body → 'enfant' (fallback car quizGen.ageGroup === undefined)
     const lastCall = (verifyAnswer as any).mock.calls[(verifyAnswer as any).mock.calls.length - 1];
-    expect(lastCall[7]).toBe('enfant'); // 8th param = ageGroup
+    expect(lastCall[5]).toEqual(expect.objectContaining({ ageGroup: 'enfant' }));
   });
 
   it('LEGACY: utilise req.body.lang en fallback pour quiz vocaux sans lang persisté (best-effort)', async () => {
@@ -671,7 +667,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     // Quiz legacy sans lang persisté → fallback sur req.body.lang = 'en'
     expect(transcribeAudio).toHaveBeenCalledWith(client, expect.anything(), 'answer.webm', 'en');
     const lastCall = (verifyAnswer as any).mock.calls[(verifyAnswer as any).mock.calls.length - 1];
-    expect(lastCall[6]).toBe('en'); // 7th param = lang
+    expect(lastCall[5]).toEqual(expect.objectContaining({ lang: 'en' }));
   });
 
   it('retourne 404 quand la generation n existe pas', async () => {

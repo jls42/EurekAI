@@ -99,6 +99,22 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
+// Phase 1B.3 — Allowlist locale pour /generate/auto (cf. décision produit #8).
+// executePlan() ne sait exécuter que ces 5 agents ; le router peut en proposer 7.
+// Extrait au niveau module pour réduire la complexité cyclomatique du handler auto.
+const AUTO_EXECUTABLE = new Set(['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast']);
+
+function splitByAutoExecutable<T extends { agent: string }>(
+  plan: T[],
+): { executable: T[]; skipped: T[] } {
+  const executable: T[] = [];
+  const skipped: T[] = [];
+  for (const step of plan) {
+    (AUTO_EXECUTABLE.has(step.agent) ? executable : skipped).push(step);
+  }
+  return { executable, skipped };
+}
+
 function buildGenContext(
   store: ProjectStore,
   profileStore: ProfileStore,
@@ -734,11 +750,7 @@ export function generateRoutes(
         res.status(400).json({ error: autoCtxError });
         return;
       }
-      const rawCount = req.body.count ? Number(req.body.count) : undefined;
-      const count =
-        rawCount && Number.isFinite(rawCount)
-          ? Math.min(Math.max(Math.round(rawCount), 1), 50)
-          : undefined;
+      const count = parseCount(req.body.count);
 
       logger.info('auto', 'Smart routing: analyzing content...');
       const autoPid = String(req.params.pid);
@@ -753,13 +765,9 @@ export function generateRoutes(
       );
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
 
-      // Phase 1B.3 — Allowlist locale (cf. décision produit #8). Le router peut proposer
-      // les 7 agents valides, mais executePlan ne sait exécuter que ces 5. Filtrer ici
-      // (consommateur défaillant) plutôt que dans le router (producteur partagé) pour ne
-      // pas régresser le flow UI principal qui utilise /generate/route + routes dédiées.
-      const AUTO_EXECUTABLE = new Set(['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast']);
-      const executablePlan = route.plan.filter((step) => AUTO_EXECUTABLE.has(step.agent));
-      const skippedSteps = route.plan.filter((step) => !AUTO_EXECUTABLE.has(step.agent));
+      const { executable: executablePlan, skipped: skippedSteps } = splitByAutoExecutable(
+        route.plan,
+      );
       if (skippedSteps.length > 0) {
         logger.warn(
           'auto',

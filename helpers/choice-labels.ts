@@ -18,7 +18,14 @@
  * - Espace seul rejeté : "A propos" ne doit pas devenir "choix A : propos".
  * - Si dérive vers "A Paris" sans ponctuation : pas strippé, TTS lit "A Paris" tel
  *   quel — dégradé mais pas cassé.
+ *
+ * Note ReDoS : SonarCloud (S5852) flag les `\s*` comme potentiellement vulnérables
+ * au catastrophic backtracking. Faux positif ici : les 3 quantifiers `\s*` sont
+ * suivis de classes DISJOINTES ([A-D], [).:], end-of-string), donc le moteur ne
+ * peut pas backtracker ambigument. De plus, l'input est borné (un texte de choix,
+ * < 200 chars) — le risque DoS réel est nul.
  */
+// NOSONAR(S5852) — voir note ReDoS ci-dessus : classes disjointes, input borné, sûr.
 export const LABEL_RE = /^\s*([A-D])\s*[).:]\s*(.*)$/;
 
 const SPOKEN_LABEL_BY_LANG: Record<string, string> = {
@@ -47,6 +54,8 @@ export function spokenChoiceLabel(lang: string): string {
  * retourne le texte inchangé — dégradation acceptée plutôt que faux-match.
  */
 export function toSpokenChoice(raw: string, lang: string): string {
+  // NOSONAR(S6594) — String.match() est strictement équivalent à RegExp.exec() ici
+  // (pas de flag /g). Préférence stylistique de SonarCloud, pas un vrai défaut.
   const m = raw.match(LABEL_RE);
   if (!m) return raw;
   return `${spokenChoiceLabel(lang)} ${m[1]} : ${m[2]}`;
@@ -58,6 +67,7 @@ export function toSpokenChoice(raw: string, lang: string): string {
  * mêmes dérives typographiques que toSpokenChoice.
  */
 export function stripChoiceLabel(raw: string): string {
+  // NOSONAR(S6594) — voir note dans toSpokenChoice ci-dessus.
   const m = raw.match(LABEL_RE);
   return m ? m[2] : raw;
 }

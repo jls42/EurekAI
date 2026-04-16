@@ -347,9 +347,7 @@ export function generationCrudRoutes(
         question.choices,
         question.correct,
         transcription,
-        config.models.quizVerify,
-        lang,
-        ageGroup,
+        { model: config.models.quizVerify, lang, ageGroup },
       );
       console.log(`  Result: ${result.correct ? 'correct' : 'incorrect'} — ${result.feedback}`);
 
