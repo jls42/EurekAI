@@ -1,6 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
-import { routerSystem } from '../prompts.js';
+import { routerSystem, defaultReasonFor } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
 export interface RoutePlan {
@@ -24,6 +24,52 @@ const AGE_LABELS: Record<AgeGroup, string> = {
   etudiant: 'un etudiant de 16-25 ans',
   adulte: 'un adulte',
 };
+
+const MAX_PLAN_LENGTH = 6;
+
+/**
+ * Normalise un plan brut renvoyé par le LLM (Phase 2.4 — cf. décision produit #5) :
+ * 1. Filtrage des noms invalides (pas dans VALID_AGENTS).
+ * 2. Si liste vide après filtrage → fallback catastrophe [summary, flashcards, quiz].
+ * 3. Sinon : déduplication (1ère occurrence gardée, ordre du modèle préservé).
+ * 4. Invariant summary : ajouté en tête s'il est absent ; jamais déplacé s'il est présent.
+ * 5. Troncature aux MAX_PLAN_LENGTH premiers (6).
+ *
+ * Pas de complétion forcée à 3 — si le modèle renvoie 1-2 agents délibérément (source
+ * courte), on respecte ce jugement.
+ */
+export function normalizePlan(
+  rawPlan: Array<{ agent: string; reason: string }>,
+  lang: string,
+): Array<{ agent: string; reason: string }> {
+  // 1. Filter invalid agent names
+  const filtered = rawPlan.filter((step) => VALID_AGENTS.has(step.agent));
+
+  // 2. Catastrophe fallback: empty after filtering → return defaults immediately
+  if (filtered.length === 0) {
+    return [
+      { agent: 'summary', reason: defaultReasonFor('summary', lang) },
+      { agent: 'flashcards', reason: defaultReasonFor('flashcards', lang) },
+      { agent: 'quiz', reason: defaultReasonFor('quiz', lang) },
+    ];
+  }
+
+  // 3. Deduplicate while preserving model's order
+  const seen = new Set<string>();
+  const deduped = filtered.filter((step) => {
+    if (seen.has(step.agent)) return false;
+    seen.add(step.agent);
+    return true;
+  });
+
+  // 4. Summary invariant: prepend if absent, never relocate if present
+  if (!seen.has('summary')) {
+    deduped.unshift({ agent: 'summary', reason: defaultReasonFor('summary', lang) });
+  }
+
+  // 5. Truncate to max
+  return deduped.slice(0, MAX_PLAN_LENGTH);
+}
 
 export async function routeRequest(
   client: Mistral,
@@ -50,6 +96,6 @@ export async function routeRequest(
 
   const raw = getContent(response);
   const parsed = safeParseJson<RoutePlan>(raw);
-  parsed.plan = (parsed.plan ?? []).filter((step) => VALID_AGENTS.has(step.agent));
+  parsed.plan = normalizePlan(parsed.plan ?? [], lang);
   return parsed;
 }

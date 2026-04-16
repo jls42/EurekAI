@@ -2,14 +2,19 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { verifyAnswerSystem } from '../prompts.js';
+import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion } from '../types.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
   voiceId: string,
   ttsOptions: TtsOptions,
+  lang = 'fr',
 ): Promise<Buffer> {
-  const text = `${question.question} ${question.choices.join('. ')}`;
+  // Phase 2.5 — Transformer "A) Paris" en "choix A : Paris" (localisé) avant TTS,
+  // pour éviter que le moteur ne prononce "A parenthèse fermée Paris".
+  const spokenChoices = question.choices.map((c) => toSpokenChoice(c, lang));
+  const text = `${question.question} ${spokenChoices.join('. ')}`;
   return textToSpeech(text, voiceId, ttsOptions);
 }
 
@@ -37,9 +42,12 @@ export async function verifyAnswer(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<{ correct: boolean; feedback: string }> {
-  const correctAnswer = choices[correctIndex]?.replace(/^[A-D]\)\s*/, '') ?? '';
+  // Phase 2.5 — Aligner le strip sur LABEL_RE (via stripChoiceLabel) pour absorber
+  // les mêmes dérives typographiques que toSpokenChoice. Avant : strip strict /^[A-D]\)\s*/
+  // ne reconnaissait que "A)" mais pas "A." ou "A:" — incohérent si le modèle dérive.
+  const correctAnswer = choices[correctIndex] ? stripChoiceLabel(choices[correctIndex]) : '';
   const choicesList = choices
-    .map((c, i) => `${String.fromCodePoint(65 + i)}) ${c.replace(/^[A-D]\)\s*/, '')}`)
+    .map((c, i) => `${String.fromCodePoint(65 + i)}) ${stripChoiceLabel(c)}`)
     .join('\n');
 
   const correctAnswerLine = `${String.fromCodePoint(65 + correctIndex)}) ${correctAnswer}`;

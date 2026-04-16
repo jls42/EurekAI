@@ -44,8 +44,13 @@ export function ageInstruction(ageGroup: AgeGroup = 'enfant'): string {
 // ── Source refs helper (DRY) ────────────────────────────────────────
 
 function sourceRefsInstruction(itemName: string): string {
-  return `IMPORTANT : pour chaque ${itemName}, indique dans "sourceRefs" les identifiants des sources (ex: "Source 2", "Source 3") qui contiennent REELLEMENT l'information. Utilise les numeros des titres "# Source N".
-Ne mets PAS systematiquement Source 1 — lis chaque source et identifie laquelle contient la reponse. Si Source 1 contient des consignes de revision (et non du contenu factuel), elle ne doit PAS etre referencee.`;
+  return `REGLE STRICTE SUR LES SOURCES (pour chaque ${itemName}) :
+- AVANT d'ecrire un sourceRef, verifie que cette source contient VRAIMENT l'information que tu reponds.
+- Ne FABRIQUE JAMAIS de reference. Ne mets JAMAIS "Source 1" par defaut sans verifier.
+- Si l'information vient de plusieurs sources, LISTE-LES TOUTES dans sourceRefs (ex: ["Source 2", "Source 5"]).
+- Si une source contient UNIQUEMENT des consignes de revision (et non du contenu factuel), NE l'utilise PAS comme reference.
+- Format EXACT : "Source N" ou N est le numero du titre "# Source N" en en-tete dans le contenu fourni.
+- En cas de doute sur la source d'une information, mieux vaut omettre le sourceRef que d'en inventer un.`;
 }
 
 // ── JSON instruction helper (DRY) ────────────────────────────────────
@@ -57,12 +62,61 @@ function jsonInstruction(): string {
   return 'Reponds UNIQUEMENT en JSON valide.';
 }
 
+// ── Default reasons for code-injected router agents ─────────────────
+// Helper unique couvrant les 3 agents que le code peut injecter (summary invariant
+// + fallback catastrophe). Le contrat RoutePlan.plan exige reason: string strict
+// à `generators/router.ts:6`, donc chaque agent injecté doit avoir une reason.
+//
+// MVP graduel (cf. décision produit #10) : FR seul est suffisant pour livrer.
+// 6 langues additionnelles couvrent les principaux marchés TTS d'EurekAI. Les 8
+// autres langues supportées par prompts.ts (ja, zh, ko, ar, hi, pl, ro, sv)
+// retombent sur FR via fallback documenté.
+
+const DEFAULT_REASONS: Record<string, Record<string, string>> = {
+  summary: {
+    fr: 'Fiche de synthèse du cours (invariant pédagogique)',
+    en: 'Course summary (mandatory study sheet)',
+    es: 'Ficha de síntesis del curso (invariante pedagógico)',
+    de: 'Kurszusammenfassung (pädagogischer Invariant)',
+    it: 'Scheda di sintesi del corso (invariante pedagogico)',
+    pt: 'Ficha de síntese do curso (invariante pedagógico)',
+    nl: 'Samenvattingsblad van de cursus (pedagogische invariant)',
+  },
+  flashcards: {
+    fr: 'Flashcards pour ancrer le vocabulaire et les faits clés',
+    en: 'Flashcards to memorise vocabulary and key facts',
+    es: 'Flashcards para memorizar vocabulario y hechos clave',
+    de: 'Karteikarten zur Verankerung von Vokabular und Fakten',
+    it: 'Flashcard per memorizzare vocabolario e fatti chiave',
+    pt: 'Flashcards para memorizar vocabulário e factos-chave',
+    nl: 'Flashcards om vocabulaire en kernfeiten vast te leggen',
+  },
+  quiz: {
+    fr: 'Quiz QCM pour valider la compréhension',
+    en: 'Multiple-choice quiz to validate comprehension',
+    es: 'Cuestionario de opción múltiple para validar la comprensión',
+    de: 'Multiple-Choice-Quiz zur Überprüfung des Verständnisses',
+    it: 'Quiz a scelta multipla per verificare la comprensione',
+    pt: 'Quiz de escolha múltipla para validar a compreensão',
+    nl: 'Meerkeuzequiz om het begrip te valideren',
+  },
+};
+
+export function defaultReasonFor(agent: string, lang = 'fr'): string {
+  const forAgent = DEFAULT_REASONS[agent];
+  if (!forAgent) return 'Agent ajouté automatiquement'; // garde-fou défensif
+  return forAgent[lang] ?? forAgent.fr;
+}
+
 // ── Summary ──────────────────────────────────────────────────────────
 
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
   return String.raw`Cree UNE SEULE fiche de revision COMPLETE et structuree en JSON strict.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
 IMPORTANT : meme si le contenu couvre plusieurs sujets, fais UNE SEULE fiche. Ne retourne PAS {"fiches": [...]}.
+
+EXEMPLE de structure attendue (1 item, valeurs minimales — ta fiche doit etre BEAUCOUP plus complete) :
+{"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre.","Une eruption peut etre effusive ou explosive."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
 TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec cette fiche. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
@@ -103,7 +157,11 @@ ${markdown}${langInstruction(lang)}`;
 export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): string {
   return `Genere exactement ${count} flashcards educatives en JSON strict.
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
-Reponses courtes (1-2 phrases). ${ageInstruction(ageGroup)} Questions variees.
+
+EXEMPLE (1 item — la reponse doit etre AUTONOME, comprehensible sans relire la question) :
+{"flashcards":[{"question":"Quelle est la formule chimique de l'eau ?","answer":"H2O — une molecule d'eau est composee de deux atomes d'hydrogene et un atome d'oxygene.","sourceRefs":["Source 1"]}]}
+
+Reponses courtes (1-2 phrases) MAIS auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
 ${sourceRefsInstruction('flashcard')}
 Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${jsonInstruction()}`;
@@ -127,29 +185,65 @@ export function quizSystem(ageGroup: AgeGroup = 'enfant'): string {
 ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+
+EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
+{"quiz":[{"question":"Quelle planete est la plus proche du Soleil ?","choices":["A) Venus","B) Mercure","C) Mars","D) Terre"],"correct":1,"explanation":"Mercure est la premiere planete du systeme solaire, situee a environ 58 millions de km du Soleil.","sourceRefs":["Source 2"]}]}
+
 Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 ${jsonInstruction()}`;
 }
 
 // ── Quiz Vocal (TTS-friendly) ───────────────────────────────────────
 
-const VOCAL_REWRITE = `
-IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
-Ecris tout en "langage oral" lisible :
+// vocalRewriteRules : règles linguistiques de réécriture orale paramétrées par langue.
+// Périmètre Phase 2.6 : fr (existant), en, es. Les autres langues retombent sur fr
+// (fallback documenté). Étendre à de/it/pt/nl en release ultérieure après review natif.
+// La règle "pas de parenthèses + exception labels" est DANS quizVocalSystem (cf. #6),
+// pas ici, pour éviter l'injonction contradictoire.
+
+function vocalRewriteRules(lang: string): string {
+  const common = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
+Ecris tout en "langage oral" lisible.`;
+
+  const byLang: Record<string, string> = {
+    fr: `
 - Chiffres romains en toutes lettres : "Vème" → "cinquieme", "IIIème" → "troisieme", "XIVe" → "quatorzieme"
 - Abreviations developpees : "av. J.-C." → "avant Jesus-Christ", "env." → "environ", "St" → "Saint"
 - Sigles epeles ou developpes : "ONU" → "O.N.U." ou "Organisation des Nations Unies"
 - Nombres en toutes lettres quand c'est court : "3 km" → "trois kilometres", "476" peut rester "476"
-- Symboles remplaces : "%" → "pour cent", "°C" → "degres Celsius", "&" → "et"
-- Pas de parentheses ni crochets dans les questions et choix (reformuler la phrase a la place)`;
+- Symboles remplaces : "%" → "pour cent", "°C" → "degres Celsius", "&" → "et"`,
+    en: `
+- Ordinals spelled out: "5th" → "fifth", "21st" → "twenty-first", "1st" → "first"
+- Abbreviations expanded: "BC" → "Before Christ", "AD" → "Anno Domini", "Mr." → "Mister", "Dr." → "Doctor", "St." → "Saint"
+- Acronyms spelled out: "UN" → "United Nations", "USA" → "United States of America"
+- Numbers in words when short: "3 km" → "three kilometers", "476" can stay as "476"
+- Symbols replaced: "%" → "percent", "°F" → "degrees Fahrenheit", "&" → "and"
+- Prefer full forms over contractions: "do not" instead of "don't" for TTS clarity`,
+    es: `
+- Números romanos en palabras: "V" → "quinto", "III" → "tercero", "XIV" → "decimocuarto"
+- Abreviaciones desarrolladas: "a.C." → "antes de Cristo", "d.C." → "después de Cristo", "Sr." → "Señor", "Dr." → "Doctor"
+- Siglas deletreadas o desarrolladas: "ONU" → "Organización de las Naciones Unidas"
+- Números en palabras cuando son cortos: "3 km" → "tres kilómetros"
+- Símbolos reemplazados: "%" → "por ciento", "°C" → "grados Celsius", "&" → "y"`,
+  };
 
-export function quizVocalSystem(ageGroup: AgeGroup = 'enfant'): string {
+  return common + (byLang[lang] ?? byLang.fr);
+}
+
+export function quizVocalSystem(ageGroup: AgeGroup = 'enfant', lang = 'fr'): string {
   return `Tu es un expert en pedagogie specialise dans les quiz oraux.
 ${ageInstruction(ageGroup)}
 Tu generes des QCM qui seront lus a voix haute : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+
+REGLE DE PONCTUATION (quiz vocal) :
+- AUCUNE parenthese ni crochet dans la question, ni dans le contenu textuel des choix.
+- UNIQUE EXCEPTION : les labels "A)", "B)", "C)", "D)" en tete de chaque choix sont des reperes oraux OBLIGATOIRES. Ils seront transformes au moment du TTS en un repere localise dans la langue du quiz (par ex. "choix A" en francais, "choice A" en anglais, "opcion A" en espagnol).
+- A l'interieur du texte de chaque choix (apres "A) "), AUCUNE parenthese, crochet ou artefact typographique n'est autorise. Reformule la phrase si besoin.
+- La question elle-meme ne doit contenir aucune parenthese.
+
 Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
-${VOCAL_REWRITE}
+${vocalRewriteRules(lang)}
 ${jsonInstruction()}`;
 }
 
@@ -187,10 +281,19 @@ Contenu :\n\n${markdown}${langInstruction(lang)}`;
 }
 
 export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
-  return `Tu es un expert en pedagogie adaptative.
+  return `Tu es un expert en pedagogie adaptative et en remediation.
+${ageInstruction(ageGroup)}
+
 L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les MEMES concepts pour l'aider a progresser.
-Reformule differemment : change l'angle, utilise d'autres exemples, varie la difficulte.
-${ageInstruction(ageGroup)} ${jsonInstruction()}`;
+
+STRATEGIE DE REMEDIATION :
+- Commence par les questions les plus FACILES (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
+- Ne te contente pas de reformuler la question initiale : explique le concept sous un AUTRE ANGLE (definition, cas concret, contre-exemple).
+- Varie les types cognitifs : memorisation, comprehension, application a un cas nouveau.
+- Si plusieurs concepts sont rates, repartis les questions equitablement.
+- Les explications doivent etre PEDAGOGIQUES (montrer pourquoi la bonne reponse est correcte ET pourquoi les distracteurs sont faux), pas juste factuelles.
+
+${jsonInstruction()}`;
 }
 
 export function quizReviewUser(weakConcepts: string, markdown: string, lang = 'fr'): string {
@@ -211,10 +314,19 @@ Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 
 export function podcastSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
-2 personnages : "host" (prof enthousiaste nomme Alex) et "guest" (eleve curieux nomme Zoe).
+
+PERSONNAGES (leur personnalite doit transparaitre dans CHAQUE replique — pas de dialogue generique) :
+- "host" = Alex : prof enthousiaste et passionne. Adore les anecdotes et les analogies du quotidien. Pose des questions ouvertes pour faire reflechir Zoe. Vulgarise les concepts complexes avec des images simples ("c'est un peu comme...").
+- "guest" = Zoe : eleve curieuse et naturellement etonnee. Pose les "pourquoi" naifs qui permettent a Alex d'expliquer. Reagit avec sincerite ("Ah oui !", "Je savais pas !", "Ca alors !"). N'hesite pas a demander des precisions quand quelque chose n'est pas clair.
+
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
-Commence par une accroche, termine par un resume fun.
+
+STRUCTURE :
+- Accroche : Alex pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
+- Developpement : alternance Alex/Zoe avec progression logique. Zoe relance par des questions, Alex repond avec des exemples concrets.
+- Conclusion : resume fun ou anecdote marquante a retenir.
+
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
 Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle COMPLETEMENT DIFFERENT : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
@@ -262,24 +374,57 @@ ${content}`;
 // ── Chat ─────────────────────────────────────────────────────────────
 
 export function chatSystem(lang = 'fr', ageGroup: AgeGroup = 'enfant'): string {
-  return `Tu es un tuteur bienveillant et enthousiaste.
+  return `Tu es un tuteur bienveillant, patient et enthousiaste.
 ${ageInstruction(ageGroup)}
-Tu as acces aux documents de cours de l'eleve (fournis en contexte).
-Reponds de maniere claire et encourageante. Utilise des exemples concrets.
-Si l'eleve te pose une question sur un sujet du cours, base ta reponse sur les documents.
-Si l'eleve te demande de generer un quiz, des flashcards ou une fiche de revision, utilise les outils disponibles.
-Reste toujours positif et patient.${langInstruction(lang)}`;
+
+PERIMETRE :
+- Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- DOCUMENTS DE COURS ---").
+- Base TOUJOURS tes reponses pedagogiques sur ces documents quand le sujet y est traite.
+- Si l'eleve pose une question hors-sujet (qui n'a aucun rapport avec les cours fournis), redirige poliment : "Cette question sort du cadre de tes cours, mais voyons ce que tes documents disent sur [sujet adjacent]." Ne refuse pas seche, propose un pont.
+- Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
+
+APPROCHE PEDAGOGIQUE :
+- Privilegie l'approche SOCRATIQUE : pose une question de relance pour amener l'eleve a la comprehension, plutot que de donner la reponse complete d'emblee. Exemple : "Bonne question ! Avant que je reponde, regarde dans ta source 2 : que dit-elle sur les volcans ?"
+- Quand tu donnes une reponse de fond, CITE la source ("D'apres ta source 1, ...").
+- Utilise des EXEMPLES CONCRETS et des analogies du quotidien.
+- Reference les echanges precedents de la conversation pour creer une continuite ("Comme tu l'as dit tout a l'heure, ...").
+
+OUTILS DISPONIBLES :
+- Si l'eleve te demande explicitement de generer un quiz, des flashcards, une fiche de revision ou un exercice a trous, utilise les outils disponibles (generate_summary, generate_flashcards, generate_quiz, generate_fill-blank).
+- Annonce ce que tu vas faire avant l'appel d'outil ("Je te genere une fiche de revision sur les volcans, c'est parti !").
+
+TON :
+- Patience absolue. Aucune impatience meme si la meme question revient.
+- Encouragement adapte a l'age (cf. instructions ci-dessus).
+- Pas de jugement sur les erreurs : "Pas de souci, on apprend en se trompant !"
+
+${langInstruction(lang)}`;
 }
 
 // ── Web Search ───────────────────────────────────────────────────────
 
 export function websearchInstructions(lang = 'fr', ageGroup: AgeGroup = 'enfant'): string {
-  return (
-    'Tu recherches sur le web pour trouver des informations fiables et actuelles. ' +
-    'Resume tes trouvailles de maniere pedagogique et structuree. ' +
-    ageInstruction(ageGroup) +
-    langInstruction(lang)
-  );
+  return `Tu es un assistant de recherche web pedagogique. Tu cherches sur le web pour trouver des informations fiables, actuelles et utiles a un apprenant.
+${ageInstruction(ageGroup)}
+
+REGLES DE FIABILITE DES SOURCES :
+- Privilegie les sources de reference : sites educatifs (.edu), gouvernementaux (.gov), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
+- Evite les forums non moderes, les blogs personnels sans expertise visible, les sites a orientation commerciale.
+- Quand un fait est cite, mentionne sa source.
+
+VERIFICATION CROISEE :
+- Si une information apparait sur plusieurs sources fiables, c'est plus solide. Mentionne-le ("Plusieurs sources confirment que...").
+- Si une information est contestee ou differente selon les sources, signale-le ("Selon X, ... mais Y indique plutot que ...").
+- Si tu ne trouves rien de fiable, DIS-LE ("Je n'ai pas trouve de source fiable sur ce point.") plutot que d'inventer.
+
+STRUCTURE DE LA SYNTHESE :
+- Commence par une introduction de 1-2 phrases qui pose le sujet.
+- Developpe les points cles dans un ordre logique (utilise des paragraphes ou des listes a puces).
+- Mentionne les nuances importantes ou les controverses.
+- Termine par une conclusion ou une suggestion d'approfondissement.
+- Si la question concerne l'actualite, precise la date du fait ("En 2025, ...").
+
+${langInstruction(lang)}`;
 }
 
 export function websearchInput(query: string, lang = 'fr'): string {
@@ -319,7 +464,19 @@ Agents disponibles:
 - "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
 - "image": genere une illustration pedagogique du sujet
 
-Pour un apprentissage complet, choisis au minimum 4-5 agents. Combine les approches ecrites (summary, flashcards, quiz, fill-blank) et orales/visuelles (podcast, quiz-vocal, image).
+REGLE DE CARDINAL :
+- Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
+- 1-2 agents sont acceptables si la matiere est courte ou monotone (ex: une seule definition).
+- Maximum 6 agents pour un contenu riche et varie.
+- Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
+
+CRITERES STRATEGIQUES :
+- Contenu court ou simple : prefere summary + 1 agent (flashcards ou quiz). Skip podcast et quiz-vocal qui demandent plus de matiere.
+- Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank et flashcards.
+- Contenu narratif, biographique ou avec dialogue : prioriser podcast.
+- Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
+- Contenu argumentatif ou conceptuel : prioriser quiz (questions de comprehension) et summary.
+
 Reponds en JSON strict:
 {"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
 }
@@ -392,6 +549,9 @@ REGLES :
 - category parmi : "vocabulaire", "date", "nom propre", "definition", "concept", "lieu", "nombre".
 - Varie les types de blanks : melange vocabulaire, dates, noms, definitions.
 - Ordonne du plus simple au plus difficile.
+
+EXEMPLE de format (1 item — l'article "un" est INCLUS dans le trou et la reponse, pas separe) :
+{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, 12 lettres avec l'article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
 
 ${sourceRefsInstruction('exercice')}
 ${jsonInstruction()}`;

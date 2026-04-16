@@ -408,7 +408,7 @@ export function generateRoutes(
           mistralClient: client,
         } as const;
         for (let i = 0; i < data.length; i++) {
-          const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts);
+          const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
           audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
           logger.info(
             'quiz-vocal',
