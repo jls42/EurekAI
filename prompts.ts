@@ -49,6 +49,15 @@ function sourceRefsInstruction(itemName: string): string {
 Ne mets PAS systematiquement Source 1 — lis chaque source et identifie laquelle contient la reponse. Si Source 1 contient des consignes de revision (et non du contenu factuel), elle ne doit PAS etre referencee.`;
 }
 
+// ── JSON instruction helper (DRY) ────────────────────────────────────
+// Texte verbatim identique aux 7 occurrences dans prompts.ts (lignes 72, 99, 119,
+// 144, 179, 210, 308 avant refacto). Utilisé pour factoriser sans changer le texte
+// effectif envoyé à Mistral.
+
+function jsonInstruction(): string {
+  return 'Reponds UNIQUEMENT en JSON valide.';
+}
+
 // ── Summary ──────────────────────────────────────────────────────────
 
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
@@ -69,13 +78,15 @@ REGLES DE COUVERTURE :
 
 ${ageInstruction(ageGroup)}
 Cite tes sources [Source 1], [Source 2], etc. dans les key_points et le summary.
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
 
-// Legacy export
-export const SUMMARY_SYSTEM = summarySystem('enfant');
-
-export function summaryUser(markdown: string, hasConsigne = false, lang = 'fr', exclusions?: string): string {
+export function summaryUser(
+  markdown: string,
+  hasConsigne = false,
+  lang = 'fr',
+  exclusions?: string,
+): string {
   const consigneBlock = hasConsigne
     ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
     : `Aucune consigne specifique n'est fournie. Fais une synthese complete de TOUTES les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec cette seule fiche.`;
@@ -96,13 +107,15 @@ Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["So
 Reponses courtes (1-2 phrases). ${ageInstruction(ageGroup)} Questions variees.
 ${sourceRefsInstruction('flashcard')}
 Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
 
-// Legacy export
-export const FLASHCARDS_SYSTEM = flashcardsSystem('enfant');
-
-export function flashcardsUser(markdown: string, count = 5, lang = 'fr', exclusions?: string): string {
+export function flashcardsUser(
+  markdown: string,
+  count = 5,
+  lang = 'fr',
+  exclusions?: string,
+): string {
   let prompt = `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
   return prompt;
@@ -116,11 +129,8 @@ ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
-
-// Legacy export
-export const QUIZ_SYSTEM = quizSystem('enfant');
 
 // ── Quiz Vocal (TTS-friendly) ───────────────────────────────────────
 
@@ -141,10 +151,15 @@ Tu generes des QCM qui seront lus a voix haute : questions claires, choix plausi
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${VOCAL_REWRITE}
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
 
-export function quizVocalUser(markdown: string, count = 15, lang = 'fr', exclusions?: string): string {
+export function quizVocalUser(
+  markdown: string,
+  count = 15,
+  lang = 'fr',
+  exclusions?: string,
+): string {
   let prompt = `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
 Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
@@ -176,11 +191,8 @@ export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie adaptative.
 L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les MEMES concepts pour l'aider a progresser.
 Reformule differemment : change l'angle, utilise d'autres exemples, varie la difficulte.
-${ageInstruction(ageGroup)} Reponds UNIQUEMENT en JSON valide.`;
+${ageInstruction(ageGroup)} ${jsonInstruction()}`;
 }
-
-// Legacy export
-export const QUIZ_REVIEW_SYSTEM = quizReviewSystem('enfant');
 
 export function quizReviewUser(weakConcepts: string, markdown: string, lang = 'fr'): string {
   return `L'eleve a rate ces questions :
@@ -207,11 +219,8 @@ Commence par une accroche, termine par un resume fun.
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
 Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle COMPLETEMENT DIFFERENT : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
-
-// Legacy export
-export const PODCAST_SYSTEM = podcastSystem('enfant');
 
 export function podcastUser(markdown: string, lang = 'fr', exclusions?: string): string {
   let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
@@ -263,9 +272,6 @@ Si l'eleve te demande de generer un quiz, des flashcards ou une fiche de revisio
 Reste toujours positif et patient.${langInstruction(lang)}`;
 }
 
-// Legacy export
-export const CHAT_SYSTEM = chatSystem('fr', 'enfant');
-
 // ── Web Search ───────────────────────────────────────────────────────
 
 export function websearchInstructions(lang = 'fr', ageGroup: AgeGroup = 'enfant'): string {
@@ -277,11 +283,74 @@ export function websearchInstructions(lang = 'fr', ageGroup: AgeGroup = 'enfant'
   );
 }
 
-// Legacy export
-export const WEBSEARCH_INSTRUCTIONS = websearchInstructions('fr', 'enfant');
-
 export function websearchInput(query: string, lang = 'fr'): string {
   return `Recherche des informations sur : ${query}. Donne un resume structure avec les points cles.${langInstruction(lang)}`;
+}
+
+// ── Consigne (detection) ────────────────────────────────────────────
+// Centralise (Phase 1A.2) le prompt inline historique de generators/consigne.ts.
+// Texte strictement verbatim — la valeur retournee est identique a
+// `CONSIGNE_SYSTEM_INLINE + langInstruction(lang)` precedemment dans le generator.
+
+export function consigneSystem(lang = 'fr'): string {
+  return `Tu es un assistant pedagogique expert. Analyse les documents fournis et determine s'ils contiennent des consignes de revision, un programme de controle, des objectifs d'apprentissage, ou des indications du type "Je sais ma lecon si je sais...".
+
+Reponds en JSON strict :
+{"found": true/false, "text": "resume des consignes detectees", "keyTopics": ["point 1", "point 2", ...]}
+
+Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTopics": []}
+${jsonInstruction()}${langInstruction(lang)}`;
+}
+
+// ── Router (orchestrateur) ──────────────────────────────────────────
+// Centralise (Phase 1A.2) le prompt inline historique de generators/router.ts.
+// Texte strictement verbatim — la valeur retournee est identique a celle qui
+// etait construite inline dans `routeRequest()`.
+
+export function routerSystem(ageGroup: AgeGroup = 'enfant', lang = 'fr'): string {
+  return `Tu es un orchestrateur educatif intelligent. Analyse le contenu et decide quels types de materiel generer pour maximiser l'apprentissage.
+${ageInstruction(ageGroup)}
+
+Agents disponibles:
+- "summary": cree des fiches de revision structurees
+- "flashcards": cree des flashcards question/reponse pour memoriser
+- "quiz": cree un quiz QCM ecrit
+- "fill-blank": cree des exercices a trous (phrases avec mots manquants)
+- "podcast": cree un podcast educatif a ecouter (dialogue entre 2 personnes)
+- "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
+- "image": genere une illustration pedagogique du sujet
+
+Pour un apprentissage complet, choisis au minimum 4-5 agents. Combine les approches ecrites (summary, flashcards, quiz, fill-blank) et orales/visuelles (podcast, quiz-vocal, image).
+Reponds en JSON strict:
+{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
+}
+
+// ── Verify answer (quiz vocal correction) ───────────────────────────
+// Centralise (Phase 1A.2) le prompt inline historique de generators/quiz-vocal.ts.
+// Phase 1A : signature equivalente, texte verbatim, age hardcode "9 ans" preserve.
+// Le fix reel (ageGroup parametre, helper feedbackAgeInstruction) releve de Phase 1B.1.
+// `correctAnswerLine` represente le format "X) text" deja compose par l'appelant.
+
+export function verifyAnswerSystem(
+  choicesList: string,
+  correctAnswerLine: string,
+  lang = 'fr',
+): string {
+  return `Tu es un correcteur de quiz pour enfants (9 ans). Compare la reponse de l'eleve avec la bonne reponse.
+
+Les choix disponibles sont :
+${choicesList}
+
+La bonne reponse est : ${correctAnswerLine}
+
+Regles strictes :
+- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
+- Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true avec un feedback enthousiaste comme "Bravo !" ou "Excellent !".
+- Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback encourageant qui explique la bonne reponse.
+- Ne dis JAMAIS "presque bon" ou "presque correct" quand la reponse EST correcte. Soit c'est bon, soit c'est faux.
+- Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
+
+Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
 }
 
 // ── Fill-in-the-blanks ────────────────────────────────────────────────
@@ -305,10 +374,15 @@ REGLES :
 - Ordonne du plus simple au plus difficile.
 
 ${sourceRefsInstruction('exercice')}
-Reponds UNIQUEMENT en JSON valide.`;
+${jsonInstruction()}`;
 }
 
-export function fillBlankUser(markdown: string, count: number, lang = 'fr', exclusions?: string): string {
+export function fillBlankUser(
+  markdown: string,
+  count: number,
+  lang = 'fr',
+  exclusions?: string,
+): string {
   let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
 
 Format JSON :

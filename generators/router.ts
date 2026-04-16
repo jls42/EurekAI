@@ -1,6 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
-import { langInstruction, ageInstruction } from '../prompts.js';
+import { routerSystem } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
 export interface RoutePlan {
@@ -9,7 +9,13 @@ export interface RoutePlan {
 }
 
 const VALID_AGENTS = new Set([
-  'summary', 'flashcards', 'quiz', 'fill-blank', 'podcast', 'quiz-vocal', 'image',
+  'summary',
+  'flashcards',
+  'quiz',
+  'fill-blank',
+  'podcast',
+  'quiz-vocal',
+  'image',
 ]);
 
 const AGE_LABELS: Record<AgeGroup, string> = {
@@ -31,21 +37,7 @@ export async function routeRequest(
     messages: [
       {
         role: 'system',
-        content: `Tu es un orchestrateur educatif intelligent. Analyse le contenu et decide quels types de materiel generer pour maximiser l'apprentissage.
-${ageInstruction(ageGroup)}
-
-Agents disponibles:
-- "summary": cree des fiches de revision structurees
-- "flashcards": cree des flashcards question/reponse pour memoriser
-- "quiz": cree un quiz QCM ecrit
-- "fill-blank": cree des exercices a trous (phrases avec mots manquants)
-- "podcast": cree un podcast educatif a ecouter (dialogue entre 2 personnes)
-- "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
-- "image": genere une illustration pedagogique du sujet
-
-Pour un apprentissage complet, choisis au minimum 4-5 agents. Combine les approches ecrites (summary, flashcards, quiz, fill-blank) et orales/visuelles (podcast, quiz-vocal, image).
-Reponds en JSON strict:
-{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`,
+        content: routerSystem(ageGroup, lang),
       },
       {
         role: 'user',

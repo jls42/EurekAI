@@ -3,19 +3,14 @@ import {
   langInstruction,
   ageInstruction,
   summarySystem,
-  SUMMARY_SYSTEM,
   summaryUser,
   flashcardsSystem,
-  FLASHCARDS_SYSTEM,
   flashcardsUser,
   quizSystem,
-  QUIZ_SYSTEM,
   quizUser,
   quizReviewSystem,
-  QUIZ_REVIEW_SYSTEM,
   quizReviewUser,
   podcastSystem,
-  PODCAST_SYSTEM,
   podcastUser,
   fillBlankSystem,
   fillBlankUser,
@@ -23,7 +18,6 @@ import {
   imageSystem,
   imageUser,
   websearchInstructions,
-  WEBSEARCH_INSTRUCTIONS,
   websearchInput,
 } from './prompts.js';
 import type { AgeGroup } from './types.js';
@@ -72,26 +66,11 @@ describe('system functions adapt to ageGroup', () => {
   }
 });
 
-// ── Legacy exports (backwards compat) ───────────────────────────────
-
-describe('legacy exports = enfant default', () => {
-  it.each([
-    ['SUMMARY_SYSTEM', SUMMARY_SYSTEM],
-    ['FLASHCARDS_SYSTEM', FLASHCARDS_SYSTEM],
-    ['QUIZ_SYSTEM', QUIZ_SYSTEM],
-    ['QUIZ_REVIEW_SYSTEM', QUIZ_REVIEW_SYSTEM],
-    ['PODCAST_SYSTEM', PODCAST_SYSTEM],
-    ['WEBSEARCH_INSTRUCTIONS', WEBSEARCH_INSTRUCTIONS],
-  ])('%s contient le keyword enfant', (_name, value) => {
-    expect(value).toContain('6-10 ans');
-  });
-});
-
 // ── Specific content tests ──────────────────────────────────────────
 
 describe('SUMMARY', () => {
   it('contient JSON strict', () => {
-    expect(SUMMARY_SYSTEM).toContain('JSON strict');
+    expect(summarySystem('enfant')).toContain('JSON strict');
   });
 
   it('summaryUser inclut le markdown complet', () => {
@@ -102,7 +81,7 @@ describe('SUMMARY', () => {
 
 describe('FLASHCARDS', () => {
   it('contient 5 flashcards', () => {
-    expect(FLASHCARDS_SYSTEM).toContain('5 flashcards');
+    expect(flashcardsSystem('enfant')).toContain('5 flashcards');
   });
 
   it('flashcardsUser inclut le markdown complet', () => {
@@ -112,7 +91,7 @@ describe('FLASHCARDS', () => {
 
 describe('QUIZ', () => {
   it('contient pedagogie', () => {
-    expect(QUIZ_SYSTEM).toContain('pedagogie');
+    expect(quizSystem('enfant')).toContain('pedagogie');
   });
 
   it('quizUser contient QCM et inclut le markdown complet', () => {
@@ -124,7 +103,7 @@ describe('QUIZ', () => {
 
 describe('QUIZ_REVIEW', () => {
   it('contient NOUVELLES questions', () => {
-    expect(QUIZ_REVIEW_SYSTEM).toContain('NOUVELLES questions');
+    expect(quizReviewSystem('enfant')).toContain('NOUVELLES questions');
   });
 
   it('quizReviewUser inclut concepts et markdown', () => {
@@ -136,8 +115,9 @@ describe('QUIZ_REVIEW', () => {
 
 describe('PODCAST', () => {
   it('contient host, guest, Alex, Zoe', () => {
+    const podcast = podcastSystem('enfant');
     for (const kw of ['host', 'guest', 'Alex', 'Zoe']) {
-      expect(PODCAST_SYSTEM).toContain(kw);
+      expect(podcast).toContain(kw);
     }
   });
 
@@ -163,7 +143,7 @@ describe('FILL_BLANK', () => {
 
 describe('WEBSEARCH', () => {
   it('contient pedagogique', () => {
-    expect(WEBSEARCH_INSTRUCTIONS).toContain('pedagogique');
+    expect(websearchInstructions('fr', 'enfant')).toContain('pedagogique');
   });
 
   it("websearchInstructions('en', 'adulte') combine lang + ageGroup", () => {
