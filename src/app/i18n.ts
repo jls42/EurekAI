@@ -23,6 +23,9 @@ export function createI18n() {
       } else if (this.currentProfile) {
         this.currentProfile.locale = lang;
         setProfileLocale(this.currentProfile.id, lang);
+      } else if (typeof this.newProfileLocale === 'string') {
+        // Sans profil actif, la langue UI doit aussi initialiser la langue du prochain profil.
+        this.newProfileLocale = lang;
       }
     },
 

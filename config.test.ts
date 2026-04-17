@@ -81,6 +81,47 @@ describe('saveConfig', () => {
     expect(cfg.voices.host.id).toBe('new-id');
     expect(cfg.voices.guest.name).toBeTruthy(); // guest preserve
   });
+
+  it("preserve la source 'default' quand un save complet renvoie les memes mistralVoices", () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    expect(cfg.mistralVoicesSource).toBe('default');
+
+    setVoiceCache([
+      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      {
+        id: 'oliver-cheerful',
+        name: 'Oliver - Cheerful',
+        languages: ['en_gb'],
+        tags: ['cheerful'],
+      },
+    ]);
+
+    saveConfig({
+      models: { summary: 'new-model' } as any,
+      mistralVoices: { ...cfg.mistralVoices },
+    });
+
+    const updated = getConfig();
+    expect(updated.mistralVoicesSource).toBe('default');
+    expect(resolveVoices(updated, undefined, 'en')).toEqual({
+      host: 'jane-curious',
+      guest: 'oliver-cheerful',
+    });
+    setVoiceCache([]);
+  });
+
+  it("accepte un override explicite via mistralVoicesSource meme si les IDs restent identiques", () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+
+    saveConfig({
+      mistralVoices: { ...cfg.mistralVoices },
+      mistralVoicesSource: 'user',
+    });
+
+    expect(getConfig().mistralVoicesSource).toBe('user');
+  });
 });
 
 describe('getApiStatus', () => {

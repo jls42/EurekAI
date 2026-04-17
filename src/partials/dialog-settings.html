@@ -180,6 +180,7 @@
             <select
               id="cfg-mistral-voice-host"
               x-model="configDraft.mistralVoices.host"
+              @change="configDraft.mistralVoicesSource = 'user'"
               class="w-full input-modern px-3 py-2 text-body-sm"
             >
               <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
@@ -200,6 +201,7 @@
             <select
               id="cfg-mistral-voice-guest"
               x-model="configDraft.mistralVoices.guest"
+              @change="configDraft.mistralVoicesSource = 'user'"
               class="w-full input-modern px-3 py-2 text-body-sm"
             >
               <template x-for="v in mistralVoicesList" :key="'g-'+v.id">

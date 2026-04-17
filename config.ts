@@ -90,9 +90,21 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
     currentConfig.ttsProvider = partial.ttsProvider;
   }
   if (partial.mistralVoices) {
+    const hasExplicitVoiceChange =
+      (partial.mistralVoices.host !== undefined &&
+        partial.mistralVoices.host !== currentConfig.mistralVoices.host) ||
+      (partial.mistralVoices.guest !== undefined &&
+        partial.mistralVoices.guest !== currentConfig.mistralVoices.guest);
     currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
-    // Toute mutation explicite des voix globales = choix utilisateur intentionnel.
-    currentConfig.mistralVoicesSource = 'user';
+    // Un round-trip complet du configDraft ne doit pas transformer une config
+    // "default" en override utilisateur si les IDs n'ont pas réellement changé.
+    if (partial.mistralVoicesSource !== undefined) {
+      currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
+    } else if (hasExplicitVoiceChange) {
+      currentConfig.mistralVoicesSource = 'user';
+    }
+  } else if (partial.mistralVoicesSource !== undefined) {
+    currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
   }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   return currentConfig;
