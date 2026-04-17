@@ -46,6 +46,15 @@ export const hi: Record<string, string> = {
     '\u090F\u0915 TTS \u092A\u094D\u0930\u0926\u093E\u0924\u093E \u0915\u0949\u0928\u094D\u092B\u093C\u093F\u0917\u0930 \u0915\u0930\u0928\u093E \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u0948',
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
+  'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
+  'errorCode.quota_exceeded': 'कोटा समाप्त, कुछ समय बाद पुनः प्रयास करें',
+  'errorCode.upstream_unavailable': 'सेवा अस्थायी रूप से अनुपलब्ध, जल्द ही पुनः प्रयास करें',
+  'errorCode.context_length_exceeded': 'मॉडल के लिए सामग्री बहुत लंबी है',
+  'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
+  'errorCode.upload_failed': 'अपलोड विफल',
+  'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
+
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
   'header.switchToLight':
@@ -310,7 +319,7 @@ export const hi: Record<string, string> = {
     '\u0906\u0935\u093E\u091C\u093C \u0938\u0947 \u091C\u0935\u093E\u092C \u0926\u0947\u0902',
   'quiz.checking': '\u091C\u093E\u0901\u091A \u0930\u0939\u0947 \u0939\u0948\u0902...',
   'quiz.correct': '\u0938\u0939\u0940!',
-  'quiz.incorrect': '\u092C\u093F\u0932\u094D\u0915\u0941\u0932 \u0928\u0939\u0940\u0902...',
+  'quiz.incorrect': '\u0917\u0932\u0924',
   'quiz.youSaid': '\u0906\u092A\u0928\u0947 \u0915\u0939\u093E: {text}',
   'quiz.nextQuestion': '\u0905\u0917\u0932\u093E \u092A\u094D\u0930\u0936\u094D\u0928',
   'quiz.verificationError':

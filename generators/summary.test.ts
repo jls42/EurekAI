@@ -55,9 +55,13 @@ describe('generateSummary', () => {
     const retryCall = client.chat.complete.mock.calls[1][0];
     const retryUserMessage = retryCall.messages[retryCall.messages.length - 1].content;
     const lower = retryUserMessage.toLowerCase();
-    // Phrase exacte de l'ancienne formulation problématique
+    // Phrases exactes des anciennes formulations problématiques — alignées sur
+    // les verrous d'absence de `prompts.test.ts` (cf. .claude/rules/prompts.md §Anti-leak).
     expect(lower).not.toContain('une seule fiche complete');
     expect(lower).not.toContain('fiche complete');
+    expect(lower).not.toContain('la fiche finale');
+    expect(lower).not.toContain('avec cette fiche');
+    expect(lower).not.toContain('resume complet du cours');
     // Règle positive présente — assertions simples
     expect(retryUserMessage).toContain('objet JSON unique');
     expect(retryUserMessage).toContain('premier niveau');
@@ -70,6 +74,35 @@ describe('generateSummary', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] });
 
     await expect(generateSummary(client, 'content')).rejects.toThrow(/generer une fiche valide/);
+  });
+
+  it('lève une SyntaxError finale (→ llm_invalid_json côté route)', async () => {
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] });
+
+    await expect(generateSummary(client, 'content')).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  it('retry API rejection propage le message originel intact (→ quota_exceeded préservé)', async () => {
+    const client = mockClient({});
+    const rateLimitError = new Error('429 rate_limit exceeded on retry');
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockRejectedValueOnce(rateLimitError);
+
+    await expect(generateSummary(client, 'content')).rejects.toBe(rateLimitError);
+  });
+
+  it('retry API rejection context_length propage intact', async () => {
+    const client = mockClient({});
+    const contextError = new Error('context_length_exceeded in retry attempt');
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockRejectedValueOnce(contextError);
+
+    await expect(generateSummary(client, 'content')).rejects.toBe(contextError);
   });
 
   it('handles wrapped response {"fiches": [fiche1]} (single fiche unwrap)', async () => {

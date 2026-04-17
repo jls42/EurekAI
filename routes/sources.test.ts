@@ -464,7 +464,31 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Error: AI error' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+  });
+
+  it('ne fuite pas err.message brut (clé API, URL interne)', async () => {
+    const project = store.createProject('P1');
+    store.addSource(project.meta.id, {
+      id: 's1',
+      filename: 's.txt',
+      markdown: 'content',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'text',
+    });
+    vi.mocked(detectConsigne).mockRejectedValueOnce(
+      new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+    );
+
+    const handler = getHandler(router, 'post', '/:pid/detect-consigne');
+    const req = mockReq({ params: { pid: project.meta.id }, body: {} });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+    expect(serialized).not.toContain('sk-1234');
+    expect(serialized).not.toContain('api.internal');
   });
 });
 
@@ -510,7 +534,7 @@ describe('POST /:pid/moderate', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Error: moderation API down' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
   });
 
   it('retourne unsafe quand le contenu est inapproprie', async () => {
@@ -803,6 +827,73 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].scrapeEngine).toBe('mistral');
   });
 
+  it('log la scrapeError avant le fallback (pas de swallow silencieux)', async () => {
+    const { logger } = await import('../helpers/logger.js');
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const scrapeError = new Error('scrape boom');
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(scrapeError);
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com/broken' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    // Verrou contre la régression vers un `catch {}` qui swallow l'erreur :
+    // le helper doit logger avant de basculer sur web_search.
+    expect(warnSpy).toHaveBeenCalled();
+    const args = warnSpy.mock.calls.find((c) => String(c[0]).includes('sources'));
+    expect(args).toBeDefined();
+    expect(args!.some((a) => a === scrapeError || String(a).includes('scrape boom'))).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('rethrow SyntaxError (bug parser) sans fallback web search silencieux', async () => {
+    const { logger } = await import('../helpers/logger.js');
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => undefined);
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(new SyntaxError('bad HTML fragment'));
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com/corrupt' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    // Verrou : SyntaxError = bug parseur côté nous. Ne doit PAS déclencher la web search
+    // (sinon le bug reste masqué en prod). Le logger.error doit être appelé.
+    expect(webSearchEnrich).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('fallback sur web search pour TypeError (fetch natif DNS/TLS)', async () => {
+    // Régression à prévenir : en Node, `fetch()` natif lance `TypeError: fetch failed`
+    // sur DNS/TLS/ECONNREFUSED. Les URLs mortes doivent fallback sur la web search,
+    // pas crasher. Ne PAS rethrow TypeError comme un bug de code.
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(new TypeError('fetch failed'));
+    vi.mocked(webSearchEnrich).mockResolvedValueOnce({ text: 'web result', elapsed: 0.1 });
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://dead.example.com' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(webSearchEnrich).toHaveBeenCalledTimes(1);
+    const sources = res.json.mock.calls[0][0];
+    expect(sources).toHaveLength(1);
+    expect(sources[0].scrapeEngine).toBe('mistral');
+  });
+
   it('retourne 500 quand scrape et fallback echouent tous les deux', async () => {
     vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
     vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('mistral failed'));
@@ -954,7 +1045,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Transcription echouee: STT API error' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'tts_upstream_error' });
   });
 
   it('ajoute la moderation pending quand le profil a la moderation activee', async () => {
@@ -1108,7 +1199,10 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Echec upload: bad.jpg: OCR failed' });
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'upload_failed',
+      failures: [{ filename: 'bad.jpg', error: 'internal_error' }],
+    });
   });
 
   it('retourne { sources, failures } en partial success quand un fichier sur deux echoue', async () => {
@@ -1135,7 +1229,7 @@ describe('POST /:pid/sources/upload', () => {
     const payload = res.json.mock.calls[0][0];
     expect(payload.sources).toHaveLength(1);
     expect(payload.sources[0].filename).toBe('good.jpg');
-    expect(payload.failures).toEqual([{ filename: 'bad.jpg', error: 'OCR crashed' }]);
+    expect(payload.failures).toEqual([{ filename: 'bad.jpg', error: 'internal_error' }]);
 
     // Verifie que seul le fichier reussi est persiste dans le store
     const updated = store.getProject(project.meta.id);
@@ -1164,7 +1258,11 @@ describe('POST /:pid/sources/upload', () => {
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
-      error: 'Echec upload: a.jpg: OCR down; b.jpg: timeout',
+      error: 'upload_failed',
+      failures: [
+        { filename: 'a.jpg', error: 'internal_error' },
+        { filename: 'b.jpg', error: 'internal_error' },
+      ],
     });
     const updated = store.getProject(project.meta.id);
     expect(updated!.sources).toHaveLength(0);

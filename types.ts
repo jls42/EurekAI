@@ -177,15 +177,22 @@ export type Generation =
 
 // Codes d'erreur stables renvoyés par /generate/auto via FailedStep.
 // Contrat client : les détails bruts (err.message, stack) restent dans les logs serveur.
+// - quota_exceeded : 429 / tier limit / rate limit côté compte utilisateur.
+// - upstream_unavailable : 503 / 529 / "overloaded" / "capacity" — saturation backend
+//   non liée au budget utilisateur, retry typiquement utile.
+// - tts_upstream_error : pile audio (TTS + STT), libellé i18n explicite.
 export type FailedStepCode =
   | 'llm_invalid_json'
   | 'quota_exceeded'
+  | 'upstream_unavailable'
   | 'tts_upstream_error'
   | 'context_length_exceeded'
   | 'internal_error';
 
 export interface FailedStep {
-  agent: string;
+  // Toujours un agent exécutable par /generate/auto (cf. AUTO_AGENTS_SET) :
+  // les étapes skippedSteps vont dans un champ distinct avant exécution.
+  agent: import('./generators/auto-agents.js').AutoAgentType;
   code: FailedStepCode;
 }
 

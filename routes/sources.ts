@@ -13,6 +13,7 @@ import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
@@ -171,8 +172,8 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
       }
       logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-      const msg = e instanceof Error ? e.message : String(e);
-      return { failure: { filename: file.originalname, error: msg } };
+      // Code stable (pas d'err.message brut) : les détails restent dans logger.error ci-dessus.
+      return { failure: { filename: file.originalname, error: extractErrorCode(e) } };
     }
   }
 
@@ -193,8 +194,8 @@ export function sourceRoutes(
   /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
   function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
     if (results.length === 0) {
-      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
-      res.status(500).json({ error: `Echec upload: ${aggregated}` });
+      // error = code stable ; failures[] expose par-fichier { filename, error: code }.
+      res.status(500).json({ error: 'upload_failed', failures });
       return;
     }
     if (failures.length === 0) {
@@ -330,9 +331,7 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
       logger.error('sources', 'STT error:', e);
-      res.status(500).json({
-        error: `Transcription echouee: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      res.status(500).json({ error: extractErrorCode(e, 'stt') });
     }
   });
 
@@ -362,8 +361,22 @@ export function sourceRoutes(
         scrapeEngine: result.engine,
         moderation: modCats ? pendingModeration() : undefined,
       };
-    } catch {
-      logger.warn('sources', `URL scrape failed for "${url}", falling back to web search`);
+    } catch (scrapeError) {
+      // Discrimination : SyntaxError signe un bug de parseur (JSON/HTML corrompu côté
+      // notre code), pas une panne réseau — on log en error et rethrow pour surfacer le
+      // bug au lieu de le masquer derrière un fallback web search trompeur.
+      // Note : TypeError n'est PAS rethrow ici car `fetch()` natif de Node lance
+      // `TypeError: fetch failed` sur DNS/TLS/ECONNREFUSED — c'est le cas le plus courant
+      // pour les URLs mortes saisies par un enfant, elles doivent fallback sur la web search.
+      if (scrapeError instanceof SyntaxError) {
+        logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
+        throw scrapeError;
+      }
+      logger.warn(
+        'sources',
+        `URL scrape failed for "${url}", falling back to web search:`,
+        scrapeError,
+      );
     }
     try {
       const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
@@ -510,9 +523,7 @@ export function sourceRoutes(
       res.json(sources);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
-      res.status(500).json({
-        error: `Recherche web echouee: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 
@@ -549,7 +560,7 @@ export function sourceRoutes(
       res.json(result);
     } catch (e) {
       logger.error('consigne', 'detection error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 
@@ -565,7 +576,7 @@ export function sourceRoutes(
       res.json(result);
     } catch (e) {
       logger.error('moderation', 'error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 

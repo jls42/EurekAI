@@ -65,7 +65,7 @@ async function fetchWithLightpanda(url: string): Promise<string> {
 
 /** Extract text content from a Mistral chat completion response choice. */
 export function getContent(response: {
-  choices?: Array<{ message: { content?: unknown } }>;
+  choices?: Array<{ message?: { content?: unknown } }>;
 }): string {
   const content = response.choices?.[0]?.message?.content;
   return typeof content === 'string' ? content : '';

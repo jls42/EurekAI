@@ -49,6 +49,15 @@ export const ar: Record<string, string> = {
     '\u064a\u062a\u0637\u0644\u0651\u0628 \u0645\u0632\u0648\u0651\u062f TTS \u0645\u064f\u0647\u064a\u0651\u0623',
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
+  'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
+  'errorCode.quota_exceeded': 'تم تجاوز الحصة، أعد المحاولة لاحقا',
+  'errorCode.upstream_unavailable': 'الخدمة غير متاحة مؤقتا، أعد المحاولة قريبا',
+  'errorCode.context_length_exceeded': 'المحتوى طويل جدا بالنسبة للنموذج',
+  'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
+  'errorCode.upload_failed': 'فشل التحميل',
+  'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
+
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',
   'header.switchToLight':
@@ -307,7 +316,7 @@ export const ar: Record<string, string> = {
   'quiz.answerMic': '\u0623\u062c\u0628 \u0628\u0627\u0644\u0635\u0648\u062a',
   'quiz.checking': '\u062c\u0627\u0631\u064d \u0627\u0644\u062a\u062d\u0642\u0651\u0642...',
   'quiz.correct': '\u0635\u062d\u064a\u062d!',
-  'quiz.incorrect': '\u0644\u064a\u0633 \u062a\u0645\u0627\u0645\u0627\u064b...',
+  'quiz.incorrect': '\u062e\u0637\u0623',
   'quiz.youSaid': '\u0642\u0644\u062a: {text}',
   'quiz.nextQuestion': '\u0627\u0644\u0633\u0624\u0627\u0644 \u0627\u0644\u062a\u0627\u0644\u064a',
   'quiz.verificationError':

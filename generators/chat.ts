@@ -65,13 +65,14 @@ export async function chatWithSources(
   });
 
   const choice = response.choices![0]; // NOSONAR(S4325) — choices always present in non-streaming response
+  const message = choice.message!; // NOSONAR(S4325) — message always present on non-streaming choice
   const toolCalls: string[] = [];
 
   // Handle tool calls (max 3)
-  if (choice.message.toolCalls && choice.message.toolCalls.length > 0) {
-    apiMessages.push(choice.message);
+  if (message.toolCalls && message.toolCalls.length > 0) {
+    apiMessages.push(message);
 
-    const calls = choice.message.toolCalls.slice(0, 3);
+    const calls = message.toolCalls.slice(0, 3);
     for (const tc of calls) {
       const fnName = tc.function.name;
       toolCalls.push(fnName);
@@ -90,14 +91,14 @@ export async function chatWithSources(
       tools: TOOLS,
     });
 
-    const finalContent = finalResponse.choices![0].message.content; // NOSONAR(S4325) — choices always present in non-streaming response
+    const finalContent = finalResponse.choices![0].message!.content; // NOSONAR(S4325) — choices/message always present in non-streaming response
     return {
       reply: typeof finalContent === 'string' ? finalContent : '',
       toolCalls,
     };
   }
 
-  const content = choice.message.content;
+  const content = message.content;
   return {
     reply: typeof content === 'string' ? content : '',
     toolCalls,

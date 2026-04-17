@@ -414,6 +414,26 @@ describe('verifyAnswerSystem invariants', () => {
       expect(result.toLowerCase()).not.toMatch(/pas tout à fait/);
     });
   }
+
+  it('impose une structure de feedback avec opener binaire', () => {
+    const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
+    expect(result).toContain('STRUCTURE OBLIGATOIRE');
+    // Opener imposé pour correct=false (few-shot + règle)
+    expect(result).toMatch(/negation nette/);
+    expect(result).toContain('"Non,"');
+    // Few-shot avec feedback qui commence par "Non,"
+    expect(result).toMatch(/"feedback":\s*"Non,/);
+  });
+
+  it('utilise un few-shot hors-domaine des quiz classiques (anti-collision)', () => {
+    // Le few-shot est verrouillé sur Mercure/Venus plutôt que Paris/France : si la vraie
+    // question porte sur la capitale de la France, le LLM risque de recopier l'exemple
+    // littéralement. Cf. .claude/rules/prompts.md §Few-shots (contenu transférable,
+    // pas un cas pédagogique ultra-courant).
+    const result = verifyAnswerSystem('A) Mercure', 'A) Mercure', 'enfant', 'fr');
+    expect(result).toContain('Mercure');
+    expect(result).not.toMatch(/la capitale de la France/);
+  });
 });
 
 // ── feedbackAgeInstruction invariants ──────────────────────────────

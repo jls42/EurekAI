@@ -338,9 +338,11 @@ describe('generateRoutes', () => {
       expect(updatedProject!.results.generations[0].type).toBe('summary');
     });
 
-    it('handles generator errors -> 500', async () => {
+    it('handles generator errors -> 500 with stable code, no err.message leak', async () => {
       const { generateSummary } = await import('../generators/summary.js');
-      (generateSummary as any).mockRejectedValueOnce(new Error('API error'));
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -358,7 +360,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('API error') });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('uses default lang=fr and ageGroup=enfant when not provided', async () => {
@@ -1073,9 +1078,11 @@ describe('generateRoutes', () => {
       expect(result.plan[1].agent).toBe('flashcards');
     });
 
-    it('returns 500 when routeRequest fails', async () => {
+    it('returns 500 with stable code and no err.message leak when routeRequest fails', async () => {
       const { routeRequest } = await import('../generators/router.js');
-      (routeRequest as any).mockRejectedValueOnce(new Error('Route analysis failed'));
+      (routeRequest as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1093,9 +1100,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({
-        error: expect.stringContaining('Route analysis failed'),
-      });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('applies consigne when present and useConsigne is not false', async () => {
@@ -1198,7 +1206,13 @@ describe('generateRoutes', () => {
       expect(result.generations).toHaveLength(2);
       expect(result.generations[0].type).toBe('summary');
       expect(result.generations[1].type).toBe('flashcards');
+      // Contrat succès complet : aucun champ d'échec dans le body, status 200.
+      // Verrouille l'absence (pas juste failedSteps: []) contre une régression du
+      // spread conditionnel dans routes/generate.ts.
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(result.failedSteps).toBeUndefined();
+      expect(result.skippedSteps).toBeUndefined();
+      expect(result.error).toBeUndefined();
 
       // Verify all generations were stored
       const updatedProject = store.getProject(pid);
@@ -1272,9 +1286,11 @@ describe('generateRoutes', () => {
       ]);
     });
 
-    it('returns 500 when routeRequest itself fails', async () => {
+    it('returns 500 with stable code and no err.message leak when routeRequest itself fails', async () => {
       const { routeRequest } = await import('../generators/router.js');
-      (routeRequest as any).mockRejectedValueOnce(new Error('Router API error'));
+      (routeRequest as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1292,7 +1308,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('Router API error') });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('handles empty plan from router', async () => {
@@ -1428,7 +1447,7 @@ describe('generateRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(502);
       const body = res.json.mock.calls[0][0];
-      expect(body.error).toBe('auto.allStepsFailed');
+      expect(body.error).toBe('all_steps_failed');
       expect(body.generations).toHaveLength(0);
       expect(body.failedSteps).toHaveLength(2);
     });
@@ -1517,6 +1536,99 @@ describe('generateRoutes', () => {
       expect(serialized).not.toContain('sk-1234');
       expect(serialized).not.toContain('api.internal');
       expect(body.failedSteps[0].code).toBe('internal_error');
+    });
+
+    it('failedSteps[].code est context_length_exceeded pour erreur de contexte', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('context_length_exceeded: too many tokens in prompt'),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('context_length_exceeded');
+    });
+
+    it("succès partiel : status 200, generations + failedSteps, pas d'error top-level", async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'flashcards', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('429 rate_limit'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      // Status 200 (pas 502 tant qu'au moins une generation a réussi)
+      expect(res.status).toHaveBeenCalledWith(200);
+      const body = res.json.mock.calls[0][0];
+      // Flashcards ok, summary échoue
+      expect(body.generations).toHaveLength(1);
+      expect(body.generations[0].type).toBe('flashcards');
+      expect(body.failedSteps).toEqual([{ agent: 'summary', code: 'quota_exceeded' }]);
+      // Pas de top-level error dans le cas partial-success
+      expect(body.error).toBeUndefined();
+    });
+
+    it('failedSteps[].code est tts_upstream_error pour quiz-vocal', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const quizMod = (await import('../generators/quiz.js')) as any;
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'quiz-vocal', reason: 'r' }],
+        context: 'ctx',
+      });
+      quizMod.generateQuizVocal.mockRejectedValueOnce(new Error('TTS API unreachable'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0]).toEqual({ agent: 'quiz-vocal', code: 'tts_upstream_error' });
     });
   });
 

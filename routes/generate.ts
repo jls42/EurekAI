@@ -24,11 +24,12 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
-import { AUTO_AGENTS_SET } from '../generators/auto-agents.js';
+import { AUTO_AGENTS_SET, type AutoAgentType } from '../generators/auto-agents.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
   const selected =
@@ -110,34 +111,23 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
-// Map une erreur brute vers un code client stable. Pas d'err.message dans la réponse HTTP :
-// les détails (clés API, URLs internes, stack) restent dans logger.error côté serveur.
-function extractErrorCode(err: unknown, agent: string): FailedStepCode {
-  if (err instanceof SyntaxError) return 'llm_invalid_json';
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/429|rate_?limit|quota/i.test(msg)) return 'quota_exceeded';
-  if (/context[_ ]?length|token.*limit|too.?long/i.test(msg)) return 'context_length_exceeded';
-  if (agent === 'podcast' || agent === 'quiz-vocal') {
-    // Les erreurs qui remontent depuis un agent audio sans signature reconnue au-dessus
-    // viennent très probablement de la pile TTS (generateAudio / ttsQuestion / saveAudioFile).
-    return 'tts_upstream_error';
-  }
-  return 'internal_error';
-}
-
-// Source unique avec generators/router.ts VALID_AGENTS : garantit qu'aucun
-// agent valide renvoyé par le routeur ne peut tomber dans skippedSteps.
-// skippedSteps reste dans la réponse pour future divergence possible
-// (VALID_AGENTS ⊋ AUTO_EXECUTABLE).
 const AUTO_EXECUTABLE = AUTO_AGENTS_SET;
+
+// Narrow `agent: string` vers `AutoAgentType` côté executable après le check runtime
+// sur AUTO_EXECUTABLE.has — permet à FailedStep.agent de rester typé sans cast ailleurs.
+type WithAgent<T, A> = Omit<T, 'agent'> & { agent: A };
 
 function splitByAutoExecutable<T extends { agent: string }>(
   plan: T[],
-): { executable: T[]; skipped: T[] } {
-  const executable: T[] = [];
+): { executable: Array<WithAgent<T, AutoAgentType>>; skipped: T[] } {
+  const executable: Array<WithAgent<T, AutoAgentType>> = [];
   const skipped: T[] = [];
   for (const step of plan) {
-    (AUTO_EXECUTABLE.has(step.agent) ? executable : skipped).push(step);
+    if (AUTO_EXECUTABLE.has(step.agent)) {
+      executable.push(step as WithAgent<T, AutoAgentType>);
+    } else {
+      skipped.push(step);
+    }
   }
   return { executable, skipped };
 }
@@ -197,7 +187,7 @@ function handleGeneration(
   profileStore: ProfileStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
   modelId?: string,
-  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
+  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean; agentName?: string },
 ) {
   return async (req: Request, res: Response) => {
     const pid = req.params.pid as string;
@@ -231,7 +221,7 @@ function handleGeneration(
         persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
       }
       logger.error('generate', 'error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e, options?.agentName) });
     }
   };
 }
@@ -245,34 +235,40 @@ export function generateRoutes(
 
   router.post(
     '/:pid/generate/summary',
-    handleGeneration(store, profileStore, async (ctx) => {
-      logger.info(
-        'summary',
-        `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-      );
-      const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
-      const data = await generateSummary(
-        client,
-        ctx.markdown,
-        ctx.config.models.summary,
-        ctx.hasConsigne,
-        ctx.lang,
-        ctx.ageGroup,
-        exclusions,
-      );
-      logger.info(
-        'summary',
-        `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
-      );
-      return {
-        id: randomUUID(),
-        title: autoTitle('summary', data, ctx.lang),
-        createdAt: new Date().toISOString(),
-        sourceIds: ctx.sourceIds,
-        type: 'summary',
-        data,
-      };
-    }),
+    handleGeneration(
+      store,
+      profileStore,
+      async (ctx) => {
+        logger.info(
+          'summary',
+          `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+        );
+        const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
+        const data = await generateSummary(
+          client,
+          ctx.markdown,
+          ctx.config.models.summary,
+          ctx.hasConsigne,
+          ctx.lang,
+          ctx.ageGroup,
+          exclusions,
+        );
+        logger.info(
+          'summary',
+          `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
+        );
+        return {
+          id: randomUUID(),
+          title: autoTitle('summary', data, ctx.lang),
+          createdAt: new Date().toISOString(),
+          sourceIds: ctx.sourceIds,
+          type: 'summary',
+          data,
+        };
+      },
+      undefined,
+      { agentName: 'summary' },
+    ),
   );
 
   router.post(
@@ -301,6 +297,7 @@ export function generateRoutes(
         };
       },
       'flashcards',
+      { agentName: 'flashcards' },
     ),
   );
 
@@ -330,6 +327,7 @@ export function generateRoutes(
         };
       },
       'quiz',
+      { agentName: 'quiz' },
     ),
   );
 
@@ -378,6 +376,7 @@ export function generateRoutes(
         };
       },
       'podcast',
+      { agentName: 'podcast' },
     ),
   );
 
@@ -422,7 +421,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { skipContextCheck: true },
+      { skipContextCheck: true, agentName: 'quiz-review' },
     ),
   );
 
@@ -484,6 +483,7 @@ export function generateRoutes(
         };
       },
       'quiz',
+      { agentName: 'quiz-vocal' },
     ),
   );
 
@@ -518,7 +518,7 @@ export function generateRoutes(
         };
       },
       'mistral-large-latest',
-      { checkRawMarkdown: true },
+      { checkRawMarkdown: true, agentName: 'image' },
     ),
   );
 
@@ -553,6 +553,7 @@ export function generateRoutes(
         };
       },
       'quiz',
+      { agentName: 'fill-blank' },
     ),
   );
 
@@ -764,7 +765,7 @@ export function generateRoutes(
         );
       }
       logger.error('route', 'analysis error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 
@@ -773,13 +774,17 @@ export function generateRoutes(
   // (event-loop single-thread), mais l'agrégation dans generations[]/failedSteps[] est
   // remontée par l'appelant pour contrôler l'ordre de sortie (= ordre du plan).
   async function runStep(
-    step: { agent: string },
+    step: { agent: AutoAgentType },
     autoCtx: AutoCtx,
     st: ProjectStore,
     pid: string,
-  ): Promise<{ ok: true; gen: Generation } | { ok: false; agent: string; code: FailedStepCode }> {
+  ): Promise<
+    { ok: true; gen: Generation } | { ok: false; agent: AutoAgentType; code: FailedStepCode }
+  > {
     const executor = AUTO_EXECUTORS[step.agent];
     if (!executor) {
+      // Cas impossible : executablePlan est déjà filtré via splitByAutoExecutable.
+      // Filet de sécurité en cas de dérive future du typage.
       logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
       return { ok: false, agent: step.agent, code: 'internal_error' };
     }
@@ -818,7 +823,7 @@ export function generateRoutes(
   // Changement observable acté : buildExclusionContext voit l'état initial du projet
   // pour tous les agents, pas les générations produites par les autres étapes en cours.
   async function executePlan(
-    plan: Array<{ agent: string }>,
+    plan: Array<{ agent: AutoAgentType }>,
     autoCtx: AutoCtx,
     st: ProjectStore,
     pid: string,
@@ -833,7 +838,7 @@ export function generateRoutes(
         // runStep catche déjà tout. Ce cas ne devrait pas arriver, mais on le capte
         // quand même pour ne jamais perdre un step du plan.
         logger.error('auto', `${step.agent} unexpected rejection:`, outcome.reason);
-        failedSteps.push({ agent: step.agent, code: 'internal_error' });
+        failedSteps.push({ agent: step.agent, code: extractErrorCode(outcome.reason, step.agent) });
         return;
       }
       const result = outcome.value;
@@ -914,7 +919,9 @@ export function generateRoutes(
         generations,
         ...(failedSteps.length > 0 && { failedSteps }),
         ...(skippedSteps.length > 0 && { skippedSteps }),
-        ...(allFailed && { error: 'auto.allStepsFailed' }),
+        // Code stable (snake_case) cohérent avec FailedStepCode — pas une clé i18n :
+        // les consommateurs API doivent pouvoir brancher leur propre message.
+        ...(allFailed && { error: 'all_steps_failed' }),
       });
     } catch (e) {
       const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
@@ -927,7 +934,7 @@ export function generateRoutes(
         );
       }
       logger.error('auto', 'error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 

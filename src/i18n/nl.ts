@@ -41,6 +41,15 @@ export const nl: Record<string, string> = {
   'gen.contextTooLarge':
     'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
+  'errorCode.internal_error': 'Interne serverfout',
+  'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
+  'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
+  'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',
+  'errorCode.context_length_exceeded': 'Inhoud te lang voor het model',
+  'errorCode.llm_invalid_json': 'Ongeldig AI-antwoord',
+  'errorCode.upload_failed': 'Uploaden mislukt',
+  'errorCode.all_steps_failed': 'Alle generaties mislukt',
+
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
   'header.switchToDark': 'Schakel naar donkere modus',
@@ -237,7 +246,7 @@ export const nl: Record<string, string> = {
   'quiz.answerMic': 'Antwoord met je stem',
   'quiz.checking': 'Controleren...',
   'quiz.correct': 'Goed!',
-  'quiz.incorrect': 'Niet helemaal...',
+  'quiz.incorrect': 'Fout',
   'quiz.youSaid': 'Je zei: {text}',
   'quiz.nextQuestion': 'Volgende vraag',
   'quiz.verificationError': 'Verificatiefout',

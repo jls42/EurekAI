@@ -41,6 +41,16 @@ export const pt: Record<string, string> = {
   'gen.contextTooLarge':
     'Conteudo muito longo ({pct}% da capacidade do modelo). Selecione menos fontes.',
 
+  'errorCode.internal_error': 'Erro interno do servidor',
+  'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
+  'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
+  'errorCode.upstream_unavailable':
+    'Servi\u00e7o temporariamente indispon\u00edvel, tente novamente em breve',
+  'errorCode.context_length_exceeded': 'Conte\u00fado demasiado longo para o modelo',
+  'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
+  'errorCode.upload_failed': 'Falha no envio',
+  'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
+
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
   'header.switchToDark': 'Mudar para modo escuro',
@@ -239,7 +249,7 @@ export const pt: Record<string, string> = {
   'quiz.answerMic': 'Responder por voz',
   'quiz.checking': 'Verificando...',
   'quiz.correct': 'Correto!',
-  'quiz.incorrect': 'N\u00e3o exatamente...',
+  'quiz.incorrect': 'Incorreto',
   'quiz.youSaid': 'Voc\u00ea disse: {text}',
   'quiz.nextQuestion': 'Pr\u00f3xima quest\u00e3o',
   'quiz.verificationError': 'Erro de verifica\u00e7\u00e3o',

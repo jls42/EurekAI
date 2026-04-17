@@ -41,6 +41,16 @@ export const de: Record<string, string> = {
   'gen.contextTooLarge':
     'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
 
+  'errorCode.internal_error': 'Interner Serverfehler',
+  'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
+  'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
+  'errorCode.upstream_unavailable':
+    'Dienst vor\u00fcbergehend nicht verf\u00fcgbar, bitte bald erneut versuchen',
+  'errorCode.context_length_exceeded': 'Inhalt zu lang f\u00fcr das Modell',
+  'errorCode.llm_invalid_json': 'Ung\u00fcltige KI-Antwort',
+  'errorCode.upload_failed': 'Upload fehlgeschlagen',
+  'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
+
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',
   'header.switchToDark': 'Zum dunklen Modus wechseln',
@@ -239,7 +249,7 @@ export const de: Record<string, string> = {
   'quiz.answerMic': 'Per Sprache antworten',
   'quiz.checking': 'Wird gepr\u00fcft...',
   'quiz.correct': 'Richtig!',
-  'quiz.incorrect': 'Nicht ganz...',
+  'quiz.incorrect': 'Falsch',
   'quiz.youSaid': 'Du hast gesagt: {text}',
   'quiz.nextQuestion': 'N\u00e4chste Frage',
   'quiz.verificationError': 'Pr\u00fcfungsfehler',

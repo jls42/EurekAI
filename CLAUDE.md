@@ -50,7 +50,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 ### Codes d'erreur API (FailedStep)
 - `/generate/auto` retourne `failedSteps: FailedStep[]` avec codes stables (`types.ts` : `FailedStepCode`) — jamais `err.message` brut dans la réponse HTTP (fuite potentielle clés API / URLs internes)
 - Codes : `llm_invalid_json`, `quota_exceeded`, `tts_upstream_error`, `context_length_exceeded`, `internal_error`
-- Status 502 quand tous les steps échouent (`allFailed`), 200 sinon
+- Status 502 quand tous les steps échouent (réponse inclut `error: 'all_steps_failed'`), 200 sinon
 - Le détail complet (stack, message) reste dans `logger.error` côté serveur
 
 ### HTML interactif

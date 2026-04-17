@@ -44,6 +44,16 @@ export const fr: Record<string, string> = {
   'gen.contextTooLarge':
     'Contenu trop volumineux ({pct}% de la capacité du modèle). Sélectionnez moins de sources.',
 
+  // Error codes (stable API codes → user-facing message)
+  'errorCode.internal_error': 'Erreur interne du serveur',
+  'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
+  'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
+  'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',
+  'errorCode.context_length_exceeded': 'Contenu trop volumineux pour le modèle',
+  'errorCode.llm_invalid_json': "Réponse invalide de l'IA",
+  'errorCode.upload_failed': "Échec de l'envoi",
+  'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
+
   // Header
   'header.menuProjects': 'Menu projets',
   'header.switchToLight': 'Passer en mode clair',
@@ -253,7 +263,7 @@ export const fr: Record<string, string> = {
   'quiz.answerMic': 'Répondre au micro',
   'quiz.checking': 'Vérification...',
   'quiz.correct': 'Correct !',
-  'quiz.incorrect': 'Pas tout à fait...',
+  'quiz.incorrect': 'Mauvaise réponse',
   'quiz.youSaid': 'Tu as dit : {text}',
   'quiz.nextQuestion': 'Question suivante',
   'quiz.verificationError': 'Erreur de vérification',

@@ -35,6 +35,54 @@ describe('quiz-vocal', () => {
       expect(result).toBeInstanceOf(Buffer);
       expect(result.toString()).toBe('question-audio');
     });
+
+    it('localises A)/B) labels per lang before TTS (FR)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: 'Capitale ?',
+        choices: ['A) Paris', 'B) Lyon'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'fr');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        'Capitale ? choix A : Paris. choix B : Lyon',
+        'v',
+        ttsOptions,
+      );
+    });
+
+    it('localises A)/B) labels per lang before TTS (EN)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: 'Capital?',
+        choices: ['A) Paris', 'B) London'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'en');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        'Capital? choice A : Paris. choice B : London',
+        'v',
+        ttsOptions,
+      );
+    });
+
+    it('localises A)/B) labels per lang before TTS (ES)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: '¿Capital?',
+        choices: ['A) Madrid', 'B) Barcelona'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'es');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        '¿Capital? opción A : Madrid. opción B : Barcelona',
+        'v',
+        ttsOptions,
+      );
+    });
   });
 
   describe('transcribeAudio', () => {

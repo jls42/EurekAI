@@ -55,23 +55,13 @@ function sourceRefsInstruction(itemName: string): string {
 }
 
 // ── JSON instruction helper (DRY) ────────────────────────────────────
-// Texte verbatim identique aux 7 occurrences dans prompts.ts (lignes 72, 99, 119,
-// 144, 179, 210, 308 avant refacto). Utilisé pour factoriser sans changer le texte
-// effectif envoyé à Mistral.
 
 function jsonInstruction(): string {
   return 'Reponds UNIQUEMENT en JSON valide.';
 }
 
-// ── Default reasons for code-injected router agents ─────────────────
-// Helper unique couvrant les 3 agents que le code peut injecter (summary invariant
-// + fallback catastrophe). Le contrat RoutePlan.plan exige reason: string strict
-// à `generators/router.ts:6`, donc chaque agent injecté doit avoir une reason.
-//
-// MVP graduel (cf. décision produit #10) : FR seul est suffisant pour livrer.
-// 6 langues additionnelles couvrent les principaux marchés TTS d'EurekAI. Les 8
-// autres langues supportées par prompts.ts (ja, zh, ko, ar, hi, pl, ro, sv)
-// retombent sur FR via fallback documenté.
+// Contrat `RoutePlan.plan` (cf. generators/router.ts) exige `reason: string`.
+// Langues non listées retombent sur FR (fallback documenté).
 
 const DEFAULT_REASONS: Record<string, Record<string, string>> = {
   summary: {
@@ -604,6 +594,14 @@ Regles strictes :
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - La reponse est soit correcte, soit fausse — binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.
 - Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
+
+STRUCTURE OBLIGATOIRE du feedback :
+- Si correct=true : le feedback DOIT commencer par une validation directe (ex: "Oui", "Exact", "Bravo", "C'est ça", "Correct").
+- Si correct=false : le feedback DOIT commencer par une negation nette (ex: "Non,", "Mauvaise reponse,", "Faux,") suivie immediatement de la bonne reponse. AUCUN mot d'attenuation ou d'encouragement partiel avant la negation.
+
+EXEMPLE (correct=false, sans attenuation) :
+Question: "Quelle planete est la plus proche du Soleil ?" — eleve repond "Venus".
+Feedback attendu: {"correct": false, "feedback": "Non, la planete la plus proche du Soleil est Mercure."}
 
 Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
 }

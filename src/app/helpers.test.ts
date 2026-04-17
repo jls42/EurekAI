@@ -950,6 +950,39 @@ describe('resolveError', () => {
     };
     expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:100')).toBe('100%');
   });
+
+  it('translates stable API codes via errorCode.* prefix', () => {
+    const ctx = {
+      t: (k: string) => (k === 'errorCode.internal_error' ? 'Erreur interne du serveur' : k),
+    };
+    expect(callWith<string>(helpers.resolveError, ctx, 'internal_error')).toBe(
+      'Erreur interne du serveur',
+    );
+  });
+
+  it('falls back to pass-through when stable code has no errorCode.* key', () => {
+    const ctx = { t: (k: string) => k };
+    expect(callWith<string>(helpers.resolveError, ctx, 'unknown_code')).toBe('unknown_code');
+  });
+
+  it('skips errorCode.* branch for mixed-case inputs (only snake_case codes qualify)', () => {
+    // MixedCase fails /^[a-z_]+$/ predicate → goes directly to this.t fallback
+    const ctx = {
+      t: (k: string) => (k === 'errorCode.MixedCase' ? 'SHOULD NOT MATCH' : k),
+    };
+    expect(callWith<string>(helpers.resolveError, ctx, 'MixedCase_CODE')).toBe('MixedCase_CODE');
+  });
+
+  it('prioritizes context_too_large regex over errorCode.* lookup', () => {
+    const ctx = {
+      t: (k: string, params?: any) =>
+        k === 'gen.contextTooLarge' ? `Trop gros ${params?.pct}%` : k,
+    };
+    // context_too_large:50 matches the regex branch first → errorCode.* is never consulted
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:50')).toBe(
+      'Trop gros 50%',
+    );
+  });
 });
 
 describe('activeGenerations', () => {
