@@ -8,6 +8,8 @@ type ErrWithFields = {
 
 type Rule = readonly [RegExp, FailedStepCode];
 
+const EMPTY_FIELDS = Object.freeze({}) as ErrWithFields;
+
 const STATUS_RULES = new Map<number, FailedStepCode>([
   [429, 'quota_exceeded'],
   [503, 'upstream_unavailable'],
@@ -36,25 +38,57 @@ function matchRule(value: string, rules: readonly Rule[]): FailedStepCode | null
   return rules.find(([pattern]) => pattern.test(value))?.[1] ?? null;
 }
 
+function getErrFields(err: unknown): ErrWithFields {
+  if (err === null || typeof err !== 'object') return EMPTY_FIELDS;
+  return err as ErrWithFields;
+}
+
+function getErrorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function readString(value: unknown): string {
+  return typeof value === 'string' ? value : '';
+}
+
+function getStatusMatch(status: unknown): FailedStepCode | null {
+  if (typeof status !== 'number') return null;
+  return STATUS_RULES.get(status) ?? null;
+}
+
+function getStructuredMatch(fields: ErrWithFields): FailedStepCode | null {
+  return getStatusMatch(fields.status) ?? matchRule(readString(fields.code), STRUCTURED_CODE_RULES);
+}
+
+function getAudioMatch(
+  agent: string | undefined,
+  fields: ErrWithFields,
+  message: string,
+): FailedStepCode | null {
+  if (!agent || !TTS_AGENTS.has(agent)) return null;
+  if (readString(fields.stage) === 'tts') return 'tts_upstream_error';
+  return TTS_SIGNATURE.test(message) ? 'tts_upstream_error' : null;
+}
+
+function firstMatch(matches: Array<FailedStepCode | null>): FailedStepCode | null {
+  for (const match of matches) {
+    if (match) return match;
+  }
+  return null;
+}
+
+function resolveErrorCode(err: unknown, agent?: string): FailedStepCode {
+  const fields = getErrFields(err);
+  const message = getErrorMessage(err);
+  const match = firstMatch([
+    getStructuredMatch(fields),
+    matchRule(message, MESSAGE_RULES),
+    getAudioMatch(agent, fields, message),
+  ]);
+  return match ?? 'internal_error';
+}
+
 export function extractErrorCode(err: unknown, agent?: string): FailedStepCode {
   if (err instanceof SyntaxError) return 'llm_invalid_json';
-
-  const fields = err !== null && typeof err === 'object' ? (err as ErrWithFields) : {};
-  const message = err instanceof Error ? err.message : String(err);
-  const status =
-    typeof fields.status === 'number' ? (STATUS_RULES.get(fields.status) ?? null) : null;
-  const code = typeof fields.code === 'string' ? fields.code : '';
-  const stage = typeof fields.stage === 'string' ? fields.stage : '';
-  const audio =
-    agent && TTS_AGENTS.has(agent) && (stage === 'tts' || TTS_SIGNATURE.test(message))
-      ? 'tts_upstream_error'
-      : null;
-
-  return (
-    status ??
-    matchRule(code, STRUCTURED_CODE_RULES) ??
-    matchRule(message, MESSAGE_RULES) ??
-    audio ??
-    'internal_error'
-  );
+  return resolveErrorCode(err, agent);
 }
