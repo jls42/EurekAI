@@ -100,6 +100,24 @@ const DEFAULT_REASONS: Record<string, Record<string, string>> = {
     pt: 'Quiz de escolha múltipla para validar a compreensão',
     nl: 'Meerkeuzequiz om het begrip te valideren',
   },
+  podcast: {
+    fr: "Podcast éducatif pour réviser le cours à l'oral",
+    en: 'Educational podcast to review the lesson aloud',
+    es: 'Podcast educativo para repasar la lección oralmente',
+    de: 'Lernpodcast zur mündlichen Wiederholung des Kurses',
+    it: 'Podcast educativo per ripassare il corso ad alta voce',
+    pt: 'Podcast educativo para rever a aula em formato oral',
+    nl: 'Educatieve podcast om de les mondeling te herhalen',
+  },
+  'quiz-vocal': {
+    fr: 'Quiz oral pour renforcer la mémorisation active',
+    en: 'Oral quiz to reinforce active recall',
+    es: 'Cuestionario oral para reforzar la memorización activa',
+    de: 'Mündliches Quiz zur Stärkung des aktiven Erinnerns',
+    it: 'Quiz orale per rafforzare il richiamo attivo',
+    pt: 'Quiz oral para reforçar a memorização ativa',
+    nl: 'Mondelinge quiz om actieve herinnering te versterken',
+  },
 };
 
 export function defaultReasonFor(agent: string, lang = 'fr'): string {
@@ -466,16 +484,19 @@ Agents disponibles:
 
 REGLE DE CARDINAL :
 - Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
-- 1-2 agents sont acceptables si la matiere est courte ou monotone (ex: une seule definition).
+- Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-6 agents.
+- 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
 - Maximum 6 agents pour un contenu riche et varie.
 - Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
 
 CRITERES STRATEGIQUES :
-- Contenu court ou simple : prefere summary + 1 agent (flashcards ou quiz). Skip podcast et quiz-vocal qui demandent plus de matiere.
-- Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank et flashcards.
-- Contenu narratif, biographique ou avec dialogue : prioriser podcast.
+- Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
+- Contenu pedagogique standard (cours, chapitre, lecon, fiche de revision) : inclure generalement au moins un format audio, et souvent les deux (podcast + quiz-vocal) si le contenu permet de varier les angles.
+- Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
+- Contenu explicatif, factuel ou facilement recitable a voix haute : prioriser quiz-vocal.
+- Contenu narratif, biographique, historique ou avec progression logique : prioriser podcast.
 - Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
-- Contenu argumentatif ou conceptuel : prioriser quiz (questions de comprehension) et summary.
+- Contenu argumentatif ou conceptuel : prioriser quiz, summary, podcast et quiz-vocal.
 
 Reponds en JSON strict:
 {"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;

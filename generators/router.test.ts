@@ -174,4 +174,50 @@ describe('normalizePlan', () => {
     // ja has no entry → fallback to fr
     expect(resultJa[0].reason).toContain('Fiche de synthèse');
   });
+
+  it('re-adds podcast and quiz-vocal for substantial study material', () => {
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r1' },
+        { agent: 'quiz', reason: 'r2' },
+      ],
+      'fr',
+      'a'.repeat(500),
+    );
+    expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz', 'podcast', 'quiz-vocal']);
+  });
+
+  it('does not force audio formats for genuinely short material', () => {
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r1' },
+        { agent: 'quiz', reason: 'r2' },
+      ],
+      'fr',
+      'Definition courte.',
+    );
+    expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz']);
+  });
+
+  it('prioritizes audio before image when trimming to 6 agents', () => {
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r' },
+        { agent: 'flashcards', reason: 'r' },
+        { agent: 'quiz', reason: 'r' },
+        { agent: 'fill-blank', reason: 'r' },
+        { agent: 'image', reason: 'r' },
+      ],
+      'fr',
+      'b'.repeat(500),
+    );
+    expect(result.map((s) => s.agent)).toEqual([
+      'summary',
+      'flashcards',
+      'quiz',
+      'fill-blank',
+      'podcast',
+      'quiz-vocal',
+    ]);
+  });
 });

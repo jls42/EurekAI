@@ -100,9 +100,16 @@ function parseCount(raw: unknown): number | undefined {
 }
 
 // Phase 1B.3 — Allowlist locale pour /generate/auto (cf. décision produit #8).
-// executePlan() ne sait exécuter que ces 5 agents ; le router peut en proposer 7.
+// executePlan() sait exécuter ces 6 agents ; le router peut en proposer 7.
 // Extrait au niveau module pour réduire la complexité cyclomatique du handler auto.
-const AUTO_EXECUTABLE = new Set(['summary', 'flashcards', 'quiz', 'fill-blank', 'podcast']);
+const AUTO_EXECUTABLE = new Set([
+  'summary',
+  'flashcards',
+  'quiz',
+  'fill-blank',
+  'podcast',
+  'quiz-vocal',
+]);
 
 function splitByAutoExecutable<T extends { agent: string }>(
   plan: T[],
@@ -625,6 +632,36 @@ export function generateRoutes(
         { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
         ctx,
       );
+    },
+    'quiz-vocal': async (ctx) => {
+      const excl = buildExclusionContext(ctx.generations, 'quiz-vocal');
+      const data = await generateQuizVocal(
+        ctx.client,
+        ctx.markdown,
+        ctx.config.models.quiz,
+        ctx.lang,
+        ctx.ageGroup,
+        ctx.count,
+        excl,
+      );
+      const audioUrls: string[] = [];
+      const projectDir = ctx.store.getProjectDir(ctx.pid);
+      const hostVoice = resolveVoices(ctx.config, ctx.profileVoices, ctx.lang).host;
+      const ttsOpts = {
+        provider: ctx.config.ttsProvider,
+        model: ctx.config.ttsModel,
+        mistralClient: ctx.client,
+      } as const;
+      for (let i = 0; i < data.length; i += 1) {
+        const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
+        audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
+      }
+      return {
+        ...makeGen('quiz-vocal', data, ctx),
+        audioUrls,
+        lang: ctx.lang,
+        ageGroup: ctx.ageGroup,
+      } as Generation;
     },
   };
 

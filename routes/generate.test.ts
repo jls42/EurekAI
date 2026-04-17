@@ -1234,11 +1234,11 @@ describe('generateRoutes', () => {
       expect(result.generations[0].type).toBe('flashcards');
     });
 
-    it('skips non-auto-executable agents (Phase 1B.3 — allowlist locale)', async () => {
+    it('skips only truly non-auto-executable agents (Phase 1B.3 — allowlist locale)', async () => {
       const { routeRequest } = await import('../generators/router.js');
-      // Le router peut proposer quiz-vocal, image (valides côté router) ainsi que des
-      // noms inconnus, mais executePlan ne sait exécuter que summary/flashcards/quiz/
-      // fill-blank/podcast. Tous les autres doivent finir dans skippedSteps (pas tentés).
+      // Le router peut proposer des noms inconnus. Ceux-là doivent finir dans
+      // skippedSteps. Les agents auto supportés, y compris quiz-vocal, doivent être
+      // réellement exécutés.
       (routeRequest as any).mockResolvedValueOnce({
         plan: [
           { agent: 'unknown-type', reason: 'test' },
@@ -1264,17 +1264,16 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const result = res.json.mock.calls[0][0];
-      // Seul "quiz" est exécutable → 1 génération, pas de "Unknown agent" silencieux.
-      expect(result.generations).toHaveLength(1);
-      expect(result.generations[0].type).toBe('quiz');
-      // unknown-type ET quiz-vocal sont filtrés AVANT executePlan → skippedSteps, pas failedSteps.
-      expect(result.skippedSteps).toEqual([
-        { agent: 'unknown-type', reason: 'test' },
-        { agent: 'quiz-vocal', reason: 'test' },
-      ]);
+      expect(result.generations).toHaveLength(2);
+      expect(result.generations[0].type).toBe('quiz-vocal');
+      expect(result.generations[1].type).toBe('quiz');
+      expect(result.skippedSteps).toEqual([{ agent: 'unknown-type', reason: 'test' }]);
       expect(result.failedSteps).toBeUndefined();
       // La réponse "route" reflète le plan effectivement exécuté (cohérent UX).
-      expect(result.route).toEqual([{ agent: 'quiz', reason: 'test' }]);
+      expect(result.route).toEqual([
+        { agent: 'quiz-vocal', reason: 'test' },
+        { agent: 'quiz', reason: 'test' },
+      ]);
     });
 
     it('returns 500 when routeRequest itself fails', async () => {
@@ -1399,6 +1398,45 @@ describe('generateRoutes', () => {
       expect(result.generations).toHaveLength(1);
       expect(result.generations[0].type).toBe('summary');
       expect(result.failedSteps).toEqual(['podcast']);
+    });
+  });
+
+  describe('POST /:pid/generate/auto (quiz-vocal step)', () => {
+    it('executes quiz-vocal step with per-question audio generation', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'quiz-vocal', reason: 'oral practice' }],
+        context: 'Quiz vocal context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content for quiz-vocal',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: { lang: 'fr' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('quiz-vocal');
+      expect(result.generations[0].data).toHaveLength(1);
+      expect(result.generations[0].audioUrls).toHaveLength(1);
+      expect(result.generations[0].audioUrls[0]).toContain(`/output/projects/${pid}/quiz-vocal-q0-`);
+      expect(result.generations[0].lang).toBe('fr');
+      expect(result.generations[0].ageGroup).toBe('enfant');
+      expect(result.failedSteps).toBeUndefined();
+
+      const updatedProject = store.getProject(pid);
+      expect(updatedProject!.results.generations).toHaveLength(1);
+      expect(updatedProject!.results.generations[0].type).toBe('quiz-vocal');
     });
   });
 
