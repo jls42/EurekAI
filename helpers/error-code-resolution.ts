@@ -6,39 +6,15 @@ type ErrWithFields = {
   stage?: unknown;
 };
 
-type Rule = readonly [RegExp, FailedStepCode];
+type Rule = Readonly<{
+  pattern: RegExp;
+  code: FailedStepCode;
+}>;
 
 const EMPTY_FIELDS = Object.freeze({}) as ErrWithFields;
 
-const STATUS_RULES = new Map<number, FailedStepCode>([
-  [429, 'quota_exceeded'],
-  [503, 'upstream_unavailable'],
-  [529, 'upstream_unavailable'],
-]);
-
-const STRUCTURED_CODE_RULES: readonly Rule[] = [
-  [/rate.?limit|quota|tier/i, 'quota_exceeded'],
-  [/capacity|overloaded|unavailable/i, 'upstream_unavailable'],
-  [/context.?length|token.?limit/i, 'context_length_exceeded'],
-];
-
-const MESSAGE_RULES: readonly Rule[] = [
-  [/\b429\b|rate[_ ]?limit|quota|tier.*limit/i, 'quota_exceeded'],
-  [/\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i, 'upstream_unavailable'],
-  [
-    /context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i,
-    'context_length_exceeded',
-  ],
-];
-
-const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
-const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib/i;
-
 function matchRule(value: string, rules: readonly Rule[]): FailedStepCode | null {
-  for (const [pattern, result] of rules) {
-    if (pattern.test(value)) return result;
-  }
-  return null;
+  return rules.find(({ pattern }) => pattern.test(value))?.code ?? null;
 }
 
 function getErrFields(err: unknown): ErrWithFields {
@@ -53,6 +29,35 @@ function getErrorMessage(err: unknown): string {
 function readString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
+
+const STATUS_RULES = new Map<number, FailedStepCode>([
+  [429, 'quota_exceeded'],
+  [503, 'upstream_unavailable'],
+  [529, 'upstream_unavailable'],
+]);
+
+const STRUCTURED_RATE_LIMIT = /rate.?limit|quota|tier/i;
+const STRUCTURED_UPSTREAM_UNAVAILABLE = /capacity|overloaded|unavailable/i;
+const STRUCTURED_CONTEXT_LIMIT = /context.?length|token.?limit/i;
+
+const MESSAGE_RATE_LIMIT = /\b429\b|rate[_ ]?limit|quota|tier.*limit/i;
+const MESSAGE_UPSTREAM_UNAVAILABLE = /\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i;
+const MESSAGE_CONTEXT_LIMIT = /context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i;
+
+const STRUCTURED_CODE_RULES: readonly Rule[] = [
+  { pattern: STRUCTURED_RATE_LIMIT, code: 'quota_exceeded' },
+  { pattern: STRUCTURED_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
+  { pattern: STRUCTURED_CONTEXT_LIMIT, code: 'context_length_exceeded' },
+];
+
+const MESSAGE_RULES: readonly Rule[] = [
+  { pattern: MESSAGE_RATE_LIMIT, code: 'quota_exceeded' },
+  { pattern: MESSAGE_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
+  { pattern: MESSAGE_CONTEXT_LIMIT, code: 'context_length_exceeded' },
+];
+
+const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
+const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib/i;
 
 function getStatusMatch(status: unknown): FailedStepCode | null {
   if (typeof status !== 'number') return null;
