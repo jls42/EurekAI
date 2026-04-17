@@ -32,6 +32,26 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - ElevenLabs : necessite `ELEVENLABS_API_KEY`
 - `apiStatus.ttsAvailable` indique si le provider actif est configure
 - Griser les boutons TTS avec `:disabled="!apiStatus.ttsAvailable"` + tooltip `t('gen.needsTts')`
+- **Voix par langue** : `resolveVoices(config, profileVoices?, lang?, profileId?, flow?)` dans `config.ts` résout la voix finale selon la priorité : profil > override global explicite (`mistralVoicesSource === 'user'`) > sélection dynamique `selectVoices` (9 langues UI) > DEFAULT_CONFIG. Le flag `mistralVoicesSource` (`'default' | 'user'`) est migré one-time dans `initConfig` via `LEGACY_DEFAULT_HOSTS/GUESTS` — un config.json existant avec un ancien ID par défaut reste classé `'default'` pour que l'utilisateur bénéficie automatiquement des voix EN/ES/etc.
+- **Appels `resolveVoices()`** : sur tout nouveau chemin TTS, TOUJOURS passer `profileId` et `flow` (ex: `'podcast' | 'quiz-vocal' | 'read-aloud'`). Sinon la rotation déterministe par profil se casse (seed `__default__` partagé) et les logs de fallback portent `flow='unknown'` — observabilité dégradée.
+
+### Prompts IA (anti-leak lexical)
+- Centralisés dans `prompts.ts` — les generators importent, ne redefinissent jamais de prompt inline
+- **Ne JAMAIS mettre de tokens méta** (`"fiche"`, `"complete"`, `"exhaustive"`, `"synthese"`) au voisinage d'un champ JSON que le LLM produit sous forme de texte libre (surtout `title`, `word`, `question`) — le LLM recycle ces mots dans ses outputs (bug historique `"— Fiche de révision COMPLÈTE"` dans les titres)
+- **Pas de blacklist explicite** (`"pas de 'Fiche'"`) qui réinjecte les mots — préférer règle positive + exemples positifs
+- **Règle "title" summary** : `data.title` = sujet du cours uniquement, préfixe `"Fiche — "` ajouté par `helpers/auto-title.ts` pour la carte liste seulement ; la vue détail affiche `data.title` brut
+- **Retry prompt** (`generators/summary.ts`) : même discipline que le prompt initial, pas d'écho des formulations problématiques
+- Détails complets et règles sur emphases MAJUSCULES / few-shots / retry dans `.claude/rules/prompts.md`
+
+### Agents auto-generables
+- **Source unique de vérité** : `generators/auto-agents.ts` exporte `AUTO_AGENTS_SET` et `MAX_AUTO_PLAN_LENGTH` — utilisés par `router.ts` (`VALID_AGENTS`) ET `routes/generate.ts` (`AUTO_EXECUTABLE`). Ne jamais dupliquer la liste.
+- **Politique `normalizePlan`** : choix du modèle prime, enrichment audio (podcast/quiz-vocal) budget-aware — on ne tronque jamais un agent explicitement choisi par le LLM (`image` pour contenu visuel p.ex.)
+
+### Codes d'erreur API (FailedStep)
+- `/generate/auto` retourne `failedSteps: FailedStep[]` avec codes stables (`types.ts` : `FailedStepCode`) — jamais `err.message` brut dans la réponse HTTP (fuite potentielle clés API / URLs internes)
+- Codes : `llm_invalid_json`, `quota_exceeded`, `tts_upstream_error`, `context_length_exceeded`, `internal_error`
+- Status 502 quand tous les steps échouent (`allFailed`), 200 sinon
+- Le détail complet (stack, message) reste dans `logger.error` côté serveur
 
 ### HTML interactif
 - Ne JAMAIS imbriquer de `<button>` dans un `<button>` (HTML invalide, casse le layout)

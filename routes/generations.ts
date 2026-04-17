@@ -20,6 +20,7 @@ import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+import { logger } from '../helpers/logger.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -62,7 +63,7 @@ async function generateBatchAudio(
       const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
       audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
     } catch (err) {
-      console.error(`TTS failed for section ${s}:`, err);
+      logger.error('tts', `section ${s} failed:`, err);
       failedSections.push(s);
     }
   }
@@ -162,7 +163,9 @@ function resolveReadAloudContext(
   const project = store.getProject(pid);
   const profileId = project?.meta?.profileId;
   const profile = profileId ? profileStore.get(profileId) : null;
-  const voices = resolveVoices(config, profile?.mistralVoices, lang);
+  // Passe profileId + flow='read-aloud' pour que la rotation déterministe par profil
+  // s'applique aussi ici et que les logs de fallback soient contextualisés.
+  const voices = resolveVoices(config, profile?.mistralVoices, lang, profileId, 'read-aloud');
   const ttsOpts = {
     provider: config.ttsProvider,
     model: config.ttsModel,
@@ -226,7 +229,7 @@ export function generationCrudRoutes(
       store.updateGeneration(req.params.pid, req.params.gid, { stats: quizGen.stats } as any);
       res.json({ attempt, stats: quizGen.stats });
     } catch (e) {
-      console.error('Quiz attempt error:', e);
+      logger.error('quiz', 'attempt error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -280,7 +283,7 @@ export function generationCrudRoutes(
       store.updateGeneration(req.params.pid, req.params.gid, { stats: fbGen.stats } as any);
       res.json({ attempt, stats: fbGen.stats, results });
     } catch (e) {
-      console.error('Fill-blank attempt error:', e);
+      logger.error('fill-blank', 'attempt error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -337,10 +340,7 @@ export function generationCrudRoutes(
       const lang = quizGen.lang ?? req.body.lang ?? 'fr';
       const ageGroup = quizGen.ageGroup ?? 'enfant';
       const config = getConfig();
-      console.log('  Transcribing vocal answer...');
       const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
-      console.log(`  Transcription: '${transcription}'`);
-      console.log('  Verifying answer...');
       const result = await verifyAnswer(
         client,
         question.question,
@@ -349,11 +349,10 @@ export function generationCrudRoutes(
         transcription,
         { model: config.models.quizVerify, lang, ageGroup },
       );
-      console.log(`  Result: ${result.correct ? 'correct' : 'incorrect'} — ${result.feedback}`);
 
       res.json({ correct: result.correct, feedback: result.feedback, transcription });
     } catch (e) {
-      console.error('Vocal answer error:', e);
+      logger.error('quiz-vocal', 'vocal answer error:', e);
       res.status(500).json({ error: String(e) });
     }
   });
@@ -446,7 +445,7 @@ export function generationCrudRoutes(
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }
-      console.error('Read aloud error:', e);
+      logger.error('tts', 'read-aloud error:', e);
       res.status(500).json({ error: String(e) });
     }
   });

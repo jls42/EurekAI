@@ -62,12 +62,14 @@ const SPOKEN_LABEL_BY_LANG: Record<string, string> = {
   it: 'scelta',
   pt: 'opção',
   nl: 'keuze',
+  hi: 'विकल्प',
+  ar: 'خيار',
 };
 
 /**
  * Retourne le mot localisé pour préfixer un repère oral A/B/C/D.
- * Périmètre borné aux 7 langues TTS d'EurekAI (cf. décision produit #10).
- * Fallback FR documenté pour les 8 autres langues supportées.
+ * Périmètre borné aux 9 langues UI d'EurekAI = 9 langues Voxtral-TTS.
+ * Fallback FR documenté pour les 6 langues texte hors UI (ja, zh, ko, pl, ro, sv).
  */
 export function spokenChoiceLabel(lang: string): string {
   return SPOKEN_LABEL_BY_LANG[lang] ?? SPOKEN_LABEL_BY_LANG.fr;

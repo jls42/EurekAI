@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { parseChoiceLabel, spokenChoiceLabel, toSpokenChoice, stripChoiceLabel } from './choice-labels.js';
+import {
+  parseChoiceLabel,
+  spokenChoiceLabel,
+  toSpokenChoice,
+  stripChoiceLabel,
+} from './choice-labels.js';
 
 describe('parseChoiceLabel', () => {
   it('matches standard labels A) B) C) D)', () => {
@@ -46,10 +51,18 @@ describe('parseChoiceLabel', () => {
     expect(parseChoiceLabel('E) Other')).toBeNull();
     expect(parseChoiceLabel('a) lowercase')).toBeNull();
   });
+
+  it('rejects multi-line inputs to avoid reading an adjacent line as choice content', () => {
+    // Si un choix déborde sur 2 lignes, on refuse plutôt que de lire "A parenthèse Paris Lyon" en TTS.
+    expect(parseChoiceLabel('A) Paris\nLyon')).toBeNull();
+    expect(parseChoiceLabel('A) Paris\r\nLyon')).toBeNull();
+    expect(parseChoiceLabel('A) Paris\u2028Lyon')).toBeNull();
+    expect(parseChoiceLabel('A) Paris\u2029Lyon')).toBeNull();
+  });
 });
 
 describe('spokenChoiceLabel', () => {
-  it('returns localized label for the 7 supported TTS languages', () => {
+  it('returns localized label for the 9 UI languages (= 9 Voxtral-TTS)', () => {
     expect(spokenChoiceLabel('fr')).toBe('choix');
     expect(spokenChoiceLabel('en')).toBe('choice');
     expect(spokenChoiceLabel('es')).toBe('opción');
@@ -57,11 +70,13 @@ describe('spokenChoiceLabel', () => {
     expect(spokenChoiceLabel('it')).toBe('scelta');
     expect(spokenChoiceLabel('pt')).toBe('opção');
     expect(spokenChoiceLabel('nl')).toBe('keuze');
+    expect(spokenChoiceLabel('hi')).toBe('विकल्प');
+    expect(spokenChoiceLabel('ar')).toBe('خيار');
   });
 
-  it('falls back to French for unsupported languages (cf. décision produit #10)', () => {
+  it('falls back to French for languages outside the 9 UI locales', () => {
     expect(spokenChoiceLabel('ja')).toBe('choix');
-    expect(spokenChoiceLabel('ar')).toBe('choix');
+    expect(spokenChoiceLabel('zh')).toBe('choix');
     expect(spokenChoiceLabel('xx')).toBe('choix');
   });
 });

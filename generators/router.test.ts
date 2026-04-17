@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { routeRequest, normalizePlan } from './router.js';
+import { logger } from '../helpers/logger.js';
 
 const validPlan = {
   plan: [
@@ -73,6 +74,17 @@ describe('normalizePlan', () => {
     expect(result.every((s) => s.reason.length > 0)).toBe(true);
   });
 
+  it('catastrophe fallback logs a warn pour détecter les régressions router en prod', () => {
+    const spy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    normalizePlan([{ agent: 'unknown-foo', reason: 'halluciné' }], 'fr');
+    expect(spy).toHaveBeenCalledWith(
+      'router',
+      expect.stringContaining('catastrophe fallback'),
+      expect.anything(),
+    );
+    spy.mockRestore();
+  });
+
   it('catastrophe fallback: only invalid names → same fallback', () => {
     const result = normalizePlan(
       [
@@ -128,7 +140,7 @@ describe('normalizePlan', () => {
     expect(result[0].reason).toBe('first');
   });
 
-  it('truncates to 6 when more agents (uses all 7 valid agents)', () => {
+  it('preserves all 7 agents when LLM proposes the full set (budget = 7)', () => {
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
@@ -141,7 +153,7 @@ describe('normalizePlan', () => {
       ],
       'fr',
     );
-    expect(result).toHaveLength(6);
+    expect(result).toHaveLength(7);
     expect(result.map((s) => s.agent)).toEqual([
       'summary',
       'flashcards',
@@ -149,6 +161,7 @@ describe('normalizePlan', () => {
       'fill-blank',
       'podcast',
       'quiz-vocal',
+      'image',
     ]);
   });
 
@@ -225,13 +238,17 @@ Definition tres courte.`;
     expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz']);
   });
 
-  it('prioritizes audio before image when trimming to 6 agents', () => {
+  it('preserves LLM-chosen image and enriches with quiz-vocal when budget allows', () => {
+    // Politique : le LLM a explicitement demandé image (ex. carte, anatomie).
+    // L'enrichment audio ne doit pas l'évincer — budget MAX_PLAN_LENGTH = 7 respecté.
+    // Plan entrant = 6 agents dont image ; il reste 1 slot pour l'enrichment → quiz-vocal injecté.
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
         { agent: 'flashcards', reason: 'r' },
         { agent: 'quiz', reason: 'r' },
         { agent: 'fill-blank', reason: 'r' },
+        { agent: 'podcast', reason: 'r' },
         { agent: 'image', reason: 'r' },
       ],
       'fr',
@@ -244,6 +261,52 @@ Definition tres courte.`;
       'fill-blank',
       'podcast',
       'quiz-vocal',
+      'image',
+    ]);
+  });
+
+  it('enriches audio when budget allows and image is present', () => {
+    // Budget disponible (3 agents libres sur 6) : podcast ET quiz-vocal sont injectés
+    // AVANT image, sans la tronquer.
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r' },
+        { agent: 'quiz', reason: 'r' },
+        { agent: 'image', reason: 'r' },
+      ],
+      'fr',
+      'c'.repeat(500),
+    );
+    expect(result.map((s) => s.agent)).toEqual([
+      'summary',
+      'quiz',
+      'podcast',
+      'quiz-vocal',
+      'image',
+    ]);
+  });
+
+  it('injects both audio agents when image is present with budget = 7', () => {
+    // 5 agents dont image, budget = 7 : podcast ET quiz-vocal s'insèrent avant image.
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r' },
+        { agent: 'flashcards', reason: 'r' },
+        { agent: 'quiz', reason: 'r' },
+        { agent: 'fill-blank', reason: 'r' },
+        { agent: 'image', reason: 'r' },
+      ],
+      'fr',
+      'd'.repeat(500),
+    );
+    expect(result.map((s) => s.agent)).toEqual([
+      'summary',
+      'flashcards',
+      'quiz',
+      'fill-blank',
+      'podcast',
+      'quiz-vocal',
+      'image',
     ]);
   });
 });

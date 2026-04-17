@@ -1,11 +1,7 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 
 /** Execute the actual profile deletion (API call + state cleanup). */
-async function executeDeleteProfile(
-  state: any,
-  id: string,
-  pin?: string,
-): Promise<void> {
+async function executeDeleteProfile(state: any, id: string, pin?: string): Promise<void> {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
     opts.headers = { 'Content-Type': 'application/json' };
@@ -77,7 +73,9 @@ export function createProfiles() {
         document.documentElement.dataset.theme = profile.theme;
       } else {
         const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
         this.theme = stored || system;
         document.documentElement.dataset.theme = this.theme;
       }
@@ -185,9 +183,17 @@ export function createProfiles() {
     startEditProfile(this: any, id: string) {
       const profile = this.profiles.find((p: any) => p.id === id);
       if (!profile) return;
-      this.editingProfile = { ...profile, locale: profile.locale || 'fr', mistralVoices: profile.mistralVoices || { host: '', guest: '' }, theme: profile.theme || '' };
+      this.editingProfile = {
+        ...profile,
+        locale: profile.locale || 'fr',
+        mistralVoices: profile.mistralVoices || { host: '', guest: '' },
+        theme: profile.theme || '',
+      };
       this.showProfilePicker = true;
       this.showProfileForm = false;
+      // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
+      // a publié de nouvelles voix depuis le chargement initial. Non bloquant.
+      this.loadMistralVoices?.();
     },
 
     /** Verify PIN before allowing parental settings changes. */
@@ -226,13 +232,18 @@ export function createProfiles() {
       if (!this.editingProfile) return;
       if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
       const doSave = async () => {
-        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } = this.editingProfile;
+        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
+          this.editingProfile;
         if (!name?.trim() || !age || age < 4 || age > 120) return;
         const updates: any = {
-          name: name.trim(), age, avatar, locale,
-          mistralVoices: (mistralVoices?.host || mistralVoices?.guest)
-            ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
-            : null,
+          name: name.trim(),
+          age,
+          avatar,
+          locale,
+          mistralVoices:
+            mistralVoices?.host || mistralVoices?.guest
+              ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
+              : null,
           theme: theme || null,
           _updatedAt: updatedAt,
         };
@@ -244,7 +255,10 @@ export function createProfiles() {
           if (locale) this.setLocale(locale, true);
         }
       };
-      if (immediate) { doSave(); return; }
+      if (immediate) {
+        doSave();
+        return;
+      }
       this._autoSaveTimer = setTimeout(doSave, 500);
     },
 
@@ -260,8 +274,14 @@ export function createProfiles() {
 
     async autoSaveParental(this: any) {
       if (!this.editingProfile) return;
-      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } = this.editingProfile;
-      const updates: any = { useModeration, moderationCategories, chatEnabled, _updatedAt: updatedAt };
+      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } =
+        this.editingProfile;
+      const updates: any = {
+        useModeration,
+        moderationCategories,
+        chatEnabled,
+        _updatedAt: updatedAt,
+      };
       if (_verifiedPin) updates.pin = _verifiedPin;
       if (this._saveController) this._saveController.abort();
       this._saveController = new AbortController();
@@ -275,7 +295,9 @@ export function createProfiles() {
         document.documentElement.dataset.theme = theme;
       } else {
         const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
         this.theme = stored || system;
         document.documentElement.dataset.theme = this.theme;
       }

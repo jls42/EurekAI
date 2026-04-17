@@ -23,10 +23,12 @@ export const nl: Record<string, string> = {
   'gen.quiz-vocal': 'Mondelinge quiz',
   'gen.fill-blank': 'Invuloefening',
   'gen.image': 'Afbeelding',
+  'gen.betaAudio': 'Beta-audio',
   'gen.auto': 'Auto \u2014 analyseren...',
   'gen.estimatedCost': 'Geschatte kosten (Mistral-tarieven)',
   'gen.apiCalls': 'API-aanroep(en)',
-  'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
+  'gen.costTooltip':
+    'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
@@ -36,7 +38,8 @@ export const nl: Record<string, string> = {
   'gen.questionCount': 'Aantal:',
   'gen.needsElevenLabs': 'Vereist een ElevenLabs API-sleutel',
   'gen.needsTts': 'Vereist een geconfigureerde TTS-provider',
-  'gen.contextTooLarge': 'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
+  'gen.contextTooLarge':
+    'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
@@ -111,7 +114,8 @@ export const nl: Record<string, string> = {
   'emotion.Sad': 'Verdrietig',
   'emotion.Sarcasm': 'Sarcasme',
   'emotion.Shameful': 'Beschaamd',
-  'settings.mistralVoicesHint': 'Mistral-stemmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Mistral-stemmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Samenvatting',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -266,8 +270,10 @@ export const nl: Record<string, string> = {
   'podcast.script': 'Script',
   'podcast.lines': '({count} regels)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs': 'Configureer ELEVENLABS_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
-  'podcast.noTts': 'Configureer een TTS-provider (Mistral of ElevenLabs) om audiopodcasts in te schakelen',
+  'podcast.noElevenLabs':
+    'Configureer ELEVENLABS_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
+  'podcast.noTts':
+    'Configureer een TTS-provider (Mistral of ElevenLabs) om audiopodcasts in te schakelen',
 
   'image.heading': 'Illustraties',
   'image.new': 'Illustreren',
@@ -388,7 +394,8 @@ export const nl: Record<string, string> = {
   'moderation.cat.pii': 'Persoonlijke gegevens',
   'moderation.cat.jailbreaking': 'Jailbreaking',
 
-  'chat.ageRestricted': 'Chat is niet ingeschakeld voor dit profiel. Een ouder kan het autoriseren.',
+  'chat.ageRestricted':
+    'Chat is niet ingeschakeld voor dit profiel. Een ouder kan het autoriseren.',
   'chat.ageRestrictedTooltip': 'Chat uitgeschakeld voor dit profiel',
   'chat.moderationBlocked': 'Dit bericht is geblokkeerd door moderatie.',
 
@@ -415,9 +422,10 @@ export const nl: Record<string, string> = {
   'profile.themeDark': 'Donker',
   'profile.themeLight': 'Licht',
   'profile.voicePreferences': 'Stemmen',
-  'profile.voicePreferencesHint': 'Pas stemmen aan voor audiocontent (podcasts, spraakquiz, voorlezen)',
+  'profile.voicePreferencesHint':
+    'Pas stemmen aan voor audiocontent (podcasts, spraakquiz, voorlezen)',
   'profile.voiceDefault': 'Standaard (op basis van taal)',
-  'profile.voiceCurrentDefault': 'Huidige standaard:',
+  'profile.voiceCurrentDefault': 'Standaard voor velden op \u201cStandaard\u201d:',
   'profile.resetDefaults': 'Herstellen',
   'profile.backToProfiles': 'Terug',
 

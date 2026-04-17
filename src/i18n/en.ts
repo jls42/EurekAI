@@ -23,10 +23,12 @@ export const en: Record<string, string> = {
   'gen.quiz-vocal': 'Vocal Quiz',
   'gen.fill-blank': 'Fill-in-the-blanks',
   'gen.image': 'Image',
+  'gen.betaAudio': 'Beta audio',
   'gen.auto': 'Auto — analyzing...',
   'gen.estimatedCost': 'Estimated cost (Mistral pricing)',
   'gen.apiCalls': 'API call(s)',
-  'gen.costTooltip': 'Estimate \u2014 {input} tokens in + {output} tokens out \u00b7 {calls} API call(s) \u00b7 Official Mistral pricing',
+  'gen.costTooltip':
+    'Estimate \u2014 {input} tokens in + {output} tokens out \u00b7 {calls} API call(s) \u00b7 Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate \u2014 {detail} \u00b7 Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate \u2014 No API call',
   'gen.costPrefix': 'Est.',
@@ -111,7 +113,8 @@ export const en: Record<string, string> = {
   'emotion.Sad': 'Sad',
   'emotion.Sarcasm': 'Sarcasm',
   'emotion.Shameful': 'Shameful',
-  'settings.mistralVoicesHint': 'Mistral voices: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Mistral voices: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Note',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -422,9 +425,10 @@ export const en: Record<string, string> = {
   'profile.themeDark': 'Dark',
   'profile.themeLight': 'Light',
   'profile.voicePreferences': 'Voices',
-  'profile.voicePreferencesHint': 'Customize voices for audio content (podcasts, vocal quizzes, read-aloud)',
+  'profile.voicePreferencesHint':
+    'Customize voices for audio content (podcasts, vocal quizzes, read-aloud)',
   'profile.voiceDefault': 'Default (based on language)',
-  'profile.voiceCurrentDefault': 'Current default:',
+  'profile.voiceCurrentDefault': 'Default for fields left on "Default":',
   'profile.resetDefaults': 'Reset defaults',
   'profile.backToProfiles': 'Back',
 

@@ -1,3 +1,4 @@
+import { logger } from './helpers/logger.js';
 import type { AgeGroup } from './types.js';
 
 // ── Language helper ──────────────────────────────────────────────────
@@ -122,27 +123,38 @@ const DEFAULT_REASONS: Record<string, Record<string, string>> = {
 
 export function defaultReasonFor(agent: string, lang = 'fr'): string {
   const forAgent = DEFAULT_REASONS[agent];
-  if (!forAgent) return 'Agent ajouté automatiquement'; // garde-fou défensif
+  if (!forAgent) {
+    logger.warn(
+      'router',
+      `no default reason for agent "${agent}" (lang=${lang}) — VALID_AGENTS/DEFAULT_REASONS desync`,
+    );
+    return `[${agent}]`;
+  }
   return forAgent[lang] ?? forAgent.fr;
 }
 
 // ── Summary ──────────────────────────────────────────────────────────
 
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
-  return String.raw`Cree UNE SEULE fiche de revision COMPLETE et structuree en JSON strict.
+  return String.raw`Analyse les sources et produis UN SEUL objet JSON strict avec les champs ci-dessous.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
-IMPORTANT : meme si le contenu couvre plusieurs sujets, fais UNE SEULE fiche. Ne retourne PAS {"fiches": [...]}.
+IMPORTANT : meme si le contenu couvre plusieurs sujets, produis UN SEUL objet. Ne retourne PAS {"fiches": [...]}.
 
-EXEMPLE de structure attendue (1 item, valeurs minimales — ta fiche doit etre BEAUCOUP plus complete) :
+REGLE POUR LE CHAMP "title" :
+- title = sujet du cours uniquement, court et descriptif.
+- Exemples attendus : "Les volcans", "La photosynthese", "L'energie : formes et sources".
+- title ne doit pas contenir de qualificatif sur le format du document.
+
+EXEMPLE de structure attendue (valeurs minimales — le document final doit etre bien plus detaille) :
 {"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre.","Une eruption peut etre effusive ou explosive."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
-TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec cette fiche. Ne laisse rien d'important de cote.
+TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec ce document. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
 
 REGLES DE COUVERTURE :
 - Si des CONSIGNES DE REVISION sont presentes, couvre CHAQUE point mentionne sans exception.
 - Sinon, couvre chaque source en y extrayant toutes les notions essentielles.
-- summary : un vrai resume complet du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
+- summary : un resume approfondi du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
 - key_points : autant que necessaire pour tout couvrir (10-25 typiquement). Chaque point est une phrase complete, informative, avec les faits, dates et noms importants. Pas juste des titres.
 - vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.
@@ -160,9 +172,10 @@ export function summaryUser(
 ): string {
   const consigneBlock = hasConsigne
     ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
-    : `Aucune consigne specifique n'est fournie. Fais une synthese complete de TOUTES les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec cette seule fiche.`;
+    : `Aucune consigne specifique n'est fournie. Couvre toutes les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec ce seul document.`;
 
-  let prompt = `Cree une fiche de revision COMPLETE. Les sources sont numerotees (# Source 1, # Source 2, etc.).
+  let prompt = `Remplis l'objet JSON attendu a partir des sources ci-dessous. Les sources sont numerotees (# Source 1, # Source 2, etc.).
+Rappel : le champ "title" nomme uniquement le sujet du cours.
 ${consigneBlock}
 
 ${markdown}${langInstruction(lang)}`;
@@ -176,12 +189,12 @@ export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): stri
   return `Genere exactement ${count} flashcards educatives en JSON strict.
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 
-EXEMPLE (1 item — la reponse doit etre AUTONOME, comprehensible sans relire la question) :
-{"flashcards":[{"question":"Quelle est la formule chimique de l'eau ?","answer":"H2O — une molecule d'eau est composee de deux atomes d'hydrogene et un atome d'oxygene.","sourceRefs":["Source 1"]}]}
+EXEMPLE (1 item — la reponse doit etre auto-suffisante, comprehensible sans relire la question) :
+{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960 ; elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
 
-Reponses courtes (1-2 phrases) MAIS auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
+Reponses courtes (1-2 phrases) mais auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
 ${sourceRefsInstruction('flashcard')}
-Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
+Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${jsonInstruction()}`;
 }
 
@@ -205,21 +218,24 @@ Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 
 EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
-{"quiz":[{"question":"Quelle planete est la plus proche du Soleil ?","choices":["A) Venus","B) Mercure","C) Mars","D) Terre"],"correct":1,"explanation":"Mercure est la premiere planete du systeme solaire, situee a environ 58 millions de km du Soleil.","sourceRefs":["Source 2"]}]}
+{"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
+Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 ${jsonInstruction()}`;
 }
 
 // ── Quiz Vocal (TTS-friendly) ───────────────────────────────────────
 
 // vocalRewriteRules : règles linguistiques de réécriture orale paramétrées par langue.
-// Périmètre Phase 2.6 : fr (existant), en, es. Les autres langues retombent sur fr
-// (fallback documenté). Étendre à de/it/pt/nl en release ultérieure après review natif.
+// Périmètre : 9 langues UI supportées par Voxtral-TTS (fr, en, es, de, it, pt, nl, hi, ar).
+// Les 6 langues texte hors UI (ja, zh, ko, pl, ro, sv) retombent sur fr (fallback).
+// Règles conservatrices pour de/it/pt/nl/hi/ar : chiffres/ordinaux lisibles, abréviations
+// usuelles, symboles. Pas de promesse "native-grade" — validation audio manuelle attendue
+// avant de considérer la qualité acquise. hi/ar sortent en statut "beta audio".
 // La règle "pas de parenthèses + exception labels" est DANS quizVocalSystem (cf. #6),
 // pas ici, pour éviter l'injonction contradictoire.
 
-function vocalRewriteRules(lang: string): string {
+export function vocalRewriteRules(lang: string): string {
   const common = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
 Ecris tout en "langage oral" lisible.`;
 
@@ -243,6 +259,42 @@ Ecris tout en "langage oral" lisible.`;
 - Siglas deletreadas o desarrolladas: "ONU" → "Organización de las Naciones Unidas"
 - Números en palabras cuando son cortos: "3 km" → "tres kilómetros"
 - Símbolos reemplazados: "%" → "por ciento", "°C" → "grados Celsius", "&" → "y"`,
+    de: `
+- Römische Zahlen ausgeschrieben: "V." → "fünfter", "III." → "dritter", "XIV." → "vierzehnter"
+- Abkürzungen ausgeschrieben: "v. Chr." → "vor Christus", "n. Chr." → "nach Christus", "bzw." → "beziehungsweise", "z. B." → "zum Beispiel"
+- Akronyme ausgeschrieben: "UNO" → "Vereinte Nationen", "EU" → "Europäische Union"
+- Zahlen in Worten bei kurzen Angaben: "3 km" → "drei Kilometer"
+- Symbole ersetzt: "%" → "Prozent", "°C" → "Grad Celsius", "&" → "und"`,
+    it: `
+- Numeri romani in lettere: "V" → "quinto", "III" → "terzo", "XIV" → "quattordicesimo"
+- Abbreviazioni estese: "a.C." → "avanti Cristo", "d.C." → "dopo Cristo", "sig." → "signore", "dott." → "dottore"
+- Sigle pronunciate o estese: "ONU" → "Organizzazione delle Nazioni Unite"
+- Numeri in parole quando brevi: "3 km" → "tre chilometri"
+- Simboli sostituiti: "%" → "per cento", "°C" → "gradi Celsius", "&" → "e"`,
+    pt: `
+- Numerais romanos por extenso: "V" → "quinto", "III" → "terceiro", "XIV" → "décimo quarto"
+- Abreviaturas desenvolvidas: "a.C." → "antes de Cristo", "d.C." → "depois de Cristo", "Sr." → "Senhor", "Dr." → "Doutor"
+- Siglas soletradas ou desenvolvidas: "ONU" → "Organização das Nações Unidas"
+- Números por extenso quando curtos: "3 km" → "três quilómetros"
+- Símbolos substituídos: "%" → "por cento", "°C" → "graus Celsius", "&" → "e"`,
+    nl: `
+- Romeinse cijfers uitgeschreven: "V" → "vijfde", "III" → "derde", "XIV" → "veertiende"
+- Afkortingen voluit: "v. Chr." → "voor Christus", "n. Chr." → "na Christus", "bv." → "bijvoorbeeld", "dhr." → "meneer"
+- Acroniemen voluit: "VN" → "Verenigde Naties", "EU" → "Europese Unie"
+- Korte getallen in woorden: "3 km" → "drie kilometer"
+- Symbolen vervangen: "%" → "procent", "°C" → "graden Celsius", "&" → "en"`,
+    hi: `
+- रोमन अंक शब्दों में: "V" → "पाँचवाँ", "III" → "तीसरा", "XIV" → "चौदहवाँ"
+- संक्षिप्त रूपों का विस्तार: "ई.पू." → "ईसा पूर्व", "ई." → "ईसवी"
+- लघुरूप विस्तारित: "संरा" → "संयुक्त राष्ट्र"
+- छोटे अंक शब्दों में: "3 km" → "तीन किलोमीटर"
+- प्रतीक बदले जाते हैं: "%" → "प्रतिशत", "°C" → "डिग्री सेल्सियस", "&" → "और"`,
+    ar: `
+- الأرقام الرومانية بالحروف: "V" → "الخامس"، "III" → "الثالث"، "XIV" → "الرابع عشر"
+- تفكيك الاختصارات: "ق.م" → "قبل الميلاد"، "م" → "ميلادي"
+- الأحرف المختصرة مفصلة: "الأمم المتحدة" بدلاً من "أ.م"
+- الأرقام بالحروف عندما تكون قصيرة: "3 km" → "ثلاثة كيلومترات"
+- الرموز مستبدلة: "%" → "بالمئة"، "°C" → "درجة مئوية"، "&" → "و"`,
   };
 
   return common + (byLang[lang] ?? byLang.fr);
@@ -260,7 +312,7 @@ REGLE DE PONCTUATION (quiz vocal) :
 - A l'interieur du texte de chaque choix (apres "A) "), AUCUNE parenthese, crochet ou artefact typographique n'est autorise. Reformule la phrase si besoin.
 - La question elle-meme ne doit contenir aucune parenthese.
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions COMPLETEMENT DIFFERENTES : nouveaux angles, nouveaux exemples, nouvelles formulations.
+Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${vocalRewriteRules(lang)}
 ${jsonInstruction()}`;
 }
@@ -333,7 +385,7 @@ Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 export function podcastSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
-PERSONNAGES (leur personnalite doit transparaitre dans CHAQUE replique — pas de dialogue generique) :
+PERSONNAGES (leur personnalite doit transparaitre dans chaque replique — pas de dialogue generique) :
 - "host" = Alex : prof enthousiaste et passionne. Adore les anecdotes et les analogies du quotidien. Pose des questions ouvertes pour faire reflechir Zoe. Vulgarise les concepts complexes avec des images simples ("c'est un peu comme...").
 - "guest" = Zoe : eleve curieuse et naturellement etonnee. Pose les "pourquoi" naifs qui permettent a Alex d'expliquer. Reagit avec sincerite ("Ah oui !", "Je savais pas !", "Ca alors !"). N'hesite pas a demander des precisions quand quelque chose n'est pas clair.
 
@@ -347,7 +399,7 @@ STRUCTURE :
 
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
-Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle COMPLETEMENT DIFFERENT : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
+Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle completement different : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
 ${jsonInstruction()}`;
 }
 
@@ -484,14 +536,14 @@ Agents disponibles:
 
 REGLE DE CARDINAL :
 - Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
-- Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-6 agents.
+- Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-7 agents.
 - 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
-- Maximum 6 agents pour un contenu riche et varie.
+- Maximum 7 agents pour un contenu riche et varie.
 - Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
 
 CRITERES STRATEGIQUES :
 - Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
-- Contenu pedagogique standard (cours, chapitre, lecon, fiche de revision) : inclure generalement au moins un format audio, et souvent les deux (podcast + quiz-vocal) si le contenu permet de varier les angles.
+- Contenu pedagogique standard (cours, chapitre, lecon) : envisage un format audio si le contenu s'y prete (narratif, explicatif, facilement recitable a voix haute).
 - Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
 - Contenu explicatif, factuel ou facilement recitable a voix haute : prioriser quiz-vocal.
 - Contenu narratif, biographique, historique ou avec progression logique : prioriser podcast.
@@ -556,7 +608,7 @@ Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruct
 export function fillBlankSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie specialise dans les exercices a trous.
 ${ageInstruction(ageGroup)}
-Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices COMPLETEMENT DIFFERENTS : nouveaux mots cles, nouvelles phrases, nouveaux angles.
+Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices completement differents : nouveaux mots cles, nouvelles phrases, nouveaux angles.
 Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
 L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
 

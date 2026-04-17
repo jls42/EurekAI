@@ -1,21 +1,16 @@
 import type { Mistral } from '@mistralai/mistralai';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
 import { collectStream } from '../helpers/audio.js';
+import type { MistralVoice } from '../helpers/voice-types.js';
+
+// Re-export pour conserver la surface API publique de ce module.
+export type { MistralVoice };
 
 // --- Types ---
 
 export type TtsOptions =
   | { provider: 'mistral'; model: string; mistralClient: Mistral }
   | { provider: 'elevenlabs'; model: string };
-
-export interface MistralVoice {
-  id: string;
-  name: string;
-  languages: string[];
-  gender?: string;
-  tags?: string[];
-  createdAt?: string;
-}
 
 export interface CreateVoiceOptions {
   name: string;
@@ -119,11 +114,7 @@ export async function getVoiceSample(client: Mistral, voiceId: string): Promise<
 
 // --- ElevenLabs TTS ---
 
-async function elevenlabsTts(
-  text: string,
-  voiceId: string,
-  model: string,
-): Promise<Buffer> {
+async function elevenlabsTts(text: string, voiceId: string, model: string): Promise<Buffer> {
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) throw new Error('ELEVENLABS_API_KEY non defini');
 

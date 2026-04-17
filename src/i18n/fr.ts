@@ -26,10 +26,12 @@ export const fr: Record<string, string> = {
   'gen.quiz-vocal': 'Quiz vocal',
   'gen.fill-blank': 'Texte à trous',
   'gen.image': 'Image',
+  'gen.betaAudio': 'Audio bêta',
   'gen.auto': 'Auto — analyse...',
   'gen.estimatedCost': 'Coût estimé (tarifs Mistral)',
   'gen.apiCalls': 'appel(s) API',
-  'gen.costTooltip': 'Estimation \u2014 {input} tokens in + {output} tokens out \u00b7 {calls} appel(s) API \u00b7 Tarifs officiels Mistral',
+  'gen.costTooltip':
+    'Estimation \u2014 {input} tokens in + {output} tokens out \u00b7 {calls} appel(s) API \u00b7 Tarifs officiels Mistral',
   'gen.costTooltipSource': 'Estimation \u2014 {detail} \u00b7 Tarifs officiels Mistral',
   'gen.costTooltipFree': 'Estimation \u2014 Aucun appel API',
   'gen.costPrefix': 'Est.',
@@ -39,7 +41,8 @@ export const fr: Record<string, string> = {
   'gen.questionCount': 'Nombre :',
   'gen.needsElevenLabs': 'Nécessite une clé API ElevenLabs',
   'gen.needsTts': 'Nécessite un fournisseur TTS configuré',
-  'gen.contextTooLarge': 'Contenu trop volumineux ({pct}% de la capacité du modèle). Sélectionnez moins de sources.',
+  'gen.contextTooLarge':
+    'Contenu trop volumineux ({pct}% de la capacité du modèle). Sélectionnez moins de sources.',
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -120,7 +123,8 @@ export const fr: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarcastique',
   'emotion.Shameful': 'Honteux',
-  'settings.mistralVoicesHint': 'Voix Mistral : Marie, Oliver, Nick, Margaret, Sanchit, Angèle, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Voix Mistral : Marie, Oliver, Nick, Margaret, Sanchit, Angèle, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Fiche',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -446,9 +450,10 @@ export const fr: Record<string, string> = {
   'profile.themeDark': 'Sombre',
   'profile.themeLight': 'Clair',
   'profile.voicePreferences': 'Voix',
-  'profile.voicePreferencesHint': 'Personnalise les voix pour le contenu audio (podcasts, quiz vocaux, lectures)',
+  'profile.voicePreferencesHint':
+    'Personnalise les voix pour le contenu audio (podcasts, quiz vocaux, lectures)',
   'profile.voiceDefault': 'Par défaut (selon la langue)',
-  'profile.voiceCurrentDefault': 'Défaut actuel :',
+  'profile.voiceCurrentDefault': 'Par défaut pour les champs laissés sur « Par défaut » :',
   'profile.resetDefaults': 'Réinitialiser',
   'profile.backToProfiles': 'Retour',
 

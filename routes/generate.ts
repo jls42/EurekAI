@@ -1,7 +1,14 @@
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
-import type { Source, Generation, QuizQuestion, AgeGroup } from '../types.js';
+import type {
+  Source,
+  Generation,
+  QuizQuestion,
+  AgeGroup,
+  FailedStep,
+  FailedStepCode,
+} from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices, getModelLimits } from '../config.js';
@@ -17,6 +24,7 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
+import { AUTO_AGENTS_SET } from '../generators/auto-agents.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
@@ -90,6 +98,9 @@ interface GenContext {
   count?: number;
   pid: string;
   profileVoices?: { host: string; guest: string };
+  // Propagé pour que resolveVoices() applique la rotation déterministe par profil
+  // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
+  profileId?: string;
   req: Request;
   res: Response;
 }
@@ -99,17 +110,26 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
-// Phase 1B.3 — Allowlist locale pour /generate/auto (cf. décision produit #8).
-// executePlan() sait exécuter ces 6 agents ; le router peut en proposer 7.
-// Extrait au niveau module pour réduire la complexité cyclomatique du handler auto.
-const AUTO_EXECUTABLE = new Set([
-  'summary',
-  'flashcards',
-  'quiz',
-  'fill-blank',
-  'podcast',
-  'quiz-vocal',
-]);
+// Map une erreur brute vers un code client stable. Pas d'err.message dans la réponse HTTP :
+// les détails (clés API, URLs internes, stack) restent dans logger.error côté serveur.
+function extractErrorCode(err: unknown, agent: string): FailedStepCode {
+  if (err instanceof SyntaxError) return 'llm_invalid_json';
+  const msg = err instanceof Error ? err.message : String(err);
+  if (/429|rate_?limit|quota/i.test(msg)) return 'quota_exceeded';
+  if (/context[_ ]?length|token.*limit|too.?long/i.test(msg)) return 'context_length_exceeded';
+  if (agent === 'podcast' || agent === 'quiz-vocal') {
+    // Les erreurs qui remontent depuis un agent audio sans signature reconnue au-dessus
+    // viennent très probablement de la pile TTS (generateAudio / ttsQuestion / saveAudioFile).
+    return 'tts_upstream_error';
+  }
+  return 'internal_error';
+}
+
+// Source unique avec generators/router.ts VALID_AGENTS : garantit qu'aucun
+// agent valide renvoyé par le routeur ne peut tomber dans skippedSteps.
+// skippedSteps reste dans la réponse pour future divergence possible
+// (VALID_AGENTS ⊋ AUTO_EXECUTABLE).
+const AUTO_EXECUTABLE = AUTO_AGENTS_SET;
 
 function splitByAutoExecutable<T extends { agent: string }>(
   plan: T[],
@@ -167,6 +187,7 @@ function buildGenContext(
       count: parseCount(body.count),
       pid,
       profileVoices: profile?.mistralVoices,
+      profileId: profileId || undefined,
     },
   };
 }
@@ -333,7 +354,7 @@ export function generateRoutes(
         logger.info('podcast', 'Generating audio...');
         const audioBuffer = await generateAudio(
           podcastResult.script,
-          resolveVoices(ctx.config, ctx.profileVoices, ctx.lang),
+          resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
           { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: client },
         );
         const audioUrl = saveAudioFile(
@@ -351,6 +372,9 @@ export function generateRoutes(
           sourceIds: ctx.sourceIds,
           type: 'podcast',
           data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          // Figer lang sur la génération pour que le badge beta audio (hi/ar) reste cohérent
+          // après un changement de locale UI. Aligné sur QuizVocalGeneration.
+          lang: ctx.lang,
         };
       },
       'podcast',
@@ -424,7 +448,13 @@ export function generateRoutes(
         logger.info('quiz-vocal', 'Generating TTS for each question...');
         const audioUrls: string[] = [];
         const projectDir = store.getProjectDir(ctx.pid);
-        const hostVoice = resolveVoices(ctx.config, ctx.profileVoices, ctx.lang).host;
+        const hostVoice = resolveVoices(
+          ctx.config,
+          ctx.profileVoices,
+          ctx.lang,
+          ctx.profileId,
+          'quiz-vocal',
+        ).host;
         const ttsOpts = {
           provider: ctx.config.ttsProvider,
           model: ctx.config.ttsModel,
@@ -530,6 +560,8 @@ export function generateRoutes(
   interface AutoCtx {
     client: Mistral;
     markdown: string;
+    // rawMarkdown sans consigne, utilisé par l'executor image (aligné sur /generate/image).
+    rawMarkdown: string;
     config: ReturnType<typeof getConfig>;
     hasConsigne: boolean;
     lang: string;
@@ -540,6 +572,7 @@ export function generateRoutes(
     store: ProjectStore;
     generations: Generation[];
     profileVoices?: { host: string; guest: string };
+    profileId?: string;
   }
 
   function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
@@ -618,7 +651,7 @@ export function generateRoutes(
       );
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang),
+        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
         { provider: ctx.config.ttsProvider, model: ctx.config.ttsModel, mistralClient: ctx.client },
       );
       const audioUrl = saveAudioFile(
@@ -627,11 +660,15 @@ export function generateRoutes(
         ctx.pid,
         'podcast',
       );
-      return makeGen(
-        'podcast',
-        { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
-        ctx,
-      );
+      return {
+        ...makeGen(
+          'podcast',
+          { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          ctx,
+        ),
+        // Figer lang pour le badge beta audio (hi/ar) — même contrat que la route dédiée.
+        lang: ctx.lang,
+      } as Generation;
     },
     'quiz-vocal': async (ctx) => {
       const excl = buildExclusionContext(ctx.generations, 'quiz-vocal');
@@ -646,7 +683,13 @@ export function generateRoutes(
       );
       const audioUrls: string[] = [];
       const projectDir = ctx.store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices(ctx.config, ctx.profileVoices, ctx.lang).host;
+      const hostVoice = resolveVoices(
+        ctx.config,
+        ctx.profileVoices,
+        ctx.lang,
+        ctx.profileId,
+        'quiz-vocal',
+      ).host;
       const ttsOpts = {
         provider: ctx.config.ttsProvider,
         model: ctx.config.ttsModel,
@@ -662,6 +705,19 @@ export function generateRoutes(
         lang: ctx.lang,
         ageGroup: ctx.ageGroup,
       } as Generation;
+    },
+    image: async (ctx) => {
+      // Utilise rawMarkdown (sans consigne) pour rester aligné sur la route dédiée
+      // /generate/image et ne pas polluer le prompt image avec la consigne de révision.
+      const data = await generateImage(
+        ctx.client,
+        ctx.rawMarkdown,
+        ctx.store.getProjectDir(ctx.pid),
+        ctx.pid,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return makeGen('image', data, ctx);
     },
   };
 
@@ -712,51 +768,81 @@ export function generateRoutes(
     }
   });
 
+  // Exécute un step en parallèle : retourne soit la génération, soit l'erreur encapsulée.
+  // Les mutations du store (persistUsage, addGeneration) restent séquentielles au niveau JS
+  // (event-loop single-thread), mais l'agrégation dans generations[]/failedSteps[] est
+  // remontée par l'appelant pour contrôler l'ordre de sortie (= ordre du plan).
+  async function runStep(
+    step: { agent: string },
+    autoCtx: AutoCtx,
+    st: ProjectStore,
+    pid: string,
+  ): Promise<{ ok: true; gen: Generation } | { ok: false; agent: string; code: FailedStepCode }> {
+    const executor = AUTO_EXECUTORS[step.agent];
+    if (!executor) {
+      logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
+      return { ok: false, agent: step.agent, code: 'internal_error' };
+    }
+    try {
+      const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+      const persisted = persistUsage(
+        st,
+        pid,
+        `POST /api/projects/${pid}/generate/auto/${step.agent}`,
+        usage,
+      );
+      if (persisted) {
+        gen.usage = persisted.usage;
+        gen.estimatedCost = persisted.cost;
+        gen.costBreakdown = persisted.costBreakdown;
+      }
+      st.addGeneration(pid, gen);
+      logger.info('auto', `${step.agent} OK`);
+      return { ok: true, gen };
+    } catch (err) {
+      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      if (failedUsage?.length) {
+        persistUsage(
+          st,
+          pid,
+          `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+          failedUsage,
+        );
+      }
+      logger.error('auto', `${step.agent} FAILED:`, err);
+      return { ok: false, agent: step.agent, code: extractErrorCode(err, step.agent) };
+    }
+  }
+
+  // Parallélisation alignée sur le comportement UI (cf. src/app/generate.ts:260).
+  // Changement observable acté : buildExclusionContext voit l'état initial du projet
+  // pour tous les agents, pas les générations produites par les autres étapes en cours.
   async function executePlan(
     plan: Array<{ agent: string }>,
     autoCtx: AutoCtx,
     st: ProjectStore,
     pid: string,
     generations: Generation[],
-    failedSteps: string[],
+    failedSteps: FailedStep[],
   ) {
-    for (const step of plan) {
-      try {
-        const executor = AUTO_EXECUTORS[step.agent];
-        if (executor) {
-          const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
-          const persisted = persistUsage(
-            st,
-            pid,
-            `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-            usage,
-          );
-          if (persisted) {
-            gen.usage = persisted.usage;
-            gen.estimatedCost = persisted.cost;
-            gen.costBreakdown = persisted.costBreakdown;
-          }
-          st.addGeneration(pid, gen);
-          generations.push(gen);
-          logger.info('auto', `${step.agent} OK`);
-        } else {
-          logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
-          failedSteps.push(step.agent);
-        }
-      } catch (err) {
-        const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
-        if (failedUsage?.length) {
-          persistUsage(
-            st,
-            pid,
-            `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-            failedUsage,
-          );
-        }
-        logger.error('auto', `${step.agent} FAILED:`, err);
-        failedSteps.push(step.agent);
+    const settled = await Promise.allSettled(plan.map((step) => runStep(step, autoCtx, st, pid)));
+    // Ordre de sortie = ordre du plan (Promise.allSettled préserve l'ordre d'input).
+    settled.forEach((outcome, idx) => {
+      const step = plan[idx];
+      if (outcome.status === 'rejected') {
+        // runStep catche déjà tout. Ce cas ne devrait pas arriver, mais on le capte
+        // quand même pour ne jamais perdre un step du plan.
+        logger.error('auto', `${step.agent} unexpected rejection:`, outcome.reason);
+        failedSteps.push({ agent: step.agent, code: 'internal_error' });
+        return;
       }
-    }
+      const result = outcome.value;
+      if (result.ok) {
+        generations.push(result.gen);
+      } else {
+        failedSteps.push({ agent: result.agent, code: result.code });
+      }
+    });
   }
 
   router.post('/:pid/generate/auto', async (req, res) => {
@@ -813,13 +899,14 @@ export function generateRoutes(
       }
 
       const generations: Generation[] = [];
-      const failedSteps: string[] = [];
+      const failedSteps: FailedStep[] = [];
       const sourceIds = resolveSourceIds(req.body, project.sources);
       const autoProfileId = project.meta?.profileId;
       const autoProfile = autoProfileId ? profileStore.get(autoProfileId) : null;
       const autoCtx: AutoCtx = {
         client,
         markdown,
+        rawMarkdown: rawAutoMarkdown,
         config,
         hasConsigne,
         lang,
@@ -830,15 +917,18 @@ export function generateRoutes(
         store,
         generations: project.results.generations,
         profileVoices: autoProfile?.mistralVoices,
+        profileId: autoProfileId,
       };
 
       await executePlan(executablePlan, autoCtx, store, req.params.pid, generations, failedSteps);
 
-      res.json({
+      const allFailed = generations.length === 0 && failedSteps.length > 0;
+      res.status(allFailed ? 502 : 200).json({
         route: executablePlan,
         generations,
         ...(failedSteps.length > 0 && { failedSteps }),
         ...(skippedSteps.length > 0 && { skippedSteps }),
+        ...(allFailed && { error: 'auto.allStepsFailed' }),
       });
     } catch (e) {
       const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;

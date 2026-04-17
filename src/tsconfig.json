@@ -7,7 +7,7 @@
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "paths": { "@helpers/*": ["./helpers/*"] },
+    "paths": { "@helpers/*": ["../helpers/*"] },
     "rootDir": "..",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": []

@@ -39,7 +39,8 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('quiz')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-quiz animate-slide-up">
-        {{> gen-card-header icon="brain" chipClass="icon-chip-quiz" colorClass="gen-quiz" hasScore=true}}
+        {{> gen-card-header icon="brain" chipClass="icon-chip-quiz" colorClass="gen-quiz"
+        hasScore=true}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
           <!-- Interactive step-by-step quiz -->
           <div x-data="quizComponent(gen)">
@@ -86,8 +87,11 @@
                         }"
                         @click="selectChoice(ci)"
                         :disabled="!!feedback"
-                        x-text="choice"
-                      ></button>
+                      >
+                        <bdi x-text="choiceParts(choice).label"></bdi>
+                        <span x-show="choiceParts(choice).label"> </span>
+                        <bdi x-text="choiceParts(choice).text"></bdi>
+                      </button>
                     </template>
                   </div>
                 </div>

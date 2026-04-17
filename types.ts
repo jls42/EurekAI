@@ -115,6 +115,10 @@ export interface QuizGeneration extends GenerationMeta {
 export interface PodcastGeneration extends GenerationMeta {
   type: 'podcast';
   data: { script: PodcastLine[]; audioUrl: string; sourceRefs?: string[] };
+  // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
+  // Aligné sur QuizVocalGeneration (cf. ligne plus bas) : les anciennes générations
+  // sans `lang` ne porteront pas de badge beta audio, pas de backfill.
+  lang?: string;
 }
 
 export interface QuizVocalGeneration extends GenerationMeta {
@@ -170,6 +174,20 @@ export type Generation =
   | QuizVocalGeneration
   | ImageGeneration
   | FillBlankGeneration;
+
+// Codes d'erreur stables renvoyés par /generate/auto via FailedStep.
+// Contrat client : les détails bruts (err.message, stack) restent dans les logs serveur.
+export type FailedStepCode =
+  | 'llm_invalid_json'
+  | 'quota_exceeded'
+  | 'tts_upstream_error'
+  | 'context_length_exceeded'
+  | 'internal_error';
+
+export interface FailedStep {
+  agent: string;
+  code: FailedStepCode;
+}
 
 // --- Quiz adaptive learning ---
 
@@ -253,4 +271,9 @@ export interface AppConfig {
     host: string;
     guest: string;
   };
+  // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
+  // 'user'    : l'utilisateur a explicitement configuré les voix via settings.
+  // Permet de traiter l'override global comme intentionnel ou non sans allonger
+  // LEGACY_DEFAULT_* à chaque release qui change le défaut.
+  mistralVoicesSource?: 'default' | 'user';
 }

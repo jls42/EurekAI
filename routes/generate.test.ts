@@ -32,26 +32,22 @@ vi.mock('../generators/quiz.js', () => ({
     .mockResolvedValue([
       { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'Expl' },
     ]),
-  generateQuizVocal: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        question: 'Q1 vocal',
-        choices: ['a', 'b', 'c', 'd'],
-        correct: 1,
-        explanation: 'Expl vocal',
-      },
-    ]),
-  generateQuizReview: vi
-    .fn()
-    .mockResolvedValue([
-      {
-        question: 'Review Q1',
-        choices: ['a', 'b', 'c', 'd'],
-        correct: 2,
-        explanation: 'Review expl',
-      },
-    ]),
+  generateQuizVocal: vi.fn().mockResolvedValue([
+    {
+      question: 'Q1 vocal',
+      choices: ['a', 'b', 'c', 'd'],
+      correct: 1,
+      explanation: 'Expl vocal',
+    },
+  ]),
+  generateQuizReview: vi.fn().mockResolvedValue([
+    {
+      question: 'Review Q1',
+      choices: ['a', 'b', 'c', 'd'],
+      correct: 2,
+      explanation: 'Review expl',
+    },
+  ]),
 }));
 
 vi.mock('../generators/podcast.js', () => ({
@@ -1229,7 +1225,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const result = res.json.mock.calls[0][0];
-      expect(result.failedSteps).toEqual(['summary']);
+      expect(result.failedSteps).toEqual([{ agent: 'summary', code: 'internal_error' }]);
       expect(result.generations).toHaveLength(1);
       expect(result.generations[0].type).toBe('flashcards');
     });
@@ -1397,7 +1393,130 @@ describe('generateRoutes', () => {
       // Summary should succeed, podcast should fail
       expect(result.generations).toHaveLength(1);
       expect(result.generations[0].type).toBe('summary');
-      expect(result.failedSteps).toEqual(['podcast']);
+      expect(result.failedSteps).toEqual([{ agent: 'podcast', code: 'tts_upstream_error' }]);
+    });
+  });
+
+  describe('POST /:pid/generate/auto (HTTP 502 + codes stables)', () => {
+    it('renvoie 502 quand tous les steps échouent', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      const { generateFlashcards } = await import('../generators/flashcards.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'flashcards', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('boom'));
+      (generateFlashcards as any).mockRejectedValueOnce(new Error('boom'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(502);
+      const body = res.json.mock.calls[0][0];
+      expect(body.error).toBe('auto.allStepsFailed');
+      expect(body.generations).toHaveLength(0);
+      expect(body.failedSteps).toHaveLength(2);
+    });
+
+    it('failedSteps[].code est llm_invalid_json pour SyntaxError', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new SyntaxError('Unexpected token'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps).toEqual([{ agent: 'summary', code: 'llm_invalid_json' }]);
+    });
+
+    it('failedSteps[].code est quota_exceeded pour rate_limit', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('429 rate_limit exceeded'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('quota_exceeded');
+    });
+
+    it('ne renvoie pas le message brut de err au client (pas de fuite)', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via URL https://api.internal/...'),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      const serialized = JSON.stringify(body);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
+      expect(body.failedSteps[0].code).toBe('internal_error');
     });
   });
 
@@ -1429,7 +1548,9 @@ describe('generateRoutes', () => {
       expect(result.generations[0].type).toBe('quiz-vocal');
       expect(result.generations[0].data).toHaveLength(1);
       expect(result.generations[0].audioUrls).toHaveLength(1);
-      expect(result.generations[0].audioUrls[0]).toContain(`/output/projects/${pid}/quiz-vocal-q0-`);
+      expect(result.generations[0].audioUrls[0]).toContain(
+        `/output/projects/${pid}/quiz-vocal-q0-`,
+      );
       expect(result.generations[0].lang).toBe('fr');
       expect(result.generations[0].ageGroup).toBe('enfant');
       expect(result.failedSteps).toBeUndefined();

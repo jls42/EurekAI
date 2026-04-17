@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from './types.js';
-import { type MistralVoice } from './generators/tts-provider.js';
+import type { MistralVoice } from './helpers/voice-types.js';
+import { selectVoices } from './helpers/voice-selection.js';
+import { logger } from './helpers/logger.js';
 
 const DEFAULT_CONFIG: AppConfig = {
   models: {
@@ -52,6 +54,16 @@ export function initConfig(outputDir: string): void {
   } else {
     currentConfig = { ...DEFAULT_CONFIG };
   }
+
+  // Migration one-time : classer mistralVoicesSource à partir des IDs existants.
+  // Tout config qui match DEFAULT_CONFIG ou LEGACY_DEFAULT_* est 'default', sinon 'user'.
+  // Evite d'étendre LEGACY_DEFAULT_* à chaque release qui change le défaut.
+  if (!currentConfig.mistralVoicesSource) {
+    const isDefault =
+      isDefaultHost(currentConfig.mistralVoices.host) &&
+      isDefaultGuest(currentConfig.mistralVoices.guest);
+    currentConfig.mistralVoicesSource = isDefault ? 'default' : 'user';
+  }
 }
 
 export function getConfig(): AppConfig {
@@ -79,6 +91,8 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   }
   if (partial.mistralVoices) {
     currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
+    // Toute mutation explicite des voix globales = choix utilisateur intentionnel.
+    currentConfig.mistralVoicesSource = 'user';
   }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   return currentConfig;
@@ -99,75 +113,91 @@ export function getApiStatus(): { mistral: boolean; elevenlabs: boolean; ttsAvai
 
 let modelLimits: Record<string, number> = {};
 
-export function setModelLimits(limits: Record<string, number>): void { modelLimits = limits; }
-export function getModelLimits(): Record<string, number> { return modelLimits; }
+export function setModelLimits(limits: Record<string, number>): void {
+  modelLimits = limits;
+}
+export function getModelLimits(): Record<string, number> {
+  return modelLimits;
+}
 
 // --- Voice cache & language defaults ---
 
 let voiceCache: MistralVoice[] = [];
 
-export function setVoiceCache(voices: MistralVoice[]): void { voiceCache = voices; }
-export function getVoiceCache(): MistralVoice[] { return voiceCache; }
-
-const VOICE_SELECTION: Record<string, { host: { speaker: string; tag: string }; guest: { speaker: string; tag: string } }> = {
-  fr: { host: { speaker: 'Marie', tag: 'excited' }, guest: { speaker: 'Marie', tag: 'curious' } },
-  en: { host: { speaker: 'Jane', tag: 'curious' }, guest: { speaker: 'Oliver', tag: 'cheerful' } },
-};
-
-function findVoice(lang: string, criteria: { speaker: string; tag: string }): string | undefined {
-  return voiceCache.find(v =>
-    v.languages.some(l => l.startsWith(lang)) &&
-    v.name.startsWith(criteria.speaker) &&
-    v.tags?.includes(criteria.tag),
-  )?.id;
+export function setVoiceCache(voices: MistralVoice[]): void {
+  voiceCache = voices;
+}
+export function getVoiceCache(): MistralVoice[] {
+  return voiceCache;
 }
 
-function resolveLanguageVoiceDefaults(lang?: string): Partial<{ host: string; guest: string }> {
-  if (!lang) return {};
-  const sel = VOICE_SELECTION[lang];
-  if (!sel) return {};
-  return {
-    host: findVoice(lang, sel.host),
-    guest: findVoice(lang, sel.guest),
-  };
+// IDs de voix Mistral qui ont été les defaults avant des releases précédentes.
+// Conservé pour la migration mistralVoicesSource (cf. initConfig) : un config.json
+// existant avec un de ces IDs est classé 'default', pas 'user'.
+const LEGACY_DEFAULT_HOSTS: ReadonlySet<string> = new Set(['e3596645-b1af-469e-b857-f18ddedc7652']);
+const LEGACY_DEFAULT_GUESTS: ReadonlySet<string> = new Set([
+  '5a271406-039d-46fe-835b-fbbb00eaf08d',
+]);
+
+function isDefaultHost(id: string | undefined): boolean {
+  return !id || id === DEFAULT_CONFIG.mistralVoices.host || LEGACY_DEFAULT_HOSTS.has(id);
+}
+
+function isDefaultGuest(id: string | undefined): boolean {
+  return !id || id === DEFAULT_CONFIG.mistralVoices.guest || LEGACY_DEFAULT_GUESTS.has(id);
+}
+
+// Résout host + guest via le helper partagé selectVoices, avec logging des fallbacks.
+// Retourne null si voiceCache est entièrement vide (cas dégradé).
+function resolveMistralDefaults(
+  lang: string | undefined,
+  profileId: string | undefined,
+  flow: string,
+): { host: string; guest: string } | null {
+  if (!lang) return null;
+  const result = selectVoices({ voices: voiceCache, lang, profileId });
+  if (!result) {
+    logger.warn('voice-selection', `no voice available (lang=${lang}, flow=${flow})`);
+    return null;
+  }
+  if (result.source !== 'lang-match') {
+    logger.info(
+      'voice-selection',
+      `fallback lang_input=${lang} lang_matched=${result.langMatched ?? 'none'} source=${result.source} bucketSize=${result.bucketSize} flow=${flow}`,
+    );
+  }
+  return { host: result.host, guest: result.guest };
 }
 
 export function resolveVoices(
   config: AppConfig,
   profileVoices?: { host: string; guest: string },
   lang?: string,
+  profileId?: string,
+  flow = 'unknown',
 ): { host: string; guest: string } {
   if (config.ttsProvider !== 'mistral') {
     return { host: config.voices.host.id, guest: config.voices.guest.id };
   }
 
-  const configured = config.mistralVoices;
-  const languageDefaults = resolveLanguageVoiceDefaults(lang);
-  const preferLanguageHost =
-    !!languageDefaults.host &&
-    !!lang &&
-    lang !== 'fr' &&
-    (!configured.host || configured.host === DEFAULT_CONFIG.mistralVoices.host);
-  const preferLanguageGuest =
-    !!languageDefaults.guest &&
-    !!lang &&
-    lang !== 'fr' &&
-    (!configured.guest || configured.guest === DEFAULT_CONFIG.mistralVoices.guest);
+  const userConfigured = config.mistralVoicesSource === 'user';
+  const dynamic = resolveMistralDefaults(lang, profileId, flow);
 
-  const defaults = {
-    host:
-      (preferLanguageHost ? languageDefaults.host : configured.host) ||
-      languageDefaults.host ||
-      DEFAULT_CONFIG.mistralVoices.host,
-    guest:
-      (preferLanguageGuest ? languageDefaults.guest : configured.guest) ||
-      languageDefaults.guest ||
-      DEFAULT_CONFIG.mistralVoices.guest,
-  };
+  // Priorités backend :
+  // 1. override par profil (per-field)
+  // 2. override global explicite (mistralVoicesSource === 'user')
+  // 3. sélection dynamique via selectVoices (9 langues UI)
+  // 4. fallback legacy DEFAULT_CONFIG.mistralVoices si voiceCache vide
+  const globalHost = userConfigured ? config.mistralVoices.host : undefined;
+  const globalGuest = userConfigured ? config.mistralVoices.guest : undefined;
 
-  // Merge profile overrides per field (partial overrides supported)
+  const hostFallback =
+    dynamic?.host || config.mistralVoices.host || DEFAULT_CONFIG.mistralVoices.host;
+  const guestFallback =
+    dynamic?.guest || config.mistralVoices.guest || DEFAULT_CONFIG.mistralVoices.guest;
+
   return {
-    host: profileVoices?.host || defaults.host,
-    guest: profileVoices?.guest || defaults.guest,
+    host: profileVoices?.host || globalHost || hostFallback,
+    guest: profileVoices?.guest || globalGuest || guestFallback,
   };
 }

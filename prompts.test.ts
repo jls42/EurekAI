@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   langInstruction,
   ageInstruction,
@@ -19,7 +19,13 @@ import {
   imageUser,
   websearchInstructions,
   websearchInput,
+  defaultReasonFor,
+  routerSystem,
+  verifyAnswerSystem,
+  vocalRewriteRules,
+  quizVocalSystem,
 } from './prompts.js';
+import { logger } from './helpers/logger.js';
 import type { AgeGroup } from './types.js';
 
 // ── ageInstruction ──────────────────────────────────────────────────
@@ -217,6 +223,189 @@ describe('imageSystem', () => {
     expect(result).toContain('illustrateur');
     expect(result).toContain('professionnel');
     expect(result).toContain('English');
+  });
+});
+
+// ── summarySystem / summaryUser title policy (anti-leak lexical) ────
+
+describe('summarySystem title policy', () => {
+  it('énonce une règle positive sur le champ title', () => {
+    const result = summarySystem('enfant');
+    expect(result).toContain('sujet du cours uniquement');
+    expect(result).toContain('"Les volcans"');
+    expect(result).toContain('"La photosynthese"');
+  });
+
+  it('ne contient plus les phrases exactes problématiques (anti-régression)', () => {
+    const lower = summarySystem('enfant').toLowerCase();
+    // Bug historique (premier leak COMPLÈTE dans title)
+    expect(lower).not.toContain('cree une seule fiche de revision complete');
+    expect(lower).not.toContain('fiche de revision exhaustive');
+    // Occurrences dans le corps du prompt (deuxième passe d'audit)
+    expect(lower).not.toContain('la fiche finale');
+    expect(lower).not.toContain('avec cette fiche');
+    expect(lower).not.toContain('resume complet du cours');
+    // Pas de réinjection de la phrase legacy sur le préfixe UI
+    expect(lower).not.toContain('prefixe par "fiche — "');
+  });
+});
+
+describe('summaryUser title policy', () => {
+  it('branche hasConsigne=false ne fait plus fuiter de tokens méta', () => {
+    const lower = summaryUser('# Source 1\n\nContenu', false, 'fr').toLowerCase();
+    expect(lower).not.toContain('fiche de revision exhaustive');
+    expect(lower).not.toContain('synthese complete');
+    expect(lower).not.toContain('cette seule fiche');
+    expect(lower).toContain('title');
+  });
+
+  it('branche hasConsigne=true préserve le comportement de consigne', () => {
+    const result = summaryUser('# Source 1\n\nContenu', true, 'fr');
+    expect(result).toContain('CONSIGNE DE REVISION');
+    expect(result).toContain('key_points');
+  });
+});
+
+// ── defaultReasonFor (logger.warn sur agent inconnu) ────────────────
+
+describe('defaultReasonFor', () => {
+  it('retourne la reason localisée pour un agent connu', () => {
+    expect(defaultReasonFor('summary', 'en')).toContain('Course summary');
+    expect(defaultReasonFor('podcast', 'fr')).toMatch(/podcast/i);
+  });
+
+  it('log un warn et retourne un placeholder neutre pour un agent inconnu', () => {
+    const spy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const result = defaultReasonFor('unknown-xyz', 'fr');
+    expect(result).toBe('[unknown-xyz]');
+    expect(spy).toHaveBeenCalledWith('router', expect.stringContaining('unknown-xyz'));
+    spy.mockRestore();
+  });
+});
+
+// ── routerSystem invariants ─────────────────────────────────────────
+
+describe('routerSystem invariants', () => {
+  it('contient la règle de cardinal 4-7 agents et la liste des 7 agents', () => {
+    const result = routerSystem('enfant', 'fr');
+    expect(result).toContain('4-7 agents');
+    expect(result).toContain('Maximum 7 agents');
+    for (const agent of [
+      'summary',
+      'flashcards',
+      'quiz',
+      'fill-blank',
+      'podcast',
+      'quiz-vocal',
+      'image',
+    ]) {
+      expect(result).toContain(`"${agent}"`);
+    }
+  });
+
+  it('mentionne le critère audio sans imposer sa sélection (politique neutre)', () => {
+    const result = routerSystem('enfant', 'fr');
+    // Le mot "audio" reste présent comme critère de pertinence
+    expect(result.toLowerCase()).toContain('audio');
+    // Mais la formulation prescriptive doit disparaître
+    expect(result).not.toContain('inclure generalement au moins un format audio');
+    expect(result).not.toContain('souvent les deux (podcast + quiz-vocal)');
+  });
+});
+
+// ── verifyAnswerSystem invariants ───────────────────────────────────
+
+describe('verifyAnswerSystem invariants', () => {
+  it("encode l'équivalence lettres/numéros 1=A, 2=B, 3=C, 4=D", () => {
+    const result = verifyAnswerSystem('A) Paris\nB) Lyon', 'A) Paris', 'enfant', 'fr');
+    expect(result).toContain('1=A, 2=B, 3=C, 4=D');
+  });
+
+  it('interdit le "presque bon" quand la réponse est correcte', () => {
+    const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
+    expect(result).toContain('JAMAIS "presque bon"');
+  });
+
+  it('tolère les variantes orthographiques', () => {
+    const result = verifyAnswerSystem('A) x', 'A) x', 'enfant', 'fr');
+    expect(result).toContain('Wisigoths/Visigoths');
+  });
+});
+
+// ── vocalRewriteRules invariants ────────────────────────────────────
+
+describe('vocalRewriteRules', () => {
+  it('FR contient des règles spécifiques (chiffres romains, abréviations)', () => {
+    const result = vocalRewriteRules('fr');
+    expect(result).toContain('cinquieme');
+    expect(result).toContain('avant Jesus-Christ');
+  });
+
+  it('EN contient ses propres règles (ordinals, acronyms)', () => {
+    const result = vocalRewriteRules('en');
+    expect(result).toContain('fifth');
+    expect(result).toContain('United Nations');
+    expect(result).not.toContain('cinquieme');
+  });
+
+  it('ES contient ses propres règles', () => {
+    const result = vocalRewriteRules('es');
+    expect(result).toContain('quinto');
+    expect(result).not.toContain('cinquieme');
+  });
+
+  it('DE contient ses propres règles (ajout 9 langues UI)', () => {
+    const result = vocalRewriteRules('de');
+    expect(result).toContain('fünfter');
+    expect(result).not.toContain('cinquieme');
+  });
+
+  it('IT contient ses propres règles', () => {
+    const result = vocalRewriteRules('it');
+    expect(result).toContain('quinto');
+    expect(result).toContain('quattordicesimo');
+  });
+
+  it('PT contient ses propres règles', () => {
+    const result = vocalRewriteRules('pt');
+    expect(result).toContain('quinto');
+    expect(result).toContain('décimo quarto');
+  });
+
+  it('NL contient ses propres règles', () => {
+    const result = vocalRewriteRules('nl');
+    expect(result).toContain('vijfde');
+  });
+
+  it('HI contient ses propres règles (devanagari)', () => {
+    const result = vocalRewriteRules('hi');
+    expect(result).toContain('पाँचवाँ');
+  });
+
+  it('AR contient ses propres règles (arabe)', () => {
+    const result = vocalRewriteRules('ar');
+    expect(result).toContain('الخامس');
+  });
+
+  it('langue hors UI retombe sur FR (ex: japonais, coréen)', () => {
+    const result = vocalRewriteRules('ja');
+    expect(result).toContain('cinquieme');
+  });
+
+  it("toutes les 9 langues UI partagent l'intro TTS commune", () => {
+    for (const lang of ['fr', 'en', 'es', 'de', 'it', 'pt', 'nl', 'hi', 'ar']) {
+      expect(vocalRewriteRules(lang)).toContain('LUES A HAUTE VOIX');
+    }
+  });
+});
+
+// ── quizVocalSystem (vérifie que vocalRewriteRules est bien intégrée) ─
+
+describe('quizVocalSystem integration', () => {
+  it('contient la règle parenthèses/labels (exception A-D)', () => {
+    const result = quizVocalSystem('enfant', 'fr');
+    expect(result).toContain('AUCUNE parenthese');
+    expect(result).toContain('A)');
   });
 });
 

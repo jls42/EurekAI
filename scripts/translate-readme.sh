@@ -2,11 +2,26 @@
 set -e
 # Translate README.md (FR) to all supported languages using ai-powered-markdown-translator
 
-TRANSLATOR_DIR="$HOME/git/ai-powered-markdown-translator"
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-if [ ! -f "$TRANSLATOR_DIR/translate.py" ]; then
-  echo "ERROR: ai-powered-markdown-translator not found in $TRANSLATOR_DIR" >&2
+# Cherche l'outil dans TRANSLATOR_DIR (override), puis dans les chemins standards.
+# Permet aux setups qui rangent les projets sous ~/git/ai/ de fonctionner.
+CANDIDATES=(
+  "${TRANSLATOR_DIR:-}"
+  "$HOME/git/ai-powered-markdown-translator"
+  "$HOME/git/ai/ai-powered-markdown-translator"
+)
+TRANSLATOR_DIR=""
+for candidate in "${CANDIDATES[@]}"; do
+  if [ -n "$candidate" ] && [ -f "$candidate/translate.py" ]; then
+    TRANSLATOR_DIR="$candidate"
+    break
+  fi
+done
+
+if [ -z "$TRANSLATOR_DIR" ]; then
+  echo "ERROR: ai-powered-markdown-translator not found. Checked: ${CANDIDATES[*]}" >&2
+  echo "Set TRANSLATOR_DIR env var to override." >&2
   exit 1
 fi
 
