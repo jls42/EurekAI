@@ -5,27 +5,34 @@
 // Garde une source de vérité unique pour la regex : toute divergence entre les deux
 // call-sites recrée la régression "pastilles manquantes sur format dégradé".
 
-// Regex tolérante. Couvre :
+// Stratégie multi-passes pour éviter tout risque de backtracking catastrophique
+// (règle SonarQube typescript:S5852) :
+//   1. Regex simple `\[Source([^\]]+)\]` — classe négée, linéaire par construction.
+//   2. Parse manuel du contenu capturé via split(',') + trim + extraction numérique.
+// Couvre les formats :
 //   [Source N]                  canonique simple
-//   [Source N][Source M]        canonique multi (rendu via 2 matchs consécutifs)
+//   [Source N][Source M]        canonique multi (deux matchs consécutifs)
 //   [Source N, M]               dégradé "liste de numéros"
 //   [Source N, Source M]        dégradé "préfixe répété dans liste"
 //   [Source N,M]                espaces absents
-// Le préfixe "Source" devant chaque numéro additionnel est optionnel, les espaces sont libres.
-const SOURCE_MARKER_RE = /\[Source\s*(\d+(?:\s*,\s*(?:Source\s*)?\d+)*)\]/gi;
+const SOURCE_MARKER_RE = /\[Source([^\]]+)\]/gi;
 
-function parsePartToNum(part: string): number {
-  return Number.parseInt(part.replace(/^Source\s*/i, '').trim(), 10);
+/** Extract all numeric IDs from the inner content of a [Source ...] bracket. */
+function parseInnerToNums(inner: string): number[] {
+  const nums: number[] = [];
+  for (const part of inner.split(',')) {
+    const trimmed = part.replace(/^\s*Source\s*/i, '').trim();
+    const n = Number.parseInt(trimmed, 10);
+    if (Number.isFinite(n)) nums.push(n);
+  }
+  return nums;
 }
 
 /** Extract all source numbers from a text containing [Source N] markers (single or multi). */
 export function extractSourceNums(text: string): number[] {
   const nums: number[] = [];
   for (const m of text.matchAll(SOURCE_MARKER_RE)) {
-    for (const part of m[1].split(/\s*,\s*/)) {
-      const n = parsePartToNum(part);
-      if (Number.isFinite(n)) nums.push(n);
-    }
+    nums.push(...parseInnerToNums(m[1]));
   }
   return nums;
 }
@@ -38,10 +45,9 @@ export function extractSourceNums(text: string): number[] {
  * Output : "barrages [Source 13][Source 20] et eoliennes [Source 5][Source 7]"
  */
 export function normalizeSourceMarkers(text: string): string {
-  return text.replace(SOURCE_MARKER_RE, (_, inner: string) =>
-    inner
-      .split(/\s*,\s*/)
-      .map((p) => `[Source ${parsePartToNum(p)}]`)
-      .join(''),
-  );
+  return text.replace(SOURCE_MARKER_RE, (match, inner: string) => {
+    const nums = parseInnerToNums(inner);
+    if (nums.length === 0) return match;
+    return nums.map((n) => `[Source ${n}]`).join('');
+  });
 }
