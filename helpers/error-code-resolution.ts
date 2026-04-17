@@ -35,7 +35,10 @@ const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
 const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib/i;
 
 function matchRule(value: string, rules: readonly Rule[]): FailedStepCode | null {
-  return rules.find(([pattern]) => pattern.test(value))?.[1] ?? null;
+  for (const [pattern, result] of rules) {
+    if (pattern.test(value)) return result;
+  }
+  return null;
 }
 
 function getErrFields(err: unknown): ErrWithFields {
