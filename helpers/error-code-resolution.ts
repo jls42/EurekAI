@@ -34,39 +34,6 @@ function readString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-const STATUS_RULES = new Map<number, FailedStepCode>([
-  [429, 'quota_exceeded'],
-  [503, 'upstream_unavailable'],
-  [529, 'upstream_unavailable'],
-]);
-
-const STRUCTURED_RATE_LIMIT = createPattern(String.raw`rate.?limit|quota|tier`);
-const STRUCTURED_UPSTREAM_UNAVAILABLE = createPattern(String.raw`capacity|overloaded|unavailable`);
-const STRUCTURED_CONTEXT_LIMIT = createPattern(String.raw`context.?length|token.?limit`);
-
-const MESSAGE_RATE_LIMIT = createPattern(String.raw`\b429\b|rate[_ ]?limit|quota|tier.*limit`);
-const MESSAGE_UPSTREAM_UNAVAILABLE = createPattern(
-  String.raw`\b503\b|\b529\b|overloaded|capacity|service.?unavailable`,
-);
-const MESSAGE_CONTEXT_LIMIT = createPattern(
-  String.raw`context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long`,
-);
-
-const STRUCTURED_CODE_RULES: readonly Rule[] = [
-  { pattern: STRUCTURED_RATE_LIMIT, code: 'quota_exceeded' },
-  { pattern: STRUCTURED_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
-  { pattern: STRUCTURED_CONTEXT_LIMIT, code: 'context_length_exceeded' },
-];
-
-const MESSAGE_RULES: readonly Rule[] = [
-  { pattern: MESSAGE_RATE_LIMIT, code: 'quota_exceeded' },
-  { pattern: MESSAGE_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
-  { pattern: MESSAGE_CONTEXT_LIMIT, code: 'context_length_exceeded' },
-];
-
-const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
-const TTS_SIGNATURE = createPattern(String.raw`\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib`);
-
 function getStatusMatch(status: unknown): FailedStepCode | null {
   if (typeof status !== 'number') return null;
   return STATUS_RULES.get(status) ?? null;
@@ -108,3 +75,36 @@ export function extractErrorCode(err: unknown, agent?: string): FailedStepCode {
   if (err instanceof SyntaxError) return 'llm_invalid_json';
   return resolveErrorCode(err, agent);
 }
+
+const STATUS_RULES = new Map<number, FailedStepCode>([
+  [429, 'quota_exceeded'],
+  [503, 'upstream_unavailable'],
+  [529, 'upstream_unavailable'],
+]);
+
+const STRUCTURED_RATE_LIMIT = createPattern(String.raw`rate.?limit|quota|tier`);
+const STRUCTURED_UPSTREAM_UNAVAILABLE = createPattern(String.raw`capacity|overloaded|unavailable`);
+const STRUCTURED_CONTEXT_LIMIT = createPattern(String.raw`context.?length|token.?limit`);
+
+const MESSAGE_RATE_LIMIT = createPattern(String.raw`\b429\b|rate[_ ]?limit|quota|tier.*limit`);
+const MESSAGE_UPSTREAM_UNAVAILABLE = createPattern(
+  String.raw`\b503\b|\b529\b|overloaded|capacity|service.?unavailable`,
+);
+const MESSAGE_CONTEXT_LIMIT = createPattern(
+  String.raw`context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long`,
+);
+
+const STRUCTURED_CODE_RULES: readonly Rule[] = [
+  { pattern: STRUCTURED_RATE_LIMIT, code: 'quota_exceeded' },
+  { pattern: STRUCTURED_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
+  { pattern: STRUCTURED_CONTEXT_LIMIT, code: 'context_length_exceeded' },
+];
+
+const MESSAGE_RULES: readonly Rule[] = [
+  { pattern: MESSAGE_RATE_LIMIT, code: 'quota_exceeded' },
+  { pattern: MESSAGE_UPSTREAM_UNAVAILABLE, code: 'upstream_unavailable' },
+  { pattern: MESSAGE_CONTEXT_LIMIT, code: 'context_length_exceeded' },
+];
+
+const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
+const TTS_SIGNATURE = createPattern(String.raw`\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib`);
