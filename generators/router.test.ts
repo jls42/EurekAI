@@ -199,6 +199,32 @@ describe('normalizePlan', () => {
     expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz']);
   });
 
+  it('ignores long consigne preamble when underlying study material is short', () => {
+    const markdown = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :
+- date exacte
+- definition precise
+- personnage important
+- cause et consequence
+- exemple detaille
+
+Concentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.
+
+---
+
+# Source 1 — cours.txt
+
+Definition tres courte.`;
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r1' },
+        { agent: 'quiz', reason: 'r2' },
+      ],
+      'fr',
+      markdown,
+    );
+    expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz']);
+  });
+
   it('prioritizes audio before image when trimming to 6 agents', () => {
     const result = normalizePlan(
       [

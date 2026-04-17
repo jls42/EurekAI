@@ -196,7 +196,21 @@ describe('resolveVoices', () => {
       { id: 'oliver-cheerful', name: 'Oliver - Cheerful', languages: ['en_gb'], tags: ['cheerful'] },
     ]);
     const voices = resolveVoices(cfg, undefined, 'en');
-    expect(voices).toEqual(cfg.mistralVoices);
+    expect(voices).toEqual({ host: 'jane-curious', guest: 'oliver-cheerful' });
+    setVoiceCache([]); // cleanup
+  });
+
+  it('preserve config globale custom pour EN si utilisateur a override les voix', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    cfg.mistralVoices = { host: 'custom-host', guest: 'custom-guest' };
+    setVoiceCache([
+      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: 'oliver-cheerful', name: 'Oliver - Cheerful', languages: ['en_gb'], tags: ['cheerful'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'en');
+    expect(voices).toEqual({ host: 'custom-host', guest: 'custom-guest' });
     setVoiceCache([]); // cleanup
   });
 
@@ -241,6 +255,21 @@ describe('resolveVoices', () => {
     const partial = { host: '', guest: 'only-guest' };
     const voices = resolveVoices(cfg, partial, 'fr');
     expect(voices).toEqual({ host: cfg.mistralVoices.host, guest: 'only-guest' });
+  });
+
+  it('combine override partiel utilisateur + fallback langue pour champ restant', () => {
+    initConfig(tempDir);
+    const cfg = getConfig();
+    cfg.ttsProvider = 'mistral';
+    const defaultGuest = cfg.mistralVoices.guest;
+    cfg.mistralVoices = { host: 'custom-host', guest: defaultGuest };
+    setVoiceCache([
+      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: 'oliver-cheerful', name: 'Oliver - Cheerful', languages: ['en_gb'], tags: ['cheerful'] },
+    ]);
+    const voices = resolveVoices(cfg, undefined, 'en');
+    expect(voices).toEqual({ host: 'custom-host', guest: 'oliver-cheerful' });
+    setVoiceCache([]); // cleanup
   });
 });
 

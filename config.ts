@@ -122,6 +122,16 @@ function findVoice(lang: string, criteria: { speaker: string; tag: string }): st
   )?.id;
 }
 
+function resolveLanguageVoiceDefaults(lang?: string): Partial<{ host: string; guest: string }> {
+  if (!lang) return {};
+  const sel = VOICE_SELECTION[lang];
+  if (!sel) return {};
+  return {
+    host: findVoice(lang, sel.host),
+    guest: findVoice(lang, sel.guest),
+  };
+}
+
 export function resolveVoices(
   config: AppConfig,
   profileVoices?: { host: string; guest: string },
@@ -131,16 +141,29 @@ export function resolveVoices(
     return { host: config.voices.host.id, guest: config.voices.guest.id };
   }
 
-  // Resolve defaults: tier 2 = global config (user settings), tier 3 = language defaults
-  let defaults: { host: string; guest: string } = config.mistralVoices;
-  if (lang && (!defaults.host || !defaults.guest)) {
-    const sel = VOICE_SELECTION[lang];
-    if (sel) {
-      const h = findVoice(lang, sel.host);
-      const g = findVoice(lang, sel.guest);
-      if (h && g) defaults = { host: defaults.host || h, guest: defaults.guest || g };
-    }
-  }
+  const configured = config.mistralVoices;
+  const languageDefaults = resolveLanguageVoiceDefaults(lang);
+  const preferLanguageHost =
+    !!languageDefaults.host &&
+    !!lang &&
+    lang !== 'fr' &&
+    (!configured.host || configured.host === DEFAULT_CONFIG.mistralVoices.host);
+  const preferLanguageGuest =
+    !!languageDefaults.guest &&
+    !!lang &&
+    lang !== 'fr' &&
+    (!configured.guest || configured.guest === DEFAULT_CONFIG.mistralVoices.guest);
+
+  const defaults = {
+    host:
+      (preferLanguageHost ? languageDefaults.host : configured.host) ||
+      languageDefaults.host ||
+      DEFAULT_CONFIG.mistralVoices.host,
+    guest:
+      (preferLanguageGuest ? languageDefaults.guest : configured.guest) ||
+      languageDefaults.guest ||
+      DEFAULT_CONFIG.mistralVoices.guest,
+  };
 
   // Merge profile overrides per field (partial overrides supported)
   return {

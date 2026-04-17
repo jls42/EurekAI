@@ -28,17 +28,21 @@ const AGE_LABELS: Record<AgeGroup, string> = {
 const MAX_PLAN_LENGTH = 6;
 const SUBSTANTIAL_MATERIAL_CHARS = 350;
 
+function stripNonSourcePreamble(markdown: string): string {
+  const sourceStart = markdown.indexOf('# Source ');
+  return sourceStart === -1 ? markdown : markdown.slice(sourceStart);
+}
+
 function studyMaterialLength(markdown: string): number {
-  return markdown
+  return stripNonSourcePreamble(markdown)
     .split('\n')
     .filter(
       (line) =>
         !line.startsWith('# Source ') &&
-        !line.startsWith('CONSIGNE DE REVISION DETECTEE') &&
         line.trim() !== '---',
     )
     .join(' ')
-    .replace(/\s+/g, ' ')
+    .replaceAll(/\s+/g, ' ')
     .trim().length;
 }
 
