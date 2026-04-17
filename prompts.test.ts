@@ -389,7 +389,7 @@ describe('routerSystem invariants', () => {
 
 // ── verifyAnswerSystem invariants ───────────────────────────────────
 
-describe('verifyAnswerSystem invariants', () => {
+describe('verifyAnswerSystem core rules', () => {
   it("encode l'équivalence lettres/numéros 1=A, 2=B, 3=C, 4=D", () => {
     const result = verifyAnswerSystem('A) Paris\nB) Lyon', 'A) Paris', 'enfant', 'fr');
     expect(result).toContain('1=A, 2=B, 3=C, 4=D');
@@ -405,16 +405,19 @@ describe('verifyAnswerSystem invariants', () => {
     const result = verifyAnswerSystem('A) x', 'A) x', 'enfant', 'fr');
     expect(result).toContain('Wisigoths/Visigoths');
   });
+});
 
-  // Matrix : aucun ageGroup ne contient de formulation ambiguë
+describe('verifyAnswerSystem ne contient pas de formulation ambiguë', () => {
   for (const ageGroup of ['enfant', 'ado', 'etudiant', 'adulte'] as const) {
-    it(`ne contient ni "presque" ni "pas tout à fait" pour ageGroup=${ageGroup}`, () => {
+    it(`ageGroup=${ageGroup} ne contient ni "presque" ni "pas tout à fait"`, () => {
       const result = verifyAnswerSystem('A) x', 'A) x', ageGroup, 'fr');
       expect(result.toLowerCase()).not.toMatch(/\bpresque\b/);
       expect(result.toLowerCase()).not.toMatch(/pas tout à fait/);
     });
   }
+});
 
+describe('verifyAnswerSystem feedback structure', () => {
   it('impose une structure de feedback avec opener binaire', () => {
     const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
     expect(result).toContain('STRUCTURE OBLIGATOIRE');

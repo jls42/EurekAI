@@ -29,43 +29,57 @@ function readString(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
-// Map une erreur brute vers un code client stable : pas d'err.message dans la réponse HTTP
-// (clés API, URLs internes, stack restent dans logger.error côté serveur).
-export function extractErrorCode(err: unknown, agent?: string): FailedStepCode {
-  if (err instanceof SyntaxError) return 'llm_invalid_json';
-
-  const fields = asErrFields(err);
-
-  // Inspecter d'abord les champs structurés (SDK Mistral APIError expose status/code).
-  // Plus robuste que regex sur message qui peut être localisé ou muter entre versions.
-  // Distinction : 429 = budget utilisateur (rate limit / tier) ; 503/529 = saturation backend
-  // indépendante du budget (panne ou overload). UX distincte côté i18n + retry plus pertinent
-  // sur upstream_unavailable que sur quota.
+// Champs SDK structurés (status HTTP, code string). Prime sur les regex message :
+// 429 = budget utilisateur, 503/529 = saturation backend indépendante du budget.
+function fromStructured(fields: ErrWithFields): FailedStepCode | null {
   const status = fields.status;
-  const code = readString(fields.code);
   if (status === 429) return 'quota_exceeded';
   if (status === 503 || status === 529) return 'upstream_unavailable';
+
+  const code = readString(fields.code);
   if (/rate.?limit|quota|tier/i.test(code)) return 'quota_exceeded';
   if (/capacity|overloaded|unavailable/i.test(code)) return 'upstream_unavailable';
   if (/context.?length|token.?limit/i.test(code)) return 'context_length_exceeded';
+  return null;
+}
 
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/\b429\b|rate[_ ]?limit|quota|tier.*limit/i.test(msg)) {
-    return 'quota_exceeded';
-  }
+// Fallback regex sur err.message quand le SDK ne pose pas de status/code structurés.
+function fromMessage(msg: string): FailedStepCode | null {
+  if (/\b429\b|rate[_ ]?limit|quota|tier.*limit/i.test(msg)) return 'quota_exceeded';
   if (/\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i.test(msg)) {
     return 'upstream_unavailable';
   }
   if (/context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i.test(msg)) {
     return 'context_length_exceeded';
   }
+  return null;
+}
 
-  // Audio seulement si signature positive : tag explicite posé par le generator,
-  // ou message qui cite un composant de la pile audio. Sinon internal_error plutôt
-  // que masquer un bug hors-TTS (parser, FS, auth) derrière tts_upstream_error.
-  const stage = readString(fields.stage);
-  if (agent && TTS_AGENTS.has(agent) && (stage === 'tts' || TTS_SIGNATURE.test(msg))) {
-    return 'tts_upstream_error';
+// Audio seulement si signature positive : tag explicite posé par le generator, ou message
+// qui cite un composant de la pile audio. Sinon internal_error plutôt que masquer un bug
+// hors-TTS (parser, FS, auth) derrière tts_upstream_error.
+function fromAudioSignature(agent: string, msg: string, stage: string): FailedStepCode | null {
+  if (!TTS_AGENTS.has(agent)) return null;
+  if (stage === 'tts' || TTS_SIGNATURE.test(msg)) return 'tts_upstream_error';
+  return null;
+}
+
+// Map une erreur brute vers un code client stable : pas d'err.message dans la réponse HTTP
+// (clés API, URLs internes, stack restent dans logger.error côté serveur).
+export function extractErrorCode(err: unknown, agent?: string): FailedStepCode {
+  if (err instanceof SyntaxError) return 'llm_invalid_json';
+
+  const fields = asErrFields(err);
+  const structured = fromStructured(fields);
+  if (structured) return structured;
+
+  const msg = err instanceof Error ? err.message : String(err);
+  const fromMsg = fromMessage(msg);
+  if (fromMsg) return fromMsg;
+
+  if (agent) {
+    const audio = fromAudioSignature(agent, msg, readString(fields.stage));
+    if (audio) return audio;
   }
 
   return 'internal_error';
