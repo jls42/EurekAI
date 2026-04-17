@@ -21,38 +21,63 @@ interface ErrWithFields {
   message?: unknown;
 }
 
-function asErrFields(err: unknown): ErrWithFields {
-  return err !== null && typeof err === 'object' ? (err as ErrWithFields) : {};
+interface RegexRule {
+  pattern: RegExp;
+  result: FailedStepCode;
 }
+
+const EMPTY_ERR_FIELDS: ErrWithFields = {};
+
+const STATUS_RULES: Readonly<Record<number, FailedStepCode>> = {
+  429: 'quota_exceeded',
+  503: 'upstream_unavailable',
+  529: 'upstream_unavailable',
+};
+
+const STRUCTURED_CODE_RULES: readonly RegexRule[] = [
+  { pattern: /rate.?limit|quota|tier/i, result: 'quota_exceeded' },
+  { pattern: /capacity|overloaded|unavailable/i, result: 'upstream_unavailable' },
+  { pattern: /context.?length|token.?limit/i, result: 'context_length_exceeded' },
+];
+
+const MESSAGE_RULES: readonly RegexRule[] = [
+  { pattern: /\b429\b|rate[_ ]?limit|quota|tier.*limit/i, result: 'quota_exceeded' },
+  {
+    pattern: /\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i,
+    result: 'upstream_unavailable',
+  },
+  {
+    pattern: /context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i,
+    result: 'context_length_exceeded',
+  },
+];
 
 function readString(v: unknown): string {
   return typeof v === 'string' ? v : '';
 }
 
+function getErrFields(err: unknown): ErrWithFields {
+  return err !== null && typeof err === 'object' ? (err as ErrWithFields) : EMPTY_ERR_FIELDS;
+}
+
+function matchRule(value: string, rules: readonly RegexRule[]): FailedStepCode | null {
+  const match = rules.find((rule) => rule.pattern.test(value));
+  return match?.result ?? null;
+}
+
+function getStatusCode(status: unknown): FailedStepCode | null {
+  return typeof status === 'number' ? (STATUS_RULES[status] ?? null) : null;
+}
+
 // Champs SDK structurés (status HTTP, code string). Prime sur les regex message :
 // 429 = budget utilisateur, 503/529 = saturation backend indépendante du budget.
 function fromStructured(fields: ErrWithFields): FailedStepCode | null {
-  const status = fields.status;
-  if (status === 429) return 'quota_exceeded';
-  if (status === 503 || status === 529) return 'upstream_unavailable';
-
-  const code = readString(fields.code);
-  if (/rate.?limit|quota|tier/i.test(code)) return 'quota_exceeded';
-  if (/capacity|overloaded|unavailable/i.test(code)) return 'upstream_unavailable';
-  if (/context.?length|token.?limit/i.test(code)) return 'context_length_exceeded';
-  return null;
+  return getStatusCode(fields.status) ?? matchRule(readString(fields.code), STRUCTURED_CODE_RULES);
 }
 
 // Fallback regex sur err.message quand le SDK ne pose pas de status/code structurés.
 function fromMessage(msg: string): FailedStepCode | null {
-  if (/\b429\b|rate[_ ]?limit|quota|tier.*limit/i.test(msg)) return 'quota_exceeded';
-  if (/\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i.test(msg)) {
-    return 'upstream_unavailable';
-  }
-  if (/context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i.test(msg)) {
-    return 'context_length_exceeded';
-  }
-  return null;
+  return matchRule(msg, MESSAGE_RULES);
 }
 
 // Audio seulement si signature positive : tag explicite posé par le generator, ou message
@@ -69,18 +94,12 @@ function fromAudioSignature(agent: string, msg: string, stage: string): FailedSt
 export function extractErrorCode(err: unknown, agent?: string): FailedStepCode {
   if (err instanceof SyntaxError) return 'llm_invalid_json';
 
-  const fields = asErrFields(err);
-  const structured = fromStructured(fields);
-  if (structured) return structured;
-
+  const fields = getErrFields(err);
   const msg = err instanceof Error ? err.message : String(err);
-  const fromMsg = fromMessage(msg);
-  if (fromMsg) return fromMsg;
-
-  if (agent) {
-    const audio = fromAudioSignature(agent, msg, readString(fields.stage));
-    if (audio) return audio;
-  }
-
-  return 'internal_error';
+  return (
+    fromStructured(fields) ??
+    fromMessage(msg) ??
+    (agent ? fromAudioSignature(agent, msg, readString(fields.stage)) : null) ??
+    'internal_error'
+  );
 }

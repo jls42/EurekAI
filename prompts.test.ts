@@ -60,6 +60,102 @@ const systemFns: [string, (ag: AgeGroup) => string][] = [
   ['fillBlankSystem', fillBlankSystem],
 ];
 
+function getVerifyAnswerPrompt(
+  ageGroup: AgeGroup = 'enfant',
+  question = 'A) x',
+  answer = question,
+): string {
+  return verifyAnswerSystem(question, answer, ageGroup, 'fr');
+}
+
+function assertVerifyAnswerLettersNumbersRule(): void {
+  expect(getVerifyAnswerPrompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris')).toContain(
+    '1=A, 2=B, 3=C, 4=D',
+  );
+}
+
+function assertVerifyAnswerBinaryRule(): void {
+  const result = getVerifyAnswerPrompt('enfant', 'A) Paris', 'A) Paris');
+  expect(result).toContain('binaire');
+  expect(result).toContain('quasi-reussite');
+}
+
+function assertVerifyAnswerSpellingVariants(): void {
+  expect(getVerifyAnswerPrompt()).toContain('Wisigoths/Visigoths');
+}
+
+function assertVerifyAnswerNoAmbiguity(ageGroup: AgeGroup): void {
+  const result = getVerifyAnswerPrompt(ageGroup).toLowerCase();
+  expect(result).not.toMatch(/\bpresque\b/);
+  expect(result).not.toMatch(/pas tout à fait/);
+}
+
+function assertVerifyAnswerNoAmbiguityEnfant(): void {
+  assertVerifyAnswerNoAmbiguity('enfant');
+}
+
+function assertVerifyAnswerNoAmbiguityAdo(): void {
+  assertVerifyAnswerNoAmbiguity('ado');
+}
+
+function assertVerifyAnswerNoAmbiguityEtudiant(): void {
+  assertVerifyAnswerNoAmbiguity('etudiant');
+}
+
+function assertVerifyAnswerNoAmbiguityAdulte(): void {
+  assertVerifyAnswerNoAmbiguity('adulte');
+}
+
+function assertVerifyAnswerFeedbackOpener(): void {
+  const result = getVerifyAnswerPrompt('enfant', 'A) Paris', 'A) Paris');
+  expect(result).toContain('STRUCTURE OBLIGATOIRE');
+  expect(result).toMatch(/negation nette/);
+  expect(result).toContain('"Non,"');
+  expect(result).toMatch(/"feedback":\s*"Non,/);
+}
+
+function assertVerifyAnswerFewShotIsolation(): void {
+  const result = getVerifyAnswerPrompt('enfant', 'A) Mercure', 'A) Mercure');
+  expect(result).toContain('Mercure');
+  expect(result).not.toMatch(/la capitale de la France/);
+}
+
+function registerVerifyAnswerCoreRulesSuite(): void {
+  it(
+    "encode l'équivalence lettres/numéros 1=A, 2=B, 3=C, 4=D",
+    assertVerifyAnswerLettersNumbersRule,
+  );
+  it('impose une règle binaire sans quasi-réussite', assertVerifyAnswerBinaryRule);
+  it('tolère les variantes orthographiques', assertVerifyAnswerSpellingVariants);
+}
+
+function registerVerifyAnswerNoAmbiguitySuite(): void {
+  it(
+    'ageGroup=enfant ne contient ni "presque" ni "pas tout à fait"',
+    assertVerifyAnswerNoAmbiguityEnfant,
+  );
+  it(
+    'ageGroup=ado ne contient ni "presque" ni "pas tout à fait"',
+    assertVerifyAnswerNoAmbiguityAdo,
+  );
+  it(
+    'ageGroup=etudiant ne contient ni "presque" ni "pas tout à fait"',
+    assertVerifyAnswerNoAmbiguityEtudiant,
+  );
+  it(
+    'ageGroup=adulte ne contient ni "presque" ni "pas tout à fait"',
+    assertVerifyAnswerNoAmbiguityAdulte,
+  );
+}
+
+function registerVerifyAnswerFeedbackStructureSuite(): void {
+  it('impose une structure de feedback avec opener binaire', assertVerifyAnswerFeedbackOpener);
+  it(
+    'utilise un few-shot hors-domaine des quiz classiques (anti-collision)',
+    assertVerifyAnswerFewShotIsolation,
+  );
+}
+
 describe('system functions adapt to ageGroup', () => {
   for (const [name, fn] of systemFns) {
     it.each(Object.entries(AGE_KEYWORD))(`${name}(%s) contient %s`, (group, keyword) => {
@@ -389,55 +485,14 @@ describe('routerSystem invariants', () => {
 
 // ── verifyAnswerSystem invariants ───────────────────────────────────
 
-describe('verifyAnswerSystem core rules', () => {
-  it("encode l'équivalence lettres/numéros 1=A, 2=B, 3=C, 4=D", () => {
-    const result = verifyAnswerSystem('A) Paris\nB) Lyon', 'A) Paris', 'enfant', 'fr');
-    expect(result).toContain('1=A, 2=B, 3=C, 4=D');
-  });
+describe('verifyAnswerSystem core rules', registerVerifyAnswerCoreRulesSuite);
 
-  it('impose une règle binaire sans quasi-réussite', () => {
-    const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
-    expect(result).toContain('binaire');
-    expect(result).toContain('quasi-reussite');
-  });
+describe(
+  'verifyAnswerSystem ne contient pas de formulation ambiguë',
+  registerVerifyAnswerNoAmbiguitySuite,
+);
 
-  it('tolère les variantes orthographiques', () => {
-    const result = verifyAnswerSystem('A) x', 'A) x', 'enfant', 'fr');
-    expect(result).toContain('Wisigoths/Visigoths');
-  });
-});
-
-describe('verifyAnswerSystem ne contient pas de formulation ambiguë', () => {
-  for (const ageGroup of ['enfant', 'ado', 'etudiant', 'adulte'] as const) {
-    it(`ageGroup=${ageGroup} ne contient ni "presque" ni "pas tout à fait"`, () => {
-      const result = verifyAnswerSystem('A) x', 'A) x', ageGroup, 'fr');
-      expect(result.toLowerCase()).not.toMatch(/\bpresque\b/);
-      expect(result.toLowerCase()).not.toMatch(/pas tout à fait/);
-    });
-  }
-});
-
-describe('verifyAnswerSystem feedback structure', () => {
-  it('impose une structure de feedback avec opener binaire', () => {
-    const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
-    expect(result).toContain('STRUCTURE OBLIGATOIRE');
-    // Opener imposé pour correct=false (few-shot + règle)
-    expect(result).toMatch(/negation nette/);
-    expect(result).toContain('"Non,"');
-    // Few-shot avec feedback qui commence par "Non,"
-    expect(result).toMatch(/"feedback":\s*"Non,/);
-  });
-
-  it('utilise un few-shot hors-domaine des quiz classiques (anti-collision)', () => {
-    // Le few-shot est verrouillé sur Mercure/Venus plutôt que Paris/France : si la vraie
-    // question porte sur la capitale de la France, le LLM risque de recopier l'exemple
-    // littéralement. Cf. .claude/rules/prompts.md §Few-shots (contenu transférable,
-    // pas un cas pédagogique ultra-courant).
-    const result = verifyAnswerSystem('A) Mercure', 'A) Mercure', 'enfant', 'fr');
-    expect(result).toContain('Mercure');
-    expect(result).not.toMatch(/la capitale de la France/);
-  });
-});
+describe('verifyAnswerSystem feedback structure', registerVerifyAnswerFeedbackStructureSuite);
 
 // ── feedbackAgeInstruction invariants ──────────────────────────────
 
