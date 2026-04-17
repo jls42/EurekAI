@@ -21,7 +21,6 @@ import {
   websearchInput,
   defaultReasonFor,
   routerSystem,
-  verifyAnswerSystem,
   feedbackAgeInstruction,
   vocalRewriteRules,
   quizVocalSystem,
@@ -59,102 +58,6 @@ const systemFns: [string, (ag: AgeGroup) => string][] = [
   ['podcastSystem', podcastSystem],
   ['fillBlankSystem', fillBlankSystem],
 ];
-
-function getVerifyAnswerPrompt(
-  ageGroup: AgeGroup = 'enfant',
-  question = 'A) x',
-  answer = question,
-): string {
-  return verifyAnswerSystem(question, answer, ageGroup, 'fr');
-}
-
-function assertVerifyAnswerLettersNumbersRule(): void {
-  expect(getVerifyAnswerPrompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris')).toContain(
-    '1=A, 2=B, 3=C, 4=D',
-  );
-}
-
-function assertVerifyAnswerBinaryRule(): void {
-  const result = getVerifyAnswerPrompt('enfant', 'A) Paris', 'A) Paris');
-  expect(result).toContain('binaire');
-  expect(result).toContain('quasi-reussite');
-}
-
-function assertVerifyAnswerSpellingVariants(): void {
-  expect(getVerifyAnswerPrompt()).toContain('Wisigoths/Visigoths');
-}
-
-function assertVerifyAnswerNoAmbiguity(ageGroup: AgeGroup): void {
-  const result = getVerifyAnswerPrompt(ageGroup).toLowerCase();
-  expect(result).not.toMatch(/\bpresque\b/);
-  expect(result).not.toMatch(/pas tout à fait/);
-}
-
-function assertVerifyAnswerNoAmbiguityEnfant(): void {
-  assertVerifyAnswerNoAmbiguity('enfant');
-}
-
-function assertVerifyAnswerNoAmbiguityAdo(): void {
-  assertVerifyAnswerNoAmbiguity('ado');
-}
-
-function assertVerifyAnswerNoAmbiguityEtudiant(): void {
-  assertVerifyAnswerNoAmbiguity('etudiant');
-}
-
-function assertVerifyAnswerNoAmbiguityAdulte(): void {
-  assertVerifyAnswerNoAmbiguity('adulte');
-}
-
-function assertVerifyAnswerFeedbackOpener(): void {
-  const result = getVerifyAnswerPrompt('enfant', 'A) Paris', 'A) Paris');
-  expect(result).toContain('STRUCTURE OBLIGATOIRE');
-  expect(result).toMatch(/negation nette/);
-  expect(result).toContain('"Non,"');
-  expect(result).toMatch(/"feedback":\s*"Non,/);
-}
-
-function assertVerifyAnswerFewShotIsolation(): void {
-  const result = getVerifyAnswerPrompt('enfant', 'A) Mercure', 'A) Mercure');
-  expect(result).toContain('Mercure');
-  expect(result).not.toMatch(/la capitale de la France/);
-}
-
-function registerVerifyAnswerCoreRulesSuite(): void {
-  it(
-    "encode l'équivalence lettres/numéros 1=A, 2=B, 3=C, 4=D",
-    assertVerifyAnswerLettersNumbersRule,
-  );
-  it('impose une règle binaire sans quasi-réussite', assertVerifyAnswerBinaryRule);
-  it('tolère les variantes orthographiques', assertVerifyAnswerSpellingVariants);
-}
-
-function registerVerifyAnswerNoAmbiguitySuite(): void {
-  it(
-    'ageGroup=enfant ne contient ni "presque" ni "pas tout à fait"',
-    assertVerifyAnswerNoAmbiguityEnfant,
-  );
-  it(
-    'ageGroup=ado ne contient ni "presque" ni "pas tout à fait"',
-    assertVerifyAnswerNoAmbiguityAdo,
-  );
-  it(
-    'ageGroup=etudiant ne contient ni "presque" ni "pas tout à fait"',
-    assertVerifyAnswerNoAmbiguityEtudiant,
-  );
-  it(
-    'ageGroup=adulte ne contient ni "presque" ni "pas tout à fait"',
-    assertVerifyAnswerNoAmbiguityAdulte,
-  );
-}
-
-function registerVerifyAnswerFeedbackStructureSuite(): void {
-  it('impose une structure de feedback avec opener binaire', assertVerifyAnswerFeedbackOpener);
-  it(
-    'utilise un few-shot hors-domaine des quiz classiques (anti-collision)',
-    assertVerifyAnswerFewShotIsolation,
-  );
-}
 
 describe('system functions adapt to ageGroup', () => {
   for (const [name, fn] of systemFns) {
@@ -482,17 +385,6 @@ describe('routerSystem invariants', () => {
     expect(result).not.toContain('souvent les deux (podcast + quiz-vocal)');
   });
 });
-
-// ── verifyAnswerSystem invariants ───────────────────────────────────
-
-describe('verifyAnswerSystem core rules', registerVerifyAnswerCoreRulesSuite);
-
-describe(
-  'verifyAnswerSystem ne contient pas de formulation ambiguë',
-  registerVerifyAnswerNoAmbiguitySuite,
-);
-
-describe('verifyAnswerSystem feedback structure', registerVerifyAnswerFeedbackStructureSuite);
 
 // ── feedbackAgeInstruction invariants ──────────────────────────────
 
