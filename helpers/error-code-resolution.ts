@@ -13,6 +13,10 @@ type Rule = Readonly<{
 
 const EMPTY_FIELDS = Object.freeze({}) as ErrWithFields;
 
+function createPattern(source: string): RegExp {
+  return new RegExp(source, 'i');
+}
+
 function matchRule(value: string, rules: readonly Rule[]): FailedStepCode | null {
   return rules.find(({ pattern }) => pattern.test(value))?.code ?? null;
 }
@@ -36,13 +40,17 @@ const STATUS_RULES = new Map<number, FailedStepCode>([
   [529, 'upstream_unavailable'],
 ]);
 
-const STRUCTURED_RATE_LIMIT = /rate.?limit|quota|tier/i;
-const STRUCTURED_UPSTREAM_UNAVAILABLE = /capacity|overloaded|unavailable/i;
-const STRUCTURED_CONTEXT_LIMIT = /context.?length|token.?limit/i;
+const STRUCTURED_RATE_LIMIT = createPattern(String.raw`rate.?limit|quota|tier`);
+const STRUCTURED_UPSTREAM_UNAVAILABLE = createPattern(String.raw`capacity|overloaded|unavailable`);
+const STRUCTURED_CONTEXT_LIMIT = createPattern(String.raw`context.?length|token.?limit`);
 
-const MESSAGE_RATE_LIMIT = /\b429\b|rate[_ ]?limit|quota|tier.*limit/i;
-const MESSAGE_UPSTREAM_UNAVAILABLE = /\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i;
-const MESSAGE_CONTEXT_LIMIT = /context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i;
+const MESSAGE_RATE_LIMIT = createPattern(String.raw`\b429\b|rate[_ ]?limit|quota|tier.*limit`);
+const MESSAGE_UPSTREAM_UNAVAILABLE = createPattern(
+  String.raw`\b503\b|\b529\b|overloaded|capacity|service.?unavailable`,
+);
+const MESSAGE_CONTEXT_LIMIT = createPattern(
+  String.raw`context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long`,
+);
 
 const STRUCTURED_CODE_RULES: readonly Rule[] = [
   { pattern: STRUCTURED_RATE_LIMIT, code: 'quota_exceeded' },
@@ -57,7 +65,7 @@ const MESSAGE_RULES: readonly Rule[] = [
 ];
 
 const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
-const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib/i;
+const TTS_SIGNATURE = createPattern(String.raw`\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib`);
 
 function getStatusMatch(status: unknown): FailedStepCode | null {
   if (typeof status !== 'number') return null;
