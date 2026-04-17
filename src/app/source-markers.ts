@@ -45,7 +45,7 @@ export function extractSourceNums(text: string): number[] {
  * Output : "barrages [Source 13][Source 20] et eoliennes [Source 5][Source 7]"
  */
 export function normalizeSourceMarkers(text: string): string {
-  return text.replace(SOURCE_MARKER_RE, (match, inner: string) => {
+  return text.replaceAll(SOURCE_MARKER_RE, (match, inner: string) => {
     const nums = parseInnerToNums(inner);
     if (nums.length === 0) return match;
     return nums.map((n) => `[Source ${n}]`).join('');
