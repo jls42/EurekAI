@@ -416,6 +416,18 @@ describe('referencedSourceNums', () => {
     expect(nums).toEqual(new Set([1, 2, 5]));
   });
 
+  it('extracts source nums from summary degraded multi-ref [Source N, M]', () => {
+    const gen = {
+      type: 'summary',
+      data: {
+        summary: 'Les centrales [Source 13, 20] produisent.',
+        key_points: ['Point avec [Source 5, Source 7].'],
+      },
+    };
+    const nums = helpers.referencedSourceNums(gen);
+    expect(nums).toEqual(new Set([13, 20, 5, 7]));
+  });
+
   it('returns empty set for unknown generation type', () => {
     const gen = { type: 'image', data: {} };
     const nums = helpers.referencedSourceNums(gen);
@@ -749,6 +761,15 @@ describe('questionSources', () => {
     const q = { sourceRefs: ['Source 1', 'Source 99'] };
     const result = callWith<any[]>(helpers.questionSources, ctx, {}, q);
     expect(result).toHaveLength(1);
+  });
+
+  it('returns [] without throwing when item is undefined (Alpine transient state)', () => {
+    const ctx = {
+      genSources: () => sources,
+      resolveSourceRef: helpers.resolveSourceRef,
+    };
+    expect(() => callWith<any[]>(helpers.questionSources, ctx, {}, undefined)).not.toThrow();
+    expect(callWith<any[]>(helpers.questionSources, ctx, {}, undefined)).toEqual([]);
   });
 });
 

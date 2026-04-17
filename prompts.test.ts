@@ -22,6 +22,7 @@ import {
   defaultReasonFor,
   routerSystem,
   verifyAnswerSystem,
+  feedbackAgeInstruction,
   vocalRewriteRules,
   quizVocalSystem,
 } from './prompts.js';
@@ -250,6 +251,79 @@ describe('summarySystem title policy', () => {
   });
 });
 
+// ── summarySystem source refs policy (format canonique) ───────────
+
+describe('summarySystem source refs policy', () => {
+  it('contient un exemple de multi-citation canonique [Source N][Source M]', () => {
+    const result = summarySystem('enfant');
+    expect(result).toMatch(/\[Source \d+\]\[Source \d+\]/);
+  });
+
+  it('ne mentionne jamais la forme dégradée ni aucun pattern similaire (anti-blacklist)', () => {
+    const result = summarySystem('enfant');
+    // Pas de chaîne exacte [Source 13, 20]
+    expect(result).not.toContain('[Source 13, 20]');
+    // Pas de variante avec virgule à l'intérieur d'un seul bracket
+    expect(result).not.toMatch(/\[Source\s*\d+\s*,\s*\d+\]/);
+  });
+
+  it("ne demande plus d'inliner les sources dans summary/key_points (instruction retirée)", () => {
+    const result = summarySystem('enfant');
+    expect(result).not.toContain('Cite tes sources [Source 1], [Source 2]');
+  });
+});
+
+// ── sourceRefsInstruction emphases policy (testé via flashcardsSystem) ─
+
+describe('sourceRefsInstruction emphases', () => {
+  it('contient uniquement les emphases load-bearing (FABRIQUE JAMAIS, LISTE-LES TOUTES)', () => {
+    const result = flashcardsSystem('enfant');
+    expect(result).toContain('FABRIQUE JAMAIS');
+    expect(result).toContain('LISTE-LES TOUTES');
+  });
+
+  it('ne contient pas les emphases décoratives retirées', () => {
+    const result = flashcardsSystem('enfant');
+    expect(result).not.toContain('REGLE STRICTE SUR LES SOURCES');
+    expect(result).not.toContain("AVANT d'ecrire un sourceRef");
+    expect(result).not.toContain('contient VRAIMENT');
+    expect(result).not.toContain('Format EXACT :');
+  });
+});
+
+// ── chatSystem approche pédagogique (pas de socratique prescriptif) ──
+
+describe('chatSystem approche pédagogique', () => {
+  it('ne prescrit plus une relance socratique en emphase MAJUSCULE', () => {
+    const result = chatSystem('fr', 'enfant');
+    expect(result).not.toContain('SOCRATIQUE');
+    expect(result).not.toContain("Privilegie l'approche SOCRATIQUE");
+  });
+
+  it('affirme que la réponse directe est le comportement par défaut', () => {
+    const result = chatSystem('fr', 'enfant');
+    expect(result).toContain('reponds clairement et directement');
+  });
+});
+
+// ── podcastSystem personnages sans tics imposés ─────────────────
+
+describe('podcastSystem personnages', () => {
+  it("ne force pas d'interjection répétitive imposée à Zoé", () => {
+    const result = podcastSystem('enfant');
+    // Les 3 tics sur main-HEAD ne doivent plus apparaître en liste imposée
+    expect(result).not.toContain('"Ah oui !"');
+    expect(result).not.toContain('"Je savais pas !"');
+    expect(result).not.toContain('"Ca alors !"');
+  });
+
+  it('conserve la différenciation des personnages Alex/Zoe', () => {
+    const result = podcastSystem('enfant');
+    expect(result).toContain('Alex');
+    expect(result).toContain('Zoe');
+  });
+});
+
 describe('summaryUser title policy', () => {
   it('branche hasConsigne=false ne fait plus fuiter de tokens méta', () => {
     const lower = summaryUser('# Source 1\n\nContenu', false, 'fr').toLowerCase();
@@ -321,15 +395,37 @@ describe('verifyAnswerSystem invariants', () => {
     expect(result).toContain('1=A, 2=B, 3=C, 4=D');
   });
 
-  it('interdit le "presque bon" quand la réponse est correcte', () => {
+  it('impose une règle binaire sans quasi-réussite', () => {
     const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'fr');
-    expect(result).toContain('JAMAIS "presque bon"');
+    expect(result).toContain('binaire');
+    expect(result).toContain('quasi-reussite');
   });
 
   it('tolère les variantes orthographiques', () => {
     const result = verifyAnswerSystem('A) x', 'A) x', 'enfant', 'fr');
     expect(result).toContain('Wisigoths/Visigoths');
   });
+
+  // Matrix : aucun ageGroup ne contient de formulation ambiguë
+  for (const ageGroup of ['enfant', 'ado', 'etudiant', 'adulte'] as const) {
+    it(`ne contient ni "presque" ni "pas tout à fait" pour ageGroup=${ageGroup}`, () => {
+      const result = verifyAnswerSystem('A) x', 'A) x', ageGroup, 'fr');
+      expect(result.toLowerCase()).not.toMatch(/\bpresque\b/);
+      expect(result.toLowerCase()).not.toMatch(/pas tout à fait/);
+    });
+  }
+});
+
+// ── feedbackAgeInstruction invariants ──────────────────────────────
+
+describe('feedbackAgeInstruction invariants', () => {
+  for (const ageGroup of ['enfant', 'ado', 'etudiant', 'adulte'] as const) {
+    it(`ageGroup=${ageGroup} ne contient ni "presque" ni "pas tout à fait"`, () => {
+      const result = feedbackAgeInstruction(ageGroup).toLowerCase();
+      expect(result).not.toMatch(/\bpresque\b/);
+      expect(result).not.toMatch(/pas tout à fait/);
+    });
+  }
 });
 
 // ── vocalRewriteRules invariants ────────────────────────────────────

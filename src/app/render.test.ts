@@ -180,6 +180,37 @@ describe('createRender', () => {
       expect(result).toContain('>2</button>');
     });
 
+    it('eclate la forme degradee [Source N, M] en badges adjacents sans bracket brut', () => {
+      const sources = [
+        { id: 'src-13', filename: 'a.pdf' },
+        { id: 'src-20', filename: 'b.pdf' },
+      ];
+      // 20 sources placeholder so idx 12 and 19 resolve
+      for (let i = sources.length; i < 20; i += 1) sources.push({ id: `s${i}`, filename: `f${i}` });
+      sources[12] = { id: 'src-13', filename: 'a.pdf' };
+      sources[19] = { id: 'src-20', filename: 'b.pdf' };
+      const ctx = makeCtx(sources);
+      const result = render.renderWithSources.call(ctx, 'barrages [Source 13, 20] et fin', {});
+      expect(result).toContain('data-source-id="src-13"');
+      expect(result).toContain('data-source-id="src-20"');
+      expect(result).toContain('>13</button>');
+      expect(result).toContain('>20</button>');
+      // aucun bracket brut ne doit subsister
+      expect(result).not.toMatch(/\[Source[^<]*\]/);
+    });
+
+    it('eclate la forme sans espace [Source N,M]', () => {
+      const sources = Array.from({ length: 20 }, (_, i) => ({
+        id: `s${i + 1}`,
+        filename: `f${i + 1}`,
+      }));
+      const ctx = makeCtx(sources);
+      const result = render.renderWithSources.call(ctx, '[Source 13,20]', {});
+      expect(result).toContain('data-source-id="s13"');
+      expect(result).toContain('data-source-id="s20"');
+      expect(result).not.toMatch(/\[Source[^<]*\]/);
+    });
+
     it('gere les references hors plage avec un badge span', () => {
       const sources = [{ id: 'src-1', filename: 'a.pdf' }];
       const ctx = makeCtx(sources);

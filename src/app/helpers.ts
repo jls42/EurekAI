@@ -1,7 +1,9 @@
 import { createIcons, icons } from 'lucide';
+import { extractSourceNums } from './source-markers';
 
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
 function extractItemRefs(item: any): string[] {
+  if (!item) return [];
   if (item.sourceRefs) return item.sourceRefs;
   if (item.sourceRef) return [item.sourceRef];
   if (item.source) return [item.source];
@@ -346,9 +348,7 @@ export function createHelpers() {
           if (cit.sourceRef) extractNums([cit.sourceRef]);
         }
         const text = (d.summary || '') + ' ' + (d.key_points || []).join(' ');
-        for (const m of text.matchAll(/\[Source\s*(\d+)\]/gi)) {
-          nums.add(Number.parseInt(m[1], 10));
-        }
+        for (const n of extractSourceNums(text)) nums.add(n);
       }
       return nums;
     },

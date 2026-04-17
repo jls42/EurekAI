@@ -45,13 +45,13 @@ export function ageInstruction(ageGroup: AgeGroup = 'enfant'): string {
 // ── Source refs helper (DRY) ────────────────────────────────────────
 
 function sourceRefsInstruction(itemName: string): string {
-  return `REGLE STRICTE SUR LES SOURCES (pour chaque ${itemName}) :
-- AVANT d'ecrire un sourceRef, verifie que cette source contient VRAIMENT l'information que tu reponds.
-- Ne FABRIQUE JAMAIS de reference. Ne mets JAMAIS "Source 1" par defaut sans verifier.
+  return `Regle sur les sources (pour chaque ${itemName}) :
+- Avant d'ecrire un sourceRef, verifie que cette source contient vraiment l'information.
+- Ne FABRIQUE JAMAIS de reference. Ne mets pas "Source 1" par defaut sans verifier.
 - Si l'information vient de plusieurs sources, LISTE-LES TOUTES dans sourceRefs (ex: ["Source 2", "Source 5"]).
-- Si une source contient UNIQUEMENT des consignes de revision (et non du contenu factuel), NE l'utilise PAS comme reference.
-- Format EXACT : "Source N" ou N est le numero du titre "# Source N" en en-tete dans le contenu fourni.
-- En cas de doute sur la source d'une information, mieux vaut omettre le sourceRef que d'en inventer un.`;
+- Si une source contient uniquement des consignes de revision, ne l'utilise pas comme reference.
+- Format : "Source N" ou N est le numero du titre "# Source N".
+- En cas de doute, mieux vaut omettre le sourceRef que d'en inventer un.`;
 }
 
 // ── JSON instruction helper (DRY) ────────────────────────────────────
@@ -146,7 +146,7 @@ REGLE POUR LE CHAMP "title" :
 - title ne doit pas contenir de qualificatif sur le format du document.
 
 EXEMPLE de structure attendue (valeurs minimales — le document final doit etre bien plus detaille) :
-{"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre.","Une eruption peut etre effusive ou explosive."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
+{"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre [Source 1][Source 3].","Une eruption peut etre effusive ou explosive [Source 2]."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
 TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec ce document. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
@@ -159,8 +159,11 @@ REGLES DE COUVERTURE :
 - vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.
 
+REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
+- Format canonique : un bracket par source, meme en multi-citation.
+- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+
 ${ageInstruction(ageGroup)}
-Cite tes sources [Source 1], [Source 2], etc. dans les key_points et le summary.
 ${jsonInstruction()}`;
 }
 
@@ -385,9 +388,10 @@ Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 export function podcastSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
-PERSONNAGES (leur personnalite doit transparaitre dans chaque replique — pas de dialogue generique) :
-- "host" = Alex : prof enthousiaste et passionne. Adore les anecdotes et les analogies du quotidien. Pose des questions ouvertes pour faire reflechir Zoe. Vulgarise les concepts complexes avec des images simples ("c'est un peu comme...").
-- "guest" = Zoe : eleve curieuse et naturellement etonnee. Pose les "pourquoi" naifs qui permettent a Alex d'expliquer. Reagit avec sincerite ("Ah oui !", "Je savais pas !", "Ca alors !"). N'hesite pas a demander des precisions quand quelque chose n'est pas clair.
+PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
+- "host" = Alex : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir Zoe.
+- "guest" = Zoe : eleve curieuse qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
@@ -454,10 +458,11 @@ PERIMETRE :
 - Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
 
 APPROCHE PEDAGOGIQUE :
-- Privilegie l'approche SOCRATIQUE : pose une question de relance pour amener l'eleve a la comprehension, plutot que de donner la reponse complete d'emblee. Exemple : "Bonne question ! Avant que je reponde, regarde dans ta source 2 : que dit-elle sur les volcans ?"
-- Quand tu donnes une reponse de fond, CITE la source ("D'apres ta source 1, ...").
-- Utilise des EXEMPLES CONCRETS et des analogies du quotidien.
-- Reference les echanges precedents de la conversation pour creer une continuite ("Comme tu l'as dit tout a l'heure, ...").
+- Par defaut, reponds clairement et directement a la question de l'eleve, avec un exemple concret si utile.
+- Quand une question de relance aide vraiment la comprehension (eleve qui ferait mieux de chercher dans ses documents, concept deja aborde), tu peux poser une question courte avant de repondre. Reste optionnel, pas systematique.
+- Quand tu donnes une reponse de fond, cite la source ("D'apres ta source 1, ...").
+- Utilise des exemples concrets et des analogies du quotidien.
+- Reference les echanges precedents de la conversation pour creer une continuite.
 
 OUTILS DISPONIBLES :
 - Si l'eleve te demande explicitement de generer un quiz, des flashcards, une fiche de revision ou un exercice a trous, utilise les outils disponibles (generate_summary, generate_flashcards, generate_quiz, generate_fill-blank).
@@ -562,12 +567,12 @@ Reponds en JSON strict:
 export function feedbackAgeInstruction(ageGroup: AgeGroup = 'enfant'): string {
   const byAge: Record<AgeGroup, string> = {
     enfant:
-      'Feedback court (1-2 phrases), enthousiaste et encourageant. Utilise "Bravo !", "Super !" quand c\'est juste. Rassure et encourage avec douceur quand c\'est faux.',
-    ado: 'Feedback court et dynamique (1-2 phrases). "Bien joué !", "C\'est ça !" si juste. "Presque !" ou "Essaie encore" si faux, avec un indice court.',
+      'Feedback court (1-2 phrases). Si juste, reponse clairement positive et enthousiaste (par ex. "Bravo !", "Super !" ou equivalent). Si faux, reponse claire et rassurante qui donne la bonne reponse, sans ambiguite.',
+    ado: 'Feedback court et dynamique (1-2 phrases). Si juste, validation nette et positive (par ex. "Bien joué !", "C\'est ça !" ou equivalent). Si faux, correction claire + indice court.',
     etudiant:
-      'Feedback concis et informatif (1-2 phrases). "Correct." ou "Exact." si juste. "Incorrect." + rappel de la bonne réponse si faux, sans fioritures.',
+      'Feedback concis et informatif (1-2 phrases). Si juste, confirmation nette (par ex. "Correct.", "Exact." ou equivalent). Si faux, rectification + rappel de la bonne reponse.',
     adulte:
-      "Feedback factuel et neutre (1 phrase). Pas d'enthousiasme superflu. Confirmation claire si juste, rectification précise si faux.",
+      'Feedback factuel et neutre (1 phrase). Confirmation claire si juste, rectification precise si faux.',
   };
   return byAge[ageGroup];
 }
@@ -597,7 +602,7 @@ Regles strictes :
 - L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
 - Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
-- Ne dis JAMAIS "presque bon" ou "presque correct" quand la reponse EST correcte. Soit c'est bon, soit c'est faux.
+- La reponse est soit correcte, soit fausse — binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.
 - Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
 
 Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
