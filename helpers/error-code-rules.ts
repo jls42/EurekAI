@@ -19,7 +19,10 @@ export const STRUCTURED_CODE_RULES: readonly Rule[] = [
 
 export const MESSAGE_RULES: readonly Rule[] = [
   { pattern: /\b429\b|rate[_ ]?limit|quota|tier.*limit/i, code: 'quota_exceeded' },
-  { pattern: /\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i, code: 'upstream_unavailable' },
+  {
+    pattern: /\b503\b|\b529\b|overloaded|capacity|service.?unavailable/i,
+    code: 'upstream_unavailable',
+  },
   {
     pattern: /context[_ ]?length|token.*limit|too.?many.?tokens|prompt.*too.?long/i,
     code: 'context_length_exceeded',

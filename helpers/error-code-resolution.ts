@@ -8,83 +8,77 @@ import {
 } from './error-code-rules.js';
 import type { Rule } from './error-code-rules.js';
 
-type ErrWithFields = {
-  status: unknown | undefined;
-  code: unknown | undefined;
-  stage: unknown | undefined;
-};
-
-const EMPTY_FIELDS = Object.freeze({
-  status: undefined,
-  code: undefined,
-  stage: undefined,
-}) as ErrWithFields;
-
-function matchRule(value: string, rules: readonly Rule[]): FailedStepCode | null {
-  const matchedRule = rules.find(({ pattern }) => pattern.test(value));
-  if (!matchedRule) return null;
-  return matchedRule.code;
+interface ErrContext {
+  message: string;
+  status: unknown;
+  code: unknown;
+  stage: unknown;
+  agent: string | undefined;
 }
 
-function getErrFields(err: unknown): ErrWithFields {
-  if (err === null || typeof err !== 'object') return EMPTY_FIELDS;
-  return err as ErrWithFields;
-}
+type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 
-function getErrorMessage(err: unknown): string {
-  if (err instanceof Error) return err.message;
-  return String(err);
-}
-
-function readString(value: unknown): string {
-  if (typeof value === 'string') return value;
-  return '';
-}
-
-function getStatusMatch(status: unknown): FailedStepCode | null {
-  if (typeof status !== 'number') return null;
-  const statusMatch = STATUS_RULES.get(status);
-  if (!statusMatch) return null;
-  return statusMatch;
-}
-
-function getStructuredMatch(fields: ErrWithFields): FailedStepCode | null {
-  const statusMatch = getStatusMatch(fields.status);
-  if (statusMatch) return statusMatch;
-  return matchRule(readString(fields.code), STRUCTURED_CODE_RULES);
-}
-
-function getAudioMatch(
-  agent: string | undefined,
-  fields: ErrWithFields,
-  message: string,
-): FailedStepCode | null {
-  if (!agent || !TTS_AGENTS.has(agent)) return null;
-  if (readString(fields.stage) === 'tts') return 'tts_upstream_error';
-  if (TTS_SIGNATURE.test(message)) return 'tts_upstream_error';
-  return null;
-}
-
-function firstMatch(matches: Array<FailedStepCode | null>): FailedStepCode | null {
-  for (const match of matches) {
-    if (match) return match;
+function matchByPattern(value: string, rules: readonly Rule[]): FailedStepCode | null {
+  for (const rule of rules) {
+    if (rule.pattern.test(value)) return rule.code;
   }
   return null;
 }
 
-function resolveErrorCode(err: unknown, agent: string | undefined): FailedStepCode {
-  const fields = getErrFields(err);
-  const message = getErrorMessage(err);
-  const match = firstMatch([
-    getStructuredMatch(fields),
-    matchRule(message, MESSAGE_RULES),
-    getAudioMatch(agent, fields, message),
-  ]);
-  if (match) return match;
-  return 'internal_error';
+function matchStatus(ctx: ErrContext): FailedStepCode | null {
+  if (typeof ctx.status !== 'number') return null;
+  return STATUS_RULES.get(ctx.status) || null;
 }
 
-export function extractErrorCode(err: unknown, agent: string | undefined = undefined): FailedStepCode {
+function matchStructuredCode(ctx: ErrContext): FailedStepCode | null {
+  const code = typeof ctx.code === 'string' ? ctx.code : '';
+  return matchByPattern(code, STRUCTURED_CODE_RULES);
+}
+
+function matchMessage(ctx: ErrContext): FailedStepCode | null {
+  return matchByPattern(ctx.message, MESSAGE_RULES);
+}
+
+function matchAudio(ctx: ErrContext): FailedStepCode | null {
+  if (!ctx.agent) return null;
+  if (!TTS_AGENTS.has(ctx.agent)) return null;
+  if (ctx.stage === 'tts') return 'tts_upstream_error';
+  if (TTS_SIGNATURE.test(ctx.message)) return 'tts_upstream_error';
+  return null;
+}
+
+const MATCHERS: readonly Matcher[] = [matchStatus, matchStructuredCode, matchMessage, matchAudio];
+
+function readObject(err: unknown): Record<string, unknown> {
+  if (err === null || typeof err !== 'object') return {};
+  return err as Record<string, unknown>;
+}
+
+function readMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
+function buildContext(err: unknown, agent: string | undefined): ErrContext {
+  const obj = readObject(err);
+  return {
+    message: readMessage(err),
+    status: obj.status,
+    code: obj.code,
+    stage: obj.stage,
+    agent,
+  };
+}
+
+export function extractErrorCode(
+  err: unknown,
+  agent: string | undefined = undefined,
+): FailedStepCode {
   if (err instanceof SyntaxError) return 'llm_invalid_json';
-  return resolveErrorCode(err, agent);
+  const ctx = buildContext(err, agent);
+  for (const matcher of MATCHERS) {
+    const code = matcher(ctx);
+    if (code) return code;
+  }
+  return 'internal_error';
 }
