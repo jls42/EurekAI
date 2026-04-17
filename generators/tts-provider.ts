@@ -4,7 +4,7 @@ import { collectStream } from '../helpers/audio.js';
 import type { MistralVoice } from '../helpers/voice-types.js';
 
 // Re-export pour conserver la surface API publique de ce module.
-export type { MistralVoice };
+export type { MistralVoice } from '../helpers/voice-types.js';
 
 // --- Types ---
 

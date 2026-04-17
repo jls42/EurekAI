@@ -235,69 +235,69 @@ ${jsonInstruction()}`;
 // La règle "pas de parenthèses + exception labels" est DANS quizVocalSystem (cf. #6),
 // pas ici, pour éviter l'injonction contradictoire.
 
-export function vocalRewriteRules(lang: string): string {
-  const common = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
+const VOCAL_REWRITE_COMMON = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
 Ecris tout en "langage oral" lisible.`;
 
-  const byLang: Record<string, string> = {
-    fr: `
+const VOCAL_REWRITE_BY_LANG: Record<string, string> = {
+  fr: `
 - Chiffres romains en toutes lettres : "Vème" → "cinquieme", "IIIème" → "troisieme", "XIVe" → "quatorzieme"
 - Abreviations developpees : "av. J.-C." → "avant Jesus-Christ", "env." → "environ", "St" → "Saint"
 - Sigles epeles ou developpes : "ONU" → "O.N.U." ou "Organisation des Nations Unies"
 - Nombres en toutes lettres quand c'est court : "3 km" → "trois kilometres", "476" peut rester "476"
 - Symboles remplaces : "%" → "pour cent", "°C" → "degres Celsius", "&" → "et"`,
-    en: `
+  en: `
 - Ordinals spelled out: "5th" → "fifth", "21st" → "twenty-first", "1st" → "first"
 - Abbreviations expanded: "BC" → "Before Christ", "AD" → "Anno Domini", "Mr." → "Mister", "Dr." → "Doctor", "St." → "Saint"
 - Acronyms spelled out: "UN" → "United Nations", "USA" → "United States of America"
 - Numbers in words when short: "3 km" → "three kilometers", "476" can stay as "476"
 - Symbols replaced: "%" → "percent", "°F" → "degrees Fahrenheit", "&" → "and"
 - Prefer full forms over contractions: "do not" instead of "don't" for TTS clarity`,
-    es: `
+  es: `
 - Números romanos en palabras: "V" → "quinto", "III" → "tercero", "XIV" → "decimocuarto"
 - Abreviaciones desarrolladas: "a.C." → "antes de Cristo", "d.C." → "después de Cristo", "Sr." → "Señor", "Dr." → "Doctor"
 - Siglas deletreadas o desarrolladas: "ONU" → "Organización de las Naciones Unidas"
 - Números en palabras cuando son cortos: "3 km" → "tres kilómetros"
 - Símbolos reemplazados: "%" → "por ciento", "°C" → "grados Celsius", "&" → "y"`,
-    de: `
+  de: `
 - Römische Zahlen ausgeschrieben: "V." → "fünfter", "III." → "dritter", "XIV." → "vierzehnter"
 - Abkürzungen ausgeschrieben: "v. Chr." → "vor Christus", "n. Chr." → "nach Christus", "bzw." → "beziehungsweise", "z. B." → "zum Beispiel"
 - Akronyme ausgeschrieben: "UNO" → "Vereinte Nationen", "EU" → "Europäische Union"
 - Zahlen in Worten bei kurzen Angaben: "3 km" → "drei Kilometer"
 - Symbole ersetzt: "%" → "Prozent", "°C" → "Grad Celsius", "&" → "und"`,
-    it: `
+  it: `
 - Numeri romani in lettere: "V" → "quinto", "III" → "terzo", "XIV" → "quattordicesimo"
 - Abbreviazioni estese: "a.C." → "avanti Cristo", "d.C." → "dopo Cristo", "sig." → "signore", "dott." → "dottore"
 - Sigle pronunciate o estese: "ONU" → "Organizzazione delle Nazioni Unite"
 - Numeri in parole quando brevi: "3 km" → "tre chilometri"
 - Simboli sostituiti: "%" → "per cento", "°C" → "gradi Celsius", "&" → "e"`,
-    pt: `
+  pt: `
 - Numerais romanos por extenso: "V" → "quinto", "III" → "terceiro", "XIV" → "décimo quarto"
 - Abreviaturas desenvolvidas: "a.C." → "antes de Cristo", "d.C." → "depois de Cristo", "Sr." → "Senhor", "Dr." → "Doutor"
 - Siglas soletradas ou desenvolvidas: "ONU" → "Organização das Nações Unidas"
 - Números por extenso quando curtos: "3 km" → "três quilómetros"
 - Símbolos substituídos: "%" → "por cento", "°C" → "graus Celsius", "&" → "e"`,
-    nl: `
+  nl: `
 - Romeinse cijfers uitgeschreven: "V" → "vijfde", "III" → "derde", "XIV" → "veertiende"
 - Afkortingen voluit: "v. Chr." → "voor Christus", "n. Chr." → "na Christus", "bv." → "bijvoorbeeld", "dhr." → "meneer"
 - Acroniemen voluit: "VN" → "Verenigde Naties", "EU" → "Europese Unie"
 - Korte getallen in woorden: "3 km" → "drie kilometer"
 - Symbolen vervangen: "%" → "procent", "°C" → "graden Celsius", "&" → "en"`,
-    hi: `
+  hi: `
 - रोमन अंक शब्दों में: "V" → "पाँचवाँ", "III" → "तीसरा", "XIV" → "चौदहवाँ"
 - संक्षिप्त रूपों का विस्तार: "ई.पू." → "ईसा पूर्व", "ई." → "ईसवी"
 - लघुरूप विस्तारित: "संरा" → "संयुक्त राष्ट्र"
 - छोटे अंक शब्दों में: "3 km" → "तीन किलोमीटर"
 - प्रतीक बदले जाते हैं: "%" → "प्रतिशत", "°C" → "डिग्री सेल्सियस", "&" → "और"`,
-    ar: `
+  ar: `
 - الأرقام الرومانية بالحروف: "V" → "الخامس"، "III" → "الثالث"، "XIV" → "الرابع عشر"
 - تفكيك الاختصارات: "ق.م" → "قبل الميلاد"، "م" → "ميلادي"
 - الأحرف المختصرة مفصلة: "الأمم المتحدة" بدلاً من "أ.م"
 - الأرقام بالحروف عندما تكون قصيرة: "3 km" → "ثلاثة كيلومترات"
 - الرموز مستبدلة: "%" → "بالمئة"، "°C" → "درجة مئوية"، "&" → "و"`,
-  };
+};
 
-  return common + (byLang[lang] ?? byLang.fr);
+export function vocalRewriteRules(lang: string): string {
+  return VOCAL_REWRITE_COMMON + (VOCAL_REWRITE_BY_LANG[lang] ?? VOCAL_REWRITE_BY_LANG.fr);
 }
 
 export function quizVocalSystem(ageGroup: AgeGroup = 'enfant', lang = 'fr'): string {

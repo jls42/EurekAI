@@ -69,11 +69,13 @@ function scoreVoice(v: MistralVoice): number {
 
 // djb2 : hash simple, stable, non cryptographique, suffisant pour répartir
 // des profileId sur un bucket de voix.
+// Math.imul garantit la multiplication 32-bit et évite le bit-op `|= 0` (Sonar S2999).
+// `for…of` itère par code point (surrogate pairs sûres).
 function djb2(s: string): number {
   let hash = 5381;
-  for (let i = 0; i < s.length; i += 1) {
-    hash = (hash << 5) + hash + s.charCodeAt(i);
-    hash |= 0; // force 32-bit signed to avoid unbounded growth
+  for (const ch of s) {
+    hash = Math.imul(hash, 33) + (ch.codePointAt(0) ?? 0);
+    hash = Math.imul(hash, 1); // re-cast en int32 signed sans `| 0`
   }
   return hash >>> 0;
 }

@@ -40,6 +40,34 @@ function deleteConfirmMessage(state: any, id: string): string {
     : state.t('profile.deleteConfirmNoProjects');
 }
 
+/** Whether the edit form has a valid name + age pair. */
+function isProfileFormValid(p: any): boolean {
+  return !!p?.name?.trim() && !!p.age && p.age >= 4 && p.age <= 120;
+}
+
+/** Normalise partial voice selection : null when both empty, fill missing side with '' otherwise. */
+function buildVoicesUpdate(mistralVoices: any): { host: string; guest: string } | null {
+  if (!mistralVoices?.host && !mistralVoices?.guest) return null;
+  return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
+}
+
+/** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
+function buildProfileUpdates(editingProfile: any): Record<string, any> {
+  const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
+    editingProfile;
+  const updates: Record<string, any> = {
+    name: name.trim(),
+    age,
+    avatar,
+    locale,
+    mistralVoices: buildVoicesUpdate(mistralVoices),
+    theme: theme || null,
+    _updatedAt: updatedAt,
+  };
+  if (_verifiedPin) updates.pin = _verifiedPin;
+  return updates;
+}
+
 export function createProfiles() {
   return {
     async loadProfiles(this: any) {
@@ -232,28 +260,13 @@ export function createProfiles() {
       if (!this.editingProfile) return;
       if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
       const doSave = async () => {
-        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
-          this.editingProfile;
-        if (!name?.trim() || !age || age < 4 || age > 120) return;
-        const updates: any = {
-          name: name.trim(),
-          age,
-          avatar,
-          locale,
-          mistralVoices:
-            mistralVoices?.host || mistralVoices?.guest
-              ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
-              : null,
-          theme: theme || null,
-          _updatedAt: updatedAt,
-        };
-        if (_verifiedPin) updates.pin = _verifiedPin;
+        if (!isProfileFormValid(this.editingProfile)) return;
+        const { id, locale } = this.editingProfile;
+        const updates = buildProfileUpdates(this.editingProfile);
         if (this._saveController) this._saveController.abort();
         this._saveController = new AbortController();
         await this.updateProfile(id, updates, this._saveController.signal);
-        if (this.currentProfile?.id === id) {
-          if (locale) this.setLocale(locale, true);
-        }
+        if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
       };
       if (immediate) {
         doSave();

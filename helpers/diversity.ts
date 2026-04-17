@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto';
 import type { Generation } from '../types.js';
 
 const PARAMS: Record<string, { temperature: number; presencePenalty: number }> = {
@@ -14,8 +15,8 @@ export function diversityParams(type: string) {
   return {
     temperature: p.temperature,
     presencePenalty: p.presencePenalty,
-    randomSeed: Math.floor(Math.random() * 1_000_000),
-  }; // NOSONAR(S2245) — seed for AI prompt diversity, not security
+    randomSeed: randomInt(0, 1_000_000),
+  };
 }
 
 function extractQuizQuestions(gens: Generation[]): string[] {

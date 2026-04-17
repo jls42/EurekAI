@@ -845,82 +845,68 @@ export function generateRoutes(
     });
   }
 
+  // Route analysis + split en une étape : persiste l'usage, trace le plan, isole les
+  // steps non-auto-executable pour les remonter dans la réponse sans bloquer l'exécution.
+  async function runAutoRouting(markdown: string, lang: string, ageGroup: AgeGroup, pid: string) {
+    logger.info('auto', 'Smart routing: analyzing content...');
+    const { result: route, usage } = await runWithUsageTracking(() =>
+      routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
+    );
+    persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
+    logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
+    const { executable, skipped } = splitByAutoExecutable(route.plan);
+    if (skipped.length > 0) {
+      logger.warn(
+        'auto',
+        `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
+      );
+    }
+    return { executable, skipped };
+  }
+
+  function toAutoCtx(baseCtx: Omit<GenContext, 'req' | 'res'>): AutoCtx {
+    return {
+      client,
+      markdown: baseCtx.markdown,
+      rawMarkdown: baseCtx.rawMarkdown,
+      config: baseCtx.config,
+      hasConsigne: baseCtx.hasConsigne,
+      lang: baseCtx.lang,
+      ageGroup: baseCtx.ageGroup,
+      sourceIds: baseCtx.sourceIds,
+      count: baseCtx.count,
+      pid: baseCtx.pid,
+      store,
+      generations: baseCtx.project.results.generations,
+      profileVoices: baseCtx.profileVoices,
+      profileId: baseCtx.profileId,
+    };
+  }
+
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
-      const project = store.getProject(req.params.pid);
-      if (!project) {
-        res.status(404).json({ error: 'Projet introuvable' });
-        return;
-      }
-      const unsafeSource = checkModeration(store, profileStore, req.params.pid, req.body.sourceIds);
-      if (unsafeSource) {
-        res.status(400).json({ error: `moderation.blocked` });
-        return;
-      }
-      const lang = req.body.lang || 'fr';
-      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const useConsigneAuto = req.body.useConsigne !== false;
-      const rawAutoMarkdown = getMarkdown(project.sources, req.body.sourceIds);
-      const markdown = useConsigneAuto
-        ? applyConsigne(rawAutoMarkdown, project.consigne)
-        : rawAutoMarkdown;
-      const hasConsigne =
-        useConsigneAuto && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
-      const config = getConfig();
-      // Check context limit against the routing model
-      const autoCtxError = checkContextLimit(markdown, 'mistral-small-latest');
-      if (autoCtxError) {
-        res.status(400).json({ error: autoCtxError });
-        return;
-      }
-      const count = parseCount(req.body.count);
-
-      logger.info('auto', 'Smart routing: analyzing content...');
-      const autoPid = String(req.params.pid);
-      const { result: route, usage: autoRouteUsage } = await runWithUsageTracking(() =>
-        routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
-      );
-      persistUsage(
+      const built = buildGenContext(
         store,
-        autoPid,
-        `POST /api/projects/${autoPid}/generate/auto/route`,
-        autoRouteUsage,
+        profileStore,
+        req.params.pid,
+        req.body,
+        'mistral-small-latest',
       );
-      logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
-
-      const { executable: executablePlan, skipped: skippedSteps } = splitByAutoExecutable(
-        route.plan,
-      );
-      if (skippedSteps.length > 0) {
-        logger.warn(
-          'auto',
-          `skipped (non-auto-executable): [${skippedSteps.map((s) => s.agent).join(', ')}]`,
-        );
+      if (!built.ok) {
+        res.status(built.status).json({ error: built.error });
+        return;
       }
+      const { ctx } = built;
+      const { executable: executablePlan, skipped: skippedSteps } = await runAutoRouting(
+        ctx.markdown,
+        ctx.lang,
+        ctx.ageGroup,
+        ctx.pid,
+      );
 
       const generations: Generation[] = [];
       const failedSteps: FailedStep[] = [];
-      const sourceIds = resolveSourceIds(req.body, project.sources);
-      const autoProfileId = project.meta?.profileId;
-      const autoProfile = autoProfileId ? profileStore.get(autoProfileId) : null;
-      const autoCtx: AutoCtx = {
-        client,
-        markdown,
-        rawMarkdown: rawAutoMarkdown,
-        config,
-        hasConsigne,
-        lang,
-        ageGroup,
-        sourceIds,
-        count,
-        pid: req.params.pid,
-        store,
-        generations: project.results.generations,
-        profileVoices: autoProfile?.mistralVoices,
-        profileId: autoProfileId,
-      };
-
-      await executePlan(executablePlan, autoCtx, store, req.params.pid, generations, failedSteps);
+      await executePlan(executablePlan, toAutoCtx(ctx), store, ctx.pid, generations, failedSteps);
 
       const allFailed = generations.length === 0 && failedSteps.length > 0;
       res.status(allFailed ? 502 : 200).json({
