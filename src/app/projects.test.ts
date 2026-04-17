@@ -182,10 +182,13 @@ describe('createProject', () => {
 
     const ctx = makeContext({ newProjectName: '  My project  ' });
     await proj.createProject.call(ctx);
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({ name: 'My project', profileId: 'p1' }),
-    }));
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      '/api/projects',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ name: 'My project', profileId: 'p1' }),
+      }),
+    );
     expect(ctx.projects).toContainEqual(meta);
     expect(ctx.newProjectName).toBe('');
     expect(ctx.showNewProject).toBe(false);

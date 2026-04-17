@@ -9,10 +9,12 @@ const TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
   },
   flashcards: (data) => `Flashcards (${arrayLen(data)})`,
   quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
-  'quiz-vocal': (data, lang) => `${lang === 'en' ? 'Vocal Quiz' : 'Quiz Vocal'} (${arrayLen(data)} questions)`,
+  'quiz-vocal': (data, lang) =>
+    `${lang === 'en' ? 'Vocal Quiz' : 'Quiz Vocal'} (${arrayLen(data)} questions)`,
   podcast: () => 'Podcast',
   image: () => 'Illustration',
-  'fill-blank': (data, lang) => `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
+  'fill-blank': (data, lang) =>
+    `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
 };
 
 export function autoTitle(type: string, data: any, lang = 'fr'): string {

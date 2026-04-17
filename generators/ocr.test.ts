@@ -65,9 +65,7 @@ describe('ocrFile', () => {
   });
 
   it('returns undefined confidence when scores are null', async () => {
-    const pages = [
-      { markdown: '# P1', confidenceScores: null },
-    ];
+    const pages = [{ markdown: '# P1', confidenceScores: null }];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
@@ -120,13 +118,15 @@ describe('ocrFile', () => {
 
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
-    expect(loggerError).toHaveBeenCalledWith('ocr', expect.stringContaining('file cleanup failed'), expect.any(Error));
+    expect(loggerError).toHaveBeenCalledWith(
+      'ocr',
+      expect.stringContaining('file cleanup failed'),
+      expect.any(Error),
+    );
   });
 
   it('clamps confidence score to [0, 1] range', async () => {
-    const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } },
-    ];
+    const pages = [{ markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } }];
     const client = createClient(pages);
     const result = await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
@@ -135,9 +135,7 @@ describe('ocrFile', () => {
 
   it('logs warning when confidence score is clamped', async () => {
     loggerWarn.mockClear();
-    const pages = [
-      { markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } },
-    ];
+    const pages = [{ markdown: '# P1', confidenceScores: { averagePageConfidenceScore: 1.5 } }];
     const client = createClient(pages);
 
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
@@ -152,6 +150,9 @@ describe('ocrFile', () => {
 
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
-    expect(loggerWarn).toHaveBeenCalledWith('ocr', expect.stringContaining('confidence scores requested but not returned'));
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'ocr',
+      expect.stringContaining('confidence scores requested but not returned'),
+    );
   });
 });

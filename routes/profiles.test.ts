@@ -485,7 +485,10 @@ describe('profileRoutes', () => {
       // Stale write with a timestamp clearly in the past
       const staleTimestamp = new Date(Date.now() - 10000).toISOString();
       const handler = getHandler(router, 'put', '/:id');
-      const req = mockReq({ params: { id: created.id }, body: { name: 'Stale', _updatedAt: staleTimestamp } });
+      const req = mockReq({
+        params: { id: created.id },
+        body: { name: 'Stale', _updatedAt: staleTimestamp },
+      });
       const res = mockRes();
       await handler(req, res);
       expect(res.status).toHaveBeenCalledWith(409);

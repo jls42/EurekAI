@@ -28,8 +28,15 @@ export function createI18n() {
 
     dateLocale(this: any): string {
       const map: Record<string, string> = {
-        fr: 'fr-FR', en: 'en-GB', es: 'es-ES', pt: 'pt-BR',
-        it: 'it-IT', nl: 'nl-NL', de: 'de-DE', hi: 'hi-IN', ar: 'ar-SA',
+        fr: 'fr-FR',
+        en: 'en-GB',
+        es: 'es-ES',
+        pt: 'pt-BR',
+        it: 'it-IT',
+        nl: 'nl-NL',
+        de: 'de-DE',
+        hi: 'hi-IN',
+        ar: 'ar-SA',
       };
       return map[this.locale] || this.locale;
     },

@@ -60,9 +60,7 @@ export async function generateFillBlank(
     responseFormat: { type: 'json_object' },
     ...diversityParams('fill-blank'),
   });
-  const retryData = unwrapJsonArray<FillBlankItem>(
-    safeParseJson(getContent(retry)),
-  );
+  const retryData = unwrapJsonArray<FillBlankItem>(safeParseJson(getContent(retry)));
 
   if (!isValidFillBlank(retryData)) {
     throw new Error(

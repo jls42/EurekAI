@@ -45,13 +45,19 @@
   <!-- Summary cards -->
   <div class="space-y-3">
     <template x-for="gen in generationsByType('summary')" :key="gen.id">
-      <div class="gen-card border-l-4 border-l-gen-summary animate-slide-up"
-        x-init="initSummaryAudio(gen)">
-        {{> gen-card-header icon="file-text" chipClass="icon-chip-summary" colorClass="gen-summary"}}
+      <div
+        class="gen-card border-l-4 border-l-gen-summary animate-slide-up"
+        x-init="initSummaryAudio(gen)"
+      >
+        {{> gen-card-header icon="file-text" chipClass="icon-chip-summary"
+        colorClass="gen-summary"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
           <!-- Audio toolbar with section chips -->
           <div class="mb-5 p-3 bg-surface rounded-card border border-gray-200">
-            <div class="flex flex-wrap gap-1.5" :class="(gen._audioUrl_intro || gen._audioUrl_key_points || gen._audioUrl_fun_fact || gen._audioUrl_vocabulary) ? 'mb-2' : ''">
+            <div
+              class="flex flex-wrap gap-1.5"
+              :class="(gen._audioUrl_intro || gen._audioUrl_key_points || gen._audioUrl_fun_fact || gen._audioUrl_vocabulary) ? 'mb-2' : ''"
+            >
               <!-- Chip: All (batch generate or playlist) -->
               <button
                 @click="playSection(gen, null)"
@@ -60,8 +66,15 @@
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary' : isBatchComplete(gen) ? (gen._playlistMode ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
-                <i x-show="gen._generatingVoice_all !== true" data-lucide="headphones" class="w-3.5 h-3.5"></i>
-                <span x-show="gen._generatingVoice_all === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"></span>
+                <i
+                  x-show="gen._generatingVoice_all !== true"
+                  data-lucide="headphones"
+                  class="w-3.5 h-3.5"
+                ></i>
+                <span
+                  x-show="gen._generatingVoice_all === true"
+                  class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
+                ></span>
                 <span x-text="t('summary.audioAll')">All</span>
               </button>
               <!-- Chip: Intro -->
@@ -72,8 +85,15 @@
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_intro === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_intro ? (gen._activeAudioSection === 'intro' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
-                <i x-show="gen._generatingVoice_intro !== true" data-lucide="book-open" class="w-3.5 h-3.5"></i>
-                <span x-show="gen._generatingVoice_intro === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"></span>
+                <i
+                  x-show="gen._generatingVoice_intro !== true"
+                  data-lucide="book-open"
+                  class="w-3.5 h-3.5"
+                ></i>
+                <span
+                  x-show="gen._generatingVoice_intro === true"
+                  class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
+                ></span>
                 <span x-text="t('summary.audioIntro')">Intro</span>
               </button>
               <!-- Chip: Key points -->
@@ -84,8 +104,15 @@
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_key_points === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_key_points ? (gen._activeAudioSection === 'key_points' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
               >
-                <i x-show="gen._generatingVoice_key_points !== true" data-lucide="list-checks" class="w-3.5 h-3.5"></i>
-                <span x-show="gen._generatingVoice_key_points === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"></span>
+                <i
+                  x-show="gen._generatingVoice_key_points !== true"
+                  data-lucide="list-checks"
+                  class="w-3.5 h-3.5"
+                ></i>
+                <span
+                  x-show="gen._generatingVoice_key_points === true"
+                  class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
+                ></span>
                 <span x-text="t('summary.audioKeyPoints')">Key points</span>
               </button>
               <!-- Chip: Fun fact (conditional) -->
@@ -97,8 +124,15 @@
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_fun_fact === true ? 'border-warning/30 text-warning-dark' : gen._audioUrl_fun_fact ? (gen._activeAudioSection === 'fun_fact' ? 'bg-warning-dark text-white border-warning-dark' : 'bg-warning/15 text-warning-dark border-warning/30 hover:bg-warning/25') : 'border-gray-300 text-text-secondary hover:border-warning hover:text-warning-dark'"
               >
-                <i x-show="gen._generatingVoice_fun_fact !== true" data-lucide="lightbulb" class="w-3.5 h-3.5"></i>
-                <span x-show="gen._generatingVoice_fun_fact === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-warning-dark border-t-transparent"></span>
+                <i
+                  x-show="gen._generatingVoice_fun_fact !== true"
+                  data-lucide="lightbulb"
+                  class="w-3.5 h-3.5"
+                ></i>
+                <span
+                  x-show="gen._generatingVoice_fun_fact === true"
+                  class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-warning-dark border-t-transparent"
+                ></span>
                 <span x-text="t('summary.audioFunFact')">Fun fact</span>
               </button>
               <!-- Chip: Vocabulary (conditional) -->
@@ -110,15 +144,24 @@
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
                 :class="gen._generatingVoice_vocabulary === true ? 'border-accent/30 text-accent-dark' : gen._audioUrl_vocabulary ? (gen._activeAudioSection === 'vocabulary' ? 'bg-accent-dark text-white border-accent-dark' : 'bg-accent/15 text-accent-dark border-accent/30 hover:bg-accent/25') : 'border-gray-300 text-text-secondary hover:border-accent hover:text-accent-dark'"
               >
-                <i x-show="gen._generatingVoice_vocabulary !== true" data-lucide="book-a" class="w-3.5 h-3.5"></i>
-                <span x-show="gen._generatingVoice_vocabulary === true" class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-accent-dark border-t-transparent"></span>
+                <i
+                  x-show="gen._generatingVoice_vocabulary !== true"
+                  data-lucide="book-a"
+                  class="w-3.5 h-3.5"
+                ></i>
+                <span
+                  x-show="gen._generatingVoice_vocabulary === true"
+                  class="w-3.5 h-3.5 animate-spin rounded-full border-2 border-accent-dark border-t-transparent"
+                ></span>
                 <span x-text="t('summary.audioVocabulary')">Vocabulary</span>
               </button>
             </div>
             <!-- Single audio player with playlist support -->
             <audio
               x-show="gen._audioUrl_intro || gen._audioUrl_key_points || gen._audioUrl_fun_fact || gen._audioUrl_vocabulary"
-              controls preload="metadata" class="w-full"
+              controls
+              preload="metadata"
+              class="w-full"
               :src="gen._activeAudioSection === 'key_points' ? gen._audioUrl_key_points : gen._activeAudioSection === 'fun_fact' ? gen._audioUrl_fun_fact : gen._activeAudioSection === 'vocabulary' ? gen._audioUrl_vocabulary : gen._audioUrl_intro"
               :data-gen-id="gen.id"
               @ended="playNextSection(gen)"
@@ -127,7 +170,12 @@
 
           <!-- Intro section (content only, no audio controls) -->
           <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-          <h3 class="font-heading font-bold summary-title text-text-primary" x-text="summaryData(gen).title">Summary title</h3>
+          <h3
+            class="font-heading font-bold summary-title text-text-primary"
+            x-text="summaryData(gen).title"
+          >
+            Summary title
+          </h3>
           <div
             class="text-text-primary mb-5 summary-body chat-markdown"
             x-html="renderWithSources(summaryData(gen).summary, gen)"
@@ -135,37 +183,58 @@
 
           <!-- Key points section -->
           <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-          <h4 class="font-heading font-semibold text-sm mb-3 text-text-primary flex items-center gap-1.5">
+          <h4
+            class="font-heading font-semibold text-sm mb-3 text-text-primary flex items-center gap-1.5"
+          >
             <i data-lucide="list-checks" class="w-4 h-4 text-primary"></i>
             <span x-text="t('summary.keyPoints')">Key Points</span>
           </h4>
           <ul class="list-none space-y-2 mb-5">
             <template x-for="(pt, ptIdx) in summaryData(gen).key_points" :key="ptIdx">
-              <li class="flex items-start gap-3 bg-gray-50 text-text-primary px-4 py-2.5 rounded-card text-body-sm chat-markdown border border-gray-200">
-                <span class="shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold mt-0.5" x-text="ptIdx + 1"></span>
+              <li
+                class="flex items-start gap-3 bg-gray-50 text-text-primary px-4 py-2.5 rounded-card text-body-sm chat-markdown border border-gray-200"
+              >
+                <span
+                  class="shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold mt-0.5"
+                  x-text="ptIdx + 1"
+                ></span>
                 <span class="flex-1" x-html="renderWithSources(pt, gen)"></span>
               </li>
             </template>
           </ul>
 
           <!-- Fun fact section -->
-          <div x-show="summaryData(gen).fun_fact" class="bg-warning-light border border-warning rounded-card p-4 mb-4 flex items-start gap-3">
+          <div
+            x-show="summaryData(gen).fun_fact"
+            class="bg-warning-light border border-warning rounded-card p-4 mb-4 flex items-start gap-3"
+          >
             <i data-lucide="lightbulb" class="w-6 h-6 text-warning-dark shrink-0 mt-0.5"></i>
             <div>
               <strong class="text-warning-dark" x-text="t('summary.funFact')"></strong>
-              <div class="text-text-primary text-body-sm chat-markdown" x-html="renderWithSources(summaryData(gen).fun_fact, gen)"></div>
+              <div
+                class="text-text-primary text-body-sm chat-markdown"
+                x-html="renderWithSources(summaryData(gen).fun_fact, gen)"
+              ></div>
             </div>
           </div>
 
           <!-- Vocabulary section -->
           <div x-show="summaryData(gen).vocabulary.length > 0">
             <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-            <h4 class="font-heading font-semibold text-sm mb-2 text-text-primary" x-text="t('summary.vocabulary')">Vocabulary</h4>
+            <h4
+              class="font-heading font-semibold text-sm mb-2 text-text-primary"
+              x-text="t('summary.vocabulary')"
+            >
+              Vocabulary
+            </h4>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <template x-for="v in summaryData(gen).vocabulary" :key="v.word">
                 <div class="bg-accent-light rounded-button p-3">
                   <strong class="text-accent-dark text-body-sm" x-text="v.word"></strong>
-                  <p class="text-text-primary text-sm chat-markdown" x-html="renderWithSources(v.definition, gen)"></p>
+                  <p
+                    class="text-text-primary text-sm chat-markdown"
+                    x-html="renderWithSources(v.definition, gen)"
+                  ></p>
                 </div>
               </template>
             </div>

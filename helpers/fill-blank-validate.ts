@@ -1,7 +1,5 @@
 function stripArticles(text: string): string {
-  return text
-    .replace(/^(l'|d'|un |une |le |la |les |des |du |de la |de l')/i, '')
-    .trim();
+  return text.replace(/^(l'|d'|un |une |le |la |les |des |du |de la |de l')/i, '').trim();
 }
 
 export function normalizeAnswer(text: string): string {

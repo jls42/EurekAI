@@ -185,8 +185,12 @@ describe('createRecorder', () => {
         start = mockStart;
         stop = mockStop;
         state = 'recording';
-        set ondataavailable(fn: any) { onDataAvailable = fn; }
-        set onstop(fn: any) { onStop = fn; }
+        set ondataavailable(fn: any) {
+          onDataAvailable = fn;
+        }
+        set onstop(fn: any) {
+          onStop = fn;
+        }
       }
 
       mockTrackStop = vi.fn();
@@ -245,10 +249,7 @@ describe('createRecorder', () => {
       await vi.advanceTimersByTimeAsync(0);
       await promise;
 
-      expect(ctx.showToast).toHaveBeenCalledWith(
-        'toast.micError',
-        'error',
-      );
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.micError', 'error');
       expect(ctx.recording).toBe(false);
     });
   });

@@ -109,7 +109,12 @@ export function createHelpers() {
     },
 
     sourceTypeIcon(this: any, src: any) {
-      const icons: Record<string, string> = { ocr: 'scan', text: 'pencil', voice: 'mic', websearch: 'globe' };
+      const icons: Record<string, string> = {
+        ocr: 'scan',
+        text: 'pencil',
+        voice: 'mic',
+        websearch: 'globe',
+      };
       return icons[this.inferSourceType(src)] || 'file-text';
     },
 
@@ -250,12 +255,18 @@ export function createHelpers() {
     showCostPopover(this: any, el: HTMLElement, item: any) {
       let lines: string[] = [];
       if (item?.costBreakdown?.length) lines = item.costBreakdown;
-      else if (item?.usage) lines = [`${item.usage.totalTokens} tokens · ${item.usage.callCount} ${this.t('gen.apiCalls')}`];
+      else if (item?.usage)
+        lines = [
+          `${item.usage.totalTokens} tokens · ${item.usage.callCount} ${this.t('gen.apiCalls')}`,
+        ];
       this.showMetaPopover(el, {
         title: this.t('gen.estimatedCost'),
         lines,
         lineClass: 'text-text-secondary font-mono',
-        footer: item?.estimatedCost == null ? '' : this.t('dashboard.totalCost') + ' ~$' + item.estimatedCost.toFixed(4),
+        footer:
+          item?.estimatedCost == null
+            ? ''
+            : this.t('dashboard.totalCost') + ' ~$' + item.estimatedCost.toFixed(4),
         footerClass: 'text-accent',
       });
     },
@@ -273,7 +284,9 @@ export function createHelpers() {
       this.showMetaPopover(el, {
         title: this.moderationBadgeTitle(src),
         lines: labels ? [labels] : [],
-        lineClass: labels ? 'text-text-secondary' : this.moderationToneClass(src) + ' font-semibold',
+        lineClass: labels
+          ? 'text-text-secondary'
+          : this.moderationToneClass(src) + ' font-semibold',
       });
     },
 
@@ -313,7 +326,11 @@ export function createHelpers() {
           if (m) nums.add(Number.parseInt(m[1], 10));
         }
       };
-      const DATA_KEY: Record<string, string> = { flashcards: 'flashcards', quiz: 'quiz', 'quiz-vocal': 'quiz' };
+      const DATA_KEY: Record<string, string> = {
+        flashcards: 'flashcards',
+        quiz: 'quiz',
+        'quiz-vocal': 'quiz',
+      };
       const dataKey = DATA_KEY[gen.type];
       if (dataKey) {
         const items = gen.data?.[dataKey] || (Array.isArray(gen.data) ? gen.data : []);
@@ -389,7 +406,9 @@ export function createHelpers() {
       return Object.values(this.loading).some(Boolean);
     },
 
-    activeGenerations(this: any): Array<{ key: string; label: string; color: string; icon: string }> {
+    activeGenerations(
+      this: any,
+    ): Array<{ key: string; label: string; color: string; icon: string }> {
       const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
         auto: { labelKey: 'gen.auto', icon: 'sparkles', color: 'var(--color-primary)' },
         voice: { labelKey: 'gen.voice', icon: 'volume-2', color: 'var(--color-accent)' },
@@ -398,7 +417,12 @@ export function createHelpers() {
       const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
       for (const cat of this.categories) {
         if (this.loading[cat.key]) {
-          result.push({ key: cat.key, label: this.t('gen.' + cat.key), color: cat.color, icon: cat.icon });
+          result.push({
+            key: cat.key,
+            label: this.t('gen.' + cat.key),
+            color: cat.color,
+            icon: cat.icon,
+          });
         }
       }
       for (const [key, meta] of Object.entries(EXTRA_KEYS)) {

@@ -35,7 +35,10 @@ export async function ocrFile(
   // Extraire les scores de confiance (graceful degradation)
   const confidence = extractConfidence(ocrResult.pages);
   if (!confidence && ocrResult.pages.length > 0) {
-    logger.warn('ocr', `confidence scores requested but not returned for "${fileName}" (${ocrResult.pages.length} pages)`);
+    logger.warn(
+      'ocr',
+      `confidence scores requested but not returned for "${fileName}" (${ocrResult.pages.length} pages)`,
+    );
   }
 
   // Cleanup fichier uploade
@@ -52,12 +55,11 @@ function extractConfidence(
   pages: Array<{ confidenceScores?: { averagePageConfidenceScore: number } | null }>,
 ): OcrConfidence | undefined {
   const scored = pages.filter(
-    (p) =>
-      p.confidenceScores
-      && Number.isFinite(p.confidenceScores.averagePageConfidenceScore),
+    (p) => p.confidenceScores && Number.isFinite(p.confidenceScores.averagePageConfidenceScore),
   );
   if (scored.length === 0) return undefined;
-  const rawAvg = scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
+  const rawAvg =
+    scored.reduce((s, p) => s + p.confidenceScores!.averagePageConfidenceScore, 0) / scored.length;
   const avg = Math.max(0, Math.min(1, rawAvg));
   if (rawAvg !== avg) {
     logger.warn('ocr', `confidence score out of [0,1] range (rawAvg=${rawAvg}), clamped to ${avg}`);

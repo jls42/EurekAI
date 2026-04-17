@@ -14,10 +14,7 @@ export function registerGeneration(state: any, gen: any): void {
 }
 
 /** Process responses from generateAll, returns failure count. */
-async function aggregateGenerateResults(
-  responses: Response[],
-  state: any,
-): Promise<number> {
+async function aggregateGenerateResults(responses: Response[], state: any): Promise<number> {
   let failures = 0;
   for (const r of responses) {
     if (r.ok) {
@@ -65,7 +62,10 @@ function applyVoiceResult(state: any, gen: any, result: any, section?: string): 
   state.showToast(state.t('toast.audioDone'), 'success');
   state.$nextTick(() => {
     const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
-    if (audioEl) { audioEl.load(); audioEl.play().catch((e: any) => console.warn('Auto-play blocked:', e.message)); }
+    if (audioEl) {
+      audioEl.load();
+      audioEl.play().catch((e: any) => console.warn('Auto-play blocked:', e.message));
+    }
   });
 }
 
@@ -288,7 +288,10 @@ export function createGenerate() {
         if (this.currentProjectId !== projectId) return;
 
         if (failures > 0 && failures < plannedTypes.length) {
-          this.showToast(this.t('toast.partialGenerated', { count: plannedTypes.length - failures }), 'warning');
+          this.showToast(
+            this.t('toast.partialGenerated', { count: plannedTypes.length - failures }),
+            'warning',
+          );
         } else if (failures >= plannedTypes.length) {
           this.showToast(this.t('toast.generationError', { error: 'all' }), 'error');
         } else {
@@ -337,7 +340,10 @@ export function createGenerate() {
           gen._activeAudioSection = order[i];
           this.$nextTick(() => {
             const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
-            if (a) { a.load(); a.play().catch((e: any) => console.warn('Audio play failed:', e.message)); }
+            if (a) {
+              a.load();
+              a.play().catch((e: any) => console.warn('Audio play failed:', e.message));
+            }
           });
           return;
         }
@@ -365,14 +371,18 @@ export function createGenerate() {
         gen._activeAudioSection = section;
       } else if (!section && this.isBatchComplete(gen)) {
         gen._playlistMode = true;
-        gen._activeAudioSection = this._audioSectionOrder.find((s: string) => gen[`_audioUrl_${s}`]) || 'intro';
+        gen._activeAudioSection =
+          this._audioSectionOrder.find((s: string) => gen[`_audioUrl_${s}`]) || 'intro';
       } else {
         this.generateVoice(gen, section || undefined);
         return;
       }
       this.$nextTick(() => {
         const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
-        if (a) { a.load(); a.play().catch((e: any) => console.warn('Audio play failed:', e.message)); }
+        if (a) {
+          a.load();
+          a.play().catch((e: any) => console.warn('Audio play failed:', e.message));
+        }
       });
     },
 

@@ -102,7 +102,7 @@ export async function generateSummary(
     {
       role: 'user',
       content:
-        "Ta reponse JSON etait vide ou incomplete. Regenere UNE SEULE fiche COMPLETE (pas de tableau 'fiches') avec title, summary, key_points (5-7), fun_fact et vocabulary au premier niveau du JSON. Reponds uniquement en JSON valide.",
+        "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.",
     },
   );
 

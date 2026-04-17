@@ -103,7 +103,10 @@
             class="w-full input-modern px-3 py-2 text-body-sm"
           >
             <option value="elevenlabs">ElevenLabs</option>
-            <option value="mistral" x-text="'Mistral (Voxtral) — ' + t('settings.recommended')"></option>
+            <option
+              value="mistral"
+              x-text="'Mistral (Voxtral) — ' + t('settings.recommended')"
+            ></option>
           </select>
         </div>
         <div>
@@ -129,58 +132,85 @@
             x-model="configDraft.ttsModel"
             class="w-full input-modern px-3 py-2 text-body-sm"
           >
-            <option value="voxtral-mini-tts-latest" x-text="'voxtral-mini-tts-latest — ' + t('settings.recommended')"></option>
+            <option
+              value="voxtral-mini-tts-latest"
+              x-text="'voxtral-mini-tts-latest — ' + t('settings.recommended')"
+            ></option>
           </select>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ttsModelHint')"></p>
         </div>
         <!-- ElevenLabs voice IDs -->
         <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="cfg-voice-host" class="text-sm text-text-secondary block mb-1"
-                x-text="t('settings.voiceHost') + ' ID'">Voice Host ID</label
-              >
-              <input
-                id="cfg-voice-host"
-                x-model="configDraft.voices.host.id"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              />
-            </div>
-            <div>
-              <label for="cfg-voice-guest" class="text-sm text-text-secondary block mb-1"
-                x-text="t('settings.voiceGuest') + ' ID'">Voice Guest ID</label
-              >
-              <input
-                id="cfg-voice-guest"
-                x-model="configDraft.voices.guest.id"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              />
-            </div>
+          <div>
+            <label
+              for="cfg-voice-host"
+              class="text-sm text-text-secondary block mb-1"
+              x-text="t('settings.voiceHost') + ' ID'"
+              >Voice Host ID</label
+            >
+            <input
+              id="cfg-voice-host"
+              x-model="configDraft.voices.host.id"
+              class="w-full input-modern px-3 py-2 text-body-sm"
+            />
           </div>
+          <div>
+            <label
+              for="cfg-voice-guest"
+              class="text-sm text-text-secondary block mb-1"
+              x-text="t('settings.voiceGuest') + ' ID'"
+              >Voice Guest ID</label
+            >
+            <input
+              id="cfg-voice-guest"
+              x-model="configDraft.voices.guest.id"
+              class="w-full input-modern px-3 py-2 text-body-sm"
+            />
+          </div>
+        </div>
         <!-- Mistral voice selectors (dynamic from API) -->
         <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
-            <div>
-              <label for="cfg-mistral-voice-host" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceHost')">Voice Host</label>
-              <select
-                id="cfg-mistral-voice-host" x-model="configDraft.mistralVoices.host"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              >
-                <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
-                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
-                </template>
-              </select>
-            </div>
-            <div>
-              <label for="cfg-mistral-voice-guest" class="text-sm text-text-secondary block mb-1" x-text="t('settings.voiceGuest')">Voice Guest</label>
-              <select
-                id="cfg-mistral-voice-guest" x-model="configDraft.mistralVoices.guest"
-                class="w-full input-modern px-3 py-2 text-body-sm"
-              >
-                <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
-                  <option :value="v.id" x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"></option>
-                </template>
-              </select>
-            </div>
+          <div>
+            <label
+              for="cfg-mistral-voice-host"
+              class="text-sm text-text-secondary block mb-1"
+              x-text="t('settings.voiceHost')"
+              >Voice Host</label
+            >
+            <select
+              id="cfg-mistral-voice-host"
+              x-model="configDraft.mistralVoices.host"
+              class="w-full input-modern px-3 py-2 text-body-sm"
+            >
+              <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
+                <option
+                  :value="v.id"
+                  x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
+                ></option>
+              </template>
+            </select>
           </div>
+          <div>
+            <label
+              for="cfg-mistral-voice-guest"
+              class="text-sm text-text-secondary block mb-1"
+              x-text="t('settings.voiceGuest')"
+              >Voice Guest</label
+            >
+            <select
+              id="cfg-mistral-voice-guest"
+              x-model="configDraft.mistralVoices.guest"
+              class="w-full input-modern px-3 py-2 text-body-sm"
+            >
+              <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
+                <option
+                  :value="v.id"
+                  x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
+                ></option>
+              </template>
+            </select>
+          </div>
+        </div>
       </div>
     </div>
     <div class="flex gap-3">

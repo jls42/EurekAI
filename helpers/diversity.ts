@@ -11,7 +11,11 @@ const PARAMS: Record<string, { temperature: number; presencePenalty: number }> =
 
 export function diversityParams(type: string) {
   const p = PARAMS[type] || { temperature: 0.7, presencePenalty: 0 };
-  return { temperature: p.temperature, presencePenalty: p.presencePenalty, randomSeed: Math.floor(Math.random() * 1_000_000) }; // NOSONAR(S2245) — seed for AI prompt diversity, not security
+  return {
+    temperature: p.temperature,
+    presencePenalty: p.presencePenalty,
+    randomSeed: Math.floor(Math.random() * 1_000_000),
+  }; // NOSONAR(S2245) — seed for AI prompt diversity, not security
 }
 
 function extractQuizQuestions(gens: Generation[]): string[] {
@@ -36,12 +40,14 @@ function extractFillBlankAnswers(gens: Generation[]): string[] {
 }
 
 function extractPodcastTopics(gens: Generation[]): string[] {
-  return gens.map((g) => {
-    const script = (g.data as any)?.script;
-    if (!Array.isArray(script)) return '';
-    const firstHost = script.find((l: any) => l.speaker === 'host');
-    return firstHost?.text?.slice(0, 100) || '';
-  }).filter(Boolean);
+  return gens
+    .map((g) => {
+      const script = (g.data as any)?.script;
+      if (!Array.isArray(script)) return '';
+      const firstHost = script.find((l: any) => l.speaker === 'host');
+      return firstHost?.text?.slice(0, 100) || '';
+    })
+    .filter(Boolean);
 }
 
 function extractSummaryKeyPoints(gens: Generation[]): string[] {
@@ -69,7 +75,11 @@ const HEADERS: Record<string, string> = {
   summary: 'POINTS DEJA COUVERTS (UTILISE DES EXEMPLES ET FORMULATIONS DIFFERENTS) :',
 };
 
-export function buildExclusionContext(generations: Generation[], type: string, maxChars = 2000): string {
+export function buildExclusionContext(
+  generations: Generation[],
+  type: string,
+  maxChars = 2000,
+): string {
   const matching = generations.filter((g) => g.type === type);
   if (matching.length === 0) return '';
 

@@ -44,7 +44,8 @@
   <div class="space-y-3">
     <template x-for="gen in generationsByType('flashcards')" :key="gen.id">
       <div class="gen-card border-l-4 border-l-gen-flashcards animate-slide-up">
-        {{> gen-card-header icon="layers" chipClass="icon-chip-flashcards" colorClass="gen-flashcards"}}
+        {{> gen-card-header icon="layers" chipClass="icon-chip-flashcards"
+        colorClass="gen-flashcards"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
           <!-- Audio controls -->
           <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
@@ -111,10 +112,7 @@
                         x-show="flashcardSource(gen, currentCard()).length > 0"
                         class="flex flex-wrap gap-1 mt-2 justify-center"
                       >
-                        <template
-                          x-for="src in flashcardSource(gen, currentCard())"
-                          :key="src.id"
-                        >
+                        <template x-for="src in flashcardSource(gen, currentCard())" :key="src.id">
                           <button
                             @click.stop="openSourceDialog(src)"
                             class="source-badge text-[0.65em]"
@@ -132,16 +130,17 @@
                     <div
                       class="flip-card-back absolute inset-0 bg-gen-flashcards text-white rounded-card p-6 flex items-center justify-center text-center"
                     >
-                      <span
-                        class="text-lg font-medium"
-                        x-text="currentCard()?.answer"
-                      ></span>
+                      <span class="text-lg font-medium" x-text="currentCard()?.answer"></span>
                     </div>
                   </div>
                 </div>
 
                 <!-- Self-evaluation buttons (after flip, before feedback, not when reviewing) -->
-                <div x-show="flipped && !feedback && !isCurrentAnswered()" x-transition class="flex gap-3 justify-center mt-4">
+                <div
+                  x-show="flipped && !feedback && !isCurrentAnswered()"
+                  x-transition
+                  class="flex gap-3 justify-center mt-4"
+                >
                   <button
                     @click="rate(false)"
                     class="flex-1 max-w-[200px] min-h-touch bg-danger-light text-danger-dark rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center justify-center gap-2"

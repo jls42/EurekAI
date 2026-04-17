@@ -127,5 +127,21 @@ describe('quiz-vocal', () => {
       const call = client.chat.complete.mock.calls[0][0];
       expect(call.messages[0].content).toContain('English');
     });
+
+    it('strips choice labels before composing correctAnswerLine (ex: A. → texte pur)', async () => {
+      const client = createChatClient(true, 'ok');
+      await verifyAnswer(
+        client,
+        'Quel fleuve ?',
+        ['A. Seine', 'B: Loire', 'C) Rhône', 'Alice'],
+        0,
+        'Seine',
+      );
+      const systemPrompt = client.chat.complete.mock.calls[0][0].messages[0].content;
+      // correctAnswerLine est reconstruit avec le label A) et le texte stripped "Seine"
+      expect(systemPrompt).toContain('A) Seine');
+      // Les choix legacy mal formatés sont préservés ou traités sans casser l'API
+      expect(systemPrompt).toContain('Seine');
+    });
   });
 });

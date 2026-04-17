@@ -26,23 +26,17 @@ vi.mock('../generators/summary.js', () => ({
 }));
 
 vi.mock('../generators/flashcards.js', () => ({
-  generateFlashcards: vi
-    .fn()
-    .mockResolvedValue([{ question: 'Q', answer: 'A' }]),
+  generateFlashcards: vi.fn().mockResolvedValue([{ question: 'Q', answer: 'A' }]),
 }));
 
 vi.mock('../generators/quiz.js', () => ({
   generateQuiz: vi
     .fn()
-    .mockResolvedValue([
-      { question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 },
-    ]),
+    .mockResolvedValue([{ question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 }]),
 }));
 
 vi.mock('../generators/fill-blank.js', () => ({
-  generateFillBlank: vi
-    .fn()
-    .mockResolvedValue([{ sentence: 'The ___ is blue', answer: 'sky' }]),
+  generateFillBlank: vi.fn().mockResolvedValue([{ sentence: 'The ___ is blue', answer: 'sky' }]),
 }));
 
 vi.mock('../config.js', () => ({
@@ -453,9 +447,7 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     const updated = store.getProject(project.meta.id);
-    const assistantMsg = updated!.chat!.messages.find(
-      (m) => m.role === 'assistant',
-    );
+    const assistantMsg = updated!.chat!.messages.find((m) => m.role === 'assistant');
     expect(assistantMsg!.generatedIds).toHaveLength(1);
   });
 
@@ -529,9 +521,7 @@ describe('POST /:pid/chat', () => {
 
     // moderateContent should NOT have been called
     expect(moderateContent).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
   it('ne bloque pas la moderation quand le profil est etudiant (categories vides)', async () => {
@@ -554,9 +544,7 @@ describe('POST /:pid/chat', () => {
 
     // moderateContent should NOT be called since etudiant categories are empty
     expect(moderateContent).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
   it('retourne 500 quand chatWithSources lance une erreur', async () => {
@@ -590,9 +578,7 @@ describe('POST /:pid/chat', () => {
 
     await handler(req, res);
 
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 });
 

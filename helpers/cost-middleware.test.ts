@@ -38,7 +38,8 @@ describe('withCostTracking', () => {
       return { result: undefined, usage: [] };
     });
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -50,7 +51,12 @@ describe('withCostTracking', () => {
 
   it('calls appendCostEntry with correct data when cost > 0', async () => {
     const usage: ApiUsage[] = [
-      { promptTokens: 1000, completionTokens: 500, totalTokens: 1500, model: 'mistral-large-latest' },
+      {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500,
+        model: 'mistral-large-latest',
+      },
     ];
 
     mockedRunWithUsageTracking.mockImplementation(async (fn) => {
@@ -58,7 +64,8 @@ describe('withCostTracking', () => {
       return { result: undefined, usage };
     });
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -87,7 +94,12 @@ describe('withCostTracking', () => {
 
   it('does not call appendCostEntry when cost is 0 (free model)', async () => {
     const usage: ApiUsage[] = [
-      { promptTokens: 500, completionTokens: 100, totalTokens: 600, model: 'mistral-moderation-latest' },
+      {
+        promptTokens: 500,
+        completionTokens: 100,
+        totalTokens: 600,
+        model: 'mistral-moderation-latest',
+      },
     ];
 
     mockedRunWithUsageTracking.mockImplementation(async (fn) => {
@@ -95,7 +107,8 @@ describe('withCostTracking', () => {
       return { result: undefined, usage };
     });
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -107,7 +120,12 @@ describe('withCostTracking', () => {
 
   it('falls back to empty string when req.route is undefined', async () => {
     const usage: ApiUsage[] = [
-      { promptTokens: 1000, completionTokens: 500, totalTokens: 1500, model: 'mistral-large-latest' },
+      {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500,
+        model: 'mistral-large-latest',
+      },
     ];
 
     mockedRunWithUsageTracking.mockImplementation(async (fn) => {
@@ -115,7 +133,8 @@ describe('withCostTracking', () => {
       return { result: undefined, usage };
     });
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -128,7 +147,12 @@ describe('withCostTracking', () => {
 
   it('records cost entry even when handler throws', async () => {
     const usage: ApiUsage[] = [
-      { promptTokens: 800, completionTokens: 400, totalTokens: 1200, model: 'mistral-large-latest' },
+      {
+        promptTokens: 800,
+        completionTokens: 400,
+        totalTokens: 1200,
+        model: 'mistral-large-latest',
+      },
     ];
 
     const error = new Error('handler failed');
@@ -136,7 +160,8 @@ describe('withCostTracking', () => {
 
     mockedRunWithUsageTracking.mockRejectedValue(error);
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -151,7 +176,8 @@ describe('withCostTracking', () => {
   it('does not call appendCostEntry when handler throws with no apiUsage', async () => {
     mockedRunWithUsageTracking.mockRejectedValue(new Error('no usage'));
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockResolvedValue(undefined);
     const wrapped = withCostTracking(store as any, handler);
 
@@ -168,7 +194,8 @@ describe('withCostTracking', () => {
       return { result: undefined, usage: [] };
     });
 
-    const handler = vi.fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
+    const handler = vi
+      .fn<(req: Request, res: Response, next: NextFunction) => Promise<void>>()
       .mockImplementation(async (r, s, n) => {
         capturedArgs.push(r, s, n);
       });

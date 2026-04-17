@@ -21,7 +21,9 @@ function makeContext(overrides: any = {}) {
     showTextInput: true,
     uploadSessions: [] as any[],
     get uploading(): boolean {
-      return this.uploadSessions.some((s: any) => s.files.some((f: any) => f.status === 'pending' || f.status === 'uploading'));
+      return this.uploadSessions.some((s: any) =>
+        s.files.some((f: any) => f.status === 'pending' || f.status === 'uploading'),
+      );
     },
     dragging: false,
     locale: 'fr',
@@ -496,7 +498,12 @@ describe('createSources', () => {
       mockFetchOk([{ id: 's1', text: 'ocr1', moderation: { status: 'pending' } }]);
       // 2nd file: never resolves (blocked)
       let resolveSecond: any;
-      vi.mocked(globalThis.fetch).mockImplementationOnce(() => new Promise(r => { resolveSecond = r; }));
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolveSecond = r;
+          }),
+      );
 
       ctx.refreshModeration = vi.fn();
 
@@ -520,7 +527,10 @@ describe('createSources', () => {
       const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
       let resolveFetch: any;
       vi.mocked(globalThis.fetch).mockImplementationOnce(
-        () => new Promise(r => { resolveFetch = r; }),
+        () =>
+          new Promise((r) => {
+            resolveFetch = r;
+          }),
       );
 
       const promise = src.handleFiles.call(ctx, makeFileList(file));
@@ -542,7 +552,10 @@ describe('createSources', () => {
       const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
       let resolveFetch: any;
       vi.mocked(globalThis.fetch).mockImplementationOnce(
-        () => new Promise(r => { resolveFetch = r; }),
+        () =>
+          new Promise((r) => {
+            resolveFetch = r;
+          }),
       );
 
       const promise = src.handleFiles.call(ctx, makeFileList(file));
@@ -564,7 +577,10 @@ describe('createSources', () => {
 
       let resolve1: any;
       vi.mocked(globalThis.fetch).mockImplementationOnce(
-        () => new Promise(r => { resolve1 = r; }),
+        () =>
+          new Promise((r) => {
+            resolve1 = r;
+          }),
       );
 
       const promise = src.handleFiles.call(ctx, makeFileList(f1, f2, f3));
@@ -600,7 +616,12 @@ describe('createSources', () => {
 
   describe('retryFile', () => {
     function makeFileList(...files: File[]) {
-      const fl: any = { length: files.length, [Symbol.iterator]: function* () { for (let i = 0; i < this.length; i++) yield this[i]; } };
+      const fl: any = {
+        length: files.length,
+        [Symbol.iterator]: function* () {
+          for (let i = 0; i < this.length; i++) yield this[i];
+        },
+      };
       files.forEach((f, i) => (fl[i] = f));
       return fl as FileList;
     }
@@ -658,7 +679,12 @@ describe('createSources', () => {
 
   describe('dismissFailedFile', () => {
     function makeFileList(...files: File[]) {
-      const fl: any = { length: files.length, [Symbol.iterator]: function* () { for (let i = 0; i < this.length; i++) yield this[i]; } };
+      const fl: any = {
+        length: files.length,
+        [Symbol.iterator]: function* () {
+          for (let i = 0; i < this.length; i++) yield this[i];
+        },
+      };
       files.forEach((f, i) => (fl[i] = f));
       return fl as FileList;
     }
@@ -721,7 +747,10 @@ describe('createSources', () => {
     it('does not push source when user switches project mid-flight', async () => {
       let resolveFetch: any;
       vi.mocked(globalThis.fetch).mockImplementationOnce(
-        () => new Promise(r => { resolveFetch = r; }),
+        () =>
+          new Promise((r) => {
+            resolveFetch = r;
+          }),
       );
 
       const promise = src.addText.call(ctx);
@@ -743,7 +772,11 @@ describe('createSources', () => {
     it('startDrag returns early when zoom<=1 and rotation%360===0', () => {
       ctx.viewSourceZoom = 1;
       ctx.viewSourceRotation = 0;
-      const event = { clientX: 100, clientY: 200, preventDefault: vi.fn() } as unknown as MouseEvent;
+      const event = {
+        clientX: 100,
+        clientY: 200,
+        preventDefault: vi.fn(),
+      } as unknown as MouseEvent;
 
       src.startDrag.call(ctx, event);
 
@@ -755,7 +788,11 @@ describe('createSources', () => {
       ctx.viewSourceZoom = 2;
       ctx.viewSourcePanX = 10;
       ctx.viewSourcePanY = 20;
-      const event = { clientX: 100, clientY: 200, preventDefault: vi.fn() } as unknown as MouseEvent;
+      const event = {
+        clientX: 100,
+        clientY: 200,
+        preventDefault: vi.fn(),
+      } as unknown as MouseEvent;
 
       src.startDrag.call(ctx, event);
 
@@ -786,7 +823,11 @@ describe('createSources', () => {
       ctx.viewSourceDragging = true;
       ctx.viewSourceDragStart = { x: 100, y: 200 };
       ctx.viewSourcePanStart = { x: 10, y: 20 };
-      const event = { clientX: 130, clientY: 250, preventDefault: vi.fn() } as unknown as MouseEvent;
+      const event = {
+        clientX: 130,
+        clientY: 250,
+        preventDefault: vi.fn(),
+      } as unknown as MouseEvent;
 
       src.onDrag.call(ctx, event);
 
@@ -799,7 +840,11 @@ describe('createSources', () => {
       ctx.viewSourceDragging = false;
       ctx.viewSourcePanX = 0;
       ctx.viewSourcePanY = 0;
-      const event = { clientX: 130, clientY: 250, preventDefault: vi.fn() } as unknown as MouseEvent;
+      const event = {
+        clientX: 130,
+        clientY: 250,
+        preventDefault: vi.fn(),
+      } as unknown as MouseEvent;
 
       src.onDrag.call(ctx, event);
 

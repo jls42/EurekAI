@@ -42,6 +42,5 @@ export function createRender() {
       r.key_points = r.key_points.filter((pt: string) => pt?.trim());
       return r;
     },
-
-};
+  };
 }

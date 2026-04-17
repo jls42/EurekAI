@@ -60,9 +60,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
     ...diversityParams(type),
   });
-  const retryData = unwrapJsonArray<QuizQuestion>(
-    safeParseJson(getContent(retry)),
-  );
+  const retryData = unwrapJsonArray<QuizQuestion>(safeParseJson(getContent(retry)));
 
   if (!isValidQuiz(retryData)) {
     throw new Error(errorMsg);

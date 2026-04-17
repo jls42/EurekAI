@@ -25,14 +25,18 @@ vi.mock('../generators/websearch.js', () => ({
 }));
 
 vi.mock('../generators/consigne.js', () => ({
-  detectConsigne: vi.fn().mockResolvedValue({ found: true, text: 'Reviser les dates', keyTopics: ['dates'] }),
+  detectConsigne: vi
+    .fn()
+    .mockResolvedValue({ found: true, text: 'Reviser les dates', keyTopics: ['dates'] }),
 }));
 
 vi.mock('../helpers/index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../helpers/index.js')>();
   return {
     ...actual,
-    fetchPageContent: vi.fn().mockResolvedValue({ text: 'scraped page content', engine: 'readability' }),
+    fetchPageContent: vi
+      .fn()
+      .mockResolvedValue({ text: 'scraped page content', engine: 'readability' }),
   };
 });
 
@@ -90,7 +94,14 @@ afterEach(() => {
 // --- Helper: create a project with optional moderation-enabled profile ---
 
 function createProjectWithProfile(opts: { useModeration?: boolean; ageGroup?: string } = {}) {
-  const age = opts.ageGroup === 'adulte' ? 30 : opts.ageGroup === 'etudiant' ? 20 : opts.ageGroup === 'ado' ? 14 : 9;
+  const age =
+    opts.ageGroup === 'adulte'
+      ? 30
+      : opts.ageGroup === 'etudiant'
+        ? 20
+        : opts.ageGroup === 'ado'
+          ? 14
+          : 9;
   const profile = profileStore.create('Test Kid', age, '0', 'fr');
   if (opts.useModeration !== undefined) {
     profileStore.update(profile.id, { useModeration: opts.useModeration });
@@ -200,10 +211,16 @@ describe('POST /:pid/sources/text', () => {
 
   it('bloque le contenu unsafe quand la moderation est activee', async () => {
     const { project } = createProjectWithProfile({ useModeration: true });
-    vi.mocked(moderateContent).mockResolvedValueOnce({ status: 'unsafe', categories: { sexual: true } });
+    vi.mocked(moderateContent).mockResolvedValueOnce({
+      status: 'unsafe',
+      categories: { sexual: true },
+    });
 
     const handler = getHandler(router, 'post', '/:pid/sources/text');
-    const req = mockReq({ params: { pid: project.meta.id }, body: { text: 'contenu inapproprie' } });
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { text: 'contenu inapproprie' },
+    });
     const res = mockRes();
 
     await handler(req, res);
@@ -366,11 +383,19 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'fr');
-    expect(res.json).toHaveBeenCalledWith({ found: true, text: 'Reviser les dates', keyTopics: ['dates'] });
+    expect(res.json).toHaveBeenCalledWith({
+      found: true,
+      text: 'Reviser les dates',
+      keyTopics: ['dates'],
+    });
 
     // Verify consigne saved in store
     const updated = store.getProject(project.meta.id);
-    expect(updated!.consigne).toEqual({ found: true, text: 'Reviser les dates', keyTopics: ['dates'] });
+    expect(updated!.consigne).toEqual({
+      found: true,
+      text: 'Reviser les dates',
+      keyTopics: ['dates'],
+    });
   });
 
   it('utilise lang par defaut "fr" si non fourni', async () => {
@@ -460,7 +485,10 @@ describe('POST /:pid/moderate', () => {
   });
 
   it('retourne le resultat de moderation', async () => {
-    vi.mocked(moderateContent).mockResolvedValueOnce({ status: 'safe', categories: { sexual: false } });
+    vi.mocked(moderateContent).mockResolvedValueOnce({
+      status: 'safe',
+      categories: { sexual: false },
+    });
 
     const handler = getHandler(router, 'post', '/:pid/moderate');
     const req = mockReq({ params: { pid: 'any' }, body: { text: 'texte a moderer' } });
@@ -627,7 +655,10 @@ describe('POST /:pid/sources/websearch', () => {
 
   it('bloque la query unsafe quand la moderation est activee', async () => {
     const { project } = createProjectWithProfile({ useModeration: true });
-    vi.mocked(moderateContent).mockResolvedValueOnce({ status: 'unsafe', categories: { hate_and_discrimination: true } });
+    vi.mocked(moderateContent).mockResolvedValueOnce({
+      status: 'unsafe',
+      categories: { hate_and_discrimination: true },
+    });
 
     const handler = getHandler(router, 'post', '/:pid/sources/websearch');
     const req = mockReq({
@@ -854,7 +885,12 @@ describe('POST /:pid/sources/voice', () => {
 
     await handler(req, res);
 
-    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('fake-audio'), 'record.webm', 'fr');
+    expect(transcribeAudio).toHaveBeenCalledWith(
+      client,
+      Buffer.from('fake-audio'),
+      'record.webm',
+      'fr',
+    );
     expect(res.json).toHaveBeenCalledTimes(1);
     const source = res.json.mock.calls[0][0];
     expect(source.id).toBeTruthy();
@@ -1175,7 +1211,7 @@ describe('POST /:pid/sources/upload', () => {
 
 describe('Background triggers after source addition', () => {
   /** Flush fire-and-forget promises (no more setTimeout, tasks run as microtasks) */
-  const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
+  const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it('text source triggers background consigne detection', async () => {
     const project = store.createProject('P1');
@@ -1198,12 +1234,7 @@ describe('Background triggers after source addition', () => {
     await flushPromises();
 
     expect(res.json).toHaveBeenCalledTimes(1);
-    expect(detectConsigne).toHaveBeenCalledWith(
-      client,
-      '# Combined markdown',
-      undefined,
-      'en',
-    );
+    expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'en');
   });
 
   it('voice source triggers background consigne detection', async () => {
@@ -1220,12 +1251,7 @@ describe('Background triggers after source addition', () => {
     await flushPromises();
 
     expect(res.json).toHaveBeenCalledTimes(1);
-    expect(detectConsigne).toHaveBeenCalledWith(
-      client,
-      '# Combined markdown',
-      undefined,
-      'fr',
-    );
+    expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'fr');
   });
 
   it('voice source triggers background moderation when profile has moderation enabled', async () => {
@@ -1268,12 +1294,7 @@ describe('Background triggers after source addition', () => {
     const results = res.json.mock.calls[0][0];
     expect(results[0].moderation).toEqual({ status: 'pending', categories: {} });
 
-    expect(detectConsigne).toHaveBeenCalledWith(
-      client,
-      '# Combined markdown',
-      undefined,
-      'fr',
-    );
+    expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'fr');
     expect(moderateContent).toHaveBeenCalled();
   });
 
@@ -1315,7 +1336,7 @@ describe('Background triggers after source addition', () => {
 
     // Source should have error moderation status
     const updatedProject = store.getProject(project.meta.id);
-    const source = updatedProject!.sources.find(s => s.sourceType === 'voice');
+    const source = updatedProject!.sources.find((s) => s.sourceType === 'voice');
     expect(source?.moderation).toEqual({ status: 'error', categories: {} });
   });
 });

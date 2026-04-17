@@ -52,11 +52,14 @@ describe('profile locale storage', () => {
   it('filters out non-string values from stored locales', () => {
     const storage = new MemoryStorage();
     // Store an object where one value is not a string
-    storage.setItem('sf-profile-locales', JSON.stringify({
-      'profile-1': 'en',
-      'profile-2': 42,
-      'profile-3': null,
-    }));
+    storage.setItem(
+      'sf-profile-locales',
+      JSON.stringify({
+        'profile-1': 'en',
+        'profile-2': 42,
+        'profile-3': null,
+      }),
+    );
 
     expect(getProfileLocale('profile-1', 'fr', storage)).toBe('en');
     expect(getProfileLocale('profile-2', 'fr', storage)).toBe('fr');

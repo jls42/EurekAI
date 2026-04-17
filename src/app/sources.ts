@@ -3,8 +3,10 @@ import { addCostDelta } from './cost-utils';
 type UploadResult = 'applied' | 'ignored' | 'failed';
 
 function _isSessionActive(ctx: any, session: any): boolean {
-  return ctx.uploadSessions.some((s: any) => s.id === session.id)
-    && ctx.currentProjectId === session.projectId;
+  return (
+    ctx.uploadSessions.some((s: any) => s.id === session.id) &&
+    ctx.currentProjectId === session.projectId
+  );
 }
 
 async function _resolveHttpError(ctx: any, session: any, res: Response): Promise<string | null> {
@@ -26,7 +28,9 @@ function _applyUploadSuccess(ctx: any, session: any, file: any, newSources: any[
   file.status = 'done';
   ctx.$nextTick(() => ctx.refreshIcons());
   if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
-    setTimeout(() => { if (_isSessionActive(ctx, session)) ctx.refreshModeration(); }, 2000);
+    setTimeout(() => {
+      if (_isSessionActive(ctx, session)) ctx.refreshModeration();
+    }, 2000);
   }
 }
 
@@ -71,16 +75,15 @@ async function _uploadSingleFile(this: any, session: any, fileId: string): Promi
     file.status = 'error';
     file.errorMsg = e.message;
     this.$nextTick(() => this.refreshIcons());
-    this.showToast(
-      this.t('toast.uploadError', { filename: file.name, error: e.message }),
-      'error',
-    );
+    this.showToast(this.t('toast.uploadError', { filename: file.name, error: e.message }), 'error');
     return 'failed';
   }
 }
 
 function _scheduleConsigneRefresh(this: any, projectId: string) {
-  setTimeout(() => { if (this.currentProjectId === projectId) this.refreshConsigne(); }, 3000);
+  setTimeout(() => {
+    if (this.currentProjectId === projectId) this.refreshConsigne();
+  }, 3000);
 }
 
 function _maybeCleanupSession(this: any, sessionId: string) {
@@ -108,8 +111,11 @@ export function createSources() {
 
       const sessionId = crypto.randomUUID();
       const files = Array.from(fileList).map((f) => ({
-        id: crypto.randomUUID(), name: f.name, file: f as File | null,
-        status: 'pending' as const, errorMsg: null as string | null,
+        id: crypto.randomUUID(),
+        name: f.name,
+        file: f as File | null,
+        status: 'pending' as const,
+        errorMsg: null as string | null,
       }));
       this.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
       this.$nextTick(() => this.refreshIcons());
@@ -120,7 +126,10 @@ export function createSources() {
 
       for (const fileEntry of session.files) {
         const result = await _uploadSingleFile.call(this, session, fileEntry.id);
-        if (result === 'ignored') { interrupted = true; break; }
+        if (result === 'ignored') {
+          interrupted = true;
+          break;
+        }
         if (result === 'applied') appliedCount++;
       }
 
@@ -167,8 +176,18 @@ export function createSources() {
 
       const sessionId = crypto.randomUUID();
       this.uploadSessions.push({
-        id: sessionId, projectId, cleanupScheduled: false,
-        files: [{ id: crypto.randomUUID(), name: 'text', file: null, status: 'uploading' as const, errorMsg: null }],
+        id: sessionId,
+        projectId,
+        cleanupScheduled: false,
+        files: [
+          {
+            id: crypto.randomUUID(),
+            name: 'text',
+            file: null,
+            status: 'uploading' as const,
+            errorMsg: null,
+          },
+        ],
       });
       const session = this.uploadSessions.find((s: any) => s.id === sessionId);
 

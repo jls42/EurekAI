@@ -336,7 +336,9 @@ describe('referencedSourceNums', () => {
   it('extracts source nums from flashcards sourceRefs', () => {
     const gen = {
       type: 'flashcards',
-      data: { flashcards: [{ sourceRefs: ['Source 1', 'Source 3'] }, { sourceRefs: ['Source 2'] }] },
+      data: {
+        flashcards: [{ sourceRefs: ['Source 1', 'Source 3'] }, { sourceRefs: ['Source 2'] }],
+      },
     };
     const nums = helpers.referencedSourceNums(gen);
     expect(nums).toEqual(new Set([1, 2, 3]));
@@ -622,23 +624,33 @@ describe('sourceTypeIcon', () => {
   it('returns correct icons for each source type', () => {
     const ctx = { inferSourceType: helpers.inferSourceType };
     expect(callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'photo.jpg' })).toBe('scan');
-    expect(callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Texte libre' })).toBe('pencil');
-    expect(callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Enregistrement vocal' })).toBe('mic');
-    expect(callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Recherche web : test' })).toBe('globe');
+    expect(callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Texte libre' })).toBe(
+      'pencil',
+    );
+    expect(
+      callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Enregistrement vocal' }),
+    ).toBe('mic');
+    expect(
+      callWith<string>(helpers.sourceTypeIcon, ctx, { filename: 'Recherche web : test' }),
+    ).toBe('globe');
   });
 });
 
 describe('sourceTypeBadge', () => {
   it('returns correct i18n keys', () => {
     const ctx = { inferSourceType: helpers.inferSourceType, t: (k: string) => k };
-    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'photo.jpg' })).toBe('sourceBadge.ocr');
-    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Texte libre' })).toBe('sourceBadge.text');
-    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Enregistrement vocal' })).toBe(
-      'sourceBadge.voice',
+    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'photo.jpg' })).toBe(
+      'sourceBadge.ocr',
     );
-    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Recherche web : test' })).toBe(
-      'sourceBadge.web',
+    expect(callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Texte libre' })).toBe(
+      'sourceBadge.text',
     );
+    expect(
+      callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Enregistrement vocal' }),
+    ).toBe('sourceBadge.voice');
+    expect(
+      callWith<string>(helpers.sourceTypeBadge, ctx, { filename: 'Recherche web : test' }),
+    ).toBe('sourceBadge.web');
   });
 });
 
@@ -651,17 +663,19 @@ describe('sourceTypeBadgeColor', () => {
     expect(callWith<string>(helpers.sourceTypeBadgeColor, ctx, { filename: 'Texte libre' })).toBe(
       'bg-green-100 text-green-700',
     );
-    expect(callWith<string>(helpers.sourceTypeBadgeColor, ctx, { filename: 'Enregistrement vocal' })).toBe(
-      'bg-orange-100 text-orange-700',
-    );
-    expect(callWith<string>(helpers.sourceTypeBadgeColor, ctx, { filename: 'Recherche web : x' })).toBe(
-      'bg-teal-100 text-teal-700',
-    );
+    expect(
+      callWith<string>(helpers.sourceTypeBadgeColor, ctx, { filename: 'Enregistrement vocal' }),
+    ).toBe('bg-orange-100 text-orange-700');
+    expect(
+      callWith<string>(helpers.sourceTypeBadgeColor, ctx, { filename: 'Recherche web : x' }),
+    ).toBe('bg-teal-100 text-teal-700');
   });
 
   it('returns gray fallback for unknown source type', () => {
     const ctx = { inferSourceType: () => 'alien' };
-    expect(callWith<string>(helpers.sourceTypeBadgeColor, ctx, {})).toBe('bg-gray-100 text-gray-700');
+    expect(callWith<string>(helpers.sourceTypeBadgeColor, ctx, {})).toBe(
+      'bg-gray-100 text-gray-700',
+    );
   });
 });
 
@@ -856,7 +870,12 @@ describe('getQuizScores', () => {
       generations: [
         {
           type: 'quiz',
-          stats: { attempts: [{ score: 3, total: 5 }, { score: 4, total: 5 }] },
+          stats: {
+            attempts: [
+              { score: 3, total: 5 },
+              { score: 4, total: 5 },
+            ],
+          },
         },
         {
           type: 'quiz',
@@ -889,25 +908,44 @@ describe('resolveError', () => {
 
   it('returns original error when no translation found', () => {
     const ctx = { t: (k: string) => k };
-    expect(callWith<string>(helpers.resolveError, ctx, 'Something went wrong')).toBe('Something went wrong');
+    expect(callWith<string>(helpers.resolveError, ctx, 'Something went wrong')).toBe(
+      'Something went wrong',
+    );
   });
 
   it('handles context_too_large with percentage', () => {
-    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `Trop gros ${params?.pct}%` : k) };
-    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:95')).toBe('Trop gros 95%');
+    const ctx = {
+      t: (k: string, params?: any) =>
+        k === 'gen.contextTooLarge' ? `Trop gros ${params?.pct}%` : k,
+    };
+    expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:95')).toBe(
+      'Trop gros 95%',
+    );
   });
 
   it('handles context_too_large at exactly 100%', () => {
-    const ctx = { t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `${params?.pct}%` : k) };
+    const ctx = {
+      t: (k: string, params?: any) => (k === 'gen.contextTooLarge' ? `${params?.pct}%` : k),
+    };
     expect(callWith<string>(helpers.resolveError, ctx, 'context_too_large:100')).toBe('100%');
   });
 });
 
 describe('activeGenerations', () => {
   const categories = [
-    { key: 'summary', labelKey: 'nav.summary', icon: 'file-text', color: 'var(--color-gen-summary)' },
+    {
+      key: 'summary',
+      labelKey: 'nav.summary',
+      icon: 'file-text',
+      color: 'var(--color-gen-summary)',
+    },
     { key: 'quiz', labelKey: 'nav.quiz', icon: 'brain', color: 'var(--color-gen-quiz)' },
-    { key: 'flashcards', labelKey: 'nav.flashcards', icon: 'layers', color: 'var(--color-gen-flashcards)' },
+    {
+      key: 'flashcards',
+      labelKey: 'nav.flashcards',
+      icon: 'layers',
+      color: 'var(--color-gen-flashcards)',
+    },
   ];
 
   it('returns empty array when nothing is loading', () => {
@@ -917,7 +955,11 @@ describe('activeGenerations', () => {
   });
 
   it('returns active generation chips for loading types', () => {
-    const ctx = { categories, loading: { summary: true, quiz: false, flashcards: true }, t: (k: string) => k };
+    const ctx = {
+      categories,
+      loading: { summary: true, quiz: false, flashcards: true },
+      t: (k: string) => k,
+    };
     const result = callWith<any[]>(helpers.activeGenerations, ctx);
     expect(result).toHaveLength(2);
     expect(result[0].key).toBe('summary');
@@ -1055,17 +1097,23 @@ describe('ocrConfidencePercent', () => {
 
 describe('ocrConfidenceColor', () => {
   it('returns success classes for high tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.95 } });
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, {
+      ocrConfidence: { average: 0.95 },
+    });
     expect(result).toBe('bg-success-light text-success-dark');
   });
 
   it('returns warning classes for medium tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.8 } });
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, {
+      ocrConfidence: { average: 0.8 },
+    });
     expect(result).toBe('bg-warning-light text-warning-dark');
   });
 
   it('returns danger classes for low tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, { ocrConfidence: { average: 0.5 } });
+    const result = callWith<string>(helpers.ocrConfidenceColor, helpers, {
+      ocrConfidence: { average: 0.5 },
+    });
     expect(result).toBe('bg-danger-light text-danger-dark');
   });
 
@@ -1077,17 +1125,23 @@ describe('ocrConfidenceColor', () => {
 
 describe('ocrConfidenceIcon', () => {
   it('returns check-circle for high tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.95 } });
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, {
+      ocrConfidence: { average: 0.95 },
+    });
     expect(result).toBe('check-circle');
   });
 
   it('returns alert-circle for medium tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.8 } });
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, {
+      ocrConfidence: { average: 0.8 },
+    });
     expect(result).toBe('alert-circle');
   });
 
   it('returns alert-triangle for low tier', () => {
-    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, { ocrConfidence: { average: 0.5 } });
+    const result = callWith<string>(helpers.ocrConfidenceIcon, helpers, {
+      ocrConfidence: { average: 0.5 },
+    });
     expect(result).toBe('alert-triangle');
   });
 
@@ -1099,18 +1153,27 @@ describe('ocrConfidenceIcon', () => {
 
 describe('ocrConfidenceToneClass', () => {
   it('returns success class for high tier', () => {
-    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.95 } }))
-      .toBe('text-success-dark');
+    expect(
+      callWith<string>(helpers.ocrConfidenceToneClass, helpers, {
+        ocrConfidence: { average: 0.95 },
+      }),
+    ).toBe('text-success-dark');
   });
 
   it('returns warning class for medium tier', () => {
-    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.8 } }))
-      .toBe('text-warning-dark');
+    expect(
+      callWith<string>(helpers.ocrConfidenceToneClass, helpers, {
+        ocrConfidence: { average: 0.8 },
+      }),
+    ).toBe('text-warning-dark');
   });
 
   it('returns danger class for low tier', () => {
-    expect(callWith<string>(helpers.ocrConfidenceToneClass, helpers, { ocrConfidence: { average: 0.5 } }))
-      .toBe('text-danger-dark');
+    expect(
+      callWith<string>(helpers.ocrConfidenceToneClass, helpers, {
+        ocrConfidence: { average: 0.5 },
+      }),
+    ).toBe('text-danger-dark');
   });
 
   it('returns primary class when no confidence', () => {
@@ -1141,14 +1204,20 @@ describe('moderationStatus', () => {
 
 describe('moderationBadgeColor', () => {
   it('returns correct classes for each status', () => {
-    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'safe' } }))
-      .toBe('bg-success-light text-success-dark');
-    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'unsafe' } }))
-      .toBe('bg-danger-light text-danger-dark');
-    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'pending' } }))
-      .toBe('bg-primary-light text-primary');
-    expect(callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'error' } }))
-      .toBe('bg-warning-light text-warning-dark');
+    expect(
+      callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'safe' } }),
+    ).toBe('bg-success-light text-success-dark');
+    expect(
+      callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'unsafe' } }),
+    ).toBe('bg-danger-light text-danger-dark');
+    expect(
+      callWith<string>(helpers.moderationBadgeColor, helpers, {
+        moderation: { status: 'pending' },
+      }),
+    ).toBe('bg-primary-light text-primary');
+    expect(
+      callWith<string>(helpers.moderationBadgeColor, helpers, { moderation: { status: 'error' } }),
+    ).toBe('bg-warning-light text-warning-dark');
   });
 
   it('returns empty string when no moderation', () => {
@@ -1158,10 +1227,18 @@ describe('moderationBadgeColor', () => {
 
 describe('moderationBadgeIcon', () => {
   it('returns correct icons for each status', () => {
-    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'safe' } })).toBe('shield-check');
-    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'unsafe' } })).toBe('shield-alert');
-    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'pending' } })).toBe('loader-circle');
-    expect(callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'error' } })).toBe('shield-x');
+    expect(
+      callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'safe' } }),
+    ).toBe('shield-check');
+    expect(
+      callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'unsafe' } }),
+    ).toBe('shield-alert');
+    expect(
+      callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'pending' } }),
+    ).toBe('loader-circle');
+    expect(
+      callWith<string>(helpers.moderationBadgeIcon, helpers, { moderation: { status: 'error' } }),
+    ).toBe('shield-x');
   });
 
   it('returns empty string when no moderation', () => {
@@ -1171,23 +1248,42 @@ describe('moderationBadgeIcon', () => {
 
 describe('moderationBadgeIconClass', () => {
   it('returns animate-spin for pending', () => {
-    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'pending' } }))
-      .toBe('animate-spin');
+    expect(
+      callWith<string>(helpers.moderationBadgeIconClass, helpers, {
+        moderation: { status: 'pending' },
+      }),
+    ).toBe('animate-spin');
   });
 
   it('returns empty string for other statuses', () => {
-    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'safe' } })).toBe('');
-    expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, { moderation: { status: 'unsafe' } })).toBe('');
+    expect(
+      callWith<string>(helpers.moderationBadgeIconClass, helpers, {
+        moderation: { status: 'safe' },
+      }),
+    ).toBe('');
+    expect(
+      callWith<string>(helpers.moderationBadgeIconClass, helpers, {
+        moderation: { status: 'unsafe' },
+      }),
+    ).toBe('');
     expect(callWith<string>(helpers.moderationBadgeIconClass, helpers, {})).toBe('');
   });
 });
 
 describe('moderationToneClass', () => {
   it('returns correct tone class for each status', () => {
-    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'safe' } })).toBe('text-success-dark');
-    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'unsafe' } })).toBe('text-danger-dark');
-    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'pending' } })).toBe('text-primary');
-    expect(callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'error' } })).toBe('text-warning-dark');
+    expect(
+      callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'safe' } }),
+    ).toBe('text-success-dark');
+    expect(
+      callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'unsafe' } }),
+    ).toBe('text-danger-dark');
+    expect(
+      callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'pending' } }),
+    ).toBe('text-primary');
+    expect(
+      callWith<string>(helpers.moderationToneClass, helpers, { moderation: { status: 'error' } }),
+    ).toBe('text-warning-dark');
   });
 
   it('returns text-text-primary when no moderation', () => {
@@ -1200,9 +1296,15 @@ describe('moderationBadgeTitle', () => {
 
   it('returns translated title for safe/pending/error', () => {
     const ctx = { ...helpers, t };
-    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'safe' } })).toBe('moderation.safe');
-    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'pending' } })).toBe('moderation.pending');
-    expect(callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'error' } })).toBe('moderation.error');
+    expect(
+      callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'safe' } }),
+    ).toBe('moderation.safe');
+    expect(
+      callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'pending' } }),
+    ).toBe('moderation.pending');
+    expect(
+      callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'error' } }),
+    ).toBe('moderation.error');
   });
 
   it('returns unsafe title with flagged categories when present', () => {
@@ -1211,7 +1313,9 @@ describe('moderationBadgeTitle', () => {
       t,
       flaggedCategoryLabels: () => 'violence, sexual',
     };
-    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, {
+      moderation: { status: 'unsafe' },
+    });
     expect(result).toBe('moderation.unsafe — violence, sexual');
   });
 
@@ -1221,7 +1325,9 @@ describe('moderationBadgeTitle', () => {
       t,
       flaggedCategoryLabels: () => '',
     };
-    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, { moderation: { status: 'unsafe' } });
+    const result = callWith<string>(helpers.moderationBadgeTitle, ctx, {
+      moderation: { status: 'unsafe' },
+    });
     expect(result).toBe('moderation.unsafe');
   });
 
@@ -1253,7 +1359,16 @@ describe('hideMetaPopover', () => {
   });
 });
 
-const mockEl = { getBoundingClientRect: () => ({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 }) } as unknown as HTMLElement;
+const mockEl = {
+  getBoundingClientRect: () => ({
+    top: 100,
+    bottom: 130,
+    left: 50,
+    right: 200,
+    width: 150,
+    height: 30,
+  }),
+} as unknown as HTMLElement;
 
 describe('showMetaPopover', () => {
   it('sets all popover state from config', () => {
@@ -1265,7 +1380,14 @@ describe('showMetaPopover', () => {
       footer: 'Footer text',
       footerClass: 'custom-footer',
     });
-    expect(ctx._metaPopoverPos).toEqual({ top: 100, bottom: 130, left: 50, right: 200, width: 150, height: 30 });
+    expect(ctx._metaPopoverPos).toEqual({
+      top: 100,
+      bottom: 130,
+      left: 50,
+      right: 200,
+      width: 150,
+      height: 30,
+    });
     expect(ctx._metaPopoverTitle).toBe('Test Title');
     expect(ctx._metaPopoverLines).toEqual(['line1', 'line2']);
     expect(ctx._metaPopoverLineClass).toBe('custom-line');
@@ -1348,7 +1470,9 @@ describe('showModerationPopover', () => {
       showMetaPopover: helpers.showMetaPopover,
       flaggedCategoryLabels: () => 'violence, sexual',
     };
-    callWith<void>(helpers.showModerationPopover, ctx, mockEl, { moderation: { status: 'unsafe' } });
+    callWith<void>(helpers.showModerationPopover, ctx, mockEl, {
+      moderation: { status: 'unsafe' },
+    });
     expect(ctx._metaPopoverLines).toEqual(['violence, sexual']);
     expect(ctx._metaPopoverLineClass).toBe('text-text-secondary');
   });

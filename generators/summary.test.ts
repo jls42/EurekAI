@@ -41,15 +41,35 @@ describe('generateSummary', () => {
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
   });
 
+  it('retry prompt ne fait pas fuiter "UNE SEULE fiche COMPLETE" dans le title', async () => {
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(validSummary) } }],
+      });
+
+    await generateSummary(client, 'Some markdown');
+
+    // Inspect le 2e appel (le retry)
+    const retryCall = client.chat.complete.mock.calls[1][0];
+    const retryUserMessage = retryCall.messages[retryCall.messages.length - 1].content;
+    const lower = retryUserMessage.toLowerCase();
+    // Phrase exacte de l'ancienne formulation problématique
+    expect(lower).not.toContain('une seule fiche complete');
+    expect(lower).not.toContain('fiche complete');
+    // Règle positive présente — assertions simples
+    expect(retryUserMessage).toContain('objet JSON unique');
+    expect(retryUserMessage).toContain('premier niveau');
+  });
+
   it('throws when both attempts fail', async () => {
     const client = mockClient({});
     client.chat.complete
       .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
       .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] });
 
-    await expect(generateSummary(client, 'content')).rejects.toThrow(
-      /generer une fiche valide/,
-    );
+    await expect(generateSummary(client, 'content')).rejects.toThrow(/generer une fiche valide/);
   });
 
   it('handles wrapped response {"fiches": [fiche1]} (single fiche unwrap)', async () => {

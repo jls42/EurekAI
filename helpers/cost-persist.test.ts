@@ -12,7 +12,12 @@ describe('persistUsage', () => {
   it('writes to costLog and returns cost data for billable usage', () => {
     const store = makeStore();
     const entries: ApiUsage[] = [
-      { promptTokens: 1000, completionTokens: 500, totalTokens: 1500, model: 'mistral-large-latest' },
+      {
+        promptTokens: 1000,
+        completionTokens: 500,
+        totalTokens: 1500,
+        model: 'mistral-large-latest',
+      },
     ];
 
     const result = persistUsage(store, 'p1', 'POST /generate/summary', entries);
@@ -38,7 +43,12 @@ describe('persistUsage', () => {
   it('returns null for free model (cost = 0)', () => {
     const store = makeStore();
     const entries: ApiUsage[] = [
-      { promptTokens: 500, completionTokens: 100, totalTokens: 600, model: 'mistral-moderation-latest' },
+      {
+        promptTokens: 500,
+        completionTokens: 100,
+        totalTokens: 600,
+        model: 'mistral-moderation-latest',
+      },
     ];
 
     expect(persistUsage(store, 'p1', 'POST /moderate', entries)).toBeNull();

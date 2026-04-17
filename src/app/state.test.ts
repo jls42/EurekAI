@@ -230,40 +230,56 @@ describe('createState', () => {
 
   it('uploading is true when a file is pending', () => {
     const state = createState();
-    state.uploadSessions = [{
-      id: '1', projectId: 'p1', cleanupScheduled: false,
-      files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'pending', errorMsg: null }],
-    }] as any;
+    state.uploadSessions = [
+      {
+        id: '1',
+        projectId: 'p1',
+        cleanupScheduled: false,
+        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'pending', errorMsg: null }],
+      },
+    ] as any;
     expect(state.uploading).toBe(true);
   });
 
   it('uploading is true when a file is uploading', () => {
     const state = createState();
-    state.uploadSessions = [{
-      id: '1', projectId: 'p1', cleanupScheduled: false,
-      files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'uploading', errorMsg: null }],
-    }] as any;
+    state.uploadSessions = [
+      {
+        id: '1',
+        projectId: 'p1',
+        cleanupScheduled: false,
+        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'uploading', errorMsg: null }],
+      },
+    ] as any;
     expect(state.uploading).toBe(true);
   });
 
   it('uploading is false when all files are error', () => {
     const state = createState();
-    state.uploadSessions = [{
-      id: '1', projectId: 'p1', cleanupScheduled: false,
-      files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'error', errorMsg: 'fail' }],
-    }] as any;
+    state.uploadSessions = [
+      {
+        id: '1',
+        projectId: 'p1',
+        cleanupScheduled: false,
+        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'error', errorMsg: 'fail' }],
+      },
+    ] as any;
     expect(state.uploading).toBe(false);
   });
 
   it('uploading is false when mix of done and error', () => {
     const state = createState();
-    state.uploadSessions = [{
-      id: '1', projectId: 'p1', cleanupScheduled: false,
-      files: [
-        { id: 'f1', name: 'a.pdf', file: null, status: 'done', errorMsg: null },
-        { id: 'f2', name: 'b.pdf', file: null, status: 'error', errorMsg: 'fail' },
-      ],
-    }] as any;
+    state.uploadSessions = [
+      {
+        id: '1',
+        projectId: 'p1',
+        cleanupScheduled: false,
+        files: [
+          { id: 'f1', name: 'a.pdf', file: null, status: 'done', errorMsg: null },
+          { id: 'f2', name: 'b.pdf', file: null, status: 'error', errorMsg: 'fail' },
+        ],
+      },
+    ] as any;
     expect(state.uploading).toBe(false);
   });
 
