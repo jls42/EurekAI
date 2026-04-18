@@ -139,9 +139,6 @@ let voiceCache: MistralVoice[] = [];
 export function setVoiceCache(voices: MistralVoice[]): void {
   voiceCache = voices;
 }
-export function getVoiceCache(): MistralVoice[] {
-  return voiceCache;
-}
 
 // IDs de voix Mistral qui ont été les defaults avant des releases précédentes.
 // Conservé pour la migration mistralVoicesSource (cf. initConfig) : un config.json

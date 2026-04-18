@@ -3,8 +3,6 @@ import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET } from '../../generators/auto-agents';
 
-export { addCostDelta } from './cost-utils';
-
 /** Build POST options with JSON body and abort signal for generate endpoints. */
 function postJson(body: unknown, signal: AbortSignal): RequestInit {
   return {

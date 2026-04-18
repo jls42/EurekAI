@@ -9,5 +9,3 @@ export const UI_LANGUAGES = [
   { code: 'hi', flag: '\u{1F1EE}\u{1F1F3}', label: '\u0939\u093F\u0928\u094D\u0926\u0940' },
   { code: 'ar', flag: '\u{1F1F8}\u{1F1E6}', label: '\u0627\u0644\u0639\u0631\u0628\u064A\u0629' },
 ] as const;
-
-export type LangCode = (typeof UI_LANGUAGES)[number]['code'];
