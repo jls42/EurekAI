@@ -60,7 +60,7 @@ function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
 
 const profiles = createProfiles();
 
-function callMethod(name: string, ctx: any, ...args: any[]) {
+function callMethod(name: string, ctx: Record<string, any>, ...args: any[]) {
   return (profiles as any)[name].call(ctx, ...args);
 }
 
@@ -146,7 +146,7 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
       });
       // Wire up selectProfile so it works
-      ctx.selectProfile = profiles.selectProfile.bind(ctx);
+      ctx.selectProfile = profiles.selectProfile.bind(ctx as any);
 
       await callMethod('createProfile', ctx);
 
@@ -638,8 +638,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
         currentProfile: { id: 'p1', name: 'Alice', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       await callMethod('saveEditProfile', ctx);
 
@@ -670,8 +670,8 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       await callMethod('saveEditProfile', ctx);
 
@@ -682,7 +682,7 @@ describe('createProfiles', () => {
     it('returns early if editingProfile is null', async () => {
       vi.stubGlobal('fetch', vi.fn());
       const ctx = makeCtx({ editingProfile: null });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -692,7 +692,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: '   ', age: 10 },
       });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -702,7 +702,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: 'Test', age: 3 },
       });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -721,8 +721,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'A', locale: 'fr' }],
         currentProfile: { id: 'p1', name: 'A', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       callMethod('autoSaveProfile', ctx, true);
       await vi.waitFor(() => expect(ctx.setLocale).toHaveBeenCalledWith('en', true));
@@ -752,7 +752,7 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx, true);
       await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     });
@@ -769,7 +769,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: '  ', age: 10, avatar: '0', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx, true);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -795,7 +795,7 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
       vi.advanceTimersByTime(600);
@@ -825,7 +825,7 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveParental', ctx);
       await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
       const body = JSON.parse((fetch as any).mock.calls[0][1].body);
@@ -872,8 +872,8 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('applyThemeLive', ctx);
       expect(ctx.theme).toBe('light');
       expect((document as any).documentElement.dataset.theme).toBe('light');
@@ -899,8 +899,8 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('applyThemeLive', ctx);
       expect(['dark', 'light']).toContain(ctx.theme);
     });
@@ -929,8 +929,8 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('closeEditProfile', ctx);
       expect(ctx.editingProfile).toBeNull();
     });
@@ -965,12 +965,12 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
-      ctx.applyThemeLive = profiles.applyThemeLive.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
+      ctx.applyThemeLive = profiles.applyThemeLive.bind(ctx as any);
       callMethod('resetProfileDefaults', ctx);
       expect(ctx.editingProfile.mistralVoices).toEqual({ host: '', guest: '' });
-      expect(ctx.editingProfile.theme).toBe('');
+      expect(ctx.editingProfile.theme).toBeUndefined();
       expect(ctx.showToast).toHaveBeenCalledWith('toast.profileReset', 'success');
     });
 
@@ -1008,7 +1008,7 @@ describe('createProfiles', () => {
         showPinDialog: true,
       });
       // submitPinVerify calls this.closePinDialog(), so wire it up
-      ctx.closePinDialog = profiles.closePinDialog.bind(ctx);
+      ctx.closePinDialog = profiles.closePinDialog.bind(ctx as any);
       callMethod('submitPinVerify', ctx);
 
       expect(callback).toHaveBeenCalledWith('1234');
@@ -1088,8 +1088,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', useModeration: false, hasPin: false }],
         currentProfile: { id: 'p1', name: 'Alice', useModeration: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx as any);
 
       await callMethod('toggleModeration', ctx, 'p1');
 
@@ -1113,8 +1113,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', chatEnabled: false, hasPin: false }],
         currentProfile: { id: 'p1', name: 'Alice', chatEnabled: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx as any);
 
       await callMethod('toggleChat', ctx, 'p1');
 
@@ -1156,7 +1156,7 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', hasPin: true, useModeration: false }],
         currentProfile: { id: 'p1', name: 'Alice', useModeration: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       // requirePin immediately invokes the callback with a test PIN
       ctx.requirePin = vi.fn((cb: Function) => cb('4321'));
 

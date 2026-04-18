@@ -1,5 +1,5 @@
 import type { createState } from './state';
-import type { Generation, Source } from '../../types';
+import type { Generation, Profile, Source } from '../../types';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -51,6 +51,30 @@ export interface AppContext extends AppState {
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
+
+  // Profiles mixin (src/app/profiles.ts) — self-reference
+  selectProfile(id: string): void;
+  loadMistralVoices?(): Promise<void>;
+  requirePin(callback: (pin: string) => void): void;
+  confirmDelete(message: string, callback: () => void): void;
+  setLocale(lang: string, skipProfileSync?: boolean): void;
+  resetState(): void;
+  loadProjects(): Promise<void>;
+  applyProfileUpdate(id: string, updated: Profile): void;
+  updateProfile(id: string, updates: Record<string, unknown>, signal?: AbortSignal): Promise<void>;
+  autoSaveProfile(immediate?: boolean): void;
+  autoSaveParental(): Promise<void>;
+  applyThemeLive(): void;
+  closePinDialog(): void;
+  requireParentalAccess(callback: () => void): void;
+  _toggleProfileProp(id: string, prop: string): Promise<void>;
+
+  // UI-only extended draft on profile editing (verified PIN held in memory)
+  editingProfile: (Profile & { _verifiedPin?: string; hasPin?: boolean }) | null;
+
+  // Private fields du mixin profiles (auto-save debounce + abort controller)
+  _autoSaveTimer: ReturnType<typeof setTimeout> | null;
+  _saveController: AbortController | null;
 
   generationsByType(type: string): Generation[];
   toggleGen(id: string): void;
