@@ -4,7 +4,8 @@
 # ou vraie complexité excessive).
 #
 # Threshold : 8 (aligné sur Codacy, default Lizard est 15).
-# Scope actuel : helpers/error-*.ts. À élargir quand le legacy sera refactoré.
+# Scope actuel : helpers/error-*.ts + src/app/helpers.ts. À élargir quand
+# le legacy des generators/routes sera refactoré (24 fonctions > CCN 8).
 # Requiert : pipx (https://pipx.pypa.io).
 set -euo pipefail
 
@@ -20,4 +21,5 @@ pipx run lizard \
   helpers/error-code-resolution.ts \
   helpers/error-matchers.ts \
   helpers/error-code-rules.ts \
-  helpers/error-codes.ts
+  helpers/error-codes.ts \
+  src/app/helpers.ts
