@@ -82,6 +82,14 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)
 - **Avant chaque commit** : verifier si `CLAUDE.md`, `.claude/rules/` ou `README.md` doivent etre mis a jour pour refleter les changements. Mettre a jour si necessaire, montrer le diff README a l'utilisateur pour validation avant traduction
+- **Après chaque `git push`** (sur une PR, jamais main) : surveiller les checks GitHub automatiquement.
+  1. Attendre ~30-60s que Codacy / SonarQube / SonarCloud / CodeFactor scannent.
+  2. `gh pr checks <num>` pour lire l'état.
+  3. Si tous `pass` → signaler à l'utilisateur et stop.
+  4. Si un check est `pending` → re-check dans 60-90s.
+  5. Si un check est `fail` : récupérer le finding (API `gh`, URL Codacy dans la colonne link), **reproduire localement** (`pipx run lizard -l typescript`, `npm run security`, `npm run lint`) AVANT de proposer un fix — jamais d'itération à l'aveugle (règle "Mesurer > deviner"). Appliquer le fix, `npm run test && npm run format && npm run security` verts, skill `/commit`, `git push`.
+  6. Reboucler jusqu'à tous verts ou finding non-trivial (dans ce cas stop et demander aide).
+  7. Pièges connus : extraire un `fetch(url, ...)` hors de la fonction qui construit l'URL réactive `rule-node-ssrf` (cf. section Sécurité). `??=` pèse 2 dans Lizard. Les règles Codacy suivent l'Opengrep depuis 2026-02 : `// nosemgrep: <rule-id>` fonctionne, `// codacy:ignore-next-line` n'existe pas.
 
 ## SonarQube
 
