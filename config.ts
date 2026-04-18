@@ -76,6 +76,36 @@ export function resetConfig(): AppConfig {
   return currentConfig;
 }
 
+function hasVoiceIdChange(
+  next: Partial<AppConfig['mistralVoices']>,
+  current: AppConfig['mistralVoices'],
+): boolean {
+  const hostChanged = next.host !== undefined && next.host !== current.host;
+  const guestChanged = next.guest !== undefined && next.guest !== current.guest;
+  return hostChanged || guestChanged;
+}
+
+// Un round-trip complet du configDraft ne doit pas transformer une config
+// "default" en override utilisateur si les IDs n'ont pas réellement changé.
+function applyMistralVoicesPatch(partial: Partial<AppConfig>): void {
+  if (!partial.mistralVoices) {
+    if (partial.mistralVoicesSource !== undefined) {
+      currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
+    }
+    return;
+  }
+  const hasExplicitVoiceChange = hasVoiceIdChange(
+    partial.mistralVoices,
+    currentConfig.mistralVoices,
+  );
+  currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
+  if (partial.mistralVoicesSource !== undefined) {
+    currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
+  } else if (hasExplicitVoiceChange) {
+    currentConfig.mistralVoicesSource = 'user';
+  }
+}
+
 export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
@@ -83,29 +113,9 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.voices) {
     currentConfig.voices = { ...currentConfig.voices, ...partial.voices };
   }
-  if (partial.ttsModel) {
-    currentConfig.ttsModel = partial.ttsModel;
-  }
-  if (partial.ttsProvider) {
-    currentConfig.ttsProvider = partial.ttsProvider;
-  }
-  if (partial.mistralVoices) {
-    const hasExplicitVoiceChange =
-      (partial.mistralVoices.host !== undefined &&
-        partial.mistralVoices.host !== currentConfig.mistralVoices.host) ||
-      (partial.mistralVoices.guest !== undefined &&
-        partial.mistralVoices.guest !== currentConfig.mistralVoices.guest);
-    currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
-    // Un round-trip complet du configDraft ne doit pas transformer une config
-    // "default" en override utilisateur si les IDs n'ont pas réellement changé.
-    if (partial.mistralVoicesSource !== undefined) {
-      currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
-    } else if (hasExplicitVoiceChange) {
-      currentConfig.mistralVoicesSource = 'user';
-    }
-  } else if (partial.mistralVoicesSource !== undefined) {
-    currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
-  }
+  if (partial.ttsModel) currentConfig.ttsModel = partial.ttsModel;
+  if (partial.ttsProvider) currentConfig.ttsProvider = partial.ttsProvider;
+  applyMistralVoicesPatch(partial);
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   return currentConfig;
 }
@@ -178,6 +188,23 @@ function resolveMistralDefaults(
   return { host: result.host, guest: result.guest };
 }
 
+// Priorités backend :
+// 1. override par profil (per-field)
+// 2. override global explicite (mistralVoicesSource === 'user')
+// 3. sélection dynamique via selectVoices (9 langues UI)
+// 4. fallback legacy DEFAULT_CONFIG.mistralVoices si voiceCache vide
+function pickMistralVoice(
+  profile: string | undefined,
+  userConfigured: boolean,
+  configured: string,
+  dynamic: string | undefined,
+  defaultVoice: string,
+): string {
+  if (profile) return profile;
+  if (userConfigured) return configured;
+  return dynamic || configured || defaultVoice;
+}
+
 export function resolveVoices(
   config: AppConfig,
   profileVoices?: { host: string; guest: string },
@@ -188,25 +215,22 @@ export function resolveVoices(
   if (config.ttsProvider !== 'mistral') {
     return { host: config.voices.host.id, guest: config.voices.guest.id };
   }
-
   const userConfigured = config.mistralVoicesSource === 'user';
   const dynamic = resolveMistralDefaults(lang, profileId, flow);
-
-  // Priorités backend :
-  // 1. override par profil (per-field)
-  // 2. override global explicite (mistralVoicesSource === 'user')
-  // 3. sélection dynamique via selectVoices (9 langues UI)
-  // 4. fallback legacy DEFAULT_CONFIG.mistralVoices si voiceCache vide
-  const globalHost = userConfigured ? config.mistralVoices.host : undefined;
-  const globalGuest = userConfigured ? config.mistralVoices.guest : undefined;
-
-  const hostFallback =
-    dynamic?.host || config.mistralVoices.host || DEFAULT_CONFIG.mistralVoices.host;
-  const guestFallback =
-    dynamic?.guest || config.mistralVoices.guest || DEFAULT_CONFIG.mistralVoices.guest;
-
   return {
-    host: profileVoices?.host || globalHost || hostFallback,
-    guest: profileVoices?.guest || globalGuest || guestFallback,
+    host: pickMistralVoice(
+      profileVoices?.host,
+      userConfigured,
+      config.mistralVoices.host,
+      dynamic?.host,
+      DEFAULT_CONFIG.mistralVoices.host,
+    ),
+    guest: pickMistralVoice(
+      profileVoices?.guest,
+      userConfigured,
+      config.mistralVoices.guest,
+      dynamic?.guest,
+      DEFAULT_CONFIG.mistralVoices.guest,
+    ),
   };
 }
