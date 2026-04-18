@@ -19,10 +19,8 @@ interface ErrContext {
 type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 
 function matchByPattern(value: string, rules: readonly Rule[]): FailedStepCode | null {
-  for (const rule of rules) {
-    if (rule.pattern.test(value)) return rule.code;
-  }
-  return null;
+  const matched = rules.find((r) => r.pattern.test(value));
+  return matched ? matched.code : null;
 }
 
 function matchStatus(ctx: ErrContext): FailedStepCode | null {
