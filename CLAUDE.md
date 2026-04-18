@@ -88,6 +88,21 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text`.
 - Details, faux positifs connus et solutions dans `.claude/rules/sonarqube.md` (charge auto sur fichiers src/)
 
+## Mesurer > deviner (règle OBLIGATOIRE)
+
+**Dès qu'un fait est mesurable factuellement, mesurer AVANT de raisonner dessus.** Ne jamais estimer/supposer quand une vérification coûte quelques secondes. L'intuition est souvent fausse et les itérations basées sur elle coûtent 10× plus cher que la mesure directe.
+
+Cas concrets (non exhaustif) :
+- **Calcul** (somme, produit, pourcentage, unités, dates) : bash/python/calculette, jamais à la tête
+- **Comptage** : `wc -l`, `grep -c`, `.length`, jamais "à peu près N"
+- **Contenu fichier / comportement code** : lire le fichier, `grep`, lancer le test, jamais depuis la mémoire
+- **Outils externes** (Codacy CCN, SonarQube, CI warnings) : lancer l'outil localement (`pipx run lizard`, `sonar-scanner`, etc.) pour voir ce qu'il voit réellement, jamais deviner la cause d'un flag
+- **Dates relatives** (utilisateur dit "jeudi", "le mois dernier") : convertir en absolu via le contexte date, jamais extrapoler mentalement
+
+**Anti-pattern documenté** : série de 9 commits (`977b535..68ed476`) sur un faux positif Lizard `matchStatus` résolus en 2 min dès qu'on a lancé `pipx run lizard` local — cause racine = parseur TS de Lizard qui agglomère les `function foo()` top-level consécutives. Fix propre via extraction dans `helpers/error-matchers.ts` (chaque matcher `export function` délimité proprement). Leçon : ne JAMAIS itérer à l'aveugle sur un signal d'outil externe.
+
+Garde-fou local actuel : `npm run test` déclenche `pretest` → `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8, scope `helpers/error-*.ts`). Pistes d'élargissement et outils complémentaires : `.claude/todo-tooling.md`.
+
 ## Conventions detaillees
 
 Voir `.claude/rules/` pour :
