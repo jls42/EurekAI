@@ -1,6 +1,7 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
+import { AUTO_AGENTS_SET } from '../../generators/auto-agents';
 
 export { addCostDelta } from './cost-utils';
 
@@ -250,6 +251,10 @@ export function createGenerate() {
         delete this.abortControllers.auto;
         for (const step of route.plan) {
           if (ttsTypes.has(step.agent) && !this.apiStatus.ttsAvailable) continue;
+          // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
+          // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
+          // Evite tout SSRF meme en cas de reponse /generate/route corrompue.
+          if (!AUTO_AGENTS_SET.has(step.agent)) continue;
           plannedTypes.push(step.agent);
           this.loading[step.agent] = true;
           this.abortControllers[step.agent] = controller;
@@ -259,6 +264,7 @@ export function createGenerate() {
         const base = '/api/projects/' + projectId;
         let failures = 0;
         const promises = plannedTypes.map(async (type) => {
+          if (!AUTO_AGENTS_SET.has(type)) return;
           try {
             const res = await fetch(base + '/generate/' + type, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
