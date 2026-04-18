@@ -8,7 +8,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 - ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
 - ✅ **Opengrep** : garde-fou en **pre-push** (`npm run security` via `scripts/check-security.sh`). SAST v1.19.0 fork open-source de Semgrep CE, binaire standalone dans `~/.local/bin/` (install via `scripts/install-opengrep.sh`). Configs `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`. Scan ~11.8s sur 171 fichiers (trop lent pour pretest). Baseline post-fix : 0 finding ERROR. 1 faux positif `detected-sonarqube-docs-api-key` (SHA256 GitHub Actions pinnee) exclu via `--exclude-rule` documente dans le script. Section dediee dans CLAUDE.md.
 - ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
-  - Baseline actuelle : **0 errors + 482 warnings**. `lint:ci` = `eslint . --max-warnings 500` (baseline 482 + marge ~4 %). Toute nouvelle error ou dérive > 500 warnings bloque `npm run test`.
+  - Baseline actuelle : **0 errors + 392 warnings** (2026-04-18 : -91 via refactor `AppContext` dans `src/app/helpers.ts`). `lint:ci` = `eslint . --max-warnings 450` (baseline 392 + marge ~15 %). Toute nouvelle error ou dérive > 450 warnings bloque `npm run test`.
   - Règles bruyantes en `warn` le temps du refactor : `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag`.
   - Override tests (`**/*.test.ts`) : `publicly-writable-directories`, `no-unsafe-function-type`, `no-clear-text-protocols`, `no-explicit-any`, `no-duplicate-string` désactivés (faux positifs contextuels dans des mocks/fixtures).
   - `complexity` désactivé dans ESLint (redondant avec Lizard).
@@ -18,8 +18,8 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 
 ## Refactor progressif ESLint warnings (status)
 
-- ✅ **Errors** : 79 → 0 (PR `feat/prompts-improvements`, 6 commits séquentiels). `lint:ci` bloquant activé en pretest avec plafond `--max-warnings 500`.
-- ⏳ **Warnings** : 482 (baseline). Prochaine étape : descendre progressivement le plafond (450 → 400 → …) au fil des refactors. Règles dominantes :
+- ✅ **Errors** : 79 → 0 (PR `feat/prompts-improvements`, 6 commits séquentiels). `lint:ci` bloquant activé en pretest avec plafond `--max-warnings 500` (descendu à 450 le 2026-04-18).
+- ⏳ **Warnings** : 482 → 392 (refactor `AppContext` helpers.ts, 2026-04-18). Plafond actuel 450. Prochaine étape : descendre à 400 (cibles candidates : `src/app/sources.ts` 51 any, `src/app/profiles.ts` 46 any, `src/app/generate.ts` 31 any). Règles dominantes :
   - `@typescript-eslint/no-explicit-any` (plus gros volume)
   - `sonarjs/cognitive-complexity` (fonctions héritées en `src/app/*`, `generators/*`, `routes/*`)
   - `sonarjs/no-duplicate-string` (strings de constantes de tests + templates)
