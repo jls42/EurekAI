@@ -52,7 +52,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 | | Fonctionnalité | Description |
 |---|---|---|
-| 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR avec score de confiance) ou fichier texte (TXT, MD) |
+| 📷 | **Import de fichiers** | Importez vos leçons — photo, PDF (via Mistral OCR avec score de confiance par page, tiers `high`/`medium`/`low`) ou fichier texte (TXT, MD). Sessions d'upload avec retry par fichier et progress individuel |
 | 📝 | **Saisie texte** | Tapez ou collez n'importe quel texte directement |
 | 🎤 | **Entrée vocale** | Enregistrez-vous — Voxtral STT transcrit votre voix |
 | 🌐 | **Web / URL** | Collez une URL (scraping direct via Readability + Lightpanda) ou tapez une recherche (Agent Mistral web_search) |
@@ -68,6 +68,8 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
 | 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS ou ElevenLabs |
+| 💶 | **Suivi des coûts API** | Estimation transparente du coût € de chaque génération et source (tokens / caractères / pages / secondes audio). Badge par carte + total par projet, visible dans le dashboard |
+| 🎨 | **Thème par profil** | Chaque profil choisit son thème `dark` ou `light` — persiste au changement de profil |
 
 ---
 
@@ -101,7 +103,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 EurekAI accepte 4 types de sources, modérées selon le profil (activé par défaut pour enfant et ado) :
 
-- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par `mistral-ocr-latest` (texte imprimé, tableaux, écriture manuscrite), ou fichiers texte (TXT, MD) importés directement.
+- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par `mistral-ocr-latest` (texte imprimé, tableaux, écriture manuscrite), ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** par page (`overall` + `perPage[]`), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
 - **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
@@ -149,8 +151,20 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Système multi-profils
 
 - Profils multiples avec nom, âge, avatar, préférences de langue
+- **Voix par profil** (`Profile.mistralVoices?: { host, guest }`) — chaque enfant peut avoir sa paire de voix podcast/quiz vocal
+- **Thème par profil** (`Profile.theme: 'dark' | 'light'`) — bascule automatique au changement de profil, persistée côté backend
 - Projets liés aux profils via `profileId`
 - Suppression en cascade : supprimer un profil supprime tous ses projets
+
+### Suivi des coûts API
+
+Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur — pas de surprise sur la facturation.
+
+- **Source de vérité** : `helpers/pricing.ts` — `MODEL_PRICING` par prefix de modèle (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` avec URLs doc Mistral pour re-scraping périodique
+- **Unités supportées** : `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversion pilotée par `helpers/cost-calc.ts`
+- **Chaîne d'instrumentation** : `helpers/tracked-client.ts` (wrap client Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injection dans la réponse HTTP)
+- **UI** : badge coût par génération (`src/partials/cost-badge-gen.html`), par source (`cost-badge-src.html`), total cumulé dans le dashboard (`Project.totalCost`)
+- **Endpoints** : les réponses `/generate/*` et `/sources/*` incluent `costDelta: { estimatedEuros, perModel }`. `GET /projects/:pid` retourne `totalCost` + `costLog[]` historique. `GET /api/config/status` expose `costEstimateAvailable`
 
 ### TTS multi-provider & voix personnalisées
 
@@ -276,7 +290,8 @@ types.ts                  — Types TypeScript : Source, Generation (7 types), Q
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, 15 langues)
 
 generators/
-  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF)
+  auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (7 agents) + MAX_AUTO_PLAN_LENGTH
+  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF) + extractConfidence (score par page)
   summary.ts              — Génération de fiche de révision (JSON structuré)
   flashcards.ts           — Flashcards Q/R (5-50, configurable)
   quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
@@ -302,10 +317,35 @@ routes/
   chat.ts                 — Chat IA avec appel d'outils
 
 helpers/
+  # IO & parsing
   index.ts                — getContent, stripJsonMarkdown, safeParseJson, unwrapJsonArray, extractAllText, timer
   audio.ts                — collectStream (ReadableStream → Buffer)
-  fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
+  audio-files.ts          — Persistance et lecture des fichiers audio générés (podcast, flashcards)
+  logger.ts               — Logger structuré (niveaux, contexte JSON)
+
+  # Génération & UX
+  auto-title.ts           — autoTitle(type, data, lang) : préfixe auto pour carte liste (Fiche, Note, Quiz, etc.)
+  choice-labels.ts        — Labels localisés des choix (quiz, quiz-vocal) — 9 langues
   diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, randomSeed)
+  fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
+
+  # Codes d'erreur stables
+  error-codes.ts              — Re-export mince de l'API publique
+  error-code-resolution.ts    — Orchestration extractErrorCode(e, agent) → FailedStepCode
+  error-code-rules.ts         — Règles de mapping par agent/step
+  error-matchers.ts           — Matchers par pattern d'erreur HTTP/LLM (délimités pour Lizard)
+
+  # Cost tracking API (suivi coûts €)
+  pricing.ts              — MODEL_PRICING + PRICING_SOURCES (tarifs Mistral par prefix de modèle)
+  cost-calc.ts            — Conversion ApiUsage → coût € (tokens / characters / pages / audio-seconds)
+  cost-persist.ts         — Écriture dans Project.costLog + totalCost
+  cost-middleware.ts      — Injection de costDelta dans la réponse HTTP
+  tracked-client.ts       — Wrap du client Mistral (capture ApiUsage automatiquement)
+  usage-context.ts        — AsyncLocalStorage pour propager l'usage dans les pipelines async
+
+  # Voix & profils
+  voice-selection.ts      — selectVoices : rotation déterministe par profil + langue (host/guest)
+  voice-types.ts          — Types Voice, VoiceRole, VoiceMap
 
 src/                      — Frontend (Vite + Handlebars)
   index.html              — Point d'entrée HTML principal
@@ -353,7 +393,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/config` | Configuration courante |
 | `PUT` | `/api/config` | Modifier la config (modèles, voix, TTS provider) |
-| `GET` | `/api/config/status` | Statut des APIs (Mistral, ElevenLabs, TTS) |
+| `GET` | `/api/config/status` | Statut des APIs : `mistralAvailable`, `elevenlabsAvailable`, `ttsAvailable` (provider actif), `costEstimateAvailable` |
 | `POST` | `/api/config/reset` | Réinitialiser la config par défaut |
 | `GET` | `/api/config/voices` | Lister les voix Mistral TTS (optionnel `?lang=fr`) |
 | `GET` | `/api/moderation-categories` | Catégories de modération disponibles + défauts par âge |

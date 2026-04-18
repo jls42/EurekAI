@@ -54,6 +54,20 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Status 502 quand tous les steps échouent (réponse inclut `error: 'all_steps_failed'`), 200 sinon
 - **Tous les endpoints** qui renvoient une erreur HTTP doivent utiliser `extractErrorCode(e, '<agent>')` plutôt que `err.message`/`String(e)` (cf. `helpers/error-codes.ts`) — ne pas en créer de nouveaux sans cette pratique.
 - Le détail complet (stack, message) reste dans `logger.error` côté serveur
+- **Architecture interne** : `helpers/error-codes.ts` est un re-export mince. La logique vit dans `helpers/error-code-resolution.ts` (orchestration), `helpers/error-code-rules.ts` (règles par agent), `helpers/error-matchers.ts` (matchers par pattern d'erreur — chaque matcher délimité `export function` pour contourner le parseur Lizard TS qui agglomère sinon les `function foo()` top-level consécutives).
+
+### Cost tracking API
+- **Objectif** : chaque appel Mistral (chat, OCR, STT, TTS, moderation, agents) est instrumenté pour exposer un coût € estimé à l'utilisateur, persisté par projet.
+- **Source de vérité pricing** : `helpers/pricing.ts` — `MODEL_PRICING` (par prefix de modèle) + `PRICING_SOURCES` (URL doc Mistral pour scraping tarifaire). Prefix matching greedy (plus long gagne, ex: `mistral-large-2512` → `mistral-large`).
+- **Chaîne de calcul** : `helpers/tracked-client.ts` wrappe le client Mistral (capture `ApiUsage`) → `helpers/usage-context.ts` (AsyncLocalStorage pour propager l'usage dans les pipelines async) → `helpers/cost-calc.ts` (conversion usage → € selon l'unité : `tokens` / `characters` / `pages` / `audio-seconds`) → `helpers/cost-persist.ts` (écriture dans `Project.costLog` + mise à jour `totalCost`) → `helpers/cost-middleware.ts` (injection du `costDelta` dans la réponse HTTP).
+- **Contrat endpoint** : les réponses `/generate/*` et `/sources/*` incluent `costDelta: { estimatedEuros: number, perModel: {...} }`. `GET /projects/:pid` retourne `totalCost` + `costLog[]` historique. `GET /api/config/status` indique `costEstimateAvailable`.
+- **Règle OBLIGATOIRE** : tout nouvel appel Mistral DOIT passer par `tracked-client` (jamais `new Mistral(...)` direct dans un generator). Sinon le coût échappe au tracking silencieusement — bug observabilité invisible côté UI.
+
+### OCR confidence scores
+- **Type** : `OcrConfidence = { overall: number, perPage: number[] }` dans `types.ts` — stocké en `Source.ocrConfidence?` pour les sources PDF/image.
+- **Extraction** : `generators/ocr.ts` appelle `extractConfidence()` sur le résultat Mistral OCR (champs `confidence` par page), moyenne pour `overall`.
+- **Tiers UI** : `src/app/helpers.ts` expose `ocrConfidenceTier(score)` → `'high' | 'medium' | 'low' | null` (seuils ~0.9 / ~0.7). Badges colorés dans la vue sources + i18n via clé `ocr.confidence` (9 langues).
+- **Règle** : quand un score est bas, ne PAS bloquer la génération — afficher le badge warning et laisser l'utilisateur décider (les scores bas viennent souvent de scans de mauvaise qualité, pas d'un vrai problème de contenu).
 
 ### HTML interactif
 - Ne JAMAIS imbriquer de `<button>` dans un `<button>` (HTML invalide, casse le layout)
@@ -68,7 +82,8 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Templates HTML : extraire en partials quand un bloc depasse ~100 lignes
 - Pas de listes hardcodees de types/categories : utiliser une source de verite unique (`categories` dans state.ts)
 - Les composants interactifs (quiz, fill-blank, flashcards) utilisent le mixin `step-by-step.ts`
-- **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`). `npm run lint:fix` pour les auto-fixables. Pas encore en pretest car baseline > 50 errors — viser zéro errors pour activer bloquant. Config tunée en `warn` les règles legacy-bruyantes (`no-explicit-any`, `cognitive-complexity`) le temps du refactor progressif. Détails : `.claude/todo-tooling.md`.
+- **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`) — `lint:fix` pour les auto-fixables. Actif en `pretest` via `lint:ci` (`--max-warnings 300` transitoire le temps du refactor, cible = 0 warnings), en complément de `lint:complexity` (Lizard) et `lint:deadcode` (knip). Config tunée en `warn` les règles legacy-bruyantes (`no-explicit-any`, `cognitive-complexity`). Détails progression : `.claude/todo-tooling.md`.
+- **Autres scripts utiles** : `format` / `format:check` (prettier), `test:coverage` / `test:watch` (vitest), `build` / `preview` / `start` (vite + prod), `dev:server` / `dev:web` (splits isolés du `dev` combiné).
 
 ## Workflow
 
@@ -93,9 +108,9 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ## SonarQube
 
-- **JS/TS** : `// NOSONAR(S1234) — raison concise`
-- **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text`.
-- Details, faux positifs connus et solutions dans `.claude/rules/sonarqube.md` (charge auto sur fichiers src/)
+- **JS/TS** : `// NOSONAR(S1234) — raison concise` immédiatement au-dessus de la ligne flaggée.
+- **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text` pour satisfaire les règles d'accessibilité (ex: `<span x-text="title">Chargement…</span>`).
+- Faux positifs fréquents : `S1192` (string duplication) — souvent préférable d'extraire une constante plutôt qu'ignorer. `S3776` / `S6324` (complexity) — croiser avec `npm run lint:complexity` (Lizard CCN 8) avant de supprimer.
 
 ## Sécurité (SAST local)
 
@@ -131,7 +146,7 @@ Garde-fou local actuel : `npm run test` déclenche `pretest` → `lint:complexit
 ## Conventions detaillees
 
 Voir `.claude/rules/` pour :
-- `architecture.md` — Structure fichiers, patterns critiques, modeles IA
-- `api-routes.md` — Routes API completes
 - `add-feature.md` — Checklist pour ajouter un generateur ou une source
-- `prompts.md` — Conventions prompts IA (lang, ageGroup, TTS)
+- `prompts.md` — Conventions prompts IA (lang, ageGroup, anti-leak, retry, few-shots)
+
+Structure fichiers, routes API et patterns critiques : voir directement la section **Structure du projet** du `README.md` (détaillée et maintenue), ou lire les sources — `server.ts`, `routes/*.ts`, `generators/*.ts`, `helpers/*.ts`.
