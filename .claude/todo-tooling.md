@@ -5,6 +5,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 ## État actuel (2026-04-18)
 
 - ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope `helpers/error-*.ts` uniquement (CCN 8, strict `-i 0`). Via pipx/Python.
+- ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
 - ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
   - Baseline actuelle : **0 errors + 482 warnings**. `lint:ci` = `eslint . --max-warnings 500` (baseline 482 + marge ~4 %). Toute nouvelle error ou dérive > 500 warnings bloque `npm run test`.
   - Règles bruyantes en `warn` le temps du refactor : `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag`.
@@ -27,18 +28,9 @@ Pour chaque descente de plafond : mesurer `npm run lint 2>&1 | grep -c warning`,
 
 ## Priorité haute
 
-### knip — exports / fichiers / deps non utilisés
+### ~~knip~~ — adopté 2026-04-18
 
-**But** : empêcher l'accumulation de code mort. Aurait détecté les résidus des 9 itérations Codacy (`statusCodeFor`, `matchByPattern`, `matchRule`) avant nettoyage manuel.
-
-**Effort** : faible. `npm i -D knip && npx knip`.
-
-**À tester** :
-1. Lancer `npx knip` sur l'état actuel, voir le volume de findings
-2. Créer `knip.config.ts` avec entry points (`server.ts`, `src/main.ts`, fichiers de test)
-3. Intégrer en `pretest` ou `prepush` si signal/bruit acceptable
-
-**Critère GO** : < 15 findings légitimes après config. Si 100+, effort de config disproportionné.
+Installé en `devDependencies` (v6.4.1). Config `knip.json` minimale, intégré en `pretest` via `lint:deadcode`. Baseline 0 finding après cleanup (3 exports morts supprimés : `getVoiceCache`, re-export `addCostDelta`, type `LangCode`). Exécution ~1.2s, pas de latence notable sur le pretest.
 
 ### ESLint + `complexity` rule + `eslint-plugin-sonarjs`
 
@@ -56,13 +48,26 @@ Pour chaque descente de plafond : mesurer `npm run lint 2>&1 | grep -c warning`,
 
 ## Priorité moyenne
 
-### jscpd — duplication detection
+### ~~jscpd~~ — évalué 2026-04-18, NO-GO
 
-**But** : détecter copy-paste inter-fichiers. Utile quand un refactor split mal (ex: helpers dupliqués dans 2 routes).
+One-shot mesure via `npx jscpd . --threshold 5 --ignore "node_modules/**,dist/**,output/**,coverage/**,.scannerwork/**,public/**,**/*.test.ts"` (hors tests pour mesurer signal code prod).
 
-**Effort** : faible. `npx jscpd . --threshold 5`.
+**Résultats par format** (159 fichiers, 28 455 lignes) :
+- TypeScript : **1.41%** (213/15 160 lignes, 23 clones) — **sous seuil 3%**
+- Markup HTML : 5.47% (240/4 389 lignes, 19 clones) — patterns Alpine.js légitimes
+- Markdown : 32.8% (2 362/7 202 lignes, 69 clones) — traductions README, non-actionnable (générées par `scripts/translate-readme.sh`)
+- CSS/JSON/YAML/Bash/JS : 0%
 
-**À tester** : lancer en one-shot, regarder top 10 findings. Si duplication réelle < 3%, outil surdimensionné pour ce projet.
+**Verdict NO-GO** : code prod TS déjà propre. Aucun clone TS ne dépasse 14 lignes (bien sous le seuil actionnable de 50 LOC du plan). Pas d'install, pas de config permanente.
+
+**Findings intéressants pour refactor futur ciblé** (hors scope jscpd pretest) :
+- `routes/chat.ts` ↔ `routes/generate.ts` : 4 clones de ~12 lignes chacun (lignes 89-151 vs 258-555) — probablement préparation d'appels Mistral factorisable en helper partagé, ~48 lignes totales.
+- `src/app/generate.ts` : 5 clones intra-fichier de 8-12 lignes — suggère un helper UI manquant.
+- `src/components/quiz.ts` ↔ `flashcards.ts`/`fill-blank.ts`/`quiz-vocal.ts` : 3 clones de 13-14 lignes (Alpine.js setup déjà partiellement factorisé via `step-by-step.ts`, mais restes exploitables).
+
+Ces clones sont trop petits pour justifier jscpd en garde-fou pretest mais peuvent être attaqués opportunément lors de refactors ciblés.
+
+**Re-tester dans 6 mois** si la codebase grossit significativement, ou évaluer **fallow** (Rust, suffix-array, plus performant que jscpd mais jeune en 2026).
 
 ### dependency-cruiser
 
