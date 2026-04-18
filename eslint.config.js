@@ -62,11 +62,17 @@ export default [
     },
   },
   {
-    // Config test files : relâcher les règles strictes
+    // Config test files : relâcher les règles strictes.
+    // Les règles désactivées ci-dessous sont des faux positifs récurrents dans un
+    // contexte de tests : mocks de fonctions, chemins /tmp contrôlés par le test,
+    // URLs http:// dans des fixtures non exposées.
     files: ['**/*.test.ts'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unsafe-function-type': 'off',
       'sonarjs/no-duplicate-string': 'off',
+      'sonarjs/publicly-writable-directories': 'off',
+      'sonarjs/no-clear-text-protocols': 'off',
     },
   },
 ];
