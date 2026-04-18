@@ -2,6 +2,22 @@ import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
+import type { AppContext } from './app-context';
+import type { Generation, Source } from '../../types';
+
+/** Generation extended with frontend-only audio/UI state fields. */
+type GenerationUI = Generation & {
+  _playlistMode?: boolean;
+  _activeAudioSection?: string;
+  [key: string]: unknown;
+};
+
+type VoiceResult = {
+  audioUrl?: string;
+  audioUrls?: Record<string, string>;
+  failedSections?: string[];
+  costDelta?: number;
+};
 
 /** Build POST options with JSON body and abort signal for generate endpoints. */
 function postJson(body: unknown, signal: AbortSignal): RequestInit {
@@ -14,7 +30,7 @@ function postJson(body: unknown, signal: AbortSignal): RequestInit {
 }
 
 /** Normalize and register a generation into the app state. */
-export function registerGeneration(state: any, gen: any): void {
+export function registerGeneration(state: AppContext, gen: Generation): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
   state.generations.push(gen);
@@ -23,7 +39,7 @@ export function registerGeneration(state: any, gen: any): void {
 }
 
 /** Process responses from generateAll, returns failure count. */
-async function aggregateGenerateResults(responses: Response[], state: any): Promise<number> {
+async function aggregateGenerateResults(responses: Response[], state: AppContext): Promise<number> {
   let failures = 0;
   for (const r of responses) {
     if (r.ok) {
@@ -38,7 +54,7 @@ async function aggregateGenerateResults(responses: Response[], state: any): Prom
 }
 
 /** Show appropriate toast after generateAll completes. */
-function showGenerateAllResult(failures: number, total: number, state: any): void {
+function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
     state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
   } else if (failures >= total) {
@@ -51,13 +67,19 @@ function showGenerateAllResult(failures: number, total: number, state: any): voi
   }
 }
 
-function applyVoiceResult(state: any, gen: any, result: any, section?: string): void {
+function applyVoiceResult(
+  state: AppContext,
+  gen: GenerationUI,
+  result: VoiceResult,
+  section?: string,
+): void {
   if (result.audioUrls) {
+    const audioUrls = result.audioUrls;
     const sectionOrder = state._audioSectionOrder;
-    for (const [s, url] of Object.entries(result.audioUrls)) {
+    for (const [s, url] of Object.entries(audioUrls)) {
       gen[`_audioUrl_${s}`] = url;
     }
-    gen._activeAudioSection = sectionOrder.find((s: string) => result.audioUrls[s]) || 'intro';
+    gen._activeAudioSection = sectionOrder.find((s: string) => audioUrls[s]) || 'intro';
     gen._playlistMode = true;
     if (result.failedSections?.length) {
       state.showToast(state.t('toast.audioPartial'), 'warning');
@@ -73,26 +95,29 @@ function applyVoiceResult(state: any, gen: any, result: any, section?: string): 
     const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
     if (audioEl) {
       audioEl.load();
-      audioEl.play().catch((e: any) => console.warn('Auto-play blocked:', e.message));
+      audioEl.play().catch((e: unknown) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.warn('Auto-play blocked:', msg);
+      });
     }
   });
 }
 
 export function createGenerate() {
   return {
-    blockedModerationSource(this: any) {
+    blockedModerationSource(this: AppContext) {
       const selected =
         this.selectedIds.length > 0
-          ? this.sources.filter((s: any) => this.selectedIds.includes(s.id))
+          ? this.sources.filter((s: Source) => this.selectedIds.includes(s.id))
           : this.sources;
-      return selected.find((s: any) => s.moderation && s.moderation.status !== 'safe') ?? null;
+      return selected.find((s: Source) => s.moderation && s.moderation.status !== 'safe') ?? null;
     },
 
-    blockedModerationStatus(this: any): string | null {
+    blockedModerationStatus(this: AppContext): string | null {
       return this.blockedModerationSource()?.moderation?.status ?? null;
     },
 
-    moderationBlockedMessage(this: any, status: string | null): string {
+    moderationBlockedMessage(this: AppContext, status: string | null): string {
       if (status === 'pending') return this.t('moderation.pending');
       if (status === 'error') return this.t('moderation.error');
       const src = this.blockedModerationSource();
@@ -100,7 +125,7 @@ export function createGenerate() {
       return this.t('moderation.blocked') + (cats ? ` (${cats})` : '');
     },
 
-    async generate(this: any, type: string) {
+    async generate(this: AppContext, type: string) {
       if (!this.currentProjectId || this.loading[type]) return;
       const moderationStatus = this.blockedModerationStatus();
       if (this.currentProfile?.useModeration && moderationStatus) {
@@ -144,9 +169,10 @@ export function createGenerate() {
           null,
           { label: this.t('toast.view'), fn: () => this.goToView(type) },
         );
-      } catch (e: any) {
-        if (e.name === 'AbortError') return;
-        this.showToast(this.t('toast.generationError', { error: e.message }), 'error', () =>
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.generationError', { error: msg }), 'error', () =>
           this.generate(type),
         );
       } finally {
@@ -156,7 +182,7 @@ export function createGenerate() {
       }
     },
 
-    async generateAll(this: any) {
+    async generateAll(this: AppContext) {
       if (!this.currentProjectId) return;
       const moderationStatus = this.blockedModerationStatus();
       if (this.currentProfile?.useModeration && moderationStatus) {
@@ -188,9 +214,10 @@ export function createGenerate() {
         const responses = [summaryRes, flashcardsRes, quizRes];
         const failures = await aggregateGenerateResults(responses, this);
         showGenerateAllResult(failures, responses.length, this);
-      } catch (e: any) {
-        if (e.name === 'AbortError') return;
-        this.showToast(this.t('toast.generationError', { error: e.message }), 'error', () =>
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.generationError', { error: msg }), 'error', () =>
           this.generateAll(),
         );
       } finally {
@@ -202,7 +229,7 @@ export function createGenerate() {
       }
     },
 
-    async generateAuto(this: any) {
+    async generateAuto(this: AppContext) {
       if (!this.currentProjectId) return;
       const moderationStatus = this.blockedModerationStatus();
       if (this.currentProfile?.useModeration && moderationStatus) {
@@ -287,10 +314,11 @@ export function createGenerate() {
               const err = await res.json().catch(() => ({}));
               console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
             }
-          } catch (e: any) {
-            if (e.name === 'AbortError') return;
+          } catch (e: unknown) {
+            if (e instanceof Error && e.name === 'AbortError') return;
             failures++;
-            console.error(`auto: ${type} error:`, e.message);
+            const msg = e instanceof Error ? e.message : String(e);
+            console.error(`auto: ${type} error:`, msg);
           } finally {
             this.loading[type] = false;
             delete this.abortControllers[type];
@@ -313,9 +341,10 @@ export function createGenerate() {
             fn: () => this.goToView('dashboard'),
           });
         }
-      } catch (e: any) {
-        if (e.name === 'AbortError') return;
-        this.showToast(this.t('toast.autoError', { error: e.message }), 'error', () =>
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return;
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.autoError', { error: msg }), 'error', () =>
           this.generateAuto(),
         );
       } finally {
@@ -335,19 +364,19 @@ export function createGenerate() {
     _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],
 
     /** Check if all expected sections for a summary have audio generated */
-    isBatchComplete(gen: any): boolean {
+    isBatchComplete(gen: GenerationUI): boolean {
       if (!gen._audioUrl_intro || !gen._audioUrl_key_points) return false;
-      const d = gen.data;
+      const d = gen.data as { fun_fact?: string; vocabulary?: unknown[] } | undefined;
       if (d?.fun_fact && !gen._audioUrl_fun_fact) return false;
       if (d?.vocabulary?.length && !gen._audioUrl_vocabulary) return false;
       return true;
     },
 
     /** Play next section in playlist mode */
-    playNextSection(this: any, gen: any) {
+    playNextSection(this: AppContext, gen: GenerationUI) {
       if (!gen._playlistMode) return;
       const order = this._audioSectionOrder;
-      const idx = order.indexOf(gen._activeAudioSection);
+      const idx = order.indexOf(gen._activeAudioSection ?? 'intro');
       for (let i = idx + 1; i < order.length; i++) {
         if (gen[`_audioUrl_${order[i]}`]) {
           gen._activeAudioSection = order[i];
@@ -355,7 +384,10 @@ export function createGenerate() {
             const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
             if (a) {
               a.load();
-              a.play().catch((e: any) => console.warn('Audio play failed:', e.message));
+              a.play().catch((e: unknown) => {
+                const msg = e instanceof Error ? e.message : String(e);
+                console.warn('Audio play failed:', msg);
+              });
             }
           });
           return;
@@ -365,20 +397,22 @@ export function createGenerate() {
     },
 
     /** Initialize audio state from persisted summary data */
-    initSummaryAudio(gen: any) {
-      if (gen.data.audioUrls) {
-        for (const [s, url] of Object.entries(gen.data.audioUrls)) {
+    initSummaryAudio(gen: GenerationUI) {
+      const d = gen.data as { audioUrls?: Record<string, string>; audioUrl?: string } | undefined;
+      if (!d) return;
+      if (d.audioUrls) {
+        for (const [s, url] of Object.entries(d.audioUrls)) {
           gen[`_audioUrl_${s}`] = url;
         }
-        gen._activeAudioSection = Object.keys(gen.data.audioUrls)[0];
-      } else if (gen.data.audioUrl) {
-        gen._audioUrl_intro = gen.data.audioUrl;
+        gen._activeAudioSection = Object.keys(d.audioUrls)[0];
+      } else if (d.audioUrl) {
+        gen._audioUrl_intro = d.audioUrl;
         gen._activeAudioSection = 'intro';
       }
     },
 
     /** Play a specific section or trigger generation if not yet available */
-    playSection(this: any, gen: any, section: string | null) {
+    playSection(this: AppContext, gen: GenerationUI, section: string | null) {
       if (section && gen[`_audioUrl_${section}`]) {
         gen._playlistMode = false;
         gen._activeAudioSection = section;
@@ -394,18 +428,21 @@ export function createGenerate() {
         const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
         if (a) {
           a.load();
-          a.play().catch((e: any) => console.warn('Audio play failed:', e.message));
+          a.play().catch((e: unknown) => {
+            const msg = e instanceof Error ? e.message : String(e);
+            console.warn('Audio play failed:', msg);
+          });
         }
       });
     },
 
-    async generateVoice(this: any, gen: any, section?: string) {
+    async generateVoice(this: AppContext, gen: GenerationUI, section?: string) {
       const key = section || 'all';
       const busyKey = `_generatingVoice_${key}`;
       if (gen[busyKey]) return;
       gen[busyKey] = true;
       try {
-        const body: any = { lang: getLocale() };
+        const body: Record<string, unknown> = { lang: getLocale() };
         if (section) body.section = section;
         const res = await fetch(this.apiBase() + '/generations/' + gen.id + '/read-aloud', {
           method: 'POST',

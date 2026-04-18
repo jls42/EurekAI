@@ -69,6 +69,23 @@ export interface AppContext extends AppState {
   requireParentalAccess(callback: () => void): void;
   _toggleProfileProp(id: string, prop: string): Promise<void>;
 
+  // Navigation mixin (src/app/navigation.ts)
+  goToView(view: string): void;
+
+  // Generate mixin (src/app/generate.ts) — self-reference
+  blockedModerationSource(): Source | null;
+  blockedModerationStatus(): string | null;
+  moderationBlockedMessage(status: string | null): string;
+  generate(type: string): Promise<void>;
+  generateAll(): Promise<void>;
+  generateAuto(): Promise<void>;
+  generateVoice(gen: Generation, section?: string): Promise<void>;
+  playSection(gen: Generation, section: string | null): void;
+  playNextSection(gen: Generation): void;
+  isBatchComplete(gen: Generation): boolean;
+  initSummaryAudio(gen: Generation): void;
+  _audioSectionOrder: readonly string[];
+
   // UI-only extended draft on profile editing (verified PIN held in memory)
   editingProfile: (Profile & { _verifiedPin?: string; hasPin?: boolean }) | null;
 
