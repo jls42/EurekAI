@@ -11,10 +11,7 @@ export type StatusRule = Readonly<{
 }>;
 
 // Mapping status HTTP → code d'erreur stable. Co-localisé avec MESSAGE_RULES /
-// STRUCTURED_CODE_RULES (même fichier de données) pour que matchStatus soit
-// traité par Lizard comme matchMessage / matchStructuredCode : ranger la table
-// dans le module appelant agrégeait historiquement les entrées à la CCN de la
-// fonction (faux positif confirmé sur 8 itérations, cf. historique).
+// STRUCTURED_CODE_RULES : ce fichier regroupe toutes les tables de données.
 export const STATUS_RULES: readonly StatusRule[] = [
   { status: 401, code: 'auth_required' },
   { status: 403, code: 'auth_required' },
