@@ -1297,7 +1297,7 @@ describe('createProfiles', () => {
       callMethod('deleteProfile', ctx, 'p-del');
       // Wait for the async delete operation
       await deletePromise;
-      (await vi.dynamicImportSettled?.()) ?? new Promise((r) => setTimeout(r, 10));
+      await (vi.dynamicImportSettled?.() ?? new Promise((r) => setTimeout(r, 10)));
       // Profile should NOT be removed since res.ok was false
       expect(ctx.profiles).toHaveLength(1);
       expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('toast.error'), 'error');

@@ -14,7 +14,20 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
   context_length_exceeded: true,
   internal_error: true,
 };
-void _KNOWN_CODES;
+
+describe('FailedStepCode registry', () => {
+  it('liste exhaustivement les 7 codes contractuels (garde compile-time + runtime)', () => {
+    expect(Object.keys(_KNOWN_CODES).sort()).toEqual([
+      'auth_required',
+      'context_length_exceeded',
+      'internal_error',
+      'llm_invalid_json',
+      'quota_exceeded',
+      'tts_upstream_error',
+      'upstream_unavailable',
+    ]);
+  });
+});
 
 describe('extractErrorCode', () => {
   it('mappe SyntaxError vers llm_invalid_json', () => {

@@ -429,7 +429,6 @@ describe('POST /:pid/detect-consigne', () => {
     });
 
     // Mock setConsigne to return false (simulates project deleted between check and save)
-    const origSetConsigne = store.setConsigne.bind(store);
     vi.spyOn(store, 'setConsigne').mockReturnValueOnce(null);
 
     const handler = getHandler(router, 'post', '/:pid/detect-consigne');

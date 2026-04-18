@@ -9,7 +9,6 @@ const proj = createProjects();
 
 // Mock localStorage
 const localStorageMock: Record<string, string> = {};
-const origLocalStorage = globalThis.localStorage;
 Object.defineProperty(globalThis, 'localStorage', {
   value: {
     getItem: vi.fn((key: string) => localStorageMock[key] ?? null),
