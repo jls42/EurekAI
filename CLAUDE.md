@@ -68,6 +68,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Templates HTML : extraire en partials quand un bloc depasse ~100 lignes
 - Pas de listes hardcodees de types/categories : utiliser une source de verite unique (`categories` dans state.ts)
 - Les composants interactifs (quiz, fill-blank, flashcards) utilisent le mixin `step-by-step.ts`
+- **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`). `npm run lint:fix` pour les auto-fixables. Pas encore en pretest car baseline > 50 errors — viser zéro errors pour activer bloquant. Config tunée en `warn` les règles legacy-bruyantes (`no-explicit-any`, `cognitive-complexity`) le temps du refactor progressif. Détails : `.claude/todo-tooling.md`.
 
 ## Workflow
 

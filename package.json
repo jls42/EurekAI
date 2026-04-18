@@ -9,6 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "tsx server.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "lint:complexity": "./scripts/check-complexity.sh",
     "pretest": "npm run lint:complexity",
     "test": "vitest run",
@@ -38,6 +40,7 @@
     }
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@google/genai": "^1.47.0",
     "@tailwindcss/vite": "^4.2.1",
     "@types/express": "^5.0.0",
@@ -45,11 +48,14 @@
     "@types/node": "^25.0.0",
     "@vitest/coverage-v8": "^4.1.2",
     "concurrently": "^9.2.1",
+    "eslint": "^10.2.1",
+    "eslint-plugin-sonarjs": "^4.0.3",
     "husky": "^9.1.7",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.19.0",
     "typescript": "^6.0.0",
+    "typescript-eslint": "^8.58.2",
     "vite": "^8.0.0",
     "vite-plugin-handlebars": "^2.0.0",
     "vitest": "^4.0.18"
