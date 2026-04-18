@@ -89,6 +89,17 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text`.
 - Details, faux positifs connus et solutions dans `.claude/rules/sonarqube.md` (charge auto sur fichiers src/)
 
+## Sécurité (SAST local)
+
+- **Source de vérité locale** : Opengrep (fork open-source de Semgrep CE) via `npm run security` → `scripts/check-security.sh`. Configs `p/security-audit` + `p/default` + `p/nodejsscan`, `--severity=ERROR --error` (exit 1 sur toute error).
+- **Intégration** : `.husky/pre-push` — bloque tout push avec finding ERROR. Pas dans pretest (scan ~12s, trop lent pour boucle commit).
+- **Install** : `./scripts/install-opengrep.sh` (binaire standalone ~40Mo dans `~/.local/bin/`, auto-detect linux/osx x86/arm). Pas de devDependency npm (placeholder vide sur registry).
+- **Suppression faux positifs** : deux mécanismes
+  - Inline : `// nosemgrep: <rule-id> -- <raison>` au-dessus de la ligne flaggée
+  - Global : `--exclude-rule=<rule-id>` dans `scripts/check-security.sh` avec commentaire expliquant le pattern récurrent
+- **Règle** : avant d'ajouter un ignore (inline ou global), **mesurer** en lançant `npm run security` localement — ne jamais ignorer à l'aveugle un finding Codacy/SonarQube sans reproduire via Opengrep d'abord (principe "Mesurer > deviner" ci-dessous).
+- **Couverture actuelle** : SSRF (fix commit 4027c37), timing attacks (fix commit 7e0fb32), XSS, injection, secrets hardcodes, expressjs patterns dangereux. 153 règles actives sur 171 fichiers. Baseline post-fix : 0 finding ERROR.
+
 ## Mesurer > deviner (règle OBLIGATOIRE)
 
 **Dès qu'un fait est mesurable factuellement, mesurer AVANT de raisonner dessus.** Ne jamais estimer/supposer quand une vérification coûte quelques secondes. L'intuition est souvent fausse et les itérations basées sur elle coûtent 10× plus cher que la mesure directe.

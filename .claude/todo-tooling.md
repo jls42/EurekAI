@@ -6,6 +6,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 
 - ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope `helpers/error-*.ts` uniquement (CCN 8, strict `-i 0`). Via pipx/Python.
 - ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
+- ✅ **Opengrep** : garde-fou en **pre-push** (`npm run security` via `scripts/check-security.sh`). SAST v1.19.0 fork open-source de Semgrep CE, binaire standalone dans `~/.local/bin/` (install via `scripts/install-opengrep.sh`). Configs `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`. Scan ~11.8s sur 171 fichiers (trop lent pour pretest). Baseline post-fix : 0 finding ERROR. 1 faux positif `detected-sonarqube-docs-api-key` (SHA256 GitHub Actions pinnee) exclu via `--exclude-rule` documente dans le script. Section dediee dans CLAUDE.md.
 - ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
   - Baseline actuelle : **0 errors + 482 warnings**. `lint:ci` = `eslint . --max-warnings 500` (baseline 482 + marge ~4 %). Toute nouvelle error ou dérive > 500 warnings bloque `npm run test`.
   - Règles bruyantes en `warn` le temps du refactor : `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag`.
@@ -31,6 +32,27 @@ Pour chaque descente de plafond : mesurer `npm run lint 2>&1 | grep -c warning`,
 ### ~~knip~~ — adopté 2026-04-18
 
 Installé en `devDependencies` (v6.4.1). Config `knip.json` minimale, intégré en `pretest` via `lint:deadcode`. Baseline 0 finding après cleanup (3 exports morts supprimés : `getVoiceCache`, re-export `addCostDelta`, type `LangCode`). Exécution ~1.2s, pas de latence notable sur le pretest.
+
+### ~~Opengrep~~ — adopté 2026-04-18
+
+Installé en binaire standalone (v1.19.0, ~40Mo) via `scripts/install-opengrep.sh` dans `~/.local/bin/` (pas de devDependency, le placeholder npm `opengrep@1.0.0` est vide). Garde-fou en **pre-push** (`.husky/pre-push` → `npm run security` → `scripts/check-security.sh`). Configs actives : `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`.
+
+**Baseline scan complet** (toutes sévérités, configs élargies à `p/trailofbits + p/expressjs + p/typescript + p/javascript + p/owasp-top-ten`) : 28 findings totaux, dont :
+- **1 true positive fixé** : `timing_attack_node` sur `profiles.ts:verifyPin` (commit `7e0fb32`) — comparaison hex non constante sur HTTP auth. Fix via `crypto.timingSafeEqual` + check longueur.
+- **27 faux positifs** :
+  - `detected-sonarqube-docs-api-key` (1x) — SHA256 de GitHub Action pinnee (SonarSource/sonarqube-scan-action@fd88b7d...), pas une vraie API key. **Exclu via `--exclude-rule` global dans check-security.sh**.
+  - `autoescape-disabled` (4x) — règle Java JSF flaggant Alpine.js `@keydown.escape="..."` (propriété événement Escape, aucun rapport avec HTML escape). Exclu naturellement par le filtre severity=ERROR (warning).
+  - `replaceall-sanitization` (6x) dans `render-utils.ts` — le module entier EST la sanitization HTML, `replaceAll` patterns constants voulus. Note-level.
+  - `unsafe-formatstring` (6x) — `console.error(\`...${var}...\`)` template literals JS non vulnérables (printf-style uniquement en C). Note-level.
+  - `hardcoded_secrets.node_api_key` (9x) dans `config.test.ts` — `vi.stubEnv('MISTRAL_API_KEY', 'test-key')`, fixtures de test. Exclu par `--exclude='*.test.ts'`.
+  - `helmet_header_x_powered_by` (1x) dans `server.ts` — règle "good pattern" qui signale l'absence de `app.disable('x-powered-by')`, or on l'appelle bien. Note-level.
+
+**Timing** : scan complet 11.8s sur 171 fichiers. Trop lent pour pretest (< 5s cible), positionné en pre-push uniquement.
+
+**Pistes d'élargissement** (hors scope PR actuelle) :
+- Descendre à `--severity=WARNING` si on veut inclure autoescape-disabled (nécessite suppressions inline Alpine.js — bruit élevé).
+- Ajouter `p/owasp-top-ten` en prepush si on veut couvrir plus de patterns (testé : 0 finding supplémentaire sur la baseline actuelle).
+- Migrer vers Codacy CLI local si convergence SARIF devient pertinente (même moteur sous-jacent).
 
 ### ESLint + `complexity` rule + `eslint-plugin-sonarjs`
 
