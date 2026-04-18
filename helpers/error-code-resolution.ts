@@ -21,15 +21,24 @@ type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 // complexité des regex des deux tableaux sur la fonction générique (9 > 8).
 // Chaque fonction spécialisée ne voit que ses propres règles.
 //
-// statusCodeFor utilise un if-chain explicite plutôt qu'une Map : Codacy Lizard
-// attribuait les entrées du Map comme branches de la fonction appelant .get()
-// (CCN 10 puis 11 quand on a isolé le lookup), peu importe où il était placé.
-// Le if-chain a une CCN prévisible (6) et reste lisible à 5 codes.
+// statusCodeFor utilise un switch plutôt que Map.get() ou if-chain :
+// Codacy Lizard comptait toutes les entrées du Map comme branches du callsite
+// (CCN 10-11) ; le if-chain avec `===` et `||` empirait (CCN 14) car Lizard
+// semble compter chaque comparateur et opérateur logique. Switch/case est un
+// pattern CCN standard (6 branches = 7 total), bien reconnu.
 function statusCodeFor(status: number): FailedStepCode | null {
-  if (status === 401 || status === 403) return 'auth_required';
-  if (status === 429) return 'quota_exceeded';
-  if (status === 503 || status === 529) return 'upstream_unavailable';
-  return null;
+  switch (status) {
+    case 401:
+    case 403:
+      return 'auth_required';
+    case 429:
+      return 'quota_exceeded';
+    case 503:
+    case 529:
+      return 'upstream_unavailable';
+    default:
+      return null;
+  }
 }
 
 function matchStatus(ctx: ErrContext): FailedStepCode | null {
