@@ -4,8 +4,15 @@
 # ou vraie complexité excessive).
 #
 # Threshold : 8 (aligné sur Codacy, default Lizard est 15).
-# Scope : tout le code TypeScript (src/, generators/, routes/, helpers/
-# + fichiers racine). Exclu : tests (*.test.ts) via --exclude.
+# Scope : ALLOWLIST de fichiers déjà propres (0 fonction > CCN 8).
+# Tout ajout à l'allowlist requiert un scan `-l typescript` vert.
+#
+# CAVEAT IMPORTANT (appris le 2026-04-18) : Lizard en mode walk-dossier
+# avec `-l javascript` ne parse PAS les .ts — il ne trouve donc aucune
+# violation. Il faut `-l typescript` explicitement. La liste complète
+# des 23 fonctions > CCN 8 ailleurs dans le repo est documentée dans
+# `.claude/todo-tooling.md` section "Refactor progressif Lizard CCN".
+#
 # Requiert : pipx (https://pipx.pypa.io).
 set -euo pipefail
 
@@ -18,13 +25,10 @@ pipx run lizard \
   --CCN 8 \
   --warnings_only \
   -i 0 \
-  --exclude "*.test.ts" \
-  -l javascript \
-  src/ \
-  generators/ \
-  routes/ \
-  helpers/ \
-  config.ts \
-  server.ts \
-  store.ts \
-  types.ts
+  -l typescript \
+  helpers/error-code-resolution.ts \
+  helpers/error-matchers.ts \
+  helpers/error-code-rules.ts \
+  helpers/error-codes.ts \
+  src/app/helpers.ts \
+  config.ts

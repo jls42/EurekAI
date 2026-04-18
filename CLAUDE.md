@@ -116,7 +116,9 @@ Cas concrets (non exhaustif) :
 
 **Anti-pattern documenté** : série de 9 commits (`977b535..68ed476`) sur un faux positif Lizard `matchStatus` résolus en 2 min dès qu'on a lancé `pipx run lizard` local — cause racine = parseur TS de Lizard qui agglomère les `function foo()` top-level consécutives. Fix propre via extraction dans `helpers/error-matchers.ts` (chaque matcher `export function` délimité proprement). Leçon : ne JAMAIS itérer à l'aveugle sur un signal d'outil externe.
 
-Garde-fou local actuel : `npm run test` déclenche `pretest` → `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8, scope **tout le code TS** hors tests depuis 2026-04-18). Piège connu : `??=` pèse 2 dans le comptage Lizard (nullish check + assignment) — à retenir lors de l'application du fix `prefer-nullish-coalescing` (cf. `dccd645` : re-fix via boucle). Détails : `.claude/todo-tooling.md`.
+Garde-fou local actuel : `npm run test` déclenche `pretest` → `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8 strict, scope **allowlist** : `helpers/error-*.ts`, `src/app/helpers.ts`, `config.ts`). Le reste du repo contient 23 fonctions > CCN 8 à refactorer en PR(s) séparée(s) — liste complète et priorités dans `.claude/todo-tooling.md` section "Refactor progressif Lizard CCN". Pièges connus :
+- **`-l javascript` ne parse pas les `.ts` en walk-dossier** — Lizard doit être invoqué avec `-l typescript` explicitement, sinon 0 violation silencieusement (faux positif "tout est clean"). Bug vécu 2026-04-18, Codacy a révélé 23 fonctions cachées.
+- **`??=` pèse 2 dans le comptage Lizard** (nullish check + assignment) — à retenir lors de l'application du fix `prefer-nullish-coalescing` (cf. `dccd645` : re-fix via boucle).
 
 ## Conventions detaillees
 

@@ -4,7 +4,10 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 
 ## État actuel (2026-04-18)
 
-- ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope **tout le code TS** hors tests (`src/`, `generators/`, `routes/`, `helpers/`, `config.ts`, `server.ts`, `store.ts`, `types.ts`) depuis 2026-04-18 (CCN 8, strict `-i 0`, `--exclude '*.test.ts'`). Via pipx/Python. **Piège `??=`** : chaque `??=` pèse 2 dans le comptage Lizard (nullish check + assignment). Une fonction avec 3 `??=` + un `if &&` monte à CCN 9 — à retenir lors de l'application du fix `prefer-nullish-coalescing`. Leçon vécue : commit `fa3d5f7` (fix Codacy 3 code smells sur `normalizeSummaryData`) → CCN 9 → re-fix via boucle dans `dccd645`. Refactor de `config.ts:saveConfig` (12→5) et `config.ts:resolveVoices` (12→2) dans `01672a9` a permis l'élargissement du scope.
+- ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope **allowlist** de fichiers propres (CCN 8, strict `-i 0`, `-l typescript`). Via pipx/Python. Scope : `helpers/error-*.ts` + `src/app/helpers.ts` + `config.ts`. Section "Refactor progressif Lizard CCN" ci-dessous documente les 23 fonctions restantes à refactorer pour élargir le scope.
+  - **Piège `-l javascript` (2026-04-18)** : Lizard en mode walk-dossier avec `-l javascript` ne parse PAS les `.ts` — silencieusement 0 warning. `-l typescript` est obligatoire. Le commit `928393c` avait introduit un garde-fou cassé (faux positif "0 violation"), Codacy a révélé que 23 fonctions > CCN 8 étaient cachées. Fix dans `<this-pr>` : scope restreint à l'allowlist + todo documentée.
+  - **Piège `??=`** : chaque `??=` pèse 2 dans le comptage Lizard (nullish check + assignment). Une fonction avec 3 `??=` + un `if &&` monte à CCN 9 — à retenir lors de l'application du fix `prefer-nullish-coalescing`. Leçon vécue : commit `fa3d5f7` → CCN 9 → re-fix via boucle dans `dccd645`.
+  - Refactor de `config.ts:saveConfig` (12→5), `config.ts:resolveVoices` (12→2) dans `01672a9` et `profiles.ts:executeDeleteProfile` (9→4) dans `c9d8cf9`.
 - ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
 - ✅ **Opengrep** : garde-fou en **pre-push** (`npm run security` via `scripts/check-security.sh`). SAST v1.19.0 fork open-source de Semgrep CE, binaire standalone dans `~/.local/bin/` (install via `scripts/install-opengrep.sh`). Configs `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`. Scan ~11.8s sur 171 fichiers (trop lent pour pretest). Baseline post-fix : 0 finding ERROR. 1 faux positif `detected-sonarqube-docs-api-key` (SHA256 GitHub Actions pinnee) exclu via `--exclude-rule` documente dans le script. Section dediee dans CLAUDE.md.
 - ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
@@ -14,7 +17,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
   - `complexity` désactivé dans ESLint (redondant avec Lizard).
 - ✅ **Prettier** : `format:check` en workflow manuel (pas en pretest)
 - ✅ **vitest** : 1711 tests, `npm run test`
-- ✅ **0 fonction > CCN 8** dans tout le repo (2026-04-18, post-refactor `config.ts`). La mention historique "24 fonctions legacy" n'était plus à jour — Lizard audit complet ne remonte plus aucune violation aujourd'hui. `lint:complexity` couvre désormais tout le code TS en pretest.
+- ⏳ **23 fonctions > CCN 8** dans le repo (audit `-l typescript` du 2026-04-18, post-fix `executeDeleteProfile`). L'audit précédent "0 fonction" était un faux positif du `-l javascript` qui ne parse pas les `.ts`. Scope `lint:complexity` restreint à l'allowlist `helpers/error-*.ts` + `src/app/helpers.ts` + `config.ts`. Les 23 fonctions sont à refactorer en PR(s) séparée(s) (cf. section "Refactor progressif Lizard CCN" ci-dessous).
 
 ## Refactor progressif ESLint warnings (status)
 
@@ -26,6 +29,47 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
   - `sonarjs/todo-tag` (TODO sans owner/date)
 
 Pour chaque descente de plafond : mesurer `npm run lint 2>&1 | grep -c warning`, descendre le seuil à `measured + 10-20` marge, commiter séparément. Ne jamais baisser sans refactor réel sous-jacent.
+
+## Refactor progressif Lizard CCN (status)
+
+**Scope `lint:complexity` actuel** (allowlist stricte, CCN 8) : `helpers/error-code-resolution.ts`, `helpers/error-matchers.ts`, `helpers/error-code-rules.ts`, `helpers/error-codes.ts`, `src/app/helpers.ts`, `config.ts`.
+
+**Scan complet (`pipx run lizard -l typescript --CCN 8 --warnings_only --exclude '*.test.ts' src/ generators/ routes/ helpers/ config.ts server.ts store.ts types.ts`) — 23 violations au 2026-04-18** :
+
+| Fichier | Fonction | CCN | Priorité |
+|---|---|---|---|
+| `helpers/voice-selection.ts:59` | `scoreVoice` | **15** | P1 — plafond |
+| `routes/chat.ts:38` | `validateChatRequest` | **15** | P1 — plafond |
+| `routes/chat.ts:218` | (anonymous) | **15** | P1 — plafond |
+| `routes/generate.ts:43` | `applyConsigne` | 14 | P1 |
+| `routes/profiles.ts:13` | (anonymous) | 14 | P1 |
+| `generators/tts-provider.ts:57` | `toMistralVoice` | 13 | P2 |
+| `routes/generations.ts:30` | `sectionText` | 13 | P2 |
+| `routes/generations.ts:239` | (anonymous) | 12 | P2 |
+| `routes/profiles.ts:42` | (anonymous) | 12 | P2 |
+| `helpers/tracked-client.ts:39` | `client.audio.transcriptions.complete` (wrapper) | 12 | P2 |
+| `helpers/cost-calc.ts:65` | `calculateTotalCost` | 12 | P2 |
+| `src/app/profiles.ts:135` | `createProfile` | 12 | P2 |
+| `src/app/sources.ts:126` | `handleFiles` | 11 | P2 |
+| `src/app/generate.ts:128` | `generate` | 11 | P2 |
+| `generators/tts-provider.ts:70` | `listVoices` | 11 | P2 |
+| `routes/generations.ts:193` | (anonymous) | 11 | P2 |
+| `src/i18n/index.ts:24` | `t` | 10 | P3 |
+| `src/app/sources.ts:50` | `_uploadSingleFile` | 10 | P3 |
+| `src/app/profiles.ts:52` | `deleteConfirmMessage` | 10 | P3 |
+| `routes/sources.ts:50` | `getModerationCategories` | 10 | P3 |
+| `helpers/index.ts:108` | `extractAllText` | 10 | P3 |
+| `generators/image.ts:12` | `parseChunkRef` | 9 | P3 |
+| `helpers/choice-labels.ts:38` | `parseChoiceLabel` | 9 | P3 |
+
+**Ordre de traitement suggéré** :
+1. **P1** (CCN ≥ 14, 5 fonctions) — plafond haut, refactor structurant le plus utile
+2. **P2** (CCN 11-13, 11 fonctions) — dette modérée
+3. **P3** (CCN 9-10, 7 fonctions) — petit nettoyage, parfois un simple early-return suffit
+
+**Protocole** : 1 PR par dossier (`routes/`, `helpers/`, `src/app/`, `generators/`, `src/i18n/`) pour garder la revue focalisée. À chaque fix, ajouter le fichier à l'allowlist du script.
+
+**Ne pas oublier** : le script `scripts/check-complexity.sh` utilise `-l typescript` depuis 2026-04-18 (précédent `-l javascript` ne parsait pas les `.ts` en walk). Toujours vérifier localement avec `pipx run lizard -l typescript --CCN 8 --warnings_only <fichier>` avant de push.
 
 ## Priorité haute
 
