@@ -11,10 +11,26 @@
       class="source-meta-pill {{badgeClass}} cursor-pointer"
       :class="moderationBadgeColor({{sourceRef}})"
     >
-      <i x-show="moderationStatus({{sourceRef}}) === 'pending'" data-lucide="loader-circle" class="{{iconClass}} animate-spin"></i>
-      <i x-show="moderationStatus({{sourceRef}}) === 'safe'" data-lucide="shield-check" class="{{iconClass}}"></i>
-      <i x-show="moderationStatus({{sourceRef}}) === 'unsafe'" data-lucide="shield-alert" class="{{iconClass}}"></i>
-      <i x-show="moderationStatus({{sourceRef}}) === 'error'" data-lucide="shield-x" class="{{iconClass}}"></i>
+      <i
+        x-show="moderationStatus({{sourceRef}}) === 'pending'"
+        data-lucide="loader-circle"
+        class="{{iconClass}} animate-spin"
+      ></i>
+      <i
+        x-show="moderationStatus({{sourceRef}}) === 'safe'"
+        data-lucide="shield-check"
+        class="{{iconClass}}"
+      ></i>
+      <i
+        x-show="moderationStatus({{sourceRef}}) === 'unsafe'"
+        data-lucide="shield-alert"
+        class="{{iconClass}}"
+      ></i>
+      <i
+        x-show="moderationStatus({{sourceRef}}) === 'error'"
+        data-lucide="shield-x"
+        class="{{iconClass}}"
+      ></i>
     </span>
   </span>
 </template>

@@ -23,10 +23,12 @@ export const es: Record<string, string> = {
   'gen.quiz-vocal': 'Quiz vocal',
   'gen.fill-blank': 'Completar espacios',
   'gen.image': 'Imagen',
+  'gen.betaAudio': 'Audio beta',
   'gen.auto': 'Auto \u2014 analizando...',
   'gen.estimatedCost': 'Costo estimado (tarifas Mistral)',
   'gen.apiCalls': 'llamada(s) API',
-  'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
+  'gen.costTooltip':
+    'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
@@ -36,7 +38,17 @@ export const es: Record<string, string> = {
   'gen.questionCount': 'Cantidad:',
   'gen.needsElevenLabs': 'Requiere una clave API de ElevenLabs',
   'gen.needsTts': 'Requiere un proveedor TTS configurado',
-  'gen.contextTooLarge': 'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
+  'gen.contextTooLarge':
+    'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
+
+  'errorCode.internal_error': 'Error interno del servidor',
+  'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
+  'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
+  'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',
+  'errorCode.context_length_exceeded': 'Contenido demasiado largo para el modelo',
+  'errorCode.llm_invalid_json': 'Respuesta inv\u00e1lida de la IA',
+  'errorCode.upload_failed': 'Error al subir',
+  'errorCode.all_steps_failed': 'Todas las generaciones han fallado',
 
   'header.menuProjects': 'Men\u00fa de proyectos',
   'header.switchToLight': 'Cambiar a modo claro',
@@ -111,7 +123,8 @@ export const es: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarc\u00e1stico',
   'emotion.Shameful': 'Avergonzado',
-  'settings.mistralVoicesHint': 'Voces Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Voces Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Ficha',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -233,7 +246,7 @@ export const es: Record<string, string> = {
   'quiz.answerMic': 'Responder con voz',
   'quiz.checking': 'Verificando...',
   'quiz.correct': '\u00a1Correcto!',
-  'quiz.incorrect': 'No del todo...',
+  'quiz.incorrect': '\u00a1Incorrecto!',
   'quiz.youSaid': 'Dijiste: {text}',
   'quiz.nextQuestion': 'Siguiente pregunta',
   'quiz.verificationError': 'Error de verificaci\u00f3n',
@@ -266,8 +279,10 @@ export const es: Record<string, string> = {
   'podcast.script': 'Guion',
   'podcast.lines': '({count} l\u00edneas)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs': 'Configura ELEVENLABS_API_KEY en tu archivo .env para habilitar podcasts con audio',
-  'podcast.noTts': 'Configura un proveedor TTS (Mistral o ElevenLabs) para habilitar podcasts con audio',
+  'podcast.noElevenLabs':
+    'Configura ELEVENLABS_API_KEY en tu archivo .env para habilitar podcasts con audio',
+  'podcast.noTts':
+    'Configura un proveedor TTS (Mistral o ElevenLabs) para habilitar podcasts con audio',
 
   'image.heading': 'Ilustraciones',
   'image.new': 'Ilustrar',
@@ -298,7 +313,8 @@ export const es: Record<string, string> = {
   'consigne.reAnalyze': 'Re-analizar',
   'consigne.understood': '\u00a1Entendido!',
   'consigne.dismiss': 'Ignorar',
-  'consigne.dismissed': 'Instrucciones ignoradas \u2014 las generaciones ya no ser\u00e1n enfocadas',
+  'consigne.dismissed':
+    'Instrucciones ignoradas \u2014 las generaciones ya no ser\u00e1n enfocadas',
   'consigne.dismissedLabel': 'Instrucciones de estudio ignoradas',
   'consigne.reEnable': 'Reactivar',
   'consigne.reEnabled': 'Instrucciones reactivadas \u2014 las generaciones ser\u00e1n enfocadas',
@@ -372,7 +388,8 @@ export const es: Record<string, string> = {
   'toast.scoreError': 'Error al guardar puntaje',
   'toast.reviewGenerated': '\u00a1Quiz de repaso generado!',
   'toast.reviewError': 'Error al generar repaso',
-  'moderation.blocked': 'Este contenido fue marcado como inapropiado. La generaci\u00f3n est\u00e1 bloqueada.',
+  'moderation.blocked':
+    'Este contenido fue marcado como inapropiado. La generaci\u00f3n est\u00e1 bloqueada.',
   'moderation.pending': 'Moderaci\u00f3n en curso',
   'moderation.error': 'Moderaci\u00f3n no disponible',
   'moderation.unsafe': 'Contenido marcado',
@@ -388,7 +405,8 @@ export const es: Record<string, string> = {
   'moderation.cat.pii': 'Datos personales',
   'moderation.cat.jailbreaking': 'Jailbreaking',
 
-  'chat.ageRestricted': 'El chat no est\u00e1 habilitado para este perfil. Un padre puede autorizarlo.',
+  'chat.ageRestricted':
+    'El chat no est\u00e1 habilitado para este perfil. Un padre puede autorizarlo.',
   'chat.ageRestrictedTooltip': 'Chat deshabilitado para este perfil',
   'chat.moderationBlocked': 'Este mensaje fue bloqueado por la moderaci\u00f3n.',
 
@@ -415,9 +433,10 @@ export const es: Record<string, string> = {
   'profile.themeDark': 'Oscuro',
   'profile.themeLight': 'Claro',
   'profile.voicePreferences': 'Voces',
-  'profile.voicePreferencesHint': 'Personaliza las voces para contenido de audio (podcasts, quiz vocales, lectura)',
+  'profile.voicePreferencesHint':
+    'Personaliza las voces para contenido de audio (podcasts, quiz vocales, lectura)',
   'profile.voiceDefault': 'Por defecto (segun el idioma)',
-  'profile.voiceCurrentDefault': 'Defecto actual:',
+  'profile.voiceCurrentDefault': 'Por defecto para campos en \u00abPor defecto\u00bb:',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Volver',
 

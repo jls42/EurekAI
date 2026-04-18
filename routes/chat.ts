@@ -16,6 +16,8 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 
 interface ChatRequestContext {
   pid: string;
@@ -50,13 +52,16 @@ async function validateChatRequest(
   const { message, lang: reqLang, ageGroup: reqAgeGroup } = req.body;
   const lang = reqLang || 'fr';
   const ageGroup: AgeGroup = reqAgeGroup || 'enfant';
-  if (!message || typeof message !== 'string') return new ChatValidationError(400, 'message requis');
+  if (!message || typeof message !== 'string')
+    return new ChatValidationError(400, 'message requis');
 
   if (profile?.useModeration) {
-    const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
+    const categories =
+      profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
     if (categories.length > 0) {
       const modResult = await moderateContent(client, message.trim(), categories);
-      if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');
+      if (modResult.status !== 'safe')
+        return new ChatValidationError(400, 'chat.moderationBlocked');
     }
   }
 
@@ -75,20 +80,73 @@ interface ToolCallCtx {
 
 const CHAT_TOOL_EXECUTORS: Record<string, (ctx: ToolCallCtx) => Promise<Generation>> = {
   summary: async (ctx) => {
-    const data = await generateSummary(ctx.client, ctx.markdown, ctx.config.models.summary, ctx.hasConsigne, ctx.lang, ctx.ageGroup);
-    return { id: randomUUID(), title: autoTitle('summary', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'summary', data };
+    const data = await generateSummary(
+      ctx.client,
+      ctx.markdown,
+      ctx.config.models.summary,
+      ctx.hasConsigne,
+      ctx.lang,
+      ctx.ageGroup,
+    );
+    return {
+      id: randomUUID(),
+      title: autoTitle('summary', data, ctx.lang),
+      createdAt: new Date().toISOString(),
+      sourceIds: ctx.sourceIds,
+      type: 'summary',
+      data,
+    };
   },
   flashcards: async (ctx) => {
-    const data = await generateFlashcards(ctx.client, ctx.markdown, ctx.config.models.flashcards, ctx.lang, ctx.ageGroup);
-    return { id: randomUUID(), title: autoTitle('flashcards', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'flashcards', data };
+    const data = await generateFlashcards(
+      ctx.client,
+      ctx.markdown,
+      ctx.config.models.flashcards,
+      ctx.lang,
+      ctx.ageGroup,
+    );
+    return {
+      id: randomUUID(),
+      title: autoTitle('flashcards', data, ctx.lang),
+      createdAt: new Date().toISOString(),
+      sourceIds: ctx.sourceIds,
+      type: 'flashcards',
+      data,
+    };
   },
   quiz: async (ctx) => {
-    const data = await generateQuiz(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup);
-    return { id: randomUUID(), title: autoTitle('quiz', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'quiz', data };
+    const data = await generateQuiz(
+      ctx.client,
+      ctx.markdown,
+      ctx.config.models.quiz,
+      ctx.lang,
+      ctx.ageGroup,
+    );
+    return {
+      id: randomUUID(),
+      title: autoTitle('quiz', data, ctx.lang),
+      createdAt: new Date().toISOString(),
+      sourceIds: ctx.sourceIds,
+      type: 'quiz',
+      data,
+    };
   },
   'fill-blank': async (ctx) => {
-    const data = await generateFillBlank(ctx.client, ctx.markdown, ctx.config.models.quiz, ctx.lang, ctx.ageGroup);
-    return { id: randomUUID(), title: autoTitle('fill-blank', data, ctx.lang), createdAt: new Date().toISOString(), sourceIds: ctx.sourceIds, type: 'fill-blank', data };
+    const data = await generateFillBlank(
+      ctx.client,
+      ctx.markdown,
+      ctx.config.models.quiz,
+      ctx.lang,
+      ctx.ageGroup,
+    );
+    return {
+      id: randomUUID(),
+      title: autoTitle('fill-blank', data, ctx.lang),
+      createdAt: new Date().toISOString(),
+      sourceIds: ctx.sourceIds,
+      type: 'fill-blank',
+      data,
+    };
   },
 };
 
@@ -97,7 +155,12 @@ async function processChatToolCalls(
   ctx: ToolCallCtx,
   store: ProjectStore,
   pid: string,
-): Promise<{ generatedIds: string[]; generations: Generation[]; failedTools: string[]; failedCost: number }> {
+): Promise<{
+  generatedIds: string[];
+  generations: Generation[];
+  failedTools: string[];
+  failedCost: number;
+}> {
   const generatedIds: string[] = [];
   const generations: Generation[] = [];
   const failedTools: string[] = [];
@@ -109,7 +172,12 @@ async function processChatToolCalls(
       const executor = CHAT_TOOL_EXECUTORS[type];
       if (executor) {
         const { result: gen, usage } = await runWithUsageTracking(() => executor(ctx));
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/chat/tool/${type}`, usage);
+        const persisted = persistUsage(
+          store,
+          pid,
+          `POST /api/projects/${pid}/chat/tool/${type}`,
+          usage,
+        );
         if (persisted) {
           gen.usage = persisted.usage;
           gen.estimatedCost = persisted.cost;
@@ -118,15 +186,20 @@ async function processChatToolCalls(
         store.addGeneration(pid, gen);
         generatedIds.push(gen.id);
         generations.push(gen);
-        console.log(`  Chat tool: ${type} generated`);
+        logger.info('chat', `tool ${type} generated`);
       }
     } catch (err) {
       const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
       if (failedUsage?.length) {
-        const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/chat/tool/${call}/failed`, failedUsage);
+        const persisted = persistUsage(
+          store,
+          pid,
+          `POST /api/projects/${pid}/chat/tool/${call}/failed`,
+          failedUsage,
+        );
         if (persisted) failedCost += persisted.cost;
       }
-      console.error(`  Chat tool ${call} failed:`, err);
+      logger.error('chat', `tool ${call} failed:`, err);
       failedTools.push(call);
     }
   }
@@ -185,7 +258,8 @@ export function chatRoutes(
       if (result.toolCalls.length > 0 && project.sources.length > 0) {
         const rawMarkdown = getMarkdown(project.sources);
         const markdown = applyConsigne(rawMarkdown, project.consigne);
-        const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
+        const hasConsigne =
+          !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
         const sourceIds = project.sources.map((s) => s.id);
         const toolResult = await processChatToolCalls(
           result.toolCalls,
@@ -223,8 +297,8 @@ export function chatRoutes(
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
       }
-      console.error('Chat error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('chat', 'error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'chat') });
     }
   });
 

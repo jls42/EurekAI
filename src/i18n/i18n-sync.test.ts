@@ -10,7 +10,15 @@ import { hi } from './hi';
 import { ar } from './ar';
 
 const locales: Record<string, Record<string, string>> = {
-  fr, en, es, pt, it: itLocale, nl, de, hi, ar,
+  fr,
+  en,
+  es,
+  pt,
+  it: itLocale,
+  nl,
+  de,
+  hi,
+  ar,
 };
 
 const reference = fr;

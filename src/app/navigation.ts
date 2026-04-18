@@ -2,7 +2,9 @@ export function createNavigation() {
   return {
     goToView(this: any, view: string) {
       if (view === 'chat' && !this.currentProfile?.chatEnabled) return;
-      const prefersReducedMotion = globalThis.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const prefersReducedMotion = globalThis.matchMedia(
+        '(prefers-reduced-motion: reduce)',
+      ).matches;
       if (document.startViewTransition && !prefersReducedMotion) {
         document.startViewTransition(() => {
           this.activeView = view;

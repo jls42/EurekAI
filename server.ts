@@ -8,7 +8,15 @@ import { Mistral } from '@mistralai/mistralai';
 import { trackClient } from './helpers/tracked-client.js';
 import { recordUsage } from './helpers/usage-context.js';
 import { ProjectStore } from './store.js';
-import { initConfig, getConfig, saveConfig, resetConfig, getApiStatus, setVoiceCache, setModelLimits } from './config.js';
+import {
+  initConfig,
+  getConfig,
+  saveConfig,
+  resetConfig,
+  getApiStatus,
+  setVoiceCache,
+  setModelLimits,
+} from './config.js';
 import { listVoices } from './generators/tts-provider.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
@@ -121,14 +129,19 @@ app.listen(PORT, () => {
   console.log();
 
   // Non-blocking cache warmup (optional, app works without)
-  listVoices(client).then(setVoiceCache).catch((e: any) => console.warn('Voice cache not loaded:', e.message));
-  client.models.list().then((models) => {
-    const limits: Record<string, number> = {};
-    for (const m of models.data ?? []) {
-      const card = m as any;
-      if (card.maxContextLength) limits[card.id] = card.maxContextLength;
-      for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
-    }
-    setModelLimits(limits);
-  }).catch((e: any) => console.warn('Model limits not loaded:', e.message));
+  listVoices(client)
+    .then(setVoiceCache)
+    .catch((e: any) => console.warn('Voice cache not loaded:', e.message));
+  client.models
+    .list()
+    .then((models) => {
+      const limits: Record<string, number> = {};
+      for (const m of models.data ?? []) {
+        const card = m as any;
+        if (card.maxContextLength) limits[card.id] = card.maxContextLength;
+        for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
+      }
+      setModelLimits(limits);
+    })
+    .catch((e: any) => console.warn('Model limits not loaded:', e.message));
 });

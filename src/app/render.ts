@@ -1,5 +1,6 @@
 import { marked } from 'marked';
 import { escapeHtmlAttribute, escapeMarkdownHtml, sanitizeRenderedHtml } from './render-utils';
+import { normalizeSourceMarkers } from './source-markers';
 
 export function createRender() {
   return {
@@ -19,16 +20,10 @@ export function createRender() {
         if (!src) return `<span class="source-badge">${num}</span>`;
         return `<button type="button" class="source-badge" data-source-id="${escapeHtmlAttribute(src.id)}" title="${escapeHtmlAttribute(src.filename)}">${num}</button>`;
       };
-      // prettier-ignore
-      let text = content.replace( // NOSONAR(S4043) — regex with g flag and capture group callback, replaceAll not applicable
-        /\[(Source\s*\d+(?:\s*,\s*Source\s*\d+)*)\]/g, // NOSONAR — no backtracking risk: each iteration consumes literal tokens
-        (_: string, inner: string) => {
-          return inner
-            .split(/\s*,\s*/) // NOSONAR — simple comma split, input from AI-generated content
-            .map((s: string) => '[' + s.trim() + ']')
-            .join('');
-        },
-      );
+      // Première passe : normalise les formats dégradés ([Source 13, 20], [Source 13, Source 20])
+      // en brackets adjacents canoniques. Helper partagé avec helpers.ts:referencedSourceNums
+      // pour éviter toute divergence de tolérance future.
+      const text = normalizeSourceMarkers(content);
       let html = this.renderMarkdown(text);
       html = html.replace(/\[Source\s*(\d+)\]/g, (_: string, num: string) => makeBadge(num)); // NOSONAR(S4043) — regex with g flag and capture group callback, replaceAll not applicable
       return html;
@@ -42,6 +37,5 @@ export function createRender() {
       r.key_points = r.key_points.filter((pt: string) => pt?.trim());
       return r;
     },
-
-};
+  };
 }

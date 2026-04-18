@@ -96,24 +96,37 @@
       <h3 class="font-heading font-semibold text-sm text-text-primary flex items-center gap-2">
         <span x-text="t('dashboard.recentGenerations')">Recent</span>
         <template x-if="currentProject?.totalCost > 0">
-          <span class="relative" x-data="{ hover: false }" @mouseenter="hover = true" @mouseleave="hover = false">
+          <span
+            class="relative"
+            x-data="{ hover: false }"
+            @mouseenter="hover = true"
+            @mouseleave="hover = false"
+          >
             <span
               class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-help"
               x-text="t('gen.costPrefix') + ' ' + t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
-            >Total</span>
+              >Total</span
+            >
             <div
               x-show="hover"
               x-transition.opacity
               class="absolute left-0 top-full mt-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
             >
-              <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">Estimation</div>
-              <template x-for="entry in (currentProject?.costLog || []).slice(-10).reverse()" :key="entry.timestamp">
+              <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">
+                Estimation
+              </div>
+              <template
+                x-for="entry in (currentProject?.costLog || []).slice(-10).reverse()"
+                :key="entry.timestamp"
+              >
                 <div class="text-text-secondary flex justify-between gap-4">
                   <span class="truncate max-w-[180px]" x-text="entry.route.split('/').pop()"></span>
                   <span class="font-mono" x-text="'~$' + entry.cost.toFixed(4)"></span>
                 </div>
               </template>
-              <div class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent flex justify-between gap-4">
+              <div
+                class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent flex justify-between gap-4"
+              >
                 <span>Total</span>
                 <span x-text="'~$' + currentProject.totalCost.toFixed(4)"></span>
               </div>
@@ -147,9 +160,7 @@
             <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
           </button>
           <div class="flex items-center gap-2.5 mb-2">
-            <span
-              class="icon-chip shrink-0"
-              :class="iconChipClass(gen.type)"
+            <span class="icon-chip shrink-0" :class="iconChipClass(gen.type)"
               ><i
                 :data-lucide="genIcon(gen.type)"
                 class="w-4 h-4"
@@ -169,10 +180,21 @@
                 x-text="gen.stats.attempts[gen.stats.attempts.length-1].score + '/' + gen.stats.attempts[gen.stats.attempts.length-1].total"
               ></span>
             </template>
+            <!-- Beta audio badge : livré en statut "beta audio" pour hi/ar jusqu'à validation native -->
+            <template
+              x-if="(gen.type === 'podcast' || gen.type === 'quiz-vocal') && (gen.lang === 'hi' || gen.lang === 'ar')"
+            >
+              <span
+                class="ml-auto text-xs px-2 py-0.5 rounded-badge font-bold bg-warning-light text-warning-dark"
+                x-text="t('gen.betaAudio')"
+              ></span>
+            </template>
           </div>
           <p class="font-semibold text-body-sm text-text-primary truncate" x-text="gen.title"></p>
           <p class="text-sm text-text-secondary mt-0.5">
-            <span x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"></span>
+            <span
+              x-text="new Date(gen.createdAt).toLocaleString(dateLocale(), {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'})"
+            ></span>
             {{> cost-badge-gen badgeClass="ml-1 text-sm px-2 py-0.5"}}
           </p>
         </div>

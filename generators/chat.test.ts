@@ -9,13 +9,13 @@ describe('chatWithSources', () => {
     const client = {
       chat: {
         complete: vi.fn().mockResolvedValue({
-          choices: [{ message: { content: 'Bonjour! Comment puis-je t\'aider?' } }],
+          choices: [{ message: { content: "Bonjour! Comment puis-je t'aider?" } }],
         }),
       },
     } as any;
 
     const result = await chatWithSources(client, messages, sourceContext);
-    expect(result.reply).toBe('Bonjour! Comment puis-je t\'aider?');
+    expect(result.reply).toBe("Bonjour! Comment puis-je t'aider?");
     expect(result.toolCalls).toEqual([]);
     expect(client.chat.complete).toHaveBeenCalledTimes(1);
   });
@@ -23,14 +23,17 @@ describe('chatWithSources', () => {
   it('returns reply with tool calls (first response has toolCalls, then final response)', async () => {
     const client = {
       chat: {
-        complete: vi.fn()
+        complete: vi
+          .fn()
           .mockResolvedValueOnce({
-            choices: [{
-              message: {
-                content: '',
-                toolCalls: [{ id: 'tc1', function: { name: 'generate_summary' } }],
+            choices: [
+              {
+                message: {
+                  content: '',
+                  toolCalls: [{ id: 'tc1', function: { name: 'generate_summary' } }],
+                },
               },
-            }],
+            ],
           })
           .mockResolvedValueOnce({
             choices: [{ message: { content: 'Voici ton resume!' } }],
@@ -53,7 +56,8 @@ describe('chatWithSources', () => {
     ];
     const client = {
       chat: {
-        complete: vi.fn()
+        complete: vi
+          .fn()
           .mockResolvedValueOnce({
             choices: [{ message: { content: '', toolCalls: fourToolCalls } }],
           })

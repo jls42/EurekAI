@@ -179,8 +179,7 @@ describe('quizVocalComponent', () => {
     it('correct answer increments score', async () => {
       vi.mocked(globalThis.fetch).mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({ correct: true, feedback: 'Bravo!', transcription: 'Bleu' }),
+        json: () => Promise.resolve({ correct: true, feedback: 'Bravo!', transcription: 'Bleu' }),
       } as any);
       const comp = createVocalQuiz(sampleQuestions, sampleUrls);
       const blob = new Blob(['audio'], { type: 'audio/webm' });
@@ -198,8 +197,7 @@ describe('quizVocalComponent', () => {
     it('incorrect answer does not increment score', async () => {
       vi.mocked(globalThis.fetch).mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({ correct: false, feedback: 'Non', transcription: 'Rouge' }),
+        json: () => Promise.resolve({ correct: false, feedback: 'Non', transcription: 'Rouge' }),
       } as any);
       const comp = createVocalQuiz(sampleQuestions, sampleUrls);
       const blob = new Blob(['audio'], { type: 'audio/webm' });
@@ -257,8 +255,12 @@ describe('quizVocalComponent', () => {
         start = mockStart;
         stop = mockStop;
         state = 'recording';
-        set ondataavailable(fn: any) { onDataAvailable = fn; }
-        set onstop(fn: any) { onStop = fn; }
+        set ondataavailable(fn: any) {
+          onDataAvailable = fn;
+        }
+        set onstop(fn: any) {
+          onStop = fn;
+        }
       }
 
       mockTrackStop = vi.fn();

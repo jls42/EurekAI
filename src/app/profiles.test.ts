@@ -60,7 +60,7 @@ function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
 
 const profiles = createProfiles();
 
-function callMethod(name: string, ctx: any, ...args: any[]) {
+function callMethod(name: string, ctx: Record<string, any>, ...args: any[]) {
   return (profiles as any)[name].call(ctx, ...args);
 }
 
@@ -75,7 +75,10 @@ describe('createProfiles', () => {
   describe('selectProfile', () => {
     beforeEach(() => {
       vi.stubGlobal('document', { documentElement: { dataset: {} } });
-      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: false })),
+      );
     });
     it('sets currentProfile and saves to localStorage', () => {
       const ctx = makeCtx({
@@ -143,11 +146,14 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
       });
       // Wire up selectProfile so it works
-      ctx.selectProfile = profiles.selectProfile.bind(ctx);
+      ctx.selectProfile = profiles.selectProfile.bind(ctx as any);
 
       await callMethod('createProfile', ctx);
 
-      expect(fetch).toHaveBeenCalledWith('/api/profiles', expect.objectContaining({ method: 'POST' }));
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/profiles',
+        expect.objectContaining({ method: 'POST' }),
+      );
       expect(ctx.profiles).toHaveLength(2);
       expect(ctx.profiles[1]).toEqual(newProfile);
       // Form reset
@@ -204,7 +210,14 @@ describe('createProfiles', () => {
     });
 
     it('sends PIN in body for child profiles', async () => {
-      const newProfile = { id: 'p3', name: 'Child', age: 9, avatar: '0', locale: 'fr', hasPin: true };
+      const newProfile = {
+        id: 'p3',
+        name: 'Child',
+        age: 9,
+        avatar: '0',
+        locale: 'fr',
+        hasPin: true,
+      };
       vi.stubGlobal(
         'fetch',
         vi.fn().mockResolvedValue({
@@ -230,10 +243,7 @@ describe('createProfiles', () => {
     });
 
     it('shows error toast on fetch failure', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error')),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
       const ctx = makeCtx({
         newProfileName: 'Bob',
@@ -275,10 +285,7 @@ describe('createProfiles', () => {
     });
 
     it('executeDeleteProfile removes profile from state and clears locale', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [
@@ -305,10 +312,7 @@ describe('createProfiles', () => {
     });
 
     it('executeDeleteProfile shows picker when last profile is deleted', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
@@ -326,10 +330,7 @@ describe('createProfiles', () => {
     });
 
     it('executeDeleteProfile shows error toast on fetch failure', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error')),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
@@ -345,10 +346,7 @@ describe('createProfiles', () => {
     });
 
     it('executeDeleteProfile does not clear currentProfile when deleting a different profile', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [
@@ -370,10 +368,7 @@ describe('createProfiles', () => {
     });
 
     it('executeDeleteProfile sends PIN for profile with PIN', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', hasPin: true }],
@@ -394,10 +389,7 @@ describe('createProfiles', () => {
     });
 
     it('deleteConfirmMessage includes project count when deleting current profile with projects', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', hasPin: false }],
@@ -415,10 +407,7 @@ describe('createProfiles', () => {
     });
 
     it('deleteConfirmMessage uses no-projects message for non-current profile', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockResolvedValue({ ok: true }),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
 
       const ctx = makeCtx({
         profiles: [
@@ -479,10 +468,7 @@ describe('createProfiles', () => {
     });
 
     it('shows error toast on fetch failure', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network')),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network')));
 
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice' }],
@@ -525,7 +511,14 @@ describe('createProfiles', () => {
       });
       callMethod('startEditProfile', ctx, 'p1');
 
-      expect(ctx.editingProfile).toEqual({ id: 'p1', name: 'Alice', hasPin: false, locale: 'en', mistralVoices: { host: '', guest: '' }, theme: '' });
+      expect(ctx.editingProfile).toEqual({
+        id: 'p1',
+        name: 'Alice',
+        hasPin: false,
+        locale: 'en',
+        mistralVoices: { host: '', guest: '' },
+        theme: '',
+      });
       expect(ctx.showProfileForm).toBe(false);
     });
 
@@ -645,12 +638,15 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
         currentProfile: { id: 'p1', name: 'Alice', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       await callMethod('saveEditProfile', ctx);
 
-      expect(fetch).toHaveBeenCalledWith('/api/profiles/p1', expect.objectContaining({ method: 'PUT' }));
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/profiles/p1',
+        expect.objectContaining({ method: 'PUT' }),
+      );
       expect(ctx.editingProfile).toBeNull();
     });
 
@@ -674,8 +670,8 @@ describe('createProfiles', () => {
         },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       await callMethod('saveEditProfile', ctx);
 
@@ -686,7 +682,7 @@ describe('createProfiles', () => {
     it('returns early if editingProfile is null', async () => {
       vi.stubGlobal('fetch', vi.fn());
       const ctx = makeCtx({ editingProfile: null });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -696,7 +692,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: '   ', age: 10 },
       });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -706,7 +702,7 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: 'Test', age: 3 },
       });
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       await callMethod('saveEditProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });
@@ -725,8 +721,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'A', locale: 'fr' }],
         currentProfile: { id: 'p1', name: 'A', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
 
       callMethod('autoSaveProfile', ctx, true);
       await vi.waitFor(() => expect(ctx.setLocale).toHaveBeenCalledWith('en', true));
@@ -737,14 +733,26 @@ describe('createProfiles', () => {
 
   describe('autoSaveProfile', () => {
     it('saves profile data immediately when immediate=true', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1', name: 'A', locale: 'fr' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1', name: 'A', locale: 'fr' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          mistralVoices: { host: '', guest: '' },
+          theme: '',
+        },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx, true);
       await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
     });
@@ -761,21 +769,33 @@ describe('createProfiles', () => {
       const ctx = makeCtx({
         editingProfile: { id: 'p1', name: '  ', age: 10, avatar: '0', locale: 'fr' },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx, true);
       expect(fetch).not.toHaveBeenCalled();
     });
 
     it('debounces when immediate is false', () => {
       vi.useFakeTimers();
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1', name: 'A' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1', name: 'A' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          mistralVoices: { host: '', guest: '' },
+          theme: '',
+        },
         profiles: [{ id: 'p1', name: 'A' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
       vi.advanceTimersByTime(600);
@@ -788,14 +808,24 @@ describe('createProfiles', () => {
 
   describe('autoSaveParental', () => {
     it('saves parental fields with PIN', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1', useModeration: false }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1', useModeration: false }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', useModeration: false, chatEnabled: true, moderationCategories: [], _verifiedPin: '1234' },
+        editingProfile: {
+          id: 'p1',
+          useModeration: false,
+          chatEnabled: true,
+          moderationCategories: [],
+          _verifiedPin: '1234',
+        },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       callMethod('autoSaveParental', ctx);
       await vi.waitFor(() => expect(fetch).toHaveBeenCalled());
       const body = JSON.parse((fetch as any).mock.calls[0][1].body);
@@ -816,34 +846,61 @@ describe('createProfiles', () => {
   describe('applyThemeLive', () => {
     beforeEach(() => {
       vi.stubGlobal('document', { documentElement: { dataset: {} } });
-      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })),
+      );
     });
 
     it('applies profile theme when set', () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', theme: 'light', mistralVoices: { host: '', guest: '' } },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          theme: 'light',
+          mistralVoices: { host: '', guest: '' },
+        },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('applyThemeLive', ctx);
       expect(ctx.theme).toBe('light');
       expect((document as any).documentElement.dataset.theme).toBe('light');
     });
 
     it('falls back to system default when theme is empty', () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', theme: '', mistralVoices: { host: '', guest: '' } },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          theme: '',
+          mistralVoices: { host: '', guest: '' },
+        },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('applyThemeLive', ctx);
       expect(['dark', 'light']).toContain(ctx.theme);
     });
@@ -853,15 +910,27 @@ describe('createProfiles', () => {
 
   describe('closeEditProfile', () => {
     it('saves and clears editingProfile', () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: '', guest: '' }, theme: '' },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          mistralVoices: { host: '', guest: '' },
+          theme: '',
+        },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
       callMethod('closeEditProfile', ctx);
       expect(ctx.editingProfile).toBeNull();
     });
@@ -870,23 +939,38 @@ describe('createProfiles', () => {
   describe('resetProfileDefaults', () => {
     beforeEach(() => {
       vi.stubGlobal('document', { documentElement: { dataset: {} } });
-      vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: true })));
+      vi.stubGlobal(
+        'matchMedia',
+        vi.fn(() => ({ matches: true })),
+      );
     });
 
     it('resets voices and theme to defaults', () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: true, json: () => Promise.resolve({ id: 'p1' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () => Promise.resolve({ id: 'p1' }),
+        }),
+      );
       const ctx = makeCtx({
-        editingProfile: { id: 'p1', name: 'A', age: 10, avatar: '0', locale: 'fr', mistralVoices: { host: 'x', guest: 'y' }, theme: 'dark' },
+        editingProfile: {
+          id: 'p1',
+          name: 'A',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
+          mistralVoices: { host: 'x', guest: 'y' },
+          theme: 'dark',
+        },
         profiles: [{ id: 'p1' }],
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx);
-      ctx.applyThemeLive = profiles.applyThemeLive.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx.autoSaveProfile = profiles.autoSaveProfile.bind(ctx as any);
+      ctx.applyThemeLive = profiles.applyThemeLive.bind(ctx as any);
       callMethod('resetProfileDefaults', ctx);
       expect(ctx.editingProfile.mistralVoices).toEqual({ host: '', guest: '' });
-      expect(ctx.editingProfile.theme).toBe('');
+      expect(ctx.editingProfile.theme).toBeUndefined();
       expect(ctx.showToast).toHaveBeenCalledWith('toast.profileReset', 'success');
     });
 
@@ -924,7 +1008,7 @@ describe('createProfiles', () => {
         showPinDialog: true,
       });
       // submitPinVerify calls this.closePinDialog(), so wire it up
-      ctx.closePinDialog = profiles.closePinDialog.bind(ctx);
+      ctx.closePinDialog = profiles.closePinDialog.bind(ctx as any);
       callMethod('submitPinVerify', ctx);
 
       expect(callback).toHaveBeenCalledWith('1234');
@@ -1004,8 +1088,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', useModeration: false, hasPin: false }],
         currentProfile: { id: 'p1', name: 'Alice', useModeration: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx as any);
 
       await callMethod('toggleModeration', ctx, 'p1');
 
@@ -1029,8 +1113,8 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', chatEnabled: false, hasPin: false }],
         currentProfile: { id: 'p1', name: 'Alice', chatEnabled: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
-      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
+      ctx._toggleProfileProp = profiles._toggleProfileProp.bind(ctx as any);
 
       await callMethod('toggleChat', ctx, 'p1');
 
@@ -1072,7 +1156,7 @@ describe('createProfiles', () => {
         profiles: [{ id: 'p1', name: 'Alice', hasPin: true, useModeration: false }],
         currentProfile: { id: 'p1', name: 'Alice', useModeration: false },
       });
-      ctx.updateProfile = profiles.updateProfile.bind(ctx);
+      ctx.updateProfile = profiles.updateProfile.bind(ctx as any);
       // requirePin immediately invokes the callback with a test PIN
       ctx.requirePin = vi.fn((cb: Function) => cb('4321'));
 
@@ -1153,10 +1237,7 @@ describe('createProfiles', () => {
     });
 
     it('handles fetch error gracefully', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network')),
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network')));
 
       const ctx = makeCtx();
       ctx.selectProfile = vi.fn();
@@ -1196,27 +1277,30 @@ describe('createProfiles', () => {
 
   describe('executeDeleteProfile error handling', () => {
     it('does not clean up local state on HTTP error', async () => {
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-        ok: false, statusText: 'Forbidden',
-        json: async () => ({ error: 'Code PIN incorrect' }),
-      }));
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          statusText: 'Forbidden',
+          json: async () => ({ error: 'Code PIN incorrect' }),
+        }),
+      );
       const profile = { id: 'p-del', name: 'Test', hasPin: false };
       let deletePromise: Promise<void> | undefined;
       const ctx = makeCtx({
         profiles: [profile],
         currentProfile: { id: 'p-del' },
-        confirmDelete: vi.fn((_msg: string, cb: () => void) => { deletePromise = cb() as any; }),
+        confirmDelete: vi.fn((_msg: string, cb: () => void) => {
+          deletePromise = cb() as any;
+        }),
       });
       callMethod('deleteProfile', ctx, 'p-del');
       // Wait for the async delete operation
       await deletePromise;
-      await vi.dynamicImportSettled?.() ?? new Promise((r) => setTimeout(r, 10));
+      await (vi.dynamicImportSettled?.() ?? new Promise((r) => setTimeout(r, 10)));
       // Profile should NOT be removed since res.ok was false
       expect(ctx.profiles).toHaveLength(1);
-      expect(ctx.showToast).toHaveBeenCalledWith(
-        expect.stringContaining('toast.error'),
-        'error',
-      );
+      expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('toast.error'), 'error');
       vi.stubGlobal('fetch', vi.fn());
     });
   });
@@ -1277,32 +1361,48 @@ describe('createProfiles', () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: async () => ({}) }));
       const ctx = makeCtx({
         editingProfile: {
-          id: 'p1', name: 'Test', age: 10, avatar: '0', locale: 'fr',
+          id: 'p1',
+          name: 'Test',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
           mistralVoices: { host: 'custom-host', guest: '' },
           theme: '',
         },
         updateProfile: vi.fn(),
       });
       await callMethod('autoSaveProfile', ctx, true);
-      expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
-        mistralVoices: { host: 'custom-host', guest: '' },
-      }), expect.any(AbortSignal));
+      expect(ctx.updateProfile).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          mistralVoices: { host: 'custom-host', guest: '' },
+        }),
+        expect.any(AbortSignal),
+      );
       vi.stubGlobal('fetch', vi.fn());
     });
 
     it('sends null when both voices are empty', async () => {
       const ctx = makeCtx({
         editingProfile: {
-          id: 'p1', name: 'Test', age: 10, avatar: '0', locale: 'fr',
+          id: 'p1',
+          name: 'Test',
+          age: 10,
+          avatar: '0',
+          locale: 'fr',
           mistralVoices: { host: '', guest: '' },
           theme: '',
         },
         updateProfile: vi.fn(),
       });
       await callMethod('autoSaveProfile', ctx, true);
-      expect(ctx.updateProfile).toHaveBeenCalledWith('p1', expect.objectContaining({
-        mistralVoices: null,
-      }), expect.any(AbortSignal));
+      expect(ctx.updateProfile).toHaveBeenCalledWith(
+        'p1',
+        expect.objectContaining({
+          mistralVoices: null,
+        }),
+        expect.any(AbortSignal),
+      );
     });
   });
 });

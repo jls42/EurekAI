@@ -19,9 +19,18 @@ export async function generateSilence(durationMs: number): Promise<Buffer> {
   const outputPath = join(tmpDir, 'silence.mp3');
   try {
     await execFileAsync(ffmpegPath as string, [
-      '-y', '-f', 'lavfi', '-i', 'anullsrc=r=44100:cl=mono',
-      '-t', String(durationMs / 1000),
-      '-c:a', 'libmp3lame', '-b:a', '128k', outputPath,
+      '-y',
+      '-f',
+      'lavfi',
+      '-i',
+      'anullsrc=r=44100:cl=mono',
+      '-t',
+      String(durationMs / 1000),
+      '-c:a',
+      'libmp3lame',
+      '-b:a',
+      '128k',
+      outputPath,
     ]);
     return await readFile(outputPath);
   } finally {

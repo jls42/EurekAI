@@ -115,12 +115,22 @@ export interface QuizGeneration extends GenerationMeta {
 export interface PodcastGeneration extends GenerationMeta {
   type: 'podcast';
   data: { script: PodcastLine[]; audioUrl: string; sourceRefs?: string[] };
+  // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
+  // Aligné sur QuizVocalGeneration (cf. ligne plus bas) : les anciennes générations
+  // sans `lang` ne porteront pas de badge beta audio, pas de backfill.
+  lang?: string;
 }
 
 export interface QuizVocalGeneration extends GenerationMeta {
   type: 'quiz-vocal';
   data: QuizQuestion[];
   audioUrls: string[];
+  // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
+  // Le `?` permet de lire les anciennes générations sans ces champs (avec fallback
+  // best-effort cf. décision produit #9), mais toute nouvelle création DOIT
+  // renseigner ces deux champs (cf. routes/generate.ts:368).
+  lang?: string;
+  ageGroup?: AgeGroup;
 }
 
 export interface ImageGeneration extends GenerationMeta {
@@ -164,6 +174,31 @@ export type Generation =
   | QuizVocalGeneration
   | ImageGeneration
   | FillBlankGeneration;
+
+// Codes d'erreur stables renvoyés par /generate/auto via FailedStep.
+// Contrat client : les détails bruts (err.message, stack) restent dans les logs serveur.
+// - quota_exceeded : 429 / tier limit / rate limit côté compte utilisateur.
+// - upstream_unavailable : 503 / 529 / "overloaded" / "capacity" — saturation backend
+//   non liée au budget utilisateur, retry typiquement utile.
+// - auth_required : 401 / 403 upstream OU clé API locale non définie — action user.
+//   Distingué de quota_exceeded (compte actif mais plafonné) et tts_upstream_error
+//   (panne transitoire) parce que la réparation utilisateur est différente.
+// - tts_upstream_error : pile audio (TTS + STT), libellé i18n explicite.
+export type FailedStepCode =
+  | 'llm_invalid_json'
+  | 'quota_exceeded'
+  | 'upstream_unavailable'
+  | 'auth_required'
+  | 'tts_upstream_error'
+  | 'context_length_exceeded'
+  | 'internal_error';
+
+export interface FailedStep {
+  // Toujours un agent exécutable par /generate/auto (cf. AUTO_AGENTS_SET) :
+  // les étapes skippedSteps vont dans un champ distinct avant exécution.
+  agent: import('./generators/auto-agents.js').AutoAgentType;
+  code: FailedStepCode;
+}
 
 // --- Quiz adaptive learning ---
 
@@ -247,4 +282,9 @@ export interface AppConfig {
     host: string;
     guest: string;
   };
+  // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
+  // 'user'    : l'utilisateur a explicitement configuré les voix via settings.
+  // Permet de traiter l'override global comme intentionnel ou non sans allonger
+  // LEGACY_DEFAULT_* à chaque release qui change le défaut.
+  mistralVoicesSource?: 'default' | 'user';
 }

@@ -60,9 +60,7 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
     ...diversityParams(type),
   });
-  const retryData = unwrapJsonArray<QuizQuestion>(
-    safeParseJson(getContent(retry)),
-  );
+  const retryData = unwrapJsonArray<QuizQuestion>(safeParseJson(getContent(retry)));
 
   if (!isValidQuiz(retryData)) {
     throw new Error(errorMsg);
@@ -100,7 +98,7 @@ export async function generateQuizVocal(
 ): Promise<QuizQuestion[]> {
   return generateQuizWithRetry(
     client,
-    quizVocalSystem(ageGroup),
+    quizVocalSystem(ageGroup, lang),
     quizVocalUser(markdown, count, lang, exclusions),
     'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",

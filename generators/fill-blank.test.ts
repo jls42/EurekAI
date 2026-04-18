@@ -50,9 +50,7 @@ describe('generateFillBlank', () => {
         choices: [{ message: { content: JSON.stringify(invalidData) } }],
       });
 
-    await expect(generateFillBlank(client, 'content')).rejects.toThrow(
-      /exercices a trous valides/,
-    );
+    await expect(generateFillBlank(client, 'content')).rejects.toThrow(/exercices a trous valides/);
   });
 
   it('throws when response has empty choices', async () => {

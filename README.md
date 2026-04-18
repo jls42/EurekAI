@@ -398,7 +398,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz vocal |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Révision adaptative `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) |
-| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 5 types : summary, flashcards, quiz, fill-blank, podcast) |
+| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 7 types : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 7 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
 
 Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` exige en plus `{generationId, weakQuestions}`.
 

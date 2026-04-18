@@ -60,7 +60,10 @@ describe('validateFillBlankAnswer', () => {
   });
 
   it('match insensible aux accents', () => {
-    expect(validateFillBlankAnswer('electricite', 'électricité')).toEqual({ match: true, distance: 0 });
+    expect(validateFillBlankAnswer('electricite', 'électricité')).toEqual({
+      match: true,
+      distance: 0,
+    });
   });
 
   it('match avec article en trop', () => {

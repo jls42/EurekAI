@@ -7,6 +7,7 @@ export function createI18n() {
 
     t(this: any, key: string, params?: Record<string, string | number>): string {
       // Read this.locale to create Alpine reactivity dependency
+      // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Alpine.js reactive dependency trigger (voir NOSONAR S3735)
       this.locale; // NOSONAR(S3735) — Alpine.js reactive dependency trigger
       return i18nT(key, params);
     },
@@ -23,13 +24,23 @@ export function createI18n() {
       } else if (this.currentProfile) {
         this.currentProfile.locale = lang;
         setProfileLocale(this.currentProfile.id, lang);
+      } else if (typeof this.newProfileLocale === 'string') {
+        // Sans profil actif, la langue UI doit aussi initialiser la langue du prochain profil.
+        this.newProfileLocale = lang;
       }
     },
 
     dateLocale(this: any): string {
       const map: Record<string, string> = {
-        fr: 'fr-FR', en: 'en-GB', es: 'es-ES', pt: 'pt-BR',
-        it: 'it-IT', nl: 'nl-NL', de: 'de-DE', hi: 'hi-IN', ar: 'ar-SA',
+        fr: 'fr-FR',
+        en: 'en-GB',
+        es: 'es-ES',
+        pt: 'pt-BR',
+        it: 'it-IT',
+        nl: 'nl-NL',
+        de: 'de-DE',
+        hi: 'hi-IN',
+        ar: 'ar-SA',
       };
       return map[this.locale] || this.locale;
     },

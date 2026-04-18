@@ -17,7 +17,9 @@ vi.mock('../prompts.js', () => ({
 import { generateImage } from './image.js';
 import { writeFileSync } from 'node:fs';
 
-function createClient(outputs: any[] = [{ content: [{ imageUrl: 'https://example.com/image.png' }] }]) {
+function createClient(
+  outputs: any[] = [{ content: [{ imageUrl: 'https://example.com/image.png' }] }],
+) {
   return {
     beta: {
       agents: {
@@ -70,18 +72,18 @@ describe('generateImage', () => {
   it('throws when no image found in outputs', async () => {
     const client = createClient([{ content: [{ text: 'No image here' }] }]);
 
-    await expect(
-      generateImage(client, '# Content', '/tmp/project', 'pid-3'),
-    ).rejects.toThrow("Aucune image generee par l'agent");
+    await expect(generateImage(client, '# Content', '/tmp/project', 'pid-3')).rejects.toThrow(
+      "Aucune image generee par l'agent",
+    );
   });
 
   it('cleans up agent even on error', async () => {
     const client = createClient();
     client.beta.conversations.start.mockRejectedValue(new Error('API error'));
 
-    await expect(
-      generateImage(client, '# Content', '/tmp/project', 'pid-4'),
-    ).rejects.toThrow('API error');
+    await expect(generateImage(client, '# Content', '/tmp/project', 'pid-4')).rejects.toThrow(
+      'API error',
+    );
     expect(client.beta.agents.delete).toHaveBeenCalledWith({ agentId: 'agent-img' });
   });
 });

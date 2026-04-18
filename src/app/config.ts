@@ -1,3 +1,6 @@
+import { selectVoices } from '@helpers/voice-selection';
+import type { MistralVoice } from '@helpers/voice-types';
+
 export function createConfig() {
   return {
     async loadConfig(this: any) {
@@ -35,8 +38,13 @@ export function createConfig() {
           const parts = (v.name || '').split(' - ');
           const langFull = v.languages?.[0] || '';
           return {
+            // Champs MistralVoice bruts pour selectVoices (cf. helpers/voice-types.ts)
             id: v.id,
             name: v.name,
+            languages: v.languages ?? [],
+            gender: v.gender,
+            tags: v.tags,
+            // Enrichissement UI (speaker/emotion parsés depuis name)
             speaker: parts[0] || v.name,
             emotion: parts[1] || '',
             lang: langFull.split('_')[0] || '',
@@ -60,19 +68,46 @@ export function createConfig() {
       return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.codePointAt(0) - 65));
     },
 
-    defaultVoiceHint(this: any, locale: string): string {
-      const sel: Record<string, { host: { speaker: string; tag: string }; guest: { speaker: string; tag: string } }> = {
-        fr: { host: { speaker: 'Marie', tag: 'Excited' }, guest: { speaker: 'Marie', tag: 'Curious' } },
-        en: { host: { speaker: 'Jane', tag: 'Curious' }, guest: { speaker: 'Oliver', tag: 'Cheerful' } },
+    // Hint affiché dans l'éditeur de profil (cf. profile-picker.html:383).
+    // Reflète la sélection par défaut pour les champs profil laissés sur "Par défaut".
+    // Converge avec resolveVoices() backend à config et liste de voix égales.
+    //
+    // Priorités alignées sur le backend :
+    // 1. Si l'utilisateur a configuré explicitement des voix globales
+    //    (mistralVoicesSource === 'user'), afficher ces voix — le backend les utilisera.
+    // 2. Sinon, selectVoices() sur le catalogue (rotation par profileId).
+    defaultVoiceHint(this: any, locale: string, profileId?: string): string {
+      if (!this.mistralVoicesList || this.mistralVoicesList.length === 0) return '';
+      const formatName = (id: string): string => {
+        const match = this.mistralVoicesList.find((v: any) => v.id === id);
+        if (!match) return '';
+        const emotion = match.emotion ? this.translateEmotion(match.emotion) : '';
+        return emotion ? `${match.speaker} - ${emotion}` : match.speaker;
       };
+
+      // Priorité 1 : override global explicite ("mistralVoicesSource === 'user'").
+      const cfg = this.configDraft;
+      if (
+        cfg?.mistralVoicesSource === 'user' &&
+        cfg.mistralVoices?.host &&
+        cfg.mistralVoices?.guest
+      ) {
+        const globalHost = formatName(cfg.mistralVoices.host);
+        const globalGuest = formatName(cfg.mistralVoices.guest);
+        if (globalHost && globalGuest) return `${globalHost} / ${globalGuest}`;
+        // Si l'ID global n'est pas retrouvable dans la liste (voix supprimée côté Mistral),
+        // on retombe sur selectVoices plutôt que d'afficher vide.
+      }
+
+      // Priorité 2 : sélection dynamique.
       const lang = (locale || 'fr').slice(0, 2);
-      const criteria = sel[lang];
-      if (!criteria) return '';
-      const findName = (c: { speaker: string; tag: string }) => {
-        const match = this.mistralVoicesList.find((v: any) => v.speaker === c.speaker && v.emotion === c.tag && v.lang === lang);
-        return match ? `${match.speaker} - ${this.translateEmotion(match.emotion)}` : `${c.speaker} - ${c.tag}`;
-      };
-      return `${findName(criteria.host)} / ${findName(criteria.guest)}`;
+      const voices = this.mistralVoicesList as MistralVoice[];
+      const result = selectVoices({ voices, lang, profileId });
+      if (!result) return '';
+      const hostName = formatName(result.host);
+      const guestName = formatName(result.guest);
+      if (!hostName || !guestName) return '';
+      return `${hostName} / ${guestName}`;
     },
 
     async saveSettings(this: any) {
@@ -110,6 +145,8 @@ export function createConfig() {
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) this.apiStatus = await statusRes.json();
+          // Refresh voice cache : Mistral peut avoir publié de nouvelles voix depuis l'init.
+          await this.loadMistralVoices();
           this.$refs.settingsDialog?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         } else {
@@ -128,6 +165,8 @@ export function createConfig() {
           const saved = await res.json();
           this.configDraft = structuredClone(saved);
           this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
+          // Refresh voice cache : même raison que saveSettings.
+          await this.loadMistralVoices();
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');

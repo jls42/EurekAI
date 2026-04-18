@@ -90,7 +90,7 @@
         </button>
 
         <button
-          @click="$refs.settingsDialog?.showModal(); refreshIcons()"
+          @click="loadMistralVoices(); $refs.settingsDialog?.showModal(); refreshIcons()"
           class="min-h-touch min-w-[40px] sm:min-w-[44px] flex items-center justify-center focus-ring rounded-button btn-press"
           :aria-label="t('settings.title')"
           :title="t('settings.title')"

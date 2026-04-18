@@ -218,7 +218,8 @@ describe('init', () => {
     origWindow = globalThis.window;
     vi.stubGlobal('window', {
       addEventListener: vi.fn((event: string, handler: Function) => {
-        (windowListeners[event] ??= []).push(handler);
+        windowListeners[event] ??= [];
+        windowListeners[event].push(handler);
       }),
     });
 
@@ -227,7 +228,8 @@ describe('init', () => {
     vi.stubGlobal('document', {
       documentElement: { dataset: {} },
       addEventListener: vi.fn((event: string, handler: Function) => {
-        (documentListeners[event] ??= []).push(handler);
+        documentListeners[event] ??= [];
+        documentListeners[event].push(handler);
       }),
     });
 

@@ -23,10 +23,12 @@ export const pt: Record<string, string> = {
   'gen.quiz-vocal': 'Quiz vocal',
   'gen.fill-blank': 'Preencher lacunas',
   'gen.image': 'Imagem',
+  'gen.betaAudio': '\u00c1udio beta',
   'gen.auto': 'Auto \u2014 analisando...',
   'gen.estimatedCost': 'Custo estimado (tarifas Mistral)',
   'gen.apiCalls': 'chamada(s) API',
-  'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
+  'gen.costTooltip':
+    'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
@@ -36,7 +38,18 @@ export const pt: Record<string, string> = {
   'gen.questionCount': 'Quantidade:',
   'gen.needsElevenLabs': 'Requer uma chave de API do ElevenLabs',
   'gen.needsTts': 'Requer um provedor de TTS configurado',
-  'gen.contextTooLarge': 'Conteudo muito longo ({pct}% da capacidade do modelo). Selecione menos fontes.',
+  'gen.contextTooLarge':
+    'Conteudo muito longo ({pct}% da capacidade do modelo). Selecione menos fontes.',
+
+  'errorCode.internal_error': 'Erro interno do servidor',
+  'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
+  'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
+  'errorCode.upstream_unavailable':
+    'Servi\u00e7o temporariamente indispon\u00edvel, tente novamente em breve',
+  'errorCode.context_length_exceeded': 'Conte\u00fado demasiado longo para o modelo',
+  'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
+  'errorCode.upload_failed': 'Falha no envio',
+  'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
@@ -111,7 +124,8 @@ export const pt: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarc\u00e1stico',
   'emotion.Shameful': 'Envergonhado',
-  'settings.mistralVoicesHint': 'Vozes Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Vozes Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Ficha',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -139,7 +153,8 @@ export const pt: Record<string, string> = {
   'sources.text': 'Texto',
   'sources.voice': 'Voz',
   'sources.web': 'Web',
-  'sources.textPlaceholder': 'Digite texto livre (assunto, anota\u00e7\u00f5es de aula, pergunta...)',
+  'sources.textPlaceholder':
+    'Digite texto livre (assunto, anota\u00e7\u00f5es de aula, pergunta...)',
   'sources.webPlaceholder': 'Pesquisar ou colar uma URL...',
   'sources.scrapeEngine': 'Motor:',
   'sources.scrapeAutoTip': 'Readability depois Lightpanda se necessario',
@@ -180,7 +195,8 @@ export const pt: Record<string, string> = {
   'sourceDialog.rotateRight': 'Girar para a direita',
   'sourceDialog.originalDoc': 'Documento original',
   'sourceDialog.extractedText': 'Texto extra\u00eddo (OCR)',
-  'sourceDialog.legacyNotAvailable': 'Documento original n\u00e3o dispon\u00edvel para esta fonte legada.',
+  'sourceDialog.legacyNotAvailable':
+    'Documento original n\u00e3o dispon\u00edvel para esta fonte legada.',
   'sourceDialog.legacyHint': 'As novas fontes OCR suportam compara\u00e7\u00e3o.',
   'sourceDialog.layoutHorizontal': 'Visualiza\u00e7\u00e3o lado a lado',
   'sourceDialog.layoutVertical': 'Visualiza\u00e7\u00e3o empilhada',
@@ -233,7 +249,7 @@ export const pt: Record<string, string> = {
   'quiz.answerMic': 'Responder por voz',
   'quiz.checking': 'Verificando...',
   'quiz.correct': 'Correto!',
-  'quiz.incorrect': 'N\u00e3o exatamente...',
+  'quiz.incorrect': 'Incorreto',
   'quiz.youSaid': 'Voc\u00ea disse: {text}',
   'quiz.nextQuestion': 'Pr\u00f3xima quest\u00e3o',
   'quiz.verificationError': 'Erro de verifica\u00e7\u00e3o',
@@ -266,8 +282,10 @@ export const pt: Record<string, string> = {
   'podcast.script': 'Roteiro',
   'podcast.lines': '({count} falas)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs': 'Configure ELEVENLABS_API_KEY no arquivo .env para habilitar podcasts com \u00e1udio',
-  'podcast.noTts': 'Configure um provedor de TTS (Mistral ou ElevenLabs) para habilitar podcasts com \u00e1udio',
+  'podcast.noElevenLabs':
+    'Configure ELEVENLABS_API_KEY no arquivo .env para habilitar podcasts com \u00e1udio',
+  'podcast.noTts':
+    'Configure um provedor de TTS (Mistral ou ElevenLabs) para habilitar podcasts com \u00e1udio',
 
   'image.heading': 'Ilustra\u00e7\u00f5es',
   'image.new': 'Ilustrar',
@@ -298,10 +316,12 @@ export const pt: Record<string, string> = {
   'consigne.reAnalyze': 'Reanalisar',
   'consigne.understood': 'Entendi!',
   'consigne.dismiss': 'Ignorar',
-  'consigne.dismissed': 'Instru\u00e7\u00f5es ignoradas \u2014 as gera\u00e7\u00f5es n\u00e3o ser\u00e3o mais direcionadas',
+  'consigne.dismissed':
+    'Instru\u00e7\u00f5es ignoradas \u2014 as gera\u00e7\u00f5es n\u00e3o ser\u00e3o mais direcionadas',
   'consigne.dismissedLabel': 'Instru\u00e7\u00f5es de estudo ignoradas',
   'consigne.reEnable': 'Reativar',
-  'consigne.reEnabled': 'Instru\u00e7\u00f5es reativadas \u2014 as gera\u00e7\u00f5es ser\u00e3o direcionadas',
+  'consigne.reEnabled':
+    'Instru\u00e7\u00f5es reativadas \u2014 as gera\u00e7\u00f5es ser\u00e3o direcionadas',
 
   'scores.heading': 'Minhas Pontua\u00e7\u00f5es',
   'scores.emptyTitle': 'Responda um quiz para ver suas pontua\u00e7\u00f5es aqui!',
@@ -372,7 +392,8 @@ export const pt: Record<string, string> = {
   'toast.scoreError': 'Erro ao salvar pontua\u00e7\u00e3o',
   'toast.reviewGenerated': 'Quiz de revis\u00e3o gerado!',
   'toast.reviewError': 'Erro na gera\u00e7\u00e3o de revis\u00e3o',
-  'moderation.blocked': 'Este conte\u00fado foi sinalizado como inapropriado. A gera\u00e7\u00e3o est\u00e1 bloqueada.',
+  'moderation.blocked':
+    'Este conte\u00fado foi sinalizado como inapropriado. A gera\u00e7\u00e3o est\u00e1 bloqueada.',
   'moderation.pending': 'Modera\u00e7\u00e3o em andamento',
   'moderation.error': 'Modera\u00e7\u00e3o indispon\u00edvel',
   'moderation.unsafe': 'Conte\u00fado sinalizado',
@@ -388,14 +409,16 @@ export const pt: Record<string, string> = {
   'moderation.cat.pii': 'Dados pessoais',
   'moderation.cat.jailbreaking': 'Jailbreaking',
 
-  'chat.ageRestricted': 'O chat n\u00e3o est\u00e1 habilitado para este perfil. Um respons\u00e1vel pode autoriz\u00e1-lo.',
+  'chat.ageRestricted':
+    'O chat n\u00e3o est\u00e1 habilitado para este perfil. Um respons\u00e1vel pode autoriz\u00e1-lo.',
   'chat.ageRestrictedTooltip': 'Chat desabilitado para este perfil',
   'chat.moderationBlocked': 'Esta mensagem foi bloqueada pela modera\u00e7\u00e3o.',
 
   'profile.pinLabel': 'C\u00f3digo PIN dos pais',
   'profile.pinPlaceholder': 'C\u00f3digo de 4 d\u00edgitos',
   'profile.pinConfirmLabel': 'Confirmar c\u00f3digo PIN',
-  'profile.pinRequired': 'Um c\u00f3digo PIN \u00e9 obrigat\u00f3rio para perfis de menores de 15 anos',
+  'profile.pinRequired':
+    'Um c\u00f3digo PIN \u00e9 obrigat\u00f3rio para perfis de menores de 15 anos',
   'profile.pinMismatch': 'Os c\u00f3digos PIN n\u00e3o coincidem',
   'profile.pinVerify': 'Verifica\u00e7\u00e3o dos pais',
   'profile.pinWrong': 'C\u00f3digo PIN incorreto',
@@ -415,9 +438,10 @@ export const pt: Record<string, string> = {
   'profile.themeDark': 'Escuro',
   'profile.themeLight': 'Claro',
   'profile.voicePreferences': 'Vozes',
-  'profile.voicePreferencesHint': 'Personalize as vozes para conteudo de audio (podcasts, quiz vocais, leitura)',
+  'profile.voicePreferencesHint':
+    'Personalize as vozes para conteudo de audio (podcasts, quiz vocais, leitura)',
   'profile.voiceDefault': 'Padrao (de acordo com o idioma)',
-  'profile.voiceCurrentDefault': 'Padrao atual:',
+  'profile.voiceCurrentDefault': 'Padr\u00e3o para campos em \u00abPadr\u00e3o\u00bb:',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Voltar',
 

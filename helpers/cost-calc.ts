@@ -18,8 +18,11 @@ export function calculateCost(usage: ApiUsage): number {
   const pricing = resolvePricing(usage.model);
   if (!pricing) return 0;
   if (pricing.unit === 'tokens') {
-    return ((usage.promptTokens || 0) * pricing.inputPerMillion +
-            (usage.completionTokens || 0) * pricing.outputPerMillion) / 1_000_000;
+    return (
+      ((usage.promptTokens || 0) * pricing.inputPerMillion +
+        (usage.completionTokens || 0) * pricing.outputPerMillion) /
+      1_000_000
+    );
   }
   return (getQuantity(usage, pricing.unit) * pricing.inputPerMillion) / 1_000_000;
 }
@@ -31,7 +34,9 @@ function addOptional(acc: number | undefined, val: number | undefined): number |
 
 /** Aggregate multiple API call usages into a single GenerationUsage. */
 export function aggregateUsage(entries: ApiUsage[]): GenerationUsage {
-  let promptTokens = 0, completionTokens = 0, totalTokens = 0;
+  let promptTokens = 0,
+    completionTokens = 0,
+    totalTokens = 0;
   let promptAudioSeconds: number | undefined;
   let pagesProcessed: number | undefined;
   let inputCharacters: number | undefined;
@@ -45,7 +50,15 @@ export function aggregateUsage(entries: ApiUsage[]): GenerationUsage {
     inputCharacters = addOptional(inputCharacters, e.inputCharacters);
   }
 
-  return { promptTokens, completionTokens, totalTokens, promptAudioSeconds, pagesProcessed, inputCharacters, callCount: entries.length };
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens,
+    promptAudioSeconds,
+    pagesProcessed,
+    inputCharacters,
+    callCount: entries.length,
+  };
 }
 
 /** Calculate total cost in USD across multiple API calls. */
@@ -67,17 +80,52 @@ function breakdownEntry(usage: ApiUsage, pricing: ModelPricing): string[] {
   const lines: string[] = [];
   switch (pricing.unit) {
     case 'tokens':
-      if (usage.promptTokens) lines.push(costLine(`${usage.promptTokens} tokens in`, `$${pricing.inputPerMillion}/M`, (usage.promptTokens * pricing.inputPerMillion) / 1_000_000));
-      if (usage.completionTokens) lines.push(costLine(`${usage.completionTokens} tokens out`, `$${pricing.outputPerMillion}/M`, (usage.completionTokens * pricing.outputPerMillion) / 1_000_000));
+      if (usage.promptTokens)
+        lines.push(
+          costLine(
+            `${usage.promptTokens} tokens in`,
+            `$${pricing.inputPerMillion}/M`,
+            (usage.promptTokens * pricing.inputPerMillion) / 1_000_000,
+          ),
+        );
+      if (usage.completionTokens)
+        lines.push(
+          costLine(
+            `${usage.completionTokens} tokens out`,
+            `$${pricing.outputPerMillion}/M`,
+            (usage.completionTokens * pricing.outputPerMillion) / 1_000_000,
+          ),
+        );
       break;
     case 'characters':
-      if (usage.inputCharacters) lines.push(costLine(`${usage.inputCharacters} chars`, `$${pricing.inputPerMillion}/M`, (usage.inputCharacters * pricing.inputPerMillion) / 1_000_000));
+      if (usage.inputCharacters)
+        lines.push(
+          costLine(
+            `${usage.inputCharacters} chars`,
+            `$${pricing.inputPerMillion}/M`,
+            (usage.inputCharacters * pricing.inputPerMillion) / 1_000_000,
+          ),
+        );
       break;
     case 'pages':
-      if (usage.pagesProcessed) lines.push(costLine(`${usage.pagesProcessed} page(s)`, `$${pricing.inputPerMillion / 1000}/1K pages`, (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000));
+      if (usage.pagesProcessed)
+        lines.push(
+          costLine(
+            `${usage.pagesProcessed} page(s)`,
+            `$${pricing.inputPerMillion / 1000}/1K pages`,
+            (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000,
+          ),
+        );
       break;
     case 'audio-seconds':
-      if (usage.promptAudioSeconds) lines.push(costLine(`${usage.promptAudioSeconds.toFixed(1)}s audio`, `$${(pricing.inputPerMillion / 1_000_000 * 60).toFixed(4)}/min`, (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000));
+      if (usage.promptAudioSeconds)
+        lines.push(
+          costLine(
+            `${usage.promptAudioSeconds.toFixed(1)}s audio`,
+            `$${((pricing.inputPerMillion / 1_000_000) * 60).toFixed(4)}/min`,
+            (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000,
+          ),
+        );
       break;
   }
   return lines;

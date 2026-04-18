@@ -23,10 +23,12 @@ export const de: Record<string, string> = {
   'gen.quiz-vocal': 'Sprach-Quiz',
   'gen.fill-blank': 'L\u00fcckentext',
   'gen.image': 'Bild',
+  'gen.betaAudio': 'Beta-Audio',
   'gen.auto': 'Auto \u2014 Analyse...',
   'gen.estimatedCost': 'Gesch\u00e4tzte Kosten (Mistral-Tarife)',
   'gen.apiCalls': 'API-Aufruf(e)',
-  'gen.costTooltip': 'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
+  'gen.costTooltip':
+    'Estimate — {input} tokens in + {output} tokens out · {calls} API call(s) · Official Mistral pricing',
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
@@ -36,7 +38,18 @@ export const de: Record<string, string> = {
   'gen.questionCount': 'Anzahl:',
   'gen.needsElevenLabs': 'Erfordert einen ElevenLabs-API-Schl\u00fcssel',
   'gen.needsTts': 'Erfordert einen konfigurierten TTS-Anbieter',
-  'gen.contextTooLarge': 'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
+  'gen.contextTooLarge':
+    'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
+
+  'errorCode.internal_error': 'Interner Serverfehler',
+  'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
+  'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
+  'errorCode.upstream_unavailable':
+    'Dienst vor\u00fcbergehend nicht verf\u00fcgbar, bitte bald erneut versuchen',
+  'errorCode.context_length_exceeded': 'Inhalt zu lang f\u00fcr das Modell',
+  'errorCode.llm_invalid_json': 'Ung\u00fcltige KI-Antwort',
+  'errorCode.upload_failed': 'Upload fehlgeschlagen',
+  'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',
@@ -90,7 +103,8 @@ export const de: Record<string, string> = {
   'settings.apiStatus': 'API-Status',
   'settings.aiModels': 'KI-Modelle',
   'settings.aiModel': 'KI-Modell',
-  'settings.aiModelHint': 'Verwendet f\u00fcr Zusammenfassungen, Lernkarten, Quiz, Podcast und Chat',
+  'settings.aiModelHint':
+    'Verwendet f\u00fcr Zusammenfassungen, Lernkarten, Quiz, Podcast und Chat',
   'settings.recommended': 'Empfohlen',
   'settings.voiceTts': 'Stimme & TTS',
   'settings.ttsProvider': 'TTS-Anbieter',
@@ -111,7 +125,8 @@ export const de: Record<string, string> = {
   'emotion.Sad': 'Traurig',
   'emotion.Sarcasm': 'Sarkasmus',
   'emotion.Shameful': 'Besch\u00e4mt',
-  'settings.mistralVoicesHint': 'Mistral-Stimmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
+  'settings.mistralVoicesHint':
+    'Mistral-Stimmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Zusammenfassung',
   'settings.flashcards': 'Lernkarten',
   'settings.quiz': 'Quiz',
@@ -180,7 +195,8 @@ export const de: Record<string, string> = {
   'sourceDialog.rotateRight': 'Rechts drehen',
   'sourceDialog.originalDoc': 'Originaldokument',
   'sourceDialog.extractedText': 'Extrahierter Text (OCR)',
-  'sourceDialog.legacyNotAvailable': 'Originaldokument f\u00fcr diese alte Quelle nicht verf\u00fcgbar.',
+  'sourceDialog.legacyNotAvailable':
+    'Originaldokument f\u00fcr diese alte Quelle nicht verf\u00fcgbar.',
   'sourceDialog.legacyHint': 'Neue OCR-Quellen unterst\u00fctzen den Vergleich.',
   'sourceDialog.layoutHorizontal': 'Nebeneinander-Ansicht',
   'sourceDialog.layoutVertical': 'Gestapelte Ansicht',
@@ -233,7 +249,7 @@ export const de: Record<string, string> = {
   'quiz.answerMic': 'Per Sprache antworten',
   'quiz.checking': 'Wird gepr\u00fcft...',
   'quiz.correct': 'Richtig!',
-  'quiz.incorrect': 'Nicht ganz...',
+  'quiz.incorrect': 'Falsch',
   'quiz.youSaid': 'Du hast gesagt: {text}',
   'quiz.nextQuestion': 'N\u00e4chste Frage',
   'quiz.verificationError': 'Pr\u00fcfungsfehler',
@@ -266,8 +282,10 @@ export const de: Record<string, string> = {
   'podcast.script': 'Skript',
   'podcast.lines': '({count} Zeilen)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs': 'Konfiguriere ELEVENLABS_API_KEY in deiner .env-Datei um Audio-Podcasts zu aktivieren',
-  'podcast.noTts': 'Konfiguriere einen TTS-Anbieter (Mistral oder ElevenLabs) um Audio-Podcasts zu aktivieren',
+  'podcast.noElevenLabs':
+    'Konfiguriere ELEVENLABS_API_KEY in deiner .env-Datei um Audio-Podcasts zu aktivieren',
+  'podcast.noTts':
+    'Konfiguriere einen TTS-Anbieter (Mistral oder ElevenLabs) um Audio-Podcasts zu aktivieren',
 
   'image.heading': 'Illustrationen',
   'image.new': 'Illustrieren',
@@ -298,7 +316,8 @@ export const de: Record<string, string> = {
   'consigne.reAnalyze': 'Erneut analysieren',
   'consigne.understood': 'Verstanden!',
   'consigne.dismiss': 'Ignorieren',
-  'consigne.dismissed': 'Hinweise ignoriert \u2014 Generierungen werden nicht mehr gezielt ausgerichtet',
+  'consigne.dismissed':
+    'Hinweise ignoriert \u2014 Generierungen werden nicht mehr gezielt ausgerichtet',
   'consigne.dismissedLabel': 'Lernhinweise ignoriert',
   'consigne.reEnable': 'Wieder aktivieren',
   'consigne.reEnabled': 'Hinweise reaktiviert \u2014 Generierungen werden gezielt ausgerichtet',
@@ -309,7 +328,8 @@ export const de: Record<string, string> = {
   'scores.goToMagic': 'Zur Magie',
   'scores.attempts': '{count} Versuch(e)',
 
-  'tabCourses.addPhotoText': 'F\u00fcge ein Foto oder einen Text hinzu um mit dem Lernen zu beginnen',
+  'tabCourses.addPhotoText':
+    'F\u00fcge ein Foto oder einen Text hinzu um mit dem Lernen zu beginnen',
 
   'profile.whoIsLearning': 'Wer lernt heute?',
   'profile.selectOrCreate': 'W\u00e4hle dein Profil oder erstelle ein neues',
@@ -372,7 +392,8 @@ export const de: Record<string, string> = {
   'toast.scoreError': 'Fehler beim Speichern der Punkte',
   'toast.reviewGenerated': 'Wiederholungs-Quiz generiert!',
   'toast.reviewError': 'Fehler bei der Wiederholungsgenerierung',
-  'moderation.blocked': 'Dieser Inhalt wurde als unangemessen eingestuft. Die Generierung ist blockiert.',
+  'moderation.blocked':
+    'Dieser Inhalt wurde als unangemessen eingestuft. Die Generierung ist blockiert.',
   'moderation.pending': 'Moderation l\u00e4uft',
   'moderation.error': 'Moderation nicht verf\u00fcgbar',
   'moderation.unsafe': 'Gemeldeter Inhalt',
@@ -388,7 +409,8 @@ export const de: Record<string, string> = {
   'moderation.cat.pii': 'Personliche Daten',
   'moderation.cat.jailbreaking': 'Jailbreaking',
 
-  'chat.ageRestricted': 'Der Chat ist f\u00fcr dieses Profil nicht aktiviert. Ein Elternteil kann ihn freigeben.',
+  'chat.ageRestricted':
+    'Der Chat ist f\u00fcr dieses Profil nicht aktiviert. Ein Elternteil kann ihn freigeben.',
   'chat.ageRestrictedTooltip': 'Chat f\u00fcr dieses Profil deaktiviert',
   'chat.moderationBlocked': 'Diese Nachricht wurde von der Moderation blockiert.',
 
@@ -415,9 +437,10 @@ export const de: Record<string, string> = {
   'profile.themeDark': 'Dunkel',
   'profile.themeLight': 'Hell',
   'profile.voicePreferences': 'Stimmen',
-  'profile.voicePreferencesHint': 'Stimmen fuer Audioinhalte anpassen (Podcasts, Sprachquiz, Vorlesen)',
+  'profile.voicePreferencesHint':
+    'Stimmen fuer Audioinhalte anpassen (Podcasts, Sprachquiz, Vorlesen)',
   'profile.voiceDefault': 'Standard (sprachabhaengig)',
-  'profile.voiceCurrentDefault': 'Aktueller Standard:',
+  'profile.voiceCurrentDefault': 'Standard f\u00fcr Felder auf \u201eStandard\u201c:',
   'profile.resetDefaults': 'Zuruecksetzen',
   'profile.backToProfiles': 'Zurueck',
 

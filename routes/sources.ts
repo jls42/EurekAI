@@ -13,6 +13,7 @@ import { detectConsigne } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
@@ -25,14 +26,22 @@ function errorModeration(): Source['moderation'] {
   return { status: 'error', categories: {} };
 }
 
-async function triggerConsigneDetection(store: ProjectStore, client: Mistral, pid: string, lang = 'fr') {
+async function triggerConsigneDetection(
+  store: ProjectStore,
+  client: Mistral,
+  pid: string,
+  lang = 'fr',
+) {
   try {
     const project = store.getProject(pid);
     if (!project || project.sources.length === 0) return;
     const markdown = getMarkdown(project.sources);
     const result = await detectConsigne(client, markdown, undefined, lang);
     if (!store.setConsigne(pid, result)) return;
-    logger.info('consigne', `detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`);
+    logger.info(
+      'consigne',
+      `detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`,
+    );
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
   }
@@ -112,11 +121,17 @@ export function sourceRoutes(
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
       elapsed = stop();
-      logger.info('sources', `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`);
+      logger.info(
+        'sources',
+        `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
+      );
     } else {
       ({ markdown, elapsed, confidence } = await ocrFile(client, file.path, file.originalname));
       const confStr = confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : '';
-      logger.info('sources', `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confStr})`);
+      logger.info(
+        'sources',
+        `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confStr})`,
+      );
     }
     return {
       id: randomUUID(),
@@ -140,8 +155,8 @@ export function sourceRoutes(
     modCats: string[] | null,
   ): Promise<UploadOutcome> {
     try {
-      const { result: source, usage } = await runWithUsageTracking(
-        () => processUploadedFile(file, pid, modCats),
+      const { result: source, usage } = await runWithUsageTracking(() =>
+        processUploadedFile(file, pid, modCats),
       );
       const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
       if (persisted) {
@@ -157,13 +172,18 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
       }
       logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-      const msg = e instanceof Error ? e.message : String(e);
-      return { failure: { filename: file.originalname, error: msg } };
+      // Code stable (pas d'err.message brut) : les détails restent dans logger.error ci-dessus.
+      return { failure: { filename: file.originalname, error: extractErrorCode(e) } };
     }
   }
 
   /** Fire consigne detection + per-source moderation for the successfully uploaded files. */
-  function triggerUploadDownstream(pid: string, lang: string, modCats: string[] | null, results: Source[]) {
+  function triggerUploadDownstream(
+    pid: string,
+    lang: string,
+    modCats: string[] | null,
+    results: Source[],
+  ) {
     void triggerConsigneDetection(store, client, pid, lang);
     if (!modCats) return;
     for (const src of results) {
@@ -174,8 +194,8 @@ export function sourceRoutes(
   /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
   function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
     if (results.length === 0) {
-      const aggregated = failures.map((f) => `${f.filename}: ${f.error}`).join('; ');
-      res.status(500).json({ error: `Echec upload: ${aggregated}` });
+      // error = code stable ; failures[] expose par-fichier { filename, error: code }.
+      res.status(500).json({ error: 'upload_failed', failures });
       return;
     }
     if (failures.length === 0) {
@@ -292,7 +312,11 @@ export function sourceRoutes(
         uploadedAt: new Date().toISOString(),
         sourceType: 'voice',
         moderation: modCats ? pendingModeration() : undefined,
-        ...(persisted && { usage: persisted.usage, estimatedCost: persisted.cost, costBreakdown: persisted.costBreakdown }),
+        ...(persisted && {
+          usage: persisted.usage,
+          estimatedCost: persisted.cost,
+          costBreakdown: persisted.costBreakdown,
+        }),
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
@@ -307,9 +331,7 @@ export function sourceRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
       logger.error('sources', 'STT error:', e);
-      res.status(500).json({
-        error: `Transcription echouee: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      res.status(500).json({ error: extractErrorCode(e, 'stt') });
     }
   });
 
@@ -326,21 +348,49 @@ export function sourceRoutes(
       const stop = startTimer();
       const result = await fetchPageContent(url, scrapeMode as any);
       const elapsed = stop();
-      logger.info('sources', `URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`);
+      logger.info(
+        'sources',
+        `URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`,
+      );
       return {
-        id: randomUUID(), filename: url.slice(0, 80), markdown: result.text,
-        uploadedAt: now, sourceType: 'websearch', scrapeEngine: result.engine,
+        id: randomUUID(),
+        filename: url.slice(0, 80),
+        markdown: result.text,
+        uploadedAt: now,
+        sourceType: 'websearch',
+        scrapeEngine: result.engine,
         moderation: modCats ? pendingModeration() : undefined,
       };
-    } catch {
-      logger.warn('sources', `URL scrape failed for "${url}", falling back to web search`);
+    } catch (scrapeError) {
+      // Discrimination : SyntaxError signe un bug de parseur (JSON/HTML corrompu côté
+      // notre code), pas une panne réseau — on log en error et rethrow pour surfacer le
+      // bug au lieu de le masquer derrière un fallback web search trompeur.
+      // Note : TypeError n'est PAS rethrow ici car `fetch()` natif de Node lance
+      // `TypeError: fetch failed` sur DNS/TLS/ECONNREFUSED — c'est le cas le plus courant
+      // pour les URLs mortes saisies par un enfant, elles doivent fallback sur la web search.
+      if (scrapeError instanceof SyntaxError) {
+        logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
+        throw scrapeError;
+      }
+      logger.warn(
+        'sources',
+        `URL scrape failed for "${url}", falling back to web search:`,
+        scrapeError,
+      );
     }
     try {
       const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
-      logger.info('sources', `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+      logger.info(
+        'sources',
+        `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
+      );
       return {
-        id: randomUUID(), filename: url.slice(0, 80), markdown: text,
-        uploadedAt: now, sourceType: 'websearch', scrapeEngine: 'mistral',
+        id: randomUUID(),
+        filename: url.slice(0, 80),
+        markdown: text,
+        uploadedAt: now,
+        sourceType: 'websearch',
+        scrapeEngine: 'mistral',
         moderation: modCats ? pendingModeration() : undefined,
       };
     } catch (e) {
@@ -359,7 +409,10 @@ export function sourceRoutes(
   ): Promise<Source> {
     const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
     const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
-    logger.info('sources', `Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`);
+    logger.info(
+      'sources',
+      `Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
+    );
     return {
       id: randomUUID(),
       filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
@@ -372,11 +425,18 @@ export function sourceRoutes(
 
   /** Track a web source fetch, persist cost, and decorate source if non-null. */
   async function trackWebSource(
-    pid: string, label: string, fn: () => Promise<Source | null>,
+    pid: string,
+    label: string,
+    fn: () => Promise<Source | null>,
   ): Promise<Source | null> {
     try {
       const { result: source, usage } = await runWithUsageTracking(fn);
-      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch`, usage);
+      const persisted = persistUsage(
+        store,
+        pid,
+        `POST /api/projects/${pid}/sources/websearch`,
+        usage,
+      );
       if (source && persisted) {
         source.estimatedCost = persisted.cost;
         source.usage = persisted.usage;
@@ -394,7 +454,11 @@ export function sourceRoutes(
   }
 
   /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
-  async function collectWebSources(pid: string, req: any, modCats: string[] | null): Promise<Source[]> {
+  async function collectWebSources(
+    pid: string,
+    req: any,
+    modCats: string[] | null,
+  ): Promise<Source[]> {
     const lang = req.body.lang || 'fr';
     const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
@@ -403,14 +467,18 @@ export function sourceRoutes(
     const now = new Date().toISOString();
 
     for (const url of urls) {
-      const source = await trackWebSource(pid, `URL scrape: ${url}`,
-        () => scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now));
+      const source = await trackWebSource(pid, `URL scrape: ${url}`, () =>
+        scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
+      );
       if (source) sources.push(source);
     }
 
     if (searchQuery) {
-      const source = await trackWebSource(pid, `Keyword search: ${searchQuery}`,
-        () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>);
+      const source = await trackWebSource(
+        pid,
+        `Keyword search: ${searchQuery}`,
+        () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>,
+      );
       if (source) sources.push(source);
     }
 
@@ -455,9 +523,7 @@ export function sourceRoutes(
       res.json(sources);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
-      res.status(500).json({
-        error: `Recherche web echouee: ${e instanceof Error ? e.message : String(e)}`,
-      });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 
@@ -494,7 +560,7 @@ export function sourceRoutes(
       res.json(result);
     } catch (e) {
       logger.error('consigne', 'detection error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 
@@ -510,7 +576,7 @@ export function sourceRoutes(
       res.json(result);
     } catch (e) {
       logger.error('moderation', 'error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e) });
     }
   });
 

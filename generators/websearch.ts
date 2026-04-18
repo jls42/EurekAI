@@ -32,6 +32,8 @@ export async function webSearchEnrich(
   } finally {
     try {
       await client.beta.agents.delete({ agentId: agent.id });
-    } catch {}
+    } catch {
+      /* silent: agent delete best-effort cleanup */
+    }
   }
 }

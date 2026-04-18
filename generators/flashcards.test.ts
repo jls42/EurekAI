@@ -43,9 +43,7 @@ describe('generateFlashcards', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] })
       .mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] });
 
-    await expect(generateFlashcards(client, 'content')).rejects.toThrow(
-      /flashcards valides/,
-    );
+    await expect(generateFlashcards(client, 'content')).rejects.toThrow(/flashcards valides/);
   });
 
   it('handles wrapped {"flashcards": [...]} response', async () => {

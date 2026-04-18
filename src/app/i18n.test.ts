@@ -16,6 +16,7 @@ import { setProfileLocale } from './profile-locale';
 function makeContext(overrides: any = {}) {
   return {
     locale: 'fr',
+    newProfileLocale: 'fr',
     currentProfile: { id: 'p1', locale: 'fr', hasPin: false },
     updateProfile: vi.fn(),
     ...overrides,
@@ -76,12 +77,13 @@ describe('createI18n', () => {
       expect(ctx.updateProfile).not.toHaveBeenCalled();
     });
 
-    it('handles missing currentProfile gracefully', () => {
+    it('initialise newProfileLocale quand aucun profil n est actif', () => {
       ctx.currentProfile = null;
       i18n.setLocale.call(ctx, 'en');
 
       expect(ctx.locale).toBe('en');
       expect(i18nSetLocale).toHaveBeenCalledWith('en');
+      expect(ctx.newProfileLocale).toBe('en');
       expect(setProfileLocale).not.toHaveBeenCalled();
     });
   });

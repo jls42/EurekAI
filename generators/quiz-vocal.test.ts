@@ -35,6 +35,54 @@ describe('quiz-vocal', () => {
       expect(result).toBeInstanceOf(Buffer);
       expect(result.toString()).toBe('question-audio');
     });
+
+    it('localises A)/B) labels per lang before TTS (FR)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: 'Capitale ?',
+        choices: ['A) Paris', 'B) Lyon'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'fr');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        'Capitale ? choix A : Paris. choix B : Lyon',
+        'v',
+        ttsOptions,
+      );
+    });
+
+    it('localises A)/B) labels per lang before TTS (EN)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: 'Capital?',
+        choices: ['A) Paris', 'B) London'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'en');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        'Capital? choice A : Paris. choice B : London',
+        'v',
+        ttsOptions,
+      );
+    });
+
+    it('localises A)/B) labels per lang before TTS (ES)', async () => {
+      vi.mocked(textToSpeech).mockClear();
+      const question: QuizQuestion = {
+        question: '¿Capital?',
+        choices: ['A) Madrid', 'B) Barcelona'],
+        correct: 0,
+        explanation: '',
+      };
+      await ttsQuestion(question, 'v', ttsOptions, 'es');
+      expect(textToSpeech).toHaveBeenCalledWith(
+        '¿Capital? opción A : Madrid. opción B : Barcelona',
+        'v',
+        ttsOptions,
+      );
+    });
   });
 
   describe('transcribeAudio', () => {
@@ -119,18 +167,29 @@ describe('quiz-vocal', () => {
 
     it('passes lang parameter to the system prompt', async () => {
       const client = createChatClient(true, 'Well done!');
-      await verifyAnswer(
-        client,
-        'Capital of France?',
-        ['Paris', 'London'],
-        0,
-        'Paris',
-        'mistral-large-latest',
-        'en',
-      );
+      await verifyAnswer(client, 'Capital of France?', ['Paris', 'London'], 0, 'Paris', {
+        model: 'mistral-large-latest',
+        lang: 'en',
+      });
 
       const call = client.chat.complete.mock.calls[0][0];
       expect(call.messages[0].content).toContain('English');
+    });
+
+    it('strips choice labels before composing correctAnswerLine (ex: A. → texte pur)', async () => {
+      const client = createChatClient(true, 'ok');
+      await verifyAnswer(
+        client,
+        'Quel fleuve ?',
+        ['A. Seine', 'B: Loire', 'C) Rhône', 'Alice'],
+        0,
+        'Seine',
+      );
+      const systemPrompt = client.chat.complete.mock.calls[0][0].messages[0].content;
+      // correctAnswerLine est reconstruit avec le label A) et le texte stripped "Seine"
+      expect(systemPrompt).toContain('A) Seine');
+      // Les choix legacy mal formatés sont préservés ou traités sans casser l'API
+      expect(systemPrompt).toContain('Seine');
     });
   });
 });

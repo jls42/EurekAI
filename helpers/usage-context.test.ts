@@ -4,7 +4,12 @@ import { runWithUsageTracking, recordUsage } from './usage-context.js';
 describe('usage-context', () => {
   it('captures usage entries within tracking context', async () => {
     const { result, usage } = await runWithUsageTracking(async () => {
-      recordUsage({ promptTokens: 100, completionTokens: 50, totalTokens: 150, model: 'mistral-large-latest' });
+      recordUsage({
+        promptTokens: 100,
+        completionTokens: 50,
+        totalTokens: 150,
+        model: 'mistral-large-latest',
+      });
       recordUsage({ inputCharacters: 3000, model: 'voxtral-mini-tts-2603' });
       return 'ok';
     });
@@ -36,7 +41,12 @@ describe('usage-context', () => {
 
   it('attaches captured usage to thrown error', async () => {
     const err: any = await runWithUsageTracking(async () => {
-      recordUsage({ promptTokens: 500, completionTokens: 100, totalTokens: 600, model: 'mistral-large-latest' });
+      recordUsage({
+        promptTokens: 500,
+        completionTokens: 100,
+        totalTokens: 600,
+        model: 'mistral-large-latest',
+      });
       recordUsage({ inputCharacters: 2000, model: 'voxtral-mini-tts-2603' });
       throw new Error('generation failed');
     }).catch((e) => e);

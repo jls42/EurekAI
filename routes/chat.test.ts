@@ -26,23 +26,17 @@ vi.mock('../generators/summary.js', () => ({
 }));
 
 vi.mock('../generators/flashcards.js', () => ({
-  generateFlashcards: vi
-    .fn()
-    .mockResolvedValue([{ question: 'Q', answer: 'A' }]),
+  generateFlashcards: vi.fn().mockResolvedValue([{ question: 'Q', answer: 'A' }]),
 }));
 
 vi.mock('../generators/quiz.js', () => ({
   generateQuiz: vi
     .fn()
-    .mockResolvedValue([
-      { question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 },
-    ]),
+    .mockResolvedValue([{ question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 }]),
 }));
 
 vi.mock('../generators/fill-blank.js', () => ({
-  generateFillBlank: vi
-    .fn()
-    .mockResolvedValue([{ sentence: 'The ___ is blue', answer: 'sky' }]),
+  generateFillBlank: vi.fn().mockResolvedValue([{ sentence: 'The ___ is blue', answer: 'sky' }]),
 }));
 
 vi.mock('../config.js', () => ({
@@ -453,9 +447,7 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     const updated = store.getProject(project.meta.id);
-    const assistantMsg = updated!.chat!.messages.find(
-      (m) => m.role === 'assistant',
-    );
+    const assistantMsg = updated!.chat!.messages.find((m) => m.role === 'assistant');
     expect(assistantMsg!.generatedIds).toHaveLength(1);
   });
 
@@ -529,9 +521,7 @@ describe('POST /:pid/chat', () => {
 
     // moderateContent should NOT have been called
     expect(moderateContent).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
   it('ne bloque pas la moderation quand le profil est etudiant (categories vides)', async () => {
@@ -554,14 +544,16 @@ describe('POST /:pid/chat', () => {
 
     // moderateContent should NOT be called since etudiant categories are empty
     expect(moderateContent).not.toHaveBeenCalled();
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
-  it('retourne 500 quand chatWithSources lance une erreur', async () => {
+  it('retourne 500 avec un FailedStepCode stable (pas le message brut) quand chatWithSources lance', async () => {
+    // Régression à prévenir : `res.json({ error: String(e) })` fuitait err.message
+    // (potentiellement clés API / URLs internes) au client.
     const { chatWithSources } = await import('../generators/chat.js');
-    (chatWithSources as any).mockRejectedValueOnce(new Error('API down'));
+    (chatWithSources as any).mockRejectedValueOnce(
+      new Error('sk-1234-SECRET leak via https://api.internal/v1'),
+    );
 
     const project = store.createProject('Test');
     addSource(project.meta.id);
@@ -575,7 +567,11 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Error: API down' });
+    const body = res.json.mock.calls[0][0];
+    expect(body.error).toBe('internal_error');
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('sk-1234');
+    expect(serialized).not.toContain('api.internal');
   });
 
   it('fonctionne sans profil associe au projet', async () => {
@@ -590,9 +586,7 @@ describe('POST /:pid/chat', () => {
 
     await handler(req, res);
 
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({ reply: 'Hello!' }),
-    );
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 });
 

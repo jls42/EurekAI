@@ -38,7 +38,9 @@ export function createProjects() {
         const url = profileId ? `/api/projects?profileId=${profileId}` : '/api/projects';
         const res = await fetch(url);
         if (res.ok) this.projects = await res.json();
-      } catch {}
+      } catch {
+        /* silent: offline, liste projets vide acceptable */
+      }
       // Auto-restore last project (important for mobile)
       const lastId = localStorage.getItem('sf-lastProjectId');
       if (lastId && !this.currentProjectId && this.projects.some((p: any) => p.id === lastId)) {
@@ -94,7 +96,9 @@ export function createProjects() {
           this.activeView = 'dashboard';
         }
         this.$nextTick(() => this.refreshIcons());
-      } catch {}
+      } catch {
+        /* silent: offline project select, state reset deja fait */
+      }
     },
 
     async deleteProject(this: any, id: string) {

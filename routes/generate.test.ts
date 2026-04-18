@@ -27,14 +27,26 @@ vi.mock('../generators/flashcards.js', () => ({
 }));
 
 vi.mock('../generators/quiz.js', () => ({
-  generateQuiz: vi.fn().mockResolvedValue([
-    { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'Expl' },
-  ]),
+  generateQuiz: vi
+    .fn()
+    .mockResolvedValue([
+      { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'Expl' },
+    ]),
   generateQuizVocal: vi.fn().mockResolvedValue([
-    { question: 'Q1 vocal', choices: ['a', 'b', 'c', 'd'], correct: 1, explanation: 'Expl vocal' },
+    {
+      question: 'Q1 vocal',
+      choices: ['a', 'b', 'c', 'd'],
+      correct: 1,
+      explanation: 'Expl vocal',
+    },
   ]),
   generateQuizReview: vi.fn().mockResolvedValue([
-    { question: 'Review Q1', choices: ['a', 'b', 'c', 'd'], correct: 2, explanation: 'Review expl' },
+    {
+      question: 'Review Q1',
+      choices: ['a', 'b', 'c', 'd'],
+      correct: 2,
+      explanation: 'Review expl',
+    },
   ]),
 }));
 
@@ -64,9 +76,11 @@ vi.mock('../generators/image.js', () => ({
 }));
 
 vi.mock('../generators/fill-blank.js', () => ({
-  generateFillBlank: vi.fn().mockResolvedValue([
-    { sentence: 'Le ___ est bleu', answer: 'ciel', hint: 'Au dessus', category: 'Nature' },
-  ]),
+  generateFillBlank: vi
+    .fn()
+    .mockResolvedValue([
+      { sentence: 'Le ___ est bleu', answer: 'ciel', hint: 'Au dessus', category: 'Nature' },
+    ]),
 }));
 
 vi.mock('../generators/router.js', () => ({
@@ -101,6 +115,9 @@ vi.mock('../config.js', () => ({
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
   getModelLimits: vi.fn(() => ({})),
+  // Défaut true : les tests existants supposent TTS disponible. Les tests qui veulent
+  // vérifier le filtrage audio (cf. describe "TTS unavailable") overrident via mockReturnValueOnce.
+  getApiStatus: vi.fn(() => ({ mistral: true, elevenlabs: false, ttsAvailable: true })),
 }));
 
 // --- Helpers ---
@@ -265,9 +282,7 @@ describe('generateRoutes', () => {
 
       // Should not be blocked, should succeed
       expect(res.status).not.toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'summary' }),
-      );
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
     });
 
     it('does not block when moderation status is safe', async () => {
@@ -290,9 +305,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).not.toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'summary' }),
-      );
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
     });
 
     it('successfully generates and stores a generation', async () => {
@@ -328,9 +341,11 @@ describe('generateRoutes', () => {
       expect(updatedProject!.results.generations[0].type).toBe('summary');
     });
 
-    it('handles generator errors -> 500', async () => {
+    it('handles generator errors -> 500 with stable code, no err.message leak', async () => {
       const { generateSummary } = await import('../generators/summary.js');
-      (generateSummary as any).mockRejectedValueOnce(new Error('API error'));
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -348,7 +363,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('API error') });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('uses default lang=fr and ageGroup=enfant when not provided', async () => {
@@ -423,7 +441,11 @@ describe('generateRoutes', () => {
         markdown: 'Content',
         uploadedAt: new Date().toISOString(),
       });
-      store.setConsigne(pid, { found: true, text: 'Reviser chapitre 3', keyTopics: ['topic1', 'topic2'] });
+      store.setConsigne(pid, {
+        found: true,
+        text: 'Reviser chapitre 3',
+        keyTopics: ['topic1', 'topic2'],
+      });
 
       const handler = getHandler(router, 'post', '/:pid/generate/summary');
       const req = mockReq({ params: { pid }, body: {} });
@@ -491,14 +513,30 @@ describe('generateRoutes', () => {
       const req1 = mockReq({ params: { pid }, body: { count: 100 } });
       const res1 = mockRes();
       await handler(req1, res1);
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 50, '');
+      expect(generateFlashcards).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        50,
+        '',
+      );
 
       // Test count < 1 clamped to 1
       const req2 = mockReq({ params: { pid }, body: { count: -5 } });
       const res2 = mockRes();
       await handler(req2, res2);
       // 2nd call has exclusions from 1st generation stored in project
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', 1, expect.any(String));
+      expect(generateFlashcards).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        1,
+        expect.any(String),
+      );
     });
 
     it('passes undefined count when not provided', async () => {
@@ -518,7 +556,15 @@ describe('generateRoutes', () => {
       const res = mockRes();
       await handler(req, res);
 
-      expect(generateFlashcards).toHaveBeenCalledWith(mockClient, expect.any(String), 'm', 'fr', 'enfant', undefined, '');
+      expect(generateFlashcards).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        undefined,
+        '',
+      );
     });
 
     it('filters sources by sourceIds', async () => {
@@ -933,9 +979,7 @@ describe('generateRoutes', () => {
         createdAt: new Date().toISOString(),
         sourceIds: ['src-1'],
         type: 'quiz',
-        data: [
-          { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
-        ],
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
       });
 
       const weakQuestions = [
@@ -978,9 +1022,7 @@ describe('generateRoutes', () => {
         createdAt: new Date().toISOString(),
         sourceIds: ['src-1'],
         type: 'quiz',
-        data: [
-          { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
-        ],
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
       });
 
       const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
@@ -988,7 +1030,9 @@ describe('generateRoutes', () => {
         params: { pid },
         body: {
           generationId: 'gen-quiz',
-          weakQuestions: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
+          weakQuestions: [
+            { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
+          ],
           lang: 'en',
         },
       });
@@ -1037,9 +1081,11 @@ describe('generateRoutes', () => {
       expect(result.plan[1].agent).toBe('flashcards');
     });
 
-    it('returns 500 when routeRequest fails', async () => {
+    it('returns 500 with stable code and no err.message leak when routeRequest fails', async () => {
       const { routeRequest } = await import('../generators/router.js');
-      (routeRequest as any).mockRejectedValueOnce(new Error('Route analysis failed'));
+      (routeRequest as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1057,7 +1103,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('Route analysis failed') });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('applies consigne when present and useConsigne is not false', async () => {
@@ -1160,7 +1209,13 @@ describe('generateRoutes', () => {
       expect(result.generations).toHaveLength(2);
       expect(result.generations[0].type).toBe('summary');
       expect(result.generations[1].type).toBe('flashcards');
+      // Contrat succès complet : aucun champ d'échec dans le body, status 200.
+      // Verrouille l'absence (pas juste failedSteps: []) contre une régression du
+      // spread conditionnel dans routes/generate.ts.
+      expect(res.status).toHaveBeenCalledWith(200);
       expect(result.failedSteps).toBeUndefined();
+      expect(result.skippedSteps).toBeUndefined();
+      expect(result.error).toBeUndefined();
 
       // Verify all generations were stored
       const updatedProject = store.getProject(pid);
@@ -1187,16 +1242,20 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const result = res.json.mock.calls[0][0];
-      expect(result.failedSteps).toEqual(['summary']);
+      expect(result.failedSteps).toEqual([{ agent: 'summary', code: 'internal_error' }]);
       expect(result.generations).toHaveLength(1);
       expect(result.generations[0].type).toBe('flashcards');
     });
 
-    it('skips unknown agents in the plan', async () => {
+    it('skips only truly non-auto-executable agents (Phase 1B.3 — allowlist locale)', async () => {
       const { routeRequest } = await import('../generators/router.js');
+      // Le router peut proposer des noms inconnus. Ceux-là doivent finir dans
+      // skippedSteps. Les agents auto supportés, y compris quiz-vocal, doivent être
+      // réellement exécutés.
       (routeRequest as any).mockResolvedValueOnce({
         plan: [
           { agent: 'unknown-type', reason: 'test' },
+          { agent: 'quiz-vocal', reason: 'test' },
           { agent: 'quiz', reason: 'test' },
         ],
         context: 'Test context',
@@ -1218,15 +1277,72 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const result = res.json.mock.calls[0][0];
-      // unknown-type should be logged and added to failedSteps
-      expect(result.generations).toHaveLength(1);
-      expect(result.generations[0].type).toBe('quiz');
-      expect(result.failedSteps).toEqual(['unknown-type']);
+      expect(result.generations).toHaveLength(2);
+      expect(result.generations[0].type).toBe('quiz-vocal');
+      expect(result.generations[1].type).toBe('quiz');
+      expect(result.skippedSteps).toEqual([{ agent: 'unknown-type', reason: 'test' }]);
+      expect(result.failedSteps).toBeUndefined();
+      // La réponse "route" reflète le plan effectivement exécuté (cohérent UX).
+      expect(result.route).toEqual([
+        { agent: 'quiz-vocal', reason: 'test' },
+        { agent: 'quiz', reason: 'test' },
+      ]);
     });
 
-    it('returns 500 when routeRequest itself fails', async () => {
+    it('skippe podcast/quiz-vocal quand TTS indisponible (parité UI/serveur)', async () => {
+      // Régression à prévenir : src/app/generate.ts:247-255 filtre déjà côté UI, mais les
+      // consommateurs API directs sur une instance sans TTS (ni MISTRAL_API_KEY ni
+      // ELEVENLABS_API_KEY) obtenaient auth_required/tts_upstream_error systématiques
+      // sur des steps audio INJECTÉS par enrichPlanForLearning (pas choisis par le LLM).
       const { routeRequest } = await import('../generators/router.js');
-      (routeRequest as any).mockRejectedValueOnce(new Error('Router API error'));
+      const { getApiStatus } = await import('../config.js');
+      (getApiStatus as any).mockReturnValueOnce({
+        mistral: false,
+        elevenlabs: false,
+        ttsAvailable: false,
+      });
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'podcast', reason: 'audio' },
+          { agent: 'quiz-vocal', reason: 'oral' },
+          { agent: 'quiz', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      // summary + quiz exécutés, podcast + quiz-vocal skippés (pas failed).
+      expect(body.generations.map((g: any) => g.type)).toEqual(['summary', 'quiz']);
+      expect(body.skippedSteps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ agent: 'podcast' }),
+          expect.objectContaining({ agent: 'quiz-vocal' }),
+        ]),
+      );
+      // Aucun failedStep audio ne doit apparaître — on a évité de tenter.
+      expect(body.failedSteps).toBeUndefined();
+    });
+
+    it('returns 500 with stable code and no err.message leak when routeRequest itself fails', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via https://api.internal/v1'),
+      );
 
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1244,7 +1360,10 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.json).toHaveBeenCalledWith({ error: expect.stringContaining('Router API error') });
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const serialized = JSON.stringify(res.json.mock.calls[0][0]);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
     });
 
     it('handles empty plan from router', async () => {
@@ -1281,9 +1400,7 @@ describe('generateRoutes', () => {
     it('executes podcast step with audio generation', async () => {
       const { routeRequest } = await import('../generators/router.js');
       (routeRequest as any).mockResolvedValueOnce({
-        plan: [
-          { agent: 'podcast', reason: 'educational content' },
-        ],
+        plan: [{ agent: 'podcast', reason: 'educational content' }],
         context: 'Podcast context',
       });
 
@@ -1347,7 +1464,326 @@ describe('generateRoutes', () => {
       // Summary should succeed, podcast should fail
       expect(result.generations).toHaveLength(1);
       expect(result.generations[0].type).toBe('summary');
-      expect(result.failedSteps).toEqual(['podcast']);
+      expect(result.failedSteps).toEqual([{ agent: 'podcast', code: 'tts_upstream_error' }]);
+    });
+  });
+
+  describe('POST /:pid/generate/auto (HTTP 502 + codes stables)', () => {
+    it('renvoie 502 quand tous les steps échouent', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      const { generateFlashcards } = await import('../generators/flashcards.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'flashcards', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('boom'));
+      (generateFlashcards as any).mockRejectedValueOnce(new Error('boom'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(502);
+      const body = res.json.mock.calls[0][0];
+      expect(body.error).toBe('all_steps_failed');
+      expect(body.generations).toHaveLength(0);
+      expect(body.failedSteps).toHaveLength(2);
+    });
+
+    it('failedSteps[].code est llm_invalid_json pour SyntaxError', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new SyntaxError('Unexpected token'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps).toEqual([{ agent: 'summary', code: 'llm_invalid_json' }]);
+    });
+
+    it('failedSteps[].code est quota_exceeded pour rate_limit', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('429 rate_limit exceeded'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('quota_exceeded');
+    });
+
+    it('ne renvoie pas le message brut de err au client (pas de fuite)', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('sk-1234-SECRET leaked via URL https://api.internal/...'),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      const serialized = JSON.stringify(body);
+      expect(serialized).not.toContain('sk-1234');
+      expect(serialized).not.toContain('api.internal');
+      expect(body.failedSteps[0].code).toBe('internal_error');
+    });
+
+    it('failedSteps[].code est context_length_exceeded pour erreur de contexte', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        new Error('context_length_exceeded: too many tokens in prompt'),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('context_length_exceeded');
+    });
+
+    it("succès partiel : status 200, generations + failedSteps, pas d'error top-level", async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'flashcards', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(new Error('429 rate_limit'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      // Status 200 (pas 502 tant qu'au moins une generation a réussi)
+      expect(res.status).toHaveBeenCalledWith(200);
+      const body = res.json.mock.calls[0][0];
+      // Flashcards ok, summary échoue
+      expect(body.generations).toHaveLength(1);
+      expect(body.generations[0].type).toBe('flashcards');
+      expect(body.failedSteps).toEqual([{ agent: 'summary', code: 'quota_exceeded' }]);
+      // Pas de top-level error dans le cas partial-success
+      expect(body.error).toBeUndefined();
+    });
+
+    it('failedSteps[].code est upstream_unavailable pour status 503 (panne backend)', async () => {
+      // Régression à prévenir : un 503 Mistral ne doit PAS mapper à quota_exceeded.
+      // Un user qui n'a rien consommé voyait "quota dépassé" → action incorrecte.
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        Object.assign(new Error('Service temporarily down'), { status: 503 }),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('upstream_unavailable');
+    });
+
+    it('failedSteps[].code est auth_required pour status 401 (pas quota)', async () => {
+      // Régression à prévenir : un 401 (clé API invalide ou billing non activé côté Mistral)
+      // ne doit PAS être classé quota_exceeded — action utilisateur différente.
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        Object.assign(new Error('Your account quota is not yet activated'), { status: 401 }),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('auth_required');
+    });
+
+    it('failedSteps[].code est tts_upstream_error pour quiz-vocal', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const quizMod = (await import('../generators/quiz.js')) as any;
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'quiz-vocal', reason: 'r' }],
+        context: 'ctx',
+      });
+      quizMod.generateQuizVocal.mockRejectedValueOnce(new Error('TTS API unreachable'));
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0]).toEqual({ agent: 'quiz-vocal', code: 'tts_upstream_error' });
+    });
+  });
+
+  describe('POST /:pid/generate/auto (quiz-vocal step)', () => {
+    it('executes quiz-vocal step with per-question audio generation', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'quiz-vocal', reason: 'oral practice' }],
+        context: 'Quiz vocal context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content for quiz-vocal',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: { lang: 'fr' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('quiz-vocal');
+      expect(result.generations[0].data).toHaveLength(1);
+      expect(result.generations[0].audioUrls).toHaveLength(1);
+      expect(result.generations[0].audioUrls[0]).toContain(
+        `/output/projects/${pid}/quiz-vocal-q0-`,
+      );
+      expect(result.generations[0].lang).toBe('fr');
+      expect(result.generations[0].ageGroup).toBe('enfant');
+      expect(result.failedSteps).toBeUndefined();
+
+      const updatedProject = store.getProject(pid);
+      expect(updatedProject!.results.generations).toHaveLength(1);
+      expect(updatedProject!.results.generations[0].type).toBe('quiz-vocal');
     });
   });
 
@@ -1355,9 +1791,7 @@ describe('generateRoutes', () => {
     it('executes fill-blank step successfully', async () => {
       const { routeRequest } = await import('../generators/router.js');
       (routeRequest as any).mockResolvedValueOnce({
-        plan: [
-          { agent: 'fill-blank', reason: 'practice exercises' },
-        ],
+        plan: [{ agent: 'fill-blank', reason: 'practice exercises' }],
         context: 'Fill-blank context',
       });
 
@@ -1407,9 +1841,7 @@ describe('generateRoutes', () => {
 
       // Should succeed because no profile = no moderation check
       expect(res.status).not.toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'summary' }),
-      );
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
     });
 
     it('blocks only selected sourceIds when some are unsafe', async () => {
@@ -1439,9 +1871,7 @@ describe('generateRoutes', () => {
       const res1 = mockRes();
       await handler(req1, res1);
       expect(res1.status).not.toHaveBeenCalledWith(400);
-      expect(res1.json).toHaveBeenCalledWith(
-        expect.objectContaining({ type: 'summary' }),
-      );
+      expect(res1.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
 
       // Request with unsafe source should be blocked
       const req2 = mockReq({ params: { pid }, body: { sourceIds: ['unsafe-src'] } });
@@ -1492,7 +1922,12 @@ describe('generateRoutes', () => {
       const handler = getHandler(router, 'post', '/:pid/generate/summary');
       // 300 token limit × 0.8 = 240 tokens. At ~2 chars/token, 240 tokens ≈ 480 chars
       const longContent = 'x'.repeat(800);
-      store.addSource(ctxPid, { id: 's-long', filename: 'big.txt', markdown: longContent, uploadedAt: new Date().toISOString() });
+      store.addSource(ctxPid, {
+        id: 's-long',
+        filename: 'big.txt',
+        markdown: longContent,
+        uploadedAt: new Date().toISOString(),
+      });
       const req = mockReq({ params: { pid: ctxPid }, body: { sourceIds: ['s-long'] } });
       const res = mockRes();
       await handler(req, res);
@@ -1508,7 +1943,12 @@ describe('generateRoutes', () => {
 
       const project = store.createProject('ctx-ok');
       const ctxPid = project.meta.id;
-      store.addSource(ctxPid, { id: 's-ok', filename: 'ok.txt', markdown: 'Short content', uploadedAt: new Date().toISOString() });
+      store.addSource(ctxPid, {
+        id: 's-ok',
+        filename: 'ok.txt',
+        markdown: 'Short content',
+        uploadedAt: new Date().toISOString(),
+      });
       const handler = getHandler(router, 'post', '/:pid/generate/summary');
       const req = mockReq({ params: { pid: ctxPid }, body: {} });
       const res = mockRes();
@@ -1525,7 +1965,12 @@ describe('generateRoutes', () => {
       const project = store.createProject('ctx-nolimit');
       const ctxPid = project.meta.id;
       // Short content should pass with 128K fallback
-      store.addSource(ctxPid, { id: 's-nl', filename: 'nl.txt', markdown: 'Content', uploadedAt: new Date().toISOString() });
+      store.addSource(ctxPid, {
+        id: 's-nl',
+        filename: 'nl.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
       const handler = getHandler(router, 'post', '/:pid/generate/summary');
       const req = mockReq({ params: { pid: ctxPid }, body: {} });
       const res = mockRes();
@@ -1541,7 +1986,12 @@ describe('generateRoutes', () => {
       const ctxPid = project.meta.id;
       // 128K * 0.8 = 102,400 tokens. At /2 ratio, need > 204,800 chars to exceed
       const hugeContent = 'x'.repeat(210_000);
-      store.addSource(ctxPid, { id: 's-huge', filename: 'huge.txt', markdown: hugeContent, uploadedAt: new Date().toISOString() });
+      store.addSource(ctxPid, {
+        id: 's-huge',
+        filename: 'huge.txt',
+        markdown: hugeContent,
+        uploadedAt: new Date().toISOString(),
+      });
       const handler = getHandler(router, 'post', '/:pid/generate/summary');
       const req = mockReq({ params: { pid: ctxPid }, body: { sourceIds: ['s-huge'] } });
       const res = mockRes();

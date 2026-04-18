@@ -1,6 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { resolvePricing, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
-import { calculateCost, aggregateUsage, calculateTotalCost, buildCostBreakdown } from './cost-calc.js';
+import {
+  calculateCost,
+  aggregateUsage,
+  calculateTotalCost,
+  buildCostBreakdown,
+} from './cost-calc.js';
 import type { ApiUsage } from './pricing.js';
 
 describe('resolvePricing', () => {
@@ -30,7 +35,11 @@ describe('resolvePricing', () => {
 
 describe('calculateCost', () => {
   it('calculates token-based cost for mistral-large', () => {
-    const usage: ApiUsage = { promptTokens: 1000, completionTokens: 500, model: 'mistral-large-2512' };
+    const usage: ApiUsage = {
+      promptTokens: 1000,
+      completionTokens: 500,
+      model: 'mistral-large-2512',
+    };
     // (1000 * 0.5 + 500 * 1.5) / 1M = (500 + 750) / 1M = 0.00125
     expect(calculateCost(usage)).toBeCloseTo(0.00125, 6);
   });
@@ -54,7 +63,11 @@ describe('calculateCost', () => {
   });
 
   it('returns 0 for free moderation model', () => {
-    const usage: ApiUsage = { promptTokens: 1000, completionTokens: 100, model: 'mistral-moderation-2603' };
+    const usage: ApiUsage = {
+      promptTokens: 1000,
+      completionTokens: 100,
+      model: 'mistral-moderation-2603',
+    };
     expect(calculateCost(usage)).toBe(0);
   });
 
@@ -130,36 +143,28 @@ describe('buildCostBreakdown', () => {
   });
 
   it('builds character breakdown for TTS', () => {
-    const entries: ApiUsage[] = [
-      { inputCharacters: 5000, model: 'voxtral-mini-tts-2603' },
-    ];
+    const entries: ApiUsage[] = [{ inputCharacters: 5000, model: 'voxtral-mini-tts-2603' }];
     const lines = buildCostBreakdown(entries);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('5000 chars');
   });
 
   it('builds page breakdown for OCR', () => {
-    const entries: ApiUsage[] = [
-      { pagesProcessed: 3, model: 'mistral-ocr-2512' },
-    ];
+    const entries: ApiUsage[] = [{ pagesProcessed: 3, model: 'mistral-ocr-2512' }];
     const lines = buildCostBreakdown(entries);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('3 page(s)');
   });
 
   it('builds audio breakdown for STT', () => {
-    const entries: ApiUsage[] = [
-      { promptAudioSeconds: 60, model: 'voxtral-mini-latest' },
-    ];
+    const entries: ApiUsage[] = [{ promptAudioSeconds: 60, model: 'voxtral-mini-latest' }];
     const lines = buildCostBreakdown(entries);
     expect(lines).toHaveLength(1);
     expect(lines[0]).toContain('60.0s audio');
   });
 
   it('skips unknown models', () => {
-    const entries: ApiUsage[] = [
-      { promptTokens: 100, model: 'unknown-model' },
-    ];
+    const entries: ApiUsage[] = [{ promptTokens: 100, model: 'unknown-model' }];
     expect(buildCostBreakdown(entries)).toHaveLength(0);
   });
 

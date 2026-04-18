@@ -94,7 +94,11 @@ describe('createWebsearch', () => {
 
       await ws.searchWeb.call(ctx);
 
-      expect(ctx.showToast).toHaveBeenCalledWith('toast.webSearchError', 'error', expect.any(Function));
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        'toast.webSearchError',
+        'error',
+        expect.any(Function),
+      );
       expect(ctx.loading.websearch).toBe(false);
     });
 

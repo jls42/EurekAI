@@ -68,17 +68,18 @@ describe('loadConfig', () => {
       ttsProvider: 'mistral',
     };
     const statusData = { mistral: true, elevenlabs: false, ttsAvailable: true };
-    const voicesData = [
-      { id: 'v1', name: 'Oliver - Neutral', languages: ['en_US'] },
-    ];
+    const voicesData = [{ id: 'v1', name: 'Oliver - Neutral', languages: ['en_US'] }];
 
-    const modCatsData = { all: ['sexual', 'violence_and_threats'], defaults: { enfant: ['sexual'] } };
+    const modCatsData = {
+      all: ['sexual', 'violence_and_threats'],
+      defaults: { enfant: ['sexual'] },
+    };
 
     // loadConfig calls: config, status, moderation-categories (parallel), then loadMistralVoices (voices)
-    mockFetchOk(configData);      // /api/config
-    mockFetchOk(statusData);      // /api/config/status
-    mockFetchOk(modCatsData);     // /api/moderation-categories
-    mockFetchOk(voicesData);      // /api/config/voices (called by loadMistralVoices)
+    mockFetchOk(configData); // /api/config
+    mockFetchOk(statusData); // /api/config/status
+    mockFetchOk(modCatsData); // /api/moderation-categories
+    mockFetchOk(voicesData); // /api/config/voices (called by loadMistralVoices)
 
     const ctx = makeContext();
     await config.loadConfig.call(ctx);
@@ -118,6 +119,9 @@ describe('loadMistralVoices', () => {
     expect(ctx.mistralVoicesList[0]).toEqual({
       id: 'v1',
       name: 'Oliver - Neutral',
+      languages: ['en_US'],
+      gender: undefined,
+      tags: undefined,
       speaker: 'Oliver',
       emotion: 'Neutral',
       lang: 'en',
@@ -127,6 +131,9 @@ describe('loadMistralVoices', () => {
     expect(ctx.mistralVoicesList[1]).toEqual({
       id: 'v2',
       name: 'Marie - Joyful',
+      languages: ['fr_FR'],
+      gender: undefined,
+      tags: undefined,
       speaker: 'Marie',
       emotion: 'Joyful',
       lang: 'fr',
@@ -209,8 +216,26 @@ describe('defaultVoiceHint', () => {
   it('returns voice names for FR locale with matching voices in list', () => {
     const ctx = makeContext({
       mistralVoicesList: [
-        { id: 'v1', speaker: 'Marie', emotion: 'Excited', lang: 'fr' },
-        { id: 'v2', speaker: 'Marie', emotion: 'Curious', lang: 'fr' },
+        {
+          id: 'v1',
+          name: 'Marie - Excited',
+          languages: ['fr_FR'],
+          gender: 'female',
+          tags: ['excited'],
+          speaker: 'Marie',
+          emotion: 'Excited',
+          lang: 'fr',
+        },
+        {
+          id: 'v2',
+          name: 'Marie - Curious',
+          languages: ['fr_FR'],
+          gender: 'female',
+          tags: ['curious'],
+          speaker: 'Marie',
+          emotion: 'Curious',
+          lang: 'fr',
+        },
       ],
     });
     const result = config.defaultVoiceHint.call(ctx, 'fr');
@@ -221,30 +246,138 @@ describe('defaultVoiceHint', () => {
   it('returns voice names for EN locale', () => {
     const ctx = makeContext({
       mistralVoicesList: [
-        { id: 'v1', speaker: 'Jane', emotion: 'Curious', lang: 'en' },
-        { id: 'v2', speaker: 'Oliver', emotion: 'Cheerful', lang: 'en' },
+        {
+          id: 'v1',
+          name: 'Jane - Curious',
+          languages: ['en_GB'],
+          gender: 'female',
+          tags: ['curious'],
+          speaker: 'Jane',
+          emotion: 'Curious',
+          lang: 'en',
+        },
+        {
+          id: 'v2',
+          name: 'Oliver - Cheerful',
+          languages: ['en_GB'],
+          gender: 'male',
+          tags: ['cheerful'],
+          speaker: 'Oliver',
+          emotion: 'Cheerful',
+          lang: 'en',
+        },
       ],
     });
     const result = config.defaultVoiceHint.call(ctx, 'en');
+    // Jane (female, tags=curious) score > Oliver (male, tags=cheerful) → host = Jane
     expect(result).toContain('Jane');
-    expect(result).toContain('Oliver');
   });
 
-  it('returns fallback names when voice list is empty', () => {
+  it('returns empty string when voice list is empty (hint repose sur le catalogue réel)', () => {
     const ctx = makeContext({ mistralVoicesList: [] });
     const result = config.defaultVoiceHint.call(ctx, 'fr');
-    expect(result).toBe('Marie - Excited / Marie - Curious');
+    expect(result).toBe('');
   });
 
-  it('returns empty string for unsupported locale', () => {
+  it('returns empty string for unsupported locale even with empty list', () => {
     const ctx = makeContext({ mistralVoicesList: [] });
     expect(config.defaultVoiceHint.call(ctx, 'ja')).toBe('');
   });
 
-  it('defaults to fr when locale is empty', () => {
+  it('returns empty string when locale is empty and list is empty', () => {
     const ctx = makeContext({ mistralVoicesList: [] });
     const result = config.defaultVoiceHint.call(ctx, '');
-    expect(result).toContain('Marie');
+    expect(result).toBe('');
+  });
+
+  it('selects any-fallback voice when no lang or en match', () => {
+    // 9 langues UI = 9 langues Voxtral, mais un catalogue dégradé peut ne contenir
+    // que du japonais. Le hint doit tomber sur any-fallback et afficher cette voix.
+    const ctx = makeContext({
+      mistralVoicesList: [
+        {
+          id: 'ja1',
+          name: 'Kenji - Neutral',
+          languages: ['ja_JP'],
+          gender: 'male',
+          tags: ['neutral'],
+          speaker: 'Kenji',
+          emotion: 'Neutral',
+          lang: 'ja',
+        },
+      ],
+    });
+    const result = config.defaultVoiceHint.call(ctx, 'hi');
+    expect(result).toContain('Kenji');
+  });
+
+  // Cas override global explicite (mistralVoicesSource === 'user') : le hint doit refléter
+  // les voix que le backend utilisera réellement, pas le résultat de selectVoices.
+  // Cf. addendum post-review §1.
+  describe('with mistralVoicesSource === user (global override)', () => {
+    const voicesCatalog = [
+      {
+        id: 'user-host',
+        name: 'Oliver - Confident',
+        languages: ['en_US'],
+        gender: 'male',
+        tags: ['confident'],
+        speaker: 'Oliver',
+        emotion: 'Confident',
+        lang: 'en',
+      },
+      {
+        id: 'user-guest',
+        name: 'Jane - Cheerful',
+        languages: ['en_US'],
+        gender: 'female',
+        tags: ['cheerful'],
+        speaker: 'Jane',
+        emotion: 'Cheerful',
+        lang: 'en',
+      },
+      {
+        id: 'marie-exc',
+        name: 'Marie - Excited',
+        languages: ['fr_FR'],
+        gender: 'female',
+        tags: ['excited'],
+        speaker: 'Marie',
+        emotion: 'Excited',
+        lang: 'fr',
+      },
+    ];
+
+    it('affiche les IDs globaux quand user les a définis', () => {
+      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
+      ctx.configDraft.mistralVoicesSource = 'user';
+      ctx.configDraft.mistralVoices = { host: 'user-host', guest: 'user-guest' };
+      const result = config.defaultVoiceHint.call(ctx, 'fr');
+      // Le backend utilise user-host/user-guest ; le hint doit le dire, même si selectVoices
+      // aurait retourné Marie pour lang=fr.
+      expect(result).toContain('Oliver');
+      expect(result).toContain('Jane');
+      expect(result).not.toContain('Marie');
+    });
+
+    it('retombe sur selectVoices si ID global introuvable (voix supprimée côté Mistral)', () => {
+      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
+      ctx.configDraft.mistralVoicesSource = 'user';
+      ctx.configDraft.mistralVoices = { host: 'deleted-id', guest: 'also-deleted' };
+      const result = config.defaultVoiceHint.call(ctx, 'fr');
+      // Pas vide : selectVoices trouve Marie.
+      expect(result).toContain('Marie');
+    });
+
+    it('ignore source=default et passe par selectVoices normalement', () => {
+      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
+      ctx.configDraft.mistralVoicesSource = 'default';
+      ctx.configDraft.mistralVoices = { host: 'user-host', guest: 'user-guest' };
+      const result = config.defaultVoiceHint.call(ctx, 'fr');
+      // Source=default → selectVoices prend le dessus → Marie pour lang=fr.
+      expect(result).toContain('Marie');
+      expect(result).not.toContain('Oliver');
+    });
   });
 });
 
@@ -267,8 +400,8 @@ describe('saveSettings', () => {
       ttsProvider: 'mistral',
     };
     const statusData = { mistral: true, elevenlabs: false, ttsAvailable: true };
-    mockFetchOk(savedConfig);     // PUT /api/config
-    mockFetchOk(statusData);      // GET /api/config/status
+    mockFetchOk(savedConfig); // PUT /api/config
+    mockFetchOk(statusData); // GET /api/config/status
 
     const ctx = makeContext();
     await config.saveSettings.call(ctx);
@@ -286,7 +419,11 @@ describe('saveSettings', () => {
   });
 
   it('auto-corrects ttsModel: mistral provider with eleven model', async () => {
-    const savedConfig = { models: { summary: 'mistral-large-latest' }, ttsModel: 'voxtral-mini-tts-2603', ttsProvider: 'mistral' };
+    const savedConfig = {
+      models: { summary: 'mistral-large-latest' },
+      ttsModel: 'voxtral-mini-tts-2603',
+      ttsProvider: 'mistral',
+    };
     mockFetchOk(savedConfig);
     mockFetchOk({ mistral: true, elevenlabs: false, ttsAvailable: true });
 
@@ -306,7 +443,11 @@ describe('saveSettings', () => {
   });
 
   it('auto-corrects ttsModel: elevenlabs provider with voxtral model', async () => {
-    const savedConfig = { models: { summary: 'mistral-large-latest' }, ttsModel: 'eleven_v3', ttsProvider: 'elevenlabs' };
+    const savedConfig = {
+      models: { summary: 'mistral-large-latest' },
+      ttsModel: 'eleven_v3',
+      ttsProvider: 'elevenlabs',
+    };
     mockFetchOk(savedConfig);
     mockFetchOk({ mistral: true, elevenlabs: true, ttsAvailable: true });
 

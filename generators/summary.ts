@@ -1,6 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
+import { logger } from '../helpers/logger.js';
 import { summarySystem, summaryUser } from '../prompts.js';
 import type { StudyFiche, AgeGroup } from '../types.js';
 
@@ -59,7 +60,7 @@ function extractSummary(raw: string): StudyFiche {
 
   const merged = unwrapAndMerge(data);
   if (merged && isValidSummary(merged)) {
-    console.log('Summary: merged', (data.fiches as any[])?.length || '?', 'sub-fiches into one');
+    logger.info('summary', `merged ${(data.fiches as any[])?.length || '?'} sub-fiches into one`);
     return merged;
   }
 
@@ -92,9 +93,12 @@ export async function generateSummary(
   try {
     const data = extractSummary(raw);
     if (isValidSummary(data)) return data;
-    console.warn('Summary validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
+    logger.warn(
+      'summary',
+      `validation failed, retrying. Got: ${JSON.stringify(data).slice(0, 200)}`,
+    );
   } catch (e) {
-    console.warn('Summary JSON parse failed, retrying:', (e as Error).message);
+    logger.warn('summary', `JSON parse failed, retrying: ${(e as Error).message}`);
   }
 
   messages.push(
@@ -102,23 +106,37 @@ export async function generateSummary(
     {
       role: 'user',
       content:
-        "Ta reponse JSON etait vide ou incomplete. Regenere UNE SEULE fiche COMPLETE (pas de tableau 'fiches') avec title, summary, key_points (5-7), fun_fact et vocabulary au premier niveau du JSON. Reponds uniquement en JSON valide.",
+        "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.",
     },
   );
 
-  const retry = await client.chat.complete({
-    model,
-    messages,
-    responseFormat: { type: 'json_object' },
-    ...diversityParams('summary'),
-  });
+  let retryRaw: string;
+  try {
+    const retry = await client.chat.complete({
+      model,
+      messages,
+      responseFormat: { type: 'json_object' },
+      ...diversityParams('summary'),
+    });
+    retryRaw = getContent(retry);
+  } catch (e) {
+    // Le retry peut échouer indépendamment (429, context_length inflaté par l'historique).
+    // Préserver le message originel pour que extractErrorCode mappe vers quota_exceeded /
+    // context_length_exceeded côté route, au lieu de retomber sur internal_error.
+    logger.error('summary', `retry API call failed: ${(e as Error).message}`);
+    throw e;
+  }
 
-  const retryRaw = getContent(retry);
   const retryData = extractSummary(retryRaw);
 
   if (!isValidSummary(retryData)) {
-    console.error('Summary retry also failed. Got:', JSON.stringify(retryData).slice(0, 200));
-    throw new Error("Le modele n'a pas reussi a generer une fiche valide apres 2 tentatives");
+    logger.error('summary', `retry also failed. Got: ${JSON.stringify(retryData).slice(0, 200)}`);
+    // SyntaxError (et non Error) pour que extractErrorCode mappe vers llm_invalid_json.
+    // Tradeoff observabilité assumé : le code agrège deux causes racines (JSON non parsable
+    // ET JSON parsable mais schéma invalide — ex. title manquant, key_points vide). La
+    // distinction n'apporte rien côté UX (dans les deux cas le LLM a raté), mais pour
+    // debug on s'appuie sur le logger.error juste au-dessus qui sérialise retryData.
+    throw new SyntaxError("Le modele n'a pas reussi a generer une fiche valide apres 2 tentatives");
   }
 
   return retryData;

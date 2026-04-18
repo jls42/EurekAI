@@ -60,9 +60,7 @@ describe('generatePodcastScript', () => {
         choices: [{ message: { content: JSON.stringify(invalid) } }],
       });
 
-    await expect(generatePodcastScript(client, 'content')).rejects.toThrow(
-      /podcast valide/,
-    );
+    await expect(generatePodcastScript(client, 'content')).rejects.toThrow(/podcast valide/);
   });
 
   it('handles response without sourceRefs', async () => {

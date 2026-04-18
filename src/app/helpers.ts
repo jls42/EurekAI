@@ -1,59 +1,70 @@
 import { createIcons, icons } from 'lucide';
+import { extractSourceNums } from './source-markers';
+import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
+import type { Generation, Source } from '../../types';
 
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
-function extractItemRefs(item: any): string[] {
+function extractItemRefs(item: ItemWithRefs | null | undefined): string[] {
+  if (!item) return [];
   if (item.sourceRefs) return item.sourceRefs;
   if (item.sourceRef) return [item.sourceRef];
   if (item.source) return [item.source];
   return [];
 }
 
+type SourceResolverCtx = Pick<AppContext, 'genSources' | 'resolveSourceRef'>;
+
 /** Resolve source references for any item against a generation's sources. */
-function resolveItemSources(ctx: any, gen: any, item: any): any[] {
+function resolveItemSources(ctx: SourceResolverCtx, gen: Generation, item: ItemWithRefs): Source[] {
   const refs = extractItemRefs(item);
   if (refs.length === 0) return [];
   const allSources = ctx.genSources(gen);
-  return refs.map((ref: string) => ctx.resolveSourceRef(ref, allSources)).filter(Boolean);
+  return refs
+    .map((ref: string) => ctx.resolveSourceRef(ref, allSources))
+    .filter((s): s is Source => Boolean(s));
 }
 
+const SUMMARY_ARRAY_KEYS = ['citations', 'vocabulary', 'key_points'] as const;
+
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
-export function normalizeSummaryData(gen: any): void {
-  if (gen.type === 'summary' && gen.data) {
-    if (!gen.data.citations) gen.data.citations = [];
-    if (!gen.data.vocabulary) gen.data.vocabulary = [];
-    if (!gen.data.key_points) gen.data.key_points = [];
+export function normalizeSummaryData(gen: Generation): void {
+  if (gen.type !== 'summary' || !gen.data) return;
+  const data = gen.data as Record<(typeof SUMMARY_ARRAY_KEYS)[number], unknown[]>;
+  for (const key of SUMMARY_ARRAY_KEYS) {
+    data[key] ??= [];
   }
 }
 
 export function createHelpers() {
   return {
-    generationsByType(this: any, type: string) {
+    generationsByType(this: AppContext, type: string) {
       return this.generations
-        .filter((g: any) => g.type === type)
+        .filter((g: Generation) => g.type === type)
         .sort(
-          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          (a: Generation, b: Generation) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
         );
     },
 
-    toggleGen(this: any, id: string) {
+    toggleGen(this: AppContext, id: string) {
       this.openGens[id] = !this.openGens[id];
       this.$nextTick(() => this.refreshIcons());
     },
 
-    apiBase(this: any) {
+    apiBase(this: AppContext) {
       return '/api/projects/' + this.currentProjectId;
     },
 
-    currentFlag(this: any): string {
-      return this.uiLanguages.find((l: any) => l.code === this.locale)?.flag || '\u{1F310}';
+    currentFlag(this: AppContext): string {
+      return this.uiLanguages.find((l) => l.code === this.locale)?.flag || '\u{1F310}';
     },
 
-    langLabel(this: any, code: string): string {
-      return this.uiLanguages.find((l: any) => l.code === code)?.label || code;
+    langLabel(this: AppContext, code: string): string {
+      return this.uiLanguages.find((l) => l.code === code)?.label || code;
     },
 
-    langFlag(this: any, code: string): string {
-      return this.uiLanguages.find((l: any) => l.code === code)?.flag || '\u{1F310}';
+    langFlag(this: AppContext, code: string): string {
+      return this.uiLanguages.find((l) => l.code === code)?.flag || '\u{1F310}';
     },
 
     iconChipClass(type: string) {
@@ -78,12 +89,12 @@ export function createHelpers() {
       return icons[type] || 'sparkles';
     },
 
-    genSources(this: any, gen: any) {
+    genSources(this: AppContext, gen: Generation) {
       if (!gen.sourceIds || gen.sourceIds.length === 0) return this.sources;
-      return this.sources.filter((s: any) => gen.sourceIds.includes(s.id));
+      return this.sources.filter((s: Source) => gen.sourceIds.includes(s.id));
     },
 
-    inferSourceType(src: any) {
+    inferSourceType(src: Source) {
       if (src.sourceType) return src.sourceType;
       if (src.filename === 'Texte libre') return 'text';
       if (src.filename === 'Enregistrement vocal') return 'voice';
@@ -91,11 +102,11 @@ export function createHelpers() {
       return 'ocr';
     },
 
-    isOcrSource(this: any, src: any) {
+    isOcrSource(this: AppContext, src: Source) {
       return this.inferSourceType(src) === 'ocr';
     },
 
-    getOriginalFileUrl(src: any) {
+    getOriginalFileUrl(src: Source) {
       if (src.filePath) return '/output/' + src.filePath;
       return null;
     },
@@ -108,12 +119,17 @@ export function createHelpers() {
       return /\.pdf$/i.test(filename);
     },
 
-    sourceTypeIcon(this: any, src: any) {
-      const icons: Record<string, string> = { ocr: 'scan', text: 'pencil', voice: 'mic', websearch: 'globe' };
+    sourceTypeIcon(this: AppContext, src: Source) {
+      const icons: Record<string, string> = {
+        ocr: 'scan',
+        text: 'pencil',
+        voice: 'mic',
+        websearch: 'globe',
+      };
       return icons[this.inferSourceType(src)] || 'file-text';
     },
 
-    sourceTypeBadge(this: any, src: any) {
+    sourceTypeBadge(this: AppContext, src: Source) {
       const type = this.inferSourceType(src);
       const keys: Record<string, string> = {
         ocr: 'sourceBadge.ocr',
@@ -124,7 +140,7 @@ export function createHelpers() {
       return this.t(keys[type] || 'Source');
     },
 
-    sourceTypeBadgeColor(this: any, src: any) {
+    sourceTypeBadgeColor(this: AppContext, src: Source) {
       const colors: Record<string, string> = {
         ocr: 'bg-blue-100 text-blue-700',
         text: 'bg-green-100 text-green-700',
@@ -134,7 +150,7 @@ export function createHelpers() {
       return colors[this.inferSourceType(src)] || 'bg-gray-100 text-gray-700';
     },
 
-    ocrConfidenceTier(src: any): string | null {
+    ocrConfidenceTier(src: Source): string | null {
       if (!src?.ocrConfidence) return null;
       const avg = src.ocrConfidence.average;
       if (!Number.isFinite(avg)) return null;
@@ -143,7 +159,7 @@ export function createHelpers() {
       return 'low';
     },
 
-    ocrConfidenceColor(this: any, src: any) {
+    ocrConfidenceColor(this: AppContext, src: Source) {
       const tier = this.ocrConfidenceTier(src);
       if (tier === 'high') return 'bg-success-light text-success-dark';
       if (tier === 'medium') return 'bg-warning-light text-warning-dark';
@@ -151,12 +167,12 @@ export function createHelpers() {
       return '';
     },
 
-    ocrConfidencePercent(src: any) {
+    ocrConfidencePercent(src: Source) {
       if (!src?.ocrConfidence || !Number.isFinite(src.ocrConfidence.average)) return '';
       return Math.round(src.ocrConfidence.average * 100) + '%';
     },
 
-    ocrConfidenceIcon(this: any, src: any) {
+    ocrConfidenceIcon(this: AppContext, src: Source) {
       const tier = this.ocrConfidenceTier(src);
       if (tier === 'high') return 'check-circle';
       if (tier === 'medium') return 'alert-circle';
@@ -164,7 +180,7 @@ export function createHelpers() {
       return '';
     },
 
-    ocrConfidenceToneClass(src: any) {
+    ocrConfidenceToneClass(this: AppContext, src: Source) {
       const tier = this.ocrConfidenceTier(src);
       if (tier === 'high') return 'text-success-dark';
       if (tier === 'medium') return 'text-warning-dark';
@@ -172,11 +188,11 @@ export function createHelpers() {
       return 'text-text-primary';
     },
 
-    moderationStatus(src: any): string | null {
+    moderationStatus(src: Source): string | null {
       return src?.moderation?.status ?? null;
     },
 
-    moderationBadgeColor(this: any, src: any) {
+    moderationBadgeColor(this: AppContext, src: Source) {
       const status = this.moderationStatus(src);
       if (status === 'safe') return 'bg-success-light text-success-dark';
       if (status === 'unsafe') return 'bg-danger-light text-danger-dark';
@@ -185,7 +201,7 @@ export function createHelpers() {
       return '';
     },
 
-    moderationBadgeIcon(this: any, src: any) {
+    moderationBadgeIcon(this: AppContext, src: Source) {
       const status = this.moderationStatus(src);
       if (status === 'safe') return 'shield-check';
       if (status === 'unsafe') return 'shield-alert';
@@ -194,11 +210,11 @@ export function createHelpers() {
       return '';
     },
 
-    moderationBadgeIconClass(this: any, src: any) {
+    moderationBadgeIconClass(this: AppContext, src: Source) {
       return this.moderationStatus(src) === 'pending' ? 'animate-spin' : '';
     },
 
-    moderationBadgeTitle(this: any, src: any) {
+    moderationBadgeTitle(this: AppContext, src: Source) {
       const status = this.moderationStatus(src);
       if (status === 'safe') return this.t('moderation.safe');
       if (status === 'unsafe') {
@@ -210,7 +226,7 @@ export function createHelpers() {
       return '';
     },
 
-    moderationToneClass(this: any, src: any) {
+    moderationToneClass(this: AppContext, src: Source) {
       const status = this.moderationStatus(src);
       if (status === 'safe') return 'text-success-dark';
       if (status === 'unsafe') return 'text-danger-dark';
@@ -219,7 +235,7 @@ export function createHelpers() {
       return 'text-text-primary';
     },
 
-    showMetaPopover(this: any, el: HTMLElement, config: any) {
+    showMetaPopover(this: AppContext, el: HTMLElement, config: MetaPopoverConfig) {
       this._metaPopoverPos = el.getBoundingClientRect();
       this._metaPopoverTitle = config?.title || '';
       this._metaPopoverLines = config?.lines || [];
@@ -228,7 +244,7 @@ export function createHelpers() {
       this._metaPopoverFooterClass = config?.footerClass || 'text-text-primary';
     },
 
-    hideMetaPopover(this: any) {
+    hideMetaPopover(this: AppContext) {
       this._metaPopoverPos = null;
       this._metaPopoverTitle = '';
       this._metaPopoverLines = [];
@@ -237,7 +253,7 @@ export function createHelpers() {
       this._metaPopoverFooterClass = 'text-text-primary';
     },
 
-    metaPopoverStyle(this: any) {
+    metaPopoverStyle(this: AppContext) {
       if (!this._metaPopoverPos) return 'display:none';
       const pos = this._metaPopoverPos;
       const vertical =
@@ -247,20 +263,26 @@ export function createHelpers() {
       return vertical + ';left:' + pos.left + 'px';
     },
 
-    showCostPopover(this: any, el: HTMLElement, item: any) {
+    showCostPopover(this: AppContext, el: HTMLElement, item: CostPopoverItem) {
       let lines: string[] = [];
       if (item?.costBreakdown?.length) lines = item.costBreakdown;
-      else if (item?.usage) lines = [`${item.usage.totalTokens} tokens · ${item.usage.callCount} ${this.t('gen.apiCalls')}`];
+      else if (item?.usage)
+        lines = [
+          `${item.usage.totalTokens} tokens · ${item.usage.callCount} ${this.t('gen.apiCalls')}`,
+        ];
       this.showMetaPopover(el, {
         title: this.t('gen.estimatedCost'),
         lines,
         lineClass: 'text-text-secondary font-mono',
-        footer: item?.estimatedCost == null ? '' : this.t('dashboard.totalCost') + ' ~$' + item.estimatedCost.toFixed(4),
+        footer:
+          item?.estimatedCost == null
+            ? ''
+            : this.t('dashboard.totalCost') + ' ~$' + item.estimatedCost.toFixed(4),
         footerClass: 'text-accent',
       });
     },
 
-    showOcrPopover(this: any, el: HTMLElement, src: any) {
+    showOcrPopover(this: AppContext, el: HTMLElement, src: Source) {
       this.showMetaPopover(el, {
         title: this.t('ocr.confidence'),
         lines: [this.ocrConfidencePercent(src)],
@@ -268,16 +290,18 @@ export function createHelpers() {
       });
     },
 
-    showModerationPopover(this: any, el: HTMLElement, src: any) {
+    showModerationPopover(this: AppContext, el: HTMLElement, src: Source) {
       const labels = this.flaggedCategoryLabels(src);
       this.showMetaPopover(el, {
         title: this.moderationBadgeTitle(src),
         lines: labels ? [labels] : [],
-        lineClass: labels ? 'text-text-secondary' : this.moderationToneClass(src) + ' font-semibold',
+        lineClass: labels
+          ? 'text-text-secondary'
+          : this.moderationToneClass(src) + ' font-semibold',
       });
     },
 
-    resolveSourceRef(ref: string, allSources: any[]) {
+    resolveSourceRef(ref: string, allSources: Source[]) {
       const numMatch = /source\s*(\d+)/i.exec(ref);
       if (numMatch) {
         const idx = Number.parseInt(numMatch[1], 10) - 1;
@@ -285,7 +309,7 @@ export function createHelpers() {
       }
       const r = ref.toLowerCase();
       return allSources.find(
-        (s: any) =>
+        (s: Source) =>
           s.filename.toLowerCase() === r ||
           r.includes(s.filename.toLowerCase()) ||
           s.filename.toLowerCase().includes(r),
@@ -293,19 +317,19 @@ export function createHelpers() {
     },
 
     /** Resolve source references for any item (quiz question, flashcard, etc.). */
-    itemSources(this: any, gen: any, item: any) {
+    itemSources(this: AppContext, gen: Generation, item: ItemWithRefs) {
       return resolveItemSources(this, gen, item);
     },
 
-    questionSources(this: any, gen: any, q: any) {
+    questionSources(this: AppContext, gen: Generation, q: ItemWithRefs) {
       return resolveItemSources(this, gen, q);
     },
 
-    flashcardSource(this: any, gen: any, fc: any) {
+    flashcardSource(this: AppContext, gen: Generation, fc: ItemWithRefs) {
       return resolveItemSources(this, gen, fc);
     },
 
-    referencedSourceNums(gen: any) {
+    referencedSourceNums(gen: Generation) {
       const nums = new Set<number>();
       const extractNums = (refs: string[]) => {
         for (const ref of refs || []) {
@@ -313,30 +337,37 @@ export function createHelpers() {
           if (m) nums.add(Number.parseInt(m[1], 10));
         }
       };
-      const DATA_KEY: Record<string, string> = { flashcards: 'flashcards', quiz: 'quiz', 'quiz-vocal': 'quiz' };
+      const DATA_KEY: Record<string, string> = {
+        flashcards: 'flashcards',
+        quiz: 'quiz',
+        'quiz-vocal': 'quiz',
+      };
       const dataKey = DATA_KEY[gen.type];
       if (dataKey) {
-        const items = gen.data?.[dataKey] || (Array.isArray(gen.data) ? gen.data : []);
-        items.forEach((item: any) => extractNums(extractItemRefs(item)));
+        const genData = gen.data as Record<string, ItemWithRefs[]> | ItemWithRefs[];
+        const items: ItemWithRefs[] = Array.isArray(genData) ? genData : genData[dataKey] || [];
+        items.forEach((item: ItemWithRefs) => extractNums(extractItemRefs(item)));
       } else if (gen.type === 'podcast') {
-        extractNums(gen.data?.sourceRefs);
+        extractNums(gen.data?.sourceRefs || []);
       } else if (gen.type === 'fill-blank') {
-        const items = Array.isArray(gen.data) ? gen.data : [];
-        items.forEach((item: any) => extractNums(item.sourceRefs));
+        const items: ItemWithRefs[] = Array.isArray(gen.data) ? gen.data : [];
+        items.forEach((item: ItemWithRefs) => extractNums(item.sourceRefs || []));
       } else if (gen.type === 'summary') {
-        const d = gen.data || {};
-        for (const cit of d.citations || []) {
+        const summaryData = (gen.data || {}) as {
+          citations?: Array<{ sourceRef?: string }>;
+          summary?: string;
+          key_points?: string[];
+        };
+        for (const cit of summaryData.citations || []) {
           if (cit.sourceRef) extractNums([cit.sourceRef]);
         }
-        const text = (d.summary || '') + ' ' + (d.key_points || []).join(' ');
-        for (const m of text.matchAll(/\[Source\s*(\d+)\]/gi)) {
-          nums.add(Number.parseInt(m[1], 10));
-        }
+        const text = (summaryData.summary || '') + ' ' + (summaryData.key_points || []).join(' ');
+        for (const n of extractSourceNums(text)) nums.add(n);
       }
       return nums;
     },
 
-    isSourceReferenced(this: any, gen: any, srcIdx: number) {
+    isSourceReferenced(this: AppContext, gen: Generation, srcIdx: number) {
       const nums = this.referencedSourceNums(gen);
       if (nums.size === 0) return true;
       return nums.has(srcIdx + 1);
@@ -355,17 +386,20 @@ export function createHelpers() {
       return colors[type] || 'var(--color-primary)';
     },
 
-    recentGenerations(this: any) {
+    recentGenerations(this: AppContext) {
       return [...this.generations]
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .sort(
+          (a: Generation, b: Generation) =>
+            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        )
         .slice(0, 8);
     },
 
-    dashboardStats(this: any) {
+    dashboardStats(this: AppContext) {
       const stats: Record<string, number> = {};
       for (const cat of this.categories) {
         if (!['dashboard', 'sources'].includes(cat.key)) {
-          stats[cat.key] = this.generations.filter((g: any) => g.type === cat.key).length;
+          stats[cat.key] = this.generations.filter((g: Generation) => g.type === cat.key).length;
         }
       }
       return stats;
@@ -385,11 +419,13 @@ export function createHelpers() {
       return colors[index % colors.length];
     },
 
-    isGenerating(this: any) {
+    isGenerating(this: AppContext) {
       return Object.values(this.loading).some(Boolean);
     },
 
-    activeGenerations(this: any): Array<{ key: string; label: string; color: string; icon: string }> {
+    activeGenerations(
+      this: AppContext,
+    ): Array<{ key: string; label: string; color: string; icon: string }> {
       const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
         auto: { labelKey: 'gen.auto', icon: 'sparkles', color: 'var(--color-primary)' },
         voice: { labelKey: 'gen.voice', icon: 'volume-2', color: 'var(--color-accent)' },
@@ -398,7 +434,12 @@ export function createHelpers() {
       const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
       for (const cat of this.categories) {
         if (this.loading[cat.key]) {
-          result.push({ key: cat.key, label: this.t('gen.' + cat.key), color: cat.color, icon: cat.icon });
+          result.push({
+            key: cat.key,
+            label: this.t('gen.' + cat.key),
+            color: cat.color,
+            icon: cat.icon,
+          });
         }
       }
       for (const [key, meta] of Object.entries(EXTRA_KEYS)) {
@@ -409,23 +450,33 @@ export function createHelpers() {
       return result;
     },
 
-    getQuizScores(this: any) {
+    getQuizScores(this: AppContext) {
       return this.generations
-        .filter((g: any) => g.type === 'quiz' && g.stats && g.stats.attempts.length > 0)
-        .map((g: any) => {
-          const last = g.stats.attempts[g.stats.attempts.length - 1];
+        .filter(
+          (g: Generation) =>
+            g.type === 'quiz' && 'stats' in g && g.stats && g.stats.attempts.length > 0,
+        )
+        .map((g: Generation) => {
+          const stats = (g as { stats: { attempts: Array<{ score: number; total: number }> } })
+            .stats;
+          const last = stats.attempts.at(-1)!;
           return {
             gen: g,
             lastScore: last.score,
             total: last.total,
-            attempts: g.stats.attempts.length,
+            attempts: stats.attempts.length,
           };
         });
     },
 
-    resolveError(this: any, error: string): string {
+    resolveError(this: AppContext, error: string): string {
       const ctxMatch = /^context_too_large:(\d+)$/.exec(error);
       if (ctxMatch) return this.t('gen.contextTooLarge', { pct: ctxMatch[1] });
+      if (/^[a-z_]+$/.test(error)) {
+        const codeKey = 'errorCode.' + error;
+        const fromCode = this.t(codeKey);
+        if (fromCode !== codeKey) return fromCode;
+      }
       const translated = this.t(error);
       return translated === error ? error : translated;
     },
@@ -468,25 +519,26 @@ export function createHelpers() {
       return `background-image:url('/avatars.webp');background-size:500% 400%;background-position:${x} ${y};background-repeat:no-repeat;`;
     },
 
-    initGenProps(gen: any) {
-      gen._generatingVoice_all = gen._generatingVoice_all || false;
-      if (gen.type === 'podcast') gen._scriptOpen = false;
+    initGenProps(gen: Generation) {
+      const g = gen as Generation & { _generatingVoice_all?: boolean; _scriptOpen?: boolean };
+      g._generatingVoice_all = g._generatingVoice_all || false;
+      if (gen.type === 'podcast') g._scriptOpen = false;
     },
 
-    flaggedCategories(src: any): string[] {
+    flaggedCategories(src: Source): string[] {
       if (!src?.moderation?.categories) return [];
       return Object.entries(src.moderation.categories)
         .filter(([, flagged]) => flagged)
         .map(([cat]) => cat);
     },
 
-    flaggedCategoryLabels(this: any, src: any): string {
+    flaggedCategoryLabels(this: AppContext, src: Source): string {
       return this.flaggedCategories(src)
         .map((cat: string) => this.t(`moderation.cat.${cat}`))
         .join(', ');
     },
 
-    defaultModerationCategories(this: any, ageGroup: string): string[] {
+    defaultModerationCategories(this: AppContext, ageGroup: string): string[] {
       return [...(this.moderationDefaults?.[ageGroup] || [])];
     },
   };

@@ -28,7 +28,9 @@ async function fetchPricing(prefix: string, url: string): Promise<string> {
     if (charMatch) prices.push(...charMatch);
 
     // Page pricing: "$X /1,000 pages"
-    const pageMatch = html.match(/\$(\d+(?:\.\d+)?)\s*(?:per|\/)\s*[\d,]+\s*(?:annotated\s*)?pages?/gi);
+    const pageMatch = html.match(
+      /\$(\d+(?:\.\d+)?)\s*(?:per|\/)\s*[\d,]+\s*(?:annotated\s*)?pages?/gi,
+    );
     if (pageMatch) prices.push(...pageMatch);
 
     // Per-minute pricing: "$X.XXX /min"

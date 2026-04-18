@@ -43,7 +43,9 @@ export function createChat() {
           const data = await res.json();
           this.chatMessages = data.messages || [];
         }
-      } catch {}
+      } catch {
+        /* silent: offline fallback, chat vide OK */
+      }
     },
 
     async sendChatMessage(this: any) {
@@ -92,7 +94,9 @@ export function createChat() {
         await fetch(this.apiBase() + '/chat', { method: 'DELETE' });
         this.chatMessages = [];
         this.showToast(this.t('toast.chatCleared'), 'info');
-      } catch {}
+      } catch {
+        /* silent: clear chat offline est acceptable */
+      }
     },
 
     scrollChatBottom() {

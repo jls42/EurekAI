@@ -17,7 +17,14 @@ vi.mock('@elevenlabs/elevenlabs-js', () => {
   };
 });
 
-import { textToSpeech, listVoices, getVoice, createVoice, deleteVoice, getVoiceSample } from './tts-provider.js';
+import {
+  textToSpeech,
+  listVoices,
+  getVoice,
+  createVoice,
+  deleteVoice,
+  getVoiceSample,
+} from './tts-provider.js';
 
 function createMistralClient() {
   return {
@@ -94,8 +101,22 @@ describe('tts-provider', () => {
       const voices = await listVoices(client);
 
       expect(voices).toHaveLength(2);
-      expect(voices[0]).toEqual({ id: 'v1', name: 'Voice1', languages: ['fr'], gender: undefined, tags: undefined, createdAt: undefined });
-      expect(voices[1]).toEqual({ id: 'v2', name: 'Voice2', languages: ['en'], gender: undefined, tags: undefined, createdAt: undefined });
+      expect(voices[0]).toEqual({
+        id: 'v1',
+        name: 'Voice1',
+        languages: ['fr'],
+        gender: undefined,
+        tags: undefined,
+        createdAt: undefined,
+      });
+      expect(voices[1]).toEqual({
+        id: 'v2',
+        name: 'Voice2',
+        languages: ['en'],
+        gender: undefined,
+        tags: undefined,
+        createdAt: undefined,
+      });
     });
 
     it('filters voices by language', async () => {
@@ -135,7 +156,14 @@ describe('tts-provider', () => {
       const voice = await getVoice(client, 'v1');
 
       expect(client.audio.voices.get).toHaveBeenCalledWith({ voiceId: 'v1' });
-      expect(voice).toEqual({ id: 'v1', name: 'Voice1', languages: ['fr'], gender: undefined, tags: undefined, createdAt: undefined });
+      expect(voice).toEqual({
+        id: 'v1',
+        name: 'Voice1',
+        languages: ['fr'],
+        gender: undefined,
+        tags: undefined,
+        createdAt: undefined,
+      });
     });
   });
 

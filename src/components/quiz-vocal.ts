@@ -1,4 +1,5 @@
 import { stepByStep } from './step-by-step';
+import { parseChoiceLabel } from '@helpers/choice-labels';
 
 export function quizVocalComponent(gen: any) {
   return {
@@ -10,6 +11,13 @@ export function quizVocalComponent(gen: any) {
 
     questions() {
       return this.items();
+    },
+
+    // Bidi-safe split identique à quizComponent.choiceParts — évite la duplication
+    // de la logique de parsing tout en gardant le helper pur.
+    choiceParts(raw: string): { label: string; text: string } {
+      const parsed = parseChoiceLabel(raw);
+      return parsed ? { label: `${parsed.label})`, text: parsed.text } : { label: '', text: raw };
     },
 
     currentAudioUrl(this: any) {

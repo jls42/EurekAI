@@ -1,7 +1,5 @@
 function stripArticles(text: string): string {
-  return text
-    .replace(/^(l'|d'|un |une |le |la |les |des |du |de la |de l')/i, '')
-    .trim();
+  return text.replace(/^(l'|d'|un |une |le |la |les |des |du |de la |de l')/i, '').trim();
 }
 
 export function normalizeAnswer(text: string): string {
@@ -12,7 +10,8 @@ export function normalizeAnswer(text: string): string {
       .replaceAll(/[\u0300-\u036f]/g, '')
       .trim()
       .replaceAll(/\s+/g, ' ')
-      .replaceAll(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''), // NOSONAR(S5852) — simple char-class alternation anchored to start/end, no backtracking risk
+      // eslint-disable-next-line sonarjs/slow-regex -- bounded char-class, anchored, no backtracking risk (voir NOSONAR S5852)
+      .replaceAll(/^[.,;:!?'"()-]+|[.,;:!?'"()-]+$/g, ''),
   );
 }
 

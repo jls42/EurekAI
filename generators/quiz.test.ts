@@ -42,9 +42,7 @@ describe('generateQuiz', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] })
       .mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] });
 
-    await expect(generateQuiz(client, 'content')).rejects.toThrow(
-      /quiz valide/,
-    );
+    await expect(generateQuiz(client, 'content')).rejects.toThrow(/quiz valide/);
   });
 });
 

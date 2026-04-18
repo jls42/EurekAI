@@ -211,7 +211,13 @@ describe('GET /:pid', () => {
       timestamp: new Date().toISOString(),
       route: 'POST /sources/upload',
       cost: 0.002,
-      usage: { promptTokens: 0, completionTokens: 0, totalTokens: 0, pagesProcessed: 1, callCount: 1 },
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        pagesProcessed: 1,
+        callCount: 1,
+      },
     });
 
     // These estimatedCost values on entities should NOT be included in totalCost

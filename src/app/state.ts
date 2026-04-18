@@ -42,7 +42,9 @@ export function createState() {
       }>;
     }>,
     get uploading(): boolean {
-      return this.uploadSessions.some(s => s.files.some(f => f.status === 'pending' || f.status === 'uploading'));
+      return this.uploadSessions.some((s) =>
+        s.files.some((f) => f.status === 'pending' || f.status === 'uploading'),
+      );
     },
     dragging: false,
     viewSource: null as any,
@@ -131,7 +133,8 @@ export function createState() {
     // Theme
     theme: (function () {
       const t = localStorage.getItem('sf-theme');
-      if (!t) return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      if (!t)
+        return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       return t;
     })(),
 

@@ -15,7 +15,7 @@ export function withCostTracking(
 ): (req: Request, res: Response, next: NextFunction) => Promise<void> {
   return async (req: Request, res: Response, next: NextFunction) => {
     const pid = String(req.params.pid);
-    let usage: ApiUsage[] = [];
+    let usage!: ApiUsage[];
     try {
       const tracked = await runWithUsageTracking(() => handler(req, res, next));
       usage = tracked.usage;

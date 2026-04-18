@@ -1,4 +1,5 @@
 import { stepByStep } from './step-by-step';
+import { parseChoiceLabel } from '@helpers/choice-labels';
 
 export function quizComponent(gen: any) {
   return {
@@ -9,6 +10,14 @@ export function quizComponent(gen: any) {
 
     currentQuestion() {
       return this.items()[this.currentIndex()];
+    },
+
+    // Bidi-safe split pour les choix "A) texte" : label et texte dans des <bdi> séparés
+    // côté template. Quand le parseur ne reconnaît pas le format, on renvoie label vide
+    // + texte brut (fallback gracieux).
+    choiceParts(raw: string): { label: string; text: string } {
+      const parsed = parseChoiceLabel(raw);
+      return parsed ? { label: `${parsed.label})`, text: parsed.text } : { label: '', text: raw };
     },
 
     isCurrentAnswered(this: any): boolean {

@@ -1,61 +1,107 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
+import type { AppContext } from './app-context';
+import type { Profile } from '../../types';
 
-/** Execute the actual profile deletion (API call + state cleanup). */
-async function executeDeleteProfile(
-  state: any,
-  id: string,
-  pin?: string,
-): Promise<void> {
+type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
+type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
+
+/** Build RequestInit for DELETE /api/profiles/:id (optionally with PIN body). */
+export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
     opts.headers = { 'Content-Type': 'application/json' };
     opts.body = JSON.stringify({ pin });
   }
+  return opts;
+}
+
+/** Apply local state cleanup after a successful DELETE /api/profiles/:id. */
+export function finalizeDeleteProfile(state: AppContext, id: string): void {
+  clearProfileLocale(id);
+  state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
+  if (state.currentProfile?.id === id) {
+    state.currentProfile = null;
+    localStorage.removeItem('sf-profileId');
+    if (state.profiles.length > 0) {
+      state.selectProfile(state.profiles[0].id);
+    } else {
+      state.showProfilePicker = true;
+    }
+  }
+  state.showToast(state.t('toast.profileDeleted'), 'success');
+}
+
+/** Execute the actual profile deletion (API call + state cleanup). */
+async function executeDeleteProfile(state: AppContext, id: string, pin?: string): Promise<void> {
   try {
-    const res = await fetch('/api/profiles/' + id, opts);
+    // fetch reste dans la même fonction que `buildDeleteOpts` pour que Codacy/Opengrep
+    // taint analysis voie l'URL hardcodée (préfixe `/api/profiles/`) et que `rule-node-ssrf`
+    // ne flagge pas. Ne pas extraire ce fetch dans un helper (cf. incident commit précédent
+    // où `deleteProfileRequest(id, opts) → fetch(var, opts)` avait réactivé le finding SSRF).
+    const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
       return;
     }
-    clearProfileLocale(id);
-    state.profiles = state.profiles.filter((p: any) => p.id !== id);
-    if (state.currentProfile?.id === id) {
-      state.currentProfile = null;
-      localStorage.removeItem('sf-profileId');
-      if (state.profiles.length > 0) {
-        state.selectProfile(state.profiles[0].id);
-      } else {
-        state.showProfilePicker = true;
-      }
-    }
-    state.showToast(state.t('toast.profileDeleted'), 'success');
-  } catch (e: any) {
+    finalizeDeleteProfile(state, id);
+  } catch (e: unknown) {
     console.error('Failed to delete profile:', e);
-    state.showToast(state.t('toast.error', { error: e.message }), 'error');
+    const msg = e instanceof Error ? e.message : String(e);
+    state.showToast(state.t('toast.error', { error: msg }), 'error');
   }
 }
 
 /** Build the confirmation message for profile deletion. */
-function deleteConfirmMessage(state: any, id: string): string {
+function deleteConfirmMessage(state: AppContext, id: string): string {
   const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;
   return projectCount > 0
     ? state.t('profile.deleteConfirm', { count: projectCount })
     : state.t('profile.deleteConfirmNoProjects');
 }
 
+/** Whether the edit form has a valid name + age pair. */
+function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
+  return !!p?.name?.trim() && !!p.age && p.age >= 4 && p.age <= 120;
+}
+
+/** Normalise partial voice selection : null when both empty, fill missing side with '' otherwise. */
+function buildVoicesUpdate(
+  mistralVoices: MistralVoicesPartial,
+): { host: string; guest: string } | null {
+  if (!mistralVoices?.host && !mistralVoices?.guest) return null;
+  return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
+}
+
+/** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
+function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
+  const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
+    editingProfile;
+  const updates: Record<string, unknown> = {
+    name: name.trim(),
+    age,
+    avatar,
+    locale,
+    mistralVoices: buildVoicesUpdate(mistralVoices),
+    theme: theme || null,
+    _updatedAt: updatedAt,
+  };
+  if (_verifiedPin) updates.pin = _verifiedPin;
+  return updates;
+}
+
 export function createProfiles() {
   return {
-    async loadProfiles(this: any) {
+    async loadProfiles(this: AppContext) {
       try {
         const res = await fetch('/api/profiles');
         if (res.ok) this.profiles = await res.json();
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Failed to load profiles:', e);
       }
       // Restore last selected profile
       const saved = localStorage.getItem('sf-profileId');
-      if (saved && this.profiles.some((p: any) => p.id === saved)) {
+      if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
         this.selectProfile(saved);
       } else if (this.profiles.length > 0) {
         this.selectProfile(this.profiles[0].id);
@@ -64,8 +110,8 @@ export function createProfiles() {
       }
     },
 
-    selectProfile(this: any, id: string) {
-      const profile = this.profiles.find((p: any) => p.id === id);
+    selectProfile(this: AppContext, id: string) {
+      const profile = this.profiles.find((p: Profile) => p.id === id);
       if (!profile) return;
       this.currentProfile = profile;
       this.showProfilePicker = false;
@@ -77,7 +123,9 @@ export function createProfiles() {
         document.documentElement.dataset.theme = profile.theme;
       } else {
         const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
         this.theme = stored || system;
         document.documentElement.dataset.theme = this.theme;
       }
@@ -88,7 +136,7 @@ export function createProfiles() {
       this.loadProjects();
     },
 
-    async createProfile(this: any) {
+    async createProfile(this: AppContext) {
       const name = this.newProfileName.trim();
       const age = Number(this.newProfileAge);
       if (!name || !age || age < 4 || age > 120) return;
@@ -101,7 +149,7 @@ export function createProfiles() {
         }
       }
       try {
-        const body: any = {
+        const body: Record<string, unknown> = {
           name,
           age,
           avatar: this.newProfileAvatar,
@@ -128,14 +176,15 @@ export function createProfiles() {
           const err = await res.json().catch(() => ({}));
           this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         console.error('Failed to create profile:', e);
-        this.showToast(this.t('toast.error', { error: e.message }), 'error');
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.error', { error: msg }), 'error');
       }
     },
 
-    async deleteProfile(this: any, id: string) {
-      const profile = this.profiles.find((p: any) => p.id === id);
+    async deleteProfile(this: AppContext, id: string) {
+      const profile = this.profiles.find((p: Profile) => p.id === id);
       if (!profile) return;
       const target = deleteConfirmMessage(this, id);
       if (profile.hasPin) {
@@ -149,8 +198,8 @@ export function createProfiles() {
 
     _saveController: null as AbortController | null,
 
-    applyProfileUpdate(this: any, id: string, updated: any) {
-      const idx = this.profiles.findIndex((p: any) => p.id === id);
+    applyProfileUpdate(this: AppContext, id: string, updated: Profile) {
+      const idx = this.profiles.findIndex((p: Profile) => p.id === id);
       if (idx !== -1) this.profiles[idx] = updated;
       if (this.currentProfile?.id === id) this.currentProfile = updated;
       if (this.editingProfile?.id === id) {
@@ -160,7 +209,12 @@ export function createProfiles() {
       if (updated.locale) setProfileLocale(id, updated.locale);
     },
 
-    async updateProfile(this: any, id: string, updates: Record<string, any>, signal?: AbortSignal) {
+    async updateProfile(
+      this: AppContext,
+      id: string,
+      updates: Record<string, unknown>,
+      signal?: AbortSignal,
+    ) {
       try {
         const res = await fetch('/api/profiles/' + id, {
           method: 'PUT',
@@ -175,23 +229,32 @@ export function createProfiles() {
           const err = await res.json().catch(() => ({}));
           if (err.error) this.showToast(err.error, 'error');
         }
-      } catch (e: any) {
-        if (e.name === 'AbortError') return;
+      } catch (e: unknown) {
+        if (e instanceof Error && e.name === 'AbortError') return;
         console.error('Failed to update profile:', e);
-        this.showToast(this.t('toast.error', { error: e.message }), 'error');
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.error', { error: msg }), 'error');
       }
     },
 
-    startEditProfile(this: any, id: string) {
-      const profile = this.profiles.find((p: any) => p.id === id);
+    startEditProfile(this: AppContext, id: string) {
+      const profile = this.profiles.find((p: Profile) => p.id === id);
       if (!profile) return;
-      this.editingProfile = { ...profile, locale: profile.locale || 'fr', mistralVoices: profile.mistralVoices || { host: '', guest: '' }, theme: profile.theme || '' };
+      this.editingProfile = {
+        ...profile,
+        locale: profile.locale || 'fr',
+        mistralVoices: profile.mistralVoices || { host: '', guest: '' },
+        theme: profile.theme || '',
+      };
       this.showProfilePicker = true;
       this.showProfileForm = false;
+      // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
+      // a publié de nouvelles voix depuis le chargement initial. Non bloquant.
+      this.loadMistralVoices?.();
     },
 
     /** Verify PIN before allowing parental settings changes. */
-    requireParentalAccess(this: any, callback: () => void) {
+    requireParentalAccess(this: AppContext, callback: () => void) {
       if (!this.editingProfile?.hasPin) {
         callback();
         return;
@@ -200,9 +263,11 @@ export function createProfiles() {
         callback();
         return;
       }
+      const editing = this.editingProfile;
+      if (!editing) return;
       this.requirePin(async (pin: string) => {
         try {
-          const res = await fetch('/api/profiles/' + this.editingProfile.id, {
+          const res = await fetch('/api/profiles/' + editing.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin }),
@@ -211,46 +276,43 @@ export function createProfiles() {
             this.showToast(this.t('profile.pinWrong'), 'error');
             return;
           }
-        } catch (e: any) {
-          this.showToast(this.t('toast.error', { error: e.message }), 'error');
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          this.showToast(this.t('toast.error', { error: msg }), 'error');
           return;
         }
-        this.editingProfile._verifiedPin = pin;
+        editing._verifiedPin = pin;
         callback();
       });
     },
 
     _autoSaveTimer: null as ReturnType<typeof setTimeout> | null,
 
-    autoSaveProfile(this: any, immediate?: boolean) {
+    autoSaveProfile(this: AppContext, immediate?: boolean) {
       if (!this.editingProfile) return;
       if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
       const doSave = async () => {
-        const { id, name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } = this.editingProfile;
-        if (!name?.trim() || !age || age < 4 || age > 120) return;
-        const updates: any = {
-          name: name.trim(), age, avatar, locale,
-          mistralVoices: (mistralVoices?.host || mistralVoices?.guest)
-            ? { host: mistralVoices.host || '', guest: mistralVoices.guest || '' }
-            : null,
-          theme: theme || null,
-          _updatedAt: updatedAt,
-        };
-        if (_verifiedPin) updates.pin = _verifiedPin;
+        const editing = this.editingProfile;
+        if (!isProfileFormValid(editing) || !editing) return;
+        const { id, locale } = editing;
+        const updates = buildProfileUpdates(editing);
         if (this._saveController) this._saveController.abort();
         this._saveController = new AbortController();
         await this.updateProfile(id, updates, this._saveController.signal);
-        if (this.currentProfile?.id === id) {
-          if (locale) this.setLocale(locale, true);
-        }
+        if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
       };
-      if (immediate) { doSave(); return; }
+      if (immediate) {
+        doSave();
+        return;
+      }
       this._autoSaveTimer = setTimeout(doSave, 500);
     },
 
-    toggleModerationCategory(this: any, cat: string) {
+    toggleModerationCategory(this: AppContext, cat: string) {
       this.requireParentalAccess(() => {
-        const cats = (this.editingProfile.moderationCategories ??= []);
+        const editing = this.editingProfile;
+        if (!editing) return;
+        const cats = (editing.moderationCategories ??= []);
         const idx = cats.indexOf(cat);
         if (idx >= 0) cats.splice(idx, 1);
         else cats.push(cat);
@@ -258,54 +320,64 @@ export function createProfiles() {
       });
     },
 
-    async autoSaveParental(this: any) {
+    async autoSaveParental(this: AppContext) {
       if (!this.editingProfile) return;
-      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } = this.editingProfile;
-      const updates: any = { useModeration, moderationCategories, chatEnabled, _updatedAt: updatedAt };
+      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } =
+        this.editingProfile;
+      const updates: Record<string, unknown> = {
+        useModeration,
+        moderationCategories,
+        chatEnabled,
+        _updatedAt: updatedAt,
+      };
       if (_verifiedPin) updates.pin = _verifiedPin;
       if (this._saveController) this._saveController.abort();
       this._saveController = new AbortController();
       await this.updateProfile(id, updates, this._saveController.signal);
     },
 
-    applyThemeLive(this: any) {
+    applyThemeLive(this: AppContext) {
       const theme = this.editingProfile?.theme;
       if (theme) {
         this.theme = theme;
         document.documentElement.dataset.theme = theme;
       } else {
         const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
+          ? 'dark'
+          : 'light';
         this.theme = stored || system;
         document.documentElement.dataset.theme = this.theme;
       }
       this.autoSaveProfile(true);
     },
 
-    closeEditProfile(this: any) {
+    closeEditProfile(this: AppContext) {
       this.autoSaveProfile(true);
       this.editingProfile = null;
     },
 
-    resetProfileDefaults(this: any) {
+    resetProfileDefaults(this: AppContext) {
       if (!this.editingProfile) return;
       this.editingProfile.mistralVoices = { host: '', guest: '' };
-      this.editingProfile.theme = '';
+      this.editingProfile.theme = undefined;
       this.applyThemeLive();
       this.showToast(this.t('toast.profileReset'), 'success');
     },
 
     /** @deprecated Use autoSaveProfile — kept for test compat */
-    async saveEditProfile(this: any) {
+    async saveEditProfile(this: AppContext) {
       this.autoSaveProfile(true);
       this.editingProfile = null;
     },
 
-    async _toggleProfileProp(this: any, id: string, prop: string) {
-      const profile = this.profiles.find((p: any) => p.id === id);
+    async _toggleProfileProp(this: AppContext, id: string, prop: string) {
+      const profile = this.profiles.find((p: Profile) => p.id === id);
       if (!profile) return;
       const doToggle = async (pin?: string) => {
-        const updates: any = { [prop]: !profile[prop] };
+        const updates: Record<string, unknown> = {
+          [prop]: !(profile as unknown as Record<string, unknown>)[prop],
+        };
         if (pin) updates.pin = pin;
         await this.updateProfile(id, updates);
       };
@@ -318,30 +390,30 @@ export function createProfiles() {
       await doToggle();
     },
 
-    async toggleModeration(this: any, id: string) {
+    async toggleModeration(this: AppContext, id: string) {
       await this._toggleProfileProp(id, 'useModeration');
     },
 
-    async toggleChat(this: any, id: string) {
+    async toggleChat(this: AppContext, id: string) {
       await this._toggleProfileProp(id, 'chatEnabled');
     },
 
-    openProfilePicker(this: any) {
+    openProfilePicker(this: AppContext) {
       this.showProfilePicker = true;
     },
 
     // PIN dialog helpers
-    requirePin(this: any, callback: (pin: string) => void) {
+    requirePin(this: AppContext, callback: (pin: string) => void) {
       this.pinVerifyInput = '';
       this.pinVerifyCallback = callback;
       this.showPinDialog = true;
       this.$nextTick(() => {
-        this.$refs.pinDialog?.showModal();
+        (this.$refs.pinDialog as HTMLDialogElement | undefined)?.showModal();
         this.refreshIcons();
       });
     },
 
-    submitPinVerify(this: any) {
+    submitPinVerify(this: AppContext) {
       if (!/^\d{4}$/.test(this.pinVerifyInput)) return;
       const cb = this.pinVerifyCallback;
       const pin = this.pinVerifyInput;
@@ -349,11 +421,11 @@ export function createProfiles() {
       if (cb) cb(pin);
     },
 
-    closePinDialog(this: any) {
+    closePinDialog(this: AppContext) {
       this.showPinDialog = false;
       this.pinVerifyInput = '';
       this.pinVerifyCallback = null;
-      this.$refs.pinDialog?.close();
+      (this.$refs.pinDialog as HTMLDialogElement | undefined)?.close();
     },
   };
 }

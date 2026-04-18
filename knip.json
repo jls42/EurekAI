@@ -1,0 +1,7 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": ["scripts/generate-image.ts", "scripts/update-pricing.ts", "src/env.d.ts"],
+  "project": ["**/*.ts"],
+  "ignoreDependencies": ["tailwindcss"],
+  "ignoreExportsUsedInFile": true
+}

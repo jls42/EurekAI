@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
 
 // --- Age group derivation ---
@@ -31,20 +31,8 @@ export const ALL_MODERATION_CATEGORIES = [
 // Default blocked categories per age group
 // dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
 export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {
-  enfant: [
-    'sexual',
-    'hate_and_discrimination',
-    'violence_and_threats',
-    'selfharm',
-    'jailbreaking',
-  ],
-  ado: [
-    'sexual',
-    'hate_and_discrimination',
-    'violence_and_threats',
-    'selfharm',
-    'jailbreaking',
-  ],
+  enfant: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
+  ado: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
   etudiant: [],
   adulte: [],
 };
@@ -70,7 +58,15 @@ export function hashPin(pin: string): string {
 }
 
 export function verifyPin(pin: string, hash: string): boolean {
-  return hashPin(pin) === hash;
+  const candidate = Buffer.from(hashPin(pin), 'hex');
+  let expected: Buffer;
+  try {
+    expected = Buffer.from(hash, 'hex');
+  } catch {
+    return false;
+  }
+  if (candidate.length !== expected.length) return false;
+  return timingSafeEqual(candidate, expected);
 }
 
 export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { hasPin: boolean } {
@@ -191,10 +187,19 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
-    if (updates.mistralVoices !== undefined && (updates.mistralVoices === null || (typeof updates.mistralVoices === 'object' && typeof updates.mistralVoices.host === 'string' && typeof updates.mistralVoices.guest === 'string'))) {
+    if (
+      updates.mistralVoices !== undefined &&
+      (updates.mistralVoices === null ||
+        (typeof updates.mistralVoices === 'object' &&
+          typeof updates.mistralVoices.host === 'string' &&
+          typeof updates.mistralVoices.guest === 'string'))
+    ) {
       profile.mistralVoices = updates.mistralVoices || undefined;
     }
-    if (updates.theme !== undefined && (!updates.theme || updates.theme === 'dark' || updates.theme === 'light')) {
+    if (
+      updates.theme !== undefined &&
+      (!updates.theme || updates.theme === 'dark' || updates.theme === 'light')
+    ) {
       profile.theme = updates.theme || undefined;
     }
     if (updates.age !== undefined) {

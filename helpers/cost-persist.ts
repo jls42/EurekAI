@@ -14,7 +14,10 @@ export interface PersistResult {
  * Returns null if no billable usage.
  */
 export function persistUsage(
-  store: ProjectStore, pid: string, route: string, entries: ApiUsage[],
+  store: ProjectStore,
+  pid: string,
+  route: string,
+  entries: ApiUsage[],
 ): PersistResult | null {
   if (entries.length === 0) return null;
   const cost = calculateTotalCost(entries);

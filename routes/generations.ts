@@ -20,6 +20,8 @@ import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -29,7 +31,10 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
   if (s === 'intro') return `${d.title}. ${d.summary}`;
   if (s === 'key_points') return d.key_points.join('. ');
   if (s === 'fun_fact') return d.fun_fact || '';
-  if (s === 'vocabulary') return (d.vocabulary || []).map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`).join('. ');
+  if (s === 'vocabulary')
+    return (d.vocabulary || [])
+      .map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`)
+      .join('. ');
   return '';
 }
 
@@ -39,7 +44,11 @@ function readAloudText(gen: any, section: string): string | null {
 }
 
 async function generateBatchAudio(
-  gen: SummaryGeneration, voiceId: string, ttsOpts: any, projectDir: string, pid: string,
+  gen: SummaryGeneration,
+  voiceId: string,
+  ttsOpts: any,
+  projectDir: string,
+  pid: string,
 ): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
   const d = gen.data;
   const sections = ['intro', 'key_points'];
@@ -55,7 +64,7 @@ async function generateBatchAudio(
       const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
       audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
     } catch (err) {
-      console.error(`TTS failed for section ${s}:`, err);
+      logger.error('tts', `section ${s} failed:`, err);
       failedSections.push(s);
     }
   }
@@ -63,22 +72,33 @@ async function generateBatchAudio(
 }
 
 interface BatchSummaryCtx {
-  audioUrls: Record<string, string>; failedSections: string[];
-  summaryGen: SummaryGeneration; store: ProjectStore;
-  pid: string; gid: string; res: any; costDelta?: number;
+  audioUrls: Record<string, string>;
+  failedSections: string[];
+  summaryGen: SummaryGeneration;
+  store: ProjectStore;
+  pid: string;
+  gid: string;
+  res: any;
+  costDelta?: number;
 }
 
 function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
   const { audioUrls, failedSections, summaryGen, store, pid, gid, res, costDelta } = ctx;
   if (Object.keys(audioUrls).length > 0) {
     const d = summaryGen.data;
-    store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } } } as any);
+    store.updateGeneration(pid, gid, {
+      data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } },
+    } as any);
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
     res.status(500).json({ error: 'TTS failed for all sections' });
     return;
   }
-  res.json({ audioUrls, ...(failedSections.length > 0 && { failedSections }), ...(costDelta && { costDelta }) });
+  res.json({
+    audioUrls,
+    ...(failedSections.length > 0 && { failedSections }),
+    ...(costDelta && { costDelta }),
+  });
 }
 
 async function generateFlashcardsAudio(
@@ -98,37 +118,75 @@ async function generateFlashcardsAudio(
 }
 
 interface SectionAudioCtx {
-  gen: any; section: string; voiceId: string; ttsOpts: any;
-  projectDir: string; pid: string; baseId: string; store: ProjectStore; gid: string;
+  gen: any;
+  section: string;
+  voiceId: string;
+  ttsOpts: any;
+  projectDir: string;
+  pid: string;
+  baseId: string;
+  store: ProjectStore;
+  gid: string;
 }
 
 async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<string | null> {
   const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
   const text = readAloudText(gen, section);
-  if (text === null) { res.status(400).json({ error: 'Type non supporte pour la lecture' }); return null; }
-  if (!text.trim()) { res.status(400).json({ error: 'Texte vide pour cette section' }); return null; }
+  if (text === null) {
+    res.status(400).json({ error: 'Type non supporte pour la lecture' });
+    return null;
+  }
+  if (!text.trim()) {
+    res.status(400).json({ error: 'Texte vide pour cette section' });
+    return null;
+  }
 
   const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
   const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
 
   if (gen.type === 'summary') {
     const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
-    store.updateGeneration(pid, gid, { data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } } } as any);
+    store.updateGeneration(pid, gid, {
+      data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } },
+    } as any);
   }
   return audioUrl;
 }
 
-function resolveReadAloudContext(store: ProjectStore, profileStore: ProfileStore, client: Mistral, pid: string, lang?: string) {
+function resolveReadAloudContext(
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+  pid: string,
+  lang?: string,
+) {
   const config = getConfig();
   const project = store.getProject(pid);
   const profileId = project?.meta?.profileId;
   const profile = profileId ? profileStore.get(profileId) : null;
-  const voices = resolveVoices(config, profile?.mistralVoices, lang);
-  const ttsOpts = { provider: config.ttsProvider, model: config.ttsModel, mistralClient: client } as const;
-  return { config, profile, voices, voiceId: voices.host, ttsOpts, projectDir: store.getProjectDir(pid) };
+  // Passe profileId + flow='read-aloud' pour que la rotation déterministe par profil
+  // s'applique aussi ici et que les logs de fallback soient contextualisés.
+  const voices = resolveVoices(config, profile?.mistralVoices, lang, profileId, 'read-aloud');
+  const ttsOpts = {
+    provider: config.ttsProvider,
+    model: config.ttsModel,
+    mistralClient: client,
+  } as const;
+  return {
+    config,
+    profile,
+    voices,
+    voiceId: voices.host,
+    ttsOpts,
+    projectDir: store.getProjectDir(pid),
+  };
 }
 
-export function generationCrudRoutes(store: ProjectStore, client: Mistral, profileStore: ProfileStore): Router {
+export function generationCrudRoutes(
+  store: ProjectStore,
+  client: Mistral,
+  profileStore: ProfileStore,
+): Router {
   const router = Router();
 
   // --- Quiz attempt (save score) ---
@@ -172,8 +230,8 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       store.updateGeneration(req.params.pid, req.params.gid, { stats: quizGen.stats } as any);
       res.json({ attempt, stats: quizGen.stats });
     } catch (e) {
-      console.error('Quiz attempt error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('quiz', 'attempt error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'quiz') });
     }
   });
 
@@ -226,8 +284,8 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
       store.updateGeneration(req.params.pid, req.params.gid, { stats: fbGen.stats } as any);
       res.json({ attempt, stats: fbGen.stats, results });
     } catch (e) {
-      console.error('Fill-blank attempt error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('fill-blank', 'attempt error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'fill-blank') });
     }
   });
 
@@ -275,27 +333,30 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
         return;
       }
 
-      const lang = req.body.lang || 'fr';
+      // Phase 1B.1 — figer lang + ageGroup sur la génération (cf. décisions produit #4, #7).
+      // - lang : best-effort partiel via req.body.lang pour les quiz legacy (cf. #9).
+      //   Limite : si la locale UI a changé depuis la génération, le fallback sera incorrect.
+      // - ageGroup : pas de fallback body (le frontend ne l'envoie pas). Régression assumée
+      //   vers 'enfant' pour les quiz legacy (cf. #9).
+      const lang = quizGen.lang ?? req.body.lang ?? 'fr';
+      const ageGroup = quizGen.ageGroup ?? 'enfant';
       const config = getConfig();
-      console.log('  Transcribing vocal answer...');
       const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
-      console.log(`  Transcription: '${transcription}'`);
-      console.log('  Verifying answer...');
       const result = await verifyAnswer(
         client,
         question.question,
         question.choices,
         question.correct,
         transcription,
-        config.models.quizVerify,
-        lang,
+        { model: config.models.quizVerify, lang, ageGroup },
       );
-      console.log(`  Result: ${result.correct ? 'correct' : 'incorrect'} — ${result.feedback}`);
 
       res.json({ correct: result.correct, feedback: result.feedback, transcription });
     } catch (e) {
-      console.error('Vocal answer error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('quiz-vocal', 'vocal answer error:', e);
+      // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
+      // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
+      res.status(500).json({ error: extractErrorCode(e, 'stt') });
     }
   });
 
@@ -305,51 +366,90 @@ export function generationCrudRoutes(store: ProjectStore, client: Mistral, profi
     try {
       const gid = String(req.params.gid);
       const gen = store.getGeneration(pid, gid);
-      if (!gen) { res.status(404).json({ error: 'Generation introuvable' }); return; }
+      if (!gen) {
+        res.status(404).json({ error: 'Generation introuvable' });
+        return;
+      }
 
       const section = req.body.section || 'all';
       const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
-      if (!VALID_SECTIONS.has(section)) { res.status(400).json({ error: 'Section invalide' }); return; }
+      if (!VALID_SECTIONS.has(section)) {
+        res.status(400).json({ error: 'Section invalide' });
+        return;
+      }
 
-      const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(store, profileStore, client, pid, req.body.lang);
+      const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(
+        store,
+        profileStore,
+        client,
+        pid,
+        req.body.lang,
+      );
       const baseId = gen.id.slice(0, 8);
 
       // Batch mode: generate all sections individually for summaries
       if (section === 'all' && gen.type === 'summary') {
         const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
-        const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(
-          () => generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
+        const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(() =>
+          generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
         );
-        const batchCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/batch`, batchUsage);
-        handleBatchSummaryResult({ audioUrls: batchResult.audioUrls, failedSections: batchResult.failedSections, summaryGen, store, pid, gid, res, costDelta: batchCost?.cost });
+        const batchCost = persistUsage(
+          store,
+          pid,
+          `POST /api/projects/${pid}/read-aloud/batch`,
+          batchUsage,
+        );
+        handleBatchSummaryResult({
+          audioUrls: batchResult.audioUrls,
+          failedSections: batchResult.failedSections,
+          summaryGen,
+          store,
+          pid,
+          gid,
+          res,
+          costDelta: batchCost?.cost,
+        });
         return;
       }
 
       // Dual-voice flashcards: host=questions, guest=answers, silence between cards
       if (gen.type === 'flashcards') {
         const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
-        const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(
-          () => generateFlashcardsAudio(cards, voices, ttsOpts),
+        const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
+          generateFlashcardsAudio(cards, voices, ttsOpts),
         );
-        const fcCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/flashcards`, fcUsage);
+        const fcCost = persistUsage(
+          store,
+          pid,
+          `POST /api/projects/${pid}/read-aloud/flashcards`,
+          fcUsage,
+        );
         const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-all`);
         res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
         return;
       }
 
       // Single section (summary)
-      const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(
-        () => generateSectionAudio({ gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid }, res),
+      const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(() =>
+        generateSectionAudio(
+          { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid },
+          res,
+        ),
       );
-      const secCost = persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/${section}`, secUsage);
+      const secCost = persistUsage(
+        store,
+        pid,
+        `POST /api/projects/${pid}/read-aloud/${section}`,
+        secUsage,
+      );
       if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
     } catch (e) {
       const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }
-      console.error('Read aloud error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('tts', 'read-aloud error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'tts') });
     }
   });
 

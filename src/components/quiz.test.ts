@@ -221,17 +221,14 @@ describe('quizComponent', () => {
       comp.answers = { 0: 1, 1: 0 };
       await comp.reviewErrors();
 
-      expect(global.fetch).toHaveBeenCalledWith(
-        '/api/projects/proj-1/generate/quiz-review',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            generationId: 'gen-quiz-1',
-            weakQuestions: [sampleQuestions[1]],
-          }),
-        },
-      );
+      expect(global.fetch).toHaveBeenCalledWith('/api/projects/proj-1/generate/quiz-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          generationId: 'gen-quiz-1',
+          weakQuestions: [sampleQuestions[1]],
+        }),
+      });
     });
 
     it('ajoute la generation et montre toast sur succes', async () => {
