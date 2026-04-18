@@ -27,9 +27,9 @@ function resolveItemSources(ctx: SourceResolverCtx, gen: Generation, item: ItemW
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
 export function normalizeSummaryData(gen: Generation): void {
   if (gen.type === 'summary' && gen.data) {
-    if (!gen.data.citations) gen.data.citations = [];
-    if (!gen.data.vocabulary) gen.data.vocabulary = [];
-    if (!gen.data.key_points) gen.data.key_points = [];
+    gen.data.citations ??= [];
+    gen.data.vocabulary ??= [];
+    gen.data.key_points ??= [];
   }
 }
 
@@ -342,10 +342,8 @@ export function createHelpers() {
       };
       const dataKey = DATA_KEY[gen.type];
       if (dataKey) {
-        const genData = gen.data as Record<string, unknown> | unknown[];
-        const items: ItemWithRefs[] = Array.isArray(genData)
-          ? (genData as ItemWithRefs[])
-          : ((genData as Record<string, unknown>)[dataKey] as ItemWithRefs[]) || [];
+        const genData = gen.data as Record<string, ItemWithRefs[]> | ItemWithRefs[];
+        const items: ItemWithRefs[] = Array.isArray(genData) ? genData : genData[dataKey] || [];
         items.forEach((item: ItemWithRefs) => extractNums(extractItemRefs(item)));
       } else if (gen.type === 'podcast') {
         extractNums(gen.data?.sourceRefs || []);
@@ -459,7 +457,7 @@ export function createHelpers() {
         .map((g: Generation) => {
           const stats = (g as { stats: { attempts: Array<{ score: number; total: number }> } })
             .stats;
-          const last = stats.attempts[stats.attempts.length - 1];
+          const last = stats.attempts.at(-1)!;
           return {
             gen: g,
             lastScore: last.score,
