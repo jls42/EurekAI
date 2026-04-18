@@ -9,6 +9,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "tsx server.ts",
+    "lint:complexity": "./scripts/check-complexity.sh",
+    "pretest": "npm run lint:complexity",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
