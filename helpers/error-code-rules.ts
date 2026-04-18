@@ -5,9 +5,23 @@ export type Rule = Readonly<{
   code: FailedStepCode;
 }>;
 
-// Mapping status → code : voir statusCodeFor() dans error-code-resolution.ts.
-// Volontairement inlined en if-chain là-bas (pas de Map exportée) parce que
-// Codacy Lizard attribuait les entrées Map comme branches du callsite.
+export type StatusRule = Readonly<{
+  status: number;
+  code: FailedStepCode;
+}>;
+
+// Mapping status HTTP → code d'erreur stable. Co-localisé avec MESSAGE_RULES /
+// STRUCTURED_CODE_RULES (même fichier de données) pour que matchStatus soit
+// traité par Lizard comme matchMessage / matchStructuredCode : ranger la table
+// dans le module appelant agrégeait historiquement les entrées à la CCN de la
+// fonction (faux positif confirmé sur 8 itérations, cf. historique).
+export const STATUS_RULES: readonly StatusRule[] = [
+  { status: 401, code: 'auth_required' },
+  { status: 403, code: 'auth_required' },
+  { status: 429, code: 'quota_exceeded' },
+  { status: 503, code: 'upstream_unavailable' },
+  { status: 529, code: 'upstream_unavailable' },
+];
 
 // Ordre = priorité d'évaluation (première regex qui match gagne). Placer `auth_required`
 // en tête garantit que "quota is not yet activated" (libellé Mistral d'un 401 billing)
