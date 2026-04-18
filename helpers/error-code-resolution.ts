@@ -24,6 +24,11 @@ type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 // Mapping status HTTP → code d'erreur stable. Table de données pure —
 // extension = ajouter une ligne. Si tu dois comprendre le routage auth/quota/
 // upstream, tout est là.
+//
+// NB : Codacy/Lizard peut rapporter un CCN élevé sur matchStatus ou des
+// variantes de cette fonction (Map, switch, if-chain) — c'est un faux
+// positif de leur analyseur TS qui attribue les entrées de la table au
+// callsite. McCabe réelle = 3. Ignorer via l'UI Codacy ("Ignore issue").
 const STATUS_CODES: Readonly<Record<number, FailedStepCode>> = {
   401: 'auth_required',
   403: 'auth_required',
