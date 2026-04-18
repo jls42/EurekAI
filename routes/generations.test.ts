@@ -684,6 +684,33 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'Quiz vocal introuvable' });
   });
+
+  it('retourne un code FailedStep stable en catch (pas le message brut avec clés/URLs)', async () => {
+    // Régression à prévenir : `res.json({ error: String(e) })` fuitait err.message
+    // (potentiellement clés API ou URLs internes) au client.
+    const { transcribeAudio } = await import('../generators/quiz-vocal.js');
+    (transcribeAudio as any).mockRejectedValueOnce(
+      new Error('sk-1234-SECRET leak via https://api.internal/v1/audio'),
+    );
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/vocal-answer');
+    const req = mockReq({
+      params: { pid, gid: quizVocalGid },
+      body: { questionIndex: 0 },
+      file: { buffer: Buffer.from('audio') },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    const body = res.json.mock.calls[0][0];
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('sk-1234');
+    expect(serialized).not.toContain('api.internal');
+    // 'stt' agent → matchAudio détecte la signature 'audio' dans le message.
+    expect(body.error).toBe('tts_upstream_error');
+  });
 });
 
 // ================================================================
@@ -890,6 +917,30 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
 
     // Restore default mock
     (textToSpeech as any).mockResolvedValue(Buffer.from('fake-audio'));
+  });
+
+  it('retourne un code FailedStep stable en catch read-aloud (pas le message brut)', async () => {
+    // Vérifie que le catch externe (hors "all sections failed") utilise extractErrorCode.
+    // Cas trigger : resolveVoices jette — chemin atteint avant la boucle section.
+    const { resolveVoices } = await import('../config.js');
+    (resolveVoices as any).mockImplementationOnce(() => {
+      throw new Error('ELEVENLABS_API_KEY non defini — https://api.internal/key');
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+    const req = mockReq({ params: { pid, gid: summaryGid }, body: { section: 'intro' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    const body = res.json.mock.calls[0][0];
+    expect(JSON.stringify(body)).not.toContain('api.internal');
+    // Agent 'tts' + message "API_KEY non defini" → auth_required (action user).
+    expect(body.error).toBe('auth_required');
+
+    // Restore default mock pour les tests suivants.
+    (resolveVoices as any).mockImplementation(() => ({ host: 'mh', guest: 'mg' }));
   });
 
   it('retourne 500 quand toutes les sections TTS echouent', async () => {

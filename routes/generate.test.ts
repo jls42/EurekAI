@@ -115,6 +115,9 @@ vi.mock('../config.js', () => ({
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
   getModelLimits: vi.fn(() => ({})),
+  // Défaut true : les tests existants supposent TTS disponible. Les tests qui veulent
+  // vérifier le filtrage audio (cf. describe "TTS unavailable") overrident via mockReturnValueOnce.
+  getApiStatus: vi.fn(() => ({ mistral: true, elevenlabs: false, ttsAvailable: true })),
 }));
 
 // --- Helpers ---
@@ -1286,6 +1289,55 @@ describe('generateRoutes', () => {
       ]);
     });
 
+    it('skippe podcast/quiz-vocal quand TTS indisponible (parité UI/serveur)', async () => {
+      // Régression à prévenir : src/app/generate.ts:247-255 filtre déjà côté UI, mais les
+      // consommateurs API directs sur une instance sans TTS (ni MISTRAL_API_KEY ni
+      // ELEVENLABS_API_KEY) obtenaient auth_required/tts_upstream_error systématiques
+      // sur des steps audio INJECTÉS par enrichPlanForLearning (pas choisis par le LLM).
+      const { routeRequest } = await import('../generators/router.js');
+      const { getApiStatus } = await import('../config.js');
+      (getApiStatus as any).mockReturnValueOnce({
+        mistral: false,
+        elevenlabs: false,
+        ttsAvailable: false,
+      });
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'podcast', reason: 'audio' },
+          { agent: 'quiz-vocal', reason: 'oral' },
+          { agent: 'quiz', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      // summary + quiz exécutés, podcast + quiz-vocal skippés (pas failed).
+      expect(body.generations.map((g: any) => g.type)).toEqual(['summary', 'quiz']);
+      expect(body.skippedSteps).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ agent: 'podcast' }),
+          expect.objectContaining({ agent: 'quiz-vocal' }),
+        ]),
+      );
+      // Aucun failedStep audio ne doit apparaître — on a évité de tenter.
+      expect(body.failedSteps).toBeUndefined();
+    });
+
     it('returns 500 with stable code and no err.message leak when routeRequest itself fails', async () => {
       const { routeRequest } = await import('../generators/router.js');
       (routeRequest as any).mockRejectedValueOnce(
@@ -1602,6 +1654,68 @@ describe('generateRoutes', () => {
       expect(body.failedSteps).toEqual([{ agent: 'summary', code: 'quota_exceeded' }]);
       // Pas de top-level error dans le cas partial-success
       expect(body.error).toBeUndefined();
+    });
+
+    it('failedSteps[].code est upstream_unavailable pour status 503 (panne backend)', async () => {
+      // Régression à prévenir : un 503 Mistral ne doit PAS mapper à quota_exceeded.
+      // Un user qui n'a rien consommé voyait "quota dépassé" → action incorrecte.
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        Object.assign(new Error('Service temporarily down'), { status: 503 }),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('upstream_unavailable');
+    });
+
+    it('failedSteps[].code est auth_required pour status 401 (pas quota)', async () => {
+      // Régression à prévenir : un 401 (clé API invalide ou billing non activé côté Mistral)
+      // ne doit PAS être classé quota_exceeded — action utilisateur différente.
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'summary', reason: 'r' }],
+        context: 'ctx',
+      });
+      (generateSummary as any).mockRejectedValueOnce(
+        Object.assign(new Error('Your account quota is not yet activated'), { status: 401 }),
+      );
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 't.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.failedSteps[0].code).toBe('auth_required');
     });
 
     it('failedSteps[].code est tts_upstream_error pour quiz-vocal', async () => {

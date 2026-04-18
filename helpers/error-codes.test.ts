@@ -9,6 +9,7 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
   llm_invalid_json: true,
   quota_exceeded: true,
   upstream_unavailable: true,
+  auth_required: true,
   tts_upstream_error: true,
   context_length_exceeded: true,
   internal_error: true,
@@ -59,6 +60,44 @@ describe('extractErrorCode', () => {
     expect(extractErrorCode(Object.assign(new Error('x'), { code: 'service_unavailable' }))).toBe(
       'upstream_unavailable',
     );
+  });
+
+  it('mappe 401 / 403 / unauthorized / invalid_api_key vers auth_required', () => {
+    // Régression à prévenir : 401 "Your account quota is not yet activated" (libellé Mistral
+    // pour un billing inactif) ne doit PAS mapper à quota_exceeded — c'est une action user
+    // (activer le billing), pas un retry utile.
+    expect(extractErrorCode(Object.assign(new Error('Unauthorized'), { status: 401 }))).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(Object.assign(new Error('Forbidden'), { status: 403 }))).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(Object.assign(new Error('x'), { code: 'invalid_api_key' }))).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(Object.assign(new Error('x'), { code: 'unauthorized' }))).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(new Error('401 Unauthorized'))).toBe('auth_required');
+    expect(extractErrorCode(new Error('403 Forbidden'))).toBe('auth_required');
+    // Status 401 avec message "quota" — le status (SDK source de vérité) doit gagner.
+    const billingErr = Object.assign(new Error('Your account quota is not yet activated'), {
+      status: 401,
+    });
+    expect(extractErrorCode(billingErr)).toBe('auth_required');
+  });
+
+  it('mappe une clé API locale non définie vers auth_required (pas tts_upstream_error)', () => {
+    // Cas observé : tts-provider.ts throw Error('ELEVENLABS_API_KEY non defini') quand
+    // la variable d'env manque. TTS_SIGNATURE /elevenlabs/ happerait la classification
+    // en tts_upstream_error ("panne transitoire") et masquerait le vrai fix pour l'utilisateur.
+    expect(extractErrorCode(new Error('ELEVENLABS_API_KEY non defini'), 'podcast')).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(new Error('MISTRAL_API_KEY not defined'), 'summary')).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(new Error('API key missing'), 'quiz-vocal')).toBe('auth_required');
   });
 
   it('mappe context_length / token limit vers context_length_exceeded', () => {

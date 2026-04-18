@@ -21,6 +21,7 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -230,7 +231,7 @@ export function generationCrudRoutes(
       res.json({ attempt, stats: quizGen.stats });
     } catch (e) {
       logger.error('quiz', 'attempt error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e, 'quiz') });
     }
   });
 
@@ -284,7 +285,7 @@ export function generationCrudRoutes(
       res.json({ attempt, stats: fbGen.stats, results });
     } catch (e) {
       logger.error('fill-blank', 'attempt error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e, 'fill-blank') });
     }
   });
 
@@ -353,7 +354,9 @@ export function generationCrudRoutes(
       res.json({ correct: result.correct, feedback: result.feedback, transcription });
     } catch (e) {
       logger.error('quiz-vocal', 'vocal answer error:', e);
-      res.status(500).json({ error: String(e) });
+      // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
+      // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
+      res.status(500).json({ error: extractErrorCode(e, 'stt') });
     }
   });
 
@@ -446,7 +449,7 @@ export function generationCrudRoutes(
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }
       logger.error('tts', 'read-aloud error:', e);
-      res.status(500).json({ error: String(e) });
+      res.status(500).json({ error: extractErrorCode(e, 'tts') });
     }
   });
 

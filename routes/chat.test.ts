@@ -547,9 +547,13 @@ describe('POST /:pid/chat', () => {
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
-  it('retourne 500 quand chatWithSources lance une erreur', async () => {
+  it('retourne 500 avec un FailedStepCode stable (pas le message brut) quand chatWithSources lance', async () => {
+    // Régression à prévenir : `res.json({ error: String(e) })` fuitait err.message
+    // (potentiellement clés API / URLs internes) au client.
     const { chatWithSources } = await import('../generators/chat.js');
-    (chatWithSources as any).mockRejectedValueOnce(new Error('API down'));
+    (chatWithSources as any).mockRejectedValueOnce(
+      new Error('sk-1234-SECRET leak via https://api.internal/v1'),
+    );
 
     const project = store.createProject('Test');
     addSource(project.meta.id);
@@ -563,7 +567,11 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Error: API down' });
+    const body = res.json.mock.calls[0][0];
+    expect(body.error).toBe('internal_error');
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('sk-1234');
+    expect(serialized).not.toContain('api.internal');
   });
 
   it('fonctionne sans profil associe au projet', async () => {

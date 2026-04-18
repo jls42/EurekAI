@@ -180,11 +180,15 @@ export type Generation =
 // - quota_exceeded : 429 / tier limit / rate limit côté compte utilisateur.
 // - upstream_unavailable : 503 / 529 / "overloaded" / "capacity" — saturation backend
 //   non liée au budget utilisateur, retry typiquement utile.
+// - auth_required : 401 / 403 upstream OU clé API locale non définie — action user.
+//   Distingué de quota_exceeded (compte actif mais plafonné) et tts_upstream_error
+//   (panne transitoire) parce que la réparation utilisateur est différente.
 // - tts_upstream_error : pile audio (TTS + STT), libellé i18n explicite.
 export type FailedStepCode =
   | 'llm_invalid_json'
   | 'quota_exceeded'
   | 'upstream_unavailable'
+  | 'auth_required'
   | 'tts_upstream_error'
   | 'context_length_exceeded'
   | 'internal_error';

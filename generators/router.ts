@@ -58,15 +58,17 @@ function insertBeforeImageOrAppend(
   plan.splice(imageIndex, 0, step);
 }
 
+// Mute le tableau `plan` en place (via insertBeforeImageOrAppend).
+// Signature void explicite : l'appelant normalizePlan ne doit pas lire la valeur retournée.
 function enrichPlanForLearning(
   plan: Array<{ agent: string; reason: string }>,
   lang: string,
   markdown: string,
-): Array<{ agent: string; reason: string }> {
-  if (!hasSubstantialStudyMaterial(markdown)) return plan;
+): void {
+  if (!hasSubstantialStudyMaterial(markdown)) return;
 
   const seen = new Set(plan.map((step) => step.agent));
-  if (seen.size === 0) return plan;
+  if (seen.size === 0) return;
 
   // Budget post-truncation : n'injecte que ce qui rentre sans évincer un agent déjà choisi
   // par le LLM. Si le LLM a explicitement demandé `image` pour du contenu visuel
@@ -79,8 +81,6 @@ function enrichPlanForLearning(
       reason: defaultReasonFor(agent, lang),
     });
   }
-
-  return plan;
 }
 
 /**

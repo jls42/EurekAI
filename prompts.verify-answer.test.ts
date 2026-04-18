@@ -43,4 +43,32 @@ describe('verifyAnswerSystem', () => {
     expect(result).toContain('Mercure');
     expect(result).not.toMatch(/la capitale de la France/);
   });
+
+  describe('labels oraux localisés (anti-régression TTS non-FR)', () => {
+    // Régression à prévenir : le TTS (ttsQuestion) prononce les choix via
+    // toSpokenChoice(raw, lang) → "choice A : Paris" (EN), "opción A : París" (ES),
+    // "खिकल्प A : Paris" (HI), "خيار A : باريس" (AR). Le STT renvoie la forme
+    // localisée exacte. Sans mention explicite dans le prompt, le LLM peut ne pas
+    // mapper "opción B" / "खिकल्प B" à la lettre B — surtout en AR/HI scripts non-latins.
+    it.each([
+      ['fr', 'choix'],
+      ['en', 'choice'],
+      ['es', 'opción'],
+      ['de', 'Auswahl'],
+      ['it', 'scelta'],
+      ['pt', 'opção'],
+      ['nl', 'keuze'],
+      ['hi', 'विकल्प'],
+      ['ar', 'خيار'],
+    ])('mentionne le label oral "%s B" pour lang=%s', (lang, spokenLabel) => {
+      const result = verifyAnswerSystem('A) Paris\nB) Lyon', 'A) Paris', 'enfant', lang);
+      expect(result).toContain(`${spokenLabel} B`);
+    });
+
+    it('fallback FR pour les langues hors périmètre UI', () => {
+      // Ex: ja, zh, ko, pl, ro, sv (6 langues texte hors Voxtral-TTS).
+      const result = verifyAnswerSystem('A) Paris', 'A) Paris', 'enfant', 'ja');
+      expect(result).toContain('choix B');
+    });
+  });
 });

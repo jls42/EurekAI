@@ -11,7 +11,7 @@ import type {
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
-import { getConfig, resolveVoices, getModelLimits } from '../config.js';
+import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../config.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
@@ -850,8 +850,33 @@ export function generateRoutes(
     });
   }
 
+  // Agents qui nécessitent un provider TTS configuré (Mistral/ElevenLabs).
+  // Source unique serveur pour le filtrage quand `apiStatus.ttsAvailable` est faux :
+  // l'UI fait déjà ce filtrage côté client (src/app/generate.ts) ; cette liste garantit
+  // le même comportement pour les consommateurs API directs (sinon
+  // `enrichPlanForLearning` en injecte et tous échouent en `auth_required`).
+  const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set([
+    'podcast',
+    'quiz-vocal',
+  ] as AutoAgentType[]);
+
+  function splitByTtsAvailability<T extends { agent: AutoAgentType }>(
+    plan: T[],
+  ): { runnable: T[]; ttsSkipped: T[] } {
+    if (getApiStatus().ttsAvailable) return { runnable: plan, ttsSkipped: [] };
+    const runnable: T[] = [];
+    const ttsSkipped: T[] = [];
+    for (const step of plan) {
+      if (TTS_DEPENDENT_AGENTS.has(step.agent)) ttsSkipped.push(step);
+      else runnable.push(step);
+    }
+    return { runnable, ttsSkipped };
+  }
+
   // Route analysis + split en une étape : persiste l'usage, trace le plan, isole les
-  // steps non-auto-executable pour les remonter dans la réponse sans bloquer l'exécution.
+  // steps non-auto-executable ET les steps TTS si le provider n'est pas configuré,
+  // pour les remonter dans la réponse sans bloquer l'exécution (et sans produire
+  // des auth_required/tts_upstream_error systématiques).
   async function runAutoRouting(markdown: string, lang: string, ageGroup: AgeGroup, pid: string) {
     logger.info('auto', 'Smart routing: analyzing content...');
     const { result: route, usage } = await runWithUsageTracking(() =>
@@ -860,13 +885,20 @@ export function generateRoutes(
     persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
     logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
     const { executable, skipped } = splitByAutoExecutable(route.plan);
+    const { runnable, ttsSkipped } = splitByTtsAvailability(executable);
+    if (ttsSkipped.length > 0) {
+      logger.warn(
+        'auto',
+        `skipped (tts unavailable): [${ttsSkipped.map((s) => s.agent).join(', ')}]`,
+      );
+    }
     if (skipped.length > 0) {
       logger.warn(
         'auto',
         `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
       );
     }
-    return { executable, skipped };
+    return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
   }
 
   function toAutoCtx(baseCtx: Omit<GenContext, 'req' | 'res'>): AutoCtx {

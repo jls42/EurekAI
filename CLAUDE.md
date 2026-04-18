@@ -49,8 +49,10 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ### Codes d'erreur API (FailedStep)
 - `/generate/auto` retourne `failedSteps: FailedStep[]` avec codes stables (`types.ts` : `FailedStepCode`) — jamais `err.message` brut dans la réponse HTTP (fuite potentielle clés API / URLs internes)
-- Codes : `llm_invalid_json`, `quota_exceeded`, `tts_upstream_error`, `context_length_exceeded`, `internal_error`
+- **Source unique** : `types.ts` exporte `FailedStepCode`. Toute addition casse `helpers/error-codes.test.ts` (_KNOWN_CODES) tant que le nouveau code n'est pas listé → force une revue volontaire des consommateurs (UI mapping, retry policy, observabilité).
+- Codes : `llm_invalid_json`, `quota_exceeded`, `upstream_unavailable` (503/529 panne backend), `auth_required` (401/403 OU clé API locale non définie), `tts_upstream_error`, `context_length_exceeded`, `internal_error`
 - Status 502 quand tous les steps échouent (réponse inclut `error: 'all_steps_failed'`), 200 sinon
+- **Tous les endpoints** qui renvoient une erreur HTTP doivent utiliser `extractErrorCode(e, '<agent>')` plutôt que `err.message`/`String(e)` (cf. `helpers/error-codes.ts`) — ne pas en créer de nouveaux sans cette pratique.
 - Le détail complet (stack, message) reste dans `logger.error` côté serveur
 
 ### HTML interactif

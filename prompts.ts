@@ -1,4 +1,5 @@
 import { logger } from './helpers/logger.js';
+import { spokenChoiceLabel } from './helpers/choice-labels.js';
 import type { AgeGroup } from './types.js';
 
 // ── Language helper ──────────────────────────────────────────────────
@@ -580,6 +581,12 @@ export function verifyAnswerSystem(
   ageGroup: AgeGroup = 'enfant',
   lang = 'fr',
 ): string {
+  // Le TTS prononce chaque choix avec un repère oral localisé (ex: "choice A", "opción B",
+  // "خيار C") via helpers/choice-labels.ts::toSpokenChoice. Le STT renvoie donc souvent la
+  // forme localisée EXACTE que l'élève a entendue. Le prompt doit expliciter ce mapping
+  // sinon le LLM peut échouer à relier "opción B" ou "खيار B" à la lettre B — surtout
+  // en AR/HI où le script n'est pas latin.
+  const spokenLabel = spokenChoiceLabel(lang);
   return `Tu es un correcteur de quiz. Compare la reponse de l'eleve avec la bonne reponse.
 ${feedbackAgeInstruction(ageGroup)}
 
@@ -589,7 +596,7 @@ ${choicesList}
 La bonne reponse est : ${correctAnswerLine}
 
 Regles strictes :
-- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
+- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisée "${spokenLabel} B" (que le TTS prononce avant chaque choix), ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
 - Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - La reponse est soit correcte, soit fausse — binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.

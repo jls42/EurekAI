@@ -50,6 +50,52 @@ describe('initConfig', () => {
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('mistral-large-latest');
   });
+
+  it('migration one-time: config.json sans mistralVoicesSource → classé default', () => {
+    // Régression à prévenir : un user qui a un config.json pre-PR-20 (sans le champ)
+    // ne doit PAS être classé 'user' (sinon la sélection dynamique par langue ne s'applique
+    // jamais et le user reste coincé avec les voix FR même en EN/ES/etc.).
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        models: { summary: 'mistral-large-latest' },
+        // mistralVoices absent → utilise DEFAULT_CONFIG.mistralVoices via spread.
+      }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().mistralVoicesSource).toBe('default');
+  });
+
+  it('migration one-time: config.json avec legacy default host → classé default', () => {
+    // LEGACY_DEFAULT_HOSTS : un ancien ID default d'une release passée doit être détecté
+    // comme "pas un choix utilisateur" pour que la migration fonctionne.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        mistralVoices: {
+          host: 'e3596645-b1af-469e-b857-f18ddedc7652', // LEGACY_DEFAULT_HOSTS
+          guest: '5a271406-039d-46fe-835b-fbbb00eaf08d', // LEGACY_DEFAULT_GUESTS
+        },
+      }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().mistralVoicesSource).toBe('default');
+  });
+
+  it('migration one-time: config.json avec voix custom → classé user', () => {
+    // Inverse du test précédent : un vrai choix utilisateur est préservé.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        mistralVoices: {
+          host: 'custom-host-id',
+          guest: 'custom-guest-id',
+        },
+      }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().mistralVoicesSource).toBe('user');
+  });
 });
 
 describe('getConfig', () => {
@@ -111,7 +157,7 @@ describe('saveConfig', () => {
     setVoiceCache([]);
   });
 
-  it("accepte un override explicite via mistralVoicesSource meme si les IDs restent identiques", () => {
+  it('accepte un override explicite via mistralVoicesSource meme si les IDs restent identiques', () => {
     initConfig(tempDir);
     const cfg = getConfig();
 

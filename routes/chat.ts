@@ -16,6 +16,8 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+import { logger } from '../helpers/logger.js';
+import { extractErrorCode } from '../helpers/error-codes.js';
 
 interface ChatRequestContext {
   pid: string;
@@ -184,7 +186,7 @@ async function processChatToolCalls(
         store.addGeneration(pid, gen);
         generatedIds.push(gen.id);
         generations.push(gen);
-        console.log(`  Chat tool: ${type} generated`);
+        logger.info('chat', `tool ${type} generated`);
       }
     } catch (err) {
       const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
@@ -197,7 +199,7 @@ async function processChatToolCalls(
         );
         if (persisted) failedCost += persisted.cost;
       }
-      console.error(`  Chat tool ${call} failed:`, err);
+      logger.error('chat', `tool ${call} failed:`, err);
       failedTools.push(call);
     }
   }
@@ -295,8 +297,8 @@ export function chatRoutes(
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
       }
-      console.error('Chat error:', e);
-      res.status(500).json({ error: String(e) });
+      logger.error('chat', 'error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'chat') });
     }
   });
 
