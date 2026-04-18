@@ -264,11 +264,11 @@ export function createGenerate() {
         const promises = plannedTypes.map(async (type) => {
           if (!AUTO_AGENTS_SET.has(type)) return;
           try {
-            // codacy:ignore-next-line rule-node-ssrf -- URL relative same-origin vers notre
-            // propre backend (/api/projects/:pid/generate/:type). projectId = UUID genere
-            // cote backend (randomUUID, store.ts). type est whiteliste deux fois via
-            // AUTO_AGENTS_SET.has() (ligne 255 apres /generate/route, ligne 265 avant fetch).
-            // Faux positif Codacy : la regle pattern-match tout fetch(var) sans analyse flot.
+            // URL relative same-origin /api/projects/:pid/generate/:type — projectId est
+            // un UUID genere backend (randomUUID dans store.ts), type est whiteliste
+            // deux fois via AUTO_AGENTS_SET.has() (lignes 255 et 265). Pas de SSRF
+            // possible (URL relative same-origin, pas de control externe).
+            // nosemgrep: rule-node-ssrf
             const res = await fetch(base + '/generate/' + type, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
             if (res.ok) {
