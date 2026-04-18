@@ -11,7 +11,9 @@ export function createConsigne() {
             this.$nextTick(() => this.refreshIcons());
           }
         }
-      } catch {}
+      } catch {
+        /* silent: offline fallback, consigne absent OK */
+      }
     },
 
     async detectConsigne(this: any) {

@@ -22,7 +22,9 @@ export function createConfirm() {
         this.$nextTick(() => {
           try {
             this.confirmTrigger.focus();
-          } catch {}
+          } catch {
+            /* silent: focus restore peut throw si element demonte */
+          }
           this.confirmTrigger = null;
         });
       }
@@ -35,7 +37,9 @@ export function createConfirm() {
         this.$nextTick(() => {
           try {
             this.confirmTrigger.focus();
-          } catch {}
+          } catch {
+            /* silent: focus restore peut throw si element demonte */
+          }
           this.confirmTrigger = null;
         });
       }
