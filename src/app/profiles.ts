@@ -5,32 +5,42 @@ import type { Profile } from '../../types';
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
 
-/** Execute the actual profile deletion (API call + state cleanup). */
-async function executeDeleteProfile(state: AppContext, id: string, pin?: string): Promise<void> {
+/** Issue the DELETE /api/profiles/:id HTTP request, optionally with a PIN body. */
+function deleteProfileRequest(id: string, pin?: string): Promise<Response> {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
     opts.headers = { 'Content-Type': 'application/json' };
     opts.body = JSON.stringify({ pin });
   }
+  return fetch('/api/profiles/' + id, opts);
+}
+
+/** Apply local state cleanup after a successful DELETE /api/profiles/:id. */
+function finalizeDeleteProfile(state: AppContext, id: string): void {
+  clearProfileLocale(id);
+  state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
+  if (state.currentProfile?.id === id) {
+    state.currentProfile = null;
+    localStorage.removeItem('sf-profileId');
+    if (state.profiles.length > 0) {
+      state.selectProfile(state.profiles[0].id);
+    } else {
+      state.showProfilePicker = true;
+    }
+  }
+  state.showToast(state.t('toast.profileDeleted'), 'success');
+}
+
+/** Execute the actual profile deletion (API call + state cleanup). */
+async function executeDeleteProfile(state: AppContext, id: string, pin?: string): Promise<void> {
   try {
-    const res = await fetch('/api/profiles/' + id, opts);
+    const res = await deleteProfileRequest(id, pin);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
       return;
     }
-    clearProfileLocale(id);
-    state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
-    if (state.currentProfile?.id === id) {
-      state.currentProfile = null;
-      localStorage.removeItem('sf-profileId');
-      if (state.profiles.length > 0) {
-        state.selectProfile(state.profiles[0].id);
-      } else {
-        state.showProfilePicker = true;
-      }
-    }
-    state.showToast(state.t('toast.profileDeleted'), 'success');
+    finalizeDeleteProfile(state, id);
   } catch (e: unknown) {
     console.error('Failed to delete profile:', e);
     const msg = e instanceof Error ? e.message : String(e);
