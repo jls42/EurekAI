@@ -20,29 +20,21 @@ type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 // générique `matchByPattern(value, rules)`) parce que Codacy additionnait la
 // complexité des regex des deux tableaux sur la fonction générique (9 > 8).
 // Chaque fonction spécialisée ne voit que ses propres règles.
-//
-// statusCodeFor utilise un switch plutôt que Map.get() ou if-chain :
-// Codacy Lizard comptait toutes les entrées du Map comme branches du callsite
-// (CCN 10-11) ; le if-chain avec `===` et `||` empirait (CCN 14) car Lizard
-// semble compter chaque comparateur et opérateur logique. Switch/case est un
-// pattern CCN standard (6 branches = 7 total), bien reconnu.
-function statusCodeFor(status: number): FailedStepCode | null {
-  switch (status) {
-    case 401:
-    case 403:
-      return 'auth_required';
-    case 429:
-      return 'quota_exceeded';
-    case 503:
-    case 529:
-      return 'upstream_unavailable';
-    default:
-      return null;
-  }
-}
+
+// Mapping status HTTP → code d'erreur stable. Table de données pure —
+// extension = ajouter une ligne. Si tu dois comprendre le routage auth/quota/
+// upstream, tout est là.
+const STATUS_CODES: Readonly<Record<number, FailedStepCode>> = {
+  401: 'auth_required',
+  403: 'auth_required',
+  429: 'quota_exceeded',
+  503: 'upstream_unavailable',
+  529: 'upstream_unavailable',
+};
 
 function matchStatus(ctx: ErrContext): FailedStepCode | null {
-  return typeof ctx.status === 'number' ? statusCodeFor(ctx.status) : null;
+  if (typeof ctx.status !== 'number') return null;
+  return STATUS_CODES[ctx.status] ?? null;
 }
 
 function matchStructuredCode(ctx: ErrContext): FailedStepCode | null {
