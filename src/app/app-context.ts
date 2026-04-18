@@ -25,10 +25,32 @@ export interface ItemWithRefs {
   source?: string;
 }
 
+type ToastAction = { label: string; fn: () => void };
+
 export interface AppContext extends AppState {
   $nextTick(cb?: () => void): Promise<void>;
+  $refs: Record<string, HTMLElement | HTMLDialogElement | undefined>;
   t: TFn;
   locale: string;
+
+  // Toast mixin (src/app/toast.ts)
+  showToast(
+    message: string,
+    type?: string,
+    retryFn?: (() => void) | null,
+    action?: ToastAction | null,
+  ): void;
+  dismissToast(id: number): void;
+
+  // Consigne mixin (src/app/consigne.ts)
+  refreshConsigne(): Promise<void>;
+
+  // Sources mixin (src/app/sources.ts) — self-reference
+  refreshModeration(retries?: number): Promise<void>;
+  handleFiles(fileList: FileList | null | undefined): Promise<void>;
+  handleDrop(e: DragEvent): void;
+  addText(): Promise<void>;
+  deleteSource(id: string): Promise<void>;
 
   generationsByType(type: string): Generation[];
   toggleGen(id: string): void;

@@ -1,15 +1,23 @@
 import { addCostDelta } from './cost-utils';
+import type { AppContext, AppState } from './app-context';
+import type { Source } from '../../types';
 
 type UploadResult = 'applied' | 'ignored' | 'failed';
+type UploadSession = AppState['uploadSessions'][number];
+type UploadFile = UploadSession['files'][number];
 
-function _isSessionActive(ctx: any, session: any): boolean {
+function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
   return (
-    ctx.uploadSessions.some((s: any) => s.id === session.id) &&
+    ctx.uploadSessions.some((s: UploadSession) => s.id === session.id) &&
     ctx.currentProjectId === session.projectId
   );
 }
 
-async function _resolveHttpError(ctx: any, session: any, res: Response): Promise<string | null> {
+async function _resolveHttpError(
+  ctx: AppContext,
+  session: UploadSession,
+  res: Response,
+): Promise<string | null> {
   try {
     const err = await res.json();
     if (!_isSessionActive(ctx, session)) return null;
@@ -20,23 +28,32 @@ async function _resolveHttpError(ctx: any, session: any, res: Response): Promise
   }
 }
 
-function _applyUploadSuccess(ctx: any, session: any, file: any, newSources: any[]) {
+function _applyUploadSuccess(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  newSources: Source[],
+) {
   ctx.sources.push(...newSources);
-  ctx.selectedIds.push(...newSources.map((s: any) => s.id));
+  ctx.selectedIds.push(...newSources.map((s: Source) => s.id));
   for (const s of newSources) addCostDelta(ctx, s.estimatedCost, 'sources/upload');
   file.file = null;
   file.status = 'done';
   ctx.$nextTick(() => ctx.refreshIcons());
-  if (newSources.some((s: any) => s.moderation?.status === 'pending')) {
+  if (newSources.some((s: Source) => s.moderation?.status === 'pending')) {
     setTimeout(() => {
       if (_isSessionActive(ctx, session)) ctx.refreshModeration();
     }, 2000);
   }
 }
 
-async function _uploadSingleFile(this: any, session: any, fileId: string): Promise<UploadResult> {
+async function _uploadSingleFile(
+  this: AppContext,
+  session: UploadSession,
+  fileId: string,
+): Promise<UploadResult> {
   if (!_isSessionActive(this, session)) return 'ignored';
-  const file = session.files.find((f: any) => f.id === fileId);
+  const file = session.files.find((f: UploadFile) => f.id === fileId);
   if (!file?.file) return 'ignored';
 
   file.status = 'uploading';
@@ -70,29 +87,30 @@ async function _uploadSingleFile(this: any, session: any, fileId: string): Promi
 
     _applyUploadSuccess(this, session, file, newSources);
     return 'applied';
-  } catch (e: any) {
+  } catch (e: unknown) {
     if (!_isSessionActive(this, session)) return 'ignored';
+    const msg = e instanceof Error ? e.message : String(e);
     file.status = 'error';
-    file.errorMsg = e.message;
+    file.errorMsg = msg;
     this.$nextTick(() => this.refreshIcons());
-    this.showToast(this.t('toast.uploadError', { filename: file.name, error: e.message }), 'error');
+    this.showToast(this.t('toast.uploadError', { filename: file.name, error: msg }), 'error');
     return 'failed';
   }
 }
 
-function _scheduleConsigneRefresh(this: any, projectId: string) {
+function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
   setTimeout(() => {
     if (this.currentProjectId === projectId) this.refreshConsigne();
   }, 3000);
 }
 
-function _maybeCleanupSession(this: any, sessionId: string) {
-  const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+function _maybeCleanupSession(this: AppContext, sessionId: string) {
+  const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
   if (!session || session.cleanupScheduled || session.files.length === 0) return;
-  if (session.files.every((f: any) => f.status === 'done')) {
+  if (session.files.every((f: UploadFile) => f.status === 'done')) {
     session.cleanupScheduled = true;
     setTimeout(() => {
-      this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
+      this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
       this.$nextTick(() => this.refreshIcons());
     }, 3000);
   }
@@ -100,12 +118,12 @@ function _maybeCleanupSession(this: any, sessionId: string) {
 
 export function createSources() {
   return {
-    handleDrop(this: any, e: DragEvent) {
+    handleDrop(this: AppContext, e: DragEvent) {
       this.dragging = false;
       this.handleFiles(e.dataTransfer?.files);
     },
 
-    async handleFiles(this: any, fileList: FileList | undefined | null) {
+    async handleFiles(this: AppContext, fileList: FileList | undefined | null) {
       const projectId = this.currentProjectId;
       if (!fileList || fileList.length === 0 || !projectId) return;
 
@@ -120,7 +138,8 @@ export function createSources() {
       this.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
       this.$nextTick(() => this.refreshIcons());
 
-      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
+      if (!session) return;
       let appliedCount = 0;
       let interrupted = false;
 
@@ -140,10 +159,10 @@ export function createSources() {
       _maybeCleanupSession.call(this, sessionId);
     },
 
-    async retryFile(this: any, sessionId: string, fileId: string) {
-      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+    async retryFile(this: AppContext, sessionId: string, fileId: string) {
+      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
       if (!session) return;
-      const file = session.files.find((f: any) => f.id === fileId);
+      const file = session.files.find((f: UploadFile) => f.id === fileId);
       if (file?.status !== 'error') return;
 
       const result = await _uploadSingleFile.call(this, session, fileId);
@@ -154,22 +173,22 @@ export function createSources() {
       _maybeCleanupSession.call(this, sessionId);
     },
 
-    dismissFailedFile(this: any, sessionId: string, fileId: string) {
-      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+    dismissFailedFile(this: AppContext, sessionId: string, fileId: string) {
+      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
       if (!session) return;
-      const file = session.files.find((f: any) => f.id === fileId);
+      const file = session.files.find((f: UploadFile) => f.id === fileId);
       if (file?.status !== 'error') return;
 
-      session.files = session.files.filter((f: any) => f.id !== fileId);
+      session.files = session.files.filter((f: UploadFile) => f.id !== fileId);
       if (session.files.length === 0) {
-        this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
+        this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
       } else {
         _maybeCleanupSession.call(this, sessionId);
       }
       this.$nextTick(() => this.refreshIcons());
     },
 
-    async addText(this: any) {
+    async addText(this: AppContext) {
       const text = this.textInput.trim();
       const projectId = this.currentProjectId;
       if (!text || !projectId) return;
@@ -189,7 +208,8 @@ export function createSources() {
           },
         ],
       });
-      const session = this.uploadSessions.find((s: any) => s.id === sessionId);
+      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
+      if (!session) return;
 
       try {
         const res = await fetch(this.apiBase() + '/sources/text', {
@@ -218,22 +238,23 @@ export function createSources() {
         setTimeout(() => {
           if (_isSessionActive(this, session)) this.refreshModeration();
         }, 2000);
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!_isSessionActive(this, session)) return;
-        this.showToast(this.t('toast.error', { error: e.message }), 'error', () => this.addText());
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.error', { error: msg }), 'error', () => this.addText());
       } finally {
-        this.uploadSessions = this.uploadSessions.filter((s: any) => s.id !== sessionId);
+        this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
       }
     },
 
-    async deleteSource(this: any, id: string) {
+    async deleteSource(this: AppContext, id: string) {
       await fetch(this.apiBase() + '/sources/' + id, { method: 'DELETE' });
-      this.sources = this.sources.filter((s: any) => s.id !== id);
+      this.sources = this.sources.filter((s: Source) => s.id !== id);
       this.selectedIds = this.selectedIds.filter((sid: string) => sid !== id);
       this.showToast(this.t('toast.sourceDeleted'), 'info');
     },
 
-    openSourceDialog(this: any, src: any) {
+    openSourceDialog(this: AppContext, src: Source) {
       this.viewSource = src;
       this.viewSourceMode = 'ocr';
       this.viewSourceZoom = 1;
@@ -245,37 +266,37 @@ export function createSources() {
       this.$nextTick(() => this.refreshIcons());
     },
 
-    zoomIn(this: any) {
+    zoomIn(this: AppContext) {
       this.viewSourceZoom = Math.min(3, this.viewSourceZoom + 0.25);
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
-    zoomOut(this: any) {
+    zoomOut(this: AppContext) {
       this.viewSourceZoom = Math.max(0.5, this.viewSourceZoom - 0.25);
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
-    resetZoom(this: any) {
+    resetZoom(this: AppContext) {
       this.viewSourceZoom = 1;
       this.viewSourceRotation = 0;
       if (this.viewSource) delete this.viewSourceRotations[this.viewSource.id];
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
-    rotateLeft(this: any) {
+    rotateLeft(this: AppContext) {
       this.viewSourceRotation -= 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
-    rotateRight(this: any) {
+    rotateRight(this: AppContext) {
       this.viewSourceRotation += 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
 
-    startDrag(this: any, e: MouseEvent | TouchEvent) {
+    startDrag(this: AppContext, e: MouseEvent | TouchEvent) {
       if (this.viewSourceZoom <= 1 && this.viewSourceRotation % 360 === 0) return;
       this.viewSourceDragging = true;
       const point = 'touches' in e ? e.touches[0] : e;
@@ -283,7 +304,7 @@ export function createSources() {
       this.viewSourcePanStart = { x: this.viewSourcePanX, y: this.viewSourcePanY };
       e.preventDefault();
     },
-    onDrag(this: any, e: MouseEvent | TouchEvent) {
+    onDrag(this: AppContext, e: MouseEvent | TouchEvent) {
       if (!this.viewSourceDragging) return;
       const point = 'touches' in e ? e.touches[0] : e;
       this.viewSourcePanX =
@@ -292,29 +313,29 @@ export function createSources() {
         this.viewSourcePanStart.y + (point.clientY - this.viewSourceDragStart.y);
       e.preventDefault();
     },
-    stopDrag(this: any) {
+    stopDrag(this: AppContext) {
       this.viewSourceDragging = false;
     },
 
-    closeSourceDialog(this: any) {
-      this.$refs.sourceDialog?.close();
+    closeSourceDialog(this: AppContext) {
+      (this.$refs.sourceDialog as HTMLDialogElement | undefined)?.close();
       this.viewSource = null;
     },
 
-    async refreshModeration(this: any, retries = 3) {
+    async refreshModeration(this: AppContext, retries = 3) {
       if (!this.currentProjectId) return;
       try {
         const res = await fetch('/api/projects/' + this.currentProjectId);
         if (res.ok) {
           const project = await res.json();
-          for (const src of project.sources) {
+          for (const src of project.sources as Source[]) {
             if (src.moderation) {
-              const local = this.sources.find((s: any) => s.id === src.id);
+              const local = this.sources.find((s: Source) => s.id === src.id);
               if (local) local.moderation = src.moderation;
             }
           }
           this.$nextTick(() => this.refreshIcons());
-          const hasPending = this.sources.some((s: any) => s.moderation?.status === 'pending');
+          const hasPending = this.sources.some((s: Source) => s.moderation?.status === 'pending');
           if (hasPending && retries > 0) {
             setTimeout(() => this.refreshModeration(retries - 1), 3000);
           }

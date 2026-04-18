@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSources } from './sources';
+import type { Source } from '../../types';
 
 // Mock document.querySelector for openSourceDialog
 const mockDialog = { showModal: vi.fn() };
@@ -168,7 +169,7 @@ describe('createSources', () => {
 
   describe('openSourceDialog', () => {
     it('sets viewSource and opens dialog', () => {
-      const mockSrc = { id: 's1', text: 'hello' };
+      const mockSrc = { id: 's1', text: 'hello' } as unknown as Source;
       mockDialog.showModal.mockClear();
 
       src.openSourceDialog.call(ctx, mockSrc);
@@ -181,7 +182,7 @@ describe('createSources', () => {
 
     it('uses stored rotation for source', () => {
       ctx.viewSourceRotations = { s1: 180 };
-      const mockSrc = { id: 's1', text: 'hello' };
+      const mockSrc = { id: 's1', text: 'hello' } as unknown as Source;
 
       src.openSourceDialog.call(ctx, mockSrc);
 
