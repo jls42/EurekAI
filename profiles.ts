@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { randomUUID, createHash } from 'node:crypto';
+import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
 
 // --- Age group derivation ---
@@ -58,7 +58,15 @@ export function hashPin(pin: string): string {
 }
 
 export function verifyPin(pin: string, hash: string): boolean {
-  return hashPin(pin) === hash;
+  const candidate = Buffer.from(hashPin(pin), 'hex');
+  let expected: Buffer;
+  try {
+    expected = Buffer.from(hash, 'hex');
+  } catch {
+    return false;
+  }
+  if (candidate.length !== expected.length) return false;
+  return timingSafeEqual(candidate, expected);
 }
 
 export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { hasPin: boolean } {
