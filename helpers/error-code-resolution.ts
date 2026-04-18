@@ -21,25 +21,24 @@ type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 // complexité des regex des deux tableaux sur la fonction générique (9 > 8).
 // Chaque fonction spécialisée ne voit que ses propres règles.
 
-// Mapping status HTTP → code d'erreur stable. Table de données pure —
-// extension = ajouter une ligne. Si tu dois comprendre le routage auth/quota/
-// upstream, tout est là.
-//
-// NB : Codacy/Lizard peut rapporter un CCN élevé sur matchStatus ou des
-// variantes de cette fonction (Map, switch, if-chain) — c'est un faux
-// positif de leur analyseur TS qui attribue les entrées de la table au
-// callsite. McCabe réelle = 3. Ignorer via l'UI Codacy ("Ignore issue").
-const STATUS_CODES: Readonly<Record<number, FailedStepCode>> = {
-  401: 'auth_required',
-  403: 'auth_required',
-  429: 'quota_exceeded',
-  503: 'upstream_unavailable',
-  529: 'upstream_unavailable',
-};
+// Mapping status HTTP → code d'erreur stable. Structure identique aux autres
+// matchers du fichier (STRUCTURED_CODE_RULES, MESSAGE_RULES) : tableau de règles
+// itéré via `.find()`. Forme alignée pour que Lizard applique le même traitement
+// partout — un Record indexé (STATUS_CODES[key]) déclenchait un faux positif
+// CCN même avec 3 décisions réelles.
+const STATUS_RULES: ReadonlyArray<readonly [number, FailedStepCode]> = [
+  [401, 'auth_required'],
+  [403, 'auth_required'],
+  [429, 'quota_exceeded'],
+  [503, 'upstream_unavailable'],
+  [529, 'upstream_unavailable'],
+];
 
 function matchStatus(ctx: ErrContext): FailedStepCode | null {
   if (typeof ctx.status !== 'number') return null;
-  return STATUS_CODES[ctx.status] ?? null;
+  const status = ctx.status;
+  const matched = STATUS_RULES.find(([code]) => code === status);
+  return matched ? matched[1] : null;
 }
 
 function matchStructuredCode(ctx: ErrContext): FailedStepCode | null {
