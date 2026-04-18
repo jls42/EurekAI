@@ -67,6 +67,154 @@ function showGenerateAllResult(failures: number, total: number, state: AppContex
   }
 }
 
+type AutoBody = {
+  sourceIds?: string[];
+  lang: string;
+  ageGroup: string;
+  useConsigne: boolean;
+  count: number;
+};
+
+type AutoRoute = { plan: Array<{ agent: string }>; costDelta?: number };
+
+function buildAutoBody(state: AppContext): AutoBody {
+  return {
+    sourceIds: state.selectedIds.length > 0 ? state.selectedIds : undefined,
+    lang: getLocale(),
+    ageGroup: state.currentProfile?.ageGroup || 'enfant',
+    useConsigne: state.useConsigne,
+    count: state.generateCount,
+  };
+}
+
+/** Fetch /generate/route, return the plan or null on error (shows toast). */
+async function runAutoRoute(
+  state: AppContext,
+  projectId: string,
+  body: AutoBody,
+  controller: AbortController,
+): Promise<AutoRoute | null> {
+  const routeRes = await fetch(
+    '/api/projects/' + projectId + '/generate/route',
+    postJson(body, controller.signal),
+  );
+  if (!routeRes.ok) {
+    const err = await routeRes.json().catch(() => ({}));
+    state.showToast(
+      state.t('toast.error', { error: state.resolveError(err.error || routeRes.statusText) }),
+      'error',
+      () => state.generateAuto(),
+    );
+    return null;
+  }
+  const route = (await routeRes.json()) as AutoRoute;
+  if (route.costDelta) addCostDelta(state, route.costDelta, 'generate/route');
+  return route;
+}
+
+/** Populate plannedTypes + loading flags from a route plan (skips TTS if unavailable). */
+function populateAutoPlan(
+  state: AppContext,
+  plan: Array<{ agent: string }>,
+  plannedTypes: string[],
+  controller: AbortController,
+): void {
+  const ttsTypes = new Set(['podcast', 'quiz-vocal']);
+  state.loading.auto = false;
+  delete state.abortControllers.auto;
+  for (const step of plan) {
+    if (ttsTypes.has(step.agent) && !state.apiStatus.ttsAvailable) continue;
+    // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
+    // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
+    if (!AUTO_AGENTS_SET.has(step.agent)) continue;
+    plannedTypes.push(step.agent);
+    state.loading[step.agent] = true;
+    state.abortControllers[step.agent] = controller;
+  }
+}
+
+type StepResult = 'success' | 'aborted' | 'failed';
+
+/** Execute one auto-plan step (fetch + register or log). Returns 'aborted' on AbortError
+ * (not counted as failure) vs 'failed' (counted). */
+async function runAutoStep(
+  state: AppContext,
+  type: string,
+  projectId: string,
+  body: AutoBody,
+  controller: AbortController,
+  allowedUrls: Set<string>,
+): Promise<StepResult> {
+  if (!AUTO_AGENTS_SET.has(type)) return 'failed';
+  const url = '/api/projects/' + projectId + '/generate/' + type;
+  // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
+  // immédiatement avant `fetch(url, ...)` dans la même fonction.
+  if (!allowedUrls.has(url)) return 'failed';
+  try {
+    const res = await fetch(url, postJson(body, controller.signal));
+    if (state.currentProjectId !== projectId) return 'aborted';
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
+      return 'failed';
+    }
+    registerGeneration(state, await res.json());
+    state.showToast(
+      state.t('toast.generationDone', { type: state.t('gen.' + type) }),
+      'success',
+      null,
+      { label: state.t('toast.view'), fn: () => state.goToView(type) },
+    );
+    return 'success';
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') return 'aborted';
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`auto: ${type} error:`, msg);
+    return 'failed';
+  } finally {
+    state.loading[type] = false;
+    delete state.abortControllers[type];
+    state.$nextTick(() => state.refreshIcons());
+  }
+}
+
+/** Run all plan steps in parallel, return the failure count (abort is not a failure). */
+async function runAutoSteps(
+  state: AppContext,
+  plannedTypes: string[],
+  projectId: string,
+  body: AutoBody,
+  controller: AbortController,
+): Promise<number> {
+  const allowedUrls = new Set(
+    AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
+  );
+  let failures = 0;
+  const promises = plannedTypes.map(async (type) => {
+    const result = await runAutoStep(state, type, projectId, body, controller, allowedUrls);
+    if (result === 'failed') failures++;
+  });
+  await Promise.all(promises);
+  return failures;
+}
+
+/** Final toast after all auto steps complete (success / partial / all-failed). */
+function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
+  if (failures > 0 && failures < plannedCount) {
+    state.showToast(
+      state.t('toast.partialGenerated', { count: plannedCount - failures }),
+      'warning',
+    );
+  } else if (failures >= plannedCount) {
+    state.showToast(state.t('toast.generationError', { error: 'all' }), 'error');
+  } else {
+    state.showToast(state.t('toast.magicDone'), 'success', null, {
+      label: state.t('toast.view'),
+      fn: () => state.goToView('dashboard'),
+    });
+  }
+}
+
 function applyVoiceResult(
   state: AppContext,
   gen: GenerationUI,
@@ -238,109 +386,18 @@ export function createGenerate() {
       }
       const projectId = this.currentProjectId;
       this.loading.auto = true;
-
       const controller = new AbortController();
       this.abortControllers.auto = controller;
       const plannedTypes: string[] = [];
-
       try {
-        const body = {
-          sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
-          lang: getLocale(),
-          ageGroup: this.currentProfile?.ageGroup || 'enfant',
-          useConsigne: this.useConsigne,
-          count: this.generateCount,
-        };
-
-        // Phase 1: route analysis — shows "Auto — analyse..." chip
-        const routeRes = await fetch(
-          '/api/projects/' + projectId + '/generate/route',
-          postJson(body, controller.signal),
-        );
-        if (!routeRes.ok) {
-          const err = await routeRes.json().catch(() => ({}));
-          this.showToast(
-            this.t('toast.error', { error: this.resolveError(err.error || routeRes.statusText) }),
-            'error',
-            () => this.generateAuto(),
-          );
-          return;
-        }
+        const body = buildAutoBody(this);
+        const route = await runAutoRoute(this, projectId, body, controller);
+        if (!route) return;
         if (this.currentProjectId !== projectId) return;
-        const route = await routeRes.json();
-        if (route.costDelta) addCostDelta(this, route.costDelta, 'generate/route');
-
-        // Phase 2: switch to individual type chips (skip TTS types if unavailable)
-        const ttsTypes = new Set(['podcast', 'quiz-vocal']);
-        this.loading.auto = false;
-        delete this.abortControllers.auto;
-        for (const step of route.plan) {
-          if (ttsTypes.has(step.agent) && !this.apiStatus.ttsAvailable) continue;
-          // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
-          // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
-          // Evite tout SSRF meme en cas de reponse /generate/route corrompue.
-          if (!AUTO_AGENTS_SET.has(step.agent)) continue;
-          plannedTypes.push(step.agent);
-          this.loading[step.agent] = true;
-          this.abortControllers[step.agent] = controller;
-        }
-
-        // Launch individual generations in parallel, process each as it completes
-        // URL whitelist : construit a l'avance l'ensemble complet des URLs autorisees pour
-        // ce projet. Le fetch n'est execute que si l'URL cible est exactement dans la
-        // whitelist (pattern documente par Codacy/Opengrep rule-node-ssrf pour neutraliser
-        // la taint analysis sur fetch(var) — cf. doc Opengrep "safe examples").
-        const allowedUrls = new Set(
-          AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
-        );
-        let failures = 0;
-        const promises = plannedTypes.map(async (type) => {
-          if (!AUTO_AGENTS_SET.has(type)) return;
-          const url = '/api/projects/' + projectId + '/generate/' + type;
-          if (!allowedUrls.has(url)) return;
-          try {
-            const res = await fetch(url, postJson(body, controller.signal));
-            if (this.currentProjectId !== projectId) return;
-            if (res.ok) {
-              registerGeneration(this, await res.json());
-              this.showToast(
-                this.t('toast.generationDone', { type: this.t('gen.' + type) }),
-                'success',
-                null,
-                { label: this.t('toast.view'), fn: () => this.goToView(type) },
-              );
-            } else {
-              failures++;
-              const err = await res.json().catch(() => ({}));
-              console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
-            }
-          } catch (e: unknown) {
-            if (e instanceof Error && e.name === 'AbortError') return;
-            failures++;
-            const msg = e instanceof Error ? e.message : String(e);
-            console.error(`auto: ${type} error:`, msg);
-          } finally {
-            this.loading[type] = false;
-            delete this.abortControllers[type];
-            this.$nextTick(() => this.refreshIcons());
-          }
-        });
-        await Promise.all(promises);
+        populateAutoPlan(this, route.plan, plannedTypes, controller);
+        const failures = await runAutoSteps(this, plannedTypes, projectId, body, controller);
         if (this.currentProjectId !== projectId) return;
-
-        if (failures > 0 && failures < plannedTypes.length) {
-          this.showToast(
-            this.t('toast.partialGenerated', { count: plannedTypes.length - failures }),
-            'warning',
-          );
-        } else if (failures >= plannedTypes.length) {
-          this.showToast(this.t('toast.generationError', { error: 'all' }), 'error');
-        } else {
-          this.showToast(this.t('toast.magicDone'), 'success', null, {
-            label: this.t('toast.view'),
-            fn: () => this.goToView('dashboard'),
-          });
-        }
+        showAutoResult(this, failures, plannedTypes.length);
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
         const msg = e instanceof Error ? e.message : String(e);
@@ -350,8 +407,8 @@ export function createGenerate() {
       } finally {
         this.loading.auto = false;
         delete this.abortControllers.auto;
-        // Individual types clean themselves up in their own finally blocks;
-        // this catches any leftovers (e.g. early abort before promises start)
+        // Les types individuels se nettoient dans leurs propres finally ; ceci
+        // attrape les cas d'abort précoce avant que les promises démarrent.
         for (const type of plannedTypes) {
           this.loading[type] = false;
           delete this.abortControllers[type];
