@@ -4,6 +4,16 @@ import { addCostDelta } from './cost-utils';
 
 export { addCostDelta } from './cost-utils';
 
+/** Build POST options with JSON body and abort signal for generate endpoints. */
+function postJson(body: unknown, signal: AbortSignal): RequestInit {
+  return {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    signal,
+  };
+}
+
 /** Normalize and register a generation into the app state. */
 export function registerGeneration(state: any, gen: any): void {
   normalizeSummaryData(gen);
@@ -168,18 +178,12 @@ export function createGenerate() {
         ageGroup: this.currentProfile?.ageGroup || 'enfant',
         useConsigne: this.useConsigne,
       };
-      const makeOpts = () => ({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
       try {
         const base = '/api/projects/' + projectId;
         const [summaryRes, flashcardsRes, quizRes] = await Promise.all([
-          fetch(base + '/generate/summary', makeOpts()),
-          fetch(base + '/generate/flashcards', makeOpts()),
-          fetch(base + '/generate/quiz', makeOpts()),
+          fetch(base + '/generate/summary', postJson(body, controller.signal)),
+          fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
+          fetch(base + '/generate/quiz', postJson(body, controller.signal)),
         ]);
         if (this.currentProjectId !== projectId) return;
         const responses = [summaryRes, flashcardsRes, quizRes];
@@ -221,15 +225,12 @@ export function createGenerate() {
           useConsigne: this.useConsigne,
           count: this.generateCount,
         };
-        const fetchOpts = () => ({
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
 
         // Phase 1: route analysis — shows "Auto — analyse..." chip
-        const routeRes = await fetch('/api/projects/' + projectId + '/generate/route', fetchOpts());
+        const routeRes = await fetch(
+          '/api/projects/' + projectId + '/generate/route',
+          postJson(body, controller.signal),
+        );
         if (!routeRes.ok) {
           const err = await routeRes.json().catch(() => ({}));
           this.showToast(
@@ -259,7 +260,7 @@ export function createGenerate() {
         let failures = 0;
         const promises = plannedTypes.map(async (type) => {
           try {
-            const res = await fetch(base + '/generate/' + type, fetchOpts());
+            const res = await fetch(base + '/generate/' + type, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
             if (res.ok) {
               registerGeneration(this, await res.json());

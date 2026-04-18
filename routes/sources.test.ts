@@ -93,15 +93,10 @@ afterEach(() => {
 
 // --- Helper: create a project with optional moderation-enabled profile ---
 
+const AGE_BY_GROUP: Record<string, number> = { adulte: 30, etudiant: 20, ado: 14 };
+
 function createProjectWithProfile(opts: { useModeration?: boolean; ageGroup?: string } = {}) {
-  const age =
-    opts.ageGroup === 'adulte'
-      ? 30
-      : opts.ageGroup === 'etudiant'
-        ? 20
-        : opts.ageGroup === 'ado'
-          ? 14
-          : 9;
+  const age = AGE_BY_GROUP[opts.ageGroup ?? ''] ?? 9;
   const profile = profileStore.create('Test Kid', age, '0', 'fr');
   if (opts.useModeration !== undefined) {
     profileStore.update(profile.id, { useModeration: opts.useModeration });

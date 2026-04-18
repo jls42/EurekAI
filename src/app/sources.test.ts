@@ -12,6 +12,17 @@ globalThis.fetch = vi.fn();
 let uuidCounter = 0;
 vi.stubGlobal('crypto', { randomUUID: vi.fn(() => `uuid-${++uuidCounter}`) });
 
+function makeFileList(...files: File[]) {
+  const fl: any = {
+    length: files.length,
+    [Symbol.iterator]: function* () {
+      for (let i = 0; i < this.length; i++) yield this[i];
+    },
+  };
+  files.forEach((f, i) => (fl[i] = f));
+  return fl as FileList;
+}
+
 function makeContext(overrides: any = {}) {
   return {
     currentProjectId: 'pid-1',
@@ -297,17 +308,6 @@ describe('createSources', () => {
   });
 
   describe('handleFiles', () => {
-    function makeFileList(...files: File[]) {
-      const fl: any = {
-        length: files.length,
-        [Symbol.iterator]: function* () {
-          for (let i = 0; i < this.length; i++) yield this[i];
-        },
-      };
-      files.forEach((f, i) => (fl[i] = f));
-      return fl as FileList;
-    }
-
     it('returns early if fileList is null', async () => {
       await src.handleFiles.call(ctx, null);
       expect(globalThis.fetch).not.toHaveBeenCalled();
@@ -615,17 +615,6 @@ describe('createSources', () => {
   });
 
   describe('retryFile', () => {
-    function makeFileList(...files: File[]) {
-      const fl: any = {
-        length: files.length,
-        [Symbol.iterator]: function* () {
-          for (let i = 0; i < this.length; i++) yield this[i];
-        },
-      };
-      files.forEach((f, i) => (fl[i] = f));
-      return fl as FileList;
-    }
-
     it('retries a failed file and transitions to done', async () => {
       const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
       const fileList = makeFileList(file);
@@ -678,17 +667,6 @@ describe('createSources', () => {
   });
 
   describe('dismissFailedFile', () => {
-    function makeFileList(...files: File[]) {
-      const fl: any = {
-        length: files.length,
-        [Symbol.iterator]: function* () {
-          for (let i = 0; i < this.length; i++) yield this[i];
-        },
-      };
-      files.forEach((f, i) => (fl[i] = f));
-      return fl as FileList;
-    }
-
     it('removes a failed file from session', async () => {
       const file = new File(['content'], 'test.pdf', { type: 'application/pdf' });
       const fileList = makeFileList(file);
