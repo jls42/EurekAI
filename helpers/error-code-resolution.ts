@@ -21,9 +21,16 @@ type Matcher = (ctx: ErrContext) => FailedStepCode | null;
 // générique `matchByPattern(value, rules)`) parce que Codacy additionnait la
 // complexité des regex des deux tableaux sur la fonction générique (9 > 8).
 // Chaque fonction spécialisée ne voit que ses propres règles.
+//
+// statusCodeFor isole l'accès à STATUS_RULES (5 entrées) dans une fonction
+// à responsabilité unique — Codacy Lizard comptait les entrées du Map comme
+// branches de matchStatus quand la lookup y était inlinée (CCN 10 > 8).
+function statusCodeFor(status: number): FailedStepCode | null {
+  return STATUS_RULES.get(status) ?? null;
+}
+
 function matchStatus(ctx: ErrContext): FailedStepCode | null {
-  if (typeof ctx.status !== 'number') return null;
-  return STATUS_RULES.get(ctx.status) || null;
+  return typeof ctx.status === 'number' ? statusCodeFor(ctx.status) : null;
 }
 
 function matchStructuredCode(ctx: ErrContext): FailedStepCode | null {
