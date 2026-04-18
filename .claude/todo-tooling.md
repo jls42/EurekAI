@@ -4,7 +4,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
 
 ## État actuel (2026-04-18)
 
-- ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope `helpers/error-*.ts` + `src/app/helpers.ts` (CCN 8, strict `-i 0`). Via pipx/Python. **Piège `??=` (2026-04-18)** : chaque `??=` pèse 2 dans le comptage Lizard (nullish check + assignment). Une fonction avec 3 `??=` + un `if &&` monte à CCN 9 — à retenir lors de l'application du fix `prefer-nullish-coalescing`. Leçon vécue : commit `fa3d5f7` (fix Codacy 3 code smells sur `normalizeSummaryData`) → CCN 9 → re-fix via boucle dans `dccd645`.
+- ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope **tout le code TS** hors tests (`src/`, `generators/`, `routes/`, `helpers/`, `config.ts`, `server.ts`, `store.ts`, `types.ts`) depuis 2026-04-18 (CCN 8, strict `-i 0`, `--exclude '*.test.ts'`). Via pipx/Python. **Piège `??=`** : chaque `??=` pèse 2 dans le comptage Lizard (nullish check + assignment). Une fonction avec 3 `??=` + un `if &&` monte à CCN 9 — à retenir lors de l'application du fix `prefer-nullish-coalescing`. Leçon vécue : commit `fa3d5f7` (fix Codacy 3 code smells sur `normalizeSummaryData`) → CCN 9 → re-fix via boucle dans `dccd645`. Refactor de `config.ts:saveConfig` (12→5) et `config.ts:resolveVoices` (12→2) dans `01672a9` a permis l'élargissement du scope.
 - ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
 - ✅ **Opengrep** : garde-fou en **pre-push** (`npm run security` via `scripts/check-security.sh`). SAST v1.19.0 fork open-source de Semgrep CE, binaire standalone dans `~/.local/bin/` (install via `scripts/install-opengrep.sh`). Configs `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`. Scan ~11.8s sur 171 fichiers (trop lent pour pretest). Baseline post-fix : 0 finding ERROR. 1 faux positif `detected-sonarqube-docs-api-key` (SHA256 GitHub Actions pinnee) exclu via `--exclude-rule` documente dans le script. Section dediee dans CLAUDE.md.
 - ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
@@ -14,7 +14,7 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
   - `complexity` désactivé dans ESLint (redondant avec Lizard).
 - ✅ **Prettier** : `format:check` en workflow manuel (pas en pretest)
 - ✅ **vitest** : 1711 tests, `npm run test`
-- ⚠️ **24 fonctions legacy** dépassent CCN 8 dans `generators/`, `routes/`, `src/`, `helpers/` (hors scope error-*) — non bloquant actuellement car `lint:complexity` ne les check pas
+- ✅ **0 fonction > CCN 8** dans tout le repo (2026-04-18, post-refactor `config.ts`). La mention historique "24 fonctions legacy" n'était plus à jour — Lizard audit complet ne remonte plus aucune violation aujourd'hui. `lint:complexity` couvre désormais tout le code TS en pretest.
 
 ## Refactor progressif ESLint warnings (status)
 

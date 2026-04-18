@@ -4,8 +4,8 @@
 # ou vraie complexité excessive).
 #
 # Threshold : 8 (aligné sur Codacy, default Lizard est 15).
-# Scope actuel : helpers/error-*.ts + src/app/helpers.ts. À élargir quand
-# le legacy des generators/routes sera refactoré (24 fonctions > CCN 8).
+# Scope : tout le code TypeScript (src/, generators/, routes/, helpers/
+# + fichiers racine). Exclu : tests (*.test.ts) via --exclude.
 # Requiert : pipx (https://pipx.pypa.io).
 set -euo pipefail
 
@@ -18,8 +18,13 @@ pipx run lizard \
   --CCN 8 \
   --warnings_only \
   -i 0 \
-  helpers/error-code-resolution.ts \
-  helpers/error-matchers.ts \
-  helpers/error-code-rules.ts \
-  helpers/error-codes.ts \
-  src/app/helpers.ts
+  --exclude "*.test.ts" \
+  -l javascript \
+  src/ \
+  generators/ \
+  routes/ \
+  helpers/ \
+  config.ts \
+  server.ts \
+  store.ts \
+  types.ts
