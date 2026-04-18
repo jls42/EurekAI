@@ -259,18 +259,18 @@ export function createGenerate() {
         }
 
         // Launch individual generations in parallel, process each as it completes
-        // URL whitelist : construit a l'avance la liste complete des URLs autorisees pour
+        // URL whitelist : construit a l'avance l'ensemble complet des URLs autorisees pour
         // ce projet. Le fetch n'est execute que si l'URL cible est exactement dans la
         // whitelist (pattern documente par Codacy/Opengrep rule-node-ssrf pour neutraliser
         // la taint analysis sur fetch(var) — cf. doc Opengrep "safe examples").
-        const allowedUrls = AUTO_AGENT_TYPES.map(
-          (t) => '/api/projects/' + projectId + '/generate/' + t,
+        const allowedUrls = new Set(
+          AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
         );
         let failures = 0;
         const promises = plannedTypes.map(async (type) => {
           if (!AUTO_AGENTS_SET.has(type)) return;
           const url = '/api/projects/' + projectId + '/generate/' + type;
-          if (!allowedUrls.includes(url)) return;
+          if (!allowedUrls.has(url)) return;
           try {
             const res = await fetch(url, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
