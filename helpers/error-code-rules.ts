@@ -5,13 +5,9 @@ export type Rule = Readonly<{
   code: FailedStepCode;
 }>;
 
-export const STATUS_RULES = new Map<number, FailedStepCode>([
-  [401, 'auth_required'],
-  [403, 'auth_required'],
-  [429, 'quota_exceeded'],
-  [503, 'upstream_unavailable'],
-  [529, 'upstream_unavailable'],
-]);
+// Mapping status → code : voir statusCodeFor() dans error-code-resolution.ts.
+// Volontairement inlined en if-chain là-bas (pas de Map exportée) parce que
+// Codacy Lizard attribuait les entrées Map comme branches du callsite.
 
 // Ordre = priorité d'évaluation (première regex qui match gagne). Placer `auth_required`
 // en tête garantit que "quota is not yet activated" (libellé Mistral d'un 401 billing)
