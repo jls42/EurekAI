@@ -24,12 +24,14 @@ function resolveItemSources(ctx: SourceResolverCtx, gen: Generation, item: ItemW
     .filter((s): s is Source => Boolean(s));
 }
 
+const SUMMARY_ARRAY_KEYS = ['citations', 'vocabulary', 'key_points'] as const;
+
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
 export function normalizeSummaryData(gen: Generation): void {
-  if (gen.type === 'summary' && gen.data) {
-    gen.data.citations ??= [];
-    gen.data.vocabulary ??= [];
-    gen.data.key_points ??= [];
+  if (gen.type !== 'summary' || !gen.data) return;
+  const data = gen.data as Record<(typeof SUMMARY_ARRAY_KEYS)[number], unknown[]>;
+  for (const key of SUMMARY_ARRAY_KEYS) {
+    data[key] ??= [];
   }
 }
 
