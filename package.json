@@ -14,6 +14,7 @@
     "lint:ci": "eslint . --max-warnings 500",
     "lint:complexity": "./scripts/check-complexity.sh",
     "lint:deadcode": "knip",
+    "security": "./scripts/check-security.sh",
     "pretest": "npm run lint:complexity && npm run lint:ci && npm run lint:deadcode",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
