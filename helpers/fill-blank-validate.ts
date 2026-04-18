@@ -10,7 +10,8 @@ export function normalizeAnswer(text: string): string {
       .replaceAll(/[\u0300-\u036f]/g, '')
       .trim()
       .replaceAll(/\s+/g, ' ')
-      .replaceAll(/^[.,;:!?'"()\-]+|[.,;:!?'"()\-]+$/g, ''), // NOSONAR(S5852) — simple char-class alternation anchored to start/end, no backtracking risk
+      // eslint-disable-next-line sonarjs/slow-regex -- bounded char-class, anchored, no backtracking risk (voir NOSONAR S5852)
+      .replaceAll(/^[.,;:!?'"()-]+|[.,;:!?'"()-]+$/g, ''),
   );
 }
 

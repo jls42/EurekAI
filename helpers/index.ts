@@ -73,6 +73,7 @@ export function getContent(response: {
 
 /** Retire les blocs ```json ``` autour du JSON retourne par les LLMs */
 export function stripJsonMarkdown(text: string): string {
+  // eslint-disable-next-line sonarjs/slow-regex -- bounded by literal backticks, LLM-only input (voir NOSONAR ci-dessous)
   return text.replace(/```json\s*|\s*```/g, '').trim(); // NOSONAR — bounded by literal backticks, input from LLM only
 }
 

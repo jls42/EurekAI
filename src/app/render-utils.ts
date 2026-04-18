@@ -2,8 +2,11 @@ const UNSAFE_PROTOCOL_RE = /^(?:javascript|vbscript|data):/i;
 const EXPLICIT_PROTOCOL_RE = /^[a-z][a-z0-9+.-]*:/i;
 const BLOCKED_TAG_RE =
   /<\/?(?:script|style|iframe|object|embed|link|meta|form|input|textarea|select|option)[^>]*>/gi;
+// eslint-disable-next-line sonarjs/slow-regex -- AI-generated HTML (Mistral), not user-controlled (voir NOSONAR S5852)
 const EVENT_HANDLER_RE = /\s+on[a-z-]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
+// eslint-disable-next-line sonarjs/slow-regex -- AI-generated HTML (Mistral), not user-controlled (voir NOSONAR S5852)
 const STYLE_ATTR_RE = /\s+style\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
+// eslint-disable-next-line sonarjs/slow-regex -- AI-generated HTML (Mistral), not user-controlled (voir NOSONAR S5852)
 const URL_ATTR_RE = /\s+(href|src|xlink:href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/gi; // NOSONAR(S5852) — input is AI-generated HTML (Mistral), not user-controlled
 
 export function escapeMarkdownHtml(content: string): string {
@@ -32,6 +35,7 @@ function decodeUrlEntities(value: string): string {
 function isSafeUrl(value: string): boolean {
   if (!value) return true;
   const normalized = decodeUrlEntities(value)
+    // eslint-disable-next-line no-control-regex -- intentional strip of ASCII control chars from URLs (security hardening)
     .replaceAll(/[\u0000-\u0020\u007F]+/g, '')
     .toLowerCase();
 
