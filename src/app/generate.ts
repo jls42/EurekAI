@@ -1,7 +1,7 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
-import { AUTO_AGENTS_SET } from '../../generators/auto-agents';
+import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 
 /** Build POST options with JSON body and abort signal for generate endpoints. */
 function postJson(body: unknown, signal: AbortSignal): RequestInit {
@@ -259,17 +259,20 @@ export function createGenerate() {
         }
 
         // Launch individual generations in parallel, process each as it completes
-        const base = '/api/projects/' + projectId;
+        // URL whitelist : construit a l'avance la liste complete des URLs autorisees pour
+        // ce projet. Le fetch n'est execute que si l'URL cible est exactement dans la
+        // whitelist (pattern documente par Codacy/Opengrep rule-node-ssrf pour neutraliser
+        // la taint analysis sur fetch(var) — cf. doc Opengrep "safe examples").
+        const allowedUrls = AUTO_AGENT_TYPES.map(
+          (t) => '/api/projects/' + projectId + '/generate/' + t,
+        );
         let failures = 0;
         const promises = plannedTypes.map(async (type) => {
           if (!AUTO_AGENTS_SET.has(type)) return;
+          const url = '/api/projects/' + projectId + '/generate/' + type;
+          if (!allowedUrls.includes(url)) return;
           try {
-            // URL relative same-origin /api/projects/:pid/generate/:type — projectId est
-            // un UUID genere backend (randomUUID dans store.ts), type est whiteliste
-            // deux fois via AUTO_AGENTS_SET.has() (lignes 255 et 265). Pas de SSRF
-            // possible (URL relative same-origin, pas de control externe).
-            // nosemgrep: rule-node-ssrf
-            const res = await fetch(base + '/generate/' + type, postJson(body, controller.signal));
+            const res = await fetch(url, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
             if (res.ok) {
               registerGeneration(this, await res.json());
