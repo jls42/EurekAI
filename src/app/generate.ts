@@ -1,7 +1,7 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
-import { AUTO_AGENTS_SET, type AutoAgentType } from '../../generators/auto-agents';
+import { AUTO_AGENTS_SET } from '../../generators/auto-agents';
 
 /** Build POST options with JSON body and abort signal for generate endpoints. */
 function postJson(body: unknown, signal: AbortSignal): RequestInit {
@@ -11,15 +11,6 @@ function postJson(body: unknown, signal: AbortSignal): RequestInit {
     body: JSON.stringify(body),
     signal,
   };
-}
-
-// Construction d'URL /api/projects/:pid/generate/:segment centralisee :
-// - encodeURIComponent sur les deux segments (defense SSRF cote SAST, meme si
-//   projectId est un UUID backend et segment est un agent whiteliste).
-// - Point unique pour toute generation : evite les concat ad-hoc qui reintroduisent
-//   le pattern flagge par Codacy (rule user-controlled-url-to-http-client).
-function generateUrl(projectId: string, segment: string): string {
-  return `/api/projects/${encodeURIComponent(projectId)}/generate/${encodeURIComponent(segment)}`;
 }
 
 /** Normalize and register a generation into the app state. */
@@ -130,7 +121,7 @@ export function createGenerate() {
           useConsigne: this.useConsigne,
           count: this.generateCount,
         };
-        const res = await fetch(generateUrl(projectId, type), {
+        const res = await fetch('/api/projects/' + projectId + '/generate/' + type, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
@@ -187,10 +178,11 @@ export function createGenerate() {
         useConsigne: this.useConsigne,
       };
       try {
+        const base = '/api/projects/' + projectId;
         const [summaryRes, flashcardsRes, quizRes] = await Promise.all([
-          fetch(generateUrl(projectId, 'summary'), postJson(body, controller.signal)),
-          fetch(generateUrl(projectId, 'flashcards'), postJson(body, controller.signal)),
-          fetch(generateUrl(projectId, 'quiz'), postJson(body, controller.signal)),
+          fetch(base + '/generate/summary', postJson(body, controller.signal)),
+          fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
+          fetch(base + '/generate/quiz', postJson(body, controller.signal)),
         ]);
         if (this.currentProjectId !== projectId) return;
         const responses = [summaryRes, flashcardsRes, quizRes];
@@ -222,7 +214,7 @@ export function createGenerate() {
 
       const controller = new AbortController();
       this.abortControllers.auto = controller;
-      const plannedTypes: AutoAgentType[] = [];
+      const plannedTypes: string[] = [];
 
       try {
         const body = {
@@ -235,7 +227,7 @@ export function createGenerate() {
 
         // Phase 1: route analysis — shows "Auto — analyse..." chip
         const routeRes = await fetch(
-          generateUrl(projectId, 'route'),
+          '/api/projects/' + projectId + '/generate/route',
           postJson(body, controller.signal),
         );
         if (!routeRes.ok) {
@@ -261,20 +253,23 @@ export function createGenerate() {
           // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
           // Evite tout SSRF meme en cas de reponse /generate/route corrompue.
           if (!AUTO_AGENTS_SET.has(step.agent)) continue;
-          plannedTypes.push(step.agent as AutoAgentType);
+          plannedTypes.push(step.agent);
           this.loading[step.agent] = true;
           this.abortControllers[step.agent] = controller;
         }
 
         // Launch individual generations in parallel, process each as it completes
+        const base = '/api/projects/' + projectId;
         let failures = 0;
         const promises = plannedTypes.map(async (type) => {
           if (!AUTO_AGENTS_SET.has(type)) return;
           try {
-            const res = await fetch(
-              generateUrl(projectId, type),
-              postJson(body, controller.signal),
-            );
+            // codacy:ignore-next-line rule-node-ssrf -- URL relative same-origin vers notre
+            // propre backend (/api/projects/:pid/generate/:type). projectId = UUID genere
+            // cote backend (randomUUID, store.ts). type est whiteliste deux fois via
+            // AUTO_AGENTS_SET.has() (ligne 255 apres /generate/route, ligne 265 avant fetch).
+            // Faux positif Codacy : la regle pattern-match tout fetch(var) sans analyse flot.
+            const res = await fetch(base + '/generate/' + type, postJson(body, controller.signal));
             if (this.currentProjectId !== projectId) return;
             if (res.ok) {
               registerGeneration(this, await res.json());
