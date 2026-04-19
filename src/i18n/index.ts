@@ -21,13 +21,20 @@ export function getLocale(): string {
   return currentLocale;
 }
 
-export function t(key: string, params?: Record<string, string | number>): string {
-  const dict = dictionaries[currentLocale] || dictionaries['fr'] || {};
-  let text = dict[key] ?? dictionaries['fr']?.[key] ?? key;
-  if (params) {
-    for (const [k, v] of Object.entries(params)) {
-      text = text.replaceAll(`{${k}}`, String(v));
-    }
+export function resolveText(key: string, locale: string): string {
+  const dict = dictionaries[locale] || dictionaries['fr'] || {};
+  return dict[key] ?? dictionaries['fr']?.[key] ?? key;
+}
+
+export function interpolate(text: string, params: Record<string, string | number>): string {
+  let result = text;
+  for (const [k, v] of Object.entries(params)) {
+    result = result.replaceAll(`{${k}}`, String(v));
   }
-  return text;
+  return result;
+}
+
+export function t(key: string, params?: Record<string, string | number>): string {
+  const text = resolveText(key, currentLocale);
+  return params ? interpolate(text, params) : text;
 }
