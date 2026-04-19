@@ -46,6 +46,24 @@ const scoreQuizAttempt = (quizGen: QuizGeneration, answers: Record<string, unkno
   return score;
 };
 
+const scoreFillBlankAttempt = (
+  fbGen: FillBlankGeneration,
+  answers: Record<string, unknown>,
+): { score: number; results: Record<number, boolean> } => {
+  let score = 0;
+  const results: Record<number, boolean> = {};
+  for (const [qiStr, childAnswer] of Object.entries(answers)) {
+    const qi = Number(qiStr);
+    const correctAnswer = fbGen.data[qi]?.answer;
+    if (!correctAnswer) continue;
+    const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
+    results[qi] = match;
+    if (match) score++;
+    bumpQuestionStat(fbGen.stats!.questionStats, qi, match); // NOSONAR(S4325) — stats initialisé par le handler avant appel
+  }
+  return { score, results };
+};
+
 // --- Read Aloud (TTS) — helpers ---
 
 function sectionText(d: SummaryGeneration['data'], s: string): string {
@@ -267,32 +285,13 @@ export function generationCrudRoutes(
       const fbGen = gen as FillBlankGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'fill-blank' guard
       fbGen.stats ??= { attempts: [], questionStats: {} };
 
-      let score = 0;
-      const total = fbGen.data.length;
-      const results: Record<number, boolean> = {};
-
-      for (const [qiStr, childAnswer] of Object.entries(answers)) {
-        const qi = Number(qiStr);
-        const correctAnswer = fbGen.data[qi]?.answer;
-        if (!correctAnswer) continue;
-
-        const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
-        results[qi] = match;
-        if (match) score++;
-
-        if (!fbGen.stats.questionStats[qi]) {
-          fbGen.stats.questionStats[qi] = { correct: 0, wrong: 0 };
-        }
-        if (match) fbGen.stats.questionStats[qi].correct++;
-        else fbGen.stats.questionStats[qi].wrong++;
-      }
-
+      const { score, results } = scoreFillBlankAttempt(fbGen, answers);
       const attempt: FillBlankAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, string>,
         results,
         score,
-        total,
+        total: fbGen.data.length,
       };
       fbGen.stats.attempts.push(attempt);
 
