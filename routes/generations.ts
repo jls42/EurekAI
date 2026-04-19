@@ -25,6 +25,27 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+// --- Quiz / fill-blank scoring helpers ---
+
+type QuestionStats = Record<number, { correct: number; wrong: number }>;
+
+const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
+  stats[qi] ??= { correct: 0, wrong: 0 };
+  if (correct) stats[qi].correct++;
+  else stats[qi].wrong++;
+};
+
+const scoreQuizAttempt = (quizGen: QuizGeneration, answers: Record<string, unknown>): number => {
+  let score = 0;
+  for (const [qiStr, ci] of Object.entries(answers)) {
+    const qi = Number(qiStr);
+    const correct = quizGen.data[qi]?.correct === Number(ci);
+    if (correct) score++;
+    bumpQuestionStat(quizGen.stats!.questionStats, qi, correct); // NOSONAR(S4325) — stats initialisé par le handler avant appel
+  }
+  return score;
+};
+
 // --- Read Aloud (TTS) — helpers ---
 
 function sectionText(d: SummaryGeneration['data'], s: string): string {
@@ -212,24 +233,12 @@ export function generationCrudRoutes(
       const quizGen = gen as QuizGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz' guard
       quizGen.stats ??= { attempts: [], questionStats: {} };
 
-      let score = 0;
-      const total = quizGen.data.length;
-      for (const [qiStr, ci] of Object.entries(answers)) {
-        const qi = Number(qiStr);
-        const correct = quizGen.data[qi]?.correct === Number(ci);
-        if (correct) score++;
-        if (!quizGen.stats.questionStats[qi]) {
-          quizGen.stats.questionStats[qi] = { correct: 0, wrong: 0 };
-        }
-        if (correct) quizGen.stats.questionStats[qi].correct++;
-        else quizGen.stats.questionStats[qi].wrong++;
-      }
-
+      const score = scoreQuizAttempt(quizGen, answers);
       const attempt: QuizAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, number>,
         score,
-        total,
+        total: quizGen.data.length,
       };
       quizGen.stats.attempts.push(attempt);
 
