@@ -50,8 +50,16 @@ export function applyConsigne(
   return header + markdown;
 }
 
-const resolveSourceIds = (body: any, sources: Source[]): string[] => {
-  const ids = body.sourceIds || [];
+interface GenRequestBody {
+  sourceIds?: string[];
+  useConsigne?: boolean;
+  lang?: string;
+  ageGroup?: AgeGroup;
+  count?: number | string;
+}
+
+const resolveSourceIds = (body: GenRequestBody, sources: Source[]): string[] => {
+  const ids = body.sourceIds ?? [];
   return ids.length > 0 ? ids : sources.map((s) => s.id);
 };
 
@@ -139,7 +147,7 @@ function buildGenContext(
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
-  body: any,
+  body: GenRequestBody,
   modelId?: string,
   options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ):
@@ -219,7 +227,7 @@ function handleGeneration(
         res.json(gen);
       }
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
       }
@@ -579,7 +587,7 @@ export function generateRoutes(
     profileId?: string;
   }
 
-  function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
+  function makeGen(type: string, data: Generation['data'], ctx: AutoCtx): Generation {
     return {
       id: randomUUID(),
       title: autoTitle(type, data, ctx.lang),
@@ -758,7 +766,7 @@ export function generateRoutes(
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json({ ...route, ...(routeCost && { costDelta: routeCost.cost }) });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           store,
@@ -808,7 +816,7 @@ export function generateRoutes(
       logger.info('auto', `${step.agent} OK`);
       return { ok: true, gen };
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           st,
@@ -959,7 +967,7 @@ export function generateRoutes(
         ...(allFailed && { error: 'all_steps_failed' }),
       });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           store,
