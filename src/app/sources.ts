@@ -6,14 +6,14 @@ type UploadResult = 'applied' | 'ignored' | 'failed';
 type UploadSession = AppState['uploadSessions'][number];
 type UploadFile = UploadSession['files'][number];
 
-function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
+export function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
   return (
     ctx.uploadSessions.some((s: UploadSession) => s.id === session.id) &&
     ctx.currentProjectId === session.projectId
   );
 }
 
-async function _resolveHttpError(
+export async function _resolveHttpError(
   ctx: AppContext,
   session: UploadSession,
   res: Response,
@@ -28,7 +28,7 @@ async function _resolveHttpError(
   }
 }
 
-function _applyUploadSuccess(
+export function _applyUploadSuccess(
   ctx: AppContext,
   session: UploadSession,
   file: UploadFile,
@@ -47,7 +47,37 @@ function _applyUploadSuccess(
   }
 }
 
-async function _uploadSingleFile(
+export async function _handleUploadHttpError(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  res: Response,
+): Promise<UploadResult> {
+  const resolved = await _resolveHttpError(ctx, session, res);
+  if (resolved === null) return 'ignored';
+  file.status = 'error';
+  file.errorMsg = resolved;
+  ctx.$nextTick(() => ctx.refreshIcons());
+  ctx.showToast(ctx.t('toast.error', { error: resolved }), 'error');
+  return 'failed';
+}
+
+export function _handleUploadException(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  e: unknown,
+): UploadResult {
+  if (!_isSessionActive(ctx, session)) return 'ignored';
+  const msg = e instanceof Error ? e.message : String(e);
+  file.status = 'error';
+  file.errorMsg = msg;
+  ctx.$nextTick(() => ctx.refreshIcons());
+  ctx.showToast(ctx.t('toast.uploadError', { filename: file.name, error: msg }), 'error');
+  return 'failed';
+}
+
+export async function _uploadSingleFile(
   this: AppContext,
   session: UploadSession,
   fileId: string,
@@ -69,36 +99,18 @@ async function _uploadSingleFile(
       method: 'POST',
       body: formData,
     });
-
     if (!_isSessionActive(this, session)) return 'ignored';
-
-    if (!res.ok) {
-      const resolved = await _resolveHttpError(this, session, res);
-      if (resolved === null) return 'ignored';
-      file.status = 'error';
-      file.errorMsg = resolved;
-      this.$nextTick(() => this.refreshIcons());
-      this.showToast(this.t('toast.error', { error: resolved }), 'error');
-      return 'failed';
-    }
-
+    if (!res.ok) return _handleUploadHttpError(this, session, file, res);
     const newSources = await res.json();
     if (!_isSessionActive(this, session)) return 'ignored';
-
     _applyUploadSuccess(this, session, file, newSources);
     return 'applied';
   } catch (e: unknown) {
-    if (!_isSessionActive(this, session)) return 'ignored';
-    const msg = e instanceof Error ? e.message : String(e);
-    file.status = 'error';
-    file.errorMsg = msg;
-    this.$nextTick(() => this.refreshIcons());
-    this.showToast(this.t('toast.uploadError', { filename: file.name, error: msg }), 'error');
-    return 'failed';
+    return _handleUploadException(this, session, file, e);
   }
 }
 
-function _createUploadSession(
+export function _createUploadSession(
   ctx: AppContext,
   fileList: FileList,
   projectId: string,
@@ -116,7 +128,7 @@ function _createUploadSession(
   return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
 }
 
-async function _runUploadLoop(
+export async function _runUploadLoop(
   ctx: AppContext,
   session: UploadSession,
 ): Promise<{ applied: number; interrupted: boolean }> {
@@ -133,7 +145,7 @@ async function _runUploadLoop(
   return { applied, interrupted };
 }
 
-function _maybeFinalizeUpload(
+export function _maybeFinalizeUpload(
   ctx: AppContext,
   applied: number,
   interrupted: boolean,
@@ -145,13 +157,13 @@ function _maybeFinalizeUpload(
   }
 }
 
-function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
+export function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
   setTimeout(() => {
     if (this.currentProjectId === projectId) this.refreshConsigne();
   }, 3000);
 }
 
-function _maybeCleanupSession(this: AppContext, sessionId: string) {
+export function _maybeCleanupSession(this: AppContext, sessionId: string) {
   const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
   if (!session || session.cleanupScheduled || session.files.length === 0) return;
   if (session.files.every((f: UploadFile) => f.status === 'done')) {
