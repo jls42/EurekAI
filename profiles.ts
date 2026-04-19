@@ -76,6 +76,28 @@ export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { 
 
 // --- Profile store ---
 
+// Retourne `true` si un champ legacy manquant a été backfilled.
+function migrateProfile(p: Profile): boolean {
+  let changed = false;
+  if (!p.locale) {
+    p.locale = 'fr';
+    changed = true;
+  }
+  if ((p as any).chatEnabled === undefined) {
+    p.chatEnabled = p.age >= 15;
+    changed = true;
+  }
+  if (!p.moderationCategories) {
+    p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
+    changed = true;
+  }
+  if (!p.updatedAt) {
+    p.updatedAt = p.createdAt || new Date().toISOString();
+    changed = true;
+  }
+  return changed;
+}
+
 export class ProfileStore {
   private readonly filePath: string;
 
@@ -87,25 +109,9 @@ export class ProfileStore {
     if (!existsSync(this.filePath)) return [];
     try {
       const profiles: Profile[] = JSON.parse(readFileSync(this.filePath, 'utf-8'));
-      // Migrate legacy profiles
       let migrated = false;
       for (const p of profiles) {
-        if (!p.locale) {
-          p.locale = 'fr';
-          migrated = true;
-        }
-        if ((p as any).chatEnabled === undefined) {
-          p.chatEnabled = p.age >= 15;
-          migrated = true;
-        }
-        if (!p.moderationCategories) {
-          p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
-          migrated = true;
-        }
-        if (!p.updatedAt) {
-          p.updatedAt = p.createdAt || new Date().toISOString();
-          migrated = true;
-        }
+        if (migrateProfile(p)) migrated = true;
       }
       if (migrated) this.save(profiles);
       return profiles;
