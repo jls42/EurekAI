@@ -41,4 +41,6 @@ pipx run lizard \
   scripts/generate-image.ts \
   routes/chat.ts \
   routes/generate.ts \
-  routes/profiles.ts
+  routes/generations.ts \
+  routes/profiles.ts \
+  routes/sources.ts
