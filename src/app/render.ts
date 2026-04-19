@@ -4,6 +4,8 @@ import { normalizeSourceMarkers } from './source-markers';
 import type { AppContext } from './app-context';
 import type { Generation, StudyFiche } from '../../types';
 
+const SUMMARY_ARRAY_KEYS = ['citations', 'vocabulary', 'key_points'] as const;
+
 export function createRender() {
   return {
     renderMarkdown(content: string) {
@@ -34,9 +36,9 @@ export function createRender() {
     summaryData(this: AppContext, gen: Generation): StudyFiche {
       const raw = (gen as { data?: Partial<StudyFiche> }).data ?? {};
       const r = raw as StudyFiche;
-      if (!r.citations) r.citations = [];
-      if (!r.vocabulary) r.vocabulary = [];
-      if (!r.key_points) r.key_points = [];
+      for (const k of SUMMARY_ARRAY_KEYS) {
+        (r as unknown as Record<string, unknown[]>)[k] ??= [];
+      }
       r.key_points = r.key_points.filter((pt: string) => pt?.trim());
       return r;
     },

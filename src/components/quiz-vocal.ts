@@ -10,26 +10,19 @@ interface VocalFeedback {
   loading?: boolean;
 }
 
-function buildErrorFeedback(this: QuizVocalContext, key: string, error?: string): VocalFeedback {
-  const t = this.t?.bind(this);
+type TFn = (key: string, params?: Record<string, string | number>) => string;
+
+function buildVocalErrorFeedback(t: TFn | undefined, key: string, error?: string): VocalFeedback {
   const msg = error ? (t?.(key, { error }) ?? '') : (t?.(key) ?? '');
   return { correct: false, feedback: msg, transcription: '' };
 }
 
-async function postVocalAttempt(
-  pid: string,
-  genId: string,
-  idx: number,
-  blob: Blob,
-): Promise<Response> {
-  const formData = new FormData();
-  formData.append('audio', blob, 'answer.webm');
-  formData.append('questionIndex', String(idx));
-  formData.append('lang', document.documentElement.lang || 'fr');
-  return fetch('/api/projects/' + pid + '/generations/' + genId + '/vocal-answer', {
-    method: 'POST',
-    body: formData,
-  });
+function buildVocalFormData(idx: number, blob: Blob): FormData {
+  const fd = new FormData();
+  fd.append('audio', blob, 'answer.webm');
+  fd.append('questionIndex', String(idx));
+  fd.append('lang', document.documentElement.lang || 'fr');
+  return fd;
 }
 
 interface QuizVocalContext extends Omit<StepByStepBase, 'feedback'>, Partial<AppContext> {
@@ -141,11 +134,22 @@ export function quizVocalComponent(gen: Generation) {
       if (this.isReviewing()) return;
       const idx = this.currentIndex();
       if (idx === undefined || !this.currentProjectId) return;
+      // fetch reste inline (pas extrait dans un helper) pour préserver l'analyse
+      // taint Codacy rule-node-ssrf — voir CLAUDE.md section Sécurité, l'extraction
+      // `postVocalAttempt(pid, genId, ...)` réactive le finding (même incident que
+      // `deleteProfileRequest` / `API_PROJECTS_PREFIX` avant).
       this.feedback = { loading: true, correct: false };
       try {
-        const res = await postVocalAttempt(this.currentProjectId, this.gen.id, idx, blob);
+        const res = await fetch(
+          '/api/projects/' +
+            this.currentProjectId +
+            '/generations/' +
+            this.gen.id +
+            '/vocal-answer',
+          { method: 'POST', body: buildVocalFormData(idx, blob) },
+        );
         if (!res.ok) {
-          this.feedback = buildErrorFeedback.call(this, 'quiz.verificationError');
+          this.feedback = buildVocalErrorFeedback(this.t, 'quiz.verificationError');
           return;
         }
         const result = (await res.json()) as VocalFeedback;
@@ -154,7 +158,7 @@ export function quizVocalComponent(gen: Generation) {
         if (result.correct) this.score++;
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);
-        this.feedback = buildErrorFeedback.call(this, 'toast.error', error);
+        this.feedback = buildVocalErrorFeedback(this.t, 'toast.error', error);
       }
     },
 

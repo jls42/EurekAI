@@ -24,7 +24,7 @@ interface CreateProfileBody {
 const validateCreateProfileInput = (body: CreateProfileBody): string | null => {
   if (!isValidName(body?.name)) return 'Nom requis';
   if (!isValidAge(body?.age)) return 'Age invalide (4-120)';
-  if ((body.age as number) < 15 && !isValidPin(body?.pin))
+  if (body.age < 15 && !isValidPin(body?.pin))
     return 'Code PIN 4 chiffres requis pour les moins de 15 ans';
   return null;
 };

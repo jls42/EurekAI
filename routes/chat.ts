@@ -287,16 +287,19 @@ const EMPTY_TOOL_PHASE: ToolPhaseResult = {
   failedCost: 0,
 };
 
-const runToolCallPhase = async (
-  toolCalls: string[],
-  project: ChatProject,
-  lang: string,
-  ageGroup: AgeGroup,
-  config: ReturnType<typeof getConfig>,
-  client: Mistral,
-  store: ProjectStore,
-  pid: string,
-): Promise<ToolPhaseResult> => {
+interface RunToolCallPhaseArgs {
+  toolCalls: string[];
+  project: ChatProject;
+  lang: string;
+  ageGroup: AgeGroup;
+  config: ReturnType<typeof getConfig>;
+  client: Mistral;
+  store: ProjectStore;
+  pid: string;
+}
+
+const runToolCallPhase = async (args: RunToolCallPhaseArgs): Promise<ToolPhaseResult> => {
+  const { toolCalls, project, lang, ageGroup, config, client, store, pid } = args;
   if (toolCalls.length === 0 || project.sources.length === 0) return EMPTY_TOOL_PHASE;
   const rawMarkdown = getMarkdown(project.sources);
   const markdown = applyConsigne(rawMarkdown, project.consigne);
@@ -380,8 +383,8 @@ export function chatRoutes(
       );
       const chatCost = persistUsage(store, pid, `POST /api/projects/${pid}/chat`, chatUsage);
 
-      const tools = await runToolCallPhase(
-        result.toolCalls,
+      const tools = await runToolCallPhase({
+        toolCalls: result.toolCalls,
         project,
         lang,
         ageGroup,
@@ -389,7 +392,7 @@ export function chatRoutes(
         client,
         store,
         pid,
-      );
+      });
 
       appendAssistantMessage(store, pid, result.reply, tools.generatedIds);
 
