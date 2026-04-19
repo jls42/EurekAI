@@ -22,16 +22,16 @@ function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
 }
 
-function errorModeration(): Source['moderation'] {
-  return { status: 'error', categories: {} };
-}
+// Arrow const pour empêcher l'agglomération Lizard avec pendingModeration
+// (cf. CLAUDE.md "Pièges Lizard connus").
+const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
-async function triggerConsigneDetection(
+const triggerConsigneDetection = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
   lang = 'fr',
-) {
+): Promise<void> => {
   try {
     const project = store.getProject(pid);
     if (!project || project.sources.length === 0) return;
@@ -45,13 +45,13 @@ async function triggerConsigneDetection(
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
   }
-}
+};
 
-function getModerationCategories(
+const getModerationCategories = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
-): string[] | null {
+): string[] | null => {
   const project = store.getProject(pid);
   if (!project) return null;
   const profileId = project.meta.profileId;
@@ -59,16 +59,16 @@ function getModerationCategories(
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
-}
+};
 
-async function triggerModeration(
+const triggerModeration = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
   sourceId: string,
   markdown: string,
   categories: string[],
-) {
+): Promise<void> => {
   try {
     const result = await moderateContent(client, markdown, categories);
     if (!store.setSourceModeration(pid, sourceId, result)) return;
@@ -77,7 +77,7 @@ async function triggerModeration(
     logger.error('moderation', 'error:', e);
     store.setSourceModeration(pid, sourceId, errorModeration());
   }
-}
+};
 
 export function sourceRoutes(
   store: ProjectStore,
