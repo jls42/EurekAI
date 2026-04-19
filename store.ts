@@ -6,6 +6,10 @@ import type {
   ProjectData,
   Source,
   Generation,
+  SummaryGeneration,
+  FlashcardsGeneration,
+  QuizGeneration,
+  PodcastGeneration,
   ChatMessage,
   CostEntry,
   ModerationResult,
@@ -264,53 +268,67 @@ export class ProjectStore {
 
   private migrateModerationFormat(data: ProjectData): void {
     for (const source of data.sources) {
-      source.moderation = this.normalizeModeration(source.moderation as any);
+      source.moderation = this.normalizeModeration(
+        source.moderation as Parameters<typeof this.normalizeModeration>[0],
+      );
     }
   }
 
   private migrateResultsFormat(data: ProjectData): void {
-    const r = data.results as any;
+    // Legacy format : results.{summary|flashcards|quiz|podcast} à plat, remplacé
+    // par results.generations[]. Les champs lus ici disparaissent en sortie.
+    interface LegacyResults {
+      generations?: unknown;
+      summary?: SummaryGeneration['data'];
+      summaryEN?: SummaryGeneration['data'];
+      flashcards?: FlashcardsGeneration['data'];
+      flashcardsEN?: FlashcardsGeneration['data'];
+      quiz?: QuizGeneration['data'];
+      quizEN?: QuizGeneration['data'];
+      podcast?: PodcastGeneration['data'];
+    }
+    const r = data.results as LegacyResults;
     if (Array.isArray(r.generations)) return;
 
     const generations: Generation[] = [];
     const now = new Date().toISOString();
 
     if (r.summary) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
-        title: r.summary.title || 'Fiche de revision',
+        title: (r.summary as { title?: string }).title || 'Fiche de revision',
         createdAt: now,
         sourceIds: [],
         type: 'summary',
         data: r.summary,
-      };
-      if (r.summaryEN) gen.dataEN = r.summaryEN;
+      } as Generation;
+      if (r.summaryEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.summaryEN;
       generations.push(gen);
     }
 
     if (r.flashcards) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
         title: 'Flashcards',
         createdAt: now,
         sourceIds: [],
         type: 'flashcards',
         data: r.flashcards,
-      };
-      if (r.flashcardsEN) gen.dataEN = r.flashcardsEN;
+      } as Generation;
+      if (r.flashcardsEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.flashcardsEN;
       generations.push(gen);
     }
 
     if (r.quiz) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
         title: 'Quiz QCM',
         createdAt: now,
         sourceIds: [],
         type: 'quiz',
         data: r.quiz,
-      };
-      if (r.quizEN) gen.dataEN = r.quizEN;
+      } as Generation;
+      if (r.quizEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.quizEN;
       generations.push(gen);
     }
 
