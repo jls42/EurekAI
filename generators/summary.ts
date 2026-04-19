@@ -18,26 +18,29 @@ function isValidSummary(data: unknown): data is StudyFiche {
   );
 }
 
+type FicheFragment = Partial<StudyFiche>;
+
 /** When the model wraps multiple fiches in {"fiches": [...]}, merge them into one. */
 function unwrapAndMerge(data: Record<string, unknown>): StudyFiche | null {
   const fiches = data.fiches || data.fiche || data.results || data.summary_fiches;
   if (!Array.isArray(fiches) || fiches.length === 0) return null;
+  const typed = fiches as FicheFragment[];
 
-  if (fiches.length === 1) return fiches[0] as StudyFiche;
+  if (typed.length === 1) return typed[0] as StudyFiche;
 
   const merged: StudyFiche = {
-    title: fiches
-      .map((f: any) => f.title)
+    title: typed
+      .map((f) => f.title)
       .filter(Boolean)
       .join(' / '),
-    summary: fiches
-      .map((f: any) => f.summary)
+    summary: typed
+      .map((f) => f.summary)
       .filter(Boolean)
       .join(' '),
-    key_points: fiches.flatMap((f: any) => f.key_points || []),
-    fun_fact: fiches.map((f: any) => f.fun_fact).find(Boolean) || '',
-    vocabulary: fiches.flatMap((f: any) => f.vocabulary || []),
-    citations: fiches.flatMap((f: any) => f.citations || []),
+    key_points: typed.flatMap((f) => f.key_points ?? []),
+    fun_fact: typed.map((f) => f.fun_fact).find(Boolean) || '',
+    vocabulary: typed.flatMap((f) => f.vocabulary ?? []),
+    citations: typed.flatMap((f) => f.citations ?? []),
   };
 
   // Deduplicate key_points
@@ -60,7 +63,10 @@ function extractSummary(raw: string): StudyFiche {
 
   const merged = unwrapAndMerge(data);
   if (merged && isValidSummary(merged)) {
-    logger.info('summary', `merged ${(data.fiches as any[])?.length || '?'} sub-fiches into one`);
+    logger.info(
+      'summary',
+      `merged ${(data.fiches as unknown[] | undefined)?.length ?? '?'} sub-fiches into one`,
+    );
     return merged;
   }
 
