@@ -77,6 +77,59 @@ export function buildVoicesUpdate(
   return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
 }
 
+type ValidationResult = 'ok' | 'invalid' | 'pin_mismatch';
+type NewProfileFormState = { result: ValidationResult; name: string; age: number };
+
+/** Pure check : non-empty name + age in 4-120 range. */
+export function isValidNameAge(name: string, age: number): boolean {
+  return !!name && !!age && age >= 4 && age <= 120;
+}
+
+/** PIN validation for under-15 profiles : 4 digits + match between pin/confirm. */
+export function checkMinorPin(state: AppContext): ValidationResult {
+  if (!/^\d{4}$/.test(state.newProfilePin)) return 'invalid';
+  if (state.newProfilePin !== state.newProfilePinConfirm) return 'pin_mismatch';
+  return 'ok';
+}
+
+/** Run all validation rules on the new profile form, return result + parsed name/age. */
+export function validateNewProfileForm(state: AppContext): NewProfileFormState {
+  const name = state.newProfileName.trim();
+  const age = Number(state.newProfileAge);
+  if (!isValidNameAge(name, age)) return { result: 'invalid', name, age };
+  if (age < 15) return { result: checkMinorPin(state), name, age };
+  return { result: 'ok', name, age };
+}
+
+/** Compose POST /api/profiles payload from the validated form. */
+export function buildCreateProfileBody(
+  state: AppContext,
+  name: string,
+  age: number,
+): Record<string, unknown> {
+  const body: Record<string, unknown> = {
+    name,
+    age,
+    avatar: state.newProfileAvatar,
+    locale: state.newProfileLocale,
+  };
+  if (age < 15) body.pin = state.newProfilePin;
+  return body;
+}
+
+/** Apply state cleanup after a successful POST /api/profiles. */
+export function applyCreateProfileSuccess(state: AppContext, profile: Profile): void {
+  state.profiles.push(profile);
+  state.selectProfile(profile.id);
+  state.newProfileName = '';
+  state.newProfileAge = '';
+  state.newProfileAvatar = '0';
+  state.newProfileLocale = 'fr';
+  state.newProfilePin = '';
+  state.newProfilePinConfirm = '';
+  state.showProfileForm = false;
+}
+
 /** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
 export function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
   const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
@@ -141,41 +194,20 @@ export function createProfiles() {
     },
 
     async createProfile(this: AppContext) {
-      const name = this.newProfileName.trim();
-      const age = Number(this.newProfileAge);
-      if (!name || !age || age < 4 || age > 120) return;
-      // Validate PIN for under 15
-      if (age < 15) {
-        if (!/^\d{4}$/.test(this.newProfilePin)) return;
-        if (this.newProfilePin !== this.newProfilePinConfirm) {
-          this.showToast(this.t('profile.pinMismatch'), 'error');
-          return;
-        }
+      const { result, name, age } = validateNewProfileForm(this);
+      if (result === 'pin_mismatch') {
+        this.showToast(this.t('profile.pinMismatch'), 'error');
+        return;
       }
+      if (result !== 'ok') return;
       try {
-        const body: Record<string, unknown> = {
-          name,
-          age,
-          avatar: this.newProfileAvatar,
-          locale: this.newProfileLocale,
-        };
-        if (age < 15) body.pin = this.newProfilePin;
         const res = await fetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify(buildCreateProfileBody(this, name, age)),
         });
         if (res.ok) {
-          const profile = await res.json();
-          this.profiles.push(profile);
-          this.selectProfile(profile.id);
-          this.newProfileName = '';
-          this.newProfileAge = '';
-          this.newProfileAvatar = '0';
-          this.newProfileLocale = 'fr';
-          this.newProfilePin = '';
-          this.newProfilePinConfirm = '';
-          this.showProfileForm = false;
+          applyCreateProfileSuccess(this, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
           this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
