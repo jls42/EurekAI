@@ -254,6 +254,28 @@ export function canStartGenerate(state: AppContext, type?: string): string | nul
   return state.currentProjectId;
 }
 
+/** Execute the /generate/:type fetch with double SSRF guard (type membership +
+ * URL whitelist passed as param, mirroring runAutoStep — required for Codacy
+ * `rule-node-ssrf` taint analysis to accept the dynamic `type` parameter). */
+export async function runGenerateFetch(
+  state: AppContext,
+  type: string,
+  projectId: string,
+  controller: AbortController,
+  allowedUrls: Set<string>,
+): Promise<void> {
+  if (!AUTO_AGENTS_SET.has(type)) return;
+  const url = '/api/projects/' + projectId + '/generate/' + type;
+  if (!allowedUrls.has(url)) return;
+  const res = await fetch(url, postJson(buildGenerateBody(state), controller.signal));
+  if (!res.ok) {
+    handleGenerateHttpError(state, type, res, await res.json().catch(() => ({})));
+    return;
+  }
+  if (state.currentProjectId !== projectId) return;
+  handleGenerateSuccess(state, type, await res.json());
+}
+
 /** Catch-block body : silent on AbortError, retryable toast otherwise. */
 export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
   if (e instanceof Error && e.name === 'AbortError') return;
@@ -327,23 +349,11 @@ export function createGenerate() {
       this.loading[type] = true;
       const controller = new AbortController();
       this.abortControllers[type] = controller;
+      const allowedUrls = new Set(
+        AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
+      );
       try {
-        // Whitelist canonique (cf. CLAUDE.md `rule-node-ssrf`, commit 00af5f2) :
-        // construire `allowedUrls` puis `allowedUrls.has(url)` immédiatement avant
-        // `fetch(url, ...)` dans la même fonction. Sans cela, Codacy taint analysis
-        // flagge `projectId` (issu de canStartGenerate) comme user-controlled.
-        const url = '/api/projects/' + projectId + '/generate/' + type;
-        const allowedUrls = new Set(
-          AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
-        );
-        if (!allowedUrls.has(url)) return;
-        const res = await fetch(url, postJson(buildGenerateBody(this), controller.signal));
-        if (!res.ok) {
-          handleGenerateHttpError(this, type, res, await res.json().catch(() => ({})));
-          return;
-        }
-        if (this.currentProjectId !== projectId) return;
-        handleGenerateSuccess(this, type, await res.json());
+        await runGenerateFetch(this, type, projectId, controller, allowedUrls);
       } catch (e: unknown) {
         handleGenerateError(this, type, e);
       } finally {
