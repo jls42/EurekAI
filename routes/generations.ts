@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
 import type {
+  Generation,
   QuizGeneration,
   QuizAttempt,
   QuizVocalGeneration,
@@ -13,7 +14,7 @@ import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
-import { textToSpeech } from '../generators/tts-provider.js';
+import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
@@ -79,8 +80,8 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
 
 // Arrow const pour empêcher l'agglomération Lizard avec sectionText ci-dessus
 // (cf. CLAUDE.md "Pièges Lizard connus").
-const readAloudText = (gen: any, section: string): string | null => {
-  if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
+const readAloudText = (gen: Generation, section: string): string | null => {
+  if (gen.type === 'summary') return sectionText(gen.data, section);
   return null;
 };
 
@@ -94,7 +95,7 @@ const batchSectionsFor = (d: SummaryGeneration['data']): string[] => {
 const generateBatchAudio = async (
   gen: SummaryGeneration,
   voiceId: string,
-  ttsOpts: any,
+  ttsOpts: TtsOptions,
   projectDir: string,
   pid: string,
 ): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> => {
@@ -123,7 +124,7 @@ interface BatchSummaryCtx {
   store: ProjectStore;
   pid: string;
   gid: string;
-  res: any;
+  res: Response;
   costDelta?: number;
 }
 
@@ -133,7 +134,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     const d = summaryGen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } },
-    } as any);
+    } as Partial<SummaryGeneration>);
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
     res.status(500).json({ error: 'TTS failed for all sections' });
@@ -149,7 +150,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
 async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
   voices: { host: string; guest: string },
-  ttsOpts: any,
+  ttsOpts: TtsOptions,
 ): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
   const segments: Buffer[] = [];
@@ -163,10 +164,10 @@ async function generateFlashcardsAudio(
 }
 
 interface SectionAudioCtx {
-  gen: any;
+  gen: Generation;
   section: string;
   voiceId: string;
-  ttsOpts: any;
+  ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;
   baseId: string;
@@ -174,7 +175,7 @@ interface SectionAudioCtx {
   gid: string;
 }
 
-async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<string | null> {
+async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promise<string | null> {
   const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
@@ -190,10 +191,10 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<str
   const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
 
   if (gen.type === 'summary') {
-    const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
+    const d = gen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } },
-    } as any);
+    } as Partial<SummaryGeneration>);
   }
   return audioUrl;
 }
@@ -260,7 +261,9 @@ export function generationCrudRoutes(
       };
       quizGen.stats.attempts.push(attempt);
 
-      store.updateGeneration(req.params.pid, req.params.gid, { stats: quizGen.stats } as any);
+      store.updateGeneration(req.params.pid, req.params.gid, {
+        stats: quizGen.stats,
+      } as Partial<QuizGeneration>);
       res.json({ attempt, stats: quizGen.stats });
     } catch (e) {
       logger.error('quiz', 'attempt error:', e);
@@ -295,7 +298,9 @@ export function generationCrudRoutes(
       };
       fbGen.stats.attempts.push(attempt);
 
-      store.updateGeneration(req.params.pid, req.params.gid, { stats: fbGen.stats } as any);
+      store.updateGeneration(req.params.pid, req.params.gid, {
+        stats: fbGen.stats,
+      } as Partial<FillBlankGeneration>);
       res.json({ attempt, stats: fbGen.stats, results });
     } catch (e) {
       logger.error('fill-blank', 'attempt error:', e);
@@ -310,7 +315,9 @@ export function generationCrudRoutes(
       res.status(400).json({ error: 'title requis' });
       return;
     }
-    const updated = store.updateGeneration(req.params.pid, req.params.gid, { title } as any);
+    const updated = store.updateGeneration(req.params.pid, req.params.gid, {
+      title,
+    } as Partial<Generation>);
     if (!updated) {
       res.status(404).json({ error: 'Generation introuvable' });
       return;
@@ -458,7 +465,7 @@ export function generationCrudRoutes(
       );
       if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }
