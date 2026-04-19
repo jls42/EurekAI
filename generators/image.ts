@@ -9,15 +9,24 @@ interface ImageResult {
   value: string;
 }
 
-function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
-  if (c.fileId) return { type: 'fileId', value: `${c.fileId}` }; // NOSONAR(S6551) — always string from Mistral API
-  if (c.file_id) return { type: 'fileId', value: `${c.file_id}` }; // NOSONAR(S6551) — always string from Mistral API
-  if (c.imageUrl) return { type: 'url', value: `${c.imageUrl}` }; // NOSONAR(S6551) — always string from Mistral API
-  if (c.url) return { type: 'url', value: `${c.url}` }; // NOSONAR(S6551) — always string from Mistral API
+// Champs possibles renvoyés par l'API Mistral selon la variante de chunk
+// (camelCase / snake_case / URL directe). Ordre = priorité de résolution.
+const CHUNK_REF_FIELDS: ReadonlyArray<{ key: string; type: ImageResult['type'] }> = [
+  { key: 'fileId', type: 'fileId' },
+  { key: 'file_id', type: 'fileId' },
+  { key: 'imageUrl', type: 'url' },
+  { key: 'url', type: 'url' },
+];
+
+export function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
+  for (const { key, type } of CHUNK_REF_FIELDS) {
+    const raw = c[key];
+    if (raw) return { type, value: `${raw}` }; // NOSONAR(S6551) — always string from Mistral API
+  }
   return null;
 }
 
-function extractImageRef(outputs: any[]): ImageResult | null {
+export function extractImageRef(outputs: any[]): ImageResult | null {
   for (const output of outputs) {
     const o = output as Record<string, unknown>;
     if (!Array.isArray(o.content)) continue;
