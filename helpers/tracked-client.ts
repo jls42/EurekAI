@@ -31,9 +31,9 @@ interface TtsRequestShape {
 // helpers non-exportes consecutifs (piege connu CLAUDE.md). Unifie chat
 // + STT + agent : promptAudioSeconds est optionnel sur ApiUsage, donc
 // sa presence en chat/agent (tjs undefined dans ce cas) est inerte.
-// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- `||` volontaire :
-// garde CCN ≤ 8 (chaque `??` compte 2 dans Lizard, piège CLAUDE.md). Les champs
-// sont numériques (0 falsy acceptable) ou string ('' falsy acceptable) ici.
+// `||` volontaire (pas `??`) : garde CCN ≤ 8 — chaque `??` compte 2 dans Lizard
+// (piège CLAUDE.md). Les champs sont numériques (0 falsy acceptable = fallback
+// identique) ou string ('' falsy acceptable).
 const extractUsage = (response: UsageExtractableResponse, request: RequestWithModel): ApiUsage => {
   const u = response.usage || {};
   return {
