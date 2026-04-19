@@ -8,8 +8,6 @@ import type { Generation, Source } from '../../types';
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
-const API_PROJECTS_PREFIX = '/api/projects/';
-const GENERATE_SEGMENT = '/generate/';
 
 /** Generation extended with frontend-only audio/UI state fields. */
 type GenerationUI = Generation & {
@@ -105,7 +103,8 @@ export async function runAutoRoute(
   controller: AbortController,
 ): Promise<AutoRoute | null> {
   const routeRes = await fetch(
-    API_PROJECTS_PREFIX + projectId + '/generate/route',
+    // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
+    '/api/projects/' + projectId + '/generate/route',
     postJson(body, controller.signal),
   );
   if (!routeRes.ok) {
@@ -156,7 +155,8 @@ export async function runAutoStep(
   allowedUrls: Set<string>,
 ): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return 'failed';
-  const url = API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + type;
+  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
+  const url = '/api/projects/' + projectId + '/generate/' + type;
   // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
   // immédiatement avant `fetch(url, ...)` dans la même fonction.
   if (!allowedUrls.has(url)) return 'failed';
@@ -197,7 +197,7 @@ export async function runAutoSteps(
   controller: AbortController,
 ): Promise<number> {
   const allowedUrls = new Set(
-    AUTO_AGENT_TYPES.map((t) => API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + t),
+    AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
   );
   let failures = 0;
   const promises = plannedTypes.map(async (type) => {
@@ -344,7 +344,7 @@ export function createGenerate() {
         // fetch reste inline avec projectId lu directement de this.currentProjectId
         // (pattern pré-Wave-5) pour préserver l'analyse taint Codacy rule-node-ssrf.
         const res = await fetch(
-          API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + type,
+          '/api/projects/' + projectId + '/generate/' + type,
           postJson(buildGenerateBody(this), controller.signal),
         );
         if (!res.ok) {
@@ -384,7 +384,7 @@ export function createGenerate() {
         useConsigne: this.useConsigne,
       };
       try {
-        const base = API_PROJECTS_PREFIX + projectId;
+        const base = '/api/projects/' + projectId;
         const [summaryRes, flashcardsRes, quizRes] = await Promise.all([
           fetch(base + '/generate/summary', postJson(body, controller.signal)),
           fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
