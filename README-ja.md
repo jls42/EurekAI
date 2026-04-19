@@ -5,7 +5,7 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>あらゆるコンテンツをインタラクティブな学習体験に変える — <a href="https://mistral.ai">Mistral AI</a> 搭載。</strong>
+  <strong>あらゆるコンテンツをインタラクティブな学習体験に変換 — <a href="https://mistral.ai">Mistral AI</a> 搭載。</strong>
 </p>
 
 <p align="center">
@@ -40,11 +40,11 @@
 
 ## 物語 — なぜ EurekAI なのか？
 
-**EurekAI** は [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online)（[公式サイト](https://worldwide-hackathon.mistral.ai/)）（2026年3月）で誕生しました。テーマが必要で、そこでアイデアはとても身近なことから生まれました。私は娘と一緒に定期的にテスト勉強をしており、これをAIでより楽しく、よりインタラクティブにできるはずだと思ったのです。
+**EurekAI** は [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online)（[公式サイト](https://worldwide-hackathon.mistral.ai/)）の最中に生まれました（2026年3月）。テーマが必要だったのですが、きっかけはとても身近なことから来ました。私は娘と定期的にテスト勉強をしているのですが、AI を使えばもっと楽しく、インタラクティブにできるはずだと思ったのです。
 
-目的は、**どんな入力でも** — レッスンの写真、コピー＆ペーストしたテキスト、音声録音、ウェブ検索 — **復習シート、フラッシュカード、クイズ、ポッドキャスト、穴埋め問題、イラスト** などに変換することです。すべては Mistral AI のフランス製モデルによって支えられており、フランス語話者の学習者に自然に適したソリューションになっています。
+目的は、**あらゆる入力** — 授業の写真、コピペした文章、音声録音、Web 検索 — を **復習シート、フラッシュカード、クイズ、ポッドキャスト、穴埋め問題、イラスト、その他** に変換することです。すべて Mistral AI のフランス製モデルで動作し、フランス語話者の学習者に自然に適したソリューションになっています。
 
-[初期プロトタイプ](https://github.com/jls42/worldwide-hackathon.mistral.ai) は、ハッカソン中に Mistral のサービスを使った概念実証として48時間で作られました。すでに動作していましたが、制約もありました。そこから EurekAI は本格的なプロジェクトへと成長しました。穴埋め問題、演習のナビゲーション、ウェブスクレイピング、設定可能な保護者向けモデレーション、徹底したコードレビューなど、さらに多くの機能が追加されています。コード全体はAIによって生成されており、主に [Claude Code](https://code.claude.com/) を使用し、一部は [Codex](https://openai.com/codex/) と [Gemini CLI](https://geminicli.com/) による貢献です。
+[最初のプロトタイプ](https://github.com/jls42/worldwide-hackathon.mistral.ai) は、Mistral の各種サービスを使った概念実証としてハッカソン中の48時間で作られました。すでに動作はしていましたが、制約がありました。その後、EurekAI は本格的なプロジェクトへと成長しました。穴埋め問題、演習のナビゲーション、Web スクレイピング、設定可能な保護者モデレーション、詳細なコードレビューなど、機能が増えています。コード全体は AI によって生成されており、主に [Claude Code](https://code.claude.com/) を使用し、一部は [Codex](https://openai.com/codex/) と [Gemini CLI](https://geminicli.com/) からの貢献です。
 
 ---
 
@@ -52,26 +52,28 @@
 
 | | 機能 | 説明 |
 |---|---|---|
-| 📷 | **ファイルのインポート** | レッスンをインポート — 写真、PDF（信頼度スコア付きの Mistral OCR 経由）、またはテキストファイル（TXT、MD） |
-| 📝 | **テキスト入力** | 任意のテキストを直接入力または貼り付け |
-| 🎤 | **音声入力** | 録音 — Voxtral STT が音声を文字起こし |
-| 🌐 | **Web / URL** | URL を貼り付ける（Readability + Lightpanda による直接スクレイピング）か、検索語を入力（Mistral web_search エージェント） |
-| 📄 | **復習シート** | 要点、語彙、引用、エピソードを含む構造化メモ |
-| 🃏 | **フラッシュカード** | 対話型Q&Aカード、対話形式の音声読み上げ |
-| ❓ | **QCMクイズ** | 適応型の誤答復習付き多肢選択問題（数を設定可能） |
-| ✏️ | **穴埋め問題** | ヒントと寛容な検証付きの補完演習 |
-| 🎙️ | **ポッドキャスト** | 2人の声によるミニポッドキャスト音声 — デフォルトの Mistral 音声またはカスタム音声（保護者向け！） |
-| 🖼️ | **イラスト** | Mistral エージェントが生成する教育用画像 |
-| 🗣️ | **音声クイズ** | 音声で読み上げられる問題（カスタム音声も可能）、口頭回答、AIによる検証 |
-| 💬 | **AIチューター** | ツール呼び出し付きで、授業資料と文脈を共有するチャット |
-| 🧠 | **自動ルーター** | `mistral-small-latest` ベースのルーターが内容を分析し、利用可能な7種類の生成器から組み合わせを提案 |
-| 🔒 | **保護者による管理** | プロフィールごとの設定可能なモデレーション（カスタマイズ可能なカテゴリ）、保護者PIN、チャット制限 |
-| 🌍 | **多言語対応** | インターフェースは9言語で利用可能；AI生成はプロンプト経由で15言語に対応 |
-| 🔊 | **音声読み上げ** | Mistral Voxtral TTS または ElevenLabs を使って、シートとフラッシュカード（Q&A対話）を聞くことができます |
+| 📷 | **ファイルの取り込み** | 授業内容を取り込みます — 写真、PDF（Mistral OCR による平均信頼度スコア付き、3階層 `high`/`medium`/`low`）またはテキストファイル（TXT、MD）。ファイルごとの再試行と個別進捗付きのアップロードセッション |
+| 📝 | **テキスト入力** | どんなテキストでも直接入力または貼り付け |
+| 🎤 | **音声入力** | 録音できます — Voxtral STT が音声を文字起こし |
+| 🌐 | **Web / URL** | URL を貼り付ける（Readability + Lightpanda による直接スクレイピング）か、検索語を入力（Mistral web_search Agent） |
+| 📄 | **復習シート** | 要点、語彙、引用、エピソードを含む構造化ノート |
+| 🃏 | **フラッシュカード** | 対話型の Q/A カード、対話音声読み上げ |
+| ❓ | **多肢選択クイズ** | 誤答の適応復習付きの多肢選択問題（数は設定可能） |
+| ✏️ | **穴埋め問題** | ヒントと寛容な判定付きの補完演習 |
+| 🎙️ | **ポッドキャスト** | 2人の声によるミニポッドキャスト音声 — デフォルトは Mistral の音声、またはカスタム音声（保護者！） |
+| 🖼️ | **イラスト** | Mistral Agent が生成する教育用画像 |
+| 🗣️ | **音声クイズ** | 問題を音声で読み上げ（カスタム音声可）、口頭回答、AI による検証 |
+| 💬 | **AI チューター** | 学習資料と文脈に応じて会話できるチャット、ツール呼び出し対応 |
+| 🧠 | **自動ルーター** | `mistral-small-latest` ベースのルーターがコンテンツを分析し、利用可能な7種類の生成器から組み合わせを提案 |
+| 🔒 | **保護者による管理** | プロファイルごとの設定可能なモデレーション（カスタマイズ可能なカテゴリ）、保護者 PIN、チャット制限 |
+| 🌍 | **多言語対応** | インターフェースは9言語で利用可能；AI 生成はプロンプトを通じて15言語で制御可能 |
+| 🔊 | **音声読み上げ** | Mistral Voxtral TTS または ElevenLabs で、シートとフラッシュカード（Q/A 対話）を聞くことができます |
+| 💶 | **API コスト追跡** | 各生成とソースの € コストを、入力単位（トークン / 文字 / ページ / 音声秒）ごとに透明に推定。カードごとのバッジ + プロジェクト全体の合計をダッシュボードに表示 |
+| 🎨 | **プロファイル別テーマ** | 各プロファイルは `dark` または `light` テーマを選択可能 — プロファイル変更時も保持 |
 
 ---
 
-## アーキテクチャの概要
+## アーキテクチャ概要
 
 <p align="center">
   <img src="public/assets/architecture-overview.webp" alt="Architecture Overview" width="800" />
@@ -79,7 +81,7 @@
 
 ---
 
-## モデルの用途マップ
+## モデル利用マップ
 
 <p align="center">
   <img src="public/assets/model-map.webp" alt="AI Model-to-Task Mapping" width="800" />
@@ -99,73 +101,85 @@
 
 ### マルチモーダル入力
 
-EurekAI は、プロフィールごとにモデレーションされた 4 種類のソースを受け付けます（子どもとティーンではデフォルトで有効）：
+EurekAI は、プロファイルに応じてモデレーションされた 4 種類のソースを受け付けます（子どもとティーンでは既定で有効）：
 
-- **ファイルのインポート** — JPG、PNG、PDF ファイルは `mistral-ocr-latest` によって処理されます（印刷文字、表、手書き文字）、またはテキストファイル（TXT、MD）を直接インポートします。
-- **自由テキスト** — 何でも入力または貼り付けできます。モデレーションが有効な場合は保存前に審査されます。
-- **音声入力** — ブラウザで音声を録音します。`voxtral-mini-latest` によって文字起こしされます。`language="fr"` パラメータが認識を最適化します。
-- **Web / URL** — 1つ以上のURLを貼り付けてコンテンツを直接スクレイピング（JSページ向けに Readability + Lightpanda）、またはキーワードを入力して Mistral エージェント経由でウェブ検索します。単一の入力欄で両方に対応し、URL とキーワードは自動的に分離され、各結果は独立したソースとして作成されます。
+- **ファイルの取り込み** — JPG、PNG、PDF ファイルを `mistral-ocr-latest` で処理（印刷テキスト、表、手書き）、またはテキストファイル（TXT、MD）を直接取り込み。複数ファイルのアップロードでは **アップロードセッション** を使用します：ファイルごとの個別進捗、失敗したファイルのみ再試行、完了時にセッションを閉じることができます。OCR は平均化された **信頼度スコア**（`average`、`[0,1]` にクランプ、Mistral が返す `averagePageConfidenceScore` から計算）を公開し、UI では `high` / `medium` / `low` の階層バッジ（閾値は約0.9 / 約0.7）として表示されます。スキャン品質が悪い場合はブロックせず警告します。
+- **フリーテキスト** — どんな内容でも入力または貼り付け可能。モデレーションが有効なら保存前にチェックされます。
+- **音声入力** — ブラウザ内で音声を録音します。`voxtral-mini-latest` により文字起こしされます。`language="fr"` パラメータで認識が最適化されます。
+- **Web / URL** — 1つまたは複数の URL を貼り付けて直接コンテンツをスクレイピング（JS ページには Readability + Lightpanda）、またはキーワードを入力して Mistral Agent 経由で Web 検索します。単一フィールドで両方に対応し、URL とキーワードは自動的に分離され、各結果は独立したソースとして作成されます。
 
-### AIコンテンツ生成
+### AI コンテンツ生成
 
 生成される学習教材は7種類です：
 
 | 生成器 | モデル | 出力 |
 |---|---|---|
 | **復習シート** | `mistral-large-latest` | タイトル、要約、要点、語彙、引用、エピソード |
-| **フラッシュカード** | `mistral-large-latest` | ソース参照付きQ&Aカード（数を設定可能） |
-| **QCMクイズ** | `mistral-large-latest` | 多肢選択問題、解説、適応型復習（数を設定可能） |
-| **穴埋め問題** | `mistral-large-latest` | ヒント付き補完文、寛容な検証（Levenshtein） |
-| **ポッドキャスト** | `mistral-large-latest` + Voxtral TTS | 2人の声のスクリプト → MP3音声 |
+| **フラッシュカード** | `mistral-large-latest` | ソース参照付きの Q/A カード（数は設定可能） |
+| **多肢選択クイズ** | `mistral-large-latest` | 多肢選択問題、解説、適応的復習（数は設定可能） |
+| **穴埋め問題** | `mistral-large-latest` | ヒント付きの補完文、寛容な判定（Levenshtein） |
+| **ポッドキャスト** | `mistral-large-latest` + Voxtral TTS | 2人の音声スクリプト → MP3 音声 |
 | **イラスト** | Agent `mistral-large-latest` | `image_generation` ツールによる教育用画像 |
-| **音声クイズ** | `mistral-large-latest` + Voxtral TTS + STT | TTSで出題 → STTで回答 → AI検証 |
+| **音声クイズ** | `mistral-large-latest` + Voxtral TTS + STT | TTS の問題 → STT の回答 → AI による検証 |
 
-### チャット型 AI チューター
+### チャットによる AI チューター
 
-授業資料に完全アクセスできる会話型チューター：
+学習資料へ完全にアクセスできる会話型チューターです：
 
 - `mistral-large-latest` を使用
 - **ツール呼び出し**：会話中に復習シート、フラッシュカード、クイズ、穴埋め問題を生成可能
-- 各授業につき50メッセージの履歴
-- プロフィールで有効な場合はコンテンツをモデレーション
+- コースごとに最大50メッセージの履歴
+- プロファイルで有効な場合はコンテンツモデレーション
 
 ### 自動ルーター
 
-ルーターは `mistral-small-latest` を使用してソースの内容を分析し、7種類の中から最も適切な生成器を提案します。インターフェースは進行状況をリアルタイムで表示します。まず分析フェーズがあり、その後、個別の生成が行われ、必要に応じてキャンセルできます。
+ルーターは `mistral-small-latest` を使ってソースの内容を分析し、利用可能な7種類の中から最適な生成器を提案します。UI はリアルタイムの進行状況を表示します。まず分析フェーズ、その後に個別生成が行われ、キャンセルも可能です。
 
 ### 適応学習
 
-- **クイズ統計**：各問題ごとの試行回数と正答率を追跡
-- **クイズ復習**：弱い概念を対象にした新しい問題を5〜10問生成
-- **指示検出**：「私は〜を知っていればレッスンを知っている」のような復習指示を検出し、対応するテキスト生成器（シート、フラッシュカード、クイズ、穴埋め問題）で優先的に扱う
+- **クイズ統計**：問題ごとの試行回数と正答率を追跡
+- **クイズ復習**：弱い概念に焦点を当てた新しい問題を5〜10問生成
+- **指示検出**：「レッスンを知っているとは、〜を知っていることだ」のような復習指示を検出し、対応するテキスト生成器（シート、フラッシュカード、クイズ、穴埋め問題）で優先的に扱う
 
-### セキュリティと保護者向け管理
+### セキュリティ & 保護者による管理
 
 - **4つの年齢グループ**：子ども（10歳以下）、ティーン（11〜15歳）、学生（16〜25歳）、大人（26歳以上）
-- **コンテンツモデレーション**：`mistral-moderation-latest`、利用可能な10カテゴリ、子ども/ティーンでは5カテゴリがデフォルトでブロック（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`selfharm`、`jailbreaking`）。カテゴリは設定でプロフィールごとにカスタマイズ可能。
-- **保護者PIN**：SHA-256ハッシュ、15歳未満のプロフィールでは必須。本番環境では、ソルト付きの遅いハッシュ（Argon2id、bcrypt）を使用することを推奨。
-- **チャット制限**：16歳未満ではAIチャットはデフォルトで無効、保護者が有効化可能
+- **コンテンツモデレーション**：利用可能な10カテゴリを備えた `mistral-moderation-latest`、子ども/ティーンでは既定で5カテゴリをブロック（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`selfharm`、`jailbreaking`）。カテゴリは設定でプロファイルごとにカスタマイズ可能。
+- **保護者 PIN**：SHA-256 ハッシュ、15歳未満のプロファイルに必須。本番環境では、ソルト付きの遅いハッシュ（Argon2id、bcrypt）を使用してください。
+- **チャット制限**：16歳未満では AI チャットは既定で無効、保護者が有効化可能
 
-### マルチプロフィールシステム
+### マルチプロファイルシステム
 
-- 名前、年齢、アバター、言語設定を持つ複数プロフィール
-- `profileId` を通じてプロフィールに紐づくプロジェクト
-- カスケード削除：プロフィールを削除すると、そのプロフィールの全プロジェクトも削除される
+- 名前、年齢、アバター、言語設定を持つ複数プロファイル
+- **プロファイル別音声**（`Profile.mistralVoices?: { host, guest }`）— 各子どもにポッドキャスト/音声クイズ用の音声ペアを持たせることができます
+- **プロファイル別テーマ**（`Profile.theme: 'dark' | 'light'`）— プロファイル変更時に自動切り替え、バックエンド側で永続化
+- プロファイルに紐づくプロジェクトは `profileId` を通じて管理
+- カスケード削除：プロファイルを削除すると、そのプロファイルのすべてのプロジェクトも削除されます
 
-### マルチプロバイダー TTS とカスタム音声
+### API コスト追跡
 
-- **Mistral Voxtral TTS**（デフォルト）：`voxtral-mini-tts-latest`、追加のキーは不要
+Mistral の各呼び出し（chat、OCR、STT、TTS、モデレーション、agents）は、ユーザーに対して **透明** な € コスト推定を提供するよう計測されています。請求に驚くことはありません。
+
+- **信頼できるソース**：`helpers/pricing.ts` — モデル接頭辞ごとの `MODEL_PRICING`（例：`mistral-large` → input 0.5 €/M tokens、output 1.5 €/M tokens）、定期的な再スクレイピングのための Mistral ドキュメント URL 付き `PRICING_SOURCES`
+- **対応単位**：`tokens`、`characters`（TTS）、`pages`（OCR）、`audio-seconds`（STT） — `helpers/cost-calc.ts` による変換制御
+- **計測チェーン**：`helpers/tracked-client.ts`（Mistral クライアントをラップ）→ `helpers/usage-context.ts`（AsyncLocalStorage）→ `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts`（HTTP レスポンスへ注入）
+- **UI**：生成ごとのコストバッジ（`src/partials/cost-badge-gen.html`）、ソースごとのバッジ（`cost-badge-src.html`）、ダッシュボード内の累積合計（`Project.totalCost`）
+- **エンドポイント**：`/generate/*` と `/sources/*` のレスポンスは返却オブジェクト（Generation / Source）に `estimatedCost`、`usage`、`costBreakdown` を付与します。`POST /generate/auto/route` はルーティング単体のコスト用に `costDelta: number` フィールドを追加します。`GET /projects/:pid` は `costLog[]` から計算された合計である `totalCost` と完全な履歴を含むプロジェクトを返します
+
+### マルチプロバイダー TTS & カスタム音声
+
+- **Mistral Voxtral TTS**（既定）：`voxtral-mini-tts-latest`、追加キー不要
 - **ElevenLabs**（代替）：`eleven_v3`、自然な音声、`ELEVENLABS_API_KEY` が必要
-- アプリ設定でプロバイダーを変更可能
-- **カスタム音声**：保護者は Mistral Voices API を使って自分の声を作成（音声サンプルから）し、ホスト/ゲスト役に割り当て可能 — するとポッドキャストや音声クイズは保護者の声で読み上げられ、子どもにとってさらに没入感のある体験になります
-- 設定可能な2つの音声役割：**ホスト**（メインナレーター）と **ゲスト**（ポッドキャストの第2の声）
-- Mistral 音声の完全なカタログは設定画面で利用可能、言語でフィルタリング可能
+- アプリ設定でプロバイダーを切り替え可能
+- **カスタム音声**：保護者は Mistral Voices API（音声サンプルから）で自分の声を作成し、ホスト/ゲストの役割に割り当て可能 — その場合、ポッドキャストと音声クイズは保護者の声で再生され、子どもにとってさらに没入感のある体験になります
+- 設定可能な2つの音声ロール：**ホスト**（主な語り手）と **ゲスト**（ポッドキャストの第2音声）
+- Mistral の完全な音声カタログは設定で利用可能、言語でフィルタ可能
 
 ### 国際化
 
 - インターフェースは9言語で利用可能：fr, en, es, pt, it, nl, de, hi, ar
-- AIプロンプトは15言語に対応：fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv
-- 言語はプロフィールごとに設定可能
+- AI プロンプトは15言語をサポート（fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv）
+- プロファイルごとに言語を設定可能
 
 ---
 
@@ -176,33 +190,31 @@ EurekAI は、プロフィールごとにモデレーションされた 4 種類
 | **Runtime** | Node.js + TypeScript 6.x | サーバーと型安全性 |
 | **Backend** | Express 5.x | REST API |
 | **開発サーバー** | Vite 8.x (Rolldown) + tsx | HMR、Handlebars partials、プロキシ |
-| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | リアクティブなUI、ViteでコンパイルされるTypeScript |
-| **Templating** | vite-plugin-handlebars | partials によるHTML構成 |
-| **AI** | Mistral AI SDK 2.x | チャット、OCR、STT、TTS、エージェント、モデレーション |
-| **TTS（デフォルト）** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`、統合音声合成 |
+| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | リアクティブな UI、Vite でコンパイルされる TypeScript |
+| **Templating** | vite-plugin-handlebars | partials による HTML 構成 |
+| **AI** | Mistral AI SDK 2.x | Chat、OCR、STT、TTS、Agents、モデレーション |
+| **TTS（既定）** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`、組み込み音声合成 |
 | **TTS（代替）** | ElevenLabs SDK 2.x | `eleven_v3`、自然な音声 |
-| **アイコン** | Lucide 1.x | SVGアイコンライブラリ |
-| **ウェブスクレイピング** | Readability + linkedom | ウェブページの主要コンテンツ抽出（Firefox Reader View 技術） |
-| **ヘッドレスブラウザ** | Lightpanda | JS/SPAページ向けの超軽量ヘッドレスブラウザ（Zig + V8）— フォールバックスクレイピング |
+| **アイコン** | Lucide 1.x | SVG アイコンライブラリ |
+| **Web スクレイピング** | Readability + linkedom | Web ページの主要コンテンツ抽出（Firefox Reader View 技術） |
+| **ヘッドレスブラウザ** | Lightpanda | JS/SPA ページ用の超軽量ヘッドレスブラウザ（Zig + V8）— フォールバックスクレイピング |
 | **Markdown** | Marked | チャット内の markdown レンダリング |
 | **ファイルアップロード** | Multer 2.x | multipart フォーム処理 |
 | **Audio** | ffmpeg-static | 音声セグメントの結合 |
-| **Tests** | Vitest | 単体テスト — カバレッジは SonarCloud で測定 |
-| **Persistence** | JSONファイル | 依存なしのストレージ |
+| **Tests** | Vitest | 単体テスト — カバレッジは SonarCloud で計測 |
+| **Persistance** | JSON ファイル | 依存なしの保存 |
 
 ---
 
-## モデル参照
-
-| モデル | 用途 | 理由 |
+## モデルリファレンス | モデル | 用途 | 理由 |
 |---|---|---|
-| `mistral-large-latest` | シート、フラッシュカード、ポッドキャスト、クイズ、穴埋め問題、チャット、音声クイズ検証、画像エージェント、Web検索エージェント、指示検出 | 優れた多言語対応 + 指示追従 |
-| `mistral-ocr-latest` | 文書OCR | 印刷文字、表、手書き文字 |
+| `mistral-large-latest` | まとめノート、フラッシュカード、ポッドキャスト、クイズ、穴埋め問題、チャット、音声クイズ検証、画像エージェント、Web検索エージェント、指示検出 | 優れた多言語対応 + 指示追従 |
+| `mistral-ocr-latest` | 文書OCR | 印刷テキスト、表、手書き文字 |
 | `voxtral-mini-latest` | 音声認識（STT） | 多言語STT、`language="fr"` で最適化 |
-| `voxtral-mini-tts-latest` | 音声合成（TTS） | ポッドキャスト、音声クイズ、読み上げ |
+| `voxtral-mini-tts-latest` | 音声合成（TTS） | ポッドキャスト、音声クイズ、音読 |
 | `mistral-moderation-latest` | コンテンツモデレーション | 子ども/ティーン向けに5カテゴリをブロック（+ ジェイルブレイク対策） |
-| `mistral-small-latest` | 自動ルーター | ルーティング判断のための迅速なコンテンツ分析 |
-| `eleven_v3`（ElevenLabs） | 音声合成（代替TTS） | 自然な音声、設定可能な代替 |
+| `mistral-small-latest` | 自動ルーター | ルーティング判断のためのコンテンツを高速分析 |
+| `eleven_v3` (ElevenLabs) | 音声合成（代替TTS） | 自然な音声、設定可能な代替 विकल्प |
 
 ---
 
@@ -229,13 +241,48 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **注**：Mistral Voxtral TTS はデフォルトのプロバイダーです。`MISTRAL_API_KEY` 以外の追加キーは必要ありません。ElevenLabs は設定画面で構成可能な代替 TTS プロバイダーです。
+> **注**: Mistral Voxtral TTS はデフォルトのプロバイダーです。`MISTRAL_API_KEY` 以外に追加のキーは必要ありません。ElevenLabs は設定で構成できる代替 TTS プロバイダーです。
+
+### 環境変数
+
+| 変数 | 必須 | デフォルト | 役割 |
+|---|---|---|---|
+| `MISTRAL_API_KEY` | ✅ | — | Mistral API キー（チャット、OCR、STT、Voxtral TTS、エージェント、モデレーション） |
+| `ELEVENLABS_API_KEY` | ⚠ オプション | — | ElevenLabs キー。TTS provider = ElevenLabs の場合のみ必須 |
+| `PORT` | オプション | `3000` | Express バックエンドの HTTP ポート |
+| `NODE_ENV` | オプション | `development` | `production` の場合、Express は `dist/` からフロントエンドを配信します（それ以外は `public/`） |
+| `SONAR_TOKEN` | CI 用オプション | — | GitHub Actions の SonarCloud ワークフローでのみ使用 |
+
+### テスト、コード品質、貢献
+
+```bash
+npm test                # vitest (déclenche pretest : lint:complexity + lint:ci + lint:deadcode)
+npm run test:coverage   # couverture vitest
+npm run lint            # ESLint + typescript-eslint + sonarjs
+npm run lint:fix        # auto-fix
+npm run format          # prettier
+npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
+```
+
+**Gitフック（Husky）**: `pre-commit` は `npm test` を、`pre-push` は `npm run security` を実行します。どちらも失敗時は commit/push をブロックします。
+
+**必要な外部ツール（任意だが `pretest` / `npm run security` で使用）**:
+
+```bash
+# Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
+pipx install lizard          # ou : pipx run lizard
+
+# Opengrep (binaire standalone ~40 Mo) pour npm run security
+./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
+```
+
+これらのツールがないと、`npm test` は `pretest` で失敗し（lizard がない）、`npm run security` は失敗します（opengrep がない）。その場合、husky フックが commit/push をブロックします。
 
 ---
 
 ## コンテナでのデプロイ
 
-イメージは **GitHub Container Registry** に公開されています：
+イメージは **GitHub Container Registry** に公開されています:
 
 ```bash
 # Télécharger l'image
@@ -252,7 +299,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`** は、ボリュームの権限を自動調整する Podman の rootless フラグです。
+> **`:U`** は rootless Podman のフラグで、ボリュームの権限を自動調整します。
 > **`ELEVENLABS_API_KEY`** はオプションです（代替 TTS）。
 
 ```bash
@@ -276,7 +323,8 @@ types.ts                  — Types TypeScript : Source, Generation (7 types), Q
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, 15 langues)
 
 generators/
-  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF)
+  auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (7 agents) + MAX_AUTO_PLAN_LENGTH
+  ocr.ts                  — OCR via Mistral (JPG, PNG, PDF) avec extraction interne des scores de confiance moyens par page
   summary.ts              — Génération de fiche de révision (JSON structuré)
   flashcards.ts           — Flashcards Q/R (5-50, configurable)
   quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
@@ -302,10 +350,35 @@ routes/
   chat.ts                 — Chat IA avec appel d'outils
 
 helpers/
+  # IO & parsing
   index.ts                — getContent, stripJsonMarkdown, safeParseJson, unwrapJsonArray, extractAllText, timer
   audio.ts                — collectStream (ReadableStream → Buffer)
+  audio-files.ts          — Persistance et lecture des fichiers audio générés (podcast, flashcards)
+  logger.ts               — Logger structuré (niveaux, contexte JSON)
+
+  # Génération & UX
+  auto-title.ts           — autoTitle(type, data, lang) : préfixe auto pour carte liste (Fiche, Note, Quiz, etc.)
+  choice-labels.ts        — Labels localisés des choix (quiz, quiz-vocal) — 9 langues
+  diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, `diversityParams` : temperature/presencePenalty/randomSeed)
   fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
-  diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, randomSeed)
+
+  # Codes d'erreur stables
+  error-codes.ts              — Re-export mince de l'API publique
+  error-code-resolution.ts    — Orchestration extractErrorCode(e, agent) → FailedStepCode
+  error-code-rules.ts         — Règles de mapping par agent/step
+  error-matchers.ts           — Matchers par pattern d'erreur HTTP/LLM (délimités pour Lizard)
+
+  # Cost tracking API (suivi coûts €)
+  pricing.ts              — MODEL_PRICING + PRICING_SOURCES (tarifs Mistral par prefix de modèle)
+  cost-calc.ts            — Conversion ApiUsage → coût € (tokens / characters / pages / audio-seconds)
+  cost-persist.ts         — Écriture dans Project.costLog + totalCost
+  cost-middleware.ts      — Injection de costDelta dans la réponse HTTP
+  tracked-client.ts       — Wrap du client Mistral (capture ApiUsage automatiquement)
+  usage-context.ts        — AsyncLocalStorage pour propager l'usage dans les pipelines async
+
+  # Voix & profils
+  voice-selection.ts      — selectVoices : rotation déterministe par profil + langue (host/guest)
+  voice-types.ts          — Type MistralVoice (importable côté frontend sans embarquer le SDK Mistral)
 
 src/                      — Frontend (Vite + Handlebars)
   index.html              — Point d'entrée HTML principal
@@ -340,82 +413,88 @@ src/                      — Frontend (Vite + Handlebars)
     main.css              — Entrée TailwindCSS
     theme.css             — Variables de thème personnalisées
 
-public/assets/            — Ressources statiques (logo, avatars)
-output/                   — Données d'exécution (projets, config, fichiers audio)
+public/assets/            — Ressources statiques (logo, avatars, schémas architecture)
+docs/                     — Notes internes (inventaire prompts, audits)
+scripts/                  — Tooling : check-deps, check-security, check-complexity, install-opengrep, translate-readme, publish-ghcr, update-pricing
+output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
+
+> **AI コントリビューター向け**: 詳細なアーキテクチャ背景、必須ルール（プロンプト漏えい防止、エラーコード、コスト追跡）、既知の落とし穴（Lizard CCN、Opengrep、Codacy/Semgrep 移行）については [`CLAUDE.md`](CLAUDE.md) を参照してください。
 
 ---
 
 ## API リファレンス
 
-### 設定
+### Config
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
 | `GET` | `/api/config` | 現在の設定 |
-| `PUT` | `/api/config` | 設定変更（モデル、音声、TTS プロバイダー） |
-| `GET` | `/api/config/status` | API のステータス（Mistral、ElevenLabs、TTS） |
+| `PUT` | `/api/config` | 設定を変更（モデル、音声、TTS provider） |
+| `GET` | `/api/config/status` | API ステータス: `mistral`（Mistral キーが定義済み）、`elevenlabs`（ElevenLabs キーが定義済み）、`ttsAvailable`（設定済み TTS provider のキーが存在する場合 true） |
 | `POST` | `/api/config/reset` | デフォルト設定にリセット |
-| `GET` | `/api/config/voices` | Mistral TTS の音声一覧（`?lang=fr` は任意） |
+| `GET` | `/api/config/voices` | Mistral TTS の音声一覧を取得（`?lang=fr` は任意） |
 | `GET` | `/api/moderation-categories` | 利用可能なモデレーションカテゴリ + 年齢別デフォルト |
 
-### プロフィール
+### プロファイル
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `GET` | `/api/profiles` | すべてのプロフィールを一覧表示 |
-| `POST` | `/api/profiles` | プロフィール作成 |
-| `PUT` | `/api/profiles/:id` | プロフィール編集（15歳未満はPIN必須） |
-| `DELETE` | `/api/profiles/:id` | プロフィール削除 + プロジェクトのカスケード削除 `{pin?}` → `{ok, deletedProjects}` | ### プロジェクト
+| `GET` | `/api/profiles` | すべてのプロファイルを一覧表示 |
+| `POST` | `/api/profiles` | プロファイルを作成 |
+| `PUT` | `/api/profiles/:id` | プロファイルを更新（15歳未満はPIN必須） |
+| `DELETE` | `/api/profiles/:id` | プロファイルを削除 + `{pin?}` → `{ok, deletedProjects}` のプロジェクト連鎖削除 |
+
+### プロジェクト
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `GET` | `/api/projects` | プロジェクト一覧を取得する（`?profileId=` は任意） |
-| `POST` | `/api/projects` | `{name, profileId}` プロジェクトを作成する |
-| `GET` | `/api/projects/:pid` | プロジェクトの詳細 |
-| `PUT` | `/api/projects/:pid` | `{name}` の名前を変更する |
-| `DELETE` | `/api/projects/:pid` | プロジェクトを削除する |
+| `GET` | `/api/projects` | プロジェクトを一覧表示（`?profileId=` は任意） |
+| `POST` | `/api/projects` | `{name, profileId}` プロジェクトを作成 |
+| `GET` | `/api/projects/:pid` | プロジェクト詳細 |
+| `PUT` | `/api/projects/:pid` | `{name}` をリネーム |
+| `DELETE` | `/api/projects/:pid` | プロジェクトを削除 |
 
 ### ソース
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | multipart ファイルをインポートする（JPG/PNG/PDF は OCR、TXT/MD は直接読み取り） |
+| `POST` | `/api/projects/:pid/sources/upload` | マルチパートファイルをインポート（JPG/PNG/PDF は OCR、TXT/MD は直接読み取り） |
 | `POST` | `/api/projects/:pid/sources/text` | 自由テキスト `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | 音声 STT（multipart 音声） |
-| `POST` | `/api/projects/:pid/sources/websearch` | URL スクレイピングまたはウェブ検索 `{query}` — ソース配列を返す |
-| `DELETE` | `/api/projects/:pid/sources/:sid` | ソースを削除する |
-| `POST` | `/api/projects/:pid/moderate` | `{text}` をモデレートする |
-| `POST` | `/api/projects/:pid/detect-consigne` | 復習指示を検出する |
+| `POST` | `/api/projects/:pid/sources/voice` | STT 音声（マルチパートオーディオ） |
+| `POST` | `/api/projects/:pid/sources/websearch` | URL スクレイピングまたは Web 検索 `{query}` — ソース配列を返す |
+| `DELETE` | `/api/projects/:pid/sources/:sid` | ソースを削除 |
+| `POST` | `/api/projects/:pid/moderate` | `{text}` をモデレート |
+| `POST` | `/api/projects/:pid/detect-consigne` | 学習用指示を検出 |
 
 ### 生成
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | 復習シート |
+| `POST` | `/api/projects/:pid/generate/summary` | まとめノート |
 | `POST` | `/api/projects/:pid/generate/flashcards` | フラッシュカード |
-| `POST` | `/api/projects/:pid/generate/quiz` | QCM クイズ |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | 穴埋めテキスト |
+| `POST` | `/api/projects/:pid/generate/quiz` | 選択式クイズ |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | 穴埋め問題 |
 | `POST` | `/api/projects/:pid/generate/podcast` | ポッドキャスト |
 | `POST` | `/api/projects/:pid/generate/image` | イラスト |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | 音声クイズ |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | 適応型復習 `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/route` | ルーティング分析（実行するジェネレーターの計画） |
-| `POST` | `/api/projects/:pid/generate/auto` | バックエンドの自動生成（ルーティング + 7 種類: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image）。並列実行 — 7 件以上の同時リクエストを許容する Mistral tier を想定；そうでなければ `failedSteps` に複数の 429 が返る可能性がある。 |
+| `POST` | `/api/projects/:pid/generate/route` | ルーティング分析（実行する生成器の計画）— `{plan, costDelta}` を返す（ルーティング単体のコスト） |
+| `POST` | `/api/projects/:pid/generate/auto` | バックエンド自動生成（ルーティング + 7 種類: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image）。並列実行 — 同時 7 リクエスト以上の rate limit を持つ Mistral tier を前提。そうでない場合、複数の 429 が `failedSteps` に返る可能性があります。 |
 
-すべての生成ルートは `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` を受け付けます。`quiz-review` はさらに `{generationId, weakQuestions}` を必要とします。
+すべての生成ルートは `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` を受け付けます。`quiz-review` はさらに `{generationId, weakQuestions}` を要求します。
 
 ### CRUD 生成
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | クイズ回答を送信する `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 穴埋めテキストの回答を送信する `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 音声回答を確認する（audio + questionIndex） |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS を音声で読み上げる（シート/フラッシュカード） |
-| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` の名前を変更する |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | 生成を削除する |
+| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | クイズの回答を送信 `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 穴埋め問題の回答を送信 `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 音声回答を検証（audio + questionIndex） |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 音読（まとめノート/フラッシュカード） |
+| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` をリネーム |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | 生成を削除 |
 
 ### チャット
 | メソッド | エンドポイント | 説明 |
 |---|---|---|
-| `GET` | `/api/projects/:pid/chat` | チャット履歴を取得する |
-| `POST` | `/api/projects/:pid/chat` | `{message, lang, ageGroup}` メッセージを送信する |
-| `DELETE` | `/api/projects/:pid/chat` | チャット履歴を消去する |
+| `GET` | `/api/projects/:pid/chat` | チャット履歴を取得 |
+| `POST` | `/api/projects/:pid/chat` | メッセージを送信 `{message, lang, ageGroup}` |
+| `DELETE` | `/api/projects/:pid/chat` | チャット履歴を消去 |
 
 ---
 
@@ -423,31 +502,31 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 | 決定 | 理由 |
 |---|---|
-| **React/Vue ではなく Alpine.js** | 最小限のフットプリント、Vite でコンパイルされた TypeScript と軽量なリアクティビティ。スピードが重要なハッカソンに最適。 |
-| **JSON ファイルでの永続化** | 依存関係ゼロ、即時起動。設定するデータベースは不要 — 起動してすぐに使える。 |
-| **Vite + Handlebars** | 開発時の高速 HMR、コード整理のための HTML partials、Tailwind JIT。両方の長所を兼ね備える。 |
-| **中央集約されたプロンプト** | すべての AI プロンプトを `prompts.ts` に集約 — 言語/年齢グループごとに反復、テスト、調整しやすい。 |
-| **マルチ生成システム** | 各生成物は独立した ID を持つ個別オブジェクト — 1 つのコースに複数のシート、クイズなどを持てる。 |
-| **年齢別に調整されたプロンプト** | 語彙、複雑さ、トーンが異なる 4 つの年齢グループ — 同じ内容でも学習者に応じて教え方を変えられる。 |
-| **エージェントベースの機能** | 画像生成とウェブ検索は一時的な Mistral Agents を使用 — 自動クリーンアップ付きの明確なライフサイクル。 |
-| **インテリジェントな URL スクレイピング** | 単一フィールドで URL とキーワードの混在を受け付ける — URL は Readability（静的ページ）でスクレイプされ、Lightpanda（JS/SPA ページ）へフォールバック、キーワードは Mistral web_search Agent を起動する。各結果は独立したソースを作成する。 |
+| **React/Vue ではなく Alpine.js** | 最小限のフットプリント、Vite でコンパイルされた TypeScript による軽量なリアクティビティ。速度が重要なハッカソンに最適。 |
+| **JSON ファイルで永続化** | 依存ゼロ、即時起動。設定すべきデータベースがないので、立ち上げてすぐ開始できます。 |
+| **Vite + Handlebars** | 両方の良さを活用: 開発時の高速 HMR、コード整理のための HTML partials、Tailwind JIT。 |
+| **プロンプトの केंद्रीकरण** | すべての AI プロンプトを `prompts.ts` に集約 — 言語や年齢層ごとに反復、テスト、調整が容易。 |
+| **マルチ生成システム** | 各生成は独立したオブジェクトで、専用 ID を持つ — 1 つのコースに対して複数のまとめノート、クイズなどを可能にする。 |
+| **年齢別に最適化されたプロンプト** | 語彙、複雑さ、トーンが異なる 4 つの年齢 समूह — 同じ内容でも学習者に応じて教え方を変えられる。 |
+| **エージェントベース機能** | 画像生成と Web 検索は一時的な Mistral Agents を使用 — 自動クリーンアップ付きのクリーンなライフサイクル。 |
+| **インテリジェントな URL スクレイピング** | 単一フィールドで URL とキーワードの混在を受け付ける — URL は Readability（静的ページ）でスクレイプされ、Lightpanda（JS/SPA ページ）へフォールバックし、キーワードは Mistral web_search Agent を起動します。各結果は独立したソースを作成します。 |
 | **マルチプロバイダー TTS** | デフォルトは Mistral Voxtral TTS（追加キー不要）、代替として ElevenLabs — 再起動なしで設定可能。 |
 
 ---
 
 ## クレジット & 謝辞
 
-- **[Mistral AI](https://mistral.ai)** — AI モデル（Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small）+ Worldwide Hackathon
+- **[Mistral AI](https://mistral.ai)** — AI モデル（Large、OCR、Voxtral STT、Voxtral TTS、Moderation、Small）+ Worldwide Hackathon
 - **[ElevenLabs](https://elevenlabs.io)** — 代替音声合成エンジン (`eleven_v3`)
 - **[Alpine.js](https://alpinejs.dev)** — 軽量リアクティブフレームワーク
-- **[TailwindCSS](https://tailwindcss.com)** — ユーティリティ CSS フレームワーク
+- **[TailwindCSS](https://tailwindcss.com)** — ユーティリティファースト CSS フレームワーク
 - **[Vite](https://vitejs.dev)** — フロントエンドビルドツール
 - **[Lucide](https://lucide.dev)** — アイコンライブラリ
 - **[Marked](https://marked.js.org)** — Markdown パーサー
 - **[Readability](https://github.com/mozilla/readability)** — Web コンテンツ抽出（Firefox Reader View 技術）
-- **[Lightpanda](https://lightpanda.io)** — JS/SPA ページのスクレイピング向け超軽量ヘッドレスブラウザ
+- **[Lightpanda](https://lightpanda.io)** — JS/SPA ページのスクレイピング向けの超軽量ヘッドレスブラウザ
 
-Mistral AI Worldwide Hackathon（2026 年 3 月）中に開始され、[Claude Code](https://code.claude.com/)、[Codex](https://openai.com/codex/) および [Gemini CLI](https://geminicli.com/) を用いて AI により完全に開発されました。
+Mistral AI Worldwide Hackathon（2026 年 3 月）で開始され、[Claude Code](https://code.claude.com/)、[Codex](https://openai.com/codex/) 、[Gemini CLI](https://geminicli.com/) を使って AI によって全面的に開発されました。
 
 ---
 
@@ -459,5 +538,5 @@ Mistral AI Worldwide Hackathon（2026 年 3 月）中に開始され、[Claude C
 
 [AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**このドキュメントは、モデル gpt-5.4-mini を使用して fr 版から ja 言語へ翻訳されました。翻訳プロセスの詳細については、https://gitlab.com/jls42/ai-powered-markdown-translator をご覧ください。**
+**この文書は、gpt-5.4-mini モデルを使用して fr 版から ja 言語へ翻訳されました。翻訳プロセスの詳細については、https://gitlab.com/jls42/ai-powered-markdown-translator をご覧ください。**
 
