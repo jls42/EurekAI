@@ -31,53 +31,51 @@ const MODELS: Record<string, string> = {
   pro: 'gemini-3-pro-image-preview',
 };
 
-function parseArgs() {
+type ParsedOptions = {
+  prompt: string;
+  output: string;
+  ratio: string;
+  model: keyof typeof MODELS;
+};
+
+const FLAG_MAP: Record<string, keyof ParsedOptions> = {
+  '-o': 'output',
+  '--output': 'output',
+  '-r': 'ratio',
+  '--ratio': 'ratio',
+  '-m': 'model',
+  '--model': 'model',
+};
+
+export function parseArgs(): ParsedOptions {
   const args = process.argv.slice(2);
-  const options = {
+  const options: ParsedOptions = {
     prompt: '',
     output: 'generated_image.png',
     ratio: '1:1',
-    model: 'flash' as keyof typeof MODELS,
+    model: 'flash',
   };
 
-  const skipIndices = new Set<number>();
-
-  args.forEach((arg, i) => {
-    if (skipIndices.has(i)) return;
-
-    if (arg === '-o' || arg === '--output') {
-      options.output = args[i + 1];
-      skipIndices.add(i + 1);
-    } else if (arg === '-r' || arg === '--ratio') {
-      options.ratio = args[i + 1];
-      skipIndices.add(i + 1);
-    } else if (arg === '-m' || arg === '--model') {
-      options.model = args[i + 1];
-      skipIndices.add(i + 1);
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    const key = FLAG_MAP[arg];
+    if (key) {
+      (options[key] as string) = args[++i];
     } else if (!arg.startsWith('-')) {
       options.prompt = arg;
     }
-  });
+  }
 
   return options;
 }
 
-async function generateImage(prompt: string, output: string, ratio: string, model: string) {
-  if (!VALID_RATIOS.includes(ratio)) {
-    console.error(`Erreur: Ratio invalide '${ratio}'. Valides: ${VALID_RATIOS.join(', ')}`);
-    process.exit(1);
-  }
-
-  const modelId = MODELS[model] || MODELS.flash;
-
-  console.log(`\nGénération en cours...`);
-  console.log(`  Prompt: ${prompt.slice(0, 80)}${prompt.length > 80 ? '...' : ''}`);
-  console.log(`  Modèle: ${modelId}`);
-  console.log(`  Ratio: ${ratio}`);
-
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-
-  const response = await ai.models.generateContent({
+export async function requestImage(
+  ai: GoogleGenAI,
+  modelId: string,
+  prompt: string,
+  ratio: string,
+) {
+  return ai.models.generateContent({
     model: modelId,
     contents: prompt,
     config: {
@@ -85,25 +83,54 @@ async function generateImage(prompt: string, output: string, ratio: string, mode
       imageConfig: { aspectRatio: ratio },
     },
   });
+}
 
+export function savePartAsImage(part: unknown, output: string): boolean {
+  if (typeof part !== 'object' || part === null || !('inlineData' in part)) return false;
+  const inline = (part as { inlineData?: { data?: string } }).inlineData;
+  if (!inline?.data) return false;
+
+  const buffer = Buffer.from(inline.data, 'base64');
+  const dir = path.dirname(output);
+  if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  fs.writeFileSync(output, buffer);
+  console.log(`\n  Image sauvegardée: ${output}`);
+  return true;
+}
+
+export function logTextPart(part: unknown): void {
+  if (typeof part === 'object' && part !== null && 'text' in part) {
+    const text = (part as { text?: string }).text;
+    if (text) console.log(`\n  Réponse: ${text}`);
+  }
+}
+
+export async function generateImage(
+  prompt: string,
+  output: string,
+  ratio: string,
+  model: string,
+): Promise<boolean> {
+  if (!VALID_RATIOS.includes(ratio)) {
+    console.error(`Erreur: Ratio invalide '${ratio}'. Valides: ${VALID_RATIOS.join(', ')}`);
+    process.exit(1);
+  }
+
+  const modelId = MODELS[model] || MODELS.flash;
+  const preview = prompt.slice(0, 80) + (prompt.length > 80 ? '...' : '');
+  console.log(`\nGénération en cours...`);
+  console.log(`  Prompt: ${preview}`);
+  console.log(`  Modèle: ${modelId}`);
+  console.log(`  Ratio: ${ratio}`);
+
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  const response = await requestImage(ai, modelId, prompt, ratio);
   const parts = response.candidates?.[0]?.content?.parts || [];
 
   for (const part of parts) {
-    if ('text' in part && part.text) {
-      console.log(`\n  Réponse: ${part.text}`);
-    } else if ('inlineData' in part && part.inlineData) {
-      const imageData = part.inlineData.data as string;
-      const buffer = Buffer.from(imageData, 'base64');
-
-      const dir = path.dirname(output);
-      if (dir && !fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-
-      fs.writeFileSync(output, buffer);
-      console.log(`\n  Image sauvegardée: ${output}`);
-      return true;
-    }
+    logTextPart(part);
+    if (savePartAsImage(part, output)) return true;
   }
 
   console.error('Erreur: Aucune image générée');
