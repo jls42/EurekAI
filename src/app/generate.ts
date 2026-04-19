@@ -328,12 +328,16 @@ export function createGenerate() {
       const controller = new AbortController();
       this.abortControllers[type] = controller;
       try {
-        // fetch reste inline pour préserver l'analyse taint Codacy `rule-node-ssrf`
-        // (cf. CLAUDE.md "Effet secondaire subtil cleanup de dead code").
-        const res = await fetch(
-          '/api/projects/' + projectId + '/generate/' + type,
-          postJson(buildGenerateBody(this), controller.signal),
+        // Whitelist canonique (cf. CLAUDE.md `rule-node-ssrf`, commit 00af5f2) :
+        // construire `allowedUrls` puis `allowedUrls.has(url)` immédiatement avant
+        // `fetch(url, ...)` dans la même fonction. Sans cela, Codacy taint analysis
+        // flagge `projectId` (issu de canStartGenerate) comme user-controlled.
+        const url = '/api/projects/' + projectId + '/generate/' + type;
+        const allowedUrls = new Set(
+          AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
         );
+        if (!allowedUrls.has(url)) return;
+        const res = await fetch(url, postJson(buildGenerateBody(this), controller.signal));
         if (!res.ok) {
           handleGenerateHttpError(this, type, res, await res.json().catch(() => ({})));
           return;
