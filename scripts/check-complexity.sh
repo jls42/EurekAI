@@ -31,4 +31,6 @@ pipx run lizard \
   helpers/error-code-rules.ts \
   helpers/error-codes.ts \
   src/app/helpers.ts \
-  config.ts
+  config.ts \
+  scripts/update-pricing.ts \
+  scripts/generate-image.ts
