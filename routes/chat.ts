@@ -18,6 +18,9 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
+
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+const CHAT_ROUTE_PATH = '/:pid/chat';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
 interface ChatRequestContext {
@@ -49,7 +52,7 @@ const resolveProjectAndProfile = (
 ): ResolvedProject | ChatValidationError => {
   const pid = req.params.pid;
   const project = store.getProject(pid);
-  if (!project) return new ChatValidationError(404, 'Projet introuvable');
+  if (!project) return new ChatValidationError(404, ERR_PROJECT_NOT_FOUND);
   const profileId = project.meta.profileId;
   const profile = profileId ? profileStore.get(profileId) : null;
   if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
@@ -354,7 +357,7 @@ export function chatRoutes(
   const router = Router();
 
   // Send message
-  router.post('/:pid/chat', async (req, res) => {
+  router.post(CHAT_ROUTE_PATH, async (req, res) => {
     const pid = String(req.params.pid);
     try {
       const validated = await validateChatRequest(
@@ -397,20 +400,20 @@ export function chatRoutes(
   });
 
   // Get chat history
-  router.get('/:pid/chat', (req, res) => {
+  router.get(CHAT_ROUTE_PATH, (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     res.json(project.chat || { messages: [] });
   });
 
   // Clear chat
-  router.delete('/:pid/chat', (req, res) => {
+  router.delete(CHAT_ROUTE_PATH, (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     store.clearChat(req.params.pid);

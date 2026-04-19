@@ -1,3 +1,5 @@
+import type { GenerationUsage } from './helpers/pricing.js';
+
 // --- Profiles ---
 
 export type AgeGroup = 'enfant' | 'ado' | 'etudiant' | 'adulte';
@@ -46,7 +48,7 @@ export interface Source {
   scrapeEngine?: 'readability' | 'lightpanda' | 'mistral';
   filePath?: string;
   estimatedCost?: number;
-  usage?: import('./helpers/pricing.js').GenerationUsage;
+  usage?: GenerationUsage;
   costBreakdown?: string[];
   ocrConfidence?: OcrConfidence;
 }
@@ -89,7 +91,7 @@ export interface GenerationMeta {
   title: string;
   createdAt: string;
   sourceIds: string[];
-  usage?: import('./helpers/pricing.js').GenerationUsage;
+  usage?: GenerationUsage;
   estimatedCost?: number;
   costBreakdown?: string[];
 }
@@ -233,7 +235,7 @@ export interface CostEntry {
   timestamp: string;
   route: string;
   cost: number;
-  usage: import('./helpers/pricing.js').GenerationUsage;
+  usage: GenerationUsage;
 }
 
 export interface ProjectData {

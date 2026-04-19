@@ -2,7 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
-import type { Source } from '../types.js';
+import type { Source, OcrConfidence, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
@@ -17,6 +17,8 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -116,7 +118,7 @@ export function sourceRoutes(
     const isText = TEXT_EXTS.has(ext);
     let markdown: string;
     let elapsed: number;
-    let confidence: import('../types.js').OcrConfidence | undefined;
+    let confidence: OcrConfidence | undefined;
     if (isText) {
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
@@ -226,7 +228,7 @@ export function sourceRoutes(
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -249,7 +251,7 @@ export function sourceRoutes(
   router.post('/:pid/sources/text', async (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -291,7 +293,7 @@ export function sourceRoutes(
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -350,7 +352,7 @@ export function sourceRoutes(
     url: string,
     scrapeMode: string,
     lang: string,
-    ageGroup: import('../types.js').AgeGroup,
+    ageGroup: AgeGroup,
     modCats: string[] | null,
     now: string,
   ): Promise<Source | null> {
@@ -413,7 +415,7 @@ export function sourceRoutes(
   async function searchByKeywords(
     searchQuery: string,
     lang: string,
-    ageGroup: import('../types.js').AgeGroup,
+    ageGroup: AgeGroup,
     modCats: string[] | null,
     now: string,
   ): Promise<Source> {
@@ -470,7 +472,7 @@ export function sourceRoutes(
     modCats: string[] | null,
   ): Promise<Source[]> {
     const lang = req.body.lang || 'fr';
-    const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
+    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
     const scrapeMode = req.body.scrapeMode || 'auto';
     const sources: Source[] = [];
@@ -499,7 +501,7 @@ export function sourceRoutes(
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
     if (!store.getProject(pid)) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -552,7 +554,7 @@ export function sourceRoutes(
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     if (project.sources.length === 0) {
@@ -564,7 +566,7 @@ export function sourceRoutes(
       const markdown = getMarkdown(project.sources);
       const result = await detectConsigne(client, markdown, undefined, lang);
       if (!store.setConsigne(pid, result)) {
-        res.status(404).json({ error: 'Projet introuvable' });
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
       }
       res.json(result);

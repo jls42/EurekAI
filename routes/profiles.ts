@@ -3,6 +3,9 @@ import { ProfileStore, verifyPin, profileToPublic } from '../profiles.js';
 import { ProjectStore } from '../store.js';
 import type { Profile } from '../types.js';
 
+const ERR_PROFILE_NOT_FOUND = 'Profil introuvable';
+const ERR_PIN_WRONG = 'Code PIN incorrect';
+
 const isValidName = (name: unknown): boolean => typeof name === 'string' && name.trim().length > 0;
 
 const isValidAge = (age: unknown): age is number =>
@@ -101,13 +104,13 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
   router.put('/:id', (req, res) => {
     const profile = store.get(req.params.id);
     if (!profile) {
-      res.status(404).json({ error: 'Profil introuvable' });
+      res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
       return;
     }
     const { pin, _updatedAt, ...fields } = req.body;
 
     if (pinMismatch(profile, pin)) {
-      res.status(403).json({ error: 'Code PIN incorrect' });
+      res.status(403).json({ error: ERR_PIN_WRONG });
       return;
     }
     if (Object.keys(fields).length === 0) {
@@ -115,7 +118,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
       return;
     }
     if (requiresPinForParentalChange(profile, pin, fields)) {
-      res.status(403).json({ error: 'Code PIN incorrect' });
+      res.status(403).json({ error: ERR_PIN_WRONG });
       return;
     }
     if (isStaleWrite(profile, _updatedAt)) {
@@ -124,7 +127,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
     }
     const updated = store.update(req.params.id, fields);
     if (!updated) {
-      res.status(404).json({ error: 'Profil introuvable' });
+      res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
       return;
     }
     res.json(profileToPublic(updated));
@@ -134,20 +137,20 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
     const profileId = req.params.id;
     const profile = store.get(profileId);
     if (!profile) {
-      res.status(404).json({ error: 'Profil introuvable' });
+      res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
       return;
     }
     if (profile.pinHash) {
       const { pin } = req.body;
       if (!pin || !verifyPin(pin, profile.pinHash)) {
-        res.status(403).json({ error: 'Code PIN incorrect' });
+        res.status(403).json({ error: ERR_PIN_WRONG });
         return;
       }
     }
     const deletedProjects = cascadeDeleteProjects(projectStore, profileId);
     const ok = store.delete(profileId);
     if (!ok) {
-      res.status(404).json({ error: 'Profil introuvable' });
+      res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
       return;
     }
     res.json({ ok: true, deletedProjects });

@@ -25,6 +25,7 @@ type ModerationCategoriesPayload = {
 };
 
 const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
+const TOAST_SETTINGS_ERROR = 'toast.settingsError';
 
 export function createConfig() {
   return {
@@ -177,11 +178,11 @@ export function createConfig() {
           (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         } else {
-          this.showToast(this.t('toast.settingsError'), 'error');
+          this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error');
         }
       } catch (e) {
         console.error('Failed to save settings:', e);
-        this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
+        this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error', () => this.saveSettings());
       }
     },
 
@@ -196,11 +197,11 @@ export function createConfig() {
           await this.loadMistralVoices?.();
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
-          this.showToast(this.t('toast.settingsError'), 'error');
+          this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error');
         }
       } catch (e) {
         console.error('Failed to reset settings:', e);
-        this.showToast(this.t('toast.settingsError'), 'error');
+        this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error');
       }
     },
 

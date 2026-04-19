@@ -75,4 +75,13 @@ export default [
       'sonarjs/no-clear-text-protocols': 'off',
     },
   },
+  {
+    // i18n files contiennent naturellement des traductions répétées entre clés
+    // (ex: "Quiz" pour nav.quiz et gen.quiz) — extraire en const n'améliore pas
+    // la lisibilité pour des catalogues statiques.
+    files: ['src/i18n/*.ts'],
+    rules: {
+      'sonarjs/no-duplicate-string': 'off',
+    },
+  },
 ];

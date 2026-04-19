@@ -26,6 +26,8 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+const FILL_BLANK = 'fill-blank';
+
 // --- Quiz / fill-blank scoring helpers ---
 
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
@@ -280,7 +282,7 @@ export function generationCrudRoutes(
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
-      if (gen?.type !== 'fill-blank') {
+      if (gen?.type !== FILL_BLANK) {
         res.status(404).json({ error: 'Exercice a trous introuvable' });
         return;
       }
@@ -303,8 +305,8 @@ export function generationCrudRoutes(
       } as Partial<FillBlankGeneration>);
       res.json({ attempt, stats: fbGen.stats, results });
     } catch (e) {
-      logger.error('fill-blank', 'attempt error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'fill-blank') });
+      logger.error(FILL_BLANK, 'attempt error:', e);
+      res.status(500).json({ error: extractErrorCode(e, FILL_BLANK) });
     }
   });
 

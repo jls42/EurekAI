@@ -6,6 +6,8 @@ type UploadResult = 'applied' | 'ignored' | 'failed';
 type UploadSession = AppState['uploadSessions'][number];
 type UploadFile = UploadSession['files'][number];
 
+const TOAST_ERROR = 'toast.error';
+
 export function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
   return (
     ctx.uploadSessions.some((s: UploadSession) => s.id === session.id) &&
@@ -58,7 +60,7 @@ export async function _handleUploadHttpError(
   file.status = 'error';
   file.errorMsg = resolved;
   ctx.$nextTick(() => ctx.refreshIcons());
-  ctx.showToast(ctx.t('toast.error', { error: resolved }), 'error');
+  ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
   return 'failed';
 }
 
@@ -255,7 +257,7 @@ export function createSources() {
           const err = await res.json();
           if (!_isSessionActive(this, session)) return;
           this.showToast(
-            this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
+            this.t(TOAST_ERROR, { error: this.resolveError(err.error || res.statusText) }),
             'error',
           );
           return;
@@ -274,7 +276,7 @@ export function createSources() {
       } catch (e: unknown) {
         if (!_isSessionActive(this, session)) return;
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error', () => this.addText());
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error', () => this.addText());
       } finally {
         this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
       }

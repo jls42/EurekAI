@@ -3,6 +3,11 @@ import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type { Generation, Source } from '../../types';
 
+const TEXT_TEXT_PRIMARY = 'text-text-primary';
+const TEXT_TEXT_SECONDARY = 'text-text-secondary';
+const COLOR_PRIMARY = 'var(--color-primary)';
+const COLOR_ACCENT = 'var(--color-accent)';
+
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
 function extractItemRefs(item: ItemWithRefs | null | undefined): string[] {
   if (!item) return [];
@@ -185,7 +190,7 @@ export function createHelpers() {
       if (tier === 'high') return 'text-success-dark';
       if (tier === 'medium') return 'text-warning-dark';
       if (tier === 'low') return 'text-danger-dark';
-      return 'text-text-primary';
+      return TEXT_TEXT_PRIMARY;
     },
 
     moderationStatus(src: Source): string | null {
@@ -232,25 +237,25 @@ export function createHelpers() {
       if (status === 'unsafe') return 'text-danger-dark';
       if (status === 'pending') return 'text-primary';
       if (status === 'error') return 'text-warning-dark';
-      return 'text-text-primary';
+      return TEXT_TEXT_PRIMARY;
     },
 
     showMetaPopover(this: AppContext, el: HTMLElement, config: MetaPopoverConfig) {
       this._metaPopoverPos = el.getBoundingClientRect();
       this._metaPopoverTitle = config?.title || '';
       this._metaPopoverLines = config?.lines || [];
-      this._metaPopoverLineClass = config?.lineClass || 'text-text-secondary';
+      this._metaPopoverLineClass = config?.lineClass || TEXT_TEXT_SECONDARY;
       this._metaPopoverFooter = config?.footer || '';
-      this._metaPopoverFooterClass = config?.footerClass || 'text-text-primary';
+      this._metaPopoverFooterClass = config?.footerClass || TEXT_TEXT_PRIMARY;
     },
 
     hideMetaPopover(this: AppContext) {
       this._metaPopoverPos = null;
       this._metaPopoverTitle = '';
       this._metaPopoverLines = [];
-      this._metaPopoverLineClass = 'text-text-secondary';
+      this._metaPopoverLineClass = TEXT_TEXT_SECONDARY;
       this._metaPopoverFooter = '';
-      this._metaPopoverFooterClass = 'text-text-primary';
+      this._metaPopoverFooterClass = TEXT_TEXT_PRIMARY;
     },
 
     metaPopoverStyle(this: AppContext) {
@@ -295,9 +300,7 @@ export function createHelpers() {
       this.showMetaPopover(el, {
         title: this.moderationBadgeTitle(src),
         lines: labels ? [labels] : [],
-        lineClass: labels
-          ? 'text-text-secondary'
-          : this.moderationToneClass(src) + ' font-semibold',
+        lineClass: labels ? TEXT_TEXT_SECONDARY : this.moderationToneClass(src) + ' font-semibold',
       });
     },
 
@@ -383,7 +386,7 @@ export function createHelpers() {
         image: 'var(--color-gen-image)',
         'fill-blank': 'var(--color-gen-fillblank)',
       };
-      return colors[type] || 'var(--color-primary)';
+      return colors[type] || COLOR_PRIMARY;
     },
 
     recentGenerations(this: AppContext) {
@@ -407,10 +410,10 @@ export function createHelpers() {
 
     projectColor(index: number) {
       const colors = [
-        'var(--color-primary)',
+        COLOR_PRIMARY,
         'var(--color-success)',
         'var(--color-gen-flashcards)',
-        'var(--color-accent)',
+        COLOR_ACCENT,
         'var(--color-gen-podcast)',
         'var(--color-warning)',
         'var(--color-danger)',
@@ -427,9 +430,9 @@ export function createHelpers() {
       this: AppContext,
     ): Array<{ key: string; label: string; color: string; icon: string }> {
       const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
-        auto: { labelKey: 'gen.auto', icon: 'sparkles', color: 'var(--color-primary)' },
-        voice: { labelKey: 'gen.voice', icon: 'volume-2', color: 'var(--color-accent)' },
-        websearch: { labelKey: 'gen.websearch', icon: 'search', color: 'var(--color-accent)' },
+        auto: { labelKey: 'gen.auto', icon: 'sparkles', color: COLOR_PRIMARY },
+        voice: { labelKey: 'gen.voice', icon: 'volume-2', color: COLOR_ACCENT },
+        websearch: { labelKey: 'gen.websearch', icon: 'search', color: COLOR_ACCENT },
       };
       const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
       for (const cat of this.categories) {

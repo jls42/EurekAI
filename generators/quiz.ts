@@ -11,6 +11,8 @@ import {
 } from '../prompts.js';
 import type { QuizQuestion, AgeGroup } from '../types.js';
 
+const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
+
 function isValidQuiz(data: QuizQuestion[]): boolean {
   return (
     data.length > 0 &&
@@ -71,7 +73,7 @@ async function generateQuizWithRetry(
 export async function generateQuiz(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = MISTRAL_LARGE_LATEST,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
@@ -90,7 +92,7 @@ export async function generateQuiz(
 export async function generateQuizVocal(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = MISTRAL_LARGE_LATEST,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
@@ -111,7 +113,7 @@ export async function generateQuizReview(
   client: Mistral,
   markdown: string,
   weakQuestions: QuizQuestion[],
-  model = 'mistral-large-latest',
+  model = MISTRAL_LARGE_LATEST,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<QuizQuestion[]> {

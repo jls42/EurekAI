@@ -5,6 +5,12 @@ import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents'
 import type { AppContext } from './app-context';
 import type { Generation, Source } from '../../types';
 
+const TOAST_GENERATION_ERROR = 'toast.generationError';
+const TOAST_ERROR = 'toast.error';
+const TOAST_VIEW = 'toast.view';
+const API_PROJECTS_PREFIX = '/api/projects/';
+const GENERATE_SEGMENT = '/generate/';
+
 /** Generation extended with frontend-only audio/UI state fields. */
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -61,10 +67,10 @@ export function showGenerateAllResult(failures: number, total: number, state: Ap
   if (failures > 0 && failures < total) {
     state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
   } else if (failures >= total) {
-    state.showToast(state.t('toast.generationError', { error: 'all' }), 'error');
+    state.showToast(state.t(TOAST_GENERATION_ERROR, { error: 'all' }), 'error');
   } else {
     state.showToast(state.t('toast.allGenerated'), 'success', null, {
-      label: state.t('toast.view'),
+      label: state.t(TOAST_VIEW),
       fn: () => state.goToView('dashboard'),
     });
   }
@@ -99,13 +105,13 @@ export async function runAutoRoute(
   controller: AbortController,
 ): Promise<AutoRoute | null> {
   const routeRes = await fetch(
-    '/api/projects/' + projectId + '/generate/route',
+    API_PROJECTS_PREFIX + projectId + '/generate/route',
     postJson(body, controller.signal),
   );
   if (!routeRes.ok) {
     const err = await routeRes.json().catch(() => ({}));
     state.showToast(
-      state.t('toast.error', { error: state.resolveError(err.error || routeRes.statusText) }),
+      state.t(TOAST_ERROR, { error: state.resolveError(err.error || routeRes.statusText) }),
       'error',
       () => state.generateAuto(),
     );
@@ -150,7 +156,7 @@ export async function runAutoStep(
   allowedUrls: Set<string>,
 ): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return 'failed';
-  const url = '/api/projects/' + projectId + '/generate/' + type;
+  const url = API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + type;
   // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
   // immédiatement avant `fetch(url, ...)` dans la même fonction.
   if (!allowedUrls.has(url)) return 'failed';
@@ -167,7 +173,7 @@ export async function runAutoStep(
       state.t('toast.generationDone', { type: state.t('gen.' + type) }),
       'success',
       null,
-      { label: state.t('toast.view'), fn: () => state.goToView(type) },
+      { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
     );
     return 'success';
   } catch (e: unknown) {
@@ -191,7 +197,7 @@ export async function runAutoSteps(
   controller: AbortController,
 ): Promise<number> {
   const allowedUrls = new Set(
-    AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
+    AUTO_AGENT_TYPES.map((t) => API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + t),
   );
   let failures = 0;
   const promises = plannedTypes.map(async (type) => {
@@ -210,10 +216,10 @@ export function showAutoResult(state: AppContext, failures: number, plannedCount
       'warning',
     );
   } else if (failures >= plannedCount) {
-    state.showToast(state.t('toast.generationError', { error: 'all' }), 'error');
+    state.showToast(state.t(TOAST_GENERATION_ERROR, { error: 'all' }), 'error');
   } else {
     state.showToast(state.t('toast.magicDone'), 'success', null, {
-      label: state.t('toast.view'),
+      label: state.t(TOAST_VIEW),
       fn: () => state.goToView('dashboard'),
     });
   }
@@ -227,7 +233,7 @@ export function handleGenerateHttpError(
   err: { error?: string },
 ): void {
   state.showToast(
-    state.t('toast.error', { error: state.resolveError(err.error || res.statusText) }),
+    state.t(TOAST_ERROR, { error: state.resolveError(err.error || res.statusText) }),
     'error',
     () => state.generate(type),
   );
@@ -240,7 +246,7 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
     state.t('toast.generationDone', { type: state.t('gen.' + type) }),
     'success',
     null,
-    { label: state.t('toast.view'), fn: () => state.goToView(type) },
+    { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
   );
 }
 
@@ -264,7 +270,7 @@ export function canStartGenerate(state: AppContext, type?: string): boolean {
 export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
   if (e instanceof Error && e.name === 'AbortError') return;
   const msg = e instanceof Error ? e.message : String(e);
-  state.showToast(state.t('toast.generationError', { error: msg }), 'error', () =>
+  state.showToast(state.t(TOAST_GENERATION_ERROR, { error: msg }), 'error', () =>
     state.generate(type),
   );
 }
@@ -338,7 +344,7 @@ export function createGenerate() {
         // fetch reste inline avec projectId lu directement de this.currentProjectId
         // (pattern pré-Wave-5) pour préserver l'analyse taint Codacy rule-node-ssrf.
         const res = await fetch(
-          '/api/projects/' + projectId + '/generate/' + type,
+          API_PROJECTS_PREFIX + projectId + GENERATE_SEGMENT + type,
           postJson(buildGenerateBody(this), controller.signal),
         );
         if (!res.ok) {
@@ -378,7 +384,7 @@ export function createGenerate() {
         useConsigne: this.useConsigne,
       };
       try {
-        const base = '/api/projects/' + projectId;
+        const base = API_PROJECTS_PREFIX + projectId;
         const [summaryRes, flashcardsRes, quizRes] = await Promise.all([
           fetch(base + '/generate/summary', postJson(body, controller.signal)),
           fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
@@ -391,7 +397,7 @@ export function createGenerate() {
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.generationError', { error: msg }), 'error', () =>
+        this.showToast(this.t(TOAST_GENERATION_ERROR, { error: msg }), 'error', () =>
           this.generateAll(),
         );
       } finally {
@@ -536,10 +542,8 @@ export function createGenerate() {
           applyVoiceResult(this, gen, await res.json(), section);
         } else {
           const err = await res.json().catch(() => ({}));
-          this.showToast(
-            this.t('toast.error', { error: err.error || res.statusText }),
-            'error',
-            () => this.generateVoice(gen, section),
+          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error', () =>
+            this.generateVoice(gen, section),
           );
         }
       } catch (e) {

@@ -2,6 +2,8 @@ import { normalizeSummaryData } from './helpers';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
+const LS_LAST_PROJECT_ID = 'sf-lastProjectId';
+
 function normalizeGenerations(state: AppContext, generations: Generation[]): void {
   for (const gen of generations) {
     normalizeSummaryData(gen);
@@ -42,7 +44,7 @@ export function createProjects() {
       } catch {
         /* silent: offline, liste projets vide acceptable */
       }
-      const lastId = localStorage.getItem('sf-lastProjectId');
+      const lastId = localStorage.getItem(LS_LAST_PROJECT_ID);
       if (lastId && !this.currentProjectId && this.projects.some((p) => p.id === lastId)) {
         await this.selectProject(lastId);
       }
@@ -73,7 +75,7 @@ export function createProjects() {
 
     async selectProject(this: AppContext, id: string) {
       this.currentProjectId = id;
-      localStorage.setItem('sf-lastProjectId', id);
+      localStorage.setItem(LS_LAST_PROJECT_ID, id);
       this.resetState();
       try {
         const res = await fetch('/api/projects/' + id);
@@ -107,7 +109,7 @@ export function createProjects() {
       if (this.currentProjectId === id) {
         this.currentProjectId = null;
         this.currentProject = null;
-        localStorage.removeItem('sf-lastProjectId');
+        localStorage.removeItem(LS_LAST_PROJECT_ID);
         this.resetState();
       }
       this.showToast(this.t('toast.projectDeleted'), 'info');

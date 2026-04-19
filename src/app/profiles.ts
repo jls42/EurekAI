@@ -5,6 +5,10 @@ import type { Profile } from '../../types';
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
 
+const LS_PROFILE_ID = 'sf-profileId';
+const TOAST_ERROR = 'toast.error';
+const API_PROFILES = '/api/profiles/';
+
 /** Build RequestInit for DELETE /api/profiles/:id (optionally with PIN body). */
 export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
@@ -21,7 +25,7 @@ export function finalizeDeleteProfile(state: AppContext, id: string): void {
   state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
   if (state.currentProfile?.id === id) {
     state.currentProfile = null;
-    localStorage.removeItem('sf-profileId');
+    localStorage.removeItem(LS_PROFILE_ID);
     if (state.profiles.length > 0) {
       state.selectProfile(state.profiles[0].id);
     } else {
@@ -42,17 +46,17 @@ export async function executeDeleteProfile(
     // taint analysis voie l'URL hardcodée (préfixe `/api/profiles/`) et que `rule-node-ssrf`
     // ne flagge pas. Ne pas extraire ce fetch dans un helper (cf. incident commit précédent
     // où `deleteProfileRequest(id, opts) → fetch(var, opts)` avait réactivé le finding SSRF).
-    const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
+    const res = await fetch(API_PROFILES + id, buildDeleteOpts(pin));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
+      state.showToast(state.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
       return;
     }
     finalizeDeleteProfile(state, id);
   } catch (e: unknown) {
     console.error('Failed to delete profile:', e);
     const msg = e instanceof Error ? e.message : String(e);
-    state.showToast(state.t('toast.error', { error: msg }), 'error');
+    state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
   }
 }
 
@@ -157,7 +161,7 @@ export function createProfiles() {
         console.error('Failed to load profiles:', e);
       }
       // Restore last selected profile
-      const saved = localStorage.getItem('sf-profileId');
+      const saved = localStorage.getItem(LS_PROFILE_ID);
       if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
         this.selectProfile(saved);
       } else if (this.profiles.length > 0) {
@@ -172,7 +176,7 @@ export function createProfiles() {
       if (!profile) return;
       this.currentProfile = profile;
       this.showProfilePicker = false;
-      localStorage.setItem('sf-profileId', id);
+      localStorage.setItem(LS_PROFILE_ID, id);
       this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
       // Apply profile theme or fallback to localStorage/system default
       if (profile.theme) {
@@ -210,12 +214,12 @@ export function createProfiles() {
           applyCreateProfileSuccess(this, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
-          this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
+          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
         }
       } catch (e: unknown) {
         console.error('Failed to create profile:', e);
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error');
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
       }
     },
 
@@ -252,7 +256,7 @@ export function createProfiles() {
       signal?: AbortSignal,
     ) {
       try {
-        const res = await fetch('/api/profiles/' + id, {
+        const res = await fetch(API_PROFILES + id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(updates),
@@ -269,7 +273,7 @@ export function createProfiles() {
         if (e instanceof Error && e.name === 'AbortError') return;
         console.error('Failed to update profile:', e);
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error');
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
       }
     },
 
@@ -303,7 +307,7 @@ export function createProfiles() {
       if (!editing) return;
       this.requirePin(async (pin: string) => {
         try {
-          const res = await fetch('/api/profiles/' + editing.id, {
+          const res = await fetch(API_PROFILES + editing.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ pin }),
@@ -314,7 +318,7 @@ export function createProfiles() {
           }
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
-          this.showToast(this.t('toast.error', { error: msg }), 'error');
+          this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
           return;
         }
         editing._verifiedPin = pin;

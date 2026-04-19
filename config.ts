@@ -5,16 +5,18 @@ import type { MistralVoice } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
 
+const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
+
 const DEFAULT_CONFIG: AppConfig = {
   models: {
-    summary: 'mistral-large-latest',
-    flashcards: 'mistral-large-latest',
-    quiz: 'mistral-large-latest',
-    podcast: 'mistral-large-latest',
-    translate: 'mistral-large-latest',
+    summary: MISTRAL_LARGE_LATEST,
+    flashcards: MISTRAL_LARGE_LATEST,
+    quiz: MISTRAL_LARGE_LATEST,
+    podcast: MISTRAL_LARGE_LATEST,
+    translate: MISTRAL_LARGE_LATEST,
     ocr: 'mistral-ocr-latest',
-    quizVerify: 'mistral-large-latest',
-    chat: 'mistral-large-latest',
+    quizVerify: MISTRAL_LARGE_LATEST,
+    chat: MISTRAL_LARGE_LATEST,
   },
   voices: {
     host: { id: 'JdwJ7jL68CWmQZuo7KgG', name: 'Voix info IA' },

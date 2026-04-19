@@ -108,12 +108,15 @@ app.get('/api/moderation-categories', (_req, res) =>
 );
 
 // --- Routes ---
+const API_PROJECTS = '/api/projects';
+const NON_CONFIGURE = 'NON CONFIGURE';
+
 app.use('/api/profiles', profileRoutes(outputDir, store));
-app.use('/api/projects', projectRoutes(store));
-app.use('/api/projects', sourceRoutes(store, client, profileStore));
-app.use('/api/projects', generateRoutes(store, client, profileStore));
-app.use('/api/projects', generationCrudRoutes(store, client, profileStore));
-app.use('/api/projects', chatRoutes(store, client, profileStore));
+app.use(API_PROJECTS, projectRoutes(store));
+app.use(API_PROJECTS, sourceRoutes(store, client, profileStore));
+app.use(API_PROJECTS, generateRoutes(store, client, profileStore));
+app.use(API_PROJECTS, generationCrudRoutes(store, client, profileStore));
+app.use(API_PROJECTS, chatRoutes(store, client, profileStore));
 
 // --- Start ---
 app.listen(PORT, () => {
@@ -121,9 +124,9 @@ app.listen(PORT, () => {
   const status = getApiStatus();
   const config = getConfig();
   console.log(`\n  EurekAI — http://localhost:${PORT}`);
-  console.log(`  API Mistral: ${status.mistral ? 'OK' : 'NON CONFIGURE'}`);
-  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : 'NON CONFIGURE'}`);
-  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : 'NON CONFIGURE'}`);
+  console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();

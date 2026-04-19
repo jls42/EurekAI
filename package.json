@@ -11,7 +11,7 @@
     "start": "tsx server.ts",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lint:ci": "eslint . --max-warnings 150",
+    "lint:ci": "eslint . --max-warnings 100",
     "lint:complexity": "./scripts/check-complexity.sh",
     "lint:deadcode": "knip",
     "security": "./scripts/check-security.sh",
