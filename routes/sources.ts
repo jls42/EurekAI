@@ -192,7 +192,7 @@ export function sourceRoutes(
   }
 
   /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
-  function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
+  const sendUploadResponse = (res: any, results: Source[], failures: UploadFailure[]): void => {
     if (results.length === 0) {
       // error = code stable ; failures[] expose par-fichier { filename, error: code }.
       res.status(500).json({ error: 'upload_failed', failures });
@@ -203,7 +203,23 @@ export function sourceRoutes(
       return;
     }
     res.json({ sources: results, failures });
-  }
+  };
+
+  /** Run attemptFileUpload for each file, partitioning outcomes into results vs failures. */
+  const processUploadBatch = async (
+    files: Express.Multer.File[],
+    pid: string,
+    modCats: string[] | null,
+  ): Promise<{ results: Source[]; failures: UploadFailure[] }> => {
+    const results: Source[] = [];
+    const failures: UploadFailure[] = [];
+    for (const file of files) {
+      const outcome = await attemptFileUpload(file, pid, modCats);
+      if (outcome.source) results.push(outcome.source);
+      else if (outcome.failure) failures.push(outcome.failure);
+    }
+    return { results, failures };
+  };
 
   // Upload files (OCR)
   router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
@@ -221,13 +237,7 @@ export function sourceRoutes(
     }
 
     const modCats = getModerationCategories(store, profileStore, pid);
-    const results: Source[] = [];
-    const failures: UploadFailure[] = [];
-    for (const file of files) {
-      const outcome = await attemptFileUpload(file, pid, modCats);
-      if (outcome.source) results.push(outcome.source);
-      else if (outcome.failure) failures.push(outcome.failure);
-    }
+    const { results, failures } = await processUploadBatch(files, pid, modCats);
 
     if (results.length > 0) {
       triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
