@@ -1302,7 +1302,7 @@ describe('POST /:pid/sources/upload', () => {
 // =============================================================================
 
 describe('Background triggers after source addition', () => {
-  /** Flush fire-and-forget promises (no more setTimeout, tasks run as microtasks) */
+  /** Flush fire-and-forget promises (coalesced consigne runs as microtasks). */
   const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it('text source triggers background consigne detection', async () => {

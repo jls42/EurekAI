@@ -28,11 +28,11 @@ function pendingModeration(): Source['moderation'] {
 // (cf. CLAUDE.md "Pièges Lizard connus").
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
-const triggerConsigneDetection = async (
+const runConsigneDetection = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
-  lang = 'fr',
+  lang: string,
 ): Promise<void> => {
   try {
     const project = store.getProject(pid);
@@ -47,6 +47,36 @@ const triggerConsigneDetection = async (
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
   }
+};
+
+// Coalesce par projet : le frontend envoie 1 POST par fichier. Si un scan est
+// déjà en vol pour un pid, on marque pending et replay 1× à la fin avec l'état
+// final. Résultat : 2 scans max par rafale (premier feedback rapide + rescan
+// sur état complet), zéro concurrence → plus de 429/retry SDK.
+const inFlight = new Set<string>();
+const pendingScan = new Set<string>();
+
+const triggerConsigneDetection = (
+  store: ProjectStore,
+  client: Mistral,
+  pid: string,
+  lang = 'fr',
+): void => {
+  if (inFlight.has(pid)) {
+    pendingScan.add(pid);
+    return;
+  }
+  inFlight.add(pid);
+  void (async () => {
+    try {
+      await runConsigneDetection(store, client, pid, lang);
+    } finally {
+      inFlight.delete(pid);
+      if (pendingScan.delete(pid)) {
+        triggerConsigneDetection(store, client, pid, lang);
+      }
+    }
+  })();
 };
 
 const getModerationCategories = (
