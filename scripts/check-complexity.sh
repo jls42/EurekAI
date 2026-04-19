@@ -30,6 +30,11 @@ pipx run lizard \
   helpers/error-matchers.ts \
   helpers/error-code-rules.ts \
   helpers/error-codes.ts \
+  helpers/choice-labels.ts \
+  helpers/cost-calc.ts \
+  helpers/index.ts \
+  helpers/tracked-client.ts \
+  helpers/voice-selection.ts \
   src/app/helpers.ts \
   config.ts \
   scripts/update-pricing.ts \
