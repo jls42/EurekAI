@@ -35,37 +35,68 @@ class ChatValidationError {
   ) {}
 }
 
+type ResolvedProject = {
+  pid: string;
+  project: ReturnType<ProjectStore['getProject']> & {};
+  profile: ReturnType<ProfileStore['get']>;
+};
+
+const resolveProjectAndProfile = (
+  req: { params: { pid: string } },
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): ResolvedProject | ChatValidationError => {
+  const pid = req.params.pid;
+  const project = store.getProject(pid);
+  if (!project) return new ChatValidationError(404, 'Projet introuvable');
+  const profileId = project.meta.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+  if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
+  return { pid, project, profile };
+};
+
+type ChatBody = { message: string; lang: string; ageGroup: AgeGroup };
+
+const parseChatBody = (body: any): ChatBody | ChatValidationError => {
+  const { message, lang: reqLang, ageGroup: reqAgeGroup } = body ?? {};
+  if (!message || typeof message !== 'string')
+    return new ChatValidationError(400, 'message requis');
+  return {
+    message,
+    lang: reqLang || 'fr',
+    ageGroup: (reqAgeGroup || 'enfant') as AgeGroup,
+  };
+};
+
+const runChatModeration = async (
+  client: Mistral,
+  profile: ReturnType<ProfileStore['get']>,
+  message: string,
+): Promise<ChatValidationError | null> => {
+  if (!profile?.useModeration) return null;
+  const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
+  if (categories.length === 0) return null;
+  const modResult = await moderateContent(client, message.trim(), categories);
+  if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');
+  return null;
+};
+
 async function validateChatRequest(
   req: { params: { pid: string }; body: any },
   store: ProjectStore,
   profileStore: ProfileStore,
   client: Mistral,
 ): Promise<ChatRequestContext | ChatValidationError> {
-  const pid = req.params.pid;
-  const project = store.getProject(pid);
-  if (!project) return new ChatValidationError(404, 'Projet introuvable');
+  const resolved = resolveProjectAndProfile(req, store, profileStore);
+  if (resolved instanceof ChatValidationError) return resolved;
 
-  const profileId = project.meta.profileId;
-  const profile = profileId ? profileStore.get(profileId) : null;
-  if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
+  const body = parseChatBody(req.body);
+  if (body instanceof ChatValidationError) return body;
 
-  const { message, lang: reqLang, ageGroup: reqAgeGroup } = req.body;
-  const lang = reqLang || 'fr';
-  const ageGroup: AgeGroup = reqAgeGroup || 'enfant';
-  if (!message || typeof message !== 'string')
-    return new ChatValidationError(400, 'message requis');
+  const modError = await runChatModeration(client, resolved.profile, body.message);
+  if (modError) return modError;
 
-  if (profile?.useModeration) {
-    const categories =
-      profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
-    if (categories.length > 0) {
-      const modResult = await moderateContent(client, message.trim(), categories);
-      if (modResult.status !== 'safe')
-        return new ChatValidationError(400, 'chat.moderationBlocked');
-    }
-  }
-
-  return { pid, project, profile, message, lang, ageGroup };
+  return { ...resolved, ...body };
 }
 
 interface ToolCallCtx {
