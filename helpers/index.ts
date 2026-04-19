@@ -104,29 +104,33 @@ export function unwrapJsonArray<T>(data: unknown): T[] {
   return [];
 }
 
+// Arrow consts (plutot que function) pour eviter que le parseur TS de Lizard
+// n'agglomere les helpers non-exportes avec `unwrapJsonArray<T>` precedent
+// (cf. CLAUDE.md section "Pieges Lizard connus").
+const textFromField = (v: unknown): string | undefined => {
+  if (Array.isArray(v)) return extractAllText(v);
+  if (typeof v === 'string') return v;
+  return undefined;
+};
+
+const arrayTextFromField = (v: unknown): string | undefined =>
+  Array.isArray(v) && v.length > 0 ? extractAllText(v) : undefined;
+
+const textsFromOutput = (output: unknown): (string | undefined)[] => {
+  const o = output as Record<string, unknown>;
+  return [
+    typeof o.text === 'string' ? o.text : undefined,
+    textFromField(o.content),
+    arrayTextFromField(o.outputs),
+    textFromField(o.output),
+  ];
+};
+
 /** Extrait tout le texte des outputs d'un agent Mistral (recursif) */
 export function extractAllText(outputs: unknown[]): string {
-  const texts: string[] = [];
+  const texts: (string | undefined)[] = [];
   for (const output of outputs) {
-    const o = output as Record<string, unknown>;
-    if (typeof o.text === 'string') {
-      texts.push(o.text);
-    }
-    if (Array.isArray(o.content)) {
-      texts.push(extractAllText(o.content));
-    } else if (typeof o.content === 'string') {
-      texts.push(o.content);
-    }
-    if (Array.isArray(o.outputs) && o.outputs.length > 0) {
-      texts.push(extractAllText(o.outputs));
-    }
-    if (o.output) {
-      if (typeof o.output === 'string') {
-        texts.push(o.output);
-      } else if (Array.isArray(o.output)) {
-        texts.push(extractAllText(o.output));
-      }
-    }
+    texts.push(...textsFromOutput(output));
   }
   return texts.filter(Boolean).join('\n');
 }
