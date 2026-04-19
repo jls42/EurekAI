@@ -1,17 +1,20 @@
 #!/bin/bash
 # Garde-fou cyclomatic complexity via Lizard. Prévient les régressions sur
-# les fichiers que Codacy a historiquement flaggés (faux positifs de parsing
-# ou vraie complexité excessive).
+# tout le repo après la campagne de dette qualité (Wave 6, 2026-04-19).
 #
 # Threshold : 8 (aligné sur Codacy, default Lizard est 15).
-# Scope : ALLOWLIST de fichiers déjà propres (0 fonction > CCN 8).
-# Tout ajout à l'allowlist requiert un scan `-l typescript` vert.
+# Scope : TOUT le repo (plus d'allowlist — dette CCN éradiquée sur 3404
+# fonctions TS). Lizard exclut automatiquement node_modules.
 #
 # CAVEAT IMPORTANT (appris le 2026-04-18) : Lizard en mode walk-dossier
 # avec `-l javascript` ne parse PAS les .ts — il ne trouve donc aucune
-# violation. Il faut `-l typescript` explicitement. La liste complète
-# des 23 fonctions > CCN 8 ailleurs dans le repo est documentée dans
-# `.claude/todo-tooling.md` section "Refactor progressif Lizard CCN".
+# violation. Il faut `-l typescript` explicitement.
+#
+# Pièges connus à garder en tête quand on ajoute du code :
+# - `??=` et `??` comptent 2 dans le CCN (nullish check + truly).
+# - Plusieurs `function` top-level non exportées consécutives peuvent être
+#   agglomérées par le parseur TS (faux positif de CCN). Workaround :
+#   `export function` ou intercaler du code (const, classe).
 #
 # Requiert : pipx (https://pipx.pypa.io).
 set -euo pipefail
@@ -26,24 +29,4 @@ pipx run lizard \
   --warnings_only \
   -i 0 \
   -l typescript \
-  helpers/error-code-resolution.ts \
-  helpers/error-matchers.ts \
-  helpers/error-code-rules.ts \
-  helpers/error-codes.ts \
-  helpers/choice-labels.ts \
-  helpers/cost-calc.ts \
-  helpers/index.ts \
-  helpers/tracked-client.ts \
-  helpers/voice-selection.ts \
-  src/app/helpers.ts \
-  src/app/profiles.ts \
-  src/app/sources.ts \
-  src/app/generate.ts \
-  config.ts \
-  scripts/update-pricing.ts \
-  scripts/generate-image.ts \
-  routes/chat.ts \
-  routes/generate.ts \
-  routes/generations.ts \
-  routes/profiles.ts \
-  routes/sources.ts
+  .
