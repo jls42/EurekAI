@@ -83,7 +83,7 @@ function migrateProfile(p: Profile): boolean {
     p.locale = 'fr';
     changed = true;
   }
-  if ((p as any).chatEnabled === undefined) {
+  if ((p as { chatEnabled?: boolean }).chatEnabled === undefined) {
     p.chatEnabled = p.age >= 15;
     changed = true;
   }

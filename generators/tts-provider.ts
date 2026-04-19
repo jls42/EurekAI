@@ -58,7 +58,7 @@ function pickField<T>(obj: Record<string, unknown>, key: string, fallback: T): T
   return (obj[key] ?? fallback) as T;
 }
 
-function toMistralVoice(v: any): MistralVoice {
+function toMistralVoice(v: unknown): MistralVoice {
   const o = v as Record<string, unknown>;
   return {
     id: pickField<string>(o, 'id', ''),
@@ -120,8 +120,8 @@ export async function deleteVoice(client: Mistral, voiceId: string): Promise<voi
 }
 
 export async function getVoiceSample(client: Mistral, voiceId: string): Promise<Buffer> {
-  const bytes = await client.audio.voices.getSampleAudio({ voiceId });
-  return Buffer.from(bytes as any);
+  const bytes = (await client.audio.voices.getSampleAudio({ voiceId })) as unknown;
+  return Buffer.from(bytes as ArrayBuffer);
 }
 
 // --- ElevenLabs TTS ---
@@ -136,5 +136,5 @@ async function elevenlabsTts(text: string, voiceId: string, model: string): Prom
     modelId: model,
     outputFormat: 'mp3_44100_128',
   });
-  return collectStream(audioStream as any);
+  return collectStream(audioStream as Parameters<typeof collectStream>[0]);
 }

@@ -44,8 +44,9 @@ async function fetchPricing(prefix: string, url: string): Promise<string> {
     if (!res.ok) return `  ${prefix}: HTTP ${res.status}`;
     const html = await res.text();
     return formatPricingReport(prefix, extractPrices(html));
-  } catch (e: any) {
-    return `  ${prefix}: ERROR ${e.message}`;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return `  ${prefix}: ERROR ${msg}`;
   }
 }
 

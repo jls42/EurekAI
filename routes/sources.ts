@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
@@ -169,7 +169,7 @@ export function sourceRoutes(
       store.addSource(pid, source);
       return { source };
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
       }
@@ -194,7 +194,11 @@ export function sourceRoutes(
   }
 
   /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
-  const sendUploadResponse = (res: any, results: Source[], failures: UploadFailure[]): void => {
+  const sendUploadResponse = (
+    res: Response,
+    results: Source[],
+    failures: UploadFailure[],
+  ): void => {
     if (results.length === 0) {
       // error = code stable ; failures[] expose par-fichier { filename, error: code }.
       res.status(500).json({ error: 'upload_failed', failures });
@@ -338,7 +342,7 @@ export function sourceRoutes(
       }
       res.json(source);
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
@@ -358,7 +362,10 @@ export function sourceRoutes(
   ): Promise<Source | null> {
     try {
       const stop = startTimer();
-      const result = await fetchPageContent(url, scrapeMode as any);
+      const result = await fetchPageContent(
+        url,
+        scrapeMode as Parameters<typeof fetchPageContent>[1],
+      );
       const elapsed = stop();
       logger.info(
         'sources',
@@ -456,7 +463,7 @@ export function sourceRoutes(
       }
       return source;
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
       }
@@ -468,7 +475,7 @@ export function sourceRoutes(
   /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
   async function collectWebSources(
     pid: string,
-    req: any,
+    req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },
     modCats: string[] | null,
   ): Promise<Source[]> {
     const lang = req.body.lang || 'fr';

@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { chatSystem } from '../prompts.js';
+import type { AgeGroup } from '../types.js';
 
 const TOOLS = [
   {
@@ -47,21 +48,22 @@ export async function chatWithSources(
   sourceContext: string,
   model = 'mistral-large-latest',
   lang = 'fr',
-  ageGroup: import('../types.js').AgeGroup = 'enfant',
+  ageGroup: AgeGroup = 'enfant',
 ): Promise<ChatResult> {
   const docsLabel = lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
   const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
 
-  const apiMessages: any[] = [
+  type ChatMessages = Parameters<typeof client.chat.complete>[0]['messages'];
+  const apiMessages: ChatMessages = [
     { role: 'system', content: systemContent },
     ...messages.map((m) => ({ role: m.role, content: m.content })),
-  ];
+  ] as ChatMessages;
 
   const response = await client.chat.complete({
     model,
     messages: apiMessages,
     tools: TOOLS,
-    toolChoice: 'auto' as any,
+    toolChoice: 'auto',
   });
 
   const choice = response.choices![0]; // NOSONAR(S4325) — choices always present in non-streaming response
@@ -70,7 +72,7 @@ export async function chatWithSources(
 
   // Handle tool calls (max 3)
   if (message.toolCalls && message.toolCalls.length > 0) {
-    apiMessages.push(message);
+    apiMessages.push({ ...message, role: 'assistant' });
 
     const calls = message.toolCalls.slice(0, 3);
     for (const tc of calls) {

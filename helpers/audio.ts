@@ -4,7 +4,7 @@ export async function collectStream(
 ): Promise<Buffer> {
   const chunks: Buffer[] = [];
 
-  if (Symbol.asyncIterator in (stream as any)) {
+  if (Symbol.asyncIterator in (stream as object)) {
     for await (const chunk of stream as AsyncIterable<Uint8Array>) {
       chunks.push(Buffer.from(chunk));
     }

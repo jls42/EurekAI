@@ -20,7 +20,7 @@ export function withCostTracking(
       const tracked = await runWithUsageTracking(() => handler(req, res, next));
       usage = tracked.usage;
     } catch (err) {
-      usage = (err as any).apiUsage ?? [];
+      usage = (err as { apiUsage?: ApiUsage[] }).apiUsage ?? [];
       throw err;
     } finally {
       persistUsage(store, pid, `${req.method} ${req.baseUrl}${req.route?.path || ''}`, usage);

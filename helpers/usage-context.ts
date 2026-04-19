@@ -13,7 +13,7 @@ export async function runWithUsageTracking<T>(
     const result = await store.run(entries, fn);
     return { result, usage: entries };
   } catch (err) {
-    (err as any).apiUsage = entries;
+    (err as { apiUsage?: ApiUsage[] }).apiUsage = entries;
     throw err;
   }
 }

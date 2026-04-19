@@ -15,7 +15,7 @@ export async function webSearchEnrich(
     name: 'EurekAI Web Researcher',
     description: 'Agent de recherche web educative',
     instructions: websearchInstructions(lang, ageGroup),
-    tools: [{ type: 'web_search' } as any],
+    tools: [{ type: 'web_search' }],
   });
 
   try {

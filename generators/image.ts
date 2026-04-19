@@ -3,6 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
 import { imageSystem, imageUser } from '../prompts.js';
+import type { AgeGroup } from '../types.js';
 
 interface ImageResult {
   type: 'url' | 'fileId';
@@ -26,7 +27,7 @@ export function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
   return null;
 }
 
-export function extractImageRef(outputs: any[]): ImageResult | null {
+export function extractImageRef(outputs: unknown[]): ImageResult | null {
   for (const output of outputs) {
     const o = output as Record<string, unknown>;
     if (!Array.isArray(o.content)) continue;
@@ -46,7 +47,7 @@ async function downloadAndSaveImage(
 ): Promise<string> {
   console.log(`    Image fileId: ${fileId}, downloading...`);
   const fileStream = await client.files.download({ fileId });
-  const imageBuffer = await collectStream(fileStream as any);
+  const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
   const imageFilename = `illustration-${Date.now()}.png`;
   writeFileSync(join(projectDir, imageFilename), imageBuffer);
   console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
@@ -59,13 +60,13 @@ export async function generateImage(
   projectDir: string,
   pid: string,
   lang: string = 'fr',
-  ageGroup: string = 'enfant',
+  ageGroup: AgeGroup = 'enfant',
 ): Promise<{ imageUrl: string; prompt: string }> {
   const agent = await client.beta.agents.create({
     model: 'mistral-large-latest',
     name: 'Illustrator',
-    instructions: imageSystem(lang, ageGroup as any),
-    tools: [{ type: 'image_generation' } as any],
+    instructions: imageSystem(lang, ageGroup),
+    tools: [{ type: 'image_generation' }],
     completionArgs: { temperature: 0.3, topP: 0.95 },
   });
 
