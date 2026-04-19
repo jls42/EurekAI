@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import type { ProjectStore } from '../store.js';
 import type { ChatMessage, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
@@ -58,14 +58,20 @@ const resolveProjectAndProfile = (
 
 type ChatBody = { message: string; lang: string; ageGroup: AgeGroup };
 
-const parseChatBody = (body: any): ChatBody | ChatValidationError => {
+interface RawChatBody {
+  message?: unknown;
+  lang?: string;
+  ageGroup?: AgeGroup;
+}
+
+const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidationError => {
   const { message, lang: reqLang, ageGroup: reqAgeGroup } = body ?? {};
   if (!message || typeof message !== 'string')
     return new ChatValidationError(400, 'message requis');
   return {
     message,
     lang: reqLang || 'fr',
-    ageGroup: (reqAgeGroup || 'enfant') as AgeGroup,
+    ageGroup: reqAgeGroup || 'enfant',
   };
 };
 
@@ -83,7 +89,7 @@ const runChatModeration = async (
 };
 
 async function validateChatRequest(
-  req: { params: { pid: string }; body: any },
+  req: { params: { pid: string }; body: RawChatBody | undefined },
   store: ProjectStore,
   profileStore: ProfileStore,
   client: Mistral,
@@ -221,7 +227,7 @@ async function processChatToolCalls(
         logger.info('chat', `tool ${type} generated`);
       }
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         const persisted = persistUsage(
           store,
@@ -332,7 +338,7 @@ const buildChatResponseBody = (
 };
 
 const handleChatError = (e: unknown, store: ProjectStore, pid: string, res: Response): void => {
-  const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
   if (failedUsage?.length) {
     persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
   }
@@ -351,7 +357,12 @@ export function chatRoutes(
   router.post('/:pid/chat', async (req, res) => {
     const pid = String(req.params.pid);
     try {
-      const validated = await validateChatRequest(req as any, store, profileStore, client);
+      const validated = await validateChatRequest(
+        req as Request<{ pid: string }, unknown, RawChatBody | undefined>,
+        store,
+        profileStore,
+        client,
+      );
       if (validated instanceof ChatValidationError) {
         res.status(validated.status).json({ error: validated.error });
         return;
