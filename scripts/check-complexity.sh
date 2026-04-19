@@ -38,4 +38,7 @@ pipx run lizard \
   src/app/helpers.ts \
   config.ts \
   scripts/update-pricing.ts \
-  scripts/generate-image.ts
+  scripts/generate-image.ts \
+  routes/chat.ts \
+  routes/generate.ts \
+  routes/profiles.ts
