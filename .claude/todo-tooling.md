@@ -2,7 +2,18 @@
 
 Pistes d'outils à évaluer pour renforcer la prévention des régressions qualité et éviter les allers-retours Codacy/SonarQube. Chaque entrée a un critère GO/NO-GO explicite pour décider après test.
 
-## État actuel (2026-04-18)
+## ✅ Campagne qualité dette éradiquée — 2026-04-20
+
+**PR #23** (branche `chore/quality-debt-plan`) — 8 waves successives. Tous seuils atteints :
+- **Lizard CCN > 8 = 0 fonction** (scope `-l typescript` full-repo, allowlist élargie à tout le code TS)
+- **ESLint = 0 warnings** (`lint:ci = eslint . --max-warnings 0` en verrou final)
+- **1712 tests verts** (non-régression complète)
+- **Opengrep SAST = 0 finding ERROR** (153 règles / 175 fichiers)
+- **CLAUDE.md** + `todo-tooling.md` nettoyés (plus de mention de dette transitoire)
+
+La baseline "0 errors + 264 warnings + 28 fonctions CCN>8" d'il y a 48h est archivée en historique git. Tout nouveau code devra désormais passer ces verrous.
+
+## État actuel (2026-04-20)
 
 - ✅ **Lizard** : garde-fou en pretest (`npm run lint:complexity`), scope **allowlist** de fichiers propres (CCN 8, strict `-i 0`, `-l typescript`). Via pipx/Python. Scope : `helpers/error-*.ts` + `src/app/helpers.ts` + `config.ts`. Section "Refactor progressif Lizard CCN" ci-dessous documente les 23 fonctions restantes à refactorer pour élargir le scope.
   - **Piège `-l javascript` (2026-04-18)** : Lizard en mode walk-dossier avec `-l javascript` ne parse PAS les `.ts` — silencieusement 0 warning. `-l typescript` est obligatoire. Le commit `928393c` avait introduit un garde-fou cassé (faux positif "0 violation"), Codacy a révélé que 23 fonctions > CCN 8 étaient cachées. Fix dans `<this-pr>` : scope restreint à l'allowlist + todo documentée.
@@ -10,29 +21,26 @@ Pistes d'outils à évaluer pour renforcer la prévention des régressions quali
   - Refactor de `config.ts:saveConfig` (12→5), `config.ts:resolveVoices` (12→2) dans `01672a9` et `profiles.ts:executeDeleteProfile` (9→4) dans `c9d8cf9`.
 - ✅ **knip** : garde-fou en pretest (`npm run lint:deadcode`), config minimale `knip.json` (entries = scripts CLI + `src/env.d.ts` ambient, plugins auto pour Express/Vite/Vitest/Husky). Exécution ~1.2s. Baseline post-cleanup : 0 finding. `ignoreExportsUsedInFile: true` pour accommoder le workaround Lizard sur `helpers/error-matchers.ts`. `tailwindcss` dans `ignoreDependencies` (peer de `@tailwindcss/vite`, consommé via classes HTML).
 - ✅ **Opengrep** : garde-fou en **pre-push** (`npm run security` via `scripts/check-security.sh`). SAST v1.19.0 fork open-source de Semgrep CE, binaire standalone dans `~/.local/bin/` (install via `scripts/install-opengrep.sh`). Configs `p/security-audit + p/default + p/nodejsscan`, `--severity=ERROR --error`. Scan ~11.8s sur 171 fichiers (trop lent pour pretest). Baseline post-fix : 0 finding ERROR. 1 faux positif `detected-sonarqube-docs-api-key` (SHA256 GitHub Actions pinnee) exclu via `--exclude-rule` documente dans le script. Section dediee dans CLAUDE.md.
-- ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest** depuis descente à 0 error.
-  - Baseline actuelle : **0 errors + 264 warnings** (2026-04-18 : -219 via refactor `AppContext` dans `src/app/helpers.ts`, `sources.ts`, `profiles.ts`, `generate.ts`). `lint:ci` = `eslint . --max-warnings 300` (baseline 264 + marge ~14 %). Toute nouvelle error ou dérive > 300 warnings bloque `npm run test`.
-  - Règles bruyantes en `warn` le temps du refactor : `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag`.
+- ✅ **ESLint** : config pragmatique legacy (`eslint.config.js`), `@eslint/js` + `typescript-eslint` + `eslint-plugin-sonarjs`. Scripts : `npm run lint`, `npm run lint:fix`, `npm run lint:ci` (bloquant). **Actif en pretest**, `--max-warnings 0` en verrou final (2026-04-20).
+  - Règles bruyantes en `warn` (héritées de la transition) : `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag` — mais baseline à 0 warning signifie que les `warn` ne sont plus un filet transitoire : tout nouveau `warn` casse le pretest.
   - Override tests (`**/*.test.ts`) : `publicly-writable-directories`, `no-unsafe-function-type`, `no-clear-text-protocols`, `no-explicit-any`, `no-duplicate-string` désactivés (faux positifs contextuels dans des mocks/fixtures).
+  - Override `src/i18n/*.ts` : `sonarjs/no-duplicate-string` désactivé (catalogues statiques, traductions dupliquées entre clés attendues).
   - `complexity` désactivé dans ESLint (redondant avec Lizard).
 - ✅ **Prettier** : `format:check` en workflow manuel (pas en pretest)
-- ✅ **vitest** : 1711 tests, `npm run test`
-- ⏳ **23 fonctions > CCN 8** dans le repo (audit `-l typescript` du 2026-04-18, post-fix `executeDeleteProfile`). L'audit précédent "0 fonction" était un faux positif du `-l javascript` qui ne parse pas les `.ts`. Scope `lint:complexity` restreint à l'allowlist `helpers/error-*.ts` + `src/app/helpers.ts` + `config.ts`. Les 23 fonctions sont à refactorer en PR(s) séparée(s) (cf. section "Refactor progressif Lizard CCN" ci-dessous).
+- ✅ **vitest** : 1712 tests, `npm run test`
+- ✅ **CCN > 8 = 0** (scope `-l typescript` full-repo via `scripts/check-complexity.sh`). Audit clean au 2026-04-20.
 
-## Refactor progressif ESLint warnings (status)
+## Refactor progressif ESLint warnings — ✅ TERMINÉ 2026-04-20
 
-- ✅ **Errors** : 79 → 0 (PR `feat/prompts-improvements`, 6 commits séquentiels). `lint:ci` bloquant activé en pretest avec plafond `--max-warnings 500` → 450 → 300 (2026-04-18).
-- ⏳ **Warnings** : 482 → 264 (refactors `AppContext` helpers.ts + sources.ts + profiles.ts + generate.ts, 2026-04-18, 4 commits). Plafond actuel 300. Prochaine étape : descendre à 250 (cibles candidates : `src/app/projects.ts` 17 any, `src/components/quiz-vocal.ts` 17 any, `helpers/tracked-client.ts` 15 any via SDK Mistral types). Règles dominantes :
-  - `@typescript-eslint/no-explicit-any` (plus gros volume)
-  - `sonarjs/cognitive-complexity` (fonctions héritées en `src/app/*`, `generators/*`, `routes/*`)
-  - `sonarjs/no-duplicate-string` (strings de constantes de tests + templates)
-  - `sonarjs/todo-tag` (TODO sans owner/date)
+- ✅ **Errors** : 79 → 0 (PR `feat/prompts-improvements`)
+- ✅ **Warnings** : 482 → 264 → **0** (PR #23 "chore/quality-debt-plan", Waves 7+8). `lint:ci = eslint . --max-warnings 0` en verrou final.
+- Refactors majeurs : typage `AppContext` / `Context` sur tous les mixins Alpine, typage composants via `StepByStepBase`, remplacement `any` backend par types précis (`Parameters<typeof X>`, types domaine), extraction constantes pour `no-duplicate-string`.
 
-Pour chaque descente de plafond : mesurer `npm run lint 2>&1 | grep -c warning`, descendre le seuil à `measured + 10-20` marge, commiter séparément. Ne jamais baisser sans refactor réel sous-jacent.
+## Refactor progressif Lizard CCN — ✅ TERMINÉ 2026-04-20
 
-## Refactor progressif Lizard CCN (status)
+**Scope `lint:complexity` final** : full-repo `-l typescript` (tous fichiers TS, sans allowlist restrictive). 0 fonction > CCN 8 confirmée par `pipx run lizard -l typescript --CCN 8 --warnings_only .` au 2026-04-20.
 
-**Scope `lint:complexity` actuel** (allowlist stricte, CCN 8) : `helpers/error-code-resolution.ts`, `helpers/error-matchers.ts`, `helpers/error-code-rules.ts`, `helpers/error-codes.ts`, `src/app/helpers.ts`, `config.ts`.
+**Historique** (conservé comme trace) :
 
 **Scan complet (`pipx run lizard -l typescript --CCN 8 --warnings_only --exclude '*.test.ts' src/ generators/ routes/ helpers/ config.ts server.ts store.ts types.ts`) — 23 violations au 2026-04-18** :
 
@@ -161,13 +169,6 @@ Ces clones sont trop petits pour justifier jscpd en garde-fou pretest mais peuve
 
 **À tester** : uniquement si les allers-retours Codacy redeviennent fréquents malgré les garde-fous npm-natifs (Lizard + ESLint).
 
-## Scope élargissement garde-fou actuel
+## Scope garde-fou — ✅ Full-repo depuis 2026-04-20
 
-Quand les 24 warnings CCN legacy seront refactorés (ou documentés via `.codacy.yaml` ignore), élargir le scope de `scripts/check-complexity.sh` :
-
-1. `helpers/*.ts` (ajouter choice-labels, tracked-client, voice-selection, cost-calc, index)
-2. `generators/*.ts`
-3. `routes/*.ts`
-4. `src/**/*.ts`
-
-Chaque élargissement = un commit séparé avec refactor préalable des fonctions > CCN 8 dans le nouveau scope.
+`scripts/check-complexity.sh` scanne **tout le repo** (`-l typescript` walk dossier). Baseline : 0 fonction > CCN 8. Toute nouvelle fonction dépassant le seuil bloque `npm test` via `pretest`.
