@@ -131,17 +131,18 @@ app.listen(PORT, () => {
   // Non-blocking cache warmup (optional, app works without)
   listVoices(client)
     .then(setVoiceCache)
-    .catch((e: any) => console.warn('Voice cache not loaded:', e.message));
+    .catch((e: Error) => console.warn('Voice cache not loaded:', e.message));
   client.models
     .list()
     .then((models) => {
       const limits: Record<string, number> = {};
       for (const m of models.data ?? []) {
-        const card = m as any;
-        if (card.maxContextLength) limits[card.id] = card.maxContextLength;
+        const card = m as { id: string; maxContextLength?: number; aliases?: string[] };
+        if (!card.maxContextLength) continue;
+        limits[card.id] = card.maxContextLength;
         for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
       }
       setModelLimits(limits);
     })
-    .catch((e: any) => console.warn('Model limits not loaded:', e.message));
+    .catch((e: Error) => console.warn('Model limits not loaded:', e.message));
 });
