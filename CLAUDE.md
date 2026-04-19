@@ -82,7 +82,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Templates HTML : extraire en partials quand un bloc depasse ~100 lignes
 - Pas de listes hardcodees de types/categories : utiliser une source de verite unique (`categories` dans state.ts)
 - Les composants interactifs (quiz, fill-blank, flashcards) utilisent le mixin `step-by-step.ts`
-- **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`) — `lint:fix` pour les auto-fixables. Actif en `pretest` via `lint:ci` (`--max-warnings 300` transitoire le temps du refactor, cible = 0 warnings), en complément de `lint:complexity` (Lizard) et `lint:deadcode` (knip). Config tunée en `warn` les règles legacy-bruyantes (`no-explicit-any`, `cognitive-complexity`). Détails progression : `.claude/todo-tooling.md`.
+- **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`) — `lint:fix` pour les auto-fixables. Actif en `pretest` via `lint:ci` (`--max-warnings 200` transitoire le temps du refactor, cible = 0 warnings), en complément de `lint:complexity` (Lizard) et `lint:deadcode` (knip). Config tunée en `warn` les règles legacy-bruyantes (`no-explicit-any`, `cognitive-complexity`). Détails progression : `.claude/todo-tooling.md`.
 - **Autres scripts utiles** : `format` / `format:check` (prettier), `test:coverage` / `test:watch` (vitest), `build` / `preview` / `start` (vite + prod), `dev:server` / `dev:web` (splits isolés du `dev` combiné).
 
 ## Workflow
