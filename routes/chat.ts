@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
+import type { Response } from 'express';
 import type { ProjectStore } from '../store.js';
 import type { ChatMessage, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
@@ -238,6 +239,107 @@ async function processChatToolCalls(
   return { generatedIds, generations, failedTools, failedCost };
 }
 
+type ChatProject = ReturnType<ProjectStore['getProject']> & {};
+
+const appendUserAndBuildHistory = (
+  store: ProjectStore,
+  pid: string,
+  project: ChatProject,
+  message: string,
+): Array<{ role: string; content: string }> => {
+  const existing = project.chat?.messages ?? [];
+  const userMsg: ChatMessage = {
+    role: 'user',
+    content: message.trim(),
+    timestamp: new Date().toISOString(),
+  };
+  const history = [...existing, userMsg].slice(-50).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  store.appendChatMessage(pid, userMsg);
+  return history;
+};
+
+const buildSourceContext = (sources: ChatProject['sources']): string =>
+  sources.length > 0 ? getMarkdown(sources) : 'Aucune source ajoutee pour le moment.';
+
+type ToolPhaseResult = {
+  generatedIds: string[];
+  generations: Generation[];
+  failedTools: string[];
+  failedCost: number;
+};
+
+const EMPTY_TOOL_PHASE: ToolPhaseResult = {
+  generatedIds: [],
+  generations: [],
+  failedTools: [],
+  failedCost: 0,
+};
+
+const runToolCallPhase = async (
+  toolCalls: string[],
+  project: ChatProject,
+  lang: string,
+  ageGroup: AgeGroup,
+  config: ReturnType<typeof getConfig>,
+  client: Mistral,
+  store: ProjectStore,
+  pid: string,
+): Promise<ToolPhaseResult> => {
+  if (toolCalls.length === 0 || project.sources.length === 0) return EMPTY_TOOL_PHASE;
+  const rawMarkdown = getMarkdown(project.sources);
+  const markdown = applyConsigne(rawMarkdown, project.consigne);
+  const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
+  const sourceIds = project.sources.map((s) => s.id);
+  return processChatToolCalls(
+    toolCalls,
+    { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
+    store,
+    pid,
+  );
+};
+
+const appendAssistantMessage = (
+  store: ProjectStore,
+  pid: string,
+  reply: string,
+  generatedIds: string[],
+): void => {
+  const assistantMsg: ChatMessage = {
+    role: 'assistant',
+    content: reply,
+    timestamp: new Date().toISOString(),
+    generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
+  };
+  store.appendChatMessage(pid, assistantMsg);
+};
+
+const buildChatResponseBody = (
+  reply: string,
+  tools: ToolPhaseResult,
+  chatCost: { cost: number } | null | undefined,
+) => {
+  const totalCostDelta = (chatCost?.cost ?? 0) + tools.failedCost;
+  return {
+    reply,
+    generatedIds: tools.generatedIds,
+    generations: tools.generations,
+    ...(tools.failedTools.length > 0 && { failedTools: tools.failedTools }),
+    ...(totalCostDelta > 0 && { costDelta: totalCostDelta }),
+  };
+};
+
+const handleChatError = (e: unknown, store: ProjectStore, pid: string, res: Response): void => {
+  const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
+  }
+  logger.error('chat', 'error:', e);
+  res.status(500).json({ error: extractErrorCode(e, 'chat') });
+};
+
 export function chatRoutes(
   store: ProjectStore,
   client: Mistral,
@@ -255,81 +357,31 @@ export function chatRoutes(
         return;
       }
       const { project, message, lang, ageGroup } = validated;
-
-      const existingMessages = project.chat?.messages ?? [];
-      const userMsg: ChatMessage = {
-        role: 'user',
-        content: message.trim(),
-        timestamp: new Date().toISOString(),
-      };
-      const historyForApi = [...existingMessages, userMsg].slice(-50).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-      store.appendChatMessage(pid, userMsg);
-
-      const sourceContext =
-        project.sources.length > 0
-          ? getMarkdown(project.sources)
-          : 'Aucune source ajoutee pour le moment.';
-
+      const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
+      const sourceContext = buildSourceContext(project.sources);
       const config = getConfig();
 
-      // Track the main chat LLM call
       const { result, usage: chatUsage } = await runWithUsageTracking(() =>
         chatWithSources(client, historyForApi, sourceContext, config.models.chat, lang, ageGroup),
       );
       const chatCost = persistUsage(store, pid, `POST /api/projects/${pid}/chat`, chatUsage);
 
-      // Process tool calls — each tracked individually inside processChatToolCalls
-      let generatedIds: string[] = [];
-      let generatedGens: Generation[] = [];
-      let failedTools: string[] = [];
-      let toolCallFailedCost = 0;
-      if (result.toolCalls.length > 0 && project.sources.length > 0) {
-        const rawMarkdown = getMarkdown(project.sources);
-        const markdown = applyConsigne(rawMarkdown, project.consigne);
-        const hasConsigne =
-          !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
-        const sourceIds = project.sources.map((s) => s.id);
-        const toolResult = await processChatToolCalls(
-          result.toolCalls,
-          { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
-          store,
-          pid,
-        );
-        generatedIds = toolResult.generatedIds;
-        generatedGens = toolResult.generations;
-        failedTools = toolResult.failedTools;
-        toolCallFailedCost = toolResult.failedCost;
-      }
+      const tools = await runToolCallPhase(
+        result.toolCalls,
+        project,
+        lang,
+        ageGroup,
+        config,
+        client,
+        store,
+        pid,
+      );
 
-      // Add assistant message
-      const assistantMsg: ChatMessage = {
-        role: 'assistant',
-        content: result.reply,
-        timestamp: new Date().toISOString(),
-        generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
-      };
-      store.appendChatMessage(pid, assistantMsg);
+      appendAssistantMessage(store, pid, result.reply, tools.generatedIds);
 
-      // costDelta = chat LLM cost + failed tool call costs
-      // (successful tool call costs are on the returned generations as estimatedCost)
-      const totalCostDelta = (chatCost?.cost ?? 0) + toolCallFailedCost;
-      res.json({
-        reply: result.reply,
-        generatedIds,
-        generations: generatedGens,
-        ...(failedTools.length > 0 && { failedTools }),
-        ...(totalCostDelta > 0 && { costDelta: totalCostDelta }),
-      });
+      res.json(buildChatResponseBody(result.reply, tools, chatCost));
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
-      }
-      logger.error('chat', 'error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'chat') });
+      handleChatError(e, store, pid, res);
     }
   });
 
