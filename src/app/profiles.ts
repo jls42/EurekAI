@@ -32,7 +32,11 @@ export function finalizeDeleteProfile(state: AppContext, id: string): void {
 }
 
 /** Execute the actual profile deletion (API call + state cleanup). */
-async function executeDeleteProfile(state: AppContext, id: string, pin?: string): Promise<void> {
+export async function executeDeleteProfile(
+  state: AppContext,
+  id: string,
+  pin?: string,
+): Promise<void> {
   try {
     // fetch reste dans la même fonction que `buildDeleteOpts` pour que Codacy/Opengrep
     // taint analysis voie l'URL hardcodée (préfixe `/api/profiles/`) et que `rule-node-ssrf`
@@ -53,7 +57,7 @@ async function executeDeleteProfile(state: AppContext, id: string, pin?: string)
 }
 
 /** Build the confirmation message for profile deletion. */
-function deleteConfirmMessage(state: AppContext, id: string): string {
+export function deleteConfirmMessage(state: AppContext, id: string): string {
   const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;
   return projectCount > 0
     ? state.t('profile.deleteConfirm', { count: projectCount })
@@ -61,12 +65,12 @@ function deleteConfirmMessage(state: AppContext, id: string): string {
 }
 
 /** Whether the edit form has a valid name + age pair. */
-function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
+export function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
   return !!p?.name?.trim() && !!p.age && p.age >= 4 && p.age <= 120;
 }
 
 /** Normalise partial voice selection : null when both empty, fill missing side with '' otherwise. */
-function buildVoicesUpdate(
+export function buildVoicesUpdate(
   mistralVoices: MistralVoicesPartial,
 ): { host: string; guest: string } | null {
   if (!mistralVoices?.host && !mistralVoices?.guest) return null;
@@ -74,7 +78,7 @@ function buildVoicesUpdate(
 }
 
 /** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
-function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
+export function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
   const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
     editingProfile;
   const updates: Record<string, unknown> = {
