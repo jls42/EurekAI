@@ -36,6 +36,9 @@ pipx run lizard \
   helpers/tracked-client.ts \
   helpers/voice-selection.ts \
   src/app/helpers.ts \
+  src/app/profiles.ts \
+  src/app/sources.ts \
+  src/app/generate.ts \
   config.ts \
   scripts/update-pricing.ts \
   scripts/generate-image.ts \
