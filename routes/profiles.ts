@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { ProfileStore, verifyPin, profileToPublic } from '../profiles.js';
 import { ProjectStore } from '../store.js';
+import type { Profile } from '../types.js';
 
 const isValidName = (name: unknown): boolean => typeof name === 'string' && name.trim().length > 0;
 
@@ -9,41 +10,57 @@ const isValidAge = (age: unknown): age is number =>
 
 const isValidPin = (pin: unknown): pin is string => typeof pin === 'string' && /^\d{4}$/.test(pin);
 
-const validateCreateProfileInput = (body: any): string | null => {
+interface CreateProfileBody {
+  name?: unknown;
+  age?: unknown;
+  avatar?: string;
+  locale?: string;
+  pin?: unknown;
+}
+
+const validateCreateProfileInput = (body: CreateProfileBody): string | null => {
   if (!isValidName(body?.name)) return 'Nom requis';
   if (!isValidAge(body?.age)) return 'Age invalide (4-120)';
-  if (body.age < 15 && !isValidPin(body?.pin))
+  if ((body.age as number) < 15 && !isValidPin(body?.pin))
     return 'Code PIN 4 chiffres requis pour les moins de 15 ans';
   return null;
 };
 
 type CreateProfileArgs = Parameters<ProfileStore['create']>;
 
-const buildCreateProfileArgs = (body: any): CreateProfileArgs => [
-  body.name.trim(),
-  body.age,
+const buildCreateProfileArgs = (body: CreateProfileBody): CreateProfileArgs => [
+  (body.name as string).trim(),
+  body.age as number,
   body.avatar || '0',
   body.locale || 'fr',
-  body.age < 15 ? body.pin : undefined,
+  (body.age as number) < 15 ? (body.pin as string) : undefined,
 ];
 
 const PARENTAL_FIELDS = ['useModeration', 'moderationCategories', 'chatEnabled', 'age'] as const;
 
 type ProfileRecord = ReturnType<ProfileStore['get']> & {};
+type ProfileUpdateFields = Partial<Profile>;
 
-const parentalFieldChanged = (profile: ProfileRecord, fields: any, key: string): boolean => {
+const parentalFieldChanged = (
+  profile: ProfileRecord,
+  fields: ProfileUpdateFields,
+  key: (typeof PARENTAL_FIELDS)[number],
+): boolean => {
   if (fields[key] === undefined) return false;
   if (key === 'moderationCategories') {
     return JSON.stringify(fields[key]) !== JSON.stringify(profile[key]);
   }
-  return fields[key] !== (profile as any)[key];
+  return fields[key] !== profile[key];
 };
 
-const hasParentalChange = (profile: ProfileRecord, fields: any): boolean =>
+const hasParentalChange = (profile: ProfileRecord, fields: ProfileUpdateFields): boolean =>
   PARENTAL_FIELDS.some((f) => parentalFieldChanged(profile, fields, f));
 
-const requiresPinForParentalChange = (profile: ProfileRecord, pin: unknown, fields: any): boolean =>
-  !!profile.pinHash && !pin && hasParentalChange(profile, fields);
+const requiresPinForParentalChange = (
+  profile: ProfileRecord,
+  pin: unknown,
+  fields: ProfileUpdateFields,
+): boolean => !!profile.pinHash && !pin && hasParentalChange(profile, fields);
 
 const pinMismatch = (profile: ProfileRecord, pin: unknown): boolean =>
   !!profile.pinHash && !!pin && !verifyPin(pin as string, profile.pinHash);
