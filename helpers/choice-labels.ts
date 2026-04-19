@@ -35,16 +35,26 @@ function skipWhitespace(raw: string, start: number): number {
   return index;
 }
 
+const CHOICE_LETTERS = new Set(['A', 'B', 'C', 'D']);
+const CHOICE_PUNCTUATIONS = new Set([')', '.', ':']);
+
+function isChoiceLetter(char: string | undefined): char is 'A' | 'B' | 'C' | 'D' {
+  return char !== undefined && CHOICE_LETTERS.has(char);
+}
+
+function isChoicePunctuation(char: string | undefined): boolean {
+  return char !== undefined && CHOICE_PUNCTUATIONS.has(char);
+}
+
 export function parseChoiceLabel(raw: string): { label: string; text: string } | null {
   let index = skipWhitespace(raw, 0);
 
   const label = raw[index];
-  if (label !== 'A' && label !== 'B' && label !== 'C' && label !== 'D') return null;
+  if (!isChoiceLetter(label)) return null;
 
   index = skipWhitespace(raw, index + 1);
 
-  const punctuation = raw[index];
-  if (punctuation !== ')' && punctuation !== '.' && punctuation !== ':') return null;
+  if (!isChoicePunctuation(raw[index])) return null;
 
   index = skipWhitespace(raw, index + 1);
 
