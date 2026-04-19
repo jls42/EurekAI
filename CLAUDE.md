@@ -60,13 +60,13 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Objectif** : chaque appel Mistral (chat, OCR, STT, TTS, moderation, agents) est instrumenté pour exposer un coût € estimé à l'utilisateur, persisté par projet.
 - **Source de vérité pricing** : `helpers/pricing.ts` — `MODEL_PRICING` (par prefix de modèle) + `PRICING_SOURCES` (URL doc Mistral pour scraping tarifaire). Prefix matching greedy (plus long gagne, ex: `mistral-large-2512` → `mistral-large`).
 - **Chaîne de calcul** : `helpers/tracked-client.ts` wrappe le client Mistral (capture `ApiUsage`) → `helpers/usage-context.ts` (AsyncLocalStorage pour propager l'usage dans les pipelines async) → `helpers/cost-calc.ts` (conversion usage → € selon l'unité : `tokens` / `characters` / `pages` / `audio-seconds`) → `helpers/cost-persist.ts` (écriture dans `Project.costLog` + mise à jour `totalCost`) → `helpers/cost-middleware.ts` (injection du `costDelta` dans la réponse HTTP).
-- **Contrat endpoint** : les réponses `/generate/*` et `/sources/*` incluent `costDelta: { estimatedEuros: number, perModel: {...} }`. `GET /projects/:pid` retourne `totalCost` + `costLog[]` historique. `GET /api/config/status` indique `costEstimateAvailable`.
+- **Contrat endpoint** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation ou Source) avec `estimatedCost: number`, `usage: GenerationUsage`, `costBreakdown: string[]`. **Seul** `POST /generate/auto/route` renvoie un champ top-level `costDelta: number` (coût du routage seul) — les autres `/generate/*` exposent leur coût via `gen.estimatedCost` uniquement. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + `costLog[]` historique.
 - **Règle OBLIGATOIRE** : tout nouvel appel Mistral DOIT passer par `tracked-client` (jamais `new Mistral(...)` direct dans un generator). Sinon le coût échappe au tracking silencieusement — bug observabilité invisible côté UI.
 
 ### OCR confidence scores
-- **Type** : `OcrConfidence = { overall: number, perPage: number[] }` dans `types.ts` — stocké en `Source.ocrConfidence?` pour les sources PDF/image.
-- **Extraction** : `generators/ocr.ts` appelle `extractConfidence()` sur le résultat Mistral OCR (champs `confidence` par page), moyenne pour `overall`.
-- **Tiers UI** : `src/app/helpers.ts` expose `ocrConfidenceTier(score)` → `'high' | 'medium' | 'low' | null` (seuils ~0.9 / ~0.7). Badges colorés dans la vue sources + i18n via clé `ocr.confidence` (9 langues).
+- **Type** : `OcrConfidence = { average: number }` dans `types.ts` — stocké en `Source.ocrConfidence?` pour les sources PDF/image.
+- **Extraction** : `generators/ocr.ts` passe `confidenceScoresGranularity: 'page'` à l'API Mistral OCR puis `extractConfidence()` (interne, non exporté) moyenne les `averagePageConfidenceScore` des pages, clampé dans `[0,1]`.
+- **Tiers UI** : `src/app/helpers.ts` expose la méthode AppContext `ocrConfidenceTier(src: Source)` → `'high' | 'medium' | 'low' | null` (seuils ≥0.9 / ≥0.7, sinon `'low'`, `null` si `src.ocrConfidence` absent ou non-finite). Badges colorés dans la vue sources + i18n via clé `ocr.confidence` (9 langues). NB : la méthode prend un `Source` complet (pas un `score: number`) — utiliser `src.ocrConfidence?.average` en amont si tu n'as qu'un nombre.
 - **Règle** : quand un score est bas, ne PAS bloquer la génération — afficher le badge warning et laisser l'utilisateur décider (les scores bas viennent souvent de scans de mauvaise qualité, pas d'un vrai problème de contenu).
 
 ### HTML interactif
@@ -108,7 +108,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 
 ## SonarQube
 
-- **JS/TS** : `// NOSONAR(S1234) — raison concise` immédiatement au-dessus de la ligne flaggée.
+- **JS/TS** : `// NOSONAR(S1234) — raison concise` en **fin de ligne** flaggée (pratique réelle, cf. `generators/image.ts`, `helpers/index.ts`) ou ligne au-dessus.
 - **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text` pour satisfaire les règles d'accessibilité (ex: `<span x-text="title">Chargement…</span>`).
 - Faux positifs fréquents : `S1192` (string duplication) — souvent préférable d'extraire une constante plutôt qu'ignorer. `S3776` / `S6324` (complexity) — croiser avec `npm run lint:complexity` (Lizard CCN 8) avant de supprimer.
 
@@ -124,7 +124,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Règle** : avant d'ajouter un ignore (inline ou global), **mesurer** en lançant `npm run security` localement — ne jamais ignorer à l'aveugle un finding Codacy/SonarQube sans reproduire via Opengrep d'abord (principe "Mesurer > deviner" ci-dessous). Note : certaines règles LGPL utilisées par Codacy ne sont PAS dans nos packs locaux (`p/security-audit + p/default + p/nodejsscan`) — dans ce cas, opengrep local ne reproduit pas, et le seul moyen de valider un fix est le rescan Codacy post-push.
 - **Fix `rule-node-ssrf` préféré = pattern whitelist.includes canonique** (pas d'ignore). Exemple dans `src/app/generate.ts` (commit `00af5f2`) : construire `allowedUrls` comme `AUTO_AGENT_TYPES.map(...)`, puis `if (!allowedUrls.includes(url)) return;` avant le `fetch(url, ...)`. C'est le pattern "safe" officiellement documenté par Codacy et il éteint le flag sans suppression.
 - **Effet secondaire subtil cleanup de dead code** : retirer un `export` même inutilisé peut faire ré-évaluer le graphe de taint par Codacy/Opengrep et **réactiver des findings dormants** (cas vécu : commit knip `817fb2d` a retiré un re-export `addCostDelta` → Codacy a re-flaggé un `fetch` qui était accepté depuis `4027c37`). Quand un finding SAST apparaît après un commit "inoffensif", vérifier s'il n'a pas modifié la surface d'exports d'un fichier impliqué.
-- **Couverture actuelle** : SSRF (fix commit 4027c37 + pattern whitelist `00af5f2`), timing attacks (fix commit 7e0fb32), XSS, injection, secrets hardcodes, expressjs patterns dangereux. 153 règles actives sur 171 fichiers. Baseline post-fix : 0 finding ERROR.
+- **Couverture actuelle** : SSRF (fix commit 4027c37 + pattern whitelist `00af5f2`), timing attacks (fix commit 7e0fb32), XSS, injection, secrets hardcodes, expressjs patterns dangereux. 153 règles actives sur 175 fichiers tracked git (snapshot 2026-04-19, dérive lente avec nouveaux fichiers). Baseline post-fix : 0 finding ERROR.
 
 ## Mesurer > deviner (règle OBLIGATOIRE)
 
@@ -137,9 +137,9 @@ Cas concrets (non exhaustif) :
 - **Outils externes** (Codacy CCN, SonarQube, CI warnings) : lancer l'outil localement (`pipx run lizard`, `sonar-scanner`, etc.) pour voir ce qu'il voit réellement, jamais deviner la cause d'un flag
 - **Dates relatives** (utilisateur dit "jeudi", "le mois dernier") : convertir en absolu via le contexte date, jamais extrapoler mentalement
 
-**Anti-pattern documenté** : série de 9 commits (`977b535..68ed476`) sur un faux positif Lizard `matchStatus` résolus en 2 min dès qu'on a lancé `pipx run lizard` local — cause racine = parseur TS de Lizard qui agglomère les `function foo()` top-level consécutives. Fix propre via extraction dans `helpers/error-matchers.ts` (chaque matcher `export function` délimité proprement). Leçon : ne JAMAIS itérer à l'aveugle sur un signal d'outil externe.
+**Anti-pattern documenté** : série de 5 commits (`977b535..68ed476`) sur un faux positif Lizard `matchStatus` résolus en 2 min dès qu'on a lancé `pipx run lizard` local — cause racine = parseur TS de Lizard qui agglomère les `function foo()` top-level consécutives. Fix propre via extraction dans `helpers/error-matchers.ts` (chaque matcher `export function` délimité proprement). Leçon : ne JAMAIS itérer à l'aveugle sur un signal d'outil externe.
 
-Garde-fou local actuel : `npm run test` déclenche `pretest` → `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8 strict, scope **allowlist** : `helpers/error-*.ts`, `src/app/helpers.ts`, `config.ts`). Le reste du repo contient 23 fonctions > CCN 8 à refactorer en PR(s) séparée(s) — liste complète et priorités dans `.claude/todo-tooling.md` section "Refactor progressif Lizard CCN". Pièges connus :
+Garde-fou local actuel : `npm test` déclenche `pretest` → enchaîne **`lint:complexity` + `lint:ci` + `lint:deadcode`** (sortie pipeline en cas d'échec d'un seul). `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8 strict, scope **allowlist** : `helpers/error-*.ts`, `src/app/helpers.ts`, `config.ts`). Le reste du repo contient ~28 fonctions > CCN 8 (snapshot 2026-04-19) à refactorer en PR(s) séparée(s) — liste complète et priorités dans `.claude/todo-tooling.md` section "Refactor progressif Lizard CCN". Pièges connus :
 - **`-l javascript` ne parse pas les `.ts` en walk-dossier** — Lizard doit être invoqué avec `-l typescript` explicitement, sinon 0 violation silencieusement (faux positif "tout est clean"). Bug vécu 2026-04-18, Codacy a révélé 23 fonctions cachées.
 - **`??=` pèse 2 dans le comptage Lizard** (nullish check + assignment) — à retenir lors de l'application du fix `prefer-nullish-coalescing` (cf. `dccd645` : re-fix via boucle).
 
