@@ -20,7 +20,7 @@ type VoiceResult = {
 };
 
 /** Build POST options with JSON body and abort signal for generate endpoints. */
-function postJson(body: unknown, signal: AbortSignal): RequestInit {
+export function postJson(body: unknown, signal: AbortSignal): RequestInit {
   return {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -39,7 +39,7 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
 }
 
 /** Process responses from generateAll, returns failure count. */
-async function aggregateGenerateResults(responses: Response[], state: AppContext): Promise<number> {
+export async function aggregateGenerateResults(responses: Response[], state: AppContext): Promise<number> {
   let failures = 0;
   for (const r of responses) {
     if (r.ok) {
@@ -54,7 +54,7 @@ async function aggregateGenerateResults(responses: Response[], state: AppContext
 }
 
 /** Show appropriate toast after generateAll completes. */
-function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
+export function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
     state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
   } else if (failures >= total) {
@@ -77,7 +77,8 @@ type AutoBody = {
 
 type AutoRoute = { plan: Array<{ agent: string }>; costDelta?: number };
 
-function buildAutoBody(state: AppContext): AutoBody {
+/** Body shared by /generate/:type, /generate/route and /generate/auto. */
+export function buildGenerateBody(state: AppContext): AutoBody {
   return {
     sourceIds: state.selectedIds.length > 0 ? state.selectedIds : undefined,
     lang: getLocale(),
@@ -88,7 +89,7 @@ function buildAutoBody(state: AppContext): AutoBody {
 }
 
 /** Fetch /generate/route, return the plan or null on error (shows toast). */
-async function runAutoRoute(
+export async function runAutoRoute(
   state: AppContext,
   projectId: string,
   body: AutoBody,
@@ -113,7 +114,7 @@ async function runAutoRoute(
 }
 
 /** Populate plannedTypes + loading flags from a route plan (skips TTS if unavailable). */
-function populateAutoPlan(
+export function populateAutoPlan(
   state: AppContext,
   plan: Array<{ agent: string }>,
   plannedTypes: string[],
@@ -137,7 +138,7 @@ type StepResult = 'success' | 'aborted' | 'failed';
 
 /** Execute one auto-plan step (fetch + register or log). Returns 'aborted' on AbortError
  * (not counted as failure) vs 'failed' (counted). */
-async function runAutoStep(
+export async function runAutoStep(
   state: AppContext,
   type: string,
   projectId: string,
@@ -179,7 +180,7 @@ async function runAutoStep(
 }
 
 /** Run all plan steps in parallel, return the failure count (abort is not a failure). */
-async function runAutoSteps(
+export async function runAutoSteps(
   state: AppContext,
   plannedTypes: string[],
   projectId: string,
@@ -199,7 +200,7 @@ async function runAutoSteps(
 }
 
 /** Final toast after all auto steps complete (success / partial / all-failed). */
-function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
+export function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
   if (failures > 0 && failures < plannedCount) {
     state.showToast(
       state.t('toast.partialGenerated', { count: plannedCount - failures }),
@@ -215,7 +216,54 @@ function showAutoResult(state: AppContext, failures: number, plannedCount: numbe
   }
 }
 
-function applyVoiceResult(
+/** Toast on non-OK response from /generate/:type, with retry callback. */
+export function handleGenerateHttpError(
+  state: AppContext,
+  type: string,
+  res: Response,
+  err: { error?: string },
+): void {
+  state.showToast(
+    state.t('toast.error', { error: state.resolveError(err.error || res.statusText) }),
+    'error',
+    () => state.generate(type),
+  );
+}
+
+/** Register a successful generation and show the success toast. */
+export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
+  registerGeneration(state, gen);
+  state.showToast(
+    state.t('toast.generationDone', { type: state.t('gen.' + type) }),
+    'success',
+    null,
+    { label: state.t('toast.view'), fn: () => state.goToView(type) },
+  );
+}
+
+/** Pre-flight check for generate / generateAll / generateAuto : returns a usable
+ * projectId if the action can start, or null (with toast on moderation block). */
+export function canStartGenerate(state: AppContext, type?: string): string | null {
+  if (!state.currentProjectId) return null;
+  if (type && state.loading[type]) return null;
+  const moderationStatus = state.blockedModerationStatus();
+  if (state.currentProfile?.useModeration && moderationStatus) {
+    state.showToast(state.moderationBlockedMessage(moderationStatus), 'error');
+    return null;
+  }
+  return state.currentProjectId;
+}
+
+/** Catch-block body : silent on AbortError, retryable toast otherwise. */
+export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
+  if (e instanceof Error && e.name === 'AbortError') return;
+  const msg = e instanceof Error ? e.message : String(e);
+  state.showToast(state.t('toast.generationError', { error: msg }), 'error', () =>
+    state.generate(type),
+  );
+}
+
+export function applyVoiceResult(
   state: AppContext,
   gen: GenerationUI,
   result: VoiceResult,
@@ -274,55 +322,26 @@ export function createGenerate() {
     },
 
     async generate(this: AppContext, type: string) {
-      if (!this.currentProjectId || this.loading[type]) return;
-      const moderationStatus = this.blockedModerationStatus();
-      if (this.currentProfile?.useModeration && moderationStatus) {
-        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
-        return;
-      }
-      const projectId = this.currentProjectId;
+      const projectId = canStartGenerate(this, type);
+      if (!projectId) return;
       this.loading[type] = true;
-
       const controller = new AbortController();
       this.abortControllers[type] = controller;
-
       try {
-        const body = {
-          sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
-          lang: getLocale(),
-          ageGroup: this.currentProfile?.ageGroup || 'enfant',
-          useConsigne: this.useConsigne,
-          count: this.generateCount,
-        };
-        const res = await fetch('/api/projects/' + projectId + '/generate/' + type, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+        // fetch reste inline pour préserver l'analyse taint Codacy `rule-node-ssrf`
+        // (cf. CLAUDE.md "Effet secondaire subtil cleanup de dead code").
+        const res = await fetch(
+          '/api/projects/' + projectId + '/generate/' + type,
+          postJson(buildGenerateBody(this), controller.signal),
+        );
         if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          this.showToast(
-            this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
-            'error',
-            () => this.generate(type),
-          );
+          handleGenerateHttpError(this, type, res, await res.json().catch(() => ({})));
           return;
         }
         if (this.currentProjectId !== projectId) return;
-        registerGeneration(this, await res.json());
-        this.showToast(
-          this.t('toast.generationDone', { type: this.t('gen.' + type) }),
-          'success',
-          null,
-          { label: this.t('toast.view'), fn: () => this.goToView(type) },
-        );
+        handleGenerateSuccess(this, type, await res.json());
       } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return;
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.generationError', { error: msg }), 'error', () =>
-          this.generate(type),
-        );
+        handleGenerateError(this, type, e);
       } finally {
         this.loading[type] = false;
         delete this.abortControllers[type];
@@ -390,7 +409,7 @@ export function createGenerate() {
       this.abortControllers.auto = controller;
       const plannedTypes: string[] = [];
       try {
-        const body = buildAutoBody(this);
+        const body = buildGenerateBody(this);
         const route = await runAutoRoute(this, projectId, body, controller);
         if (!route) return;
         if (this.currentProjectId !== projectId) return;
