@@ -1,4 +1,5 @@
 import { UI_LANGUAGES } from '../i18n/languages';
+import type { Profile, ProjectData, ProjectMeta, Source, ChatMessage } from '../../types';
 
 const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
 
@@ -8,11 +9,11 @@ export function createState() {
     uiLanguages: UI_LANGUAGES,
 
     // Profile state
-    profiles: [] as any[],
-    currentProfile: null as any,
+    profiles: [] as Profile[],
+    currentProfile: null as Profile | null,
     showProfilePicker: false,
     showProfileForm: false,
-    editingProfile: null as any,
+    editingProfile: null as Profile | null,
     newProfileName: '',
     newProfileAge: '',
     newProfileAvatar: '0',
@@ -20,14 +21,14 @@ export function createState() {
     profileAvatars: PROFILE_AVATARS,
 
     // Project state
-    projects: [] as any[],
+    projects: [] as ProjectMeta[],
     currentProjectId: null as string | null,
-    currentProject: null as any,
+    currentProject: null as ProjectData | null,
     newProjectName: '',
     showNewProject: false,
 
     // Source state
-    sources: [] as any[],
+    sources: [] as Source[],
     selectedIds: [] as string[],
     uploadSessions: [] as Array<{
       id: string;
@@ -146,7 +147,7 @@ export function createState() {
     activeView: 'dashboard',
 
     // Chat state
-    chatMessages: [] as any[],
+    chatMessages: [] as ChatMessage[],
     chatInput: '',
     chatLoading: false,
 

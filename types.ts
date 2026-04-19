@@ -16,6 +16,7 @@ export interface Profile {
   mistralVoices?: { host: string; guest: string };
   theme?: 'dark' | 'light';
   pinHash?: string;
+  hasPin?: boolean;
   createdAt: string;
   updatedAt?: string;
 }

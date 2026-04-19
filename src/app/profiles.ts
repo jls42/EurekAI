@@ -280,7 +280,7 @@ export function createProfiles() {
         ...profile,
         locale: profile.locale || 'fr',
         mistralVoices: profile.mistralVoices || { host: '', guest: '' },
-        theme: profile.theme || '',
+        theme: profile.theme,
       };
       this.showProfilePicker = true;
       this.showProfileForm = false;

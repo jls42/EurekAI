@@ -72,6 +72,12 @@ export interface AppContext extends AppState {
   // Navigation mixin (src/app/navigation.ts)
   goToView(view: string): void;
 
+  // Projects mixin (src/app/projects.ts)
+  createProject(): Promise<void>;
+  selectProject(id: string): Promise<void>;
+  deleteProject(id: string): Promise<void>;
+  openLightbox(url: string): void;
+
   // Generate mixin (src/app/generate.ts) — self-reference
   blockedModerationSource(): Source | null;
   blockedModerationStatus(): string | null;
