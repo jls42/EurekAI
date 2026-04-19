@@ -98,6 +98,53 @@ async function _uploadSingleFile(
   }
 }
 
+function _createUploadSession(
+  ctx: AppContext,
+  fileList: FileList,
+  projectId: string,
+): UploadSession | null {
+  const sessionId = crypto.randomUUID();
+  const files = Array.from(fileList).map((f) => ({
+    id: crypto.randomUUID(),
+    name: f.name,
+    file: f as File | null,
+    status: 'pending' as const,
+    errorMsg: null as string | null,
+  }));
+  ctx.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
+  ctx.$nextTick(() => ctx.refreshIcons());
+  return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
+}
+
+async function _runUploadLoop(
+  ctx: AppContext,
+  session: UploadSession,
+): Promise<{ applied: number; interrupted: boolean }> {
+  let applied = 0;
+  let interrupted = false;
+  for (const fileEntry of session.files) {
+    const result = await _uploadSingleFile.call(ctx, session, fileEntry.id);
+    if (result === 'ignored') {
+      interrupted = true;
+      break;
+    }
+    if (result === 'applied') applied++;
+  }
+  return { applied, interrupted };
+}
+
+function _maybeFinalizeUpload(
+  ctx: AppContext,
+  applied: number,
+  interrupted: boolean,
+  projectId: string,
+): void {
+  if (applied > 0 && !interrupted && ctx.currentProjectId === projectId) {
+    ctx.showToast(ctx.t('toast.sourcesAdded'), 'success');
+    _scheduleConsigneRefresh.call(ctx, projectId);
+  }
+}
+
 function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
   setTimeout(() => {
     if (this.currentProjectId === projectId) this.refreshConsigne();
@@ -126,37 +173,11 @@ export function createSources() {
     async handleFiles(this: AppContext, fileList: FileList | undefined | null) {
       const projectId = this.currentProjectId;
       if (!fileList || fileList.length === 0 || !projectId) return;
-
-      const sessionId = crypto.randomUUID();
-      const files = Array.from(fileList).map((f) => ({
-        id: crypto.randomUUID(),
-        name: f.name,
-        file: f as File | null,
-        status: 'pending' as const,
-        errorMsg: null as string | null,
-      }));
-      this.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
-      this.$nextTick(() => this.refreshIcons());
-
-      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
+      const session = _createUploadSession(this, fileList, projectId);
       if (!session) return;
-      let appliedCount = 0;
-      let interrupted = false;
-
-      for (const fileEntry of session.files) {
-        const result = await _uploadSingleFile.call(this, session, fileEntry.id);
-        if (result === 'ignored') {
-          interrupted = true;
-          break;
-        }
-        if (result === 'applied') appliedCount++;
-      }
-
-      if (appliedCount > 0 && !interrupted && this.currentProjectId === projectId) {
-        this.showToast(this.t('toast.sourcesAdded'), 'success');
-        _scheduleConsigneRefresh.call(this, projectId);
-      }
-      _maybeCleanupSession.call(this, sessionId);
+      const { applied, interrupted } = await _runUploadLoop(this, session);
+      _maybeFinalizeUpload(this, applied, interrupted, projectId);
+      _maybeCleanupSession.call(this, session.id);
     },
 
     async retryFile(this: AppContext, sessionId: string, fileId: string) {
