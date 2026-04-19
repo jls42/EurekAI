@@ -54,14 +54,19 @@ async function mistralTts(
 
 // --- Voice management ---
 
+function pickField<T>(obj: Record<string, unknown>, key: string, fallback: T): T {
+  return (obj[key] ?? fallback) as T;
+}
+
 function toMistralVoice(v: any): MistralVoice {
+  const o = v as Record<string, unknown>;
   return {
-    id: v.id ?? '',
-    name: v.name ?? '',
-    languages: v.languages ?? [],
-    gender: v.gender ?? undefined,
-    tags: v.tags ?? undefined,
-    createdAt: v.createdAt ?? undefined,
+    id: pickField<string>(o, 'id', ''),
+    name: pickField<string>(o, 'name', ''),
+    languages: pickField<string[]>(o, 'languages', []),
+    gender: pickField<string | undefined>(o, 'gender', undefined),
+    tags: pickField<string[] | undefined>(o, 'tags', undefined),
+    createdAt: pickField<string | undefined>(o, 'createdAt', undefined),
   };
 }
 
