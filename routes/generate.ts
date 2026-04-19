@@ -50,12 +50,12 @@ export function applyConsigne(
   return header + markdown;
 }
 
-function resolveSourceIds(body: any, sources: Source[]): string[] {
+const resolveSourceIds = (body: any, sources: Source[]): string[] => {
   const ids = body.sourceIds || [];
   return ids.length > 0 ? ids : sources.map((s) => s.id);
-}
+};
 
-function checkContextLimit(markdown: string, modelId: string): string | null {
+const checkContextLimit = (markdown: string, modelId: string): string | null => {
   const limits = getModelLimits();
   const limit = limits[modelId] ?? 128_000;
   const estimatedTokens = Math.ceil(markdown.length / 2);
@@ -64,28 +64,31 @@ function checkContextLimit(markdown: string, modelId: string): string | null {
     return `context_too_large:${pct}`;
   }
   return null;
-}
+};
 
-function checkModeration(
+const selectModeratedSources = (project: { sources: Source[] }, sourceIds?: string[]): Source[] =>
+  sourceIds && sourceIds.length > 0
+    ? project.sources.filter((s) => sourceIds.includes(s.id))
+    : project.sources;
+
+const findBlockedSource = (sources: Source[]): Source | undefined =>
+  sources.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
+
+const checkModeration = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
   sourceIds?: string[],
-): string | null {
+): string | null => {
   const project = store.getProject(pid);
   if (!project) return null;
   const profileId = project.meta.profileId;
   if (!profileId) return null;
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
-  const selected =
-    sourceIds && sourceIds.length > 0
-      ? project.sources.filter((s) => sourceIds.includes(s.id))
-      : project.sources;
-  const blocked = selected.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
-  if (blocked) return blocked.filename;
-  return null;
-}
+  const blocked = findBlockedSource(selectModeratedSources(project, sourceIds));
+  return blocked ? blocked.filename : null;
+};
 
 interface GenContext {
   project: ReturnType<ProjectStore['getProject']> & {};
