@@ -38,26 +38,32 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
   return '';
 }
 
-function readAloudText(gen: any, section: string): string | null {
+// Arrow const pour empêcher l'agglomération Lizard avec sectionText ci-dessus
+// (cf. CLAUDE.md "Pièges Lizard connus").
+const readAloudText = (gen: any, section: string): string | null => {
   if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
   return null;
-}
+};
 
-async function generateBatchAudio(
+const batchSectionsFor = (d: SummaryGeneration['data']): string[] => {
+  const sections = ['intro', 'key_points'];
+  if (d.fun_fact) sections.push('fun_fact');
+  if (d.vocabulary?.length) sections.push('vocabulary');
+  return sections;
+};
+
+const generateBatchAudio = async (
   gen: SummaryGeneration,
   voiceId: string,
   ttsOpts: any,
   projectDir: string,
   pid: string,
-): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
+): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> => {
   const d = gen.data;
-  const sections = ['intro', 'key_points'];
-  if (d.fun_fact) sections.push('fun_fact');
-  if (d.vocabulary?.length) sections.push('vocabulary');
   const audioUrls: Record<string, string> = {};
   const failedSections: string[] = [];
   const baseId = gen.id.slice(0, 8);
-  for (const s of sections) {
+  for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
     if (!txt) continue;
     try {
@@ -69,7 +75,7 @@ async function generateBatchAudio(
     }
   }
   return { audioUrls, failedSections };
-}
+};
 
 interface BatchSummaryCtx {
   audioUrls: Record<string, string>;
