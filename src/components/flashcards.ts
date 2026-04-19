@@ -1,43 +1,60 @@
-import { stepByStep } from './step-by-step';
+import { stepByStep, type StepByStepBase } from './step-by-step';
+import type { Generation, Flashcard } from '../../types';
 
-export function flashcardsComponent(gen: any) {
+interface FlashcardsContext extends StepByStepBase {
+  flipped: boolean;
+  results: Record<number, boolean>;
+  currentCard(): Flashcard | undefined;
+  flip(): void;
+  isCurrentAnswered(): boolean;
+  rate(correct: boolean): void;
+  restoreState(): void;
+  retryWrongCards(): void;
+  resetCards(): void;
+}
+
+export function flashcardsComponent(gen: Generation) {
   return {
     ...stepByStep(gen),
     flipped: false,
     results: {} as Record<number, boolean>,
 
-    currentCard() {
-      return this.items()[this.currentIndex()];
+    currentCard(this: FlashcardsContext): Flashcard | undefined {
+      const idx = this.currentIndex();
+      return idx === undefined ? undefined : (this.items()[idx] as Flashcard);
     },
 
-    flip(this: any) {
+    flip(this: FlashcardsContext) {
       this.flipped = !this.flipped;
       if (!this.flipped) this.feedback = null;
     },
 
-    isCurrentAnswered(this: any): boolean {
-      return this.currentIndex() in this.results;
+    isCurrentAnswered(this: FlashcardsContext): boolean {
+      const idx = this.currentIndex();
+      return idx !== undefined && idx in this.results;
     },
 
-    rate(this: any, correct: boolean) {
+    rate(this: FlashcardsContext, correct: boolean) {
       if (this.isReviewing()) return;
-      this.results[this.currentIndex()] = correct;
+      const idx = this.currentIndex();
+      if (idx === undefined) return;
+      this.results[idx] = correct;
       if (correct) this.score++;
       this.feedback = { correct };
       setTimeout(() => this.nextQuestion(), 600);
     },
 
-    onNextReady(this: any) {
+    onNextReady(this: FlashcardsContext) {
       this.restoreState();
     },
 
-    onPrevReady(this: any) {
+    onPrevReady(this: FlashcardsContext) {
       this.restoreState();
     },
 
-    restoreState(this: any) {
+    restoreState(this: FlashcardsContext) {
       const idx = this.currentIndex();
-      if (idx in this.results) {
+      if (idx !== undefined && idx in this.results) {
         this.flipped = true;
         this.feedback = { correct: this.results[idx] };
       } else {
@@ -50,7 +67,7 @@ export function flashcardsComponent(gen: any) {
       // No backend persistence for flashcard scores (self-evaluation)
     },
 
-    retryWrongCards(this: any) {
+    retryWrongCards(this: FlashcardsContext) {
       const wrong = Object.entries(this.results)
         .filter(([, v]) => !v)
         .map(([k]) => Number(k));
@@ -59,7 +76,7 @@ export function flashcardsComponent(gen: any) {
       this.retryWrong(wrong);
     },
 
-    resetCards(this: any) {
+    resetCards(this: FlashcardsContext) {
       this.results = {};
       this.flipped = false;
       this.resetAll();
