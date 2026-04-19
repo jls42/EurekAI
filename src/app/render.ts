@@ -1,6 +1,8 @@
 import { marked } from 'marked';
 import { escapeHtmlAttribute, escapeMarkdownHtml, sanitizeRenderedHtml } from './render-utils';
 import { normalizeSourceMarkers } from './source-markers';
+import type { AppContext } from './app-context';
+import type { Generation, StudyFiche } from '../../types';
 
 export function createRender() {
   return {
@@ -11,7 +13,7 @@ export function createRender() {
       return sanitizeRenderedHtml(html);
     },
 
-    renderWithSources(this: any, content: string, gen: any) {
+    renderWithSources(this: AppContext, content: string, gen: Generation) {
       if (!content) return '';
       const srcs = this.genSources(gen);
       const makeBadge = (num: string) => {
@@ -29,8 +31,9 @@ export function createRender() {
       return html;
     },
 
-    summaryData(this: any, gen: any) {
-      const r = gen.data || {};
+    summaryData(this: AppContext, gen: Generation): StudyFiche {
+      const raw = (gen as { data?: Partial<StudyFiche> }).data ?? {};
+      const r = raw as StudyFiche;
       if (!r.citations) r.citations = [];
       if (!r.vocabulary) r.vocabulary = [];
       if (!r.key_points) r.key_points = [];

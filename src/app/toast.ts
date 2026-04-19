@@ -1,7 +1,17 @@
+import type { AppContext } from './app-context';
+
+export interface Toast {
+  id: number;
+  message: string;
+  type: string;
+  retryFn: (() => void) | null;
+  action: { label: string; fn: () => void } | null;
+}
+
 export function createToast() {
   return {
     showToast(
-      this: any,
+      this: AppContext,
       message: string,
       type = 'info',
       retryFn: (() => void) | null = null,
@@ -15,8 +25,8 @@ export function createToast() {
       }
     },
 
-    dismissToast(this: any, id: number) {
-      this.toasts = this.toasts.filter((t: any) => t.id !== id);
+    dismissToast(this: AppContext, id: number) {
+      this.toasts = this.toasts.filter((t) => t.id !== id);
     },
   };
 }

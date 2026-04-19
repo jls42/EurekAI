@@ -1,6 +1,9 @@
+import type { AppContext } from './app-context';
+import type { Generation } from '../../types';
+
 export function createGenerations() {
   return {
-    startEditTitle(this: any, gen: any) {
+    startEditTitle(this: AppContext, gen: Generation) {
       this.editingTitle = gen.id;
       this.editTitleValue = gen.title;
       this.$nextTick(() => {
@@ -9,7 +12,7 @@ export function createGenerations() {
       });
     },
 
-    async saveTitle(this: any, gen: any) {
+    async saveTitle(this: AppContext, gen: Generation) {
       const title = this.editTitleValue.trim();
       this.editingTitle = null;
       if (!title || title === gen.title) return;
@@ -21,9 +24,9 @@ export function createGenerations() {
       });
     },
 
-    async deleteGen(this: any, gen: any) {
+    async deleteGen(this: AppContext, gen: Generation) {
       await fetch(this.apiBase() + '/generations/' + gen.id, { method: 'DELETE' });
-      this.generations = this.generations.filter((g: any) => g.id !== gen.id);
+      this.generations = this.generations.filter((g) => g.id !== gen.id);
       this.showToast(this.t('toast.genDeleted'), 'info');
     },
   };

@@ -317,12 +317,14 @@ export function createSources() {
       this.viewSourcePanY = 0;
     },
     rotateLeft(this: AppContext) {
+      if (!this.viewSource) return;
       this.viewSourceRotation -= 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
     rotateRight(this: AppContext) {
+      if (!this.viewSource) return;
       this.viewSourceRotation += 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;

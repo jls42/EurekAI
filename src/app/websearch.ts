@@ -1,8 +1,12 @@
 import { addCostDelta } from './cost-utils';
+import type { AppContext } from './app-context';
+import type { Source } from '../../types';
+
+type WebsearchSource = Source & { estimatedCost?: number };
 
 export function createWebsearch() {
   return {
-    async searchWeb(this: any) {
+    async searchWeb(this: AppContext) {
       const query = this.webQuery.trim();
       if (!query || !this.currentProjectId) return;
       this.loading.websearch = true;
@@ -18,14 +22,14 @@ export function createWebsearch() {
           }),
         });
         if (!res.ok) {
-          const err = await res.json();
+          const err = (await res.json()) as { error?: string };
           this.showToast(
             this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
             'error',
           );
           return;
         }
-        const result = await res.json();
+        const result = (await res.json()) as WebsearchSource | WebsearchSource[];
         const sources = Array.isArray(result) ? result : [result];
         for (const source of sources) {
           this.sources.push(source);
@@ -41,10 +45,9 @@ export function createWebsearch() {
         this.showToast(msg, 'success');
         this.$nextTick(() => this.refreshIcons());
         setTimeout(() => this.refreshModeration(), 2000);
-      } catch (e: any) {
-        this.showToast(this.t('toast.webSearchError', { error: e.message }), 'error', () =>
-          this.searchWeb(),
-        );
+      } catch (e) {
+        const error = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.webSearchError', { error }), 'error', () => this.searchWeb());
       } finally {
         this.loading.websearch = false;
       }

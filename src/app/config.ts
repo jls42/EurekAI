@@ -1,71 +1,99 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
+import type { AppContext } from './app-context';
+import type { AppConfig } from '../../types';
+
+type ConfigDraft = AppConfig & { _mainModel?: string };
+
+interface VoicesEnrichedEntry {
+  id: string;
+  name: string;
+  languages: string[];
+  gender?: string;
+  tags?: string[];
+  speaker: string;
+  emotion: string;
+  lang: string;
+  langFull: string;
+}
+
+type ApiStatus = { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean };
+
+type ModerationCategoriesPayload = {
+  all?: string[];
+  defaults?: Record<string, string[]>;
+};
+
+const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 
 export function createConfig() {
   return {
-    async loadConfig(this: any) {
+    async loadConfig(this: AppContext) {
       try {
         const [configRes, statusRes, modCatsRes] = await Promise.all([
           fetch('/api/config'),
           fetch('/api/config/status'),
           fetch('/api/moderation-categories'),
         ]);
-        if (statusRes.ok) this.apiStatus = await statusRes.json();
+        if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
         if (modCatsRes.ok) {
-          const modData = await modCatsRes.json();
+          const modData = (await modCatsRes.json()) as ModerationCategoriesPayload;
           this.allModerationCategories = modData.all || [];
           this.moderationDefaults = modData.defaults || {};
         }
         // Load voices BEFORE setting configDraft so the voice list is populated
         // when Alpine renders the x-show="ttsProvider === 'mistral'" selects
-        await this.loadMistralVoices();
+        await this.loadMistralVoices?.();
         if (configRes.ok) {
-          const config = await configRes.json();
-          this.configDraft = structuredClone(config);
-          this.configDraft._mainModel = config.models?.summary || 'mistral-large-latest';
+          const config = (await configRes.json()) as AppConfig;
+          const draft = structuredClone(config) as ConfigDraft;
+          draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
+          this.configDraft = draft as unknown as typeof this.configDraft;
         }
       } catch (e) {
         console.error('Failed to load config:', e);
       }
     },
 
-    async loadMistralVoices(this: any) {
+    async loadMistralVoices(this: AppContext) {
       try {
         const voicesRes = await fetch('/api/config/voices');
         if (!voicesRes.ok) return;
-        const raw = await voicesRes.json();
-        this.mistralVoicesList = raw.map((v: any) => {
+        const raw = (await voicesRes.json()) as MistralVoice[];
+        const enriched: VoicesEnrichedEntry[] = raw.map((v) => {
           const parts = (v.name || '').split(' - ');
           const langFull = v.languages?.[0] || '';
           return {
-            // Champs MistralVoice bruts pour selectVoices (cf. helpers/voice-types.ts)
             id: v.id,
             name: v.name,
             languages: v.languages ?? [],
             gender: v.gender,
             tags: v.tags,
-            // Enrichissement UI (speaker/emotion parsés depuis name)
             speaker: parts[0] || v.name,
             emotion: parts[1] || '',
             lang: langFull.split('_')[0] || '',
             langFull,
           };
         });
+        this.mistralVoicesList = enriched as unknown as typeof this.mistralVoicesList;
       } catch (e) {
         console.error('Failed to load Mistral voices:', e);
       }
     },
 
-    translateEmotion(this: any, emotion: string): string {
+    translateEmotion(this: AppContext, emotion: string): string {
       return this.t('emotion.' + emotion) || emotion;
     },
 
-    langToFlag(this: any, lang: string): string {
+    langToFlag(this: AppContext, lang: string): string {
       if (!lang || lang.length < 2) return '';
-      const voice = this.mistralVoicesList.find((v: any) => v.lang === lang);
+      const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
+      const voice = list.find((v) => v.lang === lang);
       const country = (voice?.langFull?.split('_')[1] || lang).toUpperCase();
       if (!/^[A-Z]{2}$/.test(country)) return '';
-      return String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.codePointAt(0) - 65));
+      return String.fromCodePoint(
+        ...[...country].map((c) => 0x1f1e6 + (c.codePointAt(0) ?? 0) - 65),
+      );
     },
 
     // Hint affiché dans l'éditeur de profil (cf. profile-picker.html:383).
@@ -76,17 +104,21 @@ export function createConfig() {
     // 1. Si l'utilisateur a configuré explicitement des voix globales
     //    (mistralVoicesSource === 'user'), afficher ces voix — le backend les utilisera.
     // 2. Sinon, selectVoices() sur le catalogue (rotation par profileId).
-    defaultVoiceHint(this: any, locale: string, profileId?: string): string {
-      if (!this.mistralVoicesList || this.mistralVoicesList.length === 0) return '';
+    defaultVoiceHint(this: AppContext, locale: string, profileId?: string): string {
+      const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
+      if (!list || list.length === 0) return '';
       const formatName = (id: string): string => {
-        const match = this.mistralVoicesList.find((v: any) => v.id === id);
+        const match = list.find((v) => v.id === id);
         if (!match) return '';
         const emotion = match.emotion ? this.translateEmotion(match.emotion) : '';
         return emotion ? `${match.speaker} - ${emotion}` : match.speaker;
       };
 
       // Priorité 1 : override global explicite ("mistralVoicesSource === 'user'").
-      const cfg = this.configDraft;
+      const cfg = this.configDraft as unknown as ConfigDraft & {
+        mistralVoicesSource?: 'default' | 'user';
+        mistralVoices?: { host?: string; guest?: string };
+      };
       if (
         cfg?.mistralVoicesSource === 'user' &&
         cfg.mistralVoices?.host &&
@@ -101,7 +133,7 @@ export function createConfig() {
 
       // Priorité 2 : sélection dynamique.
       const lang = (locale || 'fr').slice(0, 2);
-      const voices = this.mistralVoicesList as MistralVoice[];
+      const voices = list as unknown as MistralVoice[];
       const result = selectVoices({ voices, lang, profileId });
       if (!result) return '';
       const hostName = formatName(result.host);
@@ -110,10 +142,11 @@ export function createConfig() {
       return `${hostName} / ${guestName}`;
     },
 
-    async saveSettings(this: any) {
+    async saveSettings(this: AppContext) {
       try {
-        const mainModel = this.configDraft._mainModel || 'mistral-large-latest';
-        this.configDraft.models = {
+        const draft = this.configDraft as unknown as ConfigDraft;
+        const mainModel = draft._mainModel || DEFAULT_MAIN_MODEL;
+        draft.models = {
           summary: mainModel,
           flashcards: mainModel,
           quiz: mainModel,
@@ -123,62 +156,56 @@ export function createConfig() {
           chat: mainModel,
           ocr: 'mistral-ocr-latest',
         };
-        if (
-          this.configDraft.ttsProvider === 'mistral' &&
-          this.configDraft.ttsModel.startsWith('eleven')
-        ) {
-          this.configDraft.ttsModel = 'voxtral-mini-tts-latest';
-        } else if (
-          this.configDraft.ttsProvider === 'elevenlabs' &&
-          this.configDraft.ttsModel.startsWith('voxtral')
-        ) {
-          this.configDraft.ttsModel = 'eleven_v3';
+        if (draft.ttsProvider === 'mistral' && draft.ttsModel.startsWith('eleven')) {
+          draft.ttsModel = 'voxtral-mini-tts-latest';
+        } else if (draft.ttsProvider === 'elevenlabs' && draft.ttsModel.startsWith('voxtral')) {
+          draft.ttsModel = 'eleven_v3';
         }
         const res = await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(this.configDraft),
+          body: JSON.stringify(draft),
         });
         if (res.ok) {
-          const saved = await res.json();
-          this.configDraft = structuredClone(saved);
-          this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
+          const saved = (await res.json()) as AppConfig;
+          const updated = structuredClone(saved) as ConfigDraft;
+          updated._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
+          this.configDraft = updated as unknown as typeof this.configDraft;
           const statusRes = await fetch('/api/config/status');
-          if (statusRes.ok) this.apiStatus = await statusRes.json();
-          // Refresh voice cache : Mistral peut avoir publié de nouvelles voix depuis l'init.
-          await this.loadMistralVoices();
-          this.$refs.settingsDialog?.close();
+          if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
+          await this.loadMistralVoices?.();
+          (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch (e: any) {
+      } catch (e) {
         console.error('Failed to save settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error', () => this.saveSettings());
       }
     },
 
-    async resetSettings(this: any) {
+    async resetSettings(this: AppContext) {
       try {
         const res = await fetch('/api/config/reset', { method: 'POST' });
         if (res.ok) {
-          const saved = await res.json();
-          this.configDraft = structuredClone(saved);
-          this.configDraft._mainModel = saved.models?.summary || 'mistral-large-latest';
-          // Refresh voice cache : même raison que saveSettings.
-          await this.loadMistralVoices();
+          const saved = (await res.json()) as AppConfig;
+          const reset = structuredClone(saved) as ConfigDraft;
+          reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
+          this.configDraft = reset as unknown as typeof this.configDraft;
+          await this.loadMistralVoices?.();
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
           this.showToast(this.t('toast.settingsError'), 'error');
         }
-      } catch (e: any) {
+      } catch (e) {
         console.error('Failed to reset settings:', e);
         this.showToast(this.t('toast.settingsError'), 'error');
       }
     },
 
-    closeSettingsDialog(this: any) {
-      this.$refs.settingsDialog?.close();
+    closeSettingsDialog(this: AppContext) {
+      (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
     },
   };
 }

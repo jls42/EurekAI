@@ -39,7 +39,10 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
 }
 
 /** Process responses from generateAll, returns failure count. */
-export async function aggregateGenerateResults(responses: Response[], state: AppContext): Promise<number> {
+export async function aggregateGenerateResults(
+  responses: Response[],
+  state: AppContext,
+): Promise<number> {
   let failures = 0;
   for (const r of responses) {
     if (r.ok) {

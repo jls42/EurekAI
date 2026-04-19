@@ -1,5 +1,13 @@
 import { UI_LANGUAGES } from '../i18n/languages';
-import type { Profile, ProjectData, ProjectMeta, Source, ChatMessage } from '../../types';
+import type {
+  Generation,
+  Profile,
+  ProjectData,
+  ProjectMeta,
+  Source,
+  ChatMessage,
+} from '../../types';
+import type { Toast } from './toast';
 
 const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
 
@@ -48,7 +56,7 @@ export function createState() {
       );
     },
     dragging: false,
-    viewSource: null as any,
+    viewSource: null as Source | null,
     viewSourceMode: 'ocr' as string,
     viewSourceZoom: 1,
     viewSourceRotation: 0,
@@ -80,14 +88,14 @@ export function createState() {
     recordingTimer: null as ReturnType<typeof setInterval> | null,
 
     // Consigne
-    consigne: null as any,
+    consigne: null as { found: boolean; text: string; keyTopics: string[] } | null,
     consigneLoading: false,
     useConsigne: true,
 
     // Generation state
     generateCount: 10,
     countOptions: [10, 20, 30, 42, 50],
-    generations: [] as any[],
+    generations: [] as Generation[],
     openGens: {} as Record<string, boolean>,
     editingTitle: null as string | null,
     editTitleValue: '',
@@ -203,7 +211,7 @@ export function createState() {
     lightboxUrl: '',
 
     // Toasts
-    toasts: [] as any[],
+    toasts: [] as Toast[],
     toastCounter: 0,
 
     // Confirm dialog

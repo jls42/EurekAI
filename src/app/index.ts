@@ -15,6 +15,7 @@ import { createGenerate } from './generate';
 import { createGenerations } from './generations';
 import { createChat } from './chat';
 import { createRender } from './render';
+import type { AppContext } from './app-context';
 
 export function app() {
   return {
@@ -36,7 +37,7 @@ export function app() {
     ...createChat(),
     ...createRender(),
 
-    async init(this: any) {
+    async init(this: AppContext) {
       document.documentElement.dataset.theme = this.theme;
 
       this.checkMobile();
@@ -53,7 +54,7 @@ export function app() {
         if (!badge) return;
         const id = (badge as HTMLElement).dataset.sourceId;
         if (!id) return;
-        const src = this.sources.find((source: any) => source.id === id);
+        const src = this.sources.find((source) => source.id === id);
         if (src) this.openSourceDialog(src);
       });
 

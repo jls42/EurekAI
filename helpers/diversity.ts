@@ -48,7 +48,8 @@ interface SummaryShape {
 function extractQuizQuestions(gens: Generation[]): string[] {
   return gens.flatMap((g) => {
     const legacy = (g.data as LegacyQuizShape).quiz;
-    const items: QuestionItem[] = legacy ?? (Array.isArray(g.data) ? (g.data as QuestionItem[]) : []);
+    const items: QuestionItem[] =
+      legacy ?? (Array.isArray(g.data) ? (g.data as QuestionItem[]) : []);
     return items.map((q) => q.question).filter((q): q is string => Boolean(q));
   });
 }

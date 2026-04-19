@@ -1,18 +1,19 @@
 import { t as i18nT, setLocale as i18nSetLocale, getLocale } from '../i18n/index';
 import { setProfileLocale } from './profile-locale';
+import type { AppContext } from './app-context';
 
 export function createI18n() {
   return {
     locale: getLocale(),
 
-    t(this: any, key: string, params?: Record<string, string | number>): string {
+    t(this: AppContext, key: string, params?: Record<string, string | number>): string {
       // Read this.locale to create Alpine reactivity dependency
       // eslint-disable-next-line @typescript-eslint/no-unused-expressions -- Alpine.js reactive dependency trigger (voir NOSONAR S3735)
       this.locale; // NOSONAR(S3735) — Alpine.js reactive dependency trigger
       return i18nT(key, params);
     },
 
-    setLocale(this: any, lang: string, skipProfileSync = false) {
+    setLocale(this: AppContext, lang: string, skipProfileSync = false) {
       this.locale = lang;
       i18nSetLocale(lang);
       if (!skipProfileSync && this.currentProfile) {
@@ -30,7 +31,7 @@ export function createI18n() {
       }
     },
 
-    dateLocale(this: any): string {
+    dateLocale(this: AppContext): string {
       const map: Record<string, string> = {
         fr: 'fr-FR',
         en: 'en-GB',
