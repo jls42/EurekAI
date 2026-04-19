@@ -216,7 +216,7 @@ export function sourceRoutes(
     modCats: string[] | null,
     results: Source[],
   ) {
-    void triggerConsigneDetection(store, client, pid, lang);
+    triggerConsigneDetection(store, client, pid, lang);
     if (!modCats) return;
     for (const src of results) {
       void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
@@ -318,7 +318,7 @@ export function sourceRoutes(
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
     const lang = req.body.lang || 'fr';
-    void triggerConsigneDetection(store, client, req.params.pid, lang);
+    triggerConsigneDetection(store, client, req.params.pid, lang);
     res.json(source);
   });
 
@@ -366,7 +366,7 @@ export function sourceRoutes(
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-      void triggerConsigneDetection(store, client, pid, lang);
+      triggerConsigneDetection(store, client, pid, lang);
       if (modCats) {
         void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
       }
@@ -565,7 +565,7 @@ export function sourceRoutes(
       }
       for (const s of sources) store.addSource(pid, s);
       const lang = req.body.lang || 'fr';
-      void triggerConsigneDetection(store, client, pid, lang);
+      triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {
         if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
       }
