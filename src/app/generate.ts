@@ -65,7 +65,7 @@ export function showGenerateAllResult(failures: number, total: number, state: Ap
   if (failures > 0 && failures < total) {
     state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
   } else if (failures >= total) {
-    state.showToast(state.t(TOAST_GENERATION_ERROR, { error: 'all' }), 'error');
+    state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
     state.showToast(state.t('toast.allGenerated'), 'success', null, {
       label: state.t(TOAST_VIEW),
@@ -216,7 +216,7 @@ export function showAutoResult(state: AppContext, failures: number, plannedCount
       'warning',
     );
   } else if (failures >= plannedCount) {
-    state.showToast(state.t(TOAST_GENERATION_ERROR, { error: 'all' }), 'error');
+    state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
     state.showToast(state.t('toast.magicDone'), 'success', null, {
       label: state.t(TOAST_VIEW),
@@ -269,10 +269,8 @@ export function canStartGenerate(state: AppContext, type?: string): boolean {
 /** Catch-block body : silent on AbortError, retryable toast otherwise. */
 export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
   if (e instanceof Error && e.name === 'AbortError') return;
-  const msg = e instanceof Error ? e.message : String(e);
-  state.showToast(state.t(TOAST_GENERATION_ERROR, { error: msg }), 'error', () =>
-    state.generate(type),
-  );
+  console.error('[generate]', type, e);
+  state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type));
 }
 
 export function applyVoiceResult(
@@ -396,10 +394,8 @@ export function createGenerate() {
         showGenerateAllResult(failures, responses.length, this);
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t(TOAST_GENERATION_ERROR, { error: msg }), 'error', () =>
-          this.generateAll(),
-        );
+        console.error('[generate:all]', e);
+        this.showToast(this.t(TOAST_GENERATION_ERROR), 'error', () => this.generateAll());
       } finally {
         for (const type of allTypes) {
           this.loading[type] = false;
@@ -432,10 +428,8 @@ export function createGenerate() {
         showAutoResult(this, failures, plannedTypes.length);
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.autoError', { error: msg }), 'error', () =>
-          this.generateAuto(),
-        );
+        console.error('[generate:auto]', e);
+        this.showToast(this.t('toast.autoError'), 'error', () => this.generateAuto());
       } finally {
         this.loading.auto = false;
         delete this.abortControllers.auto;

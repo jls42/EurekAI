@@ -71,11 +71,12 @@ export function _handleUploadException(
   e: unknown,
 ): UploadResult {
   if (!_isSessionActive(ctx, session)) return 'ignored';
+  console.error('[sources:upload]', file.name, e);
   const msg = e instanceof Error ? e.message : String(e);
   file.status = 'error';
   file.errorMsg = msg;
   ctx.$nextTick(() => ctx.refreshIcons());
-  ctx.showToast(ctx.t('toast.uploadError', { filename: file.name, error: msg }), 'error');
+  ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
   return 'failed';
 }
 

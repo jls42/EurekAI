@@ -371,11 +371,11 @@ export const pt: Record<string, string> = {
   'toast.consigneError': 'Erro na detec\u00e7\u00e3o de instru\u00e7\u00f5es',
   'toast.view': 'Ver',
   'toast.generationDone': '{type} gerado!',
-  'toast.generationError': 'Erro na gera\u00e7\u00e3o: {error}',
+  'toast.generationError': 'A gera\u00e7\u00e3o falhou. Tenta de novo daqui a pouco.',
   'toast.allGenerated': 'Tudo gerado!',
   'toast.partialGenerated': '{count}/3 gera\u00e7\u00f5es conclu\u00eddas',
   'toast.magicDone': 'Magia conclu\u00edda!',
-  'toast.autoError': 'Erro na gera\u00e7\u00e3o autom\u00e1tica: {error}',
+  'toast.autoError': 'A gera\u00e7\u00e3o autom\u00e1tica falhou. Tenta de novo.',
   'toast.audioDone': '\u00c1udio gerado!',
   'toast.audioPartial': '\u00c1udio parcial: algumas se\u00e7\u00f5es falharam',
   'toast.audioError': 'Erro na gera\u00e7\u00e3o de \u00e1udio',
@@ -446,6 +446,6 @@ export const pt: Record<string, string> = {
   'profile.backToProfiles': 'Voltar',
 
   'toast.error': 'Erro: {error}',
-  'toast.uploadError': 'Erro no upload {filename}: {error}',
+  'toast.uploadError': 'N\u00e3o foi poss\u00edvel enviar {filename}. Tenta de novo.',
   'toast.chatErrorMsg': 'Erro no chat: {error}',
 };

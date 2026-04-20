@@ -367,11 +367,11 @@ export const en: Record<string, string> = {
   'toast.consigneError': 'Instruction detection error',
   'toast.view': 'View',
   'toast.generationDone': '{type} generated!',
-  'toast.generationError': 'Generation error: {error}',
+  'toast.generationError': 'Generation failed. Try again in a moment.',
   'toast.allGenerated': 'All generated!',
   'toast.partialGenerated': '{count}/3 generations succeeded',
   'toast.magicDone': 'Magic complete!',
-  'toast.autoError': 'Auto generation error: {error}',
+  'toast.autoError': 'Automatic generation failed. Try again.',
   'toast.audioDone': 'Audio generated!',
   'toast.audioPartial': 'Partial audio: some sections failed',
   'toast.audioError': 'Audio generation error',
@@ -442,6 +442,6 @@ export const en: Record<string, string> = {
   'profile.backToProfiles': 'Back',
 
   'toast.error': 'Error: {error}',
-  'toast.uploadError': 'Upload error {filename}: {error}',
+  'toast.uploadError': 'Could not upload {filename}. Try again.',
   'toast.chatErrorMsg': 'Chat error: {error}',
 };

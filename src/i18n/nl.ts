@@ -366,11 +366,11 @@ export const nl: Record<string, string> = {
   'toast.consigneError': 'Fout bij detectie van instructies',
   'toast.view': 'Bekijken',
   'toast.generationDone': '{type} gegenereerd!',
-  'toast.generationError': 'Generatiefout: {error}',
+  'toast.generationError': 'Generatie mislukt. Probeer het zo opnieuw.',
   'toast.allGenerated': 'Alles gegenereerd!',
   'toast.partialGenerated': '{count}/3 generaties geslaagd',
   'toast.magicDone': 'Magie voltooid!',
-  'toast.autoError': 'Automatische generatiefout: {error}',
+  'toast.autoError': 'Automatische generatie mislukt. Probeer het opnieuw.',
   'toast.audioDone': 'Audio gegenereerd!',
   'toast.audioPartial': 'Gedeeltelijke audio: sommige secties mislukt',
   'toast.audioError': 'Fout bij het genereren van audio',
@@ -439,6 +439,6 @@ export const nl: Record<string, string> = {
   'profile.backToProfiles': 'Terug',
 
   'toast.error': 'Fout: {error}',
-  'toast.uploadError': 'Uploadfout {filename}: {error}',
+  'toast.uploadError': '{filename} kon niet worden geladen. Probeer het opnieuw.',
   'toast.chatErrorMsg': 'Chatfout: {error}',
 };
