@@ -23,9 +23,11 @@ const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 const CHAT_ROUTE_PATH = '/:pid/chat';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
+type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
+
 interface ChatRequestContext {
   pid: string;
-  project: ReturnType<ProjectStore['getProject']> & {};
+  project: ChatProject;
   profile: ReturnType<ProfileStore['get']>;
   message: string;
   lang: string;
@@ -41,7 +43,7 @@ class ChatValidationError {
 
 type ResolvedProject = {
   pid: string;
-  project: ReturnType<ProjectStore['getProject']> & {};
+  project: ChatProject;
   profile: ReturnType<ProfileStore['get']>;
 };
 
@@ -247,8 +249,6 @@ async function processChatToolCalls(
 
   return { generatedIds, generations, failedTools, failedCost };
 }
-
-type ChatProject = ReturnType<ProjectStore['getProject']> & {};
 
 const appendUserAndBuildHistory = (
   store: ProjectStore,

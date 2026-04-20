@@ -9,7 +9,6 @@ const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
 
-/** Generation extended with frontend-only audio/UI state fields. */
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
   _activeAudioSection?: string;
@@ -23,7 +22,6 @@ type VoiceResult = {
   costDelta?: number;
 };
 
-/** Build POST options with JSON body and abort signal for generate endpoints. */
 export function postJson(body: unknown, signal: AbortSignal): RequestInit {
   return {
     method: 'POST',
@@ -33,7 +31,6 @@ export function postJson(body: unknown, signal: AbortSignal): RequestInit {
   };
 }
 
-/** Normalize and register a generation into the app state. */
 export function registerGeneration(state: AppContext, gen: Generation): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
@@ -42,7 +39,6 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
-/** Process responses from generateAll, returns failure count. */
 export async function aggregateGenerateResults(
   responses: Response[],
   state: AppContext,
@@ -60,7 +56,6 @@ export async function aggregateGenerateResults(
   return failures;
 }
 
-/** Show appropriate toast after generateAll completes. */
 export function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
     state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
@@ -84,7 +79,6 @@ type AutoBody = {
 
 type AutoRoute = { plan: Array<{ agent: string }>; costDelta?: number };
 
-/** Body shared by /generate/:type, /generate/route and /generate/auto. */
 export function buildGenerateBody(state: AppContext): AutoBody {
   return {
     sourceIds: state.selectedIds.length > 0 ? state.selectedIds : undefined,
@@ -95,7 +89,6 @@ export function buildGenerateBody(state: AppContext): AutoBody {
   };
 }
 
-/** Fetch /generate/route, return the plan or null on error (shows toast). */
 export async function runAutoRoute(
   state: AppContext,
   projectId: string,
@@ -121,7 +114,6 @@ export async function runAutoRoute(
   return route;
 }
 
-/** Populate plannedTypes + loading flags from a route plan (skips TTS if unavailable). */
 export function populateAutoPlan(
   state: AppContext,
   plan: Array<{ agent: string }>,
@@ -144,8 +136,6 @@ export function populateAutoPlan(
 
 type StepResult = 'success' | 'aborted' | 'failed';
 
-/** Execute one auto-plan step (fetch + register or log). Returns 'aborted' on AbortError
- * (not counted as failure) vs 'failed' (counted). */
 export async function runAutoStep(
   state: AppContext,
   type: string,
@@ -188,7 +178,6 @@ export async function runAutoStep(
   }
 }
 
-/** Run all plan steps in parallel, return the failure count (abort is not a failure). */
 export async function runAutoSteps(
   state: AppContext,
   plannedTypes: string[],
@@ -208,7 +197,6 @@ export async function runAutoSteps(
   return failures;
 }
 
-/** Final toast after all auto steps complete (success / partial / all-failed). */
 export function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
   if (failures > 0 && failures < plannedCount) {
     state.showToast(
@@ -225,7 +213,6 @@ export function showAutoResult(state: AppContext, failures: number, plannedCount
   }
 }
 
-/** Toast on non-OK response from /generate/:type, with retry callback. */
 export function handleGenerateHttpError(
   state: AppContext,
   type: string,
@@ -239,7 +226,6 @@ export function handleGenerateHttpError(
   );
 }
 
-/** Register a successful generation and show the success toast. */
 export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
   registerGeneration(state, gen);
   state.showToast(
@@ -266,7 +252,6 @@ export function canStartGenerate(state: AppContext, type?: string): boolean {
   return true;
 }
 
-/** Catch-block body : silent on AbortError, retryable toast otherwise. */
 export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
   if (e instanceof Error && e.name === 'AbortError') return;
   console.error('[generate]', type, e);
@@ -443,10 +428,8 @@ export function createGenerate() {
       }
     },
 
-    /** Playlist section order for summary read-aloud */
     _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],
 
-    /** Check if all expected sections for a summary have audio generated */
     isBatchComplete(gen: GenerationUI): boolean {
       if (!gen._audioUrl_intro || !gen._audioUrl_key_points) return false;
       const d = gen.data as { fun_fact?: string; vocabulary?: unknown[] } | undefined;
@@ -455,7 +438,6 @@ export function createGenerate() {
       return true;
     },
 
-    /** Play next section in playlist mode */
     playNextSection(this: AppContext, gen: GenerationUI) {
       if (!gen._playlistMode) return;
       const order = this._audioSectionOrder;
@@ -479,7 +461,6 @@ export function createGenerate() {
       gen._playlistMode = false;
     },
 
-    /** Initialize audio state from persisted summary data */
     initSummaryAudio(gen: GenerationUI) {
       const d = gen.data as { audioUrls?: Record<string, string>; audioUrl?: string } | undefined;
       if (!d) return;
@@ -494,7 +475,6 @@ export function createGenerate() {
       }
     },
 
-    /** Play a specific section or trigger generation if not yet available */
     playSection(this: AppContext, gen: GenerationUI, section: string | null) {
       if (section && gen[`_audioUrl_${section}`]) {
         gen._playlistMode = false;

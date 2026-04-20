@@ -1,7 +1,5 @@
 import type { AppContext } from './app-context';
-import type { ProjectData } from '../../types';
-
-type Consigne = { found: boolean; text: string; keyTopics: string[] };
+import type { Consigne, ProjectData } from '../../types';
 
 export function createConsigne() {
   return {

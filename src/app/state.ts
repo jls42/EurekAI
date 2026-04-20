@@ -1,5 +1,6 @@
 import { UI_LANGUAGES } from '../i18n/languages';
 import type {
+  Consigne,
   Generation,
   Profile,
   ProjectData,
@@ -88,7 +89,7 @@ export function createState() {
     recordingTimer: null as ReturnType<typeof setInterval> | null,
 
     // Consigne
-    consigne: null as { found: boolean; text: string; keyTopics: string[] } | null,
+    consigne: null as Consigne | null,
     consigneLoading: false,
     useConsigne: true,
 

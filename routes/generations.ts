@@ -28,8 +28,6 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 
 const FILL_BLANK = 'fill-blank';
 
-// --- Quiz / fill-blank scoring helpers ---
-
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
 
 const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
@@ -38,21 +36,30 @@ const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): v
   else stats[qi].wrong++;
 };
 
-const scoreQuizAttempt = (quizGen: QuizGeneration, answers: Record<string, unknown>): number => {
+const scoreQuizAttempt = (
+  quizGen: QuizGeneration,
+  answers: Record<string, unknown>,
+): { score: number; stats: NonNullable<QuizGeneration['stats']> } => {
+  const stats = (quizGen.stats ??= { attempts: [], questionStats: {} });
   let score = 0;
   for (const [qiStr, ci] of Object.entries(answers)) {
     const qi = Number(qiStr);
     const correct = quizGen.data[qi]?.correct === Number(ci);
     if (correct) score++;
-    bumpQuestionStat(quizGen.stats!.questionStats, qi, correct); // NOSONAR(S4325) — stats initialisé par le handler avant appel
+    bumpQuestionStat(stats.questionStats, qi, correct);
   }
-  return score;
+  return { score, stats };
 };
 
 const scoreFillBlankAttempt = (
   fbGen: FillBlankGeneration,
   answers: Record<string, unknown>,
-): { score: number; results: Record<number, boolean> } => {
+): {
+  score: number;
+  results: Record<number, boolean>;
+  stats: NonNullable<FillBlankGeneration['stats']>;
+} => {
+  const stats = (fbGen.stats ??= { attempts: [], questionStats: {} });
   let score = 0;
   const results: Record<number, boolean> = {};
   for (const [qiStr, childAnswer] of Object.entries(answers)) {
@@ -62,9 +69,9 @@ const scoreFillBlankAttempt = (
     const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
     results[qi] = match;
     if (match) score++;
-    bumpQuestionStat(fbGen.stats!.questionStats, qi, match); // NOSONAR(S4325) — stats initialisé par le handler avant appel
+    bumpQuestionStat(stats.questionStats, qi, match);
   }
-  return { score, results };
+  return { score, results, stats };
 };
 
 // --- Read Aloud (TTS) — helpers ---
@@ -252,21 +259,19 @@ export function generationCrudRoutes(
       }
 
       const quizGen = gen as QuizGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz' guard
-      quizGen.stats ??= { attempts: [], questionStats: {} };
-
-      const score = scoreQuizAttempt(quizGen, answers);
+      const { score, stats } = scoreQuizAttempt(quizGen, answers);
       const attempt: QuizAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, number>,
         score,
         total: quizGen.data.length,
       };
-      quizGen.stats.attempts.push(attempt);
+      stats.attempts.push(attempt);
 
       store.updateGeneration(req.params.pid, req.params.gid, {
-        stats: quizGen.stats,
+        stats,
       } as Partial<QuizGeneration>);
-      res.json({ attempt, stats: quizGen.stats });
+      res.json({ attempt, stats });
     } catch (e) {
       logger.error('quiz', 'attempt error:', e);
       res.status(500).json({ error: extractErrorCode(e, 'quiz') });
@@ -288,9 +293,7 @@ export function generationCrudRoutes(
       }
 
       const fbGen = gen as FillBlankGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'fill-blank' guard
-      fbGen.stats ??= { attempts: [], questionStats: {} };
-
-      const { score, results } = scoreFillBlankAttempt(fbGen, answers);
+      const { score, results, stats } = scoreFillBlankAttempt(fbGen, answers);
       const attempt: FillBlankAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, string>,
@@ -298,12 +301,12 @@ export function generationCrudRoutes(
         score,
         total: fbGen.data.length,
       };
-      fbGen.stats.attempts.push(attempt);
+      stats.attempts.push(attempt);
 
       store.updateGeneration(req.params.pid, req.params.gid, {
-        stats: fbGen.stats,
+        stats,
       } as Partial<FillBlankGeneration>);
-      res.json({ attempt, stats: fbGen.stats, results });
+      res.json({ attempt, stats, results });
     } catch (e) {
       logger.error(FILL_BLANK, 'attempt error:', e);
       res.status(500).json({ error: extractErrorCode(e, FILL_BLANK) });

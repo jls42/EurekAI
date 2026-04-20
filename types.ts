@@ -238,11 +238,17 @@ export interface CostEntry {
   usage: GenerationUsage;
 }
 
+export interface Consigne {
+  found: boolean;
+  text: string;
+  keyTopics: string[];
+}
+
 export interface ProjectData {
   meta: ProjectMeta;
   sources: Source[];
   results: ProjectResults;
-  consigne?: { found: boolean; text: string; keyTopics: string[] };
+  consigne?: Consigne;
   chat?: ChatHistory;
   costLog?: CostEntry[];
 }

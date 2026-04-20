@@ -1,6 +1,7 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import type { AppContext } from './app-context';
 import type { Profile } from '../../types';
+import type { CreateProfileBody } from '../../routes/profiles';
 
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
@@ -8,7 +9,6 @@ type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined
 const LS_PROFILE_ID = 'sf-profileId';
 const TOAST_ERROR = 'toast.error';
 
-/** Build RequestInit for DELETE /api/profiles/:id (optionally with PIN body). */
 export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
@@ -18,7 +18,6 @@ export function buildDeleteOpts(pin?: string): RequestInit {
   return opts;
 }
 
-/** Apply local state cleanup after a successful DELETE /api/profiles/:id. */
 export function finalizeDeleteProfile(state: AppContext, id: string): void {
   clearProfileLocale(id);
   state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
@@ -34,7 +33,6 @@ export function finalizeDeleteProfile(state: AppContext, id: string): void {
   state.showToast(state.t('toast.profileDeleted'), 'success');
 }
 
-/** Execute the actual profile deletion (API call + state cleanup). */
 export async function executeDeleteProfile(
   state: AppContext,
   id: string,
@@ -61,7 +59,6 @@ export async function executeDeleteProfile(
   }
 }
 
-/** Build the confirmation message for profile deletion. */
 export function deleteConfirmMessage(state: AppContext, id: string): string {
   const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;
   return projectCount > 0
@@ -69,12 +66,10 @@ export function deleteConfirmMessage(state: AppContext, id: string): string {
     : state.t('profile.deleteConfirmNoProjects');
 }
 
-/** Whether the edit form has a valid name + age pair. */
 export function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
   return !!p?.name?.trim() && !!p.age && p.age >= 4 && p.age <= 120;
 }
 
-/** Normalise partial voice selection : null when both empty, fill missing side with '' otherwise. */
 export function buildVoicesUpdate(
   mistralVoices: MistralVoicesPartial,
 ): { host: string; guest: string } | null {
@@ -85,19 +80,16 @@ export function buildVoicesUpdate(
 type ValidationResult = 'ok' | 'invalid' | 'pin_mismatch';
 type NewProfileFormState = { result: ValidationResult; name: string; age: number };
 
-/** Pure check : non-empty name + age in 4-120 range. */
 export function isValidNameAge(name: string, age: number): boolean {
   return !!name && !!age && age >= 4 && age <= 120;
 }
 
-/** PIN validation for under-15 profiles : 4 digits + match between pin/confirm. */
 export function checkMinorPin(state: AppContext): ValidationResult {
   if (!/^\d{4}$/.test(state.newProfilePin)) return 'invalid';
   if (state.newProfilePin !== state.newProfilePinConfirm) return 'pin_mismatch';
   return 'ok';
 }
 
-/** Run all validation rules on the new profile form, return result + parsed name/age. */
 export function validateNewProfileForm(state: AppContext): NewProfileFormState {
   const name = state.newProfileName.trim();
   const age = Number(state.newProfileAge);
@@ -106,13 +98,12 @@ export function validateNewProfileForm(state: AppContext): NewProfileFormState {
   return { result: 'ok', name, age };
 }
 
-/** Compose POST /api/profiles payload from the validated form. */
 export function buildCreateProfileBody(
   state: AppContext,
   name: string,
   age: number,
-): Record<string, unknown> {
-  const body: Record<string, unknown> = {
+): CreateProfileBody {
+  const body: CreateProfileBody = {
     name,
     age,
     avatar: state.newProfileAvatar,
@@ -122,7 +113,6 @@ export function buildCreateProfileBody(
   return body;
 }
 
-/** Apply state cleanup after a successful POST /api/profiles. */
 export function applyCreateProfileSuccess(state: AppContext, profile: Profile): void {
   state.profiles.push(profile);
   state.selectProfile(profile.id);
@@ -135,7 +125,6 @@ export function applyCreateProfileSuccess(state: AppContext, profile: Profile): 
   state.showProfileForm = false;
 }
 
-/** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
 export function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
   const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
     editingProfile;
@@ -294,7 +283,6 @@ export function createProfiles() {
       this.loadMistralVoices?.();
     },
 
-    /** Verify PIN before allowing parental settings changes. */
     requireParentalAccess(this: AppContext, callback: () => void) {
       if (!this.editingProfile?.hasPin) {
         callback();

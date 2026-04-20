@@ -8,6 +8,7 @@ import type {
   AgeGroup,
   FailedStep,
   FailedStepCode,
+  Consigne,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -44,10 +45,7 @@ export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
     .join('\n\n---\n\n');
 }
 
-export function applyConsigne(
-  markdown: string,
-  consigne?: { found: boolean; text: string; keyTopics: string[] },
-): string {
+export function applyConsigne(markdown: string, consigne?: Consigne): string {
   if (!consigne?.found || consigne.keyTopics.length === 0) return markdown;
   const topicsList = consigne.keyTopics.map((t) => `- ${t}`).join('\n');
   const header = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :\n${topicsList}\n\nConcentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.\n\n---\n\n`;

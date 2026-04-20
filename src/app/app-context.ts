@@ -33,7 +33,6 @@ export interface AppContext extends AppState {
   t: TFn;
   locale: string;
 
-  // Toast mixin (src/app/toast.ts)
   showToast(
     message: string,
     type?: string,
@@ -42,17 +41,14 @@ export interface AppContext extends AppState {
   ): void;
   dismissToast(id: number): void;
 
-  // Consigne mixin (src/app/consigne.ts)
   refreshConsigne(): Promise<void>;
 
-  // Sources mixin (src/app/sources.ts) — self-reference
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
 
-  // Profiles mixin (src/app/profiles.ts) — self-reference
   selectProfile(id: string): void;
   loadMistralVoices?(): Promise<void>;
   requirePin(callback: (pin: string) => void): void;
@@ -69,54 +65,43 @@ export interface AppContext extends AppState {
   requireParentalAccess(callback: () => void): void;
   _toggleProfileProp(id: string, prop: string): Promise<void>;
 
-  // Navigation mixin (src/app/navigation.ts)
   goToView(view: string): void;
 
-  // Projects mixin (src/app/projects.ts)
   createProject(): Promise<void>;
   selectProject(id: string): Promise<void>;
   deleteProject(id: string): Promise<void>;
   openLightbox(url: string): void;
 
-  // Recorder mixin (src/app/recorder.ts)
   toggleRecording(): Promise<void>;
   startRecording(): Promise<void>;
   stopRecording(): void;
   uploadVoice(blob: Blob): Promise<void>;
 
-  // Navigation / theme
   checkMobile(): void;
   toggleTheme(): void;
   openSourceDialog(src: Source): void;
 
-  // Config / profiles loader
   loadProfiles(): Promise<void>;
   loadConfig(): Promise<void>;
 
-  // Websearch
   searchWeb(): Promise<void>;
 
-  // Render mixin (src/app/render.ts)
   renderMarkdown(content: string): string;
   renderWithSources(content: string, gen: Generation): string;
   summaryData(gen: Generation): import('../../types').StudyFiche;
 
-  // Chat mixin (src/app/chat.ts)
   sendChatMessage(): Promise<void>;
   loadChatHistory(): Promise<void>;
   clearChat(): Promise<void>;
   scrollChatBottom(): void;
 
-  // Generate mixin extras (voir src/app/generate.ts)
   openSummaryDetail(gen: Generation): void;
   openGenerationDetail?(gen: Generation): void;
 
-  // Generations mixin (src/app/generations.ts)
   startEditTitle(gen: Generation): void;
   saveTitle(gen: Generation): Promise<void>;
   deleteGen(gen: Generation): Promise<void>;
 
-  // Config mixin (src/app/config.ts)
   translateEmotion(emotion: string): string;
   langToFlag(lang: string): string;
   defaultVoiceHint(locale: string, profileId?: string): string;
@@ -124,7 +109,6 @@ export interface AppContext extends AppState {
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;
 
-  // Generate mixin (src/app/generate.ts) — self-reference
   blockedModerationSource(): Source | null;
   blockedModerationStatus(): string | null;
   moderationBlockedMessage(status: string | null): string;

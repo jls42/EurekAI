@@ -13,7 +13,7 @@ const isValidAge = (age: unknown): age is number =>
 
 const isValidPin = (pin: unknown): pin is string => typeof pin === 'string' && /^\d{4}$/.test(pin);
 
-interface CreateProfileBody {
+interface RawCreateProfileBody {
   name?: unknown;
   age?: unknown;
   avatar?: string;
@@ -21,7 +21,15 @@ interface CreateProfileBody {
   pin?: unknown;
 }
 
-const validateCreateProfileInput = (body: CreateProfileBody): string | null => {
+export interface CreateProfileBody {
+  name: string;
+  age: number;
+  avatar: string;
+  locale: string;
+  pin?: string;
+}
+
+const validateCreateProfileInput = (body: RawCreateProfileBody): string | null => {
   if (!isValidName(body?.name)) return 'Nom requis';
   if (!isValidAge(body?.age)) return 'Age invalide (4-120)';
   if (body.age < 15 && !isValidPin(body?.pin))
@@ -31,7 +39,7 @@ const validateCreateProfileInput = (body: CreateProfileBody): string | null => {
 
 type CreateProfileArgs = Parameters<ProfileStore['create']>;
 
-const buildCreateProfileArgs = (body: CreateProfileBody): CreateProfileArgs => [
+const buildCreateProfileArgs = (body: RawCreateProfileBody): CreateProfileArgs => [
   (body.name as string).trim(),
   body.age as number,
   body.avatar || '0',

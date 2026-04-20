@@ -74,9 +74,6 @@ export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { 
   return { ...rest, hasPin: !!pinHash };
 }
 
-// --- Profile store ---
-
-// Retourne `true` si un champ legacy manquant a été backfilled.
 function migrateProfile(p: Profile): boolean {
   let changed = false;
   if (!p.locale) {

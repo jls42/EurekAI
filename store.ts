@@ -27,8 +27,6 @@ export class ProjectStore {
     mkdirSync(this.projectsDir, { recursive: true });
   }
 
-  // --- Index ---
-
   private readIndex(): ProjectMeta[] {
     if (existsSync(this.indexPath)) {
       try {
@@ -44,8 +42,6 @@ export class ProjectStore {
   private writeIndex(index: ProjectMeta[]) {
     writeFileSync(this.indexPath, JSON.stringify(index, null, 2));
   }
-
-  // --- Project dir helpers ---
 
   private projectDir(id: string): string {
     return join(this.projectsDir, id);
@@ -66,8 +62,6 @@ export class ProjectStore {
     mkdirSync(dir, { recursive: true });
     return dir;
   }
-
-  // --- CRUD ---
 
   listProjects(profileId?: string): ProjectMeta[] {
     const all = this.readIndex();
@@ -130,8 +124,6 @@ export class ProjectStore {
     this.saveProject(id, data);
   }
 
-  // --- Sources ---
-
   addSource(projectId: string, source: Source): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
@@ -147,8 +139,6 @@ export class ProjectStore {
     this.saveProject(projectId, data);
     return data;
   }
-
-  // --- Generations ---
 
   addGeneration(projectId: string, generation: Generation): void {
     const data = this.getProject(projectId);
@@ -240,8 +230,6 @@ export class ProjectStore {
     if (!data) return null;
     return data.results.generations.find((g) => g.id === generationId) ?? null;
   }
-
-  // --- Migration: old flat format -> generations[] ---
 
   private normalizeModeration(
     moderation:
@@ -350,8 +338,6 @@ export class ProjectStore {
     }
   }
 
-  // --- Migration from legacy sources.json ---
-
   migrateFromLegacy(legacyPath: string) {
     if (!existsSync(legacyPath)) return;
     if (this.readIndex().length > 0) return;
@@ -372,8 +358,6 @@ export class ProjectStore {
     renameSync(legacyPath, legacyPath + '.bak');
     console.log(`  Migration: ${sources.length} sources -> projet "${project.meta.name}"`);
   }
-
-  // --- Private ---
 
   private touchIndex(id: string, meta: ProjectMeta) {
     const index = this.readIndex();
