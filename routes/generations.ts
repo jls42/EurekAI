@@ -87,8 +87,7 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
   return '';
 }
 
-// Arrow const pour empêcher l'agglomération Lizard avec sectionText ci-dessus
-// (cf. CLAUDE.md "Pièges Lizard connus").
+// cf. CLAUDE.md "Pièges Lizard"
 const readAloudText = (gen: Generation, section: string): string | null => {
   if (gen.type === 'summary') return sectionText(gen.data, section);
   return null;

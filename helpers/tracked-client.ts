@@ -28,13 +28,11 @@ interface TtsRequestShape {
   input?: unknown;
 }
 
-// Arrow const pour eviter l'agglomeration du parseur TS de Lizard entre
-// helpers non-exportes consecutifs (piege connu CLAUDE.md). Unifie chat
-// + STT + agent : promptAudioSeconds est optionnel sur ApiUsage, donc
-// sa presence en chat/agent (tjs undefined dans ce cas) est inerte.
-// `||` volontaire (pas `??`) : garde CCN ≤ 8 — chaque `??` compte 2 dans Lizard
-// (piège CLAUDE.md). Les champs sont numériques (0 falsy acceptable = fallback
-// identique) ou string ('' falsy acceptable).
+// cf. CLAUDE.md "Pièges Lizard" (arrow const + CCN ≤ 8).
+// Unifie chat + STT + agent : promptAudioSeconds est optionnel sur ApiUsage,
+// sa présence en chat/agent (tjs undefined dans ce cas) est inerte.
+// `||` volontaire (pas `??`) : chaque `??` compte 2 dans Lizard. Les champs sont
+// numériques (0 falsy acceptable = fallback identique) ou string ('' falsy acceptable).
 const extractUsage = (response: UsageExtractableResponse, request: RequestWithModel): ApiUsage => {
   const u = response.usage || {};
   return {

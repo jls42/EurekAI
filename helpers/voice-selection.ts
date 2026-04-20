@@ -56,9 +56,7 @@ const TAG_SCORES: Record<string, number> = {
 
 const FEMALE_BONUS = 100;
 
-// Internal helpers declares en arrow const pour eviter que le parseur TS de
-// Lizard n'agglomere les `function` top-level non exportees consecutives
-// (piege connu CLAUDE.md).
+// cf. CLAUDE.md "Pièges Lizard"
 const scoreVoice = (v: MistralVoice): number => {
   let score = 0;
   if (v.gender === 'female') score += FEMALE_BONUS;

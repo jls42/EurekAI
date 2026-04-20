@@ -324,8 +324,8 @@ export function createGenerate() {
       const controller = new AbortController();
       this.abortControllers[type] = controller;
       try {
-        // fetch reste inline avec projectId lu directement de this.currentProjectId
-        // (pattern pré-Wave-5) pour préserver l'analyse taint Codacy rule-node-ssrf.
+        // fetch inline avec projectId lu directement de this.currentProjectId pour
+        // préserver l'analyse taint Codacy `rule-node-ssrf` — cf. CLAUDE.md section Sécurité.
         const res = await fetch(
           '/api/projects/' + projectId + '/generate/' + type,
           postJson(buildGenerateBody(this), controller.signal),

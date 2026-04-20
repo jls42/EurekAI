@@ -134,10 +134,9 @@ export function quizVocalComponent(gen: QuizVocalGeneration) {
       if (this.isReviewing()) return;
       const idx = this.currentIndex();
       if (idx === undefined || !this.currentProjectId) return;
-      // fetch reste inline (pas extrait dans un helper) pour préserver l'analyse
-      // taint Codacy rule-node-ssrf — voir CLAUDE.md section Sécurité, l'extraction
-      // `postVocalAttempt(pid, genId, ...)` réactive le finding (même incident que
-      // `deleteProfileRequest` / `API_PROJECTS_PREFIX` avant).
+      // fetch inline (pas extrait dans un helper) pour préserver l'analyse taint
+      // Codacy `rule-node-ssrf` — toute extraction vers un helper ou constante
+      // top-fichier pour le préfixe d'URL réactive le finding. Cf. CLAUDE.md section Sécurité.
       this.feedback = { loading: true, correct: false };
       try {
         const res = await fetch(

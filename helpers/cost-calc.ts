@@ -8,9 +8,7 @@ const QUANTITY_BY_UNIT = {
   'audio-seconds': (usage: ApiUsage) => usage.promptAudioSeconds ?? 0,
 } satisfies Record<BillingUnit, (usage: ApiUsage) => number>;
 
-// Arrow const : evite que le parseur TS de Lizard agglomere cet helper
-// avec `calculateCost` suivant (piege connu CLAUDE.md).
-/** Get the billable quantity for a given unit type. */
+// cf. CLAUDE.md "Pièges Lizard"
 const getQuantity = (usage: ApiUsage, unit: BillingUnit): number => QUANTITY_BY_UNIT[unit](usage);
 
 /** Calculate cost in USD for a single API call. */

@@ -39,11 +39,9 @@ export async function executeDeleteProfile(
   pin?: string,
 ): Promise<void> {
   try {
-    // fetch reste dans la même fonction que `buildDeleteOpts` pour que Codacy/Opengrep
-    // taint analysis voie l'URL hardcodée (préfixe `/api/profiles/`) et que `rule-node-ssrf`
-    // ne flagge pas. Ne pas extraire ce fetch dans un helper — ni remplacer le préfixe
-    // par une constante top-fichier (cf. incidents commits précédents : `deleteProfileRequest`
-    // et `API_PROFILES` extrait ont tous deux réactivé le finding SSRF Codacy).
+    // fetch inline (pas extrait dans un helper, pas de constante top-fichier pour le préfixe)
+    // pour préserver l'analyse taint Codacy : `rule-node-ssrf` a besoin de voir l'URL littérale
+    // `/api/profiles/` dans la fonction qui appelle `fetch` — cf. CLAUDE.md section Sécurité.
     // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline
     const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
     if (!res.ok) {

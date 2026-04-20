@@ -6,11 +6,11 @@ const MAX_BACKOFF_MS = 4000;
 
 // Bug SDK Mistral 2.2.0 : undici request.clone() échoue avec `TypeError: unusable`
 // lors des retries internes du SDK → l'exception remonte et l'appel échoue à vie.
-// On reconstruit une nouvelle request à chaque tentative pour contourner.
+// Le caller passe un closure qui re-invoque la méthode SDK à chaque tentative ;
+// chaque invocation recrée un undici Request neuf côté SDK, contournant le bug.
 const SDK_CLONE_BUG = /unusable/i;
 
-// Arrow consts pour éviter l'agglomération du parseur TS de Lizard sur helpers
-// non-exportés consécutifs (piège connu, cf. CLAUDE.md).
+// cf. CLAUDE.md "Pièges Lizard"
 const isRetryableStatus = (status: unknown): boolean => {
   if (status === 408 || status === 429) return true;
   if (typeof status !== 'number') return false;
@@ -19,7 +19,7 @@ const isRetryableStatus = (status: unknown): boolean => {
 
 // Retry ciblé : transitoires upstream (429 + 5xx) + bug SDK connu.
 // Les déterministes (400 body, 401/403 auth, 422 validation) sont fail-fast :
-// retry inutile = burn quota + latence user inacceptable (~55s avant fix).
+// retry inutile = burn quota + latence user inacceptable.
 const isRetryable = (err: unknown): boolean => {
   if (!err || typeof err !== 'object') return false;
   if (err instanceof TypeError && SDK_CLONE_BUG.test(err.message)) return true;

@@ -104,9 +104,7 @@ export function unwrapJsonArray<T>(data: unknown): T[] {
   return [];
 }
 
-// Arrow consts (plutot que function) pour eviter que le parseur TS de Lizard
-// n'agglomere les helpers non-exportes avec `unwrapJsonArray<T>` precedent
-// (cf. CLAUDE.md section "Pieges Lizard connus").
+// cf. CLAUDE.md "Pièges Lizard"
 const textFromField = (v: unknown): string | undefined => {
   if (Array.isArray(v)) return extractAllText(v);
   if (typeof v === 'string') return v;

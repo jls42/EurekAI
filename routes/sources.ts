@@ -24,8 +24,7 @@ function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
 }
 
-// Arrow const pour empêcher l'agglomération Lizard avec pendingModeration
-// (cf. CLAUDE.md "Pièges Lizard connus").
+// cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
 const runConsigneDetection = async (
@@ -150,7 +149,6 @@ export function sourceRoutes(
 
   const TEXT_EXTS = new Set(['.txt', '.md']);
 
-  /** Process a single uploaded file (OCR or text read). */
   async function processUploadedFile(
     file: Express.Multer.File,
     pid: string,
@@ -194,7 +192,6 @@ export function sourceRoutes(
   type UploadFailure = { filename: string; error: string };
   type UploadOutcome = { source?: Source; failure?: UploadFailure };
 
-  /** Run OCR/text read for a single file, persist it, and classify as success or failure. */
   async function attemptFileUpload(
     file: Express.Multer.File,
     pid: string,
@@ -223,7 +220,6 @@ export function sourceRoutes(
     }
   }
 
-  /** Fire consigne detection + per-source moderation for the successfully uploaded files. */
   function triggerUploadDownstream(
     pid: string,
     lang: string,
@@ -237,7 +233,6 @@ export function sourceRoutes(
     }
   }
 
-  /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
   const sendUploadResponse = (
     res: Response,
     results: Source[],
@@ -255,7 +250,6 @@ export function sourceRoutes(
     res.json({ sources: results, failures });
   };
 
-  /** Run attemptFileUpload for each file, partitioning outcomes into results vs failures. */
   const processUploadBatch = async (
     files: Express.Multer.File[],
     pid: string,
@@ -395,7 +389,6 @@ export function sourceRoutes(
     }
   });
 
-  /** Scrape a single URL, falling back to Mistral web_search on failure. */
   async function scrapeUrl(
     url: string,
     scrapeMode: string,
@@ -462,7 +455,6 @@ export function sourceRoutes(
     }
   }
 
-  /** Perform a keyword web search via Mistral agent. */
   async function searchByKeywords(
     searchQuery: string,
     lang: string,
@@ -489,7 +481,6 @@ export function sourceRoutes(
   type WebSourceFailure = { label: string; code: string };
   type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
 
-  /** Track a web source fetch, persist cost, and classify outcome as success or failure. */
   async function trackWebSource(
     pid: string,
     label: string,
@@ -525,7 +516,6 @@ export function sourceRoutes(
     }
   }
 
-  /** Accumulate a tracked outcome into sources/failures buckets. */
   const pushOutcome = (
     outcome: WebSourceOutcome,
     sources: Source[],
@@ -535,7 +525,6 @@ export function sourceRoutes(
     if (outcome.failure) failures.push(outcome.failure);
   };
 
-  /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
   async function collectWebSources(
     pid: string,
     req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },

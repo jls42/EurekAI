@@ -908,7 +908,7 @@ describe('POST /:pid/sources/websearch', () => {
     expect(res.status).toHaveBeenCalledWith(500);
     const payload = res.json.mock.calls[0][0];
     expect(payload.error).toBe('Aucune source extraite');
-    // trackWebSource surface les failures pour l'UI (fini le silent skip).
+    // trackWebSource surface les failures pour l'UI — verrou contre un silent skip.
     expect(payload.failures).toHaveLength(1);
     expect(payload.failures[0].label).toContain('URL scrape: https://example.com/dead');
     expect(payload.failures[0].code).toBe('upstream_unavailable');
