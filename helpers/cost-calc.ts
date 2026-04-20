@@ -8,10 +8,8 @@ const QUANTITY_BY_UNIT = {
   'audio-seconds': (usage: ApiUsage) => usage.promptAudioSeconds ?? 0,
 } satisfies Record<BillingUnit, (usage: ApiUsage) => number>;
 
-/** Get the billable quantity for a given unit type. */
-function getQuantity(usage: ApiUsage, unit: BillingUnit): number {
-  return QUANTITY_BY_UNIT[unit](usage);
-}
+// cf. CLAUDE.md "Pièges Lizard"
+const getQuantity = (usage: ApiUsage, unit: BillingUnit): number => QUANTITY_BY_UNIT[unit](usage);
 
 /** Calculate cost in USD for a single API call. */
 export function calculateCost(usage: ApiUsage): number {
@@ -27,10 +25,10 @@ export function calculateCost(usage: ApiUsage): number {
   return (getQuantity(usage, pricing.unit) * pricing.inputPerMillion) / 1_000_000;
 }
 
-function addOptional(acc: number | undefined, val: number | undefined): number | undefined {
+const addOptional = (acc: number | undefined, val: number | undefined): number | undefined => {
   if (val == null) return acc;
   return (acc || 0) + val;
-}
+};
 
 /** Aggregate multiple API call usages into a single GenerationUsage. */
 export function aggregateUsage(entries: ApiUsage[]): GenerationUsage {
@@ -68,68 +66,76 @@ export function calculateTotalCost(entries: ApiUsage[]): number {
   return Math.round(total * 1_000_000) / 1_000_000;
 }
 
-function fmt(n: number): string {
-  return n < 0.0001 ? '$0' : `$${n.toFixed(4)}`;
-}
+const fmt = (n: number): string => (n < 0.0001 ? '$0' : `$${n.toFixed(4)}`);
 
-function costLine(qty: string, rate: string, cost: number): string {
-  return `${qty} × ${rate} = ${fmt(cost)}`;
-}
+const costLine = (qty: string, rate: string, cost: number): string =>
+  `${qty} × ${rate} = ${fmt(cost)}`;
 
-function breakdownEntry(usage: ApiUsage, pricing: ModelPricing): string[] {
+const tokensBreakdown = (usage: ApiUsage, pricing: ModelPricing): string[] => {
   const lines: string[] = [];
-  switch (pricing.unit) {
-    case 'tokens':
-      if (usage.promptTokens)
-        lines.push(
-          costLine(
-            `${usage.promptTokens} tokens in`,
-            `$${pricing.inputPerMillion}/M`,
-            (usage.promptTokens * pricing.inputPerMillion) / 1_000_000,
-          ),
-        );
-      if (usage.completionTokens)
-        lines.push(
-          costLine(
-            `${usage.completionTokens} tokens out`,
-            `$${pricing.outputPerMillion}/M`,
-            (usage.completionTokens * pricing.outputPerMillion) / 1_000_000,
-          ),
-        );
-      break;
-    case 'characters':
-      if (usage.inputCharacters)
-        lines.push(
-          costLine(
-            `${usage.inputCharacters} chars`,
-            `$${pricing.inputPerMillion}/M`,
-            (usage.inputCharacters * pricing.inputPerMillion) / 1_000_000,
-          ),
-        );
-      break;
-    case 'pages':
-      if (usage.pagesProcessed)
-        lines.push(
-          costLine(
-            `${usage.pagesProcessed} page(s)`,
-            `$${pricing.inputPerMillion / 1000}/1K pages`,
-            (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000,
-          ),
-        );
-      break;
-    case 'audio-seconds':
-      if (usage.promptAudioSeconds)
-        lines.push(
-          costLine(
-            `${usage.promptAudioSeconds.toFixed(1)}s audio`,
-            `$${((pricing.inputPerMillion / 1_000_000) * 60).toFixed(4)}/min`,
-            (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000,
-          ),
-        );
-      break;
+  if (usage.promptTokens) {
+    lines.push(
+      costLine(
+        `${usage.promptTokens} tokens in`,
+        `$${pricing.inputPerMillion}/M`,
+        (usage.promptTokens * pricing.inputPerMillion) / 1_000_000,
+      ),
+    );
+  }
+  if (usage.completionTokens) {
+    lines.push(
+      costLine(
+        `${usage.completionTokens} tokens out`,
+        `$${pricing.outputPerMillion}/M`,
+        (usage.completionTokens * pricing.outputPerMillion) / 1_000_000,
+      ),
+    );
   }
   return lines;
-}
+};
+
+const charactersBreakdown = (usage: ApiUsage, pricing: ModelPricing): string[] => {
+  if (!usage.inputCharacters) return [];
+  return [
+    costLine(
+      `${usage.inputCharacters} chars`,
+      `$${pricing.inputPerMillion}/M`,
+      (usage.inputCharacters * pricing.inputPerMillion) / 1_000_000,
+    ),
+  ];
+};
+
+const pagesBreakdown = (usage: ApiUsage, pricing: ModelPricing): string[] => {
+  if (!usage.pagesProcessed) return [];
+  return [
+    costLine(
+      `${usage.pagesProcessed} page(s)`,
+      `$${pricing.inputPerMillion / 1000}/1K pages`,
+      (usage.pagesProcessed * pricing.inputPerMillion) / 1_000_000,
+    ),
+  ];
+};
+
+const audioBreakdown = (usage: ApiUsage, pricing: ModelPricing): string[] => {
+  if (!usage.promptAudioSeconds) return [];
+  return [
+    costLine(
+      `${usage.promptAudioSeconds.toFixed(1)}s audio`,
+      `$${((pricing.inputPerMillion / 1_000_000) * 60).toFixed(4)}/min`,
+      (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000,
+    ),
+  ];
+};
+
+const BREAKDOWN_BY_UNIT = {
+  tokens: tokensBreakdown,
+  characters: charactersBreakdown,
+  pages: pagesBreakdown,
+  'audio-seconds': audioBreakdown,
+} satisfies Record<BillingUnit, (usage: ApiUsage, pricing: ModelPricing) => string[]>;
+
+const breakdownEntry = (usage: ApiUsage, pricing: ModelPricing): string[] =>
+  BREAKDOWN_BY_UNIT[pricing.unit](usage, pricing);
 
 /** Build a human-readable cost breakdown showing the calculation per API call. */
 export function buildCostBreakdown(entries: ApiUsage[]): string[] {

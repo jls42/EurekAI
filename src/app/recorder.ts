@@ -1,8 +1,10 @@
 import { addCostDelta } from './cost-utils';
+import type { AppContext } from './app-context';
+import type { Source } from '../../types';
 
 export function createRecorder() {
   return {
-    async toggleRecording(this: any) {
+    async toggleRecording(this: AppContext) {
       if (this.recording) {
         this.stopRecording();
       } else {
@@ -10,7 +12,7 @@ export function createRecorder() {
       }
     },
 
-    async startRecording(this: any) {
+    async startRecording(this: AppContext) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         this.recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
@@ -27,12 +29,13 @@ export function createRecorder() {
         this.recordingTimer = setInterval(() => {
           this.recordingDuration++;
         }, 1000);
-      } catch (e: any) {
-        this.showToast(this.t('toast.micError', { error: e.message }), 'error');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.micError', { error: msg }), 'error');
       }
     },
 
-    stopRecording(this: any) {
+    stopRecording(this: AppContext) {
       if (this.recorder?.state === 'recording') {
         this.recorder.stop();
       }
@@ -43,7 +46,7 @@ export function createRecorder() {
       }
     },
 
-    async uploadVoice(this: any, blob: Blob) {
+    async uploadVoice(this: AppContext, blob: Blob) {
       if (!this.currentProjectId) return;
       this.loading.voice = true;
       try {
@@ -55,22 +58,23 @@ export function createRecorder() {
           body: formData,
         });
         if (!res.ok) {
-          const err = await res.json();
+          const err = (await res.json()) as { error?: string };
           this.showToast(
             this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
             'error',
           );
           return;
         }
-        const source = await res.json();
+        const source = (await res.json()) as Source & { estimatedCost?: number };
         this.sources.push(source);
         this.selectedIds.push(source.id);
         addCostDelta(this, source.estimatedCost, 'sources/voice');
         this.showToast(this.t('toast.voiceTranscribed'), 'success');
         this.$nextTick(() => this.refreshIcons());
         setTimeout(() => this.refreshModeration(), 2000);
-      } catch (e: any) {
-        this.showToast(this.t('toast.transcriptionError', { error: e.message }), 'error');
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        this.showToast(this.t('toast.transcriptionError', { error: msg }), 'error');
       } finally {
         this.loading.voice = false;
       }

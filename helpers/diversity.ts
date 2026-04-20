@@ -19,42 +19,73 @@ export function diversityParams(type: string) {
   };
 }
 
+// Shapes minimales lues par les extracteurs. `g.data` est typé par la Generation
+// discriminée, mais accepte aussi des formats legacy ({quiz: [...]} / {flashcards:[...]})
+// — ces shapes minimales les couvrent sans `any`.
+interface QuestionItem {
+  question?: unknown;
+}
+interface AnswerItem {
+  answer?: unknown;
+}
+interface PodcastLine {
+  speaker?: unknown;
+  text?: unknown;
+}
+interface LegacyQuizShape {
+  quiz?: QuestionItem[];
+}
+interface LegacyFlashShape {
+  flashcards?: QuestionItem[];
+}
+interface PodcastShape {
+  script?: PodcastLine[];
+}
+interface SummaryShape {
+  key_points?: string[];
+}
+
 function extractQuizQuestions(gens: Generation[]): string[] {
   return gens.flatMap((g) => {
-    const questions = (g.data as any)?.quiz || (Array.isArray(g.data) ? g.data : []);
-    return questions.map((q: any) => q.question).filter(Boolean);
+    const legacy = (g.data as LegacyQuizShape).quiz;
+    const items: QuestionItem[] =
+      legacy ?? (Array.isArray(g.data) ? (g.data as QuestionItem[]) : []);
+    return items.map((q) => q.question).filter((q): q is string => Boolean(q));
   });
 }
 
 function extractFlashcardQuestions(gens: Generation[]): string[] {
   return gens.flatMap((g) => {
-    const cards = (g.data as any)?.flashcards || (Array.isArray(g.data) ? g.data : []);
-    return cards.map((f: any) => f.question).filter(Boolean);
+    const legacy = (g.data as LegacyFlashShape).flashcards;
+    const cards: QuestionItem[] =
+      legacy ?? (Array.isArray(g.data) ? (g.data as QuestionItem[]) : []);
+    return cards.map((f) => f.question).filter((q): q is string => Boolean(q));
   });
 }
 
 function extractFillBlankAnswers(gens: Generation[]): string[] {
   return gens.flatMap((g) => {
-    const items = Array.isArray(g.data) ? g.data : [];
-    return items.map((item: any) => item.answer).filter(Boolean);
+    const items: AnswerItem[] = Array.isArray(g.data) ? (g.data as AnswerItem[]) : [];
+    return items.map((item) => item.answer).filter((a): a is string => Boolean(a));
   });
 }
 
 function extractPodcastTopics(gens: Generation[]): string[] {
   return gens
     .map((g) => {
-      const script = (g.data as any)?.script;
+      const script = (g.data as PodcastShape).script;
       if (!Array.isArray(script)) return '';
-      const firstHost = script.find((l: any) => l.speaker === 'host');
-      return firstHost?.text?.slice(0, 100) || '';
+      const firstHost = script.find((l) => l.speaker === 'host');
+      const text = firstHost?.text;
+      return typeof text === 'string' ? text.slice(0, 100) : '';
     })
     .filter(Boolean);
 }
 
 function extractSummaryKeyPoints(gens: Generation[]): string[] {
   return gens.flatMap((g) => {
-    const data = g.data as any;
-    return (data?.key_points || []).slice(0, 5);
+    const data = g.data as SummaryShape;
+    return (data.key_points ?? []).slice(0, 5);
   });
 }
 

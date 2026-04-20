@@ -1,54 +1,56 @@
 import { normalizeSummaryData } from './helpers';
+import type { AppContext } from './app-context';
+import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
-/** Normalize summary data and init gen props for all generations. */
-function normalizeGenerations(state: any, generations: any[]): void {
+const LS_LAST_PROJECT_ID = 'sf-lastProjectId';
+
+function normalizeGenerations(state: AppContext, generations: Generation[]): void {
   for (const gen of generations) {
     normalizeSummaryData(gen);
     state.initGenProps(gen);
   }
 }
 
-/** Find the latest generation per type and return their ids. */
-function buildLatestByType(generations: any[]): string[] {
-  const latestByType: Record<string, any> = {};
+function buildLatestByType(generations: Generation[]): string[] {
+  const latestByType: Record<string, Generation> = {};
   for (const gen of generations) {
-    if (!latestByType[gen.type] || gen.createdAt > latestByType[gen.type].createdAt) {
+    const prev = latestByType[gen.type];
+    if (!prev || gen.createdAt > prev.createdAt) {
       latestByType[gen.type] = gen;
     }
   }
-  return Object.values(latestByType).map((gen: any) => gen.id);
+  return Object.values(latestByType).map((gen) => gen.id);
 }
 
 export function createProjects() {
   return {
-    sortedProjects(this: any) {
+    sortedProjects(this: AppContext): ProjectMeta[] {
       return [...this.projects].sort(
-        (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
       );
     },
 
-    openLightbox(this: any, url: string) {
+    openLightbox(this: AppContext, url: string) {
       this.lightboxUrl = url;
-      this.$refs.imageLightbox?.showModal();
+      (this.$refs.imageLightbox as HTMLDialogElement | undefined)?.showModal();
     },
 
-    async loadProjects(this: any) {
+    async loadProjects(this: AppContext) {
       try {
         const profileId = this.currentProfile?.id;
         const url = profileId ? `/api/projects?profileId=${profileId}` : '/api/projects';
         const res = await fetch(url);
-        if (res.ok) this.projects = await res.json();
+        if (res.ok) this.projects = (await res.json()) as ProjectMeta[];
       } catch {
         /* silent: offline, liste projets vide acceptable */
       }
-      // Auto-restore last project (important for mobile)
-      const lastId = localStorage.getItem('sf-lastProjectId');
-      if (lastId && !this.currentProjectId && this.projects.some((p: any) => p.id === lastId)) {
+      const lastId = localStorage.getItem(LS_LAST_PROJECT_ID);
+      if (lastId && !this.currentProjectId && this.projects.some((p) => p.id === lastId)) {
         await this.selectProject(lastId);
       }
     },
 
-    async createProject(this: any) {
+    async createProject(this: AppContext) {
       const name = this.newProjectName.trim();
       if (!name) return;
       try {
@@ -59,7 +61,7 @@ export function createProjects() {
           body: JSON.stringify({ name, profileId }),
         });
         if (res.ok) {
-          const meta = await res.json();
+          const meta = (await res.json()) as ProjectMeta;
           this.projects.push(meta);
           this.newProjectName = '';
           this.showNewProject = false;
@@ -71,17 +73,17 @@ export function createProjects() {
       }
     },
 
-    async selectProject(this: any, id: string) {
+    async selectProject(this: AppContext, id: string) {
       this.currentProjectId = id;
-      localStorage.setItem('sf-lastProjectId', id);
+      localStorage.setItem(LS_LAST_PROJECT_ID, id);
       this.resetState();
       try {
         const res = await fetch('/api/projects/' + id);
         if (!res.ok) return;
-        const project = await res.json();
+        const project = (await res.json()) as ProjectData;
         this.currentProject = project;
         this.sources = project.sources || [];
-        this.selectedIds = this.sources.map((s: any) => s.id);
+        this.selectedIds = this.sources.map((s) => s.id);
         this.generations = project.results?.generations || [];
         this.consigne = project.consigne || null;
         this.useConsigne = localStorage.getItem(`consigne-dismissed-${id}`) !== 'true';
@@ -101,19 +103,19 @@ export function createProjects() {
       }
     },
 
-    async deleteProject(this: any, id: string) {
+    async deleteProject(this: AppContext, id: string) {
       await fetch('/api/projects/' + id, { method: 'DELETE' });
-      this.projects = this.projects.filter((p: any) => p.id !== id);
+      this.projects = this.projects.filter((p) => p.id !== id);
       if (this.currentProjectId === id) {
         this.currentProjectId = null;
         this.currentProject = null;
-        localStorage.removeItem('sf-lastProjectId');
+        localStorage.removeItem(LS_LAST_PROJECT_ID);
         this.resetState();
       }
       this.showToast(this.t('toast.projectDeleted'), 'info');
     },
 
-    resetState(this: any) {
+    resetState(this: AppContext) {
       this.sources = [];
       this.selectedIds = [];
       this.uploadSessions = [];

@@ -8,6 +8,7 @@ import type {
   AgeGroup,
   FailedStep,
   FailedStepCode,
+  Consigne,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -15,9 +16,9 @@ import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../confi
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
-import { generatePodcastScript } from '../generators/podcast.js';
+import { generatePodcastScript, createPodcastGeneration } from '../generators/podcast.js';
 import { generateAudio } from '../generators/tts.js';
-import { ttsQuestion } from '../generators/quiz-vocal.js';
+import { ttsQuestion, createQuizVocalGeneration } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
@@ -31,6 +32,10 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
+const QUIZ_VOCAL = 'quiz-vocal';
+const FILL_BLANK = 'fill-blank';
+const ROUTER_MODEL = 'mistral-small-latest';
+
 export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
   const selected =
     sourceIds && sourceIds.length > 0 ? sources.filter((s) => sourceIds.includes(s.id)) : sources;
@@ -40,22 +45,27 @@ export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
     .join('\n\n---\n\n');
 }
 
-export function applyConsigne(
-  markdown: string,
-  consigne?: { found: boolean; text: string; keyTopics: string[] },
-): string {
+export function applyConsigne(markdown: string, consigne?: Consigne): string {
   if (!consigne?.found || consigne.keyTopics.length === 0) return markdown;
   const topicsList = consigne.keyTopics.map((t) => `- ${t}`).join('\n');
   const header = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :\n${topicsList}\n\nConcentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.\n\n---\n\n`;
   return header + markdown;
 }
 
-function resolveSourceIds(body: any, sources: Source[]): string[] {
-  const ids = body.sourceIds || [];
-  return ids.length > 0 ? ids : sources.map((s) => s.id);
+interface GenRequestBody {
+  sourceIds?: string[];
+  useConsigne?: boolean;
+  lang?: string;
+  ageGroup?: AgeGroup;
+  count?: number | string;
 }
 
-function checkContextLimit(markdown: string, modelId: string): string | null {
+const resolveSourceIds = (body: GenRequestBody, sources: Source[]): string[] => {
+  const ids = body.sourceIds ?? [];
+  return ids.length > 0 ? ids : sources.map((s) => s.id);
+};
+
+const checkContextLimit = (markdown: string, modelId: string): string | null => {
   const limits = getModelLimits();
   const limit = limits[modelId] ?? 128_000;
   const estimatedTokens = Math.ceil(markdown.length / 2);
@@ -64,28 +74,31 @@ function checkContextLimit(markdown: string, modelId: string): string | null {
     return `context_too_large:${pct}`;
   }
   return null;
-}
+};
 
-function checkModeration(
+const selectModeratedSources = (project: { sources: Source[] }, sourceIds?: string[]): Source[] =>
+  sourceIds && sourceIds.length > 0
+    ? project.sources.filter((s) => sourceIds.includes(s.id))
+    : project.sources;
+
+const findBlockedSource = (sources: Source[]): Source | undefined =>
+  sources.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
+
+const checkModeration = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
   sourceIds?: string[],
-): string | null {
+): string | null => {
   const project = store.getProject(pid);
   if (!project) return null;
   const profileId = project.meta.profileId;
   if (!profileId) return null;
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
-  const selected =
-    sourceIds && sourceIds.length > 0
-      ? project.sources.filter((s) => sourceIds.includes(s.id))
-      : project.sources;
-  const blocked = selected.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
-  if (blocked) return blocked.filename;
-  return null;
-}
+  const blocked = findBlockedSource(selectModeratedSources(project, sourceIds));
+  return blocked ? blocked.filename : null;
+};
 
 interface GenContext {
   project: ReturnType<ProjectStore['getProject']> & {};
@@ -136,7 +149,7 @@ function buildGenContext(
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
-  body: any,
+  body: GenRequestBody,
   modelId?: string,
   options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ):
@@ -216,7 +229,7 @@ function handleGeneration(
         res.json(gen);
       }
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
       }
@@ -363,17 +376,17 @@ export function generateRoutes(
         );
         logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
 
-        return {
+        // lang figé sur la génération pour que le badge beta audio (hi/ar) reste
+        // cohérent après un changement de locale UI ultérieur.
+        return createPodcastGeneration({
           id: randomUUID(),
           title: autoTitle('podcast', null, ctx.lang),
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'podcast',
           data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
-          // Figer lang sur la génération pour que le badge beta audio (hi/ar) reste cohérent
-          // après un changement de locale UI. Aligné sur QuizVocalGeneration.
           lang: ctx.lang,
-        };
+        });
       },
       'podcast',
       { agentName: 'podcast' },
@@ -431,8 +444,8 @@ export function generateRoutes(
       store,
       profileStore,
       async (ctx) => {
-        logger.info('quiz-vocal', 'Generating quiz (TTS-friendly)...');
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz-vocal');
+        logger.info(QUIZ_VOCAL, 'Generating quiz (TTS-friendly)...');
+        const exclusions = buildExclusionContext(ctx.project.results.generations, QUIZ_VOCAL);
         const data = await generateQuizVocal(
           client,
           ctx.markdown,
@@ -442,9 +455,9 @@ export function generateRoutes(
           ctx.count,
           exclusions,
         );
-        logger.info('quiz-vocal', `Quiz OK: ${data.length} questions`);
+        logger.info(QUIZ_VOCAL, `Quiz OK: ${data.length} questions`);
 
-        logger.info('quiz-vocal', 'Generating TTS for each question...');
+        logger.info(QUIZ_VOCAL, 'Generating TTS for each question...');
         const audioUrls: string[] = [];
         const projectDir = store.getProjectDir(ctx.pid);
         const hostVoice = resolveVoices(
@@ -452,7 +465,7 @@ export function generateRoutes(
           ctx.profileVoices,
           ctx.lang,
           ctx.profileId,
-          'quiz-vocal',
+          QUIZ_VOCAL,
         ).host;
         const ttsOpts = {
           provider: ctx.config.ttsProvider,
@@ -463,27 +476,27 @@ export function generateRoutes(
           const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
           audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
           logger.info(
-            'quiz-vocal',
+            QUIZ_VOCAL,
             `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`,
           );
         }
 
-        return {
+        // lang + ageGroup figés pour que verifyAnswer utilise le contexte de
+        // génération, jamais le profil courant (qui peut changer après coup).
+        return createQuizVocalGeneration({
           id: randomUUID(),
-          title: autoTitle('quiz-vocal', data),
+          title: autoTitle(QUIZ_VOCAL, data),
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'quiz-vocal',
           data,
           audioUrls,
-          // Phase 1B.1 — figer lang + ageGroup sur la génération pour que verifyAnswer
-          // utilise le contexte de génération, pas le profil courant (cf. décision produit #4).
           lang: ctx.lang,
           ageGroup: ctx.ageGroup,
-        };
+        });
       },
       'quiz',
-      { agentName: 'quiz-vocal' },
+      { agentName: QUIZ_VOCAL },
     ),
   );
 
@@ -530,10 +543,10 @@ export function generateRoutes(
       profileStore,
       async (ctx) => {
         logger.info(
-          'fill-blank',
+          FILL_BLANK,
           `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
         );
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'fill-blank');
+        const exclusions = buildExclusionContext(ctx.project.results.generations, FILL_BLANK);
         const data = await generateFillBlank(
           client,
           ctx.markdown,
@@ -545,7 +558,7 @@ export function generateRoutes(
         );
         return {
           id: randomUUID(),
-          title: autoTitle('fill-blank', data, ctx.lang),
+          title: autoTitle(FILL_BLANK, data, ctx.lang),
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'fill-blank',
@@ -553,7 +566,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { agentName: 'fill-blank' },
+      { agentName: FILL_BLANK },
     ),
   );
 
@@ -576,7 +589,7 @@ export function generateRoutes(
     profileId?: string;
   }
 
-  function makeGen(type: string, data: any, ctx: AutoCtx): Generation {
+  function makeGen(type: string, data: Generation['data'], ctx: AutoCtx): Generation {
     return {
       id: randomUUID(),
       title: autoTitle(type, data, ctx.lang),
@@ -628,7 +641,7 @@ export function generateRoutes(
       return makeGen('quiz', data, ctx);
     },
     'fill-blank': async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'fill-blank');
+      const excl = buildExclusionContext(ctx.generations, FILL_BLANK);
       const data = await generateFillBlank(
         ctx.client,
         ctx.markdown,
@@ -638,7 +651,7 @@ export function generateRoutes(
         ctx.count,
         excl,
       );
-      return makeGen('fill-blank', data, ctx);
+      return makeGen(FILL_BLANK, data, ctx);
     },
     podcast: async (ctx) => {
       const excl = buildExclusionContext(ctx.generations, 'podcast');
@@ -672,7 +685,7 @@ export function generateRoutes(
       } as Generation;
     },
     'quiz-vocal': async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'quiz-vocal');
+      const excl = buildExclusionContext(ctx.generations, QUIZ_VOCAL);
       const data = await generateQuizVocal(
         ctx.client,
         ctx.markdown,
@@ -689,7 +702,7 @@ export function generateRoutes(
         ctx.profileVoices,
         ctx.lang,
         ctx.profileId,
-        'quiz-vocal',
+        QUIZ_VOCAL,
       ).host;
       const ttsOpts = {
         provider: ctx.config.ttsProvider,
@@ -701,7 +714,7 @@ export function generateRoutes(
         audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
       }
       return {
-        ...makeGen('quiz-vocal', data, ctx),
+        ...makeGen(QUIZ_VOCAL, data, ctx),
         audioUrls,
         lang: ctx.lang,
         ageGroup: ctx.ageGroup,
@@ -737,14 +750,14 @@ export function generateRoutes(
       const markdown = useConsigneRoute
         ? applyConsigne(rawMarkdown, project.consigne)
         : rawMarkdown;
-      const ctxError = checkContextLimit(markdown, 'mistral-small-latest');
+      const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
       if (ctxError) {
         res.status(400).json({ error: ctxError });
         return;
       }
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
-        routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
+        routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
       );
       const routeCost = persistUsage(
         store,
@@ -755,7 +768,7 @@ export function generateRoutes(
       logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
       res.json({ ...route, ...(routeCost && { costDelta: routeCost.cost }) });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           store,
@@ -805,7 +818,7 @@ export function generateRoutes(
       logger.info('auto', `${step.agent} OK`);
       return { ok: true, gen };
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           st,
@@ -855,10 +868,10 @@ export function generateRoutes(
   // l'UI fait déjà ce filtrage côté client (src/app/generate.ts) ; cette liste garantit
   // le même comportement pour les consommateurs API directs (sinon
   // `enrichPlanForLearning` en injecte et tous échouent en `auth_required`).
-  const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set([
+  const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set<AutoAgentType>([
     'podcast',
-    'quiz-vocal',
-  ] as AutoAgentType[]);
+    QUIZ_VOCAL,
+  ]);
 
   function splitByTtsAvailability<T extends { agent: AutoAgentType }>(
     plan: T[],
@@ -880,7 +893,7 @@ export function generateRoutes(
   async function runAutoRouting(markdown: string, lang: string, ageGroup: AgeGroup, pid: string) {
     logger.info('auto', 'Smart routing: analyzing content...');
     const { result: route, usage } = await runWithUsageTracking(() =>
-      routeRequest(client, markdown, 'mistral-small-latest', lang, ageGroup),
+      routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
     );
     persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
     logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
@@ -922,13 +935,7 @@ export function generateRoutes(
 
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
-      const built = buildGenContext(
-        store,
-        profileStore,
-        req.params.pid,
-        req.body,
-        'mistral-small-latest',
-      );
+      const built = buildGenContext(store, profileStore, req.params.pid, req.body, ROUTER_MODEL);
       if (!built.ok) {
         res.status(built.status).json({ error: built.error });
         return;
@@ -956,7 +963,7 @@ export function generateRoutes(
         ...(allFailed && { error: 'all_steps_failed' }),
       });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(
           store,

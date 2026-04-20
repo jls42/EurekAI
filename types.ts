@@ -1,3 +1,5 @@
+import type { GenerationUsage } from './helpers/pricing.js';
+
 // --- Profiles ---
 
 export type AgeGroup = 'enfant' | 'ado' | 'etudiant' | 'adulte';
@@ -16,6 +18,7 @@ export interface Profile {
   mistralVoices?: { host: string; guest: string };
   theme?: 'dark' | 'light';
   pinHash?: string;
+  hasPin?: boolean;
   createdAt: string;
   updatedAt?: string;
 }
@@ -45,7 +48,7 @@ export interface Source {
   scrapeEngine?: 'readability' | 'lightpanda' | 'mistral';
   filePath?: string;
   estimatedCost?: number;
-  usage?: import('./helpers/pricing.js').GenerationUsage;
+  usage?: GenerationUsage;
   costBreakdown?: string[];
   ocrConfidence?: OcrConfidence;
 }
@@ -88,7 +91,7 @@ export interface GenerationMeta {
   title: string;
   createdAt: string;
   sourceIds: string[];
-  usage?: import('./helpers/pricing.js').GenerationUsage;
+  usage?: GenerationUsage;
   estimatedCost?: number;
   costBreakdown?: string[];
 }
@@ -232,14 +235,24 @@ export interface CostEntry {
   timestamp: string;
   route: string;
   cost: number;
-  usage: import('./helpers/pricing.js').GenerationUsage;
+  usage: GenerationUsage;
+}
+
+export interface Consigne {
+  found: boolean;
+  text: string;
+  keyTopics: string[];
+  // `status` absent = legacy record (considéré OK). `'failed'` = détection erreur
+  // surface un badge UI sans bloquer la génération (cf. CLAUDE.md OCR tier).
+  status?: 'ok' | 'failed';
+  error?: string;
 }
 
 export interface ProjectData {
   meta: ProjectMeta;
   sources: Source[];
   results: ProjectResults;
-  consigne?: { found: boolean; text: string; keyTopics: string[] };
+  consigne?: Consigne;
   chat?: ChatHistory;
   costLog?: CostEntry[];
 }

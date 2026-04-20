@@ -1,11 +1,14 @@
+import type { AppContext } from './app-context';
+import type { Consigne, ProjectData } from '../../types';
+
 export function createConsigne() {
   return {
-    async refreshConsigne(this: any) {
+    async refreshConsigne(this: AppContext) {
       if (!this.currentProjectId) return;
       try {
         const res = await fetch('/api/projects/' + this.currentProjectId);
         if (res.ok) {
-          const project = await res.json();
+          const project = (await res.json()) as ProjectData;
           if (project.consigne) {
             this.consigne = project.consigne;
             this.$nextTick(() => this.refreshIcons());
@@ -16,9 +19,9 @@ export function createConsigne() {
       }
     },
 
-    async detectConsigne(this: any) {
+    async detectConsigne(this: AppContext) {
       if (!this.currentProjectId) return;
-      this.$refs.consigneDialog?.close();
+      (this.$refs.consigneDialog as HTMLDialogElement | undefined)?.close();
       this.consigneLoading = true;
       this.showToast(this.t('toast.consigneAnalyzing'), 'info');
       try {
@@ -28,14 +31,14 @@ export function createConsigne() {
           body: JSON.stringify({ lang: this.locale }),
         });
         if (res.ok) {
-          this.consigne = await res.json();
+          this.consigne = (await res.json()) as Consigne;
           this.showToast(
             this.consigne.found ? this.t('toast.consigneDetected') : this.t('toast.noConsigne'),
             this.consigne.found ? 'success' : 'info',
           );
           if (this.consigne.found) {
             this.$nextTick(() => {
-              this.$refs.consigneDialog?.showModal();
+              (this.$refs.consigneDialog as HTMLDialogElement | undefined)?.showModal();
               this.refreshIcons();
             });
           }

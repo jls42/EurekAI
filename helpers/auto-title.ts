@@ -1,11 +1,12 @@
 /** Shared auto-title generation for all generation types. */
 
-const arrayLen = (data: any): string | number => (Array.isArray(data) ? data.length : '?');
+const arrayLen = (data: unknown): string | number => (Array.isArray(data) ? data.length : '?');
 
-const TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
+const TITLE_FORMATTERS: Record<string, (data: unknown, lang: string) => string> = {
   summary: (data, lang) => {
     const prefix = lang === 'en' ? 'Note' : 'Fiche';
-    return data?.title ? `${prefix} — ${data.title}` : 'summary';
+    const title = (data as { title?: string } | null | undefined)?.title;
+    return title ? `${prefix} — ${title}` : 'summary';
   },
   flashcards: (data) => `Flashcards (${arrayLen(data)})`,
   quiz: (data) => `Quiz (${arrayLen(data)} questions)`,
@@ -17,7 +18,7 @@ const TITLE_FORMATTERS: Record<string, (data: any, lang: string) => string> = {
     `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
 };
 
-export function autoTitle(type: string, data: any, lang = 'fr'): string {
+export function autoTitle(type: string, data: unknown, lang = 'fr'): string {
   const formatter = TITLE_FORMATTERS[type];
   return formatter ? formatter(data, lang) : type;
 }

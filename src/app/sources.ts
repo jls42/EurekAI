@@ -6,14 +6,16 @@ type UploadResult = 'applied' | 'ignored' | 'failed';
 type UploadSession = AppState['uploadSessions'][number];
 type UploadFile = UploadSession['files'][number];
 
-function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
+const TOAST_ERROR = 'toast.error';
+
+export function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
   return (
     ctx.uploadSessions.some((s: UploadSession) => s.id === session.id) &&
     ctx.currentProjectId === session.projectId
   );
 }
 
-async function _resolveHttpError(
+export async function _resolveHttpError(
   ctx: AppContext,
   session: UploadSession,
   res: Response,
@@ -28,7 +30,7 @@ async function _resolveHttpError(
   }
 }
 
-function _applyUploadSuccess(
+export function _applyUploadSuccess(
   ctx: AppContext,
   session: UploadSession,
   file: UploadFile,
@@ -47,7 +49,37 @@ function _applyUploadSuccess(
   }
 }
 
-async function _uploadSingleFile(
+export async function _handleUploadHttpError(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  res: Response,
+): Promise<UploadResult> {
+  const resolved = await _resolveHttpError(ctx, session, res);
+  if (resolved === null) return 'ignored';
+  file.status = 'error';
+  file.errorMsg = resolved;
+  ctx.$nextTick(() => ctx.refreshIcons());
+  ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
+  return 'failed';
+}
+
+export function _handleUploadException(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  e: unknown,
+): UploadResult {
+  if (!_isSessionActive(ctx, session)) return 'ignored';
+  console.error('[sources:upload]', file.name, e);
+  file.status = 'error';
+  file.errorMsg = ctx.t('sources.uploadError.generic');
+  ctx.$nextTick(() => ctx.refreshIcons());
+  ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
+  return 'failed';
+}
+
+export async function _uploadSingleFile(
   this: AppContext,
   session: UploadSession,
   fileId: string,
@@ -69,42 +101,71 @@ async function _uploadSingleFile(
       method: 'POST',
       body: formData,
     });
-
     if (!_isSessionActive(this, session)) return 'ignored';
-
-    if (!res.ok) {
-      const resolved = await _resolveHttpError(this, session, res);
-      if (resolved === null) return 'ignored';
-      file.status = 'error';
-      file.errorMsg = resolved;
-      this.$nextTick(() => this.refreshIcons());
-      this.showToast(this.t('toast.error', { error: resolved }), 'error');
-      return 'failed';
-    }
-
+    if (!res.ok) return _handleUploadHttpError(this, session, file, res);
     const newSources = await res.json();
     if (!_isSessionActive(this, session)) return 'ignored';
-
     _applyUploadSuccess(this, session, file, newSources);
     return 'applied';
   } catch (e: unknown) {
-    if (!_isSessionActive(this, session)) return 'ignored';
-    const msg = e instanceof Error ? e.message : String(e);
-    file.status = 'error';
-    file.errorMsg = msg;
-    this.$nextTick(() => this.refreshIcons());
-    this.showToast(this.t('toast.uploadError', { filename: file.name, error: msg }), 'error');
-    return 'failed';
+    return _handleUploadException(this, session, file, e);
   }
 }
 
-function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
+export function _createUploadSession(
+  ctx: AppContext,
+  fileList: FileList,
+  projectId: string,
+): UploadSession | null {
+  const sessionId = crypto.randomUUID();
+  const files = Array.from(fileList).map((f) => ({
+    id: crypto.randomUUID(),
+    name: f.name,
+    file: f as File | null,
+    status: 'pending' as const,
+    errorMsg: null as string | null,
+  }));
+  ctx.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
+  ctx.$nextTick(() => ctx.refreshIcons());
+  return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
+}
+
+export async function _runUploadLoop(
+  ctx: AppContext,
+  session: UploadSession,
+): Promise<{ applied: number; interrupted: boolean }> {
+  let applied = 0;
+  let interrupted = false;
+  for (const fileEntry of session.files) {
+    const result = await _uploadSingleFile.call(ctx, session, fileEntry.id);
+    if (result === 'ignored') {
+      interrupted = true;
+      break;
+    }
+    if (result === 'applied') applied++;
+  }
+  return { applied, interrupted };
+}
+
+export function _maybeFinalizeUpload(
+  ctx: AppContext,
+  applied: number,
+  interrupted: boolean,
+  projectId: string,
+): void {
+  if (applied > 0 && !interrupted && ctx.currentProjectId === projectId) {
+    ctx.showToast(ctx.t('toast.sourcesAdded'), 'success');
+    _scheduleConsigneRefresh.call(ctx, projectId);
+  }
+}
+
+export function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
   setTimeout(() => {
     if (this.currentProjectId === projectId) this.refreshConsigne();
   }, 3000);
 }
 
-function _maybeCleanupSession(this: AppContext, sessionId: string) {
+export function _maybeCleanupSession(this: AppContext, sessionId: string) {
   const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
   if (!session || session.cleanupScheduled || session.files.length === 0) return;
   if (session.files.every((f: UploadFile) => f.status === 'done')) {
@@ -126,37 +187,11 @@ export function createSources() {
     async handleFiles(this: AppContext, fileList: FileList | undefined | null) {
       const projectId = this.currentProjectId;
       if (!fileList || fileList.length === 0 || !projectId) return;
-
-      const sessionId = crypto.randomUUID();
-      const files = Array.from(fileList).map((f) => ({
-        id: crypto.randomUUID(),
-        name: f.name,
-        file: f as File | null,
-        status: 'pending' as const,
-        errorMsg: null as string | null,
-      }));
-      this.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
-      this.$nextTick(() => this.refreshIcons());
-
-      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
+      const session = _createUploadSession(this, fileList, projectId);
       if (!session) return;
-      let appliedCount = 0;
-      let interrupted = false;
-
-      for (const fileEntry of session.files) {
-        const result = await _uploadSingleFile.call(this, session, fileEntry.id);
-        if (result === 'ignored') {
-          interrupted = true;
-          break;
-        }
-        if (result === 'applied') appliedCount++;
-      }
-
-      if (appliedCount > 0 && !interrupted && this.currentProjectId === projectId) {
-        this.showToast(this.t('toast.sourcesAdded'), 'success');
-        _scheduleConsigneRefresh.call(this, projectId);
-      }
-      _maybeCleanupSession.call(this, sessionId);
+      const { applied, interrupted } = await _runUploadLoop(this, session);
+      _maybeFinalizeUpload(this, applied, interrupted, projectId);
+      _maybeCleanupSession.call(this, session.id);
     },
 
     async retryFile(this: AppContext, sessionId: string, fileId: string) {
@@ -222,7 +257,7 @@ export function createSources() {
           const err = await res.json();
           if (!_isSessionActive(this, session)) return;
           this.showToast(
-            this.t('toast.error', { error: this.resolveError(err.error || res.statusText) }),
+            this.t(TOAST_ERROR, { error: this.resolveError(err.error || res.statusText) }),
             'error',
           );
           return;
@@ -241,7 +276,7 @@ export function createSources() {
       } catch (e: unknown) {
         if (!_isSessionActive(this, session)) return;
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error', () => this.addText());
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error', () => this.addText());
       } finally {
         this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
       }
@@ -284,12 +319,14 @@ export function createSources() {
       this.viewSourcePanY = 0;
     },
     rotateLeft(this: AppContext) {
+      if (!this.viewSource) return;
       this.viewSourceRotation -= 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;
       this.viewSourcePanY = 0;
     },
     rotateRight(this: AppContext) {
+      if (!this.viewSource) return;
       this.viewSourceRotation += 90;
       this.viewSourceRotations[this.viewSource.id] = this.viewSourceRotation;
       this.viewSourcePanX = 0;

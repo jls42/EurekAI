@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
+import type { Request, Response } from 'express';
 import type { ProjectStore } from '../store.js';
 import type { ChatMessage, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
@@ -17,11 +18,16 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
+
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+const CHAT_ROUTE_PATH = '/:pid/chat';
 import { extractErrorCode } from '../helpers/error-codes.js';
+
+type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
 
 interface ChatRequestContext {
   pid: string;
-  project: ReturnType<ProjectStore['getProject']> & {};
+  project: ChatProject;
   profile: ReturnType<ProfileStore['get']>;
   message: string;
   lang: string;
@@ -35,37 +41,74 @@ class ChatValidationError {
   ) {}
 }
 
+type ResolvedProject = {
+  pid: string;
+  project: ChatProject;
+  profile: ReturnType<ProfileStore['get']>;
+};
+
+const resolveProjectAndProfile = (
+  req: { params: { pid: string } },
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): ResolvedProject | ChatValidationError => {
+  const pid = req.params.pid;
+  const project = store.getProject(pid);
+  if (!project) return new ChatValidationError(404, ERR_PROJECT_NOT_FOUND);
+  const profileId = project.meta.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+  if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
+  return { pid, project, profile };
+};
+
+type ChatBody = { message: string; lang: string; ageGroup: AgeGroup };
+
+interface RawChatBody {
+  message?: unknown;
+  lang?: string;
+  ageGroup?: AgeGroup;
+}
+
+const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidationError => {
+  const { message, lang: reqLang, ageGroup: reqAgeGroup } = body ?? {};
+  if (!message || typeof message !== 'string')
+    return new ChatValidationError(400, 'message requis');
+  return {
+    message,
+    lang: reqLang || 'fr',
+    ageGroup: reqAgeGroup || 'enfant',
+  };
+};
+
+const runChatModeration = async (
+  client: Mistral,
+  profile: ReturnType<ProfileStore['get']>,
+  message: string,
+): Promise<ChatValidationError | null> => {
+  if (!profile?.useModeration) return null;
+  const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
+  if (categories.length === 0) return null;
+  const modResult = await moderateContent(client, message.trim(), categories);
+  if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');
+  return null;
+};
+
 async function validateChatRequest(
-  req: { params: { pid: string }; body: any },
+  req: { params: { pid: string }; body: RawChatBody | undefined },
   store: ProjectStore,
   profileStore: ProfileStore,
   client: Mistral,
 ): Promise<ChatRequestContext | ChatValidationError> {
-  const pid = req.params.pid;
-  const project = store.getProject(pid);
-  if (!project) return new ChatValidationError(404, 'Projet introuvable');
+  const resolved = resolveProjectAndProfile(req, store, profileStore);
+  if (resolved instanceof ChatValidationError) return resolved;
 
-  const profileId = project.meta.profileId;
-  const profile = profileId ? profileStore.get(profileId) : null;
-  if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
+  const body = parseChatBody(req.body);
+  if (body instanceof ChatValidationError) return body;
 
-  const { message, lang: reqLang, ageGroup: reqAgeGroup } = req.body;
-  const lang = reqLang || 'fr';
-  const ageGroup: AgeGroup = reqAgeGroup || 'enfant';
-  if (!message || typeof message !== 'string')
-    return new ChatValidationError(400, 'message requis');
+  const modError = await runChatModeration(client, resolved.profile, body.message);
+  if (modError) return modError;
 
-  if (profile?.useModeration) {
-    const categories =
-      profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
-    if (categories.length > 0) {
-      const modResult = await moderateContent(client, message.trim(), categories);
-      if (modResult.status !== 'safe')
-        return new ChatValidationError(400, 'chat.moderationBlocked');
-    }
-  }
-
-  return { pid, project, profile, message, lang, ageGroup };
+  return { ...resolved, ...body };
 }
 
 interface ToolCallCtx {
@@ -189,7 +232,7 @@ async function processChatToolCalls(
         logger.info('chat', `tool ${type} generated`);
       }
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         const persisted = persistUsage(
           store,
@@ -207,6 +250,108 @@ async function processChatToolCalls(
   return { generatedIds, generations, failedTools, failedCost };
 }
 
+const appendUserAndBuildHistory = (
+  store: ProjectStore,
+  pid: string,
+  project: ChatProject,
+  message: string,
+): Array<{ role: string; content: string }> => {
+  const existing = project.chat?.messages ?? [];
+  const userMsg: ChatMessage = {
+    role: 'user',
+    content: message.trim(),
+    timestamp: new Date().toISOString(),
+  };
+  const history = [...existing, userMsg].slice(-50).map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+  store.appendChatMessage(pid, userMsg);
+  return history;
+};
+
+const buildSourceContext = (sources: ChatProject['sources']): string =>
+  sources.length > 0 ? getMarkdown(sources) : 'Aucune source ajoutee pour le moment.';
+
+type ToolPhaseResult = {
+  generatedIds: string[];
+  generations: Generation[];
+  failedTools: string[];
+  failedCost: number;
+};
+
+const EMPTY_TOOL_PHASE: ToolPhaseResult = {
+  generatedIds: [],
+  generations: [],
+  failedTools: [],
+  failedCost: 0,
+};
+
+interface RunToolCallPhaseArgs {
+  toolCalls: string[];
+  project: ChatProject;
+  lang: string;
+  ageGroup: AgeGroup;
+  config: ReturnType<typeof getConfig>;
+  client: Mistral;
+  store: ProjectStore;
+  pid: string;
+}
+
+const runToolCallPhase = async (args: RunToolCallPhaseArgs): Promise<ToolPhaseResult> => {
+  const { toolCalls, project, lang, ageGroup, config, client, store, pid } = args;
+  if (toolCalls.length === 0 || project.sources.length === 0) return EMPTY_TOOL_PHASE;
+  const rawMarkdown = getMarkdown(project.sources);
+  const markdown = applyConsigne(rawMarkdown, project.consigne);
+  const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
+  const sourceIds = project.sources.map((s) => s.id);
+  return processChatToolCalls(
+    toolCalls,
+    { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
+    store,
+    pid,
+  );
+};
+
+const appendAssistantMessage = (
+  store: ProjectStore,
+  pid: string,
+  reply: string,
+  generatedIds: string[],
+): void => {
+  const assistantMsg: ChatMessage = {
+    role: 'assistant',
+    content: reply,
+    timestamp: new Date().toISOString(),
+    generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
+  };
+  store.appendChatMessage(pid, assistantMsg);
+};
+
+const buildChatResponseBody = (
+  reply: string,
+  tools: ToolPhaseResult,
+  chatCost: { cost: number } | null | undefined,
+) => {
+  const totalCostDelta = (chatCost?.cost ?? 0) + tools.failedCost;
+  return {
+    reply,
+    generatedIds: tools.generatedIds,
+    generations: tools.generations,
+    ...(tools.failedTools.length > 0 && { failedTools: tools.failedTools }),
+    ...(totalCostDelta > 0 && { costDelta: totalCostDelta }),
+  };
+};
+
+const handleChatError = (e: unknown, store: ProjectStore, pid: string, res: Response): void => {
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
+  }
+  logger.error('chat', 'error:', e);
+  res.status(500).json({ error: extractErrorCode(e, 'chat') });
+};
+
 export function chatRoutes(
   store: ProjectStore,
   client: Mistral,
@@ -215,108 +360,63 @@ export function chatRoutes(
   const router = Router();
 
   // Send message
-  router.post('/:pid/chat', async (req, res) => {
+  router.post(CHAT_ROUTE_PATH, async (req, res) => {
     const pid = String(req.params.pid);
     try {
-      const validated = await validateChatRequest(req as any, store, profileStore, client);
+      const validated = await validateChatRequest(
+        req as Request<{ pid: string }, unknown, RawChatBody | undefined>,
+        store,
+        profileStore,
+        client,
+      );
       if (validated instanceof ChatValidationError) {
         res.status(validated.status).json({ error: validated.error });
         return;
       }
       const { project, message, lang, ageGroup } = validated;
-
-      const existingMessages = project.chat?.messages ?? [];
-      const userMsg: ChatMessage = {
-        role: 'user',
-        content: message.trim(),
-        timestamp: new Date().toISOString(),
-      };
-      const historyForApi = [...existingMessages, userMsg].slice(-50).map((m) => ({
-        role: m.role,
-        content: m.content,
-      }));
-      store.appendChatMessage(pid, userMsg);
-
-      const sourceContext =
-        project.sources.length > 0
-          ? getMarkdown(project.sources)
-          : 'Aucune source ajoutee pour le moment.';
-
+      const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
+      const sourceContext = buildSourceContext(project.sources);
       const config = getConfig();
 
-      // Track the main chat LLM call
       const { result, usage: chatUsage } = await runWithUsageTracking(() =>
         chatWithSources(client, historyForApi, sourceContext, config.models.chat, lang, ageGroup),
       );
       const chatCost = persistUsage(store, pid, `POST /api/projects/${pid}/chat`, chatUsage);
 
-      // Process tool calls — each tracked individually inside processChatToolCalls
-      let generatedIds: string[] = [];
-      let generatedGens: Generation[] = [];
-      let failedTools: string[] = [];
-      let toolCallFailedCost = 0;
-      if (result.toolCalls.length > 0 && project.sources.length > 0) {
-        const rawMarkdown = getMarkdown(project.sources);
-        const markdown = applyConsigne(rawMarkdown, project.consigne);
-        const hasConsigne =
-          !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
-        const sourceIds = project.sources.map((s) => s.id);
-        const toolResult = await processChatToolCalls(
-          result.toolCalls,
-          { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
-          store,
-          pid,
-        );
-        generatedIds = toolResult.generatedIds;
-        generatedGens = toolResult.generations;
-        failedTools = toolResult.failedTools;
-        toolCallFailedCost = toolResult.failedCost;
-      }
-
-      // Add assistant message
-      const assistantMsg: ChatMessage = {
-        role: 'assistant',
-        content: result.reply,
-        timestamp: new Date().toISOString(),
-        generatedIds: generatedIds.length > 0 ? generatedIds : undefined,
-      };
-      store.appendChatMessage(pid, assistantMsg);
-
-      // costDelta = chat LLM cost + failed tool call costs
-      // (successful tool call costs are on the returned generations as estimatedCost)
-      const totalCostDelta = (chatCost?.cost ?? 0) + toolCallFailedCost;
-      res.json({
-        reply: result.reply,
-        generatedIds,
-        generations: generatedGens,
-        ...(failedTools.length > 0 && { failedTools }),
-        ...(totalCostDelta > 0 && { costDelta: totalCostDelta }),
+      const tools = await runToolCallPhase({
+        toolCalls: result.toolCalls,
+        project,
+        lang,
+        ageGroup,
+        config,
+        client,
+        store,
+        pid,
       });
+
+      appendAssistantMessage(store, pid, result.reply, tools.generatedIds);
+
+      res.json(buildChatResponseBody(result.reply, tools, chatCost));
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/chat/failed`, failedUsage);
-      }
-      logger.error('chat', 'error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'chat') });
+      handleChatError(e, store, pid, res);
     }
   });
 
   // Get chat history
-  router.get('/:pid/chat', (req, res) => {
+  router.get(CHAT_ROUTE_PATH, (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     res.json(project.chat || { messages: [] });
   });
 
   // Clear chat
-  router.delete('/:pid/chat', (req, res) => {
+  router.delete(CHAT_ROUTE_PATH, (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     store.clearChat(req.params.pid);

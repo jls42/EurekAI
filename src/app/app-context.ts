@@ -1,5 +1,5 @@
 import type { createState } from './state';
-import type { Generation, Profile, Source } from '../../types';
+import type { Consigne, Generation, Profile, Source } from '../../types';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -33,7 +33,6 @@ export interface AppContext extends AppState {
   t: TFn;
   locale: string;
 
-  // Toast mixin (src/app/toast.ts)
   showToast(
     message: string,
     type?: string,
@@ -42,17 +41,14 @@ export interface AppContext extends AppState {
   ): void;
   dismissToast(id: number): void;
 
-  // Consigne mixin (src/app/consigne.ts)
   refreshConsigne(): Promise<void>;
 
-  // Sources mixin (src/app/sources.ts) — self-reference
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
 
-  // Profiles mixin (src/app/profiles.ts) — self-reference
   selectProfile(id: string): void;
   loadMistralVoices?(): Promise<void>;
   requirePin(callback: (pin: string) => void): void;
@@ -69,10 +65,50 @@ export interface AppContext extends AppState {
   requireParentalAccess(callback: () => void): void;
   _toggleProfileProp(id: string, prop: string): Promise<void>;
 
-  // Navigation mixin (src/app/navigation.ts)
   goToView(view: string): void;
 
-  // Generate mixin (src/app/generate.ts) — self-reference
+  createProject(): Promise<void>;
+  selectProject(id: string): Promise<void>;
+  deleteProject(id: string): Promise<void>;
+  openLightbox(url: string): void;
+
+  toggleRecording(): Promise<void>;
+  startRecording(): Promise<void>;
+  stopRecording(): void;
+  uploadVoice(blob: Blob): Promise<void>;
+
+  checkMobile(): void;
+  toggleTheme(): void;
+  openSourceDialog(src: Source): void;
+
+  loadProfiles(): Promise<void>;
+  loadConfig(): Promise<void>;
+
+  searchWeb(): Promise<void>;
+
+  renderMarkdown(content: string): string;
+  renderWithSources(content: string, gen: Generation): string;
+  summaryData(gen: Generation): import('../../types').StudyFiche;
+
+  sendChatMessage(): Promise<void>;
+  loadChatHistory(): Promise<void>;
+  clearChat(): Promise<void>;
+  scrollChatBottom(): void;
+
+  openSummaryDetail(gen: Generation): void;
+  openGenerationDetail?(gen: Generation): void;
+
+  startEditTitle(gen: Generation): void;
+  saveTitle(gen: Generation): Promise<void>;
+  deleteGen(gen: Generation): Promise<void>;
+
+  translateEmotion(emotion: string): string;
+  langToFlag(lang: string): string;
+  defaultVoiceHint(locale: string, profileId?: string): string;
+  saveSettings(): Promise<void>;
+  resetSettings(): Promise<void>;
+  closeSettingsDialog(): void;
+
   blockedModerationSource(): Source | null;
   blockedModerationStatus(): string | null;
   moderationBlockedMessage(status: string | null): string;
@@ -110,6 +146,7 @@ export interface AppContext extends AppState {
   sourceTypeIcon(src: Source): string;
   sourceTypeBadge(src: Source): string;
   sourceTypeBadgeColor(src: Source): string;
+  consigneStatus(consigne: Consigne | null | undefined): 'failed' | 'ok' | null;
   ocrConfidenceTier(src: Source): string | null;
   ocrConfidenceColor(src: Source): string;
   ocrConfidencePercent(src: Source): string;

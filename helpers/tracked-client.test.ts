@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { trackClient } from './tracked-client.js';
 import type { ApiUsage } from './pricing.js';
+import type { Mistral } from '@mistralai/mistralai';
 
 function makeFakeClient() {
   return {
@@ -232,6 +233,36 @@ describe('trackClient', () => {
     await client.audio.speech.complete({ model: 'voxtral-mini-tts-2603', input: 12345 });
 
     expect(captured[0].inputCharacters).toBe(0);
+  });
+
+  it('retries on 503 and calls onUsage once with final usage', async () => {
+    vi.useFakeTimers();
+    try {
+      const client = makeFakeClient();
+      const mockComplete = client.chat.complete;
+      mockComplete
+        .mockReset()
+        .mockRejectedValueOnce(Object.assign(new Error('upstream'), { status: 503 }))
+        .mockResolvedValueOnce({
+          model: 'mistral-large-2512',
+          usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
+          choices: [{ message: { content: 'ok' } }],
+        });
+      const captured: ApiUsage[] = [];
+      trackClient(client as unknown as Mistral, (u) => captured.push(u));
+
+      const p = client.chat.complete({ model: 'mistral-large-latest', messages: [] });
+      await vi.runAllTimersAsync();
+      await p;
+
+      expect(mockComplete).toHaveBeenCalledTimes(2);
+      expect(captured).toHaveLength(1);
+      expect(captured[0]).toEqual(
+        expect.objectContaining({ promptTokens: 10, completionTokens: 20, totalTokens: 30 }),
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('Agent conversation with no response.usage does not call onUsage', async () => {

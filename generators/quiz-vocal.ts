@@ -3,7 +3,7 @@ import { getContent, safeParseJson } from '../helpers/index.js';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { verifyAnswerSystem } from '../prompts.js';
 import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
-import type { AgeGroup, QuizQuestion } from '../types.js';
+import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
@@ -74,4 +74,13 @@ export async function verifyAnswer(
 
   const raw = getContent(response);
   return safeParseJson<{ correct: boolean; feedback: string }>(raw);
+}
+
+export function createQuizVocalGeneration(
+  fields: Omit<QuizVocalGeneration, 'lang' | 'ageGroup'> & {
+    lang: string;
+    ageGroup: AgeGroup;
+  },
+): QuizVocalGeneration {
+  return fields;
 }

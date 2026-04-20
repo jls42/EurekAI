@@ -1,26 +1,48 @@
-import { stepByStep } from './step-by-step';
+import { stepByStep, type StepByStepBase } from './step-by-step';
 import { validateAnswer } from './fill-blank-validate';
+import type { AppContext } from '../app/app-context';
+import type { FillBlankGeneration, FillBlankItem, FillBlankStats, Generation } from '../../types';
 
-export function fillBlankComponent(gen: any) {
+type FillBlankFeedback = { correct: boolean; correctAnswer?: string };
+
+interface FillBlankContext extends Omit<StepByStepBase<FillBlankItem>, 'feedback'>, AppContext {
+  answer: string;
+  answers: Record<number, string>;
+  results: Record<number, boolean>;
+  showHint: boolean;
+  feedback: FillBlankFeedback | null;
+  currentExercise(): FillBlankItem | undefined;
+  isCurrentAnswered(): boolean;
+  checkAnswer(): void;
+  restoreState(): void;
+  submitFullAttempt(): Promise<void>;
+  retryWrongExercises(): void;
+  resetExercise(): void;
+  handleKey(e: KeyboardEvent): void;
+}
+
+export function fillBlankComponent(gen: FillBlankGeneration) {
   return {
-    ...stepByStep(gen),
+    ...stepByStep<FillBlankGeneration>(gen),
     answer: '',
     answers: {} as Record<number, string>,
     results: {} as Record<number, boolean>,
     showHint: false,
 
-    currentExercise() {
-      return this.items()[this.currentIndex()];
+    currentExercise(this: FillBlankContext): FillBlankItem | undefined {
+      return this.currentItem();
     },
 
-    isCurrentAnswered(this: any): boolean {
-      return this.currentIndex() in this.results;
+    isCurrentAnswered(this: FillBlankContext): boolean {
+      const idx = this.currentIndex();
+      return idx !== undefined && idx in this.results;
     },
 
-    checkAnswer(this: any) {
+    checkAnswer(this: FillBlankContext) {
       if (this.isReviewing()) return;
       const idx = this.currentIndex();
       const ex = this.currentExercise();
+      if (idx === undefined || !ex) return;
       const correct = validateAnswer(this.answer, ex.answer);
       this.answers[idx] = this.answer;
       this.results[idx] = correct;
@@ -28,18 +50,18 @@ export function fillBlankComponent(gen: any) {
       this.feedback = { correct, correctAnswer: ex.answer };
     },
 
-    onNextReady(this: any) {
+    onNextReady(this: FillBlankContext) {
       this.restoreState();
     },
 
-    onPrevReady(this: any) {
+    onPrevReady(this: FillBlankContext) {
       this.restoreState();
     },
 
-    restoreState(this: any) {
+    restoreState(this: FillBlankContext) {
       const idx = this.currentIndex();
       this.showHint = false;
-      if (idx in this.answers) {
+      if (idx !== undefined && idx in this.answers) {
         this.answer = this.answers[idx];
         const ex = this.items()[idx];
         this.feedback = { correct: this.results[idx], correctAnswer: ex?.answer };
@@ -47,16 +69,16 @@ export function fillBlankComponent(gen: any) {
         this.answer = '';
         this.feedback = null;
         this.$nextTick(() => {
-          this.$refs.blankInput?.focus();
+          (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
         });
       }
     },
 
-    onFinish(this: any) {
+    onFinish(this: FillBlankContext) {
       this.submitFullAttempt();
     },
 
-    async submitFullAttempt(this: any) {
+    async submitFullAttempt(this: FillBlankContext) {
       const pid = this.currentProjectId;
       try {
         const res = await fetch(
@@ -68,8 +90,8 @@ export function fillBlankComponent(gen: any) {
           },
         );
         if (res.ok) {
-          const result = await res.json();
-          this.gen.stats = result.stats;
+          const result = (await res.json()) as { stats: FillBlankStats };
+          (this.gen as Generation & { stats?: FillBlankStats }).stats = result.stats;
           this.showToast(this.t('toast.scoreSaved'), 'success');
         } else {
           console.error('Fill-blank attempt failed:', res.status);
@@ -80,7 +102,7 @@ export function fillBlankComponent(gen: any) {
       }
     },
 
-    retryWrongExercises(this: any) {
+    retryWrongExercises(this: FillBlankContext) {
       const wrong = Object.entries(this.results)
         .filter(([, v]) => !v)
         .map(([k]) => Number(k));
@@ -90,22 +112,22 @@ export function fillBlankComponent(gen: any) {
       this.showHint = false;
       this.retryWrong(wrong);
       this.$nextTick(() => {
-        this.$refs.blankInput?.focus();
+        (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },
 
-    resetExercise(this: any) {
+    resetExercise(this: FillBlankContext) {
       this.answers = {};
       this.results = {};
       this.answer = '';
       this.showHint = false;
       this.resetAll();
       this.$nextTick(() => {
-        this.$refs.blankInput?.focus();
+        (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },
 
-    handleKey(this: any, e: KeyboardEvent) {
+    handleKey(this: FillBlankContext, e: KeyboardEvent) {
       if (e.key !== 'Enter') return;
       if (this.isReviewing()) return;
       if (this.feedback) {

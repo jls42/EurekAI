@@ -6,6 +6,10 @@ import type {
   ProjectData,
   Source,
   Generation,
+  SummaryGeneration,
+  FlashcardsGeneration,
+  QuizGeneration,
+  PodcastGeneration,
   ChatMessage,
   CostEntry,
   ModerationResult,
@@ -23,8 +27,6 @@ export class ProjectStore {
     mkdirSync(this.projectsDir, { recursive: true });
   }
 
-  // --- Index ---
-
   private readIndex(): ProjectMeta[] {
     if (existsSync(this.indexPath)) {
       try {
@@ -40,8 +42,6 @@ export class ProjectStore {
   private writeIndex(index: ProjectMeta[]) {
     writeFileSync(this.indexPath, JSON.stringify(index, null, 2));
   }
-
-  // --- Project dir helpers ---
 
   private projectDir(id: string): string {
     return join(this.projectsDir, id);
@@ -62,8 +62,6 @@ export class ProjectStore {
     mkdirSync(dir, { recursive: true });
     return dir;
   }
-
-  // --- CRUD ---
 
   listProjects(profileId?: string): ProjectMeta[] {
     const all = this.readIndex();
@@ -126,8 +124,6 @@ export class ProjectStore {
     this.saveProject(id, data);
   }
 
-  // --- Sources ---
-
   addSource(projectId: string, source: Source): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
@@ -143,8 +139,6 @@ export class ProjectStore {
     this.saveProject(projectId, data);
     return data;
   }
-
-  // --- Generations ---
 
   addGeneration(projectId: string, generation: Generation): void {
     const data = this.getProject(projectId);
@@ -196,6 +190,20 @@ export class ProjectStore {
     return data.consigne ?? null;
   }
 
+  setConsigneError(projectId: string, errorCode: string): ProjectData['consigne'] | null {
+    const data = this.getProject(projectId);
+    if (!data) return null;
+    data.consigne = {
+      found: false,
+      text: '',
+      keyTopics: [],
+      status: 'failed',
+      error: errorCode,
+    };
+    this.saveProject(projectId, data);
+    return data.consigne;
+  }
+
   setSourceModeration(
     projectId: string,
     sourceId: string,
@@ -237,8 +245,6 @@ export class ProjectStore {
     return data.results.generations.find((g) => g.id === generationId) ?? null;
   }
 
-  // --- Migration: old flat format -> generations[] ---
-
   private normalizeModeration(
     moderation:
       | Source['moderation']
@@ -264,53 +270,67 @@ export class ProjectStore {
 
   private migrateModerationFormat(data: ProjectData): void {
     for (const source of data.sources) {
-      source.moderation = this.normalizeModeration(source.moderation as any);
+      source.moderation = this.normalizeModeration(
+        source.moderation as Parameters<typeof this.normalizeModeration>[0],
+      );
     }
   }
 
   private migrateResultsFormat(data: ProjectData): void {
-    const r = data.results as any;
+    // Legacy format : results.{summary|flashcards|quiz|podcast} à plat, remplacé
+    // par results.generations[]. Les champs lus ici disparaissent en sortie.
+    interface LegacyResults {
+      generations?: unknown;
+      summary?: SummaryGeneration['data'];
+      summaryEN?: SummaryGeneration['data'];
+      flashcards?: FlashcardsGeneration['data'];
+      flashcardsEN?: FlashcardsGeneration['data'];
+      quiz?: QuizGeneration['data'];
+      quizEN?: QuizGeneration['data'];
+      podcast?: PodcastGeneration['data'];
+    }
+    const r = data.results as LegacyResults;
     if (Array.isArray(r.generations)) return;
 
     const generations: Generation[] = [];
     const now = new Date().toISOString();
 
     if (r.summary) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
-        title: r.summary.title || 'Fiche de revision',
+        title: (r.summary as { title?: string }).title || 'Fiche de revision',
         createdAt: now,
         sourceIds: [],
         type: 'summary',
         data: r.summary,
-      };
-      if (r.summaryEN) gen.dataEN = r.summaryEN;
+      } as Generation;
+      if (r.summaryEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.summaryEN;
       generations.push(gen);
     }
 
     if (r.flashcards) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
         title: 'Flashcards',
         createdAt: now,
         sourceIds: [],
         type: 'flashcards',
         data: r.flashcards,
-      };
-      if (r.flashcardsEN) gen.dataEN = r.flashcardsEN;
+      } as Generation;
+      if (r.flashcardsEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.flashcardsEN;
       generations.push(gen);
     }
 
     if (r.quiz) {
-      const gen: any = {
+      const gen = {
         id: randomUUID(),
         title: 'Quiz QCM',
         createdAt: now,
         sourceIds: [],
         type: 'quiz',
         data: r.quiz,
-      };
-      if (r.quizEN) gen.dataEN = r.quizEN;
+      } as Generation;
+      if (r.quizEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.quizEN;
       generations.push(gen);
     }
 
@@ -332,8 +352,6 @@ export class ProjectStore {
     }
   }
 
-  // --- Migration from legacy sources.json ---
-
   migrateFromLegacy(legacyPath: string) {
     if (!existsSync(legacyPath)) return;
     if (this.readIndex().length > 0) return;
@@ -354,8 +372,6 @@ export class ProjectStore {
     renameSync(legacyPath, legacyPath + '.bak');
     console.log(`  Migration: ${sources.length} sources -> projet "${project.meta.name}"`);
   }
-
-  // --- Private ---
 
   private touchIndex(id: string, meta: ProjectMeta) {
     const index = this.readIndex();

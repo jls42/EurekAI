@@ -1,8 +1,8 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
-import type { Source } from '../types.js';
+import type { Source, OcrConfidence, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
@@ -18,20 +18,21 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
 }
 
-function errorModeration(): Source['moderation'] {
-  return { status: 'error', categories: {} };
-}
+// cf. CLAUDE.md "Pièges Lizard"
+const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
-async function triggerConsigneDetection(
+const runConsigneDetection = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
-  lang = 'fr',
-) {
+  lang: string,
+): Promise<void> => {
   try {
     const project = store.getProject(pid);
     if (!project || project.sources.length === 0) return;
@@ -44,14 +45,58 @@ async function triggerConsigneDetection(
     );
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
+    const code = extractErrorCode(e, 'consigne');
+    store.setConsigneError(pid, code);
   }
-}
+};
 
-function getModerationCategories(
+// Coalesce par projet : le frontend envoie 1 POST par fichier. Si un scan est
+// déjà en vol pour un pid, on stocke la lang la plus récente (Map plutôt que
+// Set) et on replay 1× à la fin avec cet état final. Résultat : 2 scans max
+// par rafale (premier feedback rapide + rescan sur état complet), zéro
+// concurrence → plus de 429/retry SDK. La Map garantit que le replay utilise
+// la lang du dernier trigger du burst, pas celle du premier (bug observé :
+// upload `en` reçu pendant un scan `fr` ne faisait pas basculer le replay en
+// `en`).
+const inFlight = new Set<string>();
+const pendingLang = new Map<string, string>();
+
+const triggerConsigneDetection = (
+  store: ProjectStore,
+  client: Mistral,
+  pid: string,
+  lang = 'fr',
+): void => {
+  if (inFlight.has(pid)) {
+    pendingLang.set(pid, lang);
+    return;
+  }
+  inFlight.add(pid);
+  void (async () => {
+    try {
+      await runConsigneDetection(store, client, pid, lang);
+    } catch (e) {
+      // runConsigneDetection gère déjà ses propres erreurs, mais on se protège
+      // ici contre une régression (exception inattendue, crash du code de
+      // coalesce) qui ferait crasher l'IIFE silencieusement et bloquerait
+      // `inFlight` pour toujours sans déclencher le replay.
+      logger.error('consigne', 'IIFE crash', e);
+    } finally {
+      inFlight.delete(pid);
+      const nextLang = pendingLang.get(pid);
+      if (nextLang !== undefined) {
+        pendingLang.delete(pid);
+        triggerConsigneDetection(store, client, pid, nextLang);
+      }
+    }
+  })();
+};
+
+const getModerationCategories = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
-): string[] | null {
+): string[] | null => {
   const project = store.getProject(pid);
   if (!project) return null;
   const profileId = project.meta.profileId;
@@ -59,16 +104,16 @@ function getModerationCategories(
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
-}
+};
 
-async function triggerModeration(
+const triggerModeration = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
   sourceId: string,
   markdown: string,
   categories: string[],
-) {
+): Promise<void> => {
   try {
     const result = await moderateContent(client, markdown, categories);
     if (!store.setSourceModeration(pid, sourceId, result)) return;
@@ -77,7 +122,7 @@ async function triggerModeration(
     logger.error('moderation', 'error:', e);
     store.setSourceModeration(pid, sourceId, errorModeration());
   }
-}
+};
 
 export function sourceRoutes(
   store: ProjectStore,
@@ -104,7 +149,6 @@ export function sourceRoutes(
 
   const TEXT_EXTS = new Set(['.txt', '.md']);
 
-  /** Process a single uploaded file (OCR or text read). */
   async function processUploadedFile(
     file: Express.Multer.File,
     pid: string,
@@ -116,7 +160,7 @@ export function sourceRoutes(
     const isText = TEXT_EXTS.has(ext);
     let markdown: string;
     let elapsed: number;
-    let confidence: import('../types.js').OcrConfidence | undefined;
+    let confidence: OcrConfidence | undefined;
     if (isText) {
       const stop = startTimer();
       markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
@@ -148,7 +192,6 @@ export function sourceRoutes(
   type UploadFailure = { filename: string; error: string };
   type UploadOutcome = { source?: Source; failure?: UploadFailure };
 
-  /** Run OCR/text read for a single file, persist it, and classify as success or failure. */
   async function attemptFileUpload(
     file: Express.Multer.File,
     pid: string,
@@ -167,7 +210,7 @@ export function sourceRoutes(
       store.addSource(pid, source);
       return { source };
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
       }
@@ -177,22 +220,24 @@ export function sourceRoutes(
     }
   }
 
-  /** Fire consigne detection + per-source moderation for the successfully uploaded files. */
   function triggerUploadDownstream(
     pid: string,
     lang: string,
     modCats: string[] | null,
     results: Source[],
   ) {
-    void triggerConsigneDetection(store, client, pid, lang);
+    triggerConsigneDetection(store, client, pid, lang);
     if (!modCats) return;
     for (const src of results) {
       void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
     }
   }
 
-  /** Shape the upload response: 500 on all-fail, partial-success envelope, or plain array on full success. */
-  function sendUploadResponse(res: any, results: Source[], failures: UploadFailure[]) {
+  const sendUploadResponse = (
+    res: Response,
+    results: Source[],
+    failures: UploadFailure[],
+  ): void => {
     if (results.length === 0) {
       // error = code stable ; failures[] expose par-fichier { filename, error: code }.
       res.status(500).json({ error: 'upload_failed', failures });
@@ -203,14 +248,29 @@ export function sourceRoutes(
       return;
     }
     res.json({ sources: results, failures });
-  }
+  };
+
+  const processUploadBatch = async (
+    files: Express.Multer.File[],
+    pid: string,
+    modCats: string[] | null,
+  ): Promise<{ results: Source[]; failures: UploadFailure[] }> => {
+    const results: Source[] = [];
+    const failures: UploadFailure[] = [];
+    for (const file of files) {
+      const outcome = await attemptFileUpload(file, pid, modCats);
+      if (outcome.source) results.push(outcome.source);
+      else if (outcome.failure) failures.push(outcome.failure);
+    }
+    return { results, failures };
+  };
 
   // Upload files (OCR)
   router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -221,13 +281,7 @@ export function sourceRoutes(
     }
 
     const modCats = getModerationCategories(store, profileStore, pid);
-    const results: Source[] = [];
-    const failures: UploadFailure[] = [];
-    for (const file of files) {
-      const outcome = await attemptFileUpload(file, pid, modCats);
-      if (outcome.source) results.push(outcome.source);
-      else if (outcome.failure) failures.push(outcome.failure);
-    }
+    const { results, failures } = await processUploadBatch(files, pid, modCats);
 
     if (results.length > 0) {
       triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
@@ -239,7 +293,7 @@ export function sourceRoutes(
   router.post('/:pid/sources/text', async (req, res) => {
     const project = store.getProject(req.params.pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -272,7 +326,7 @@ export function sourceRoutes(
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
     const lang = req.body.lang || 'fr';
-    void triggerConsigneDetection(store, client, req.params.pid, lang);
+    triggerConsigneDetection(store, client, req.params.pid, lang);
     res.json(source);
   });
 
@@ -281,7 +335,7 @@ export function sourceRoutes(
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -320,13 +374,13 @@ export function sourceRoutes(
       };
       store.addSource(pid, source);
       logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-      void triggerConsigneDetection(store, client, pid, lang);
+      triggerConsigneDetection(store, client, pid, lang);
       if (modCats) {
         void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
       }
       res.json(source);
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
       }
@@ -335,18 +389,20 @@ export function sourceRoutes(
     }
   });
 
-  /** Scrape a single URL, falling back to Mistral web_search on failure. */
   async function scrapeUrl(
     url: string,
     scrapeMode: string,
     lang: string,
-    ageGroup: import('../types.js').AgeGroup,
+    ageGroup: AgeGroup,
     modCats: string[] | null,
     now: string,
   ): Promise<Source | null> {
     try {
       const stop = startTimer();
-      const result = await fetchPageContent(url, scrapeMode as any);
+      const result = await fetchPageContent(
+        url,
+        scrapeMode as Parameters<typeof fetchPageContent>[1],
+      );
       const elapsed = stop();
       logger.info(
         'sources',
@@ -399,11 +455,10 @@ export function sourceRoutes(
     }
   }
 
-  /** Perform a keyword web search via Mistral agent. */
   async function searchByKeywords(
     searchQuery: string,
     lang: string,
-    ageGroup: import('../types.js').AgeGroup,
+    ageGroup: AgeGroup,
     modCats: string[] | null,
     now: string,
   ): Promise<Source> {
@@ -423,12 +478,14 @@ export function sourceRoutes(
     };
   }
 
-  /** Track a web source fetch, persist cost, and decorate source if non-null. */
+  type WebSourceFailure = { label: string; code: string };
+  type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
+
   async function trackWebSource(
     pid: string,
     label: string,
     fn: () => Promise<Source | null>,
-  ): Promise<Source | null> {
+  ): Promise<WebSourceOutcome> {
     try {
       const { result: source, usage } = await runWithUsageTracking(fn);
       const persisted = persistUsage(
@@ -442,54 +499,69 @@ export function sourceRoutes(
         source.usage = persisted.usage;
         source.costBreakdown = persisted.costBreakdown;
       }
-      return source;
+      // scrapeUrl peut renvoyer null quand scrape + fallback échouent tous les
+      // deux (cf. `logger.error('URL failed completely')`). C'est un échec
+      // silencieux du point de vue de l'endpoint, on le surface en failure.
+      if (!source) {
+        return { source: null, failure: { label, code: 'upstream_unavailable' } };
+      }
+      return { source, failure: null };
     } catch (err) {
-      const failedUsage = (err as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
       }
       logger.error('sources', `${label} failed`, err);
-      return null;
+      return { source: null, failure: { label, code: extractErrorCode(err) } };
     }
   }
 
-  /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
+  const pushOutcome = (
+    outcome: WebSourceOutcome,
+    sources: Source[],
+    failures: WebSourceFailure[],
+  ): void => {
+    if (outcome.source) sources.push(outcome.source);
+    if (outcome.failure) failures.push(outcome.failure);
+  };
+
   async function collectWebSources(
     pid: string,
-    req: any,
+    req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },
     modCats: string[] | null,
-  ): Promise<Source[]> {
+  ): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> {
     const lang = req.body.lang || 'fr';
-    const ageGroup: import('../types.js').AgeGroup = req.body.ageGroup || 'enfant';
+    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
     const scrapeMode = req.body.scrapeMode || 'auto';
     const sources: Source[] = [];
+    const failures: WebSourceFailure[] = [];
     const now = new Date().toISOString();
 
     for (const url of urls) {
-      const source = await trackWebSource(pid, `URL scrape: ${url}`, () =>
+      const outcome = await trackWebSource(pid, `URL scrape: ${url}`, () =>
         scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
       );
-      if (source) sources.push(source);
+      pushOutcome(outcome, sources, failures);
     }
 
     if (searchQuery) {
-      const source = await trackWebSource(
+      const outcome = await trackWebSource(
         pid,
         `Keyword search: ${searchQuery}`,
         () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>,
       );
-      if (source) sources.push(source);
+      pushOutcome(outcome, sources, failures);
     }
 
-    return sources;
+    return { sources, failures };
   }
 
   // Web search / URL scrape source
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
     if (!store.getProject(pid)) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
 
@@ -509,18 +581,27 @@ export function sourceRoutes(
     }
 
     try {
-      const sources = await collectWebSources(pid, req, modCats);
+      const { sources, failures } = await collectWebSources(pid, req, modCats);
       if (sources.length === 0) {
-        res.status(500).json({ error: 'Aucune source extraite' });
+        // Tous les inputs ont échoué : on surface les failures pour que l'UI
+        // puisse afficher un toast au lieu d'un échec silencieux.
+        res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
       for (const s of sources) store.addSource(pid, s);
       const lang = req.body.lang || 'fr';
-      void triggerConsigneDetection(store, client, pid, lang);
+      triggerConsigneDetection(store, client, pid, lang);
       for (const s of sources) {
         if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
       }
-      res.json(sources);
+      // Partial success : wrapper {sources, failures} (miroir du contrat
+      // UploadFailure de /sources/upload). Full success : array nu pour
+      // backwards compat.
+      if (failures.length > 0) {
+        res.json({ sources, failures });
+      } else {
+        res.json(sources);
+      }
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
       res.status(500).json({ error: extractErrorCode(e) });
@@ -542,7 +623,7 @@ export function sourceRoutes(
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     if (project.sources.length === 0) {
@@ -554,7 +635,7 @@ export function sourceRoutes(
       const markdown = getMarkdown(project.sources);
       const result = await detectConsigne(client, markdown, undefined, lang);
       if (!store.setConsigne(pid, result)) {
-        res.status(404).json({ error: 'Projet introuvable' });
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
       }
       res.json(result);

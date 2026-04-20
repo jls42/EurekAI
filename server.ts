@@ -108,12 +108,15 @@ app.get('/api/moderation-categories', (_req, res) =>
 );
 
 // --- Routes ---
+const API_PROJECTS = '/api/projects';
+const NON_CONFIGURE = 'NON CONFIGURE';
+
 app.use('/api/profiles', profileRoutes(outputDir, store));
-app.use('/api/projects', projectRoutes(store));
-app.use('/api/projects', sourceRoutes(store, client, profileStore));
-app.use('/api/projects', generateRoutes(store, client, profileStore));
-app.use('/api/projects', generationCrudRoutes(store, client, profileStore));
-app.use('/api/projects', chatRoutes(store, client, profileStore));
+app.use(API_PROJECTS, projectRoutes(store));
+app.use(API_PROJECTS, sourceRoutes(store, client, profileStore));
+app.use(API_PROJECTS, generateRoutes(store, client, profileStore));
+app.use(API_PROJECTS, generationCrudRoutes(store, client, profileStore));
+app.use(API_PROJECTS, chatRoutes(store, client, profileStore));
 
 // --- Start ---
 app.listen(PORT, () => {
@@ -121,9 +124,9 @@ app.listen(PORT, () => {
   const status = getApiStatus();
   const config = getConfig();
   console.log(`\n  EurekAI — http://localhost:${PORT}`);
-  console.log(`  API Mistral: ${status.mistral ? 'OK' : 'NON CONFIGURE'}`);
-  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : 'NON CONFIGURE'}`);
-  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : 'NON CONFIGURE'}`);
+  console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();
@@ -131,17 +134,18 @@ app.listen(PORT, () => {
   // Non-blocking cache warmup (optional, app works without)
   listVoices(client)
     .then(setVoiceCache)
-    .catch((e: any) => console.warn('Voice cache not loaded:', e.message));
+    .catch((e: Error) => console.warn('Voice cache not loaded:', e.message));
   client.models
     .list()
     .then((models) => {
       const limits: Record<string, number> = {};
       for (const m of models.data ?? []) {
-        const card = m as any;
-        if (card.maxContextLength) limits[card.id] = card.maxContextLength;
+        const card = m as { id: string; maxContextLength?: number; aliases?: string[] };
+        if (!card.maxContextLength) continue;
+        limits[card.id] = card.maxContextLength;
         for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
       }
       setModelLimits(limits);
     })
-    .catch((e: any) => console.warn('Model limits not loaded:', e.message));
+    .catch((e: Error) => console.warn('Model limits not loaded:', e.message));
 });

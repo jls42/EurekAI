@@ -56,7 +56,8 @@ const TAG_SCORES: Record<string, number> = {
 
 const FEMALE_BONUS = 100;
 
-function scoreVoice(v: MistralVoice): number {
+// cf. CLAUDE.md "Pièges Lizard"
+const scoreVoice = (v: MistralVoice): number => {
   let score = 0;
   if (v.gender === 'female') score += FEMALE_BONUS;
   let bestTagScore = 0;
@@ -65,52 +66,52 @@ function scoreVoice(v: MistralVoice): number {
     if (s > bestTagScore) bestTagScore = s;
   }
   return score + bestTagScore;
-}
+};
 
 // djb2 : hash simple, stable, non cryptographique, suffisant pour répartir
 // des profileId sur un bucket de voix.
 // Math.imul garantit la multiplication 32-bit (évite le bit-op `|= 0` flaggé Sonar S2999).
 // `for…of` itère par code point (surrogate pairs sûres).
 // `>>> 0` final force un unsigned int32 déterministe pour le modulo.
-function djb2(s: string): number {
+const djb2 = (s: string): number => {
   let hash = 5381;
   for (const ch of s) {
     hash = Math.imul(hash, 33) + (ch.codePointAt(0) ?? 0);
   }
   return hash >>> 0;
-}
+};
 
 // Normalise une locale au code ISO 639-1 (2 premiers caractères, lowercase).
 // Absorbe aussi bien les BCP-47 (`pt-BR`, `en-US`) que les underscores (`pt_BR`)
 // et les casses inconsistantes (`FR_FR`) → tout devient `pt`, `en`, `fr`, etc.
 // Évite que des clients API publics tombent en en-fallback à tort.
-function normalizeLang(lang: string): string {
-  return lang.slice(0, 2).toLowerCase();
-}
+const normalizeLang = (lang: string): string => lang.slice(0, 2).toLowerCase();
 
-function filterByLang(voices: MistralVoice[], lang: string): MistralVoice[] {
+const filterByLang = (voices: MistralVoice[], lang: string): MistralVoice[] => {
   const target = normalizeLang(lang);
   return voices.filter((v) => v.languages.some((l) => normalizeLang(l) === target));
-}
+};
 
-function sortByScoreThenId(bucket: MistralVoice[]): MistralVoice[] {
-  return [...bucket].sort((a, b) => {
+const sortByScoreThenId = (bucket: MistralVoice[]): MistralVoice[] =>
+  [...bucket].sort((a, b) => {
     const diff = scoreVoice(b) - scoreVoice(a);
     if (diff !== 0) return diff;
     return a.id.localeCompare(b.id);
   });
-}
 
-function rotateDeterministic<T>(list: T[], seed: string): T[] {
+const rotateDeterministic = <T>(list: T[], seed: string): T[] => {
   if (list.length <= 1) return list;
   const offset = djb2(seed) % list.length;
   return [...list.slice(offset), ...list.slice(0, offset)];
-}
+};
 
-function resolveBucket(
-  voices: MistralVoice[],
-  lang: string,
-): { bucket: MistralVoice[]; source: VoiceSelectionSource; langMatched: string | null } | null {
+type ResolvedBucket = {
+  bucket: MistralVoice[];
+  source: VoiceSelectionSource;
+  langMatched: string | null;
+};
+
+const resolveBucket = (voices: MistralVoice[], lang: string): ResolvedBucket | null => {
   const normalized = normalizeLang(lang);
   const langBucket = filterByLang(voices, normalized);
   if (langBucket.length > 0) {
@@ -124,7 +125,7 @@ function resolveBucket(
     return { bucket: voices, source: 'any-fallback', langMatched: null };
   }
   return null;
-}
+};
 
 export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult | null {
   const resolved = resolveBucket(input.voices, input.lang);

@@ -318,6 +318,7 @@ export const es: Record<string, string> = {
   'consigne.dismissedLabel': 'Instrucciones de estudio ignoradas',
   'consigne.reEnable': 'Reactivar',
   'consigne.reEnabled': 'Instrucciones reactivadas \u2014 las generaciones ser\u00e1n enfocadas',
+  'consigne.detectionFailed': 'No se pudieron analizar las instrucciones. Int\u00e9ntalo de nuevo.',
 
   'scores.heading': 'Mis Puntajes',
   'scores.emptyTitle': '\u00a1Responde un quiz para ver tus puntajes aqu\u00ed!',
@@ -367,11 +368,11 @@ export const es: Record<string, string> = {
   'toast.consigneError': 'Error al detectar instrucciones',
   'toast.view': 'Ver',
   'toast.generationDone': '\u00a1{type} generado!',
-  'toast.generationError': 'Error de generaci\u00f3n: {error}',
+  'toast.generationError': 'La generaci\u00f3n fall\u00f3. Int\u00e9ntalo de nuevo en un momento.',
   'toast.allGenerated': '\u00a1Todo generado!',
   'toast.partialGenerated': '{count}/3 generaciones exitosas',
   'toast.magicDone': '\u00a1Magia completada!',
-  'toast.autoError': 'Error de generaci\u00f3n autom\u00e1tica: {error}',
+  'toast.autoError': 'La generaci\u00f3n autom\u00e1tica fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.audioDone': '\u00a1Audio generado!',
   'toast.audioPartial': 'Audio parcial: algunas secciones fallaron',
   'toast.audioError': 'Error al generar audio',
@@ -441,6 +442,7 @@ export const es: Record<string, string> = {
   'profile.backToProfiles': 'Volver',
 
   'toast.error': 'Error: {error}',
-  'toast.uploadError': 'Error al subir {filename}: {error}',
+  'toast.uploadError': 'No se pudo subir {filename}. Int\u00e9ntalo de nuevo.',
+  'sources.uploadError.generic': 'La carga fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.chatErrorMsg': 'Error en el chat: {error}',
 };

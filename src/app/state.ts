@@ -1,4 +1,14 @@
 import { UI_LANGUAGES } from '../i18n/languages';
+import type {
+  Consigne,
+  Generation,
+  Profile,
+  ProjectData,
+  ProjectMeta,
+  Source,
+  ChatMessage,
+} from '../../types';
+import type { Toast } from './toast';
 
 const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
 
@@ -8,11 +18,11 @@ export function createState() {
     uiLanguages: UI_LANGUAGES,
 
     // Profile state
-    profiles: [] as any[],
-    currentProfile: null as any,
+    profiles: [] as Profile[],
+    currentProfile: null as Profile | null,
     showProfilePicker: false,
     showProfileForm: false,
-    editingProfile: null as any,
+    editingProfile: null as Profile | null,
     newProfileName: '',
     newProfileAge: '',
     newProfileAvatar: '0',
@@ -20,14 +30,14 @@ export function createState() {
     profileAvatars: PROFILE_AVATARS,
 
     // Project state
-    projects: [] as any[],
+    projects: [] as ProjectMeta[],
     currentProjectId: null as string | null,
-    currentProject: null as any,
+    currentProject: null as ProjectData | null,
     newProjectName: '',
     showNewProject: false,
 
     // Source state
-    sources: [] as any[],
+    sources: [] as Source[],
     selectedIds: [] as string[],
     uploadSessions: [] as Array<{
       id: string;
@@ -47,7 +57,7 @@ export function createState() {
       );
     },
     dragging: false,
-    viewSource: null as any,
+    viewSource: null as Source | null,
     viewSourceMode: 'ocr' as string,
     viewSourceZoom: 1,
     viewSourceRotation: 0,
@@ -79,14 +89,14 @@ export function createState() {
     recordingTimer: null as ReturnType<typeof setInterval> | null,
 
     // Consigne
-    consigne: null as any,
+    consigne: null as Consigne | null,
     consigneLoading: false,
     useConsigne: true,
 
     // Generation state
     generateCount: 10,
     countOptions: [10, 20, 30, 42, 50],
-    generations: [] as any[],
+    generations: [] as Generation[],
     openGens: {} as Record<string, boolean>,
     editingTitle: null as string | null,
     editTitleValue: '',
@@ -146,7 +156,7 @@ export function createState() {
     activeView: 'dashboard',
 
     // Chat state
-    chatMessages: [] as any[],
+    chatMessages: [] as ChatMessage[],
     chatInput: '',
     chatLoading: false,
 
@@ -202,7 +212,7 @@ export function createState() {
     lightboxUrl: '',
 
     // Toasts
-    toasts: [] as any[],
+    toasts: [] as Toast[],
     toastCounter: 0,
 
     // Confirm dialog

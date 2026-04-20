@@ -1,11 +1,14 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import type { AppContext } from './app-context';
 import type { Profile } from '../../types';
+import type { CreateProfileBody } from '../../routes/profiles';
 
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
 
-/** Build RequestInit for DELETE /api/profiles/:id (optionally with PIN body). */
+const LS_PROFILE_ID = 'sf-profileId';
+const TOAST_ERROR = 'toast.error';
+
 export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
@@ -15,13 +18,12 @@ export function buildDeleteOpts(pin?: string): RequestInit {
   return opts;
 }
 
-/** Apply local state cleanup after a successful DELETE /api/profiles/:id. */
 export function finalizeDeleteProfile(state: AppContext, id: string): void {
   clearProfileLocale(id);
   state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
   if (state.currentProfile?.id === id) {
     state.currentProfile = null;
-    localStorage.removeItem('sf-profileId');
+    localStorage.removeItem(LS_PROFILE_ID);
     if (state.profiles.length > 0) {
       state.selectProfile(state.profiles[0].id);
     } else {
@@ -31,50 +33,97 @@ export function finalizeDeleteProfile(state: AppContext, id: string): void {
   state.showToast(state.t('toast.profileDeleted'), 'success');
 }
 
-/** Execute the actual profile deletion (API call + state cleanup). */
-async function executeDeleteProfile(state: AppContext, id: string, pin?: string): Promise<void> {
+export async function executeDeleteProfile(
+  state: AppContext,
+  id: string,
+  pin?: string,
+): Promise<void> {
   try {
-    // fetch reste dans la même fonction que `buildDeleteOpts` pour que Codacy/Opengrep
-    // taint analysis voie l'URL hardcodée (préfixe `/api/profiles/`) et que `rule-node-ssrf`
-    // ne flagge pas. Ne pas extraire ce fetch dans un helper (cf. incident commit précédent
-    // où `deleteProfileRequest(id, opts) → fetch(var, opts)` avait réactivé le finding SSRF).
+    // fetch inline (pas extrait dans un helper, pas de constante top-fichier pour le préfixe)
+    // pour préserver l'analyse taint Codacy : `rule-node-ssrf` a besoin de voir l'URL littérale
+    // `/api/profiles/` dans la fonction qui appelle `fetch` — cf. CLAUDE.md section Sécurité.
+    // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline
     const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      state.showToast(state.t('toast.error', { error: err.error || res.statusText }), 'error');
+      state.showToast(state.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
       return;
     }
     finalizeDeleteProfile(state, id);
   } catch (e: unknown) {
     console.error('Failed to delete profile:', e);
     const msg = e instanceof Error ? e.message : String(e);
-    state.showToast(state.t('toast.error', { error: msg }), 'error');
+    state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
   }
 }
 
-/** Build the confirmation message for profile deletion. */
-function deleteConfirmMessage(state: AppContext, id: string): string {
+export function deleteConfirmMessage(state: AppContext, id: string): string {
   const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;
   return projectCount > 0
     ? state.t('profile.deleteConfirm', { count: projectCount })
     : state.t('profile.deleteConfirmNoProjects');
 }
 
-/** Whether the edit form has a valid name + age pair. */
-function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
+export function isProfileFormValid(p: EditingProfile | null | undefined): boolean {
   return !!p?.name?.trim() && !!p.age && p.age >= 4 && p.age <= 120;
 }
 
-/** Normalise partial voice selection : null when both empty, fill missing side with '' otherwise. */
-function buildVoicesUpdate(
+export function buildVoicesUpdate(
   mistralVoices: MistralVoicesPartial,
 ): { host: string; guest: string } | null {
   if (!mistralVoices?.host && !mistralVoices?.guest) return null;
   return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
 }
 
-/** Compose the PUT /api/profiles payload from the editingProfile snapshot. */
-function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
+type ValidationResult = 'ok' | 'invalid' | 'pin_mismatch';
+type NewProfileFormState = { result: ValidationResult; name: string; age: number };
+
+export function isValidNameAge(name: string, age: number): boolean {
+  return !!name && !!age && age >= 4 && age <= 120;
+}
+
+export function checkMinorPin(state: AppContext): ValidationResult {
+  if (!/^\d{4}$/.test(state.newProfilePin)) return 'invalid';
+  if (state.newProfilePin !== state.newProfilePinConfirm) return 'pin_mismatch';
+  return 'ok';
+}
+
+export function validateNewProfileForm(state: AppContext): NewProfileFormState {
+  const name = state.newProfileName.trim();
+  const age = Number(state.newProfileAge);
+  if (!isValidNameAge(name, age)) return { result: 'invalid', name, age };
+  if (age < 15) return { result: checkMinorPin(state), name, age };
+  return { result: 'ok', name, age };
+}
+
+export function buildCreateProfileBody(
+  state: AppContext,
+  name: string,
+  age: number,
+): CreateProfileBody {
+  const body: CreateProfileBody = {
+    name,
+    age,
+    avatar: state.newProfileAvatar,
+    locale: state.newProfileLocale,
+  };
+  if (age < 15) body.pin = state.newProfilePin;
+  return body;
+}
+
+export function applyCreateProfileSuccess(state: AppContext, profile: Profile): void {
+  state.profiles.push(profile);
+  state.selectProfile(profile.id);
+  state.newProfileName = '';
+  state.newProfileAge = '';
+  state.newProfileAvatar = '0';
+  state.newProfileLocale = 'fr';
+  state.newProfilePin = '';
+  state.newProfilePinConfirm = '';
+  state.showProfileForm = false;
+}
+
+export function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
   const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
     editingProfile;
   const updates: Record<string, unknown> = {
@@ -100,7 +149,7 @@ export function createProfiles() {
         console.error('Failed to load profiles:', e);
       }
       // Restore last selected profile
-      const saved = localStorage.getItem('sf-profileId');
+      const saved = localStorage.getItem(LS_PROFILE_ID);
       if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
         this.selectProfile(saved);
       } else if (this.profiles.length > 0) {
@@ -115,7 +164,7 @@ export function createProfiles() {
       if (!profile) return;
       this.currentProfile = profile;
       this.showProfilePicker = false;
-      localStorage.setItem('sf-profileId', id);
+      localStorage.setItem(LS_PROFILE_ID, id);
       this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
       // Apply profile theme or fallback to localStorage/system default
       if (profile.theme) {
@@ -137,49 +186,28 @@ export function createProfiles() {
     },
 
     async createProfile(this: AppContext) {
-      const name = this.newProfileName.trim();
-      const age = Number(this.newProfileAge);
-      if (!name || !age || age < 4 || age > 120) return;
-      // Validate PIN for under 15
-      if (age < 15) {
-        if (!/^\d{4}$/.test(this.newProfilePin)) return;
-        if (this.newProfilePin !== this.newProfilePinConfirm) {
-          this.showToast(this.t('profile.pinMismatch'), 'error');
-          return;
-        }
+      const { result, name, age } = validateNewProfileForm(this);
+      if (result === 'pin_mismatch') {
+        this.showToast(this.t('profile.pinMismatch'), 'error');
+        return;
       }
+      if (result !== 'ok') return;
       try {
-        const body: Record<string, unknown> = {
-          name,
-          age,
-          avatar: this.newProfileAvatar,
-          locale: this.newProfileLocale,
-        };
-        if (age < 15) body.pin = this.newProfilePin;
         const res = await fetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+          body: JSON.stringify(buildCreateProfileBody(this, name, age)),
         });
         if (res.ok) {
-          const profile = await res.json();
-          this.profiles.push(profile);
-          this.selectProfile(profile.id);
-          this.newProfileName = '';
-          this.newProfileAge = '';
-          this.newProfileAvatar = '0';
-          this.newProfileLocale = 'fr';
-          this.newProfilePin = '';
-          this.newProfilePinConfirm = '';
-          this.showProfileForm = false;
+          applyCreateProfileSuccess(this, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
-          this.showToast(this.t('toast.error', { error: err.error || res.statusText }), 'error');
+          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
         }
       } catch (e: unknown) {
         console.error('Failed to create profile:', e);
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error');
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
       }
     },
 
@@ -233,7 +261,7 @@ export function createProfiles() {
         if (e instanceof Error && e.name === 'AbortError') return;
         console.error('Failed to update profile:', e);
         const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.error', { error: msg }), 'error');
+        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
       }
     },
 
@@ -244,7 +272,7 @@ export function createProfiles() {
         ...profile,
         locale: profile.locale || 'fr',
         mistralVoices: profile.mistralVoices || { host: '', guest: '' },
-        theme: profile.theme || '',
+        theme: profile.theme,
       };
       this.showProfilePicker = true;
       this.showProfileForm = false;
@@ -253,7 +281,6 @@ export function createProfiles() {
       this.loadMistralVoices?.();
     },
 
-    /** Verify PIN before allowing parental settings changes. */
     requireParentalAccess(this: AppContext, callback: () => void) {
       if (!this.editingProfile?.hasPin) {
         callback();
@@ -278,7 +305,7 @@ export function createProfiles() {
           }
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
-          this.showToast(this.t('toast.error', { error: msg }), 'error');
+          this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
           return;
         }
         editing._verifiedPin = pin;

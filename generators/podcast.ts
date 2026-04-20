@@ -2,7 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { podcastSystem, podcastUser } from '../prompts.js';
-import type { PodcastLine, AgeGroup } from '../types.js';
+import type { PodcastLine, AgeGroup, PodcastGeneration } from '../types.js';
 
 export interface PodcastResult {
   script: PodcastLine[];
@@ -81,4 +81,10 @@ export async function generatePodcastScript(
     throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");
   }
   return retryResult;
+}
+
+export function createPodcastGeneration(
+  fields: Omit<PodcastGeneration, 'lang'> & { lang: string },
+): PodcastGeneration {
+  return fields;
 }

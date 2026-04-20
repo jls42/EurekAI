@@ -1,15 +1,34 @@
-import { stepByStep } from './step-by-step';
+import { stepByStep, type StepByStepBase } from './step-by-step';
 import { parseChoiceLabel } from '@helpers/choice-labels';
+import type { AppContext } from '../app/app-context';
+import type { Generation, QuizGeneration, QuizQuestion, QuizStats } from '../../types';
 
-export function quizComponent(gen: any) {
+interface QuizContext extends StepByStepBase<QuizQuestion>, AppContext {
+  selectedChoice: number | null;
+  answers: Record<number, number>;
+  reviewing: boolean;
+  currentQuestion(): QuizQuestion | undefined;
+  choiceParts(raw: string): { label: string; text: string };
+  isCurrentAnswered(): boolean;
+  selectChoice(ci: number): void;
+  restoreState(): void;
+  submitAttempt(): Promise<void>;
+  reviewErrors(): Promise<void>;
+  retryWrongQuestions(): void;
+  resetQuiz(): void;
+}
+
+type QuizGen = Generation & { data: QuizQuestion[]; stats?: QuizStats };
+
+export function quizComponent(gen: QuizGeneration) {
   return {
-    ...stepByStep(gen),
+    ...stepByStep<QuizGeneration>(gen),
     selectedChoice: null as number | null,
     answers: {} as Record<number, number>,
     reviewing: false,
 
-    currentQuestion() {
-      return this.items()[this.currentIndex()];
+    currentQuestion(this: QuizContext): QuizQuestion | undefined {
+      return this.currentItem();
     },
 
     // Bidi-safe split pour les choix "A) texte" : label et texte dans des <bdi> séparés
@@ -20,31 +39,34 @@ export function quizComponent(gen: any) {
       return parsed ? { label: `${parsed.label})`, text: parsed.text } : { label: '', text: raw };
     },
 
-    isCurrentAnswered(this: any): boolean {
-      return this.currentIndex() in this.answers;
+    isCurrentAnswered(this: QuizContext): boolean {
+      const idx = this.currentIndex();
+      return idx !== undefined && idx in this.answers;
     },
 
-    selectChoice(this: any, ci: number) {
+    selectChoice(this: QuizContext, ci: number) {
       if (this.feedback || this.isReviewing()) return;
-      this.selectedChoice = ci;
+      const idx = this.currentIndex();
       const q = this.currentQuestion();
+      if (idx === undefined || !q) return;
+      this.selectedChoice = ci;
       const correct = ci === q.correct;
-      this.answers[this.currentIndex()] = ci;
+      this.answers[idx] = ci;
       if (correct) this.score++;
       this.feedback = { correct };
     },
 
-    onNextReady(this: any) {
+    onNextReady(this: QuizContext) {
       this.restoreState();
     },
 
-    onPrevReady(this: any) {
+    onPrevReady(this: QuizContext) {
       this.restoreState();
     },
 
-    restoreState(this: any) {
+    restoreState(this: QuizContext) {
       const idx = this.currentIndex();
-      if (idx in this.answers) {
+      if (idx !== undefined && idx in this.answers) {
         this.selectedChoice = this.answers[idx];
         const q = this.items()[idx];
         this.feedback = { correct: this.answers[idx] === q?.correct };
@@ -54,11 +76,11 @@ export function quizComponent(gen: any) {
       }
     },
 
-    onFinish(this: any) {
+    onFinish(this: QuizContext) {
       this.submitAttempt();
     },
 
-    async submitAttempt(this: any) {
+    async submitAttempt(this: QuizContext) {
       const pid = this.currentProjectId;
       try {
         const res = await fetch(
@@ -70,8 +92,8 @@ export function quizComponent(gen: any) {
           },
         );
         if (res.ok) {
-          const result = await res.json();
-          this.gen.stats = result.stats;
+          const result = (await res.json()) as { stats: QuizStats };
+          (this.gen as QuizGen).stats = result.stats;
           this.showToast(this.t('toast.scoreSaved'), 'success');
         } else {
           console.error('Quiz attempt failed:', res.status);
@@ -82,12 +104,13 @@ export function quizComponent(gen: any) {
       }
     },
 
-    async reviewErrors(this: any) {
+    async reviewErrors(this: QuizContext) {
       const pid = this.currentProjectId;
-      const weakQuestions: any[] = [];
+      const data = this.items();
+      const weakQuestions: QuizQuestion[] = [];
       for (const [qi, ci] of Object.entries(this.answers)) {
-        if (this.gen.data[Number(qi)]?.correct !== Number(ci)) {
-          weakQuestions.push(this.gen.data[Number(qi)]);
+        if (data[Number(qi)]?.correct !== Number(ci)) {
+          weakQuestions.push(data[Number(qi)]);
         }
       }
       if (weakQuestions.length === 0) return;
@@ -100,7 +123,7 @@ export function quizComponent(gen: any) {
           body: JSON.stringify({ generationId: this.gen.id, weakQuestions }),
         });
         if (res.ok) {
-          const newGen = await res.json();
+          const newGen = (await res.json()) as Generation;
           this.generations.push(newGen);
           this.openGens[newGen.id] = true;
           this.showToast(this.t('toast.reviewGenerated'), 'success');
@@ -115,7 +138,7 @@ export function quizComponent(gen: any) {
       }
     },
 
-    retryWrongQuestions(this: any) {
+    retryWrongQuestions(this: QuizContext) {
       const wrong = Object.entries(this.answers)
         .filter(([qi, ci]) => this.items()[Number(qi)]?.correct !== Number(ci))
         .map(([k]) => Number(k));
@@ -124,7 +147,7 @@ export function quizComponent(gen: any) {
       this.retryWrong(wrong);
     },
 
-    resetQuiz(this: any) {
+    resetQuiz(this: QuizContext) {
       this.answers = {};
       this.selectedChoice = null;
       this.resetAll();

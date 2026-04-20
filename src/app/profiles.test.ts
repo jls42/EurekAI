@@ -517,7 +517,7 @@ describe('createProfiles', () => {
         hasPin: false,
         locale: 'en',
         mistralVoices: { host: '', guest: '' },
-        theme: '',
+        theme: undefined,
       });
       expect(ctx.showProfileForm).toBe(false);
     });

@@ -1,7 +1,8 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
 import type {
+  Generation,
   QuizGeneration,
   QuizAttempt,
   QuizVocalGeneration,
@@ -13,7 +14,7 @@ import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
-import { textToSpeech } from '../generators/tts-provider.js';
+import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
@@ -24,6 +25,54 @@ import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+const FILL_BLANK = 'fill-blank';
+
+type QuestionStats = Record<number, { correct: number; wrong: number }>;
+
+const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
+  stats[qi] ??= { correct: 0, wrong: 0 };
+  if (correct) stats[qi].correct++;
+  else stats[qi].wrong++;
+};
+
+const scoreQuizAttempt = (
+  quizGen: QuizGeneration,
+  answers: Record<string, unknown>,
+): { score: number; stats: NonNullable<QuizGeneration['stats']> } => {
+  const stats = (quizGen.stats ??= { attempts: [], questionStats: {} });
+  let score = 0;
+  for (const [qiStr, ci] of Object.entries(answers)) {
+    const qi = Number(qiStr);
+    const correct = quizGen.data[qi]?.correct === Number(ci);
+    if (correct) score++;
+    bumpQuestionStat(stats.questionStats, qi, correct);
+  }
+  return { score, stats };
+};
+
+const scoreFillBlankAttempt = (
+  fbGen: FillBlankGeneration,
+  answers: Record<string, unknown>,
+): {
+  score: number;
+  results: Record<number, boolean>;
+  stats: NonNullable<FillBlankGeneration['stats']>;
+} => {
+  const stats = (fbGen.stats ??= { attempts: [], questionStats: {} });
+  let score = 0;
+  const results: Record<number, boolean> = {};
+  for (const [qiStr, childAnswer] of Object.entries(answers)) {
+    const qi = Number(qiStr);
+    const correctAnswer = fbGen.data[qi]?.answer;
+    if (!correctAnswer) continue;
+    const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
+    results[qi] = match;
+    if (match) score++;
+    bumpQuestionStat(stats.questionStats, qi, match);
+  }
+  return { score, results, stats };
+};
 
 // --- Read Aloud (TTS) — helpers ---
 
@@ -38,26 +87,31 @@ function sectionText(d: SummaryGeneration['data'], s: string): string {
   return '';
 }
 
-function readAloudText(gen: any, section: string): string | null {
-  if (gen.type === 'summary') return sectionText((gen as SummaryGeneration).data, section); // NOSONAR(S4325) — type narrowing after gen.type check
+// cf. CLAUDE.md "Pièges Lizard"
+const readAloudText = (gen: Generation, section: string): string | null => {
+  if (gen.type === 'summary') return sectionText(gen.data, section);
   return null;
-}
+};
 
-async function generateBatchAudio(
-  gen: SummaryGeneration,
-  voiceId: string,
-  ttsOpts: any,
-  projectDir: string,
-  pid: string,
-): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> {
-  const d = gen.data;
+const batchSectionsFor = (d: SummaryGeneration['data']): string[] => {
   const sections = ['intro', 'key_points'];
   if (d.fun_fact) sections.push('fun_fact');
   if (d.vocabulary?.length) sections.push('vocabulary');
+  return sections;
+};
+
+const generateBatchAudio = async (
+  gen: SummaryGeneration,
+  voiceId: string,
+  ttsOpts: TtsOptions,
+  projectDir: string,
+  pid: string,
+): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> => {
+  const d = gen.data;
   const audioUrls: Record<string, string> = {};
   const failedSections: string[] = [];
   const baseId = gen.id.slice(0, 8);
-  for (const s of sections) {
+  for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
     if (!txt) continue;
     try {
@@ -69,7 +123,7 @@ async function generateBatchAudio(
     }
   }
   return { audioUrls, failedSections };
-}
+};
 
 interface BatchSummaryCtx {
   audioUrls: Record<string, string>;
@@ -78,7 +132,7 @@ interface BatchSummaryCtx {
   store: ProjectStore;
   pid: string;
   gid: string;
-  res: any;
+  res: Response;
   costDelta?: number;
 }
 
@@ -88,7 +142,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     const d = summaryGen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } },
-    } as any);
+    } as Partial<SummaryGeneration>);
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
     res.status(500).json({ error: 'TTS failed for all sections' });
@@ -104,7 +158,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
 async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
   voices: { host: string; guest: string },
-  ttsOpts: any,
+  ttsOpts: TtsOptions,
 ): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
   const segments: Buffer[] = [];
@@ -118,10 +172,10 @@ async function generateFlashcardsAudio(
 }
 
 interface SectionAudioCtx {
-  gen: any;
+  gen: Generation;
   section: string;
   voiceId: string;
-  ttsOpts: any;
+  ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;
   baseId: string;
@@ -129,7 +183,7 @@ interface SectionAudioCtx {
   gid: string;
 }
 
-async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<string | null> {
+async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promise<string | null> {
   const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
@@ -145,10 +199,10 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: any): Promise<str
   const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
 
   if (gen.type === 'summary') {
-    const d = (gen as SummaryGeneration).data; // NOSONAR(S4325) — type narrowing after gen.type check
+    const d = gen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } },
-    } as any);
+    } as Partial<SummaryGeneration>);
   }
   return audioUrl;
 }
@@ -204,31 +258,19 @@ export function generationCrudRoutes(
       }
 
       const quizGen = gen as QuizGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz' guard
-      quizGen.stats ??= { attempts: [], questionStats: {} };
-
-      let score = 0;
-      const total = quizGen.data.length;
-      for (const [qiStr, ci] of Object.entries(answers)) {
-        const qi = Number(qiStr);
-        const correct = quizGen.data[qi]?.correct === Number(ci);
-        if (correct) score++;
-        if (!quizGen.stats.questionStats[qi]) {
-          quizGen.stats.questionStats[qi] = { correct: 0, wrong: 0 };
-        }
-        if (correct) quizGen.stats.questionStats[qi].correct++;
-        else quizGen.stats.questionStats[qi].wrong++;
-      }
-
+      const { score, stats } = scoreQuizAttempt(quizGen, answers);
       const attempt: QuizAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, number>,
         score,
-        total,
+        total: quizGen.data.length,
       };
-      quizGen.stats.attempts.push(attempt);
+      stats.attempts.push(attempt);
 
-      store.updateGeneration(req.params.pid, req.params.gid, { stats: quizGen.stats } as any);
-      res.json({ attempt, stats: quizGen.stats });
+      store.updateGeneration(req.params.pid, req.params.gid, {
+        stats,
+      } as Partial<QuizGeneration>);
+      res.json({ attempt, stats });
     } catch (e) {
       logger.error('quiz', 'attempt error:', e);
       res.status(500).json({ error: extractErrorCode(e, 'quiz') });
@@ -244,48 +286,29 @@ export function generationCrudRoutes(
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
-      if (gen?.type !== 'fill-blank') {
+      if (gen?.type !== FILL_BLANK) {
         res.status(404).json({ error: 'Exercice a trous introuvable' });
         return;
       }
 
       const fbGen = gen as FillBlankGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'fill-blank' guard
-      fbGen.stats ??= { attempts: [], questionStats: {} };
-
-      let score = 0;
-      const total = fbGen.data.length;
-      const results: Record<number, boolean> = {};
-
-      for (const [qiStr, childAnswer] of Object.entries(answers)) {
-        const qi = Number(qiStr);
-        const correctAnswer = fbGen.data[qi]?.answer;
-        if (!correctAnswer) continue;
-
-        const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
-        results[qi] = match;
-        if (match) score++;
-
-        if (!fbGen.stats.questionStats[qi]) {
-          fbGen.stats.questionStats[qi] = { correct: 0, wrong: 0 };
-        }
-        if (match) fbGen.stats.questionStats[qi].correct++;
-        else fbGen.stats.questionStats[qi].wrong++;
-      }
-
+      const { score, results, stats } = scoreFillBlankAttempt(fbGen, answers);
       const attempt: FillBlankAttempt = {
         date: new Date().toISOString(),
         answers: answers as Record<number, string>,
         results,
         score,
-        total,
+        total: fbGen.data.length,
       };
-      fbGen.stats.attempts.push(attempt);
+      stats.attempts.push(attempt);
 
-      store.updateGeneration(req.params.pid, req.params.gid, { stats: fbGen.stats } as any);
-      res.json({ attempt, stats: fbGen.stats, results });
+      store.updateGeneration(req.params.pid, req.params.gid, {
+        stats,
+      } as Partial<FillBlankGeneration>);
+      res.json({ attempt, stats, results });
     } catch (e) {
-      logger.error('fill-blank', 'attempt error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'fill-blank') });
+      logger.error(FILL_BLANK, 'attempt error:', e);
+      res.status(500).json({ error: extractErrorCode(e, FILL_BLANK) });
     }
   });
 
@@ -296,7 +319,9 @@ export function generationCrudRoutes(
       res.status(400).json({ error: 'title requis' });
       return;
     }
-    const updated = store.updateGeneration(req.params.pid, req.params.gid, { title } as any);
+    const updated = store.updateGeneration(req.params.pid, req.params.gid, {
+      title,
+    } as Partial<Generation>);
     if (!updated) {
       res.status(404).json({ error: 'Generation introuvable' });
       return;
@@ -444,7 +469,7 @@ export function generationCrudRoutes(
       );
       if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
     } catch (e) {
-      const failedUsage = (e as any).apiUsage as ApiUsage[] | undefined;
+      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }

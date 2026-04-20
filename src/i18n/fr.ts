@@ -340,6 +340,7 @@ export const fr: Record<string, string> = {
   'consigne.dismissedLabel': 'Consigne de révision ignorée',
   'consigne.reEnable': 'Réactiver',
   'consigne.reEnabled': 'Consigne réactivée — les générations seront ciblées',
+  'consigne.detectionFailed': "Impossible d'analyser les consignes. Réessaye.",
 
   // Scores tab
   'scores.heading': 'Mes Scores',
@@ -393,11 +394,11 @@ export const fr: Record<string, string> = {
   'toast.consigneError': 'Erreur détection consigne',
   'toast.view': 'Voir',
   'toast.generationDone': '{type} généré !',
-  'toast.generationError': 'Erreur génération: {error}',
+  'toast.generationError': 'La génération a échoué. Réessaye dans un instant.',
   'toast.allGenerated': 'Tout généré !',
   'toast.partialGenerated': '{count}/3 générations réussies',
   'toast.magicDone': 'Magie terminée !',
-  'toast.autoError': 'Erreur génération auto: {error}',
+  'toast.autoError': 'La génération automatique a échoué. Réessaye.',
   'toast.audioDone': 'Audio généré !',
   'toast.audioPartial': 'Audio partiel : certaines sections ont échoué',
   'toast.audioError': 'Erreur génération audio',
@@ -468,6 +469,7 @@ export const fr: Record<string, string> = {
   'profile.backToProfiles': 'Retour',
 
   'toast.error': 'Erreur: {error}',
-  'toast.uploadError': 'Erreur upload {filename}: {error}',
+  'toast.uploadError': "Impossible d'envoyer {filename}. Réessaye.",
+  'sources.uploadError.generic': "L'envoi a échoué. Réessaye.",
   'toast.chatErrorMsg': 'Erreur chat: {error}',
 };

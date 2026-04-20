@@ -316,6 +316,7 @@ export const it: Record<string, string> = {
   'consigne.dismissedLabel': 'Istruzioni di studio ignorate',
   'consigne.reEnable': 'Riattiva',
   'consigne.reEnabled': 'Istruzioni riattivate \u2014 le generazioni saranno mirate',
+  'consigne.detectionFailed': 'Impossibile analizzare le istruzioni. Riprova.',
 
   'scores.heading': 'I miei punteggi',
   'scores.emptyTitle': 'Rispondi a un quiz per vedere i tuoi punteggi qui!',
@@ -365,11 +366,11 @@ export const it: Record<string, string> = {
   'toast.consigneError': 'Errore nel rilevamento delle istruzioni',
   'toast.view': 'Vedi',
   'toast.generationDone': '{type} generato!',
-  'toast.generationError': 'Errore di generazione: {error}',
+  'toast.generationError': 'La generazione non \u00e8 riuscita. Riprova tra poco.',
   'toast.allGenerated': 'Tutto generato!',
   'toast.partialGenerated': '{count}/3 generazioni riuscite',
   'toast.magicDone': 'Magia completata!',
-  'toast.autoError': 'Errore generazione automatica: {error}',
+  'toast.autoError': 'La generazione automatica non \u00e8 riuscita. Riprova.',
   'toast.audioDone': 'Audio generato!',
   'toast.audioPartial': 'Audio parziale: alcune sezioni non riuscite',
   'toast.audioError': 'Errore nella generazione audio',
@@ -439,6 +440,7 @@ export const it: Record<string, string> = {
   'profile.backToProfiles': 'Indietro',
 
   'toast.error': 'Errore: {error}',
-  'toast.uploadError': 'Errore caricamento {filename}: {error}',
+  'toast.uploadError': 'Impossibile caricare {filename}. Riprova.',
+  'sources.uploadError.generic': 'Caricamento fallito. Riprova.',
   'toast.chatErrorMsg': 'Errore chat: {error}',
 };

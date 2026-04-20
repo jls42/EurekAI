@@ -1,17 +1,48 @@
 import type { Mistral } from '@mistralai/mistralai';
 import type { ApiUsage } from './pricing.js';
+import { callWithRetry } from './mistral-retry.js';
 
 type UsageCallback = (usage: ApiUsage) => void;
 
-function extractChatUsage(response: any, request: any): ApiUsage {
+interface UsageExtractableResponse {
+  model?: string;
+  usage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+    promptAudioSeconds?: number;
+  };
+}
+
+interface RequestWithModel {
+  model?: string;
+}
+
+interface OcrResponseShape {
+  model?: string;
+  usageInfo?: { pagesProcessed?: number };
+}
+
+interface TtsRequestShape {
+  model?: string;
+  input?: unknown;
+}
+
+// cf. CLAUDE.md "Pièges Lizard" (arrow const + CCN ≤ 8).
+// Unifie chat + STT + agent : promptAudioSeconds est optionnel sur ApiUsage,
+// sa présence en chat/agent (tjs undefined dans ce cas) est inerte.
+// `||` volontaire (pas `??`) : chaque `??` compte 2 dans Lizard. Les champs sont
+// numériques (0 falsy acceptable = fallback identique) ou string ('' falsy acceptable).
+const extractUsage = (response: UsageExtractableResponse, request: RequestWithModel): ApiUsage => {
   const u = response.usage || {};
   return {
     promptTokens: u.promptTokens || 0,
     completionTokens: u.completionTokens || 0,
     totalTokens: u.totalTokens || 0,
+    promptAudioSeconds: u.promptAudioSeconds,
     model: response.model || request.model || '',
   };
-}
+};
 
 /**
  * Wrap billable methods on the Mistral client to capture API usage.
@@ -27,58 +58,58 @@ export function trackClient(client: Mistral, onUsage: UsageCallback): void {
 
 function wrapChatComplete(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.chat.complete.bind(client.chat);
-  client.chat.complete = async (request: any, options?: any) => {
-    const response = await orig(request, options);
-    onUsage(extractChatUsage(response, request));
+  client.chat.complete = async (request, options) => {
+    const response = await callWithRetry('chat', () => orig(request, options));
+    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel));
     return response;
   };
 }
 
 function wrapStt(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.audio.transcriptions.complete.bind(client.audio.transcriptions);
-  client.audio.transcriptions.complete = async (request: any, options?: any) => {
-    const response = await orig(request, options);
-    onUsage({
-      promptTokens: response.usage?.promptTokens ?? 0,
-      completionTokens: response.usage?.completionTokens ?? 0,
-      totalTokens: response.usage?.totalTokens ?? 0,
-      promptAudioSeconds: (response.usage as any)?.promptAudioSeconds,
-      model: response.model ?? request.model ?? '',
-    });
+  client.audio.transcriptions.complete = async (request, options) => {
+    const response = await callWithRetry('stt', () => orig(request, options));
+    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel));
     return response;
   };
 }
 
 function wrapOcr(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.ocr.process.bind(client.ocr);
-  client.ocr.process = async (request: any, options?: any) => {
-    const response = await orig(request, options);
+  client.ocr.process = async (request, options) => {
+    const response = (await callWithRetry('ocr', () => orig(request, options))) as OcrResponseShape;
     onUsage({
       pagesProcessed: response.usageInfo?.pagesProcessed ?? 0,
-      model: response.model ?? request.model ?? '',
+      model: response.model ?? (request as RequestWithModel).model ?? '',
     });
-    return response;
+    return response as Awaited<ReturnType<typeof orig>>;
   };
 }
 
 function wrapTts(client: Mistral, onUsage: UsageCallback): void {
-  const orig = client.audio.speech.complete.bind(client.audio.speech);
-  (client.audio.speech as any).complete = async (request: any, options?: any) => {
-    const response = await orig(request, options);
+  const speech = client.audio.speech;
+  const orig = speech.complete.bind(speech);
+  const wrapped = async (request: TtsRequestShape, options?: Parameters<typeof orig>[1]) => {
+    const response = await callWithRetry('tts', () =>
+      orig(request as Parameters<typeof orig>[0], options),
+    );
     onUsage({
       inputCharacters: typeof request.input === 'string' ? request.input.length : 0,
       model: request.model ?? '',
     });
     return response;
   };
+  speech.complete = wrapped as typeof speech.complete;
 }
 
 function wrapAgent(client: Mistral, onUsage: UsageCallback): void {
-  const orig = client.beta.conversations.start.bind(client.beta.conversations);
-  (client.beta.conversations as any).start = async (request: any, options?: any) => {
-    const response = await orig(request, options);
-    if (response.usage) {
-      onUsage(extractChatUsage(response, { model: 'mistral-large-latest' }));
+  const conversations = client.beta.conversations;
+  const orig = conversations.start.bind(conversations);
+  conversations.start = async (request, options) => {
+    const response = await callWithRetry('agent', () => orig(request, options));
+    const usageResp = response as UsageExtractableResponse;
+    if (usageResp.usage) {
+      onUsage(extractUsage(usageResp, { model: 'mistral-large-latest' }));
     }
     return response;
   };

@@ -321,6 +321,7 @@ export const de: Record<string, string> = {
   'consigne.dismissedLabel': 'Lernhinweise ignoriert',
   'consigne.reEnable': 'Wieder aktivieren',
   'consigne.reEnabled': 'Hinweise reaktiviert \u2014 Generierungen werden gezielt ausgerichtet',
+  'consigne.detectionFailed': 'Hinweise konnten nicht analysiert werden. Versuch es nochmal.',
 
   'scores.heading': 'Meine Punkte',
   'scores.emptyTitle': 'Mach ein Quiz um deine Punkte hier zu sehen!',
@@ -371,11 +372,11 @@ export const de: Record<string, string> = {
   'toast.consigneError': 'Fehler bei der Hinweiserkennung',
   'toast.view': 'Ansehen',
   'toast.generationDone': '{type} generiert!',
-  'toast.generationError': 'Generierungsfehler: {error}',
+  'toast.generationError': 'Die Generierung ist fehlgeschlagen. Versuch es gleich noch einmal.',
   'toast.allGenerated': 'Alles generiert!',
   'toast.partialGenerated': '{count}/3 Generierungen erfolgreich',
   'toast.magicDone': 'Magie abgeschlossen!',
-  'toast.autoError': 'Auto-Generierungsfehler: {error}',
+  'toast.autoError': 'Die automatische Generierung ist fehlgeschlagen. Versuch es erneut.',
   'toast.audioDone': 'Audio generiert!',
   'toast.audioPartial': 'Teilweises Audio: einige Abschnitte fehlgeschlagen',
   'toast.audioError': 'Fehler bei der Audiogenerierung',
@@ -445,6 +446,7 @@ export const de: Record<string, string> = {
   'profile.backToProfiles': 'Zurueck',
 
   'toast.error': 'Fehler: {error}',
-  'toast.uploadError': 'Upload-Fehler {filename}: {error}',
+  'toast.uploadError': '{filename} konnte nicht hochgeladen werden. Versuch es erneut.',
+  'sources.uploadError.generic': 'Upload fehlgeschlagen. Versuch es nochmal.',
   'toast.chatErrorMsg': 'Chat-Fehler: {error}',
 };

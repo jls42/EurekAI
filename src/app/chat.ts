@@ -1,8 +1,21 @@
 import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
 import { registerGeneration } from './generate';
+import type { AppContext } from './app-context';
+import type { Generation } from '../../types';
 
-function handleChatSuccess(state: any, data: any): void {
+interface ChatSuccessPayload {
+  reply: string;
+  generatedIds?: string[];
+  costDelta?: number;
+  generations?: Generation[];
+}
+
+interface ChatErrorPayload {
+  error?: string;
+}
+
+function handleChatSuccess(state: AppContext, data: ChatSuccessPayload): void {
   state.chatMessages.push({
     role: 'assistant',
     content: data.reply,
@@ -18,9 +31,8 @@ function handleChatSuccess(state: any, data: any): void {
   }
 }
 
-function handleChatError(state: any, err: any): void {
+function handleChatError(state: AppContext, err: ChatErrorPayload): void {
   if (err.error === 'chat.moderationBlocked' || err.error === 'chat.ageRestricted') {
-    // Remove the optimistic user message
     state.chatMessages.pop();
     state.showToast(state.t(err.error), 'error');
   } else {
@@ -35,12 +47,12 @@ function handleChatError(state: any, err: any): void {
 
 export function createChat() {
   return {
-    async loadChatHistory(this: any) {
+    async loadChatHistory(this: AppContext) {
       if (!this.currentProjectId) return;
       try {
         const res = await fetch(this.apiBase() + '/chat');
         if (res.ok) {
-          const data = await res.json();
+          const data = (await res.json()) as { messages?: AppContext['chatMessages'] };
           this.chatMessages = data.messages || [];
         }
       } catch {
@@ -48,7 +60,7 @@ export function createChat() {
       }
     },
 
-    async sendChatMessage(this: any) {
+    async sendChatMessage(this: AppContext) {
       if (!this.currentProfile?.chatEnabled) return;
       const msg = this.chatInput.trim();
       if (!msg || this.chatLoading || !this.currentProjectId) return;
@@ -68,9 +80,9 @@ export function createChat() {
           }),
         });
         if (res.ok) {
-          handleChatSuccess(this, await res.json());
+          handleChatSuccess(this, (await res.json()) as ChatSuccessPayload);
         } else {
-          handleChatError(this, await res.json());
+          handleChatError(this, (await res.json()) as ChatErrorPayload);
         }
       } catch {
         this.chatMessages.push({
@@ -88,7 +100,7 @@ export function createChat() {
       }
     },
 
-    async clearChat(this: any) {
+    async clearChat(this: AppContext) {
       if (!this.currentProjectId) return;
       try {
         await fetch(this.apiBase() + '/chat', { method: 'DELETE' });
