@@ -3,6 +3,20 @@ import type { AppContext } from './app-context';
 import type { Source } from '../../types';
 
 type WebsearchSource = Source & { estimatedCost?: number };
+type WebsearchFailure = { label: string; code: string };
+type WebsearchResponse =
+  | WebsearchSource
+  | WebsearchSource[]
+  | { sources: WebsearchSource[]; failures: WebsearchFailure[] };
+
+function _extractSources(result: WebsearchResponse): {
+  sources: WebsearchSource[];
+  failures: WebsearchFailure[];
+} {
+  if (Array.isArray(result)) return { sources: result, failures: [] };
+  if ('sources' in result) return { sources: result.sources, failures: result.failures ?? [] };
+  return { sources: [result], failures: [] };
+}
 
 export function createWebsearch() {
   return {
@@ -29,8 +43,8 @@ export function createWebsearch() {
           );
           return;
         }
-        const result = (await res.json()) as WebsearchSource | WebsearchSource[];
-        const sources = Array.isArray(result) ? result : [result];
+        const result = (await res.json()) as WebsearchResponse;
+        const { sources, failures } = _extractSources(result);
         for (const source of sources) {
           this.sources.push(source);
           this.selectedIds.push(source.id);
@@ -43,6 +57,9 @@ export function createWebsearch() {
             ? this.t('toast.webSearchAddedMulti', { count: sources.length })
             : this.t('toast.webSearchAdded');
         this.showToast(msg, 'success');
+        if (failures.length > 0) {
+          console.warn('[websearch] partial failures:', failures);
+        }
         this.$nextTick(() => this.refreshIcons());
         setTimeout(() => this.refreshModeration(), 2000);
       } catch (e) {

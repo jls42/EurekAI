@@ -50,11 +50,15 @@ const runConsigneDetection = async (
 };
 
 // Coalesce par projet : le frontend envoie 1 POST par fichier. Si un scan est
-// déjà en vol pour un pid, on marque pending et replay 1× à la fin avec l'état
-// final. Résultat : 2 scans max par rafale (premier feedback rapide + rescan
-// sur état complet), zéro concurrence → plus de 429/retry SDK.
+// déjà en vol pour un pid, on stocke la lang la plus récente (Map plutôt que
+// Set) et on replay 1× à la fin avec cet état final. Résultat : 2 scans max
+// par rafale (premier feedback rapide + rescan sur état complet), zéro
+// concurrence → plus de 429/retry SDK. La Map garantit que le replay utilise
+// la lang du dernier trigger du burst, pas celle du premier (bug observé :
+// upload `en` reçu pendant un scan `fr` ne faisait pas basculer le replay en
+// `en`).
 const inFlight = new Set<string>();
-const pendingScan = new Set<string>();
+const pendingLang = new Map<string, string>();
 
 const triggerConsigneDetection = (
   store: ProjectStore,
@@ -63,17 +67,25 @@ const triggerConsigneDetection = (
   lang = 'fr',
 ): void => {
   if (inFlight.has(pid)) {
-    pendingScan.add(pid);
+    pendingLang.set(pid, lang);
     return;
   }
   inFlight.add(pid);
   void (async () => {
     try {
       await runConsigneDetection(store, client, pid, lang);
+    } catch (e) {
+      // runConsigneDetection gère déjà ses propres erreurs, mais on se protège
+      // ici contre une régression (exception inattendue, crash du code de
+      // coalesce) qui ferait crasher l'IIFE silencieusement et bloquerait
+      // `inFlight` pour toujours sans déclencher le replay.
+      logger.error('consigne', 'IIFE crash', e);
     } finally {
       inFlight.delete(pid);
-      if (pendingScan.delete(pid)) {
-        triggerConsigneDetection(store, client, pid, lang);
+      const nextLang = pendingLang.get(pid);
+      if (nextLang !== undefined) {
+        pendingLang.delete(pid);
+        triggerConsigneDetection(store, client, pid, nextLang);
       }
     }
   })();
@@ -472,12 +484,15 @@ export function sourceRoutes(
     };
   }
 
-  /** Track a web source fetch, persist cost, and decorate source if non-null. */
+  type WebSourceFailure = { label: string; code: string };
+  type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
+
+  /** Track a web source fetch, persist cost, and classify outcome as success or failure. */
   async function trackWebSource(
     pid: string,
     label: string,
     fn: () => Promise<Source | null>,
-  ): Promise<Source | null> {
+  ): Promise<WebSourceOutcome> {
     try {
       const { result: source, usage } = await runWithUsageTracking(fn);
       const persisted = persistUsage(
@@ -491,47 +506,64 @@ export function sourceRoutes(
         source.usage = persisted.usage;
         source.costBreakdown = persisted.costBreakdown;
       }
-      return source;
+      // scrapeUrl peut renvoyer null quand scrape + fallback échouent tous les
+      // deux (cf. `logger.error('URL failed completely')`). C'est un échec
+      // silencieux du point de vue de l'endpoint, on le surface en failure.
+      if (!source) {
+        return { source: null, failure: { label, code: 'upstream_unavailable' } };
+      }
+      return { source, failure: null };
     } catch (err) {
       const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
       }
       logger.error('sources', `${label} failed`, err);
-      return null;
+      return { source: null, failure: { label, code: extractErrorCode(err) } };
     }
   }
+
+  /** Accumulate a tracked outcome into sources/failures buckets. */
+  const pushOutcome = (
+    outcome: WebSourceOutcome,
+    sources: Source[],
+    failures: WebSourceFailure[],
+  ): void => {
+    if (outcome.source) sources.push(outcome.source);
+    if (outcome.failure) failures.push(outcome.failure);
+  };
 
   /** Collect sources from URLs and/or keyword search with per-source cost tracking. */
   async function collectWebSources(
     pid: string,
     req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },
     modCats: string[] | null,
-  ): Promise<Source[]> {
+  ): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> {
     const lang = req.body.lang || 'fr';
     const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
     const { urls, searchQuery } = parseWebInput(req.body.query.trim());
     const scrapeMode = req.body.scrapeMode || 'auto';
     const sources: Source[] = [];
+    const failures: WebSourceFailure[] = [];
     const now = new Date().toISOString();
 
     for (const url of urls) {
-      const source = await trackWebSource(pid, `URL scrape: ${url}`, () =>
+      const outcome = await trackWebSource(pid, `URL scrape: ${url}`, () =>
         scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
       );
-      if (source) sources.push(source);
+      pushOutcome(outcome, sources, failures);
     }
 
     if (searchQuery) {
-      const source = await trackWebSource(
+      const outcome = await trackWebSource(
         pid,
         `Keyword search: ${searchQuery}`,
         () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>,
       );
-      if (source) sources.push(source);
+      pushOutcome(outcome, sources, failures);
     }
 
-    return sources;
+    return { sources, failures };
   }
 
   // Web search / URL scrape source
@@ -558,9 +590,11 @@ export function sourceRoutes(
     }
 
     try {
-      const sources = await collectWebSources(pid, req, modCats);
+      const { sources, failures } = await collectWebSources(pid, req, modCats);
       if (sources.length === 0) {
-        res.status(500).json({ error: 'Aucune source extraite' });
+        // Tous les inputs ont échoué : on surface les failures pour que l'UI
+        // puisse afficher un toast au lieu d'un échec silencieux.
+        res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
       for (const s of sources) store.addSource(pid, s);
@@ -569,7 +603,14 @@ export function sourceRoutes(
       for (const s of sources) {
         if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
       }
-      res.json(sources);
+      // Partial success : wrapper {sources, failures} (miroir du contrat
+      // UploadFailure de /sources/upload). Full success : array nu pour
+      // backwards compat.
+      if (failures.length > 0) {
+        res.json({ sources, failures });
+      } else {
+        res.json(sources);
+      }
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
       res.status(500).json({ error: extractErrorCode(e) });

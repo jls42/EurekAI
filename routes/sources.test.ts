@@ -732,7 +732,7 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
   });
 
-  it('retourne 500 quand webSearchEnrich echoue (graceful fallback)', async () => {
+  it('retourne 500 avec failures[] quand webSearchEnrich echoue (graceful fallback)', async () => {
     const project = store.createProject('P1');
     vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('network error'));
 
@@ -745,9 +745,13 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    // collectWebSources catches the error per-source and returns empty array
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Aucune source extraite' });
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.error).toBe('Aucune source extraite');
+    expect(Array.isArray(payload.failures)).toBe(true);
+    expect(payload.failures).toHaveLength(1);
+    expect(payload.failures[0].label).toContain('Keyword search');
+    expect(payload.failures[0].code).toBe('internal_error');
   });
 
   it('scrape une URL directement via fetchPageContent', async () => {
@@ -888,7 +892,7 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].scrapeEngine).toBe('mistral');
   });
 
-  it('retourne 500 quand scrape et fallback echouent tous les deux', async () => {
+  it('retourne 500 avec failures[] quand scrape et fallback echouent tous les deux', async () => {
     vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
     vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('mistral failed'));
     const project = store.createProject('P1');
@@ -902,10 +906,15 @@ describe('POST /:pid/sources/websearch', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Aucune source extraite' });
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.error).toBe('Aucune source extraite');
+    // trackWebSource surface les failures pour l'UI (fini le silent skip).
+    expect(payload.failures).toHaveLength(1);
+    expect(payload.failures[0].label).toContain('URL scrape: https://example.com/dead');
+    expect(payload.failures[0].code).toBe('upstream_unavailable');
   });
 
-  it('gere plusieurs URLs avec succes partiel', async () => {
+  it('retourne {sources, failures} en partial success quand une URL sur deux echoue', async () => {
     vi.mocked(fetchPageContent)
       .mockResolvedValueOnce({ text: 'page 1 content', engine: 'readability' })
       .mockRejectedValueOnce(new Error('scrape failed'));
@@ -920,9 +929,61 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    const sources = res.json.mock.calls[0][0];
-    expect(sources).toHaveLength(1);
-    expect(sources[0].markdown).toBe('page 1 content');
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.sources).toHaveLength(1);
+    expect(payload.sources[0].markdown).toBe('page 1 content');
+    expect(payload.failures).toHaveLength(1);
+    expect(payload.failures[0].label).toContain('URL scrape: https://b.com');
+    expect(payload.failures[0].code).toBe('upstream_unavailable');
+  });
+
+  it('retourne un array nu (pas de wrapper) quand toutes les sources reussissent', async () => {
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const payload = res.json.mock.calls[0][0];
+    // Backwards compat : array nu quand pas de failures (contrat historique frontend).
+    expect(Array.isArray(payload)).toBe(true);
+    expect(payload).toHaveLength(1);
+  });
+
+  it('retourne {sources, failures} avec 1 URL OK + 2 URLs KO (1/3 succes)', async () => {
+    vi.mocked(fetchPageContent)
+      .mockResolvedValueOnce({ text: 'ok content', engine: 'readability' })
+      .mockRejectedValueOnce(new Error('scrape 2 failed'))
+      .mockRejectedValueOnce(new Error('scrape 3 failed'));
+    // Les 2 fallbacks webSearchEnrich échouent aussi (fail complet des 2 URLs KO)
+    vi.mocked(webSearchEnrich)
+      .mockRejectedValueOnce(new Error('fallback 2 failed'))
+      .mockRejectedValueOnce(new Error('fallback 3 failed'));
+
+    const project = store.createProject('P1');
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://a.com https://b.com https://c.com' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).not.toHaveBeenCalledWith(500);
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.sources).toHaveLength(1);
+    expect(payload.failures).toHaveLength(2);
+    // Codes stables (pas de err.message brut)
+    for (const f of payload.failures) {
+      expect(typeof f.code).toBe('string');
+      expect(f.code).toMatch(/^(upstream_unavailable|internal_error)$/);
+    }
   });
 });
 
@@ -1406,6 +1467,69 @@ describe('Background triggers after source addition', () => {
 
     expect(res.json).toHaveBeenCalledTimes(1);
     expect(res.status).not.toHaveBeenCalled();
+  });
+
+  it('coalesce replay utilise la lang la plus recente du burst (Map vs Set)', async () => {
+    // Scenario : burst de 2 triggers — #1 en fr (lance le scan), #2 en en (pendant que
+    // #1 tourne). Le replay automatique après #1 doit utiliser lang='en' (dernière
+    // valeur reçue), pas 'fr'. Avant : pendingScan Set ne retenait que la présence,
+    // le replay utilisait la lang capturée dans la closure du 1er trigger (fr).
+    const project = store.createProject('P1');
+    store.addSource(project.meta.id, {
+      id: 'src-existing',
+      filename: 'existing.txt',
+      markdown: 'existing content',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'text',
+    });
+
+    // Deferred promise pour bloquer le 1er appel detectConsigne — permet au 2e
+    // handler de s'exécuter pendant que le 1er est en vol.
+    let resolveFirstDetection: ((value: unknown) => void) | null = null;
+    const firstDetection = new Promise((resolve) => {
+      resolveFirstDetection = resolve;
+    });
+    vi.mocked(detectConsigne)
+      .mockImplementationOnce(() => firstDetection as ReturnType<typeof detectConsigne>)
+      .mockResolvedValueOnce({ found: true, text: 'replay', keyTopics: ['rep'] });
+
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+
+    const req1 = mockReq({
+      params: { pid: project.meta.id },
+      body: { text: 'premier texte', lang: 'fr' },
+    });
+    const res1 = mockRes();
+    await handler(req1, res1);
+
+    // À ce stade : scan #1 lancé (hanging), inFlight contient pid.
+    const req2 = mockReq({
+      params: { pid: project.meta.id },
+      body: { text: 'second texte', lang: 'en' },
+    });
+    const res2 = mockRes();
+    await handler(req2, res2);
+
+    // Débloquer le scan #1 → finally se déclenche → replay avec pendingLang.get(pid) = 'en'.
+    resolveFirstDetection!({ found: true, text: 'first', keyTopics: ['a'] });
+    await flushPromises();
+    await flushPromises();
+
+    expect(detectConsigne).toHaveBeenCalledTimes(2);
+    expect(detectConsigne).toHaveBeenNthCalledWith(
+      1,
+      client,
+      '# Combined markdown',
+      undefined,
+      'fr',
+    );
+    expect(detectConsigne).toHaveBeenNthCalledWith(
+      2,
+      client,
+      '# Combined markdown',
+      undefined,
+      'en',
+    );
   });
 
   it('moderation error does not crash the route and sets error status', async () => {
