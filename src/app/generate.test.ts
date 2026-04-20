@@ -513,6 +513,31 @@ describe('generateAuto', () => {
   });
 });
 
+describe('anti-leak e.message in toasts', () => {
+  const TOKEN = 'SECRET_LEAK_TEST_TOKEN';
+
+  it('generate() never surfaces raw e.message in any toast call', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error(TOKEN));
+    const ctx = makeContext();
+    await gen.generate.call(ctx, 'summary');
+    expect(JSON.stringify(ctx.showToast.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('generateAll() never surfaces raw e.message in any toast call', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error(TOKEN));
+    const ctx = makeContext();
+    await gen.generateAll.call(ctx);
+    expect(JSON.stringify(ctx.showToast.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('generateAuto() never surfaces raw e.message in any toast call', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error(TOKEN));
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+    expect(JSON.stringify(ctx.showToast.mock.calls)).not.toContain(TOKEN);
+  });
+});
+
 describe('generateAuto — additional coverage', () => {
   it('skips TTS types (podcast, quiz-vocal) when ttsAvailable is false', async () => {
     const routeResult = {

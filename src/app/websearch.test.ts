@@ -146,6 +146,29 @@ describe('createWebsearch', () => {
       });
     });
 
+    it('handles partial failure {sources, failures} from API', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const source = { id: 's1', type: 'websearch', text: 'Scraped page', estimatedCost: 0.001 };
+        const failures = [
+          { label: 'URL scrape: https://down.example', code: 'upstream_unavailable' },
+        ];
+        vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ sources: [source], failures }),
+        } as any);
+
+        await ws.searchWeb.call(ctx);
+
+        expect(ctx.sources).toEqual([source]);
+        expect(ctx.selectedIds).toEqual(['s1']);
+        expect(warnSpy).toHaveBeenCalledWith('[websearch] partial failures:', failures);
+        expect(ctx.showToast).toHaveBeenCalledWith('toast.webSearchAdded', 'success');
+      } finally {
+        warnSpy.mockRestore();
+      }
+    });
+
     it('passes locale from context', async () => {
       ctx.locale = 'en';
       const source = { id: 's1', type: 'websearch', text: 'Results' };

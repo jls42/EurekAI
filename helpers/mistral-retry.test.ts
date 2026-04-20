@@ -27,6 +27,17 @@ describe('callWithRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
+  it('retries on HTTP 408 Request Timeout then succeeds', async () => {
+    const fn = vi
+      .fn()
+      .mockRejectedValueOnce(Object.assign(new Error('request timeout'), { status: 408 }))
+      .mockResolvedValueOnce('ok');
+    const p = callWithRetry('test', fn);
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
   it('retries on HTTP 503 then succeeds', async () => {
     const fn = vi
       .fn()
