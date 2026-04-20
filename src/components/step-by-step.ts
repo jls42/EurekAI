@@ -1,11 +1,6 @@
 import type { Generation } from '../../types';
 
-/**
- * Generic step-by-step mixin for Alpine.js exercise components.
- * Provides navigation, progress tracking, score, and retry/reset logic.
- * Each consumer adds its own answer verification and submission.
- */
-export interface StepByStepBase {
+export interface StepByStepBase<T = unknown> {
   gen: Generation;
   currentQ: number;
   highWaterMark: number;
@@ -13,7 +8,8 @@ export interface StepByStepBase {
   finished: boolean;
   feedback: { correct: boolean } | null;
   queue: number[] | null;
-  items(): unknown[];
+  items(): T[];
+  currentItem(): T | undefined;
   activeIndices(): number[];
   total(): number;
   currentIndex(): number | undefined;
@@ -30,7 +26,7 @@ export interface StepByStepBase {
   onFinish?(): void;
 }
 
-export function stepByStep(gen: Generation) {
+export function stepByStep<T = unknown>(gen: Generation) {
   return {
     gen,
     currentQ: 0,
@@ -40,48 +36,53 @@ export function stepByStep(gen: Generation) {
     feedback: null as { correct: boolean } | null,
     queue: null as number[] | null,
 
-    items(this: StepByStepBase): unknown[] {
-      return ((this.gen as { data?: unknown[] }).data as unknown[]) || [];
+    items(this: StepByStepBase<T>): T[] {
+      return ((this.gen as unknown as { data?: T[] }).data as T[]) || [];
     },
 
-    activeIndices(this: StepByStepBase): number[] {
+    currentItem(this: StepByStepBase<T>): T | undefined {
+      const idx = this.currentIndex();
+      return idx === undefined ? undefined : this.items()[idx];
+    },
+
+    activeIndices(this: StepByStepBase<T>): number[] {
       return this.queue || this.items().map((_, i) => i);
     },
 
-    total(this: StepByStepBase) {
+    total(this: StepByStepBase<T>) {
       return this.activeIndices().length;
     },
 
-    currentIndex(this: StepByStepBase) {
+    currentIndex(this: StepByStepBase<T>) {
       return this.activeIndices()[this.currentQ];
     },
 
-    progress(this: StepByStepBase) {
+    progress(this: StepByStepBase<T>) {
       const t = this.total();
       if (t === 0) return 0;
       return ((this.currentQ + (this.finished ? 1 : 0)) / t) * 100;
     },
 
-    isReviewing(this: StepByStepBase) {
+    isReviewing(this: StepByStepBase<T>) {
       return this.currentQ < this.highWaterMark;
     },
 
-    canGoPrev(this: StepByStepBase) {
+    canGoPrev(this: StepByStepBase<T>) {
       return this.currentQ > 0;
     },
 
-    canGoNext(this: StepByStepBase) {
+    canGoNext(this: StepByStepBase<T>) {
       return this.currentQ < this.highWaterMark;
     },
 
-    prevQuestion(this: StepByStepBase) {
+    prevQuestion(this: StepByStepBase<T>) {
       if (this.currentQ <= 0) return;
       this.feedback = null;
       this.currentQ--;
       this.onPrevReady?.();
     },
 
-    nextQuestion(this: StepByStepBase) {
+    nextQuestion(this: StepByStepBase<T>) {
       this.feedback = null;
       this.currentQ++;
       if (this.currentQ >= this.total()) {
@@ -95,7 +96,7 @@ export function stepByStep(gen: Generation) {
       }
     },
 
-    retryWrong(this: StepByStepBase, wrongIndices: number[]) {
+    retryWrong(this: StepByStepBase<T>, wrongIndices: number[]) {
       if (wrongIndices.length === 0) return;
       this.queue = wrongIndices;
       this.currentQ = 0;
@@ -105,7 +106,7 @@ export function stepByStep(gen: Generation) {
       this.feedback = null;
     },
 
-    resetAll(this: StepByStepBase) {
+    resetAll(this: StepByStepBase<T>) {
       this.queue = null;
       this.currentQ = 0;
       this.highWaterMark = 0;

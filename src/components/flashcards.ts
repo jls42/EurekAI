@@ -1,7 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import type { Generation, Flashcard } from '../../types';
 
-interface FlashcardsContext extends StepByStepBase {
+interface FlashcardsContext extends StepByStepBase<Flashcard> {
   flipped: boolean;
   results: Record<number, boolean>;
   currentCard(): Flashcard | undefined;
@@ -15,13 +15,12 @@ interface FlashcardsContext extends StepByStepBase {
 
 export function flashcardsComponent(gen: Generation) {
   return {
-    ...stepByStep(gen),
+    ...stepByStep<Flashcard>(gen),
     flipped: false,
     results: {} as Record<number, boolean>,
 
     currentCard(this: FlashcardsContext): Flashcard | undefined {
-      const idx = this.currentIndex();
-      return idx === undefined ? undefined : (this.items()[idx] as Flashcard);
+      return this.currentItem();
     },
 
     flip(this: FlashcardsContext) {

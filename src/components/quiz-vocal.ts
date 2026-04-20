@@ -12,8 +12,8 @@ interface VocalFeedback {
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
-function buildVocalErrorFeedback(t: TFn | undefined, key: string, error?: string): VocalFeedback {
-  const msg = error ? (t?.(key, { error }) ?? '') : (t?.(key) ?? '');
+function buildVocalErrorFeedback(t: TFn, key: string, error?: string): VocalFeedback {
+  const msg = error ? t(key, { error }) : t(key);
   return { correct: false, feedback: msg, transcription: '' };
 }
 
@@ -25,7 +25,7 @@ function buildVocalFormData(idx: number, blob: Blob): FormData {
   return fd;
 }
 
-interface QuizVocalContext extends Omit<StepByStepBase, 'feedback'>, Partial<AppContext> {
+interface QuizVocalContext extends Omit<StepByStepBase<QuizQuestion>, 'feedback'>, AppContext {
   audioPlaying: boolean;
   vocalRecording: boolean;
   vocalRecorder: MediaRecorder | null;
@@ -49,14 +49,14 @@ type QuizVocalGen = Generation & { audioUrls?: Record<number, string> };
 
 export function quizVocalComponent(gen: Generation) {
   return {
-    ...stepByStep(gen),
+    ...stepByStep<QuizQuestion>(gen),
     audioPlaying: false,
     vocalRecording: false,
     vocalRecorder: null as MediaRecorder | null,
     storedFeedback: {} as Record<number, VocalFeedback>,
 
     questions(this: QuizVocalContext): QuizQuestion[] {
-      return this.items() as QuizQuestion[];
+      return this.items();
     },
 
     // Bidi-safe split identique à quizComponent.choiceParts — évite la duplication
@@ -73,7 +73,7 @@ export function quizVocalComponent(gen: Generation) {
     },
 
     questionAudio(this: QuizVocalContext): HTMLAudioElement | null {
-      return (this.$refs?.questionAudio as HTMLAudioElement | undefined) ?? null;
+      return (this.$refs.questionAudio as HTMLAudioElement | undefined) ?? null;
     },
 
     stopQuestion(this: QuizVocalContext) {
@@ -114,7 +114,7 @@ export function quizVocalComponent(gen: Generation) {
         this.vocalRecording = true;
       } catch (e) {
         const error = e instanceof Error ? e.message : String(e);
-        this.showToast?.(this.t?.('toast.micError', { error }) ?? '', 'error');
+        this.showToast(this.t('toast.micError', { error }), 'error');
       }
     },
 
@@ -201,7 +201,7 @@ export function quizVocalComponent(gen: Generation) {
         return;
       }
       this.feedback = null;
-      this.$nextTick?.(() => this.playQuestion());
+      this.$nextTick(() => this.playQuestion());
     },
 
     onFinish() {
@@ -211,7 +211,7 @@ export function quizVocalComponent(gen: Generation) {
     resetVocalQuiz(this: QuizVocalContext) {
       this.stopQuestion();
       this.resetAll();
-      this.$nextTick?.(() => this.playQuestion());
+      this.$nextTick(() => this.playQuestion());
     },
   };
 }

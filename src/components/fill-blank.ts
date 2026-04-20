@@ -5,7 +5,7 @@ import type { FillBlankItem, FillBlankStats, Generation } from '../../types';
 
 type FillBlankFeedback = { correct: boolean; correctAnswer?: string };
 
-interface FillBlankContext extends Omit<StepByStepBase, 'feedback'>, Partial<AppContext> {
+interface FillBlankContext extends Omit<StepByStepBase<FillBlankItem>, 'feedback'>, AppContext {
   answer: string;
   answers: Record<number, string>;
   results: Record<number, boolean>;
@@ -23,15 +23,14 @@ interface FillBlankContext extends Omit<StepByStepBase, 'feedback'>, Partial<App
 
 export function fillBlankComponent(gen: Generation) {
   return {
-    ...stepByStep(gen),
+    ...stepByStep<FillBlankItem>(gen),
     answer: '',
     answers: {} as Record<number, string>,
     results: {} as Record<number, boolean>,
     showHint: false,
 
     currentExercise(this: FillBlankContext): FillBlankItem | undefined {
-      const idx = this.currentIndex();
-      return idx === undefined ? undefined : (this.items()[idx] as FillBlankItem);
+      return this.currentItem();
     },
 
     isCurrentAnswered(this: FillBlankContext): boolean {
@@ -64,13 +63,13 @@ export function fillBlankComponent(gen: Generation) {
       this.showHint = false;
       if (idx !== undefined && idx in this.answers) {
         this.answer = this.answers[idx];
-        const ex = this.items()[idx] as FillBlankItem | undefined;
+        const ex = this.items()[idx];
         this.feedback = { correct: this.results[idx], correctAnswer: ex?.answer };
       } else {
         this.answer = '';
         this.feedback = null;
-        this.$nextTick?.(() => {
-          (this.$refs?.blankInput as HTMLInputElement | undefined)?.focus();
+        this.$nextTick(() => {
+          (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
         });
       }
     },
@@ -93,13 +92,13 @@ export function fillBlankComponent(gen: Generation) {
         if (res.ok) {
           const result = (await res.json()) as { stats: FillBlankStats };
           (this.gen as Generation & { stats?: FillBlankStats }).stats = result.stats;
-          this.showToast?.(this.t?.('toast.scoreSaved') ?? '', 'success');
+          this.showToast(this.t('toast.scoreSaved'), 'success');
         } else {
           console.error('Fill-blank attempt failed:', res.status);
-          this.showToast?.(this.t?.('toast.scoreError') ?? '', 'error');
+          this.showToast(this.t('toast.scoreError'), 'error');
         }
       } catch {
-        this.showToast?.(this.t?.('toast.scoreError') ?? '', 'error');
+        this.showToast(this.t('toast.scoreError'), 'error');
       }
     },
 
@@ -112,8 +111,8 @@ export function fillBlankComponent(gen: Generation) {
       this.answer = '';
       this.showHint = false;
       this.retryWrong(wrong);
-      this.$nextTick?.(() => {
-        (this.$refs?.blankInput as HTMLInputElement | undefined)?.focus();
+      this.$nextTick(() => {
+        (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },
 
@@ -123,8 +122,8 @@ export function fillBlankComponent(gen: Generation) {
       this.answer = '';
       this.showHint = false;
       this.resetAll();
-      this.$nextTick?.(() => {
-        (this.$refs?.blankInput as HTMLInputElement | undefined)?.focus();
+      this.$nextTick(() => {
+        (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },
 
