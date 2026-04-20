@@ -214,6 +214,24 @@
     </div>
   </div>
 
+  <!-- Consigne detection failed -->
+  <div
+    x-show="consigneStatus(consigne) === 'failed'"
+    x-transition
+    class="mb-4 bg-warning-light border border-warning/30 rounded-card px-4 py-2.5"
+  >
+    <div class="flex items-center gap-2">
+      <i data-lucide="alert-triangle" class="w-4 h-4 text-warning-dark shrink-0"></i>
+      <span class="text-sm text-warning-dark flex-1" x-text="t('consigne.detectionFailed')"></span>
+      <button
+        @click="detectConsigne()"
+        :disabled="consigneLoading"
+        class="text-sm font-semibold text-warning-dark hover:text-warning focus-ring rounded px-2 py-1"
+        x-text="t('common.retry')"
+      ></button>
+    </div>
+  </div>
+
   <!-- Consigne de revision detectee (active) -->
   <div
     x-show="consigne && consigne.found && useConsigne"

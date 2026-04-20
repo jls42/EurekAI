@@ -242,6 +242,10 @@ export interface Consigne {
   found: boolean;
   text: string;
   keyTopics: string[];
+  // `status` absent = legacy record (considéré OK). `'failed'` = détection erreur
+  // surface un badge UI sans bloquer la génération (cf. CLAUDE.md OCR tier).
+  status?: 'ok' | 'failed';
+  error?: string;
 }
 
 export interface ProjectData {

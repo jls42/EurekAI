@@ -72,9 +72,8 @@ export function _handleUploadException(
 ): UploadResult {
   if (!_isSessionActive(ctx, session)) return 'ignored';
   console.error('[sources:upload]', file.name, e);
-  const msg = e instanceof Error ? e.message : String(e);
   file.status = 'error';
-  file.errorMsg = msg;
+  file.errorMsg = ctx.t('sources.uploadError.generic');
   ctx.$nextTick(() => ctx.refreshIcons());
   ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
   return 'failed';

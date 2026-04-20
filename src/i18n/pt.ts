@@ -322,6 +322,8 @@ export const pt: Record<string, string> = {
   'consigne.reEnable': 'Reativar',
   'consigne.reEnabled':
     'Instru\u00e7\u00f5es reativadas \u2014 as gera\u00e7\u00f5es ser\u00e3o direcionadas',
+  'consigne.detectionFailed':
+    'N\u00e3o foi poss\u00edvel analisar as instru\u00e7\u00f5es. Tente novamente.',
 
   'scores.heading': 'Minhas Pontua\u00e7\u00f5es',
   'scores.emptyTitle': 'Responda um quiz para ver suas pontua\u00e7\u00f5es aqui!',
@@ -447,5 +449,6 @@ export const pt: Record<string, string> = {
 
   'toast.error': 'Erro: {error}',
   'toast.uploadError': 'N\u00e3o foi poss\u00edvel enviar {filename}. Tenta de novo.',
+  'sources.uploadError.generic': 'O envio falhou. Tenta de novo.',
   'toast.chatErrorMsg': 'Erro no chat: {error}',
 };

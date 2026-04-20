@@ -1,5 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { timer, extractAllText } from '../helpers/index.js';
+import { logger } from '../helpers/logger.js';
 import { websearchInstructions, websearchInput } from '../prompts.js';
 
 export async function webSearchEnrich(
@@ -32,8 +33,8 @@ export async function webSearchEnrich(
   } finally {
     try {
       await client.beta.agents.delete({ agentId: agent.id });
-    } catch {
-      /* silent: agent delete best-effort cleanup */
+    } catch (e) {
+      logger.warn('websearch', 'agent delete failed', e);
     }
   }
 }

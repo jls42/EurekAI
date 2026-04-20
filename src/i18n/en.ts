@@ -317,6 +317,7 @@ export const en: Record<string, string> = {
   'consigne.dismissedLabel': 'Study instructions dismissed',
   'consigne.reEnable': 'Re-enable',
   'consigne.reEnabled': 'Instructions re-enabled — generations will be targeted',
+  'consigne.detectionFailed': 'Could not analyze the instructions. Try again.',
 
   'scores.heading': 'My Scores',
   'scores.emptyTitle': 'Take a quiz to see your scores here!',
@@ -443,5 +444,6 @@ export const en: Record<string, string> = {
 
   'toast.error': 'Error: {error}',
   'toast.uploadError': 'Could not upload {filename}. Try again.',
+  'sources.uploadError.generic': 'Upload failed. Try again.',
   'toast.chatErrorMsg': 'Chat error: {error}',
 };

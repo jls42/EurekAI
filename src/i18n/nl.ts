@@ -317,6 +317,7 @@ export const nl: Record<string, string> = {
   'consigne.dismissedLabel': 'Studie-instructies genegeerd',
   'consigne.reEnable': 'Opnieuw inschakelen',
   'consigne.reEnabled': 'Instructies opnieuw ingeschakeld \u2014 generaties worden gericht',
+  'consigne.detectionFailed': 'Kon instructies niet analyseren. Probeer opnieuw.',
 
   'scores.heading': 'Mijn scores',
   'scores.emptyTitle': 'Maak een quiz om je scores hier te zien!',
@@ -440,5 +441,6 @@ export const nl: Record<string, string> = {
 
   'toast.error': 'Fout: {error}',
   'toast.uploadError': '{filename} kon niet worden geladen. Probeer het opnieuw.',
+  'sources.uploadError.generic': 'Uploaden mislukt. Probeer opnieuw.',
   'toast.chatErrorMsg': 'Chatfout: {error}',
 };

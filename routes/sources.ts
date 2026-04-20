@@ -46,6 +46,8 @@ const runConsigneDetection = async (
     );
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
+    const code = extractErrorCode(e, 'consigne');
+    store.setConsigneError(pid, code);
   }
 };
 

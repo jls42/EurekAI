@@ -1,7 +1,7 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
-import type { Generation, Source } from '../../types';
+import type { Consigne, Generation, Source } from '../../types';
 
 const TEXT_TEXT_PRIMARY = 'text-text-primary';
 const TEXT_TEXT_SECONDARY = 'text-text-secondary';
@@ -153,6 +153,12 @@ export function createHelpers() {
         websearch: 'bg-teal-100 text-teal-700',
       };
       return colors[this.inferSourceType(src)] || 'bg-gray-100 text-gray-700';
+    },
+
+    consigneStatus(consigne: Consigne | null | undefined): 'failed' | 'ok' | null {
+      if (!consigne) return null;
+      if (consigne.status === 'failed') return 'failed';
+      return 'ok';
     },
 
     ocrConfidenceTier(src: Source): string | null {

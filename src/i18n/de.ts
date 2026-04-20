@@ -321,6 +321,7 @@ export const de: Record<string, string> = {
   'consigne.dismissedLabel': 'Lernhinweise ignoriert',
   'consigne.reEnable': 'Wieder aktivieren',
   'consigne.reEnabled': 'Hinweise reaktiviert \u2014 Generierungen werden gezielt ausgerichtet',
+  'consigne.detectionFailed': 'Hinweise konnten nicht analysiert werden. Versuch es nochmal.',
 
   'scores.heading': 'Meine Punkte',
   'scores.emptyTitle': 'Mach ein Quiz um deine Punkte hier zu sehen!',
@@ -446,5 +447,6 @@ export const de: Record<string, string> = {
 
   'toast.error': 'Fehler: {error}',
   'toast.uploadError': '{filename} konnte nicht hochgeladen werden. Versuch es erneut.',
+  'sources.uploadError.generic': 'Upload fehlgeschlagen. Versuch es nochmal.',
   'toast.chatErrorMsg': 'Chat-Fehler: {error}',
 };

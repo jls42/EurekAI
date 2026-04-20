@@ -2,6 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
+import { logger } from '../helpers/logger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
@@ -86,6 +87,8 @@ export async function generateImage(
         : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
     return { imageUrl, prompt };
   } finally {
-    await client.beta.agents.delete({ agentId: agent.id }).catch(() => {});
+    await client.beta.agents
+      .delete({ agentId: agent.id })
+      .catch((e) => logger.warn('image', 'agent delete failed', e));
   }
 }

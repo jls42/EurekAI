@@ -190,6 +190,20 @@ export class ProjectStore {
     return data.consigne ?? null;
   }
 
+  setConsigneError(projectId: string, errorCode: string): ProjectData['consigne'] | null {
+    const data = this.getProject(projectId);
+    if (!data) return null;
+    data.consigne = {
+      found: false,
+      text: '',
+      keyTopics: [],
+      status: 'failed',
+      error: errorCode,
+    };
+    this.saveProject(projectId, data);
+    return data.consigne;
+  }
+
   setSourceModeration(
     projectId: string,
     sourceId: string,

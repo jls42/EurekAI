@@ -318,6 +318,7 @@ export const es: Record<string, string> = {
   'consigne.dismissedLabel': 'Instrucciones de estudio ignoradas',
   'consigne.reEnable': 'Reactivar',
   'consigne.reEnabled': 'Instrucciones reactivadas \u2014 las generaciones ser\u00e1n enfocadas',
+  'consigne.detectionFailed': 'No se pudieron analizar las instrucciones. Int\u00e9ntalo de nuevo.',
 
   'scores.heading': 'Mis Puntajes',
   'scores.emptyTitle': '\u00a1Responde un quiz para ver tus puntajes aqu\u00ed!',
@@ -442,5 +443,6 @@ export const es: Record<string, string> = {
 
   'toast.error': 'Error: {error}',
   'toast.uploadError': 'No se pudo subir {filename}. Int\u00e9ntalo de nuevo.',
+  'sources.uploadError.generic': 'La carga fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.chatErrorMsg': 'Error en el chat: {error}',
 };

@@ -316,6 +316,7 @@ export const it: Record<string, string> = {
   'consigne.dismissedLabel': 'Istruzioni di studio ignorate',
   'consigne.reEnable': 'Riattiva',
   'consigne.reEnabled': 'Istruzioni riattivate \u2014 le generazioni saranno mirate',
+  'consigne.detectionFailed': 'Impossibile analizzare le istruzioni. Riprova.',
 
   'scores.heading': 'I miei punteggi',
   'scores.emptyTitle': 'Rispondi a un quiz per vedere i tuoi punteggi qui!',
@@ -440,5 +441,6 @@ export const it: Record<string, string> = {
 
   'toast.error': 'Errore: {error}',
   'toast.uploadError': 'Impossibile caricare {filename}. Riprova.',
+  'sources.uploadError.generic': 'Caricamento fallito. Riprova.',
   'toast.chatErrorMsg': 'Errore chat: {error}',
 };

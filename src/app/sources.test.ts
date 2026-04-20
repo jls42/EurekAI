@@ -413,7 +413,9 @@ describe('createSources', () => {
       expect(ctx.sources).toEqual([src2]);
       const session = ctx.uploadSessions[0];
       expect(session.files[0].status).toBe('error');
-      expect(session.files[0].errorMsg).toBe('Network down');
+      // errorMsg est scellé sur clé i18n générique — pas d'écho brut de e.message.
+      expect(session.files[0].errorMsg).toBe('sources.uploadError.generic');
+      expect(session.files[0].errorMsg).not.toContain('Network down');
       expect(session.files[1].status).toBe('done');
     });
 

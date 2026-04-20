@@ -340,6 +340,7 @@ export const fr: Record<string, string> = {
   'consigne.dismissedLabel': 'Consigne de révision ignorée',
   'consigne.reEnable': 'Réactiver',
   'consigne.reEnabled': 'Consigne réactivée — les générations seront ciblées',
+  'consigne.detectionFailed': "Impossible d'analyser les consignes. Réessaye.",
 
   // Scores tab
   'scores.heading': 'Mes Scores',
@@ -469,5 +470,6 @@ export const fr: Record<string, string> = {
 
   'toast.error': 'Erreur: {error}',
   'toast.uploadError': "Impossible d'envoyer {filename}. Réessaye.",
+  'sources.uploadError.generic': "L'envoi a échoué. Réessaye.",
   'toast.chatErrorMsg': 'Erreur chat: {error}',
 };

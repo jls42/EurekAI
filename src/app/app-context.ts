@@ -1,5 +1,5 @@
 import type { createState } from './state';
-import type { Generation, Profile, Source } from '../../types';
+import type { Consigne, Generation, Profile, Source } from '../../types';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -146,6 +146,7 @@ export interface AppContext extends AppState {
   sourceTypeIcon(src: Source): string;
   sourceTypeBadge(src: Source): string;
   sourceTypeBadgeColor(src: Source): string;
+  consigneStatus(consigne: Consigne | null | undefined): 'failed' | 'ok' | null;
   ocrConfidenceTier(src: Source): string | null;
   ocrConfidenceColor(src: Source): string;
   ocrConfidencePercent(src: Source): string;

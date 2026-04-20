@@ -12,7 +12,7 @@ const SDK_CLONE_BUG = /unusable/i;
 // Arrow consts pour éviter l'agglomération du parseur TS de Lizard sur helpers
 // non-exportés consécutifs (piège connu, cf. CLAUDE.md).
 const isRetryableStatus = (status: unknown): boolean => {
-  if (status === 429) return true;
+  if (status === 408 || status === 429) return true;
   if (typeof status !== 'number') return false;
   return status >= 500 && status < 600;
 };
@@ -46,5 +46,5 @@ export async function callWithRetry<T>(label: string, fn: () => Promise<T>): Pro
       await new Promise((r) => setTimeout(r, delay));
     }
   }
-  throw lastError;
+  throw lastError ?? new Error(`callWithRetry: no attempt executed for ${label}`);
 }
