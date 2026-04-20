@@ -1,7 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { validateAnswer } from './fill-blank-validate';
 import type { AppContext } from '../app/app-context';
-import type { FillBlankItem, FillBlankStats, Generation } from '../../types';
+import type { FillBlankGeneration, FillBlankItem, FillBlankStats, Generation } from '../../types';
 
 type FillBlankFeedback = { correct: boolean; correctAnswer?: string };
 
@@ -21,9 +21,9 @@ interface FillBlankContext extends Omit<StepByStepBase<FillBlankItem>, 'feedback
   handleKey(e: KeyboardEvent): void;
 }
 
-export function fillBlankComponent(gen: Generation) {
+export function fillBlankComponent(gen: FillBlankGeneration) {
   return {
-    ...stepByStep<FillBlankItem>(gen),
+    ...stepByStep<FillBlankGeneration>(gen),
     answer: '',
     answers: {} as Record<number, string>,
     results: {} as Record<number, boolean>,

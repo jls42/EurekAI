@@ -1,7 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
-import type { Generation, QuizQuestion } from '../../types';
+import type { Generation, QuizQuestion, QuizVocalGeneration } from '../../types';
 
 interface VocalFeedback {
   correct: boolean;
@@ -47,9 +47,9 @@ interface QuizVocalContext extends Omit<StepByStepBase<QuizQuestion>, 'feedback'
 
 type QuizVocalGen = Generation & { audioUrls?: Record<number, string> };
 
-export function quizVocalComponent(gen: Generation) {
+export function quizVocalComponent(gen: QuizVocalGeneration) {
   return {
-    ...stepByStep<QuizQuestion>(gen),
+    ...stepByStep<QuizVocalGeneration>(gen),
     audioPlaying: false,
     vocalRecording: false,
     vocalRecorder: null as MediaRecorder | null,

@@ -1,5 +1,5 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
-import type { Generation, Flashcard } from '../../types';
+import type { FlashcardsGeneration, Flashcard } from '../../types';
 
 interface FlashcardsContext extends StepByStepBase<Flashcard> {
   flipped: boolean;
@@ -13,9 +13,9 @@ interface FlashcardsContext extends StepByStepBase<Flashcard> {
   resetCards(): void;
 }
 
-export function flashcardsComponent(gen: Generation) {
+export function flashcardsComponent(gen: FlashcardsGeneration) {
   return {
-    ...stepByStep<Flashcard>(gen),
+    ...stepByStep<FlashcardsGeneration>(gen),
     flipped: false,
     results: {} as Record<number, boolean>,
 

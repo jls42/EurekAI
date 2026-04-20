@@ -16,9 +16,9 @@ import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../confi
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
-import { generatePodcastScript } from '../generators/podcast.js';
+import { generatePodcastScript, createPodcastGeneration } from '../generators/podcast.js';
 import { generateAudio } from '../generators/tts.js';
-import { ttsQuestion } from '../generators/quiz-vocal.js';
+import { ttsQuestion, createQuizVocalGeneration } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
@@ -376,17 +376,17 @@ export function generateRoutes(
         );
         logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
 
-        return {
+        // lang figé sur la génération pour que le badge beta audio (hi/ar) reste
+        // cohérent après un changement de locale UI ultérieur.
+        return createPodcastGeneration({
           id: randomUUID(),
           title: autoTitle('podcast', null, ctx.lang),
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'podcast',
           data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
-          // Figer lang sur la génération pour que le badge beta audio (hi/ar) reste cohérent
-          // après un changement de locale UI. Aligné sur QuizVocalGeneration.
           lang: ctx.lang,
-        };
+        });
       },
       'podcast',
       { agentName: 'podcast' },
@@ -481,7 +481,9 @@ export function generateRoutes(
           );
         }
 
-        return {
+        // lang + ageGroup figés pour que verifyAnswer utilise le contexte de
+        // génération, jamais le profil courant (qui peut changer après coup).
+        return createQuizVocalGeneration({
           id: randomUUID(),
           title: autoTitle(QUIZ_VOCAL, data),
           createdAt: new Date().toISOString(),
@@ -489,11 +491,9 @@ export function generateRoutes(
           type: 'quiz-vocal',
           data,
           audioUrls,
-          // Phase 1B.1 — figer lang + ageGroup sur la génération pour que verifyAnswer
-          // utilise le contexte de génération, pas le profil courant (cf. décision produit #4).
           lang: ctx.lang,
           ageGroup: ctx.ageGroup,
-        };
+        });
       },
       'quiz',
       { agentName: QUIZ_VOCAL },

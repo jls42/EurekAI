@@ -1,7 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
-import type { Generation, QuizQuestion, QuizStats } from '../../types';
+import type { Generation, QuizGeneration, QuizQuestion, QuizStats } from '../../types';
 
 interface QuizContext extends StepByStepBase<QuizQuestion>, AppContext {
   selectedChoice: number | null;
@@ -20,9 +20,9 @@ interface QuizContext extends StepByStepBase<QuizQuestion>, AppContext {
 
 type QuizGen = Generation & { data: QuizQuestion[]; stats?: QuizStats };
 
-export function quizComponent(gen: Generation) {
+export function quizComponent(gen: QuizGeneration) {
   return {
-    ...stepByStep<QuizQuestion>(gen),
+    ...stepByStep<QuizGeneration>(gen),
     selectedChoice: null as number | null,
     answers: {} as Record<number, number>,
     reviewing: false,

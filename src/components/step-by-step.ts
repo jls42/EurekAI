@@ -1,5 +1,7 @@
 import type { Generation } from '../../types';
 
+export type DataItemOf<G extends Generation> = G extends { data: (infer U)[] } ? U : never;
+
 export interface StepByStepBase<T = unknown> {
   gen: Generation;
   currentQ: number;
@@ -26,7 +28,7 @@ export interface StepByStepBase<T = unknown> {
   onFinish?(): void;
 }
 
-export function stepByStep<T = unknown>(gen: Generation) {
+export function stepByStep<G extends Generation, T = DataItemOf<G>>(gen: G) {
   return {
     gen,
     currentQ: 0,
@@ -60,7 +62,7 @@ export function stepByStep<T = unknown>(gen: Generation) {
     progress(this: StepByStepBase<T>) {
       const t = this.total();
       if (t === 0) return 0;
-      return ((this.currentQ + (this.finished ? 1 : 0)) / t) * 100;
+      return Math.min(100, ((this.currentQ + (this.finished ? 1 : 0)) / t) * 100);
     },
 
     isReviewing(this: StepByStepBase<T>) {

@@ -58,6 +58,7 @@ vi.mock('../generators/podcast.js', () => ({
     ],
     sourceRefs: ['ref1'],
   }),
+  createPodcastGeneration: (fields: unknown) => fields,
 }));
 
 vi.mock('../generators/tts.js', () => ({
@@ -66,6 +67,7 @@ vi.mock('../generators/tts.js', () => ({
 
 vi.mock('../generators/quiz-vocal.js', () => ({
   ttsQuestion: vi.fn().mockResolvedValue(Buffer.from('fake-question-audio')),
+  createQuizVocalGeneration: (fields: unknown) => fields,
 }));
 
 vi.mock('../generators/image.js', () => ({
