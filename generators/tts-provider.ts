@@ -1,3 +1,13 @@
+/**
+ * TTS provider bas-niveau — couche Mistral Voxtral uniquement (actuellement mono-provider).
+ *
+ * Distinction avec `./tts.ts` : ce fichier expose l'API client (textToSpeech single-call,
+ * listVoices pagination). `tts.ts` orchestre au-dessus (concat ffmpeg, dispatch host/guest).
+ *
+ * Le nom "provider" est conservé malgré le mono-provider actuel : si un futur provider TTS
+ * est réintroduit (cf. CLAUDE.md "Réintégration ElevenLabs envisagée"), le nom reste
+ * sémantiquement correct et un dispatcher pourra être ajouté ici sans rename destructif.
+ */
 import type { Mistral } from '@mistralai/mistralai';
 import type { MistralVoice } from '../helpers/voice-types.js';
 
