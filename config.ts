@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from './types.js';
 import type { MistralVoice } from './helpers/voice-types.js';
@@ -30,30 +30,52 @@ const DEFAULT_CONFIG: AppConfig = {
 
 let configPath: string;
 let currentConfig: AppConfig;
+// Suit si le dernier load a échoué (JSON corrompu ou read error). Si true au moment d'un
+// saveConfig/resetConfig suivant, le fichier corrompu actuel est copié en `.corrupt.bak`
+// AVANT overwrite — garantit que la promesse "config préservé sur disque" du log loadFailed
+// n'est pas brisée par l'action utilisateur suivante.
+let lastLoadFailed = false;
 
 // Spread merge durci contre shapes hostiles depuis le disque (JSON valide mais types
 // inattendus : `{"models": null}`, `{"models": "x"}`, `{"models": []}`). Sans cette garde,
 // un accès ultérieur `currentConfig.models.chat` crasherait. Fragilité symétrique à
 // loadFailed : un config.json hostile ne doit jamais corrompre l'état in-memory.
+const isPlainObject = (v: unknown): v is Record<string, unknown> =>
+  !!v && typeof v === 'object' && !Array.isArray(v);
+
 function mergeSafe(saved: unknown): AppConfig {
-  const s =
-    saved && typeof saved === 'object' && !Array.isArray(saved)
-      ? (saved as Record<string, unknown>)
-      : {};
-  const savedModels =
-    s.models && typeof s.models === 'object' && !Array.isArray(s.models)
-      ? (s.models as Partial<AppConfig['models']>)
-      : {};
-  const savedVoices =
-    s.mistralVoices && typeof s.mistralVoices === 'object' && !Array.isArray(s.mistralVoices)
-      ? (s.mistralVoices as Partial<AppConfig['mistralVoices']>)
-      : {};
+  if (!isPlainObject(saved)) {
+    logger.warn('config', `invalid shape for config root (got ${Array.isArray(saved) ? 'array' : typeof saved}), resetting`);
+    return { ...DEFAULT_CONFIG };
+  }
+  const savedModels = isPlainObject(saved.models)
+    ? (saved.models as Partial<AppConfig['models']>)
+    : logAndFallback('models', saved.models);
+  const savedVoices = isPlainObject(saved.mistralVoices)
+    ? (saved.mistralVoices as Partial<AppConfig['mistralVoices']>)
+    : logAndFallback('mistralVoices', saved.mistralVoices);
   return {
     ...DEFAULT_CONFIG,
-    ...s,
+    ...saved,
     models: { ...DEFAULT_CONFIG.models, ...savedModels },
     mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...savedVoices },
   };
+}
+
+const describeShape = (value: unknown): string => {
+  if (Array.isArray(value)) return 'array';
+  if (value === null) return 'null';
+  return typeof value;
+};
+
+function logAndFallback(field: string, value: unknown): Record<string, never> {
+  if (value !== undefined) {
+    logger.warn(
+      'config',
+      `invalid shape for '${field}' (got ${describeShape(value)}), resetting to default`,
+    );
+  }
+  return {};
 }
 
 // Distingue "read failed" (EACCES/EIO) de "parse failed" (JSON corrompu).
@@ -140,18 +162,40 @@ function classifyMistralVoicesSource(): boolean {
   return true;
 }
 
+// Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
+// (lastLoadFailed), crée d'abord un `.corrupt.bak` à côté du fichier à écraser — évite la
+// perte silencieuse du contenu user original (il pouvait contenir des valeurs que le user
+// voulait récupérer manuellement après debug).
+// const arrow plutôt que `function` pour contourner le parseur TS de Lizard qui agglomère
+// les `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
+const persistConfig = (): void => {
+  if (lastLoadFailed && existsSync(configPath)) {
+    const backupPath = `${configPath}.corrupt.bak`;
+    try {
+      copyFileSync(configPath, backupPath);
+      logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
+    } catch (e) {
+      logger.warn('config', 'could not create .corrupt.bak backup (proceeding with overwrite):', e);
+    }
+    lastLoadFailed = false;
+  }
+  writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+};
+
 export function initConfig(outputDir: string): void {
   mkdirSync(outputDir, { recursive: true });
   configPath = join(outputDir, 'config.json');
-  if (!existsSync(configPath)) {
-    currentConfig = { ...DEFAULT_CONFIG };
-  } else {
+  if (existsSync(configPath)) {
     const { config, loadFailed } = loadSavedConfig();
     currentConfig = config;
+    lastLoadFailed = loadFailed;
     // Gate critique : si load a échoué (read error ou JSON corrompu), le disque est
     // potentiellement précieux. Ne PAS écraser avec DEFAULT via classify/migrate/write.
-    // L'utilisateur récupérera quand il éditera via UI (saveConfig écrira un fichier valide).
+    // Le backup .corrupt.bak sera créé par persistConfig au prochain saveConfig/resetConfig.
     if (loadFailed) return;
+  } else {
+    currentConfig = { ...DEFAULT_CONFIG };
+    lastLoadFailed = false;
   }
   // Ordre: classify AVANT migrate. Invariant actuel: aucune migration ne touche
   // `mistralVoices.host/guest`, donc classify lit un état cohérent. Si une future migration
@@ -161,7 +205,7 @@ export function initConfig(outputDir: string): void {
   const migrated = migrateLegacyElevenLabsFields();
   if (classified || migrated) {
     try {
-      writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+      persistConfig();
     } catch (e) {
       logger.error('config', 'migration persist failed (continuing in-memory):', e);
     }
@@ -174,7 +218,7 @@ export function getConfig(): AppConfig {
 
 export function resetConfig(): AppConfig {
   currentConfig = { ...DEFAULT_CONFIG };
-  writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  persistConfig();
   return currentConfig;
 }
 
@@ -214,7 +258,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   }
   if (partial.ttsModel) currentConfig.ttsModel = partial.ttsModel;
   applyMistralVoicesPatch(partial);
-  writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  persistConfig();
   return currentConfig;
 }
 

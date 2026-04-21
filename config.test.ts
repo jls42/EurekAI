@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -88,6 +88,28 @@ describe('initConfig', () => {
       expect.stringContaining('Failed to parse'),
       expect.any(SyntaxError),
     );
+  });
+
+  it('fichier corrompu + saveConfig: .corrupt.bak créé avant overwrite, une seule fois', () => {
+    // Claim review #3 : après loadFailed, la prochaine action UI (saveConfig) doit
+    // backup le fichier corrompu pour éviter la perte silencieuse du contenu user original.
+    const corruptContent = '{invalid json but user data inside}';
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    writeFileSync(configPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    initConfig(tempDir);
+    // Avant saveConfig : aucun backup
+    expect(existsSync(backupPath)).toBe(false);
+    // 1er saveConfig : crée le backup + overwrite
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    expect(existsSync(backupPath)).toBe(true);
+    expect(readFileSync(backupPath, 'utf-8')).toBe(corruptContent);
+    expect(JSON.parse(readFileSync(configPath, 'utf-8')).ttsModel).toBe('voxtral-mini-tts-latest');
+    // 2e saveConfig : ne recrée pas un 2e backup (lastLoadFailed reset à false)
+    writeFileSync(backupPath, 'this should NOT be overwritten');
+    saveConfig({ ttsModel: 'other' });
+    expect(readFileSync(backupPath, 'utf-8')).toBe('this should NOT be overwritten');
   });
 
   it('migration one-time: config.json sans mistralVoicesSource → classé default', () => {
