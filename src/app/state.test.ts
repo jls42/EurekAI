@@ -298,6 +298,8 @@ describe('createState', () => {
       podcast: '',
       translate: '',
       ocr: '',
+      quizVerify: '',
+      chat: '',
     });
     expect(state.configDraft.mistralVoices).toEqual({ host: 'Oliver', guest: 'Marie' });
   });

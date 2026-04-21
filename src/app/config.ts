@@ -157,7 +157,7 @@ export function createConfig() {
           chat: mainModel,
           ocr: 'mistral-ocr-latest',
         };
-        if (draft.ttsModel?.startsWith('eleven')) {
+        if (draft.ttsModel?.startsWith('eleven_')) {
           draft.ttsModel = 'voxtral-mini-tts-latest';
         }
         const res = await fetch('/api/config', {

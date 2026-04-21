@@ -90,6 +90,18 @@ describe('initConfig', () => {
     expect(getConfig().mistralVoicesSource).toBe('default');
   });
 
+  it('classification mistralVoicesSource sans champ legacy est persistée sur disque', () => {
+    // Régression à prévenir : avant le fix, classifyMistralVoicesSource() modifiait
+    // currentConfig en mémoire mais rien n'était écrit — re-classif à chaque boot.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({ models: { summary: 'mistral-large-latest' } }),
+    );
+    initConfig(tempDir);
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.mistralVoicesSource).toBe('default');
+  });
+
   it('migration one-time: config.json avec legacy default host → classé default', () => {
     // LEGACY_DEFAULT_HOSTS : un ancien ID default d'une release passée doit être détecté
     // comme "pas un choix utilisateur" pour que la migration fonctionne.
@@ -199,6 +211,17 @@ describe('getApiStatus', () => {
     const status = getApiStatus();
     expect(status.mistral).toBe(false);
     expect(status.ttsAvailable).toBe(false);
+  });
+
+  it('invariant: ttsAvailable === mistral (provider TTS unique)', () => {
+    // Mistral Voxtral est l'unique provider TTS : ttsAvailable et mistral doivent
+    // rester équivalents tant qu'aucun autre provider n'est réintroduit.
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    const s1 = getApiStatus();
+    expect(s1.ttsAvailable).toBe(s1.mistral);
+    vi.stubEnv('MISTRAL_API_KEY', '');
+    const s2 = getApiStatus();
+    expect(s2.ttsAvailable).toBe(s2.mistral);
   });
 });
 

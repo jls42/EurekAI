@@ -10,7 +10,6 @@ import type { TtsOptions } from './tts-provider.js';
 import type { QuizQuestion } from '../types.js';
 
 const ttsOptions: TtsOptions = {
-  provider: 'mistral',
   model: 'voxtral-mini-tts-2603',
   mistralClient: {} as any,
 };

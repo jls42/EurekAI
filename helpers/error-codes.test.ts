@@ -108,6 +108,15 @@ describe('extractErrorCode', () => {
       'auth_required',
     );
     expect(extractErrorCode(new Error('API key missing'), 'quiz-vocal')).toBe('auth_required');
+    // Protection explicite de l'ordre "auth_required > TTS_SIGNATURE" dans
+    // error-code-rules.ts MESSAGE_RULES : un message API_KEY sur un agent audio
+    // NE DOIT PAS être classé tts_upstream_error même si l'agent signe la pile TTS.
+    expect(extractErrorCode(new Error('MISTRAL_API_KEY non defini'), 'podcast')).toBe(
+      'auth_required',
+    );
+    expect(extractErrorCode(new Error('MISTRAL_API_KEY not set'), 'quiz-vocal')).toBe(
+      'auth_required',
+    );
   });
 
   it('mappe context_length / token limit vers context_length_exceeded', () => {

@@ -21,7 +21,8 @@ const DEFAULT_CONFIG: AppConfig = {
   ttsModel: 'voxtral-mini-tts-latest',
   mistralVoices: {
     // Marie - Excited (host) + Marie - Curious (guest) — voix françaises cohérentes par défaut.
-    // Pour d'autres langues, VOICE_SELECTION ci-dessous prend le relais (FR fallback sinon).
+    // Pour d'autres langues, `selectVoices` (helpers/voice-selection.ts) prend le relais
+    // via `resolveMistralDefaults` (FR fallback sinon).
     host: '2f62b1af-aea3-4079-9d10-7ca665ee7243',
     guest: 'e0580ce5-e63c-4cbe-88c8-a983b80c5f1f',
   },
@@ -40,47 +41,56 @@ function loadSavedConfig(): AppConfig {
       mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
     };
   } catch (e) {
-    console.error('Failed to load config, using defaults:', e);
+    logger.error('config', 'Failed to load config, using defaults:', e);
     return { ...DEFAULT_CONFIG };
   }
 }
 
-// Migration one-time 2026-04 : support ElevenLabs retiré. Normalise les configs existantes
-// (champs ttsProvider/voices legacy + ttsModel eleven_* → Mistral Voxtral). À retirer lors
-// de la future réintégration propre d'ElevenLabs (qui réintroduira un champ ttsProvider).
+// Migration one-time : normalise les `config.json` hérités qui contenaient les champs TTS
+// multi-provider (`ttsProvider`, `voices`, `ttsModel: 'eleven_*'`) vers le schéma Mistral
+// Voxtral actuel. Retirer quand le support multi-provider sera réintroduit.
 function migrateLegacyElevenLabsFields(): boolean {
   let changed = false;
   const legacy = currentConfig as unknown as Record<string, unknown>;
   for (const key of ['ttsProvider', 'voices']) {
     if (legacy[key] !== undefined) {
+      logger.info('config', `migration: removed legacy field '${key}'`);
       delete legacy[key];
       changed = true;
     }
   }
   if (currentConfig.ttsModel?.startsWith('eleven_')) {
+    logger.info(
+      'config',
+      `migration: ttsModel '${currentConfig.ttsModel}' -> '${DEFAULT_CONFIG.ttsModel}'`,
+    );
     currentConfig.ttsModel = DEFAULT_CONFIG.ttsModel;
     changed = true;
   }
   return changed;
 }
 
-function classifyMistralVoicesSource(): void {
+function classifyMistralVoicesSource(): boolean {
   // Migration one-time : classer mistralVoicesSource à partir des IDs existants.
   // Tout config qui match DEFAULT_CONFIG ou LEGACY_DEFAULT_* est 'default', sinon 'user'.
   // Evite d'étendre LEGACY_DEFAULT_* à chaque release qui change le défaut.
-  if (currentConfig.mistralVoicesSource) return;
+  // Retourne true quand la classification a été écrite en mémoire, pour que initConfig
+  // persiste le fichier — sinon au prochain boot on reclasserait à chaque fois.
+  if (currentConfig.mistralVoicesSource) return false;
   const isDefault =
     isDefaultHost(currentConfig.mistralVoices.host) &&
     isDefaultGuest(currentConfig.mistralVoices.guest);
   currentConfig.mistralVoicesSource = isDefault ? 'default' : 'user';
+  return true;
 }
 
 export function initConfig(outputDir: string): void {
   mkdirSync(outputDir, { recursive: true });
   configPath = join(outputDir, 'config.json');
   currentConfig = existsSync(configPath) ? loadSavedConfig() : { ...DEFAULT_CONFIG };
-  classifyMistralVoicesSource();
-  if (migrateLegacyElevenLabsFields()) {
+  const classified = classifyMistralVoicesSource();
+  const migrated = migrateLegacyElevenLabsFields();
+  if (classified || migrated) {
     writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
   }
 }

@@ -133,7 +133,16 @@ export function createState() {
       langFull: string;
     }>,
     configDraft: {
-      models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
+      models: {
+        summary: '',
+        flashcards: '',
+        quiz: '',
+        podcast: '',
+        translate: '',
+        ocr: '',
+        quizVerify: '',
+        chat: '',
+      },
       ttsModel: '',
       mistralVoices: { host: 'Oliver', guest: 'Marie' },
     },
