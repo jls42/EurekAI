@@ -36,8 +36,7 @@ export const en: Record<string, string> = {
   'gen.voice': 'Read aloud',
   'gen.websearch': 'Web search',
   'gen.questionCount': 'Count:',
-  'gen.needsElevenLabs': 'Requires an ElevenLabs API key',
-  'gen.needsTts': 'Requires a configured TTS provider',
+  'gen.needsTts': 'Requires MISTRAL_API_KEY to enable Voxtral TTS',
   'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'errorCode.internal_error': 'Internal server error',
@@ -104,7 +103,6 @@ export const en: Record<string, string> = {
   'settings.aiModelHint': 'Used for notes, flashcards, quiz, podcast and chat',
   'settings.recommended': 'Recommended',
   'settings.voiceTts': 'Voice & TTS',
-  'settings.ttsProvider': 'TTS Provider',
   'settings.ttsModel': 'TTS Model',
   'settings.ttsModelHint': 'Text-to-speech model',
   'settings.voiceHost': 'Main voice',
@@ -278,8 +276,7 @@ export const en: Record<string, string> = {
   'podcast.script': 'Script',
   'podcast.lines': '({count} lines)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs': 'Configure ELEVENLABS_API_KEY in your .env file to enable audio podcasts',
-  'podcast.noTts': 'Configure a TTS provider (Mistral or ElevenLabs) to enable audio podcasts',
+  'podcast.noTts': 'Configure MISTRAL_API_KEY in your .env file to enable audio podcasts',
 
   // Image view
   'image.heading': 'Illustrations',

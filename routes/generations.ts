@@ -222,7 +222,6 @@ function resolveReadAloudContext(
   // s'applique aussi ici et que les logs de fallback soient contextualisés.
   const voices = resolveVoices(config, profile?.mistralVoices, lang, profileId, 'read-aloud');
   const ttsOpts = {
-    provider: config.ttsProvider,
     model: config.ttsModel,
     mistralClient: client,
   } as const;

@@ -107,19 +107,14 @@ vi.mock('../config.js', () => ({
       quizVerify: 'm',
       chat: 'm',
     },
-    voices: {
-      host: { id: 'h', name: 'H' },
-      guest: { id: 'g', name: 'G' },
-    },
     ttsModel: 'voxtral-mini-tts-2603',
-    ttsProvider: 'mistral' as const,
     mistralVoices: { host: 'mh', guest: 'mg' },
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
   getModelLimits: vi.fn(() => ({})),
   // Défaut true : les tests existants supposent TTS disponible. Les tests qui veulent
   // vérifier le filtrage audio (cf. describe "TTS unavailable") overrident via mockReturnValueOnce.
-  getApiStatus: vi.fn(() => ({ mistral: true, elevenlabs: false, ttsAvailable: true })),
+  getApiStatus: vi.fn(() => ({ mistral: true, ttsAvailable: true })),
 }));
 
 // --- Helpers ---
@@ -1293,14 +1288,13 @@ describe('generateRoutes', () => {
 
     it('skippe podcast/quiz-vocal quand TTS indisponible (parité UI/serveur)', async () => {
       // Régression à prévenir : src/app/generate.ts:247-255 filtre déjà côté UI, mais les
-      // consommateurs API directs sur une instance sans TTS (ni MISTRAL_API_KEY ni
-      // ELEVENLABS_API_KEY) obtenaient auth_required/tts_upstream_error systématiques
-      // sur des steps audio INJECTÉS par enrichPlanForLearning (pas choisis par le LLM).
+      // consommateurs API directs sur une instance sans MISTRAL_API_KEY obtenaient
+      // auth_required/tts_upstream_error systématiques sur des steps audio INJECTÉS par
+      // enrichPlanForLearning (pas choisis par le LLM).
       const { routeRequest } = await import('../generators/router.js');
       const { getApiStatus } = await import('../config.js');
       (getApiStatus as any).mockReturnValueOnce({
         mistral: false,
-        elevenlabs: false,
         ttsAvailable: false,
       });
       (routeRequest as any).mockResolvedValueOnce({

@@ -11,6 +11,7 @@ import {
   resolveVoices,
   setVoiceCache,
 } from './config.js';
+import type { AppConfig } from './types.js';
 
 let tempDir: string;
 
@@ -30,7 +31,30 @@ describe('initConfig', () => {
     expect(cfg.models.summary).toBe('mistral-large-latest');
     expect(cfg.models.quizVerify).toBe('mistral-large-latest');
     expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
-    expect(cfg.ttsProvider).toBe('mistral');
+  });
+
+  it('migration 2026-04 : ttsProvider legacy et ttsModel eleven_* sont normalisés vers Mistral', () => {
+    // Un config.json pré-retrait ElevenLabs (ttsProvider + ttsModel eleven_*) doit
+    // ressortir de initConfig() nettoyé et réécrit sur disque pour que les anciens
+    // utilisateurs basculent silencieusement sur Mistral Voxtral.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
+        voices: { host: { id: 'old', name: 'old' }, guest: { id: 'old', name: 'old' } },
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { ttsProvider?: string; voices?: unknown };
+    expect(cfg.ttsProvider).toBeUndefined();
+    expect(cfg.voices).toBeUndefined();
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    // Le fichier a été réécrit sans les champs legacy.
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.ttsProvider).toBeUndefined();
+    expect(onDisk.voices).toBeUndefined();
+    expect(onDisk.ttsModel).toBe('voxtral-mini-tts-latest');
   });
 
   it('avec fichier existant merge avec les defauts', () => {
@@ -103,7 +127,7 @@ describe('getConfig', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     expect(cfg).toHaveProperty('models');
-    expect(cfg).toHaveProperty('voices');
+    expect(cfg).toHaveProperty('mistralVoices');
     expect(cfg).toHaveProperty('ttsModel');
   });
 });
@@ -118,14 +142,6 @@ describe('saveConfig', () => {
 
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.models.summary).toBe('new-model');
-  });
-
-  it('merge partiel voices', () => {
-    initConfig(tempDir);
-    saveConfig({ voices: { host: { id: 'new-id', name: 'Nouvelle voix' } } as any });
-    const cfg = getConfig();
-    expect(cfg.voices.host.id).toBe('new-id');
-    expect(cfg.voices.guest.name).toBeTruthy(); // guest preserve
   });
 
   it("preserve la source 'default' quand un save complet renvoie les memes mistralVoices", () => {
@@ -171,55 +187,17 @@ describe('saveConfig', () => {
 });
 
 describe('getApiStatus', () => {
-  it('detecte les cles API presentes', () => {
+  it('detecte MISTRAL_API_KEY presente', () => {
     vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key-2');
     const status = getApiStatus();
     expect(status.mistral).toBe(true);
-    expect(status.elevenlabs).toBe(true);
+    expect(status.ttsAvailable).toBe(true);
   });
 
-  it('detecte les cles API absentes', () => {
+  it('detecte MISTRAL_API_KEY absente', () => {
     vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
     const status = getApiStatus();
     expect(status.mistral).toBe(false);
-    expect(status.elevenlabs).toBe(false);
-  });
-
-  it('ttsAvailable vrai quand provider mistral et MISTRAL_API_KEY presente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'mistral' });
-    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(true);
-  });
-
-  it('ttsAvailable faux quand provider mistral et MISTRAL_API_KEY absente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'mistral' });
-    vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(false);
-  });
-
-  it('ttsAvailable vrai quand provider elevenlabs et ELEVENLABS_API_KEY presente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
-    vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(true);
-  });
-
-  it('ttsAvailable faux quand provider elevenlabs et ELEVENLABS_API_KEY absente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
-    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
-    const status = getApiStatus();
     expect(status.ttsAvailable).toBe(false);
   });
 });
@@ -237,34 +215,16 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
-  it('retourne mistralVoices quand provider est mistral (tier 2 global config)', () => {
+  it('retourne les mistralVoices de la config par défaut (tier 2 global config)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     const voices = resolveVoices(cfg);
     expect(voices).toEqual(cfg.mistralVoices);
-  });
-
-  it('retourne elevenlabs voices quand provider est elevenlabs', () => {
-    initConfig(tempDir);
-    const cfg = getConfig();
-    cfg.ttsProvider = 'elevenlabs';
-    const voices = resolveVoices(cfg);
-    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
-  });
-
-  it('ignore les voix profil quand provider est elevenlabs', () => {
-    initConfig(tempDir);
-    const cfg = getConfig();
-    cfg.ttsProvider = 'elevenlabs';
-    const voices = resolveVoices(cfg, { host: 'mistral-host', guest: 'mistral-guest' }, 'fr');
-    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
   });
 
   it('tier 1: retourne les voix du profil si definies', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     const profileVoices = { host: 'profile-host-id', guest: 'profile-guest-id' };
     expect(resolveVoices(cfg, profileVoices, 'fr')).toEqual(profileVoices);
   });
@@ -272,7 +232,6 @@ describe('resolveVoices', () => {
   it('tier 2: retourne config globale si settings utilisateur explicites (mistralVoicesSource=user)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
       { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
@@ -286,7 +245,6 @@ describe('resolveVoices', () => {
   it('tier 2: retourne config globale meme si cache EN rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([
       { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
@@ -304,7 +262,6 @@ describe('resolveVoices', () => {
   it('preserve config globale custom pour EN si mistralVoicesSource=user', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = { host: 'custom-host', guest: 'custom-guest' };
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
@@ -324,7 +281,6 @@ describe('resolveVoices', () => {
   it('tier 3: fallback langue si config globale vide et cache rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = { host: '', guest: '' };
     setVoiceCache([
       { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
@@ -338,7 +294,6 @@ describe('resolveVoices', () => {
   it('tier 3: fallback config globale si cache vide', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual(cfg.mistralVoices);
@@ -347,7 +302,6 @@ describe('resolveVoices', () => {
   it('merge voix profil partielles (host seul → host custom + guest default)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
     const partial = { host: 'only-host', guest: '' };
     const voices = resolveVoices(cfg, partial, 'fr');
@@ -357,7 +311,6 @@ describe('resolveVoices', () => {
   it('merge voix profil partielles (guest seul → host default + guest custom)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
     const partial = { host: '', guest: 'only-guest' };
     const voices = resolveVoices(cfg, partial, 'fr');
@@ -369,7 +322,6 @@ describe('resolveVoices', () => {
     // doit quand même récupérer Jane en EN, pas conserver l'ancienne Marie FR.
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = {
       host: 'e3596645-b1af-469e-b857-f18ddedc7652',
       guest: cfg.mistralVoices.guest,
@@ -391,7 +343,6 @@ describe('resolveVoices', () => {
   it('migration path: legacy default guest reste traité comme default pour EN', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = {
       host: cfg.mistralVoices.host,
       guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
@@ -413,7 +364,6 @@ describe('resolveVoices', () => {
   it('profile voices overrident les defaults même avec lang EN et cache rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([
       { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
@@ -431,7 +381,6 @@ describe('resolveVoices', () => {
   it('combine override partiel utilisateur (mistralVoicesSource=user) + fallback langue pour champ restant', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     const defaultGuest = cfg.mistralVoices.guest;
     cfg.mistralVoices = { host: 'custom-host', guest: defaultGuest };
     cfg.mistralVoicesSource = 'user';
@@ -462,15 +411,6 @@ describe('saveConfig (additional fields)', () => {
     expect(cfg.ttsModel).toBe('custom-tts-model');
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.ttsModel).toBe('custom-tts-model');
-  });
-
-  it('persiste ttsProvider', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
-    const cfg = getConfig();
-    expect(cfg.ttsProvider).toBe('elevenlabs');
-    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
-    expect(onDisk.ttsProvider).toBe('elevenlabs');
   });
 
   it('merge partiel mistralVoices', () => {

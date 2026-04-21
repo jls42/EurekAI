@@ -5,7 +5,7 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Transformă orice conținut într-o experiență de învățare interactivă — alimentată de <a href="https://mistral.ai">Mistral AI</a>.</strong>
+  <strong>Transformă orice conținut într-o experiență de învățare interactivă — propulsată de <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Vezi_demonstrația-YouTube-red?style=for-the-badge&logo=youtube" alt="Demonstrație YouTube"></a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="Demo YouTube"></a>
 </p>
 
 <h4 align="center">📊 Calitatea codului</h4>
@@ -40,11 +40,11 @@
 
 ## Povestea — De ce EurekAI?
 
-**EurekAI** s-a născut în timpul [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([site oficial](https://worldwide-hackathon.mistral.ai/)) (martie 2026). Aveam nevoie de un subiect — iar ideea a venit din ceva foarte concret: pregătesc regulat testările împreună cu fiica mea și mi-am spus că ar trebui să fie posibil să fac asta mai ludic și mai interactiv cu ajutorul IA.
+**EurekAI** s-a născut în timpul [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([site-ul oficial](https://worldwide-hackathon.mistral.ai/)) (martie 2026). Aveam nevoie de o temă — iar ideea a venit din ceva foarte concret: pregătesc în mod regulat testele cu fiica mea și mi-am spus că trebuie să fie posibil să fac asta mai ludic și mai interactiv cu ajutorul IA.
 
-Obiectivul: să iau **orice intrare** — o fotografie a lecției, un text copiat și lipit, o înregistrare vocală, o căutare web — și să o transform în **fișe de recapitulare, flashcarduri, quiz-uri, podcasturi, texte cu spații lipsă, ilustrații și multe altele**. Totul alimentat de modelele franceze ale Mistral AI, ceea ce îl face o soluție în mod natural adaptată elevilor francofoni.
+Obiectivul: să preia **orice intrare** — o fotografie a lecției, un text copiat și lipit, o înregistrare vocală, o căutare web — și să o transforme în **fișe de recapitulare, flashcards, quiz-uri, podcasturi, texte cu spații de completat, ilustrații și multe altele**. Totul este propulsat de modelele franceze Mistral AI, ceea ce îl face o soluție adaptată în mod natural elevilor francofoni.
 
-[Prototipul inițial](https://github.com/jls42/worldwide-hackathon.mistral.ai) a fost conceput în 48h în timpul hackathonului ca dovadă de concept în jurul serviciilor Mistral — deja funcțional, dar limitat. De atunci, EurekAI a devenit un proiect adevărat: texte cu spații lipsă, navigare în exerciții, scraping web, moderare parentală configurabilă, revizuire aprofundată a codului și multe altele. Întregul cod este generat de IA — în principal [Claude Code](https://code.claude.com/), cu câteva contribuții prin [Codex](https://openai.com/codex/) și [Gemini CLI](https://geminicli.com/).
+[Prototipul inițial](https://github.com/jls42/worldwide-hackathon.mistral.ai) a fost conceput în 48h în timpul hackathon-ului ca proof of concept în jurul serviciilor Mistral — deja funcțional, dar limitat. De atunci, EurekAI a devenit un proiect real: texte cu spații de completat, navigare prin exerciții, scraping web, moderare parentală configurabilă, revizie aprofundată a codului și multe altele. Întregul cod este generat de IA — în principal [Claude Code](https://code.claude.com/), cu câteva contribuții prin [Codex](https://openai.com/codex/) și [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -52,23 +52,23 @@ Obiectivul: să iau **orice intrare** — o fotografie a lecției, un text copia
 
 | | Funcționalitate | Descriere |
 |---|---|---|
-| 📷 | **Import de fișiere** | Importați lecțiile — fotografie, PDF (prin Mistral OCR cu scor de încredere mediat, praguri `high`/`medium`/`low`) sau fișier text (TXT, MD). Sesiuni de upload cu retry per fișier și progres individual |
+| 📷 | **Import de fișiere** | Importați lecțiile — fotografie, PDF (prin Mistral OCR cu scor de încredere mediat, nivel `high`/`medium`/`low`) sau fișier text (TXT, MD). Sesiuni de upload cu retry per fișier și progres individual |
 | 📝 | **Introducere text** | Tastați sau lipiți orice text direct |
 | 🎤 | **Intrare vocală** | Înregistrați-vă — Voxtral STT transcrie vocea dumneavoastră |
-| 🌐 | **Web / URL** | Lipiți un URL (scraping direct prin Readability + Lightpanda) sau introduceți o căutare (Agent Mistral web_search) |
-| 📄 | **Fișe de recapitulare** | Note structurate cu puncte cheie, vocabular, citate, anecdote |
-| 🃏 | **Flashcarduri** | Carduri Q/R interactive, redare audio dialogată |
-| ❓ | **Quiz-uri grilă** | Întrebări cu alegere multiplă cu revizuirea adaptivă a greșelilor (număr configurabil) |
-| ✏️ | **Texte cu spații lipsă** | Exerciții de completat cu indicii și validare tolerantă |
-| 🎙️ | **Podcast** | Mini-podcast audio în 2 voci — voce Mistral implicită sau voci personalizate (părinți!) |
-| 🖼️ | **Ilustrații** | Imagini educaționale generate de un Agent Mistral |
+| 🌐 | **Web / URL** | Lipiți un URL (scraping direct prin Readability + Lightpanda) sau tastați o căutare (Agent Mistral web_search) |
+| 📄 | **Fișe de recapitulare** | Note structurate cu puncte-cheie, vocabular, citate, anecdote |
+| 🃏 | **Flashcards** | Carduri Q/R interactive, redare audio dialogată |
+| ❓ | **Quiz QCM** | Întrebări cu alegere multiplă, cu revizuirea adaptivă a greșelilor (număr configurabil) |
+| ✏️ | **Texte cu spații de completat** | Exerciții de completat cu indicii și validare tolerantă |
+| 🎙️ | **Podcast** | Mini-podcast în 2 voci, audio — voce Mistral implicită sau voci personalizate (părinți!) |
+| 🖼️ | **Ilustrații** | Imagini educative generate de un Agent Mistral |
 | 🗣️ | **Quiz vocal** | Întrebări citite cu voce tare (voce custom posibilă), răspuns oral, verificare IA |
-| 💬 | **Tutor IA** | Chat contextual cu documentele dumneavoastră de curs, cu apelare de instrumente |
-| 🧠 | **Rutator automat** | Un rutator bazat pe `mistral-small-latest` analizează conținutul și propune o combinație de generatoare dintre cele 7 tipuri disponibile |
-| 🔒 | **Control parental** | Moderare configurabilă per profil (categorii personalizabile), PIN parental, restricții ale chatului |
-| 🌍 | **Multilingv** | Interfață disponibilă în 9 limbi; generare IA controlabilă în 15 limbi prin prompturi |
-| 🔊 | **Redare cu voce tare** | Ascultați fișele și flashcardurile (dialog între întrebare/răspuns) prin Mistral Voxtral TTS sau ElevenLabs |
-| 💶 | **Urmărirea costurilor API** | Estimare transparentă a costului € pentru fiecare generare și sursă (tokeni / caractere / pagini / secunde audio). Badge per card + total pe proiect, vizibil în dashboard |
+| 💬 | **Tutor IA** | Chat contextual cu documentele dumneavoastră de curs, cu apel de unelte |
+| 🧠 | **Router automat** | Un router bazat pe `mistral-small-latest` analizează conținutul și propune o combinație de generatoare dintre cele 7 tipuri disponibile |
+| 🔒 | **Control parental** | Moderare configurabilă pe profil (categorii personalizabile), PIN parental, restricții ale chatului |
+| 🌍 | **Multilingv** | Interfață disponibilă în 9 limbi; generarea IA poate fi pilotată în 15 limbi prin prompturi |
+| 🔊 | **Citire cu voce tare** | Ascultați fișele și flashcards-urile (dialog întrebări/răspunsuri) prin Mistral Voxtral TTS |
+| 💶 | **Urmărirea costurilor API** | Estimare transparentă a costului € pentru fiecare generație și sursă (tokeni / caractere / pagini / secunde audio). Badge per card + total per proiect, vizibil în dashboard |
 | 🎨 | **Temă per profil** | Fiecare profil își alege tema `dark` sau `light` — persistă la schimbarea profilului |
 
 ---
@@ -99,81 +99,79 @@ Obiectivul: să iau **orice intrare** — o fotografie a lecției, un text copia
 
 ## Analiză aprofundată — Funcționalități
 
-### Intrare multimodală
+### Intrare multi-modală
 
 EurekAI acceptă 4 tipuri de surse, moderate în funcție de profil (activat implicit pentru copil și adolescent) :
 
-- **Import de fișiere** — Fișiere JPG, PNG sau PDF procesate de `mistral-ocr-latest` (text tipărit, tabele, scriere de mână), sau fișiere text (TXT, MD) importate direct. Uploadurile multi-fișier folosesc un sistem de **sesiuni de upload**: progres individual pentru fiecare fișier, retry pentru fișierul eșuat fără a retrimite celelalte, închiderea sesiunii la finalizare. OCR-ul expune un **scor de încredere** mediat (`average`, limitat în `[0,1]`, calculat pe baza `averagePageConfidenceScore` returnate de Mistral), afișat în UI sub formă de badge tier `high` / `medium` / `low` (praguri ~0.9 / ~0.7) — avertizează fără să blocheze dacă scanarea este de calitate slabă.
+- **Import de fișiere** — Fișiere JPG, PNG sau PDF procesate de `mistral-ocr-latest` (text tipărit, tabele, scriere de mână), sau fișiere text (TXT, MD) importate direct. Upload-urile cu mai multe fișiere folosesc un sistem de **sesiuni de upload**: progres individual per fișier, retry pentru fișierul eșuat fără a retransmite celelalte, închiderea sesiunii când este terminată. OCR-ul expune un **scor de încredere** mediat (`average`, limitat în `[0,1]`, calculat pe baza `averagePageConfidenceScore` returnate de Mistral), afișat în UI sub formă de badge nivel `high` / `medium` / `low` (praguri ~0.9 / ~0.7) — avertizează fără a bloca dacă scanarea este de calitate slabă.
 - **Text liber** — Tastați sau lipiți orice conținut. Moderat înainte de stocare dacă moderarea este activă.
 - **Intrare vocală** — Înregistrați audio în browser. Transcris de `voxtral-mini-latest`. Parametrul `language="fr"` optimizează recunoașterea.
-- **Web / URL** — Lipiți unul sau mai multe URL-uri pentru a extrage direct conținutul (Readability + Lightpanda pentru paginile JS), sau introduceți cuvinte-cheie pentru o căutare web prin Agent Mistral. Câmpul unic acceptă ambele — URL-urile și cuvintele-cheie sunt separate automat, fiecare rezultat creează o sursă independentă.
+- **Web / URL** — Lipiți unul sau mai multe URL-uri pentru a extrage direct conținutul (Readability + Lightpanda pentru paginile JS), sau tastați cuvinte-cheie pentru o căutare web prin Agent Mistral. Câmpul unic le acceptă pe ambele — URL-urile și cuvintele-cheie sunt separate automat, fiecare rezultat creează o sursă independentă.
 
 ### Generare de conținut IA
 
-Șapte tipuri de materiale educaționale generate:
+Șapte tipuri de materiale de învățare generate:
 
-| Generator | Model | Output |
+| Generator | Model | Ieșire |
 |---|---|---|
-| **Fișă de recapitulare** | `mistral-large-latest` | Titlu, rezumat, puncte cheie, vocabular, citate, anecdotă |
-| **Flashcarduri** | `mistral-large-latest` | Carduri Q/R cu referințe la surse (număr configurabil) |
-| **Quiz grilă** | `mistral-large-latest` | Întrebări cu alegere multiplă, explicații, revizuire adaptivă (număr configurabil) |
-| **Texte cu spații lipsă** | `mistral-large-latest` | Fraze de completat cu indicii, validare tolerantă (Levenshtein) |
+| **Fișă de recapitulare** | `mistral-large-latest` | Titlu, rezumat, puncte-cheie, vocabular, citate, anecdotă |
+| **Flashcards** | `mistral-large-latest` | Carduri Q/R cu referințe la surse (număr configurabil) |
+| **Quiz QCM** | `mistral-large-latest` | Întrebări cu alegere multiplă, explicații, revizuire adaptivă (număr configurabil) |
+| **Texte cu spații de completat** | `mistral-large-latest` | Fraze de completat cu indicii, validare tolerantă (Levenshtein) |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | Script în 2 voci → audio MP3 |
-| **Ilustrație** | Agent `mistral-large-latest` | Imagine educațională prin instrumentul `image_generation` |
+| **Ilustrație** | Agent `mistral-large-latest` | Imagine educativă prin instrumentul `image_generation` |
 | **Quiz vocal** | `mistral-large-latest` + Voxtral TTS + STT | Întrebări TTS → răspuns STT → verificare IA |
 
 ### Tutor IA prin chat
 
 Un tutor conversațional cu acces complet la documentele de curs:
 
-- Utilizează `mistral-large-latest`
-- **Apelare de instrumente**: poate genera fișe, flashcarduri, quiz-uri sau texte cu spații lipsă în timpul conversației
+- Folosește `mistral-large-latest`
+- **Apel de unelte**: poate genera fișe, flashcards, quiz-uri sau texte cu spații de completat în timpul conversației
 - Istoric de 50 de mesaje per curs
 - Moderarea conținutului dacă este activată pentru profil
 
-### Rutator automat
+### Router automat
 
-Rutatorul folosește `mistral-small-latest` pentru a analiza conținutul surselor și a propune cei mai relevanți generatori dintre cei 7 disponibili. Interfața afișează progresul în timp real: mai întâi o fază de analiză, apoi generările individuale cu posibilitate de anulare.
+Routerul folosește `mistral-small-latest` pentru a analiza conținutul surselor și pentru a propune cele mai relevante generatoare dintre cele 7 disponibile. Interfața afișează progresul în timp real: mai întâi o fază de analiză, apoi generațiile individuale cu posibilitate de anulare.
 
-### Învățare adaptivă
+### Învățare adaptativă
 
-- **Statistici de quiz**: urmărirea încercărilor și a preciziei pe întrebare
-- **Revizuire de quiz**: generează 5-10 întrebări noi care vizează conceptele slabe
-- **Detectarea instrucțiunilor**: detectează instrucțiunile de recapitulare ("Știu lecția mea dacă știu...") și le prioritizează în generatoarele textuale compatibile (fișă, flashcarduri, quiz, texte cu spații lipsă)
+- **Statistici ale quiz-urilor**: urmărirea încercărilor și a preciziei pe întrebare
+- **Revizuirea quiz-urilor**: generează 5-10 întrebări noi care vizează conceptele slabe
+- **Detectarea instrucțiunilor**: detectează instrucțiunile de revizuire ("Știu lecția mea dacă știu...") și le prioritizează în generatoarele textuale compatibile (fișă, flashcards, quiz, texte cu spații de completat)
 
 ### Securitate și control parental
 
 - **4 grupe de vârstă**: copil (≤10 ani), adolescent (11-15), student (16-25), adult (26+)
-- **Moderarea conținutului**: `mistral-moderation-latest` cu 10 categorii disponibile, 5 blocate implicit pentru copil/adolescent (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Categorii personalizabile per profil în setări.
+- **Moderarea conținutului**: `mistral-moderation-latest` cu 10 categorii disponibile, 5 blocate implicit pentru copil/adolescent (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Categorii personalizabile pe profil în setări.
 - **PIN parental**: hash SHA-256, necesar pentru profilurile sub 15 ani. Pentru un deployment de producție, se recomandă un hash lent cu salt (Argon2id, bcrypt).
-- **Restricții ale chatului**: chat IA dezactivat implicit pentru cei sub 16 ani, activabil de părinți
+- **Restricții ale chatului**: chatul IA dezactivat implicit pentru cei sub 16 ani, activabil de către părinți
 
 ### Sistem multi-profil
 
 - Profiluri multiple cu nume, vârstă, avatar, preferințe de limbă
-- **Voci per profil** (`Profile.mistralVoices?: { host, guest }`) — fiecare copil poate avea propria pereche de voci pentru podcast/quiz vocal
+- **Voci per profil** (`Profile.mistralVoices?: { host, guest }`) — fiecare copil poate avea propria pereche de voci podcast/quiz vocal
 - **Temă per profil** (`Profile.theme: 'dark' | 'light'`) — comutare automată la schimbarea profilului, persistată în backend
 - Proiecte legate de profiluri prin `profileId`
 - Ștergere în cascadă: ștergerea unui profil șterge toate proiectele sale
 
 ### Urmărirea costurilor API
 
-Fiecare apel Mistral (chat, OCR, STT, TTS, moderare, agenți) este instrumentat pentru a furniza utilizatorului o estimare € **transparentă** — fără surprize la facturare.
+Fiecare apel Mistral (chat, OCR, STT, TTS, moderare, agenți) este instrumentat pentru a furniza o estimare € **transparentă** utilizatorului — fără surprize la facturare.
 
-- **Sursa de adevăr**: `helpers/pricing.ts` — `MODEL_PRICING` per prefix de model (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` cu URL-uri din documentația Mistral pentru re-scraping periodic
-- **Unități suportate**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversie controlată de `helpers/cost-calc.ts`
+- **Sursă de adevăr**: `helpers/pricing.ts` — `MODEL_PRICING` per prefix de model (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` cu URL-urile documentației Mistral pentru re-scraping periodic
+- **Unități suportate**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversie pilotată de `helpers/cost-calc.ts`
 - **Lanț de instrumentare**: `helpers/tracked-client.ts` (wrap client Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injecție în răspunsul HTTP)
-- **UI**: badge de cost per generare (`src/partials/cost-badge-gen.html`), per sursă (`cost-badge-src.html`), total cumulat în dashboard (`Project.totalCost`)
-- **Endpoints**: răspunsurile `/generate/*` și `/sources/*` decorează obiectul returnat (Generation / Source) cu `estimatedCost`, `usage` și `costBreakdown`. `POST /generate/auto/route` adaugă un câmp `costDelta: number` pentru costul doar al rutării. `GET /projects/:pid` returnează proiectul îmbogățit cu `totalCost` (sumă calculată din `costLog[]`) + istoricul complet
+- **UI**: badge cost per generație (`src/partials/cost-badge-gen.html`), per sursă (`cost-badge-src.html`), total cumulat în dashboard (`Project.totalCost`)
+- **Endpoint-uri**: răspunsurile `/generate/*` și `/sources/*` decorează obiectul returnat (Generation / Source) cu `estimatedCost`, `usage` și `costBreakdown`. `POST /generate/auto/route` adaugă un câmp `costDelta: number` pentru costul doar al rutării. `GET /projects/:pid` returnează proiectul îmbogățit cu `totalCost` (sumă calculată din `costLog[]`) + istoricul complet
 
 ### TTS multi-provider și voci personalizate
 
-- **Mistral Voxtral TTS** (implicit) : `voxtral-mini-tts-latest`, fără cheie suplimentară necesară
-- **ElevenLabs** (alternativ) : `eleven_v3`, voci naturale, necesită `ELEVENLABS_API_KEY`
-- Provider configurabil în setările aplicației
-- **Voci personalizate**: părinții își pot crea propriile voci prin API-ul Mistral Voices (pornind de la un eșantion audio) și le pot atribui rolurilor gazdă/invitat — podcasturile și quiz-urile vocale sunt atunci citite cu vocea unui părinte, făcând experiența și mai captivantă pentru copil
+- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, sinteză vocală 100% Mistral, fără cheie suplimentară necesară
+- **Voci personalizate**: părinții pot crea propriile voci prin API-ul Mistral Voices (pornind de la un eșantion audio) și le pot atribui rolurilor gazdă/guest — podcasturile și quiz-urile vocale sunt atunci citite cu vocea unui părinte, făcând experiența și mai imersivă pentru copil
 - Două roluri vocale configurabile: **gazdă** (narator principal) și **invitat** (a doua voce a podcastului)
-- Catalogul complet al vocilor Mistral disponibil în setări, filtrabil după limbă
+- Catalogul complet al vocilor Mistral este disponibil în setări, filtrabil după limbă
 
 ### Internaționalizare
 
@@ -187,34 +185,32 @@ Fiecare apel Mistral (chat, OCR, STT, TTS, moderare, agenți) este instrumentat 
 
 | Strat | Tehnologie | Rol |
 |---|---|---|
-| **Runtime** | Node.js + TypeScript 6.x | Server și siguranța tipurilor |
+| **Runtime** | Node.js + TypeScript 6.x | Server și siguranță de tipuri |
 | **Backend** | Express 5.x | API REST |
 | **Server de dev** | Vite 8.x (Rolldown) + tsx | HMR, partials Handlebars, proxy |
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Interfață reactivă, TypeScript compilat de Vite |
 | **Templating** | vite-plugin-handlebars | Compoziție HTML prin partials |
 | **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, agenți, moderare |
-| **TTS (implicit)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, sinteză vocală integrată |
-| **TTS (alternativ)** | ElevenLabs SDK 2.x | `eleven_v3`, voci naturale |
-| **Icoane** | Lucide 1.x | Bibliotecă de icoane SVG |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, sinteză vocală integrată |
+| **Iconițe** | Lucide 1.x | Bibliotecă de iconițe SVG |
 | **Scraping web** | Readability + linkedom | Extragerea conținutului principal al paginilor web (tehnologia Firefox Reader View) |
-| **Browser headless** | Lightpanda | Browser headless ultra-ușor (Zig + V8) pentru pagini JS/SPA — fallback scraping |
+| **Browser headless** | Lightpanda | Browser headless ultra-ușor (Zig + V8) pentru paginile JS/SPA — fallback scraping |
 | **Markdown** | Marked | Randare markdown în chat |
 | **Upload fișiere** | Multer 2.x | Gestionarea formularelor multipart |
 | **Audio** | ffmpeg-static | Concatenarea segmentelor audio |
-| **Teste** | Vitest | Teste unitare — acoperire măsurată de SonarCloud |
+| **Teste** | Vitest | Teste unitare — acoperirea măsurată de SonarCloud |
 | **Persistență** | Fișiere JSON | Stocare fără dependențe |
 
 ---
 
 ## Referința modelelor | Model | Utilizare | De ce |
 |---|---|---|
-| `mistral-large-latest` | Fișă, Flashcards, Podcast, Quiz, Texte cu spații libere, Chat, Verificare quiz vocal, Agent Image, Agent Web Search, Detectare instrucțiuni | Cel mai bun multilingual + urmărirea instrucțiunilor |
-| `mistral-ocr-latest` | OCR de documente | Text tipărit, tabele, scriere de mână |
+| `mistral-large-latest` | Fișe, Flashcards, Podcast, Quiz, Texte cu spații libere, Chat, Verificare quiz vocal, Agent Imagine, Agent Web Search, Detectare instrucțiuni | Cel mai bun pentru multilingual + urmărirea instrucțiunilor |
+| `mistral-ocr-latest` | OCR pentru documente | Text imprimat, tabele, scriere de mână |
 | `voxtral-mini-latest` | Recunoaștere vocală (STT) | STT multilingv, optimizat cu `language="fr"` |
 | `voxtral-mini-tts-latest` | Sinteză vocală (TTS) | Podcasturi, quiz vocal, citire cu voce tare |
-| `mistral-moderation-latest` | Moderare de conținut | 5 categorii blocate pentru copil/adolescent (+ jailbreaking) |
+| `mistral-moderation-latest` | Moderare de conținut | 5 categorii blocate pentru copii/adolescenți (+ jailbreaking) |
 | `mistral-small-latest` | Router automat | Analiză rapidă a conținutului pentru decizii de rutare |
-| `eleven_v3` (ElevenLabs) | Sinteză vocală (TTS alternativ) | Voci naturale, alternativă configurabilă |
 
 ---
 
@@ -232,7 +228,6 @@ npm install
 cp .env.example .env
 # Éditez .env avec vos clés :
 #   MISTRAL_API_KEY=<your_api_key>           (requis)
-#   ELEVENLABS_API_KEY=<your_api_key>        (optionnel, TTS alternatif)
 #   SONAR_TOKEN=...                          (optionnel, CI SonarCloud uniquement)
 
 # Lancer le développement
@@ -241,19 +236,18 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **Notă**: Mistral Voxtral TTS este providerul implicit — nu este necesară nicio cheie suplimentară în afară de `MISTRAL_API_KEY`. ElevenLabs este un provider TTS alternativ configurabil în setări.
+> **Notă** : Mistral Voxtral TTS este singurul provider TTS — nu este necesară nicio cheie suplimentară în afară de `MISTRAL_API_KEY`.
 
 ### Variabile de mediu
 
-| Variabilă | Necesită | Implicit | Rol |
+| Variabilă | Necesar | Implicit | Rol |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | ✅ | — | Cheie API Mistral (chat, OCR, STT, TTS Voxtral, agenți, moderare) |
-| `ELEVENLABS_API_KEY` | ⚠ opțional | — | Cheie ElevenLabs; necesară numai dacă providerul TTS = ElevenLabs |
-| `PORT` | opțional | `3000` | Portul HTTP al backendului Express |
+| `MISTRAL_API_KEY` | ✅ | — | Cheia API Mistral (chat, OCR, STT, TTS Voxtral, agenți, moderare) |
+| `PORT` | opțional | `3000` | Portul HTTP al backend-ului Express |
 | `NODE_ENV` | opțional | `development` | Dacă `production` → Express servește frontend-ul din `dist/` (altfel `public/`) |
 | `SONAR_TOKEN` | opțional CI | — | Folosit doar de workflow-ul GitHub Actions SonarCloud |
 
-### Teste, calitatea codului și contribuții
+### Teste, calitate a codului și contribuție
 
 ```bash
 npm test                # vitest (déclenche pretest : lint:complexity + lint:ci + lint:deadcode)
@@ -264,9 +258,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Hook-uri Git (Husky)**: `pre-commit` rulează `npm test`, `pre-push` rulează `npm run security`. Ambele blochează commit-ul/push-ul în caz de eșec.
+**Hook-uri Git (Husky)** : `pre-commit` lansează `npm test`, `pre-push` lansează `npm run security`. Ambele blochează commit-ul/push-ul în caz de eșec.
 
-**Instrumente externe necesare (opționale, dar folosite de `pretest` / `npm run security`)** :
+**Instrumente externe necesare (opționale, dar utilizate de `pretest` / `npm run security`)** :
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -276,11 +270,11 @@ pipx install lizard          # ou : pipx run lizard
 ./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
 ```
 
-Fără aceste instrumente, `npm test` eșuează la `pretest` (lizard absent) și `npm run security` eșuează (opengrep absent). Hook-urile husky blochează atunci commit-ul/push-ul.
+Fără aceste instrumente, `npm test` eșuează la `pretest` (lizard absent) iar `npm run security` eșuează (opengrep absent). Hook-urile husky blochează atunci commit-ul/push-ul.
 
 ---
 
-## Implementare cu container
+## Deploy cu container
 
 Imaginea este publicată pe **GitHub Container Registry** :
 
@@ -292,7 +286,6 @@ podman pull ghcr.io/jls42/eurekai:latest
 mkdir -p ./data
 podman run -d --name eurekai \
   -e MISTRAL_API_KEY=<your_api_key> \
-  -e ELEVENLABS_API_KEY=<your_api_key> \
   -v ./data:/app/output:U \
   -p 3000:3000 \
   ghcr.io/jls42/eurekai:latest
@@ -300,7 +293,6 @@ podman run -d --name eurekai \
 ```
 
 > **`:U`** este un flag Podman rootless care ajustează automat permisiunile volumului.
-> **`ELEVENLABS_API_KEY`** este opțional (TTS alternativ).
 
 ```bash
 # Build local
@@ -335,7 +327,7 @@ generators/
   chat.ts                 — Tuteur IA par chat avec appel d'outils
   router.ts               — Routeur automatique (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
-  tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
+  tts-provider.ts         — TTS Mistral Voxtral (+ voice management : list/get/create/delete)
   tts.ts                  — Génération audio multi-voix (podcast + flashcards, concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search (fallback)
@@ -419,7 +411,7 @@ scripts/                  — Tooling : check-deps, check-security, check-comple
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **Pentru contribuții AI**: consultați [`CLAUDE.md`](CLAUDE.md) pentru contextul arhitectural detaliat, regulile obligatorii (anti-leak prompts, coduri de eroare, cost tracking) și capcanele cunoscute (Lizard CCN, Opengrep, migrarea Codacy/Semgrep).
+> **Pentru contributorii AI** : consultați [`CLAUDE.md`](CLAUDE.md) pentru contextul arhitectural detaliat, regulile obligatorii (anti-leak prompts, coduri de eroare, cost tracking) și capcanele cunoscute (Lizard CCN, Opengrep, migrarea Codacy/Semgrep).
 
 ---
 
@@ -429,11 +421,11 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | Metodă | Endpoint | Descriere |
 |---|---|---|
 | `GET` | `/api/config` | Configurația curentă |
-| `PUT` | `/api/config` | Modifică configurația (modele, voci, provider TTS) |
-| `GET` | `/api/config/status` | Starea API-urilor: `mistral` (cheie Mistral definită), `elevenlabs` (cheie ElevenLabs definită), `ttsAvailable` (true dacă cheia providerului TTS configurat este prezentă) |
-| `POST` | `/api/config/reset` | Resetează configurația la valorile implicite |
+| `PUT` | `/api/config` | Modifică configurația (modele, voce, model TTS) |
+| `GET` | `/api/config/status` | Statutul API-urilor : `mistral` (cheie Mistral definită), `ttsAvailable` (alias pentru `mistral`, Mistral Voxtral este singurul provider TTS) |
+| `POST` | `/api/config/reset` | Resetează configurația implicită |
 | `GET` | `/api/config/voices` | Listează vocile Mistral TTS (opțional `?lang=fr`) |
-| `GET` | `/api/moderation-categories` | Categorii de moderare disponibile + valori implicite pe vârstă |
+| `GET` | `/api/moderation-categories` | Categorii de moderare disponibile + implicite în funcție de vârstă |
 
 ### Profiluri
 | Metodă | Endpoint | Descriere |
@@ -448,7 +440,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/projects` | Listează proiectele (`?profileId=` opțional) |
 | `POST` | `/api/projects` | Creează un proiect `{name, profileId}` |
-| `GET` | `/api/projects/:pid` | Detalii despre proiect |
+| `GET` | `/api/projects/:pid` | Detalii proiect |
 | `PUT` | `/api/projects/:pid` | Redenumește `{name}` |
 | `DELETE` | `/api/projects/:pid` | Șterge proiectul |
 
@@ -473,7 +465,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Ilustrație |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz vocal |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | Revizuire adaptivă `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | Revizuire adaptativă `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/route` | Analiză de rutare (planul generatoarelor de lansat) — returnează `{plan, costDelta}` (costul doar al rutării) |
 | `POST` | `/api/projects/:pid/generate/auto` | Generare automată backend (rutare + 7 tipuri: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). Execuție în paralel — presupune un tier Mistral cu rate-limit ≥ 7 cereri simultane; altfel mai multe 429 pot apărea în `failedSteps`. |
 
@@ -482,17 +474,17 @@ Toate rutele de generare acceptă `{sourceIds?, lang?, ageGroup?, count?, useCon
 ### CRUD Generări
 | Metodă | Endpoint | Descriere |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Trimite răspunsurile quizului `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Trimite răspunsurile quiz `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Trimite răspunsurile textelor cu spații libere `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Verifică un răspuns oral (audio + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Redare TTS cu voce tare (fișe/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Citire TTS cu voce tare (fișe/flashcards) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Redenumește `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | Șterge generarea |
 
 ### Chat
 | Metodă | Endpoint | Descriere |
 |---|---|---|
-| `GET` | `/api/projects/:pid/chat` | Recuperează istoricul chatului |
+| `GET` | `/api/projects/:pid/chat` | Preia istoricul chatului |
 | `POST` | `/api/projects/:pid/chat` | Trimite un mesaj `{message, lang, ageGroup}` |
 | `DELETE` | `/api/projects/:pid/chat` | Șterge istoricul chatului |
 
@@ -504,29 +496,28 @@ Toate rutele de generare acceptă `{sourceIds?, lang?, ageGroup?, count?, useCon
 |---|---|
 | **Alpine.js în loc de React/Vue** | Amprentă minimă, reactivitate ușoară cu TypeScript compilat de Vite. Perfect pentru un hackathon în care viteza contează. |
 | **Persistență în fișiere JSON** | Zero dependențe, pornire instantanee. Nicio bază de date de configurat — pornim și gata. |
-| **Vite + Handlebars** | Ce e mai bun din ambele lumi: HMR rapid pentru dezvoltare, partiale HTML pentru organizarea codului, Tailwind JIT. |
-| **Prompts centralizate** | Toate prompturile AI în `prompts.ts` — ușor de iterat, testat și adaptat după limbă/grupă de vârstă. |
+| **Vite + Handlebars** | Ce e mai bun din ambele lumi: HMR rapid pentru dezvoltare, partials HTML pentru organizarea codului, Tailwind JIT. |
+| **Prompts centralizate** | Toate prompturile AI în `prompts.ts` — ușor de iterat, testat și adaptat după limbă/grup de vârstă. |
 | **Sistem multi-generări** | Fiecare generare este un obiect independent cu propriul ID — permite mai multe fișe, quiz-uri etc. per curs. |
-| **Prompts adaptate după vârstă** | 4 grupe de vârstă cu vocabular, complexitate și ton diferite — același conținut predă diferit în funcție de elev. |
-| **Funcționalități bazate pe Agenți** | Generarea de imagini și căutarea web folosesc agenți Mistral temporari — ciclu de viață curat cu curățare automată. |
-| **Scraping inteligent de URL-uri** | Un singur câmp acceptă URL-uri și cuvinte-cheie amestecate — URL-urile sunt scrapate prin Readability (pagini statice) cu fallback Lightpanda (pagini JS/SPA), iar cuvintele-cheie declanșează un Agent Mistral web_search. Fiecare rezultat creează o sursă independentă. |
-| **TTS multi-provider** | Mistral Voxtral TTS implicit (fără cheie suplimentară), ElevenLabs ca alternativă — configurabil fără repornire. |
+| **Prompts adaptate pe vârstă** | 4 grupuri de vârstă cu vocabular, complexitate și ton diferite — același conținut predă diferit în funcție de elev. |
+| **Funcționalități bazate pe Agenți** | Generarea de imagini și căutarea web folosesc Agenți Mistral temporari — ciclu de viață curat cu curățare automată. |
+| **Scraping inteligent de URL-uri** | Un singur câmp acceptă URL-uri și cuvinte-cheie amestecate — URL-urile sunt scrapate via Readability (pagini statice) cu fallback Lightpanda (pagini JS/SPA), cuvintele-cheie declanșează un Agent Mistral web_search. Fiecare rezultat creează o sursă independentă. |
+| **TTS 100% Mistral** | Mistral Voxtral TTS (fără cheie suplimentară în afară de `MISTRAL_API_KEY`) — sinteză vocală integrată în lanțul de cost și în rezolvarea vocii după limbă. |
 
 ---
 
 ## Credite și mulțumiri
 
-- **[Mistral AI](https://mistral.ai)** — Modele IA (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
-- **[ElevenLabs](https://elevenlabs.io)** — Motor alternativ de sinteză vocală (`eleven_v3`)
+- **[Mistral AI](https://mistral.ai)** — Modele AI (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
 - **[Alpine.js](https://alpinejs.dev)** — Framework reactiv ușor
 - **[TailwindCSS](https://tailwindcss.com)** — Framework CSS utilitar
 - **[Vite](https://vitejs.dev)** — Instrument de build frontend
-- **[Lucide](https://lucide.dev)** — Bibliotecă de pictograme
+- **[Lucide](https://lucide.dev)** — Bibliotecă de iconițe
 - **[Marked](https://marked.js.org)** — Parser Markdown
 - **[Readability](https://github.com/mozilla/readability)** — Extragere de conținut web (tehnologia Firefox Reader View)
-- **[Lightpanda](https://lightpanda.io)** — Browser headless ultra-ușor pentru scraping-ul paginilor JS/SPA
+- **[Lightpanda](https://lightpanda.io)** — Browser headless ultra-ușor pentru scraping de pagini JS/SPA
 
-Inițiat în timpul Mistral AI Worldwide Hackathon (martie 2026), dezvoltat integral de IA cu [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) și [Gemini CLI](https://geminicli.com/).
+Inițiat în cadrul Mistral AI Worldwide Hackathon (martie 2026), dezvoltat integral de AI cu [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) și [Gemini CLI](https://geminicli.com/).
 
 ---
 

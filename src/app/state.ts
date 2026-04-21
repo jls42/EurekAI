@@ -121,7 +121,7 @@ export function createState() {
 
     // Settings
     showSettings: false,
-    apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    apiStatus: { mistral: false, ttsAvailable: false },
     allModerationCategories: [] as string[],
     moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as Array<{
@@ -134,9 +134,7 @@ export function createState() {
     }>,
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
-      voices: { host: { id: '', name: '' }, guest: { id: '', name: '' } },
       ttsModel: '',
-      ttsProvider: 'mistral' as string,
       mistralVoices: { host: 'Oliver', guest: 'Marie' },
     },
 

@@ -395,7 +395,7 @@ sequenceDiagram
     participant U as Élève
     participant API as /generate/quiz-vocal
     participant LLM as Mistral (quizVocalSystem)
-    participant TTS as Voxtral TTS / ElevenLabs
+    participant TTS as Voxtral TTS
     participant STT as Voxtral STT
     participant V as verifyAnswer
 

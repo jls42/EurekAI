@@ -272,8 +272,6 @@ export interface ChatHistory {
 
 // --- App config ---
 
-export type TtsProvider = 'elevenlabs' | 'mistral';
-
 export interface AppConfig {
   models: {
     summary: string;
@@ -285,12 +283,7 @@ export interface AppConfig {
     quizVerify: string;
     chat: string;
   };
-  voices: {
-    host: { id: string; name: string };
-    guest: { id: string; name: string };
-  };
   ttsModel: string;
-  ttsProvider: TtsProvider;
   mistralVoices: {
     host: string;
     guest: string;

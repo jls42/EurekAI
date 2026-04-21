@@ -39,12 +39,7 @@ const MOCK_CONFIG = {
     quizVerify: 'm',
     chat: 'm',
   },
-  voices: {
-    host: { id: 'h', name: 'H' },
-    guest: { id: 'g', name: 'G' },
-  },
   ttsModel: 'voxtral-mini-tts-2603',
-  ttsProvider: 'mistral' as const,
   mistralVoices: { host: 'mh', guest: 'mg' },
 };
 
@@ -844,7 +839,6 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
       expect.any(String),
       'mh', // resolveVoices returns { host: 'mh', guest: 'mg' }
       {
-        provider: 'mistral',
         model: 'voxtral-mini-tts-2603',
         mistralClient: client,
       },
@@ -924,7 +918,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     // Cas trigger : resolveVoices jette — chemin atteint avant la boucle section.
     const { resolveVoices } = await import('../config.js');
     (resolveVoices as any).mockImplementationOnce(() => {
-      throw new Error('ELEVENLABS_API_KEY non defini — https://api.internal/key');
+      throw new Error('MISTRAL_API_KEY non defini — https://api.internal/key');
     });
 
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');

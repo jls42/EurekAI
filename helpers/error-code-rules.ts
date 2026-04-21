@@ -31,9 +31,8 @@ export const STRUCTURED_CODE_RULES: readonly Rule[] = [
 ];
 
 // Priorité = ordre d'évaluation (première regex qui match gagne). Les trois règles
-// `auth_required` sont placées en tête pour capter 401/403 SDK et les
-// `Error('ELEVENLABS_API_KEY non defini')` levés localement par tts-provider.ts
-// avant que TTS_SIGNATURE /elevenlabs/ ne les classe à tort en tts_upstream_error.
+// `auth_required` sont placées en tête pour capter 401/403 SDK avant que
+// TTS_SIGNATURE ne classe un message d'auth en tts_upstream_error.
 // Segmentées en 3 patterns simples (Sonar S5843 : complexité regex < 20) au lieu
 // d'une grosse alternation équivalente.
 export const MESSAGE_RULES: readonly Rule[] = [
@@ -55,4 +54,4 @@ export const MESSAGE_RULES: readonly Rule[] = [
 ];
 
 export const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
-export const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|elevenlabs|audio|speech|voice|transcrib/i;
+export const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|audio|speech|voice|transcrib/i;

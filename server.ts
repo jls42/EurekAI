@@ -122,11 +122,9 @@ app.use(API_PROJECTS, chatRoutes(store, client, profileStore));
 app.listen(PORT, () => {
   const projects = store.listProjects();
   const status = getApiStatus();
-  const config = getConfig();
   console.log(`\n  EurekAI — http://localhost:${PORT}`);
   console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
-  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : NON_CONFIGURE}`);
-  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  TTS Mistral Voxtral: ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();

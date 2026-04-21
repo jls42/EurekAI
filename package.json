@@ -24,7 +24,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.36.0",
     "@lightpanda/browser": "^1.2.0",
     "@mistralai/mistralai": "^2.2.0",
     "@mozilla/readability": "^0.6.0",

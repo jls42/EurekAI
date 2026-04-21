@@ -51,12 +51,7 @@ vi.mock('../config.js', () => ({
       quizVerify: 'm',
       chat: 'm',
     },
-    voices: {
-      host: { id: 'h', name: 'H' },
-      guest: { id: 'g', name: 'G' },
-    },
     ttsModel: 'voxtral-mini-tts-2603',
-    ttsProvider: 'mistral',
     mistralVoices: { host: 'mh', guest: 'mg' },
   })),
 }));

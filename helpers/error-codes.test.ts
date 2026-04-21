@@ -101,12 +101,9 @@ describe('extractErrorCode', () => {
   });
 
   it('mappe une clé API locale non définie vers auth_required (pas tts_upstream_error)', () => {
-    // Cas observé : tts-provider.ts throw Error('ELEVENLABS_API_KEY non defini') quand
-    // la variable d'env manque. TTS_SIGNATURE /elevenlabs/ happerait la classification
-    // en tts_upstream_error ("panne transitoire") et masquerait le vrai fix pour l'utilisateur.
-    expect(extractErrorCode(new Error('ELEVENLABS_API_KEY non defini'), 'podcast')).toBe(
-      'auth_required',
-    );
+    // Les "API_KEY non defini" levés localement (env var manquante) doivent être
+    // classés auth_required (action user) et non tts_upstream_error, pour éviter
+    // un label "panne transitoire" trompeur quand le vrai fix est de configurer la clé.
     expect(extractErrorCode(new Error('MISTRAL_API_KEY not defined'), 'summary')).toBe(
       'auth_required',
     );
@@ -137,7 +134,6 @@ describe('extractErrorCode', () => {
     expect(extractErrorCode(new Error('TTS API unreachable'), 'quiz-vocal')).toBe(
       'tts_upstream_error',
     );
-    expect(extractErrorCode(new Error('ElevenLabs timeout'), 'podcast')).toBe('tts_upstream_error');
     expect(extractErrorCode(new Error('voxtral audio failure'), 'tts')).toBe('tts_upstream_error');
     expect(extractErrorCode(new Error('audio buffer corrupted'), 'stt')).toBe('tts_upstream_error');
   });

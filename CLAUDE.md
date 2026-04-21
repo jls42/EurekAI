@@ -1,13 +1,13 @@
 # EurekAI
 
 Application educative IA : photo/texte/voix -> fiches + flashcards + quiz + podcast + traduction.
-Concu pour un enfant de 9 ans. Powered by Mistral AI (+ ElevenLabs optionnel).
+Concu pour un enfant de 9 ans. Powered by Mistral AI.
 
 ## Stack & Lancement
 
 - **Backend** : TypeScript, Express, tsx (dev)
 - **Frontend** : Vite + HTML + TailwindCSS + Alpine.js (src/)
-- **APIs** : Mistral AI (chat, OCR, STT, TTS Voxtral, agents, moderation), ElevenLabs (TTS alternatif)
+- **APIs** : Mistral AI (chat, OCR, STT, TTS Voxtral, agents, moderation)
 
 ```bash
 npm install
@@ -27,10 +27,8 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation entre toutes les langues
 
 ### TTS (Text-to-Speech)
-- Deux providers : Mistral (Voxtral TTS) ou ElevenLabs, configurable dans les settings
-- Mistral TTS : utilise `MISTRAL_API_KEY` (deja requis), pas de cle supplementaire
-- ElevenLabs : necessite `ELEVENLABS_API_KEY`
-- `apiStatus.ttsAvailable` indique si le provider actif est configure
+- Provider unique : Mistral Voxtral TTS (`MISTRAL_API_KEY` suffit, pas de clé supplémentaire). Le support ElevenLabs historique (hackathon) a été retiré 2026-04 faute d'intégration au niveau Mistral (voix par langue, cost tracking) — une migration one-time dans `initConfig` nettoie les `config.json` legacy (`ttsProvider`/`voices`/`eleven_*`). Réintégration ElevenLabs envisagée plus tard au même niveau de qualité.
+- `apiStatus.ttsAvailable === apiStatus.mistral` (une seule source, plus de champ `elevenlabs`).
 - Griser les boutons TTS avec `:disabled="!apiStatus.ttsAvailable"` + tooltip `t('gen.needsTts')`
 - **Voix par langue** : `resolveVoices(config, profileVoices?, lang?, profileId?, flow?)` dans `config.ts` résout la voix finale selon la priorité : profil > override global explicite (`mistralVoicesSource === 'user'`) > sélection dynamique `selectVoices` (9 langues UI) > DEFAULT_CONFIG. Le flag `mistralVoicesSource` (`'default' | 'user'`) est migré one-time dans `initConfig` via `LEGACY_DEFAULT_HOSTS/GUESTS` — un config.json existant avec un ancien ID par défaut reste classé `'default'` pour que l'utilisateur bénéficie automatiquement des voix EN/ES/etc.
 - **Appels `resolveVoices()`** : sur tout nouveau chemin TTS, TOUJOURS passer `profileId` et `flow` (ex: `'podcast' | 'quiz-vocal' | 'read-aloud'`). Sinon la rotation déterministe par profil se casse (seed `__default__` partagé) et les logs de fallback portent `flow='unknown'` — observabilité dégradée.

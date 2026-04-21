@@ -32,13 +32,6 @@
           ></span>
           Mistral
         </span>
-        <span class="flex items-center gap-1.5 text-body-sm">
-          <span
-            class="w-3 h-3 rounded-full"
-            :class="apiStatus.elevenlabs ? 'bg-success' : 'bg-danger'"
-          ></span>
-          ElevenLabs
-        </span>
       </div>
     </div>
     <div>
@@ -92,43 +85,13 @@
       <div class="space-y-3">
         <div>
           <label
-            for="cfg-tts-provider"
-            class="text-sm text-text-secondary block mb-1"
-            x-text="t('settings.ttsProvider')"
-            >TTS Provider</label
-          >
-          <select
-            id="cfg-tts-provider"
-            x-model="configDraft.ttsProvider"
-            class="w-full input-modern px-3 py-2 text-body-sm"
-          >
-            <option value="elevenlabs">ElevenLabs</option>
-            <option
-              value="mistral"
-              x-text="'Mistral (Voxtral) — ' + t('settings.recommended')"
-            ></option>
-          </select>
-        </div>
-        <div>
-          <label
             for="cfg-tts-model"
             class="text-sm text-text-secondary block mb-1"
             x-text="t('settings.ttsModel')"
             >TTS Model</label
           >
-          <!-- ElevenLabs models -->
           <select
-            x-show="configDraft.ttsProvider === 'elevenlabs'"
-            x-model="configDraft.ttsModel"
-            class="w-full input-modern px-3 py-2 text-body-sm"
-          >
-            <option value="eleven_v3">eleven_v3</option>
-            <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
-            <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
-          </select>
-          <!-- Mistral models -->
-          <select
-            x-show="configDraft.ttsProvider === 'mistral'"
+            id="cfg-tts-model"
             x-model="configDraft.ttsModel"
             class="w-full input-modern px-3 py-2 text-body-sm"
           >
@@ -139,37 +102,7 @@
           </select>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ttsModelHint')"></p>
         </div>
-        <!-- ElevenLabs voice IDs -->
-        <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              for="cfg-voice-host"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceHost') + ' ID'"
-              >Voice Host ID</label
-            >
-            <input
-              id="cfg-voice-host"
-              x-model="configDraft.voices.host.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
-          </div>
-          <div>
-            <label
-              for="cfg-voice-guest"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceGuest') + ' ID'"
-              >Voice Guest ID</label
-            >
-            <input
-              id="cfg-voice-guest"
-              x-model="configDraft.voices.guest.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
-          </div>
-        </div>
-        <!-- Mistral voice selectors (dynamic from API) -->
-        <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label
               for="cfg-mistral-voice-host"
