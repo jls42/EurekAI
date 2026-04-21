@@ -24,6 +24,9 @@ export async function textToSpeech(
     voiceId,
     responseFormat: 'mp3',
   });
+  if (!response.audioData) {
+    throw new Error(`mistral_tts_empty_response (voiceId=${voiceId}, model=${options.model})`);
+  }
   return Buffer.from(response.audioData, 'base64');
 }
 
