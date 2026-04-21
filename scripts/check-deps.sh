@@ -8,15 +8,14 @@ npm outdated 2>/dev/null || true
 
 echo ""
 echo "=== Critical SDK versions ==="
-for pkg in @mistralai/mistralai; do
-  current=$(node -e "try{const v=JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
-  latest=$(npm view "$pkg" version 2>/dev/null | sed 's/^v//' || echo "N/A")
-  if [ "$current" = "$latest" ]; then
-    echo "  ✓ $pkg: $current"
-  else
-    echo "  ⬆ $pkg: $current -> $latest (UPDATE AVAILABLE)"
-  fi
-done
+pkg="@mistralai/mistralai"
+current=$(node -e "try{const v=JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
+latest=$(npm view "$pkg" version 2>/dev/null | sed 's/^v//' || echo "N/A")
+if [ "$current" = "$latest" ]; then
+  echo "  ✓ $pkg: $current"
+else
+  echo "  ⬆ $pkg: $current -> $latest (UPDATE AVAILABLE)"
+fi
 
 # Load env if needed
 if [ -z "${MISTRAL_API_KEY:-}" ]; then
