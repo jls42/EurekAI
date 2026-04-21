@@ -11,6 +11,7 @@ import {
   resolveVoices,
   setVoiceCache,
 } from './config.js';
+import { logger } from './helpers/logger.js';
 import type { AppConfig } from './types.js';
 
 let tempDir: string;
@@ -22,6 +23,7 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe('initConfig', () => {
@@ -68,11 +70,24 @@ describe('initConfig', () => {
     expect(cfg.models.quiz).toBe('mistral-large-latest'); // defaut preserve
   });
 
-  it('fichier JSON invalide fallback sur defaut', () => {
-    writeFileSync(join(tempDir, 'config.json'), 'not json{{{');
+  it('fichier JSON invalide: fallback in-memory DEFAULT + disque préservé + log error (C1)', () => {
+    // Régression à prévenir : avant le fix C1, un config.json corrompu déclenchait
+    // classify/migrate/writeFileSync sur DEFAULT_CONFIG et écrasait silencieusement
+    // le fichier user (perte de config invisible). Le loadFailed gate doit préserver
+    // le disque intact et émettre un logger.error explicite.
+    const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    writeFileSync(join(tempDir, 'config.json'), '{invalid json');
     initConfig(tempDir);
-    const cfg = getConfig();
-    expect(cfg.models.summary).toBe('mistral-large-latest');
+    expect(getConfig().models.summary).toBe('mistral-large-latest'); // in-memory DEFAULT
+    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+    // Disque préservé (aucune réécriture par classify/migrate)
+    expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe('{invalid json');
+    // logger.error émis avec le message "Failed to parse" + SyntaxError
+    expect(errSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining('Failed to parse'),
+      expect.any(SyntaxError),
+    );
   });
 
   it('migration one-time: config.json sans mistralVoicesSource → classé default', () => {
@@ -131,6 +146,94 @@ describe('initConfig', () => {
     );
     initConfig(tempDir);
     expect(getConfig().mistralVoicesSource).toBe('user');
+  });
+
+  it('migration partielle: voices seul legacy → removed, ttsModel intouché (S3)', () => {
+    // Cas dégénéré mais possible : un config.json pré-removal avec `voices` legacy
+    // mais un ttsModel déjà migré manuellement. La migration ne doit toucher que
+    // ce qui a besoin de l'être.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        voices: { host: { id: 'x', name: 'x' }, guest: { id: 'y', name: 'y' } },
+        ttsModel: 'voxtral-mini-tts-latest',
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { voices?: unknown };
+    expect(cfg.voices).toBeUndefined();
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.voices).toBeUndefined();
+  });
+
+  it("migration partielle: ttsModel 'eleven_*' seul → reset, pas de ttsProvider/voices touché (S3)", () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        ttsModel: 'eleven_multilingual_v2',
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { ttsProvider?: string; voices?: unknown };
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(cfg.ttsProvider).toBeUndefined();
+    expect(cfg.voices).toBeUndefined();
+  });
+
+  it('idempotent double-boot: aucune réécriture quand config est déjà migré+classifié (S3)', () => {
+    // Régression à prévenir : si initConfig réécrit même quand rien n'a changé, on rotate
+    // le mtime inutilement et on crée du bruit filesystem (backup systems, docker layers).
+    // Pattern B content-check (FS-agnostic, pas dépendant de mtime sur ext3/FAT/tmpfs).
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        models: { summary: 'custom' },
+        mistralVoicesSource: 'default',
+      }),
+    );
+    initConfig(tempDir); // 1er boot : classify sera false (source déjà présente), migrate false → rien à écrire
+    const content1 = readFileSync(join(tempDir, 'config.json'), 'utf-8');
+    initConfig(tempDir); // 2e boot : toujours rien à faire
+    const content2 = readFileSync(join(tempDir, 'config.json'), 'utf-8');
+    expect(content2).toBe(content1);
+  });
+
+  it('shape hostile: saved.models = null → fallback DEFAULT sans crash (S2)', () => {
+    // Protection contre config.json avec types invalides (corruption partielle, édition
+    // manuelle erronée, downgrade schéma). Sans mergeSafe, `currentConfig.models.chat`
+    // crasherait plus tard à l'appel.
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: null }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+    expect(getConfig().models.summary).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved.models = string → fallback DEFAULT (S2)', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: 'haxor' }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved.models = array → fallback DEFAULT (S2)', () => {
+    // {...[]} produit {}, mais {...['a','b']} produit {0:'a', 1:'b'} qui casse l'accès .chat.
+    // La garde !Array.isArray prévient les deux cas.
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: ['a', 'b'] }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved = array au top-level → fallback DEFAULT (S2)', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify([1, 2, 3]));
+    initConfig(tempDir);
+    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+  });
+
+  it('shape hostile: saved.mistralVoices = string → fallback DEFAULT (S2)', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ mistralVoices: 'haxor' }));
+    initConfig(tempDir);
+    expect(getConfig().mistralVoices.host).toBeTruthy();
+    expect(getConfig().mistralVoices.guest).toBeTruthy();
   });
 });
 

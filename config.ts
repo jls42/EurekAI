@@ -31,51 +31,107 @@ const DEFAULT_CONFIG: AppConfig = {
 let configPath: string;
 let currentConfig: AppConfig;
 
-function loadSavedConfig(): AppConfig {
+// Spread merge durci contre shapes hostiles depuis le disque (JSON valide mais types
+// inattendus : `{"models": null}`, `{"models": "x"}`, `{"models": []}`). Sans cette garde,
+// un accès ultérieur `currentConfig.models.chat` crasherait. Fragilité symétrique à
+// loadFailed : un config.json hostile ne doit jamais corrompre l'état in-memory.
+function mergeSafe(saved: unknown): AppConfig {
+  const s =
+    saved && typeof saved === 'object' && !Array.isArray(saved)
+      ? (saved as Record<string, unknown>)
+      : {};
+  const savedModels =
+    s.models && typeof s.models === 'object' && !Array.isArray(s.models)
+      ? (s.models as Partial<AppConfig['models']>)
+      : {};
+  const savedVoices =
+    s.mistralVoices && typeof s.mistralVoices === 'object' && !Array.isArray(s.mistralVoices)
+      ? (s.mistralVoices as Partial<AppConfig['mistralVoices']>)
+      : {};
+  return {
+    ...DEFAULT_CONFIG,
+    ...s,
+    models: { ...DEFAULT_CONFIG.models, ...savedModels },
+    mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...savedVoices },
+  };
+}
+
+// Distingue "read failed" (EACCES/EIO) de "parse failed" (JSON corrompu).
+// Dans les deux cas : retourne DEFAULT in-memory avec `loadFailed=true`, préserve le disque.
+// initConfig gate sur loadFailed pour ne pas overwrite un fichier potentiellement précieux.
+function loadSavedConfig(): { config: AppConfig; loadFailed: boolean } {
+  let raw: string;
   try {
-    const saved = JSON.parse(readFileSync(configPath, 'utf-8'));
-    return {
-      ...DEFAULT_CONFIG,
-      ...saved,
-      models: { ...DEFAULT_CONFIG.models, ...saved.models },
-      mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...saved.mistralVoices },
-    };
+    raw = readFileSync(configPath, 'utf-8');
   } catch (e) {
-    logger.error('config', 'Failed to load config, using defaults:', e);
-    return { ...DEFAULT_CONFIG };
+    logger.error(
+      'config',
+      "Failed to read config.json. config.json préservé sur disque, in-memory DEFAULT actif jusqu'au prochain saveConfig:",
+      e,
+    );
+    return { config: { ...DEFAULT_CONFIG }, loadFailed: true };
+  }
+  try {
+    return { config: mergeSafe(JSON.parse(raw)), loadFailed: false };
+  } catch (e) {
+    logger.error(
+      'config',
+      "Failed to parse config.json (corrompu). config.json préservé sur disque, in-memory DEFAULT actif jusqu'au prochain saveConfig:",
+      e,
+    );
+    return { config: { ...DEFAULT_CONFIG }, loadFailed: true };
   }
 }
 
 // Migration one-time : normalise les `config.json` hérités qui contenaient les champs TTS
 // multi-provider (`ttsProvider`, `voices`, `ttsModel: 'eleven_*'`) vers le schéma Mistral
 // Voxtral actuel. Retirer quand le support multi-provider sera réintroduit.
-function migrateLegacyElevenLabsFields(): boolean {
-  let changed = false;
+// const arrow plutôt que `function` pour contourner le parseur TS de Lizard qui agglomère
+// les `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
+const removeLegacyTtsFields = (): string[] => {
+  const removed: string[] = [];
   const legacy = currentConfig as unknown as Record<string, unknown>;
   for (const key of ['ttsProvider', 'voices']) {
     if (legacy[key] !== undefined) {
-      logger.info('config', `migration: removed legacy field '${key}'`);
       delete legacy[key];
-      changed = true;
+      removed.push(key);
+      logger.info('config', `migration: removed legacy field '${key}'`);
     }
   }
-  if (currentConfig.ttsModel?.startsWith('eleven_')) {
+  return removed;
+};
+
+const resetLegacyTtsModel = (): boolean => {
+  if (!currentConfig.ttsModel?.startsWith('eleven_')) return false;
+  const prev = currentConfig.ttsModel;
+  currentConfig.ttsModel = DEFAULT_CONFIG.ttsModel;
+  logger.info('config', `migration: ttsModel '${prev}' -> '${DEFAULT_CONFIG.ttsModel}'`);
+  return true;
+};
+
+function migrateLegacyElevenLabsFields(): boolean {
+  const removed = removeLegacyTtsFields();
+  const ttsModelReset = resetLegacyTtsModel();
+  const changed = removed.length > 0 || ttsModelReset;
+  if (changed) {
     logger.info(
       'config',
-      `migration: ttsModel '${currentConfig.ttsModel}' -> '${DEFAULT_CONFIG.ttsModel}'`,
+      `migration complete: removed=[${removed.join(',')}], ttsModelReset=${ttsModelReset}`,
     );
-    currentConfig.ttsModel = DEFAULT_CONFIG.ttsModel;
-    changed = true;
   }
   return changed;
 }
 
+/**
+ * First-boot classifier (pas une migration au sens strict).
+ * Classe `mistralVoicesSource` à 'default' ou 'user' selon les IDs de voix présents, si le
+ * champ est absent du config. Aucune réécriture in-place — le champ est ajouté.
+ * Tout config qui match DEFAULT_CONFIG ou LEGACY_DEFAULT_* est 'default', sinon 'user'.
+ * Evite d'étendre LEGACY_DEFAULT_* à chaque release qui change le défaut.
+ * Retourne true quand la classification a été écrite en mémoire, pour que initConfig persiste
+ * le fichier — sinon au prochain boot on reclasserait à chaque fois.
+ */
 function classifyMistralVoicesSource(): boolean {
-  // Migration one-time : classer mistralVoicesSource à partir des IDs existants.
-  // Tout config qui match DEFAULT_CONFIG ou LEGACY_DEFAULT_* est 'default', sinon 'user'.
-  // Evite d'étendre LEGACY_DEFAULT_* à chaque release qui change le défaut.
-  // Retourne true quand la classification a été écrite en mémoire, pour que initConfig
-  // persiste le fichier — sinon au prochain boot on reclasserait à chaque fois.
   if (currentConfig.mistralVoicesSource) return false;
   const isDefault =
     isDefaultHost(currentConfig.mistralVoices.host) &&
@@ -87,11 +143,28 @@ function classifyMistralVoicesSource(): boolean {
 export function initConfig(outputDir: string): void {
   mkdirSync(outputDir, { recursive: true });
   configPath = join(outputDir, 'config.json');
-  currentConfig = existsSync(configPath) ? loadSavedConfig() : { ...DEFAULT_CONFIG };
+  if (!existsSync(configPath)) {
+    currentConfig = { ...DEFAULT_CONFIG };
+  } else {
+    const { config, loadFailed } = loadSavedConfig();
+    currentConfig = config;
+    // Gate critique : si load a échoué (read error ou JSON corrompu), le disque est
+    // potentiellement précieux. Ne PAS écraser avec DEFAULT via classify/migrate/write.
+    // L'utilisateur récupérera quand il éditera via UI (saveConfig écrira un fichier valide).
+    if (loadFailed) return;
+  }
+  // Ordre: classify AVANT migrate. Invariant actuel: aucune migration ne touche
+  // `mistralVoices.host/guest`, donc classify lit un état cohérent. Si une future migration
+  // touche `mistralVoices`, inverser l'ordre (migrate → classify) pour éviter de classer
+  // sur des IDs sur le point d'être migrés.
   const classified = classifyMistralVoicesSource();
   const migrated = migrateLegacyElevenLabsFields();
   if (classified || migrated) {
-    writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+    try {
+      writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+    } catch (e) {
+      logger.error('config', 'migration persist failed (continuing in-memory):', e);
+    }
   }
 }
 
