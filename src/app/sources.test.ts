@@ -525,7 +525,7 @@ describe('createSources', () => {
       await promise;
     });
 
-    // Project switch / session invariants (C5)
+    // Project switch / session invariants
     it('aborts upload when user switches project mid-flight', async () => {
       const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
       let resolveFetch: any;

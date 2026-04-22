@@ -115,7 +115,7 @@ describe('generateAudio', () => {
     expect(textToSpeech).toHaveBeenNthCalledWith(3, 'Line 3', 'host-voice-id', ttsOptions);
   });
 
-  it('retry sur transient empty audioData: 1 fail -> success, 1 seule ligne réussie (review #10)', async () => {
+  it('retry sur transient empty audioData: 1 fail -> success, 1 seule ligne réussie', async () => {
     // Une ligne transient-fail (1re tentative) suivie d'un succès doit donner 2 appels
     // textToSpeech pour cette ligne (mais un seul segment dans l'output final).
     const ttsError = Object.assign(new Error('mistral_tts_empty_response'), { stage: 'tts' });

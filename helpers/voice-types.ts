@@ -3,7 +3,7 @@
 // sans embarquer @mistralai/mistralai.
 
 /**
- * Branded type pour les voice IDs Mistral (review PR #25 #11).
+ * Branded type pour les voice IDs Mistral.
  * Empêche de passer une string arbitraire (ex: texte à synthétiser) là où un
  * voice ID est attendu. Cast requis aux boundaries : API response, config load,
  * user input. Toujours faire `asVoiceId(s)` au lieu de `s as VoiceId` pour

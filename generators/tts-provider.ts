@@ -37,8 +37,7 @@ export async function textToSpeech(
   });
   if (!response.audioData) {
     // `.stage = 'tts'` verrouille le mapping vers `tts_upstream_error` côté
-    // `helpers/error-matchers.ts` sans dépendre d'un match textuel fragile sur le message
-    // (review PR #25 #7).
+    // `helpers/error-matchers.ts` sans dépendre d'un match textuel fragile sur le message.
     const err = new Error(
       `mistral_tts_empty_response (voiceId=${voiceId}, model=${options.model})`,
     ) as Error & { stage: string };

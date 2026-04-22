@@ -71,8 +71,8 @@ describe('initConfig', () => {
     expect(cfg.models.quiz).toBe('mistral-large-latest'); // defaut preserve
   });
 
-  it('fichier JSON invalide: fallback in-memory DEFAULT + disque préservé + log error (C1)', () => {
-    // Régression à prévenir : avant le fix C1, un config.json corrompu déclenchait
+  it('fichier JSON invalide: fallback in-memory DEFAULT + disque préservé + log error', () => {
+    // Régression à prévenir : un config.json corrompu déclenchait auparavant
     // classify/migrate/writeFileSync sur DEFAULT_CONFIG et écrasait silencieusement
     // le fichier user (perte de config invisible). Le loadFailed gate doit préserver
     // le disque intact et émettre un logger.error explicite.
@@ -92,8 +92,8 @@ describe('initConfig', () => {
   });
 
   it('fichier corrompu + saveConfig: .corrupt.bak créé avant overwrite, une seule fois', () => {
-    // Claim review #3 : après loadFailed, la prochaine action UI (saveConfig) doit
-    // backup le fichier corrompu pour éviter la perte silencieuse du contenu user original.
+    // Après loadFailed, la prochaine action UI (saveConfig) doit backup le fichier
+    // corrompu pour éviter la perte silencieuse du contenu user original.
     const corruptContent = '{invalid json but user data inside}';
     const configPath = join(tempDir, 'config.json');
     const backupPath = `${configPath}.corrupt.bak`;
@@ -171,7 +171,7 @@ describe('initConfig', () => {
     expect(getConfig().mistralVoicesSource).toBe('user');
   });
 
-  it('migration partielle: voices seul legacy → removed, ttsModel intouché (S3)', () => {
+  it('migration partielle: voices seul legacy → removed, ttsModel intouché', () => {
     // Cas dégénéré mais possible : un config.json pré-removal avec `voices` legacy
     // mais un ttsModel déjà migré manuellement. La migration ne doit toucher que
     // ce qui a besoin de l'être.
@@ -190,7 +190,7 @@ describe('initConfig', () => {
     expect(onDisk.voices).toBeUndefined();
   });
 
-  it("migration partielle: ttsModel 'eleven_*' seul → reset, pas de ttsProvider/voices touché (S3)", () => {
+  it("migration partielle: ttsModel 'eleven_*' seul → reset, pas de ttsProvider/voices touché", () => {
     writeFileSync(
       join(tempDir, 'config.json'),
       JSON.stringify({
@@ -204,7 +204,7 @@ describe('initConfig', () => {
     expect(cfg.voices).toBeUndefined();
   });
 
-  it('idempotent double-boot: aucune réécriture quand config est déjà migré+classifié (S3)', () => {
+  it('idempotent double-boot: aucune réécriture quand config est déjà migré+classifié', () => {
     // Régression à prévenir : si initConfig réécrit même quand rien n'a changé, on rotate
     // le mtime inutilement et on crée du bruit filesystem (backup systems, docker layers).
     // Pattern B content-check (FS-agnostic, pas dépendant de mtime sur ext3/FAT/tmpfs).
@@ -222,7 +222,7 @@ describe('initConfig', () => {
     expect(content2).toBe(content1);
   });
 
-  it('shape hostile: saved.models = null → fallback DEFAULT sans crash (S2)', () => {
+  it('shape hostile: saved.models = null → fallback DEFAULT sans crash', () => {
     // Protection contre config.json avec types invalides (corruption partielle, édition
     // manuelle erronée, downgrade schéma). Sans mergeSafe, `currentConfig.models.chat`
     // crasherait plus tard à l'appel.
@@ -232,13 +232,13 @@ describe('initConfig', () => {
     expect(getConfig().models.summary).toBe('mistral-large-latest');
   });
 
-  it('shape hostile: saved.models = string → fallback DEFAULT (S2)', () => {
+  it('shape hostile: saved.models = string → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: 'haxor' }));
     initConfig(tempDir);
     expect(getConfig().models.chat).toBe('mistral-large-latest');
   });
 
-  it('shape hostile: saved.models = array → fallback DEFAULT (S2)', () => {
+  it('shape hostile: saved.models = array → fallback DEFAULT', () => {
     // {...[]} produit {}, mais {...['a','b']} produit {0:'a', 1:'b'} qui casse l'accès .chat.
     // La garde !Array.isArray prévient les deux cas.
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: ['a', 'b'] }));
@@ -246,13 +246,13 @@ describe('initConfig', () => {
     expect(getConfig().models.chat).toBe('mistral-large-latest');
   });
 
-  it('shape hostile: saved = array au top-level → fallback DEFAULT (S2)', () => {
+  it('shape hostile: saved = array au top-level → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify([1, 2, 3]));
     initConfig(tempDir);
     expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
   });
 
-  it('shape hostile: saved.mistralVoices = string → fallback DEFAULT (S2)', () => {
+  it('shape hostile: saved.mistralVoices = string → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ mistralVoices: 'haxor' }));
     initConfig(tempDir);
     expect(getConfig().mistralVoices.host).toBeTruthy();
@@ -572,7 +572,7 @@ describe('saveConfig (additional fields)', () => {
     expect(onDisk.mistralVoices.host).toBe('new-host-voice');
   });
 
-  it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante (review #8)", () => {
+  it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante", () => {
     // Une UI pré-PR ou client automatisé peut POSTer encore 'eleven_*' entre 2 restarts.
     // saveConfig doit IGNORER la valeur legacy (pas reset aggressif vers DEFAULT) et preserver
     // le choix utilisateur courant (deja non-legacy apres le boot migration).

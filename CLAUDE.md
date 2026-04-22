@@ -62,9 +62,9 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Règle OBLIGATOIRE** : tout nouvel appel Mistral DOIT passer par `tracked-client` (jamais `new Mistral(...)` direct dans un generator). Sinon le coût échappe au tracking silencieusement — bug observabilité invisible côté UI.
 
 ### Persistance config.json
-- **Dans `config.ts`**, toute écriture de `config.json` DOIT passer par le helper interne `persistConfig()` (jamais `writeFileSync(configPath, …)` direct). Sinon le backup `.corrupt.bak` n'est pas créé avant overwrite d'un fichier corrompu préservé → perte silencieuse du contenu user original (bug classe C1 review PR #25). Ne s'applique pas aux fichiers ≠ `config.json` (logs, caches, etc.).
+- **Dans `config.ts`**, toute écriture de `config.json` DOIT passer par le helper interne `persistConfig()` (jamais `writeFileSync(configPath, …)` direct). Sinon le backup `.corrupt.bak` n'est pas créé avant overwrite d'un fichier corrompu préservé → perte silencieuse du contenu user original. Ne s'applique pas aux fichiers ≠ `config.json` (logs, caches, etc.).
 - Le flag module `lastLoadFailed` tracke l'état. Reset à `false` après le premier backup (un seul `.corrupt.bak` par cycle corrompu → restore).
-- **Rejection legacy à saveConfig** : tout préfixe de champ migré one-time (actuellement `ttsModel: 'eleven_*'`) doit être rejeté côté `saveConfig` aussi, pas seulement dans `migrateLegacyElevenLabsFields`. Sinon une UI pré-PR ou client automatisé peut POSTer la valeur legacy entre 2 restart → fenêtre d'incohérence opaque (fix review PR #25 #8). Pattern : `logger.warn` + garder la valeur courante (déjà non-legacy après boot), jamais reset vers DEFAULT.
+- **Rejection legacy à saveConfig** : tout préfixe de champ migré one-time (actuellement `ttsModel: 'eleven_*'`) doit être rejeté côté `saveConfig` aussi, pas seulement dans `migrateLegacyElevenLabsFields`. Sinon une UI pré-PR ou client automatisé peut POSTer la valeur legacy entre 2 restart → fenêtre d'incohérence opaque. Pattern : `logger.warn` + garder la valeur courante (déjà non-legacy après boot), jamais reset vers DEFAULT.
 
 ### OCR confidence scores
 - **Type** : `OcrConfidence = { average: number }` dans `types.ts` — stocké en `Source.ocrConfidence?` pour les sources PDF/image.

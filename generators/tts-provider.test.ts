@@ -24,7 +24,10 @@ describe('textToSpeech', () => {
     vi.mocked(client.audio.speech.complete).mockResolvedValue({
       audioData: Buffer.from('audio-bytes').toString('base64'),
     } as Awaited<ReturnType<typeof client.audio.speech.complete>>);
-    const result = await textToSpeech('bonjour', asVoiceId('voice-1'), { ...ttsOptions, mistralClient: client });
+    const result = await textToSpeech('bonjour', asVoiceId('voice-1'), {
+      ...ttsOptions,
+      mistralClient: client,
+    });
     expect(result.toString()).toBe('audio-bytes');
     expect(client.audio.speech.complete).toHaveBeenCalledWith({
       input: 'bonjour',
@@ -34,17 +37,21 @@ describe('textToSpeech', () => {
     });
   });
 
-  it('throw descriptif si audioData absent (I2 guard — évite Buffer.from(undefined) opaque)', async () => {
+  it('throw descriptif si audioData absent (évite Buffer.from(undefined) opaque)', async () => {
     const client = makeMistralClient();
     vi.mocked(client.audio.speech.complete).mockResolvedValue(
       {} as Awaited<ReturnType<typeof client.audio.speech.complete>>,
     );
     await expect(
-      textToSpeech('bonjour', asVoiceId('voice-xyz'), { ...ttsOptions, mistralClient: client, model: 'voxtral-v1' }),
+      textToSpeech('bonjour', asVoiceId('voice-xyz'), {
+        ...ttsOptions,
+        mistralClient: client,
+        model: 'voxtral-v1',
+      }),
     ).rejects.toThrow('mistral_tts_empty_response (voiceId=voice-xyz, model=voxtral-v1)');
   });
 
-  it("attache .stage='tts' sur l'Error (contrat producteur pour matcher stable, review #7)", async () => {
+  it("attache .stage='tts' sur l'Error (contrat producteur pour matcher stable)", async () => {
     // Le classifier helpers/error-matchers.ts:41 consomme ctx.stage === 'tts' pour mapper
     // vers 'tts_upstream_error'. Ce test verrouille le contrat producteur : l'Error doit
     // porter .stage avant d'être remontée via les routes podcast/quiz-vocal.
@@ -80,7 +87,7 @@ describe('listVoices', () => {
     expect(client.audio.voices.list).toHaveBeenCalledWith({ limit: 100, offset: 0 });
   });
 
-  it('multi-page: paginate jusqu\'à total atteint (offset incrémente)', async () => {
+  it("multi-page: paginate jusqu'à total atteint (offset incrémente)", async () => {
     const client = makeMistralClient();
     const page1 = Array.from({ length: 100 }, (_, i) => voice(`v${i}`, ['fr_fr']));
     const page2 = Array.from({ length: 50 }, (_, i) => voice(`v${100 + i}`, ['en_us']));

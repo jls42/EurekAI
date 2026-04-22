@@ -108,7 +108,7 @@ function loadSavedConfig(): { config: AppConfig; loadFailed: boolean } {
 
 // Migration one-time : normalise les `config.json` hérités qui contenaient les champs TTS
 // multi-provider (`ttsProvider`, `voices`, `ttsModel: 'eleven_*'`) vers le schéma Mistral
-// Voxtral actuel. Retirer quand le support multi-provider sera réintroduit.
+// Voxtral actuel.
 // const arrow plutôt que `function` pour contourner le parseur TS de Lizard qui agglomère
 // les `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const removeLegacyTtsFields = (): string[] => {
