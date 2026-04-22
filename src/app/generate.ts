@@ -15,10 +15,15 @@ type GenerationUI = Generation & {
   [key: string]: unknown;
 };
 
+type FailedSection = {
+  section: string;
+  code: string;
+};
+
 type VoiceResult = {
   audioUrl?: string;
   audioUrls?: Record<string, string>;
-  failedSections?: string[];
+  failedSections?: FailedSection[];
   costDelta?: number;
 };
 
@@ -258,6 +263,20 @@ export function handleGenerateError(state: AppContext, type: string, e: unknown)
   state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type));
 }
 
+// Toast dispatché par code pour les partial-fails (action user vs warning vs partial générique),
+// sinon success final. Pas de double toast (warning + success) sur partial — ambigu pour l'user.
+const showVoiceToast = (state: AppContext, failed?: FailedSection[]): void => {
+  if (!failed?.length) {
+    state.showToast(state.t('toast.audioDone'), 'success');
+    return;
+  }
+  const codes = new Set(failed.map((f) => f.code));
+  if (codes.has('auth_required')) state.showToast(state.t('toast.audioAuthRequired'), 'error');
+  else if (codes.has('quota_exceeded'))
+    state.showToast(state.t('toast.audioQuotaExceeded'), 'warning');
+  else state.showToast(state.t('toast.audioPartial'), 'warning');
+};
+
 export function applyVoiceResult(
   state: AppContext,
   gen: GenerationUI,
@@ -272,16 +291,13 @@ export function applyVoiceResult(
     }
     gen._activeAudioSection = sectionOrder.find((s: string) => audioUrls[s]) || 'intro';
     gen._playlistMode = true;
-    if (result.failedSections?.length) {
-      state.showToast(state.t('toast.audioPartial'), 'warning');
-    }
   } else {
     gen[`_audioUrl_${section || 'all'}`] = result.audioUrl;
     gen._activeAudioSection = section || 'intro';
     gen._playlistMode = false;
   }
   if (result.costDelta) addCostDelta(state, result.costDelta, 'read-aloud');
-  state.showToast(state.t('toast.audioDone'), 'success');
+  showVoiceToast(state, result.failedSections);
   state.$nextTick(() => {
     const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
     if (audioEl) {

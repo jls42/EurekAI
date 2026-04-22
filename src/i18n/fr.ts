@@ -397,6 +397,8 @@ export const fr: Record<string, string> = {
   'toast.autoError': 'La génération automatique a échoué. Réessaye.',
   'toast.audioDone': 'Audio généré !',
   'toast.audioPartial': 'Audio partiel : certaines sections ont échoué',
+  'toast.audioAuthRequired': 'Clé API Mistral invalide ou manquante',
+  'toast.audioQuotaExceeded': 'Quota TTS atteint, réessayez plus tard',
   'toast.audioError': 'Erreur génération audio',
   'toast.genDeleted': 'Génération supprimée',
   'toast.settingsSaved': 'Paramètres sauvegardés',

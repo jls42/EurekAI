@@ -370,6 +370,8 @@ export const nl: Record<string, string> = {
   'toast.autoError': 'Automatische generatie mislukt. Probeer het opnieuw.',
   'toast.audioDone': 'Audio gegenereerd!',
   'toast.audioPartial': 'Gedeeltelijke audio: sommige secties mislukt',
+  'toast.audioAuthRequired': 'Ongeldige of ontbrekende Mistral API-sleutel',
+  'toast.audioQuotaExceeded': 'TTS-quotum bereikt, probeer het later opnieuw',
   'toast.audioError': 'Fout bij het genereren van audio',
   'toast.genDeleted': 'Generatie verwijderd',
   'toast.settingsSaved': 'Instellingen opgeslagen',

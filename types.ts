@@ -204,6 +204,16 @@ export interface FailedStep {
   code: FailedStepCode;
 }
 
+// Section read-aloud (intro/key_points/fun_fact/vocabulary) qui a échoué pendant un batch.
+// Étend la sémantique de FailedStep à la surface partial-success HTTP 200 — l'UI peut
+// dispatcher un toast actionnable selon le code (auth_required → settings, quota_exceeded
+// → message attente, sinon partial générique). Cohérence interne avec extractErrorCode
+// utilisé déjà dans le catch global de /read-aloud.
+export interface FailedSection {
+  section: string;
+  code: FailedStepCode;
+}
+
 // --- Quiz adaptive learning ---
 
 export interface QuizAttempt {

@@ -9,6 +9,7 @@ import type {
   SummaryGeneration,
   FillBlankGeneration,
   FillBlankAttempt,
+  FailedSection,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -107,10 +108,10 @@ const generateBatchAudio = async (
   ttsOpts: TtsOptions,
   projectDir: string,
   pid: string,
-): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> => {
+): Promise<{ audioUrls: Record<string, string>; failedSections: FailedSection[] }> => {
   const d = gen.data;
   const audioUrls: Record<string, string> = {};
-  const failedSections: string[] = [];
+  const failedSections: FailedSection[] = [];
   const baseId = gen.id.slice(0, 8);
   for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
@@ -120,7 +121,7 @@ const generateBatchAudio = async (
       audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
     } catch (err) {
       logger.error('tts', `section ${s} failed:`, err);
-      failedSections.push(s);
+      failedSections.push({ section: s, code: extractErrorCode(err, 'tts') });
     }
   }
   return { audioUrls, failedSections };
@@ -128,7 +129,7 @@ const generateBatchAudio = async (
 
 interface BatchSummaryCtx {
   audioUrls: Record<string, string>;
-  failedSections: string[];
+  failedSections: FailedSection[];
   summaryGen: SummaryGeneration;
   store: ProjectStore;
   pid: string;
@@ -146,7 +147,12 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     } as Partial<SummaryGeneration>);
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
-    res.status(500).json({ error: 'TTS failed for all sections' });
+    // All-fail: use the last captured error as the terminal batch failure code.
+    // If codes diverge across sections (rare in practice since the pipeline is
+    // sequential and a single upstream failure usually propagates), the last is
+    // chosen as a convention, not a claim of superior representativeness.
+    const lastCode = failedSections[failedSections.length - 1].code;
+    res.status(500).json({ error: lastCode });
     return;
   }
   res.json({
