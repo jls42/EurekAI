@@ -12,7 +12,7 @@ const config = createConfig();
 
 function makeContext(overrides: any = {}) {
   return {
-    apiStatus: { mistral: false, ttsAvailable: false },
+    apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false },
     allModerationCategories: [] as string[],
     moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as any[],
@@ -93,7 +93,7 @@ describe('loadConfig', () => {
     vi.mocked(globalThis.fetch).mockRejectedValue(new Error('Network'));
     const ctx = makeContext();
     await config.loadConfig.call(ctx);
-    expect(ctx.apiStatus).toEqual({ mistral: false, ttsAvailable: false });
+    expect(ctx.apiStatus).toEqual({ mistral: false, ttsAvailable: false, voiceCacheReady: false });
   });
 });
 

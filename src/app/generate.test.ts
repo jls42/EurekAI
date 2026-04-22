@@ -52,7 +52,7 @@ function makeContext(overrides: any = {}) {
     moderationBlockedMessage: gen.moderationBlockedMessage,
     flaggedCategoryLabels: vi.fn(() => ''),
     configDraft: { models: { summary: 'mistral-large-latest' } },
-    apiStatus: { mistral: true, ttsAvailable: true },
+    apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true },
     generate: gen.generate,
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,

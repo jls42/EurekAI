@@ -275,11 +275,16 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   return currentConfig;
 }
 
-export function getApiStatus(): { mistral: boolean; ttsAvailable: boolean } {
+export function getApiStatus(): {
+  mistral: boolean;
+  ttsAvailable: boolean;
+  voiceCacheReady: boolean;
+} {
   const hasMistral = !!process.env.MISTRAL_API_KEY;
   return {
     mistral: hasMistral,
     ttsAvailable: hasMistral,
+    voiceCacheReady,
   };
 }
 
@@ -297,9 +302,14 @@ export function getModelLimits(): Record<string, number> {
 // --- Voice cache & language defaults ---
 
 let voiceCache: MistralVoice[] = [];
+// Signal observabilité : true uniquement après warmup réussi (listVoices au boot).
+// Reste false si le warmup throw (clé invalide, network timeout, etc.) — les routes
+// peuvent griser les sélecteurs de voix et les users non-FR sont alertés du fallback.
+let voiceCacheReady = false;
 
 export function setVoiceCache(voices: MistralVoice[]): void {
   voiceCache = voices;
+  voiceCacheReady = voices.length > 0;
 }
 
 // IDs de voix Mistral qui ont été les defaults avant des releases précédentes.

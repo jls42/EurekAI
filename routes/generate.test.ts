@@ -114,7 +114,7 @@ vi.mock('../config.js', () => ({
   getModelLimits: vi.fn(() => ({})),
   // Défaut true : les tests existants supposent TTS disponible. Les tests qui veulent
   // vérifier le filtrage audio (cf. describe "TTS unavailable") overrident via mockReturnValueOnce.
-  getApiStatus: vi.fn(() => ({ mistral: true, ttsAvailable: true })),
+  getApiStatus: vi.fn(() => ({ mistral: true, ttsAvailable: true, voiceCacheReady: true })),
 }));
 
 // --- Helpers ---
@@ -1296,6 +1296,7 @@ describe('generateRoutes', () => {
       (getApiStatus as any).mockReturnValueOnce({
         mistral: false,
         ttsAvailable: false,
+        voiceCacheReady: false,
       });
       (routeRequest as any).mockResolvedValueOnce({
         plan: [

@@ -21,8 +21,12 @@ interface VoicesEnrichedEntry {
  * @invariant ttsAvailable === mistral — Mistral Voxtral est l'unique provider TTS.
  * Verrouillage runtime : `config.test.ts` "invariant: ttsAvailable === mistral".
  * Si un futur provider TTS non-Mistral est réintroduit, remplacer par `ttsAvailable = mistral || <autre>`.
+ *
+ * voiceCacheReady : true uniquement après warmup réussi de listVoices au boot serveur.
+ * Si false, la sélection dynamique par langue retombe sur DEFAULT_CONFIG (voix FR) — UI
+ * peut griser les sélecteurs de voix ou afficher un badge "voice catalog loading".
  */
-type ApiStatus = { mistral: boolean; ttsAvailable: boolean };
+type ApiStatus = { mistral: boolean; ttsAvailable: boolean; voiceCacheReady: boolean };
 
 type ModerationCategoriesPayload = {
   all?: string[];

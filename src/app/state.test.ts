@@ -110,7 +110,11 @@ describe('createState', () => {
   it('initializes settings state', () => {
     const state = createState();
     expect(state.showSettings).toBe(false);
-    expect(state.apiStatus).toEqual({ mistral: false, ttsAvailable: false });
+    expect(state.apiStatus).toEqual({
+      mistral: false,
+      ttsAvailable: false,
+      voiceCacheReady: false,
+    });
     expect(state.mistralVoicesList).toEqual([]);
   });
 
