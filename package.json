@@ -1,6 +1,6 @@
 {
   "name": "eurekai",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n srv,web -c blue,green \"tsx watch server.ts\" \"vite\"",
