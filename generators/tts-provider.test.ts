@@ -42,6 +42,24 @@ describe('textToSpeech', () => {
       textToSpeech('bonjour', 'voice-xyz', { ...ttsOptions, mistralClient: client, model: 'voxtral-v1' }),
     ).rejects.toThrow('mistral_tts_empty_response (voiceId=voice-xyz, model=voxtral-v1)');
   });
+
+  it("attache .stage='tts' sur l'Error (contrat producteur pour matcher stable, review #7)", async () => {
+    // Le classifier helpers/error-matchers.ts:41 consomme ctx.stage === 'tts' pour mapper
+    // vers 'tts_upstream_error'. Ce test verrouille le contrat producteur : l'Error doit
+    // porter .stage avant d'être remontée via les routes podcast/quiz-vocal.
+    const client = makeMistralClient();
+    vi.mocked(client.audio.speech.complete).mockResolvedValue(
+      {} as Awaited<ReturnType<typeof client.audio.speech.complete>>,
+    );
+    let caught: (Error & { stage?: unknown }) | undefined;
+    try {
+      await textToSpeech('x', 'v', { ...ttsOptions, mistralClient: client });
+    } catch (e) {
+      caught = e as Error & { stage?: unknown };
+    }
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught?.stage).toBe('tts');
+  });
 });
 
 describe('listVoices', () => {

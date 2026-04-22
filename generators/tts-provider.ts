@@ -35,7 +35,14 @@ export async function textToSpeech(
     responseFormat: 'mp3',
   });
   if (!response.audioData) {
-    throw new Error(`mistral_tts_empty_response (voiceId=${voiceId}, model=${options.model})`);
+    // `.stage = 'tts'` verrouille le mapping vers `tts_upstream_error` côté
+    // `helpers/error-matchers.ts` sans dépendre d'un match textuel fragile sur le message
+    // (review PR #25 #7).
+    const err = new Error(
+      `mistral_tts_empty_response (voiceId=${voiceId}, model=${options.model})`,
+    ) as Error & { stage: string };
+    err.stage = 'tts';
+    throw err;
   }
   return Buffer.from(response.audioData, 'base64');
 }
