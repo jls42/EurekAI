@@ -8,9 +8,9 @@ import { ttsQuestion, transcribeAudio, verifyAnswer } from './quiz-vocal.js';
 import { textToSpeech } from './tts-provider.js';
 import type { TtsOptions } from './tts-provider.js';
 import type { QuizQuestion } from '../types.js';
+import { asVoiceId } from '../helpers/voice-types.js';
 
 const ttsOptions: TtsOptions = {
-  provider: 'mistral',
   model: 'voxtral-mini-tts-2603',
   mistralClient: {} as any,
 };
@@ -25,7 +25,7 @@ describe('quiz-vocal', () => {
         explanation: 'Paris est la capitale.',
       };
 
-      const result = await ttsQuestion(question, 'voice-1', ttsOptions);
+      const result = await ttsQuestion(question, asVoiceId('voice-1'), ttsOptions);
 
       expect(textToSpeech).toHaveBeenCalledWith(
         'Quelle est la capitale de la France ? Paris. Lyon. Marseille. Toulouse',
@@ -44,7 +44,7 @@ describe('quiz-vocal', () => {
         correct: 0,
         explanation: '',
       };
-      await ttsQuestion(question, 'v', ttsOptions, 'fr');
+      await ttsQuestion(question, asVoiceId('v'), ttsOptions, 'fr');
       expect(textToSpeech).toHaveBeenCalledWith(
         'Capitale ? choix A : Paris. choix B : Lyon',
         'v',
@@ -60,7 +60,7 @@ describe('quiz-vocal', () => {
         correct: 0,
         explanation: '',
       };
-      await ttsQuestion(question, 'v', ttsOptions, 'en');
+      await ttsQuestion(question, asVoiceId('v'), ttsOptions, 'en');
       expect(textToSpeech).toHaveBeenCalledWith(
         'Capital? choice A : Paris. choice B : London',
         'v',
@@ -76,7 +76,7 @@ describe('quiz-vocal', () => {
         correct: 0,
         explanation: '',
       };
-      await ttsQuestion(question, 'v', ttsOptions, 'es');
+      await ttsQuestion(question, asVoiceId('v'), ttsOptions, 'es');
       expect(textToSpeech).toHaveBeenCalledWith(
         '¿Capital? opción A : Madrid. opción B : Barcelona',
         'v',

@@ -39,12 +39,7 @@ const MOCK_CONFIG = {
     quizVerify: 'm',
     chat: 'm',
   },
-  voices: {
-    host: { id: 'h', name: 'H' },
-    guest: { id: 'g', name: 'G' },
-  },
   ttsModel: 'voxtral-mini-tts-2603',
-  ttsProvider: 'mistral' as const,
   mistralVoices: { host: 'mh', guest: 'mg' },
 };
 
@@ -844,7 +839,6 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
       expect.any(String),
       'mh', // resolveVoices returns { host: 'mh', guest: 'mg' }
       {
-        provider: 'mistral',
         model: 'voxtral-mini-tts-2603',
         mistralClient: client,
       },
@@ -914,8 +908,45 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(result.failedSections.length).toBeGreaterThan(0);
     // At least some sections should have succeeded
     expect(Object.keys(result.audioUrls).length).toBeGreaterThan(0);
+    // Contrat enrichi : chaque entrée est {section, code} avec un FailedStepCode stable.
+    // Sans ça, l'UI ne peut pas dispatcher des toasts actionnables (auth_required, etc.).
+    for (const fs of result.failedSections) {
+      expect(typeof fs.section).toBe('string');
+      expect(typeof fs.code).toBe('string');
+      expect(fs.code.length).toBeGreaterThan(0);
+    }
 
     // Restore default mock
+    (textToSpeech as any).mockResolvedValue(Buffer.from('fake-audio'));
+  });
+
+  it('partial-fail : code auth_required propagé via extractErrorCode', async () => {
+    // Vérifie que le code stable du failedSections permet à l'UI de dispatcher un toast
+    // actionnable (action requise vs simple warning). Cas auth_required = clé invalide
+    // sur une section, autres OK.
+    const { textToSpeech } = await import('../generators/tts-provider.js');
+    (textToSpeech as any).mockClear();
+    let callCount = 0;
+    (textToSpeech as any).mockImplementation(() => {
+      callCount++;
+      if (callCount === 2) {
+        const err: any = new Error('Unauthorized');
+        err.status = 401;
+        throw err;
+      }
+      return Buffer.from('fake-audio');
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+    const req = mockReq({ params: { pid, gid: summaryGid }, body: {} });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const result = res.json.mock.calls[0][0];
+    expect(result.failedSections).toBeDefined();
+    expect(result.failedSections.some((f: any) => f.code === 'auth_required')).toBe(true);
+
     (textToSpeech as any).mockResolvedValue(Buffer.from('fake-audio'));
   });
 
@@ -924,7 +955,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     // Cas trigger : resolveVoices jette — chemin atteint avant la boucle section.
     const { resolveVoices } = await import('../config.js');
     (resolveVoices as any).mockImplementationOnce(() => {
-      throw new Error('ELEVENLABS_API_KEY non defini — https://api.internal/key');
+      throw new Error('MISTRAL_API_KEY non defini — https://api.internal/key');
     });
 
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
@@ -955,7 +986,9 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json.mock.calls[0][0].error).toBe('TTS failed for all sections');
+    // All-fail : on retourne le FailedStepCode du dernier échec (terminal batch failure code),
+    // pas un message libre. Cohérence avec le catch global qui utilise déjà extractErrorCode.
+    expect(res.json.mock.calls[0][0].error).toBe('tts_upstream_error');
 
     // Restore default mock
     (textToSpeech as any).mockResolvedValue(Buffer.from('fake-audio'));

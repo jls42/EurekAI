@@ -32,13 +32,6 @@
           ></span>
           Mistral
         </span>
-        <span class="flex items-center gap-1.5 text-body-sm">
-          <span
-            class="w-3 h-3 rounded-full"
-            :class="apiStatus.elevenlabs ? 'bg-success' : 'bg-danger'"
-          ></span>
-          ElevenLabs
-        </span>
       </div>
     </div>
     <div>
@@ -47,7 +40,7 @@
         class="font-heading font-semibold text-sm text-text-secondary mb-2"
         x-text="t('settings.aiModels')"
       >
-        AI Models
+        AI Engines
       </h3>
       <div class="space-y-3">
         <div>
@@ -55,7 +48,7 @@
             for="cfg-main-model"
             class="text-sm text-text-secondary block mb-1"
             x-text="t('settings.aiModel')"
-            >AI Model</label
+            >Generation</label
           >
           <select
             id="cfg-main-model"
@@ -71,12 +64,20 @@
           </select>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.aiModelHint')"></p>
         </div>
-        <div class="flex items-center gap-2 text-body-sm text-text-secondary">
-          <span x-text="t('settings.ocr') + ' :'"></span>
+        <div class="flex min-w-0 items-center gap-2 text-body-sm text-text-secondary">
+          <span class="shrink-0 whitespace-nowrap" x-text="t('settings.ocr') + ' :'"></span>
           <span
-            class="font-mono text-xs px-2 py-0.5 rounded-button"
+            class="min-w-0 truncate font-mono text-xs px-2 py-0.5 rounded-button"
             style="background: var(--color-input-bg); border: 1px solid var(--color-input-border)"
             >mistral-ocr-latest</span
+          >
+        </div>
+        <div class="flex min-w-0 items-center gap-2 text-body-sm text-text-secondary">
+          <span class="shrink-0 whitespace-nowrap" x-text="t('settings.tts') + ' :'"></span>
+          <span
+            class="min-w-0 truncate font-mono text-xs px-2 py-0.5 rounded-button"
+            style="background: var(--color-input-bg); border: 1px solid var(--color-input-border)"
+            >voxtral-mini-tts-latest</span
           >
         </div>
       </div>
@@ -87,95 +88,16 @@
         class="font-heading font-semibold text-sm text-text-secondary mb-2"
         x-text="t('settings.voiceTts')"
       >
-        Voice &amp; TTS
+        Voices
       </h3>
       <div class="space-y-3">
-        <div>
-          <label
-            for="cfg-tts-provider"
-            class="text-sm text-text-secondary block mb-1"
-            x-text="t('settings.ttsProvider')"
-            >TTS Provider</label
-          >
-          <select
-            id="cfg-tts-provider"
-            x-model="configDraft.ttsProvider"
-            class="w-full input-modern px-3 py-2 text-body-sm"
-          >
-            <option value="elevenlabs">ElevenLabs</option>
-            <option
-              value="mistral"
-              x-text="'Mistral (Voxtral) — ' + t('settings.recommended')"
-            ></option>
-          </select>
-        </div>
-        <div>
-          <label
-            for="cfg-tts-model"
-            class="text-sm text-text-secondary block mb-1"
-            x-text="t('settings.ttsModel')"
-            >TTS Model</label
-          >
-          <!-- ElevenLabs models -->
-          <select
-            x-show="configDraft.ttsProvider === 'elevenlabs'"
-            x-model="configDraft.ttsModel"
-            class="w-full input-modern px-3 py-2 text-body-sm"
-          >
-            <option value="eleven_v3">eleven_v3</option>
-            <option value="eleven_flash_v2_5">eleven_flash_v2_5</option>
-            <option value="eleven_multilingual_v2">eleven_multilingual_v2</option>
-          </select>
-          <!-- Mistral models -->
-          <select
-            x-show="configDraft.ttsProvider === 'mistral'"
-            x-model="configDraft.ttsModel"
-            class="w-full input-modern px-3 py-2 text-body-sm"
-          >
-            <option
-              value="voxtral-mini-tts-latest"
-              x-text="'voxtral-mini-tts-latest — ' + t('settings.recommended')"
-            ></option>
-          </select>
-          <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ttsModelHint')"></p>
-        </div>
-        <!-- ElevenLabs voice IDs -->
-        <div x-show="configDraft.ttsProvider === 'elevenlabs'" class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              for="cfg-voice-host"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceHost') + ' ID'"
-              >Voice Host ID</label
-            >
-            <input
-              id="cfg-voice-host"
-              x-model="configDraft.voices.host.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
-          </div>
-          <div>
-            <label
-              for="cfg-voice-guest"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceGuest') + ' ID'"
-              >Voice Guest ID</label
-            >
-            <input
-              id="cfg-voice-guest"
-              x-model="configDraft.voices.guest.id"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            />
-          </div>
-        </div>
-        <!-- Mistral voice selectors (dynamic from API) -->
-        <div x-show="configDraft.ttsProvider === 'mistral'" class="grid grid-cols-2 gap-3">
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label
               for="cfg-mistral-voice-host"
               class="text-sm text-text-secondary block mb-1"
               x-text="t('settings.voiceHost')"
-              >Voice Host</label
+              >Main</label
             >
             <select
               id="cfg-mistral-voice-host"
@@ -196,7 +118,7 @@
               for="cfg-mistral-voice-guest"
               class="text-sm text-text-secondary block mb-1"
               x-text="t('settings.voiceGuest')"
-              >Voice Guest</label
+              >Secondary</label
             >
             <select
               id="cfg-mistral-voice-guest"

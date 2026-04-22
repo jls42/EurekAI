@@ -1,4 +1,5 @@
 import type { GenerationUsage } from './helpers/pricing.js';
+import type { VoiceId } from './helpers/voice-types.js';
 
 // --- Profiles ---
 
@@ -15,7 +16,7 @@ export interface Profile {
   moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
-  mistralVoices?: { host: string; guest: string };
+  mistralVoices?: { host: VoiceId; guest: VoiceId };
   theme?: 'dark' | 'light';
   pinHash?: string;
   hasPin?: boolean;
@@ -203,6 +204,16 @@ export interface FailedStep {
   code: FailedStepCode;
 }
 
+// Section read-aloud (intro/key_points/fun_fact/vocabulary) qui a échoué pendant un batch.
+// Étend la sémantique de FailedStep à la surface partial-success HTTP 200 — l'UI peut
+// dispatcher un toast actionnable selon le code (auth_required → settings, quota_exceeded
+// → message attente, sinon partial générique). Cohérence interne avec extractErrorCode
+// utilisé déjà dans le catch global de /read-aloud.
+export interface FailedSection {
+  section: string;
+  code: FailedStepCode;
+}
+
 // --- Quiz adaptive learning ---
 
 export interface QuizAttempt {
@@ -272,8 +283,6 @@ export interface ChatHistory {
 
 // --- App config ---
 
-export type TtsProvider = 'elevenlabs' | 'mistral';
-
 export interface AppConfig {
   models: {
     summary: string;
@@ -285,15 +294,10 @@ export interface AppConfig {
     quizVerify: string;
     chat: string;
   };
-  voices: {
-    host: { id: string; name: string };
-    guest: { id: string; name: string };
-  };
   ttsModel: string;
-  ttsProvider: TtsProvider;
   mistralVoices: {
-    host: string;
-    guest: string;
+    host: VoiceId;
+    guest: VoiceId;
   };
   // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
   // 'user'    : l'utilisateur a explicitement configuré les voix via settings.

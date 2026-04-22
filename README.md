@@ -67,7 +67,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 7 types disponibles |
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
-| 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS ou ElevenLabs |
+| 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS |
 | 💶 | **Suivi des coûts API** | Estimation transparente du coût € de chaque génération et source (tokens / caractères / pages / secondes audio). Badge par carte + total par projet, visible dans le dashboard |
 | 🎨 | **Thème par profil** | Chaque profil choisit son thème `dark` ou `light` — persiste au changement de profil |
 
@@ -168,9 +168,7 @@ Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté
 
 ### TTS multi-provider & voix personnalisées
 
-- **Mistral Voxtral TTS** (défaut) : `voxtral-mini-tts-latest`, pas de clé supplémentaire nécessaire
-- **ElevenLabs** (alternatif) : `eleven_v3`, voix naturelles, nécessite `ELEVENLABS_API_KEY`
-- Provider configurable dans les paramètres de l'application
+- **Mistral Voxtral TTS** : `voxtral-mini-tts-latest`, synthèse vocale 100% Mistral, pas de clé supplémentaire nécessaire
 - **Voix personnalisées** : les parents peuvent créer leurs propres voix via l'API Mistral Voices (à partir d'un échantillon audio) et les assigner aux rôles hôte/invité — les podcasts et quiz vocaux sont alors lus avec la voix d'un parent, rendant l'expérience encore plus immersive pour l'enfant
 - Deux rôles vocaux configurables : **hôte** (narrateur principal) et **invité** (deuxième voix du podcast)
 - Catalogue complet des voix Mistral disponible dans les paramètres, filtrable par langue
@@ -193,8 +191,7 @@ Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Interface réactive, TypeScript compilé par Vite |
 | **Templating** | vite-plugin-handlebars | Composition HTML par partials |
 | **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Modération |
-| **TTS (défaut)** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, synthèse vocale intégrée |
-| **TTS (alternatif)** | ElevenLabs SDK 2.x | `eleven_v3`, voix naturelles |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, synthèse vocale intégrée |
 | **Icônes** | Lucide 1.x | Bibliothèque d'icônes SVG |
 | **Scraping web** | Readability + linkedom | Extraction du contenu principal des pages web (techno Firefox Reader View) |
 | **Headless browser** | Lightpanda | Navigateur headless ultra-léger (Zig + V8) pour les pages JS/SPA — fallback scraping |
@@ -216,7 +213,6 @@ Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté
 | `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
 | `mistral-moderation-latest` | Modération de contenu | 5 catégories bloquées pour enfant/ado (+ jailbreaking) |
 | `mistral-small-latest` | Routeur automatique | Analyse rapide du contenu pour décisions de routage |
-| `eleven_v3` (ElevenLabs) | Synthèse vocale (TTS alternatif) | Voix naturelles, alternative configurable |
 
 ---
 
@@ -234,7 +230,6 @@ npm install
 cp .env.example .env
 # Éditez .env avec vos clés :
 #   MISTRAL_API_KEY=<your_api_key>           (requis)
-#   ELEVENLABS_API_KEY=<your_api_key>        (optionnel, TTS alternatif)
 #   SONAR_TOKEN=...                          (optionnel, CI SonarCloud uniquement)
 
 # Lancer le développement
@@ -243,14 +238,13 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **Note** : Mistral Voxtral TTS est le provider par défaut — aucune clé supplémentaire nécessaire au-delà de `MISTRAL_API_KEY`. ElevenLabs est un provider TTS alternatif configurable dans les paramètres.
+> **Note** : Mistral Voxtral TTS est le seul provider TTS — aucune clé supplémentaire nécessaire au-delà de `MISTRAL_API_KEY`.
 
 ### Variables d'environnement
 
 | Variable | Requis | Défaut | Rôle |
 |---|---|---|---|
 | `MISTRAL_API_KEY` | ✅ | — | Clé API Mistral (chat, OCR, STT, TTS Voxtral, agents, modération) |
-| `ELEVENLABS_API_KEY` | ⚠ optionnel | — | Clé ElevenLabs ; requise uniquement si TTS provider = ElevenLabs |
 | `PORT` | optionnel | `3000` | Port HTTP du backend Express |
 | `NODE_ENV` | optionnel | `development` | Si `production` → Express sert le frontend depuis `dist/` (sinon `public/`) |
 | `SONAR_TOKEN` | optionnel CI | — | Utilisé uniquement par le workflow GitHub Actions SonarCloud |
@@ -294,7 +288,6 @@ podman pull ghcr.io/jls42/eurekai:latest
 mkdir -p ./data
 podman run -d --name eurekai \
   -e MISTRAL_API_KEY=<your_api_key> \
-  -e ELEVENLABS_API_KEY=<your_api_key> \
   -v ./data:/app/output:U \
   -p 3000:3000 \
   ghcr.io/jls42/eurekai:latest
@@ -302,7 +295,6 @@ podman run -d --name eurekai \
 ```
 
 > **`:U`** est un flag Podman rootless qui ajuste automatiquement les permissions du volume.
-> **`ELEVENLABS_API_KEY`** est optionnel (TTS alternatif).
 
 ```bash
 # Build local
@@ -337,7 +329,7 @@ generators/
   chat.ts                 — Tuteur IA par chat avec appel d'outils
   router.ts               — Routeur automatique (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
-  tts-provider.ts         — Dispatch TTS multi-provider (Mistral Voxtral / ElevenLabs)
+  tts-provider.ts         — TTS Mistral Voxtral (synthèse vocale + listing des voix)
   tts.ts                  — Génération audio multi-voix (podcast + flashcards, concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search (fallback)
@@ -431,8 +423,8 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | Méthode | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/config` | Configuration courante |
-| `PUT` | `/api/config` | Modifier la config (modèles, voix, TTS provider) |
-| `GET` | `/api/config/status` | Statut des APIs : `mistral` (clé Mistral définie), `elevenlabs` (clé ElevenLabs définie), `ttsAvailable` (true si la clé du provider TTS configuré est présente) |
+| `PUT` | `/api/config` | Modifier la config (modèles, voix, modèle TTS) |
+| `GET` | `/api/config/status` | Statut des APIs : `mistral` (clé Mistral définie), `ttsAvailable` (alias de `mistral`, Mistral Voxtral est le seul provider TTS) |
 | `POST` | `/api/config/reset` | Réinitialiser la config par défaut |
 | `GET` | `/api/config/voices` | Lister les voix Mistral TTS (optionnel `?lang=fr`) |
 | `GET` | `/api/moderation-categories` | Catégories de modération disponibles + défauts par âge |
@@ -512,14 +504,13 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 | **Prompts adaptés par âge** | 4 groupes d'âge avec vocabulaire, complexité et ton différents — le même contenu enseigne différemment selon l'apprenant. |
 | **Fonctionnalités basées sur les Agents** | La génération d'images et la recherche web utilisent des Agents Mistral temporaires — cycle de vie propre avec nettoyage automatique. |
 | **Scraping intelligent d'URL** | Un champ unique accepte URLs et mots-clés mélangés — les URLs sont scrapées via Readability (pages statiques) avec fallback Lightpanda (pages JS/SPA), les mots-clés déclenchent un Agent Mistral web_search. Chaque résultat crée une source indépendante. |
-| **TTS multi-provider** | Mistral Voxtral TTS par défaut (pas de clé supplémentaire), ElevenLabs en alternatif — configurable sans redémarrage. |
+| **TTS 100% Mistral** | Mistral Voxtral TTS (pas de clé supplémentaire au-delà de `MISTRAL_API_KEY`) — synthèse vocale intégrée à la chaîne de coût et à la résolution voix par langue. |
 
 ---
 
 ## Crédits & remerciements
 
 - **[Mistral AI](https://mistral.ai)** — Modèles IA (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
-- **[ElevenLabs](https://elevenlabs.io)** — Moteur de synthèse vocale alternatif (`eleven_v3`)
 - **[Alpine.js](https://alpinejs.dev)** — Framework réactif léger
 - **[TailwindCSS](https://tailwindcss.com)** — Framework CSS utilitaire
 - **[Vite](https://vitejs.dev)** — Outil de build frontend

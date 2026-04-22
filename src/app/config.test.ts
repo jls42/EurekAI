@@ -12,15 +12,13 @@ const config = createConfig();
 
 function makeContext(overrides: any = {}) {
   return {
-    apiStatus: { mistral: false, elevenlabs: false, ttsAvailable: false },
+    apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false },
     allModerationCategories: [] as string[],
     moderationDefaults: {} as Record<string, string[]>,
     mistralVoicesList: [] as any[],
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
-      voices: { host: { id: '', name: '' }, guest: { id: '', name: '' } },
       ttsModel: 'voxtral-mini-tts-2603',
-      ttsProvider: 'mistral',
       mistralVoices: { host: 'Oliver', guest: 'Marie' },
       _mainModel: 'mistral-large-latest',
     } as any,
@@ -65,9 +63,8 @@ describe('loadConfig', () => {
     const configData = {
       models: { summary: 'mistral-large-latest', flashcards: 'mistral-large-latest' },
       ttsModel: 'voxtral-mini-tts-2603',
-      ttsProvider: 'mistral',
     };
-    const statusData = { mistral: true, elevenlabs: false, ttsAvailable: true };
+    const statusData = { mistral: true, ttsAvailable: true };
     const voicesData = [{ id: 'v1', name: 'Oliver - Neutral', languages: ['en_US'] }];
 
     const modCatsData = {
@@ -96,7 +93,7 @@ describe('loadConfig', () => {
     vi.mocked(globalThis.fetch).mockRejectedValue(new Error('Network'));
     const ctx = makeContext();
     await config.loadConfig.call(ctx);
-    expect(ctx.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false });
+    expect(ctx.apiStatus).toEqual({ mistral: false, ttsAvailable: false, voiceCacheReady: false });
   });
 });
 
@@ -397,9 +394,8 @@ describe('saveSettings', () => {
         ocr: 'mistral-ocr-latest',
       },
       ttsModel: 'voxtral-mini-tts-2603',
-      ttsProvider: 'mistral',
     };
-    const statusData = { mistral: true, elevenlabs: false, ttsAvailable: true };
+    const statusData = { mistral: true, ttsAvailable: true };
     mockFetchOk(savedConfig); // PUT /api/config
     mockFetchOk(statusData); // GET /api/config/status
 
@@ -418,19 +414,17 @@ describe('saveSettings', () => {
     expect(ctx.apiStatus).toEqual(statusData);
   });
 
-  it('auto-corrects ttsModel: mistral provider with eleven model', async () => {
+  it('auto-corrige ttsModel quand un ID eleven_* legacy est présent', async () => {
     const savedConfig = {
       models: { summary: 'mistral-large-latest' },
       ttsModel: 'voxtral-mini-tts-2603',
-      ttsProvider: 'mistral',
     };
     mockFetchOk(savedConfig);
-    mockFetchOk({ mistral: true, elevenlabs: false, ttsAvailable: true });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
 
     const ctx = makeContext({
       configDraft: {
         ...makeContext().configDraft,
-        ttsProvider: 'mistral',
         ttsModel: 'eleven_v3',
         _mainModel: 'mistral-large-latest',
       },
@@ -440,30 +434,6 @@ describe('saveSettings', () => {
     const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.ttsModel).toBe('voxtral-mini-tts-latest');
-  });
-
-  it('auto-corrects ttsModel: elevenlabs provider with voxtral model', async () => {
-    const savedConfig = {
-      models: { summary: 'mistral-large-latest' },
-      ttsModel: 'eleven_v3',
-      ttsProvider: 'elevenlabs',
-    };
-    mockFetchOk(savedConfig);
-    mockFetchOk({ mistral: true, elevenlabs: true, ttsAvailable: true });
-
-    const ctx = makeContext({
-      configDraft: {
-        ...makeContext().configDraft,
-        ttsProvider: 'elevenlabs',
-        ttsModel: 'voxtral-mini-tts-2603',
-        _mainModel: 'mistral-large-latest',
-      },
-    });
-    await config.saveSettings.call(ctx);
-
-    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
-    const sentBody = JSON.parse(putCall[1].body as string);
-    expect(sentBody.ttsModel).toBe('eleven_v3');
   });
 
   it('shows error toast on save failure', async () => {
@@ -492,7 +462,6 @@ describe('resetSettings', () => {
     const resetData = {
       models: { summary: 'mistral-large-latest' },
       ttsModel: 'voxtral-mini-tts-2603',
-      ttsProvider: 'mistral',
     };
     mockFetchOk(resetData);
     const ctx = makeContext();

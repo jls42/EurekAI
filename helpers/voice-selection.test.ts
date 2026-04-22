@@ -1,10 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import { selectVoices } from './voice-selection.js';
+import { asVoiceId } from './voice-types.js';
 import type { MistralVoice } from './voice-types.js';
 
-function makeVoice(overrides: Partial<MistralVoice> & { id: string }): MistralVoice {
+function makeVoice(overrides: Partial<Omit<MistralVoice, 'id'>> & { id: string }): MistralVoice {
   return {
-    id: overrides.id,
+    // Cast au point d'entrée du helper de test — évite de polluer chaque test avec asVoiceId('…').
+    id: asVoiceId(overrides.id),
     name: overrides.name ?? `Voice ${overrides.id}`,
     languages: overrides.languages ?? ['fr_FR'],
     gender: overrides.gender,

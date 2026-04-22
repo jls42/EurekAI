@@ -17,7 +17,16 @@ interface VoicesEnrichedEntry {
   langFull: string;
 }
 
-type ApiStatus = { mistral: boolean; elevenlabs: boolean; ttsAvailable: boolean };
+/**
+ * @invariant ttsAvailable === mistral — Mistral Voxtral est l'unique provider TTS.
+ * Verrouillage runtime : `config.test.ts` "invariant: ttsAvailable === mistral".
+ * Si un futur provider TTS non-Mistral est réintroduit, remplacer par `ttsAvailable = mistral || <autre>`.
+ *
+ * voiceCacheReady : true uniquement après warmup réussi de listVoices au boot serveur.
+ * Si false, la sélection dynamique par langue retombe sur DEFAULT_CONFIG (voix FR) — UI
+ * peut griser les sélecteurs de voix ou afficher un badge "voice catalog loading".
+ */
+type ApiStatus = { mistral: boolean; ttsAvailable: boolean; voiceCacheReady: boolean };
 
 type ModerationCategoriesPayload = {
   all?: string[];
@@ -43,7 +52,7 @@ export function createConfig() {
           this.moderationDefaults = modData.defaults || {};
         }
         // Load voices BEFORE setting configDraft so the voice list is populated
-        // when Alpine renders the x-show="ttsProvider === 'mistral'" selects
+        // quand Alpine rend les selects de voix Mistral.
         await this.loadMistralVoices?.();
         if (configRes.ok) {
           const config = (await configRes.json()) as AppConfig;
@@ -157,10 +166,8 @@ export function createConfig() {
           chat: mainModel,
           ocr: 'mistral-ocr-latest',
         };
-        if (draft.ttsProvider === 'mistral' && draft.ttsModel.startsWith('eleven')) {
+        if (draft.ttsModel?.startsWith('eleven_')) {
           draft.ttsModel = 'voxtral-mini-tts-latest';
-        } else if (draft.ttsProvider === 'elevenlabs' && draft.ttsModel.startsWith('voxtral')) {
-          draft.ttsModel = 'eleven_v3';
         }
         const res = await fetch('/api/config', {
           method: 'PUT',

@@ -4,10 +4,11 @@ import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import { verifyAnswerSystem } from '../prompts.js';
 import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
+import type { VoiceId } from '../helpers/voice-types.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
-  voiceId: string,
+  voiceId: VoiceId,
   ttsOptions: TtsOptions,
   lang = 'fr',
 ): Promise<Buffer> {

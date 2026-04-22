@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { Mistral } from '@mistralai/mistralai';
 
 import { trackClient } from './helpers/tracked-client.js';
+import { logger } from './helpers/logger.js';
 import { recordUsage } from './helpers/usage-context.js';
 import { ProjectStore } from './store.js';
 import {
@@ -122,19 +123,21 @@ app.use(API_PROJECTS, chatRoutes(store, client, profileStore));
 app.listen(PORT, () => {
   const projects = store.listProjects();
   const status = getApiStatus();
-  const config = getConfig();
   console.log(`\n  EurekAI — http://localhost:${PORT}`);
   console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
-  console.log(`  ElevenLabs: ${status.elevenlabs ? 'OK' : NON_CONFIGURE}`);
-  console.log(`  TTS: ${config.ttsProvider} — ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
+  console.log(`  TTS Mistral Voxtral: ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();
 
   // Non-blocking cache warmup (optional, app works without)
+  // Catch en logger structuré — le frontend lit voiceCacheReady via /api/config/status
+  // pour griser les sélecteurs de voix et alerter les users non-FR du fallback.
   listVoices(client)
     .then(setVoiceCache)
-    .catch((e: Error) => console.warn('Voice cache not loaded:', e.message));
+    .catch((e: Error) =>
+      logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${e.message}`),
+    );
   client.models
     .list()
     .then((models) => {
@@ -147,5 +150,5 @@ app.listen(PORT, () => {
       }
       setModelLimits(limits);
     })
-    .catch((e: Error) => console.warn('Model limits not loaded:', e.message));
+    .catch((e: Error) => logger.warn('models', `limits not loaded: ${e.message}`));
 });

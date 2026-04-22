@@ -36,8 +36,7 @@ export const nl: Record<string, string> = {
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
   'gen.questionCount': 'Aantal:',
-  'gen.needsElevenLabs': 'Vereist een ElevenLabs API-sleutel',
-  'gen.needsTts': 'Vereist een geconfigureerde TTS-provider',
+  'gen.needsTts': 'Vereist MISTRAL_API_KEY om Voxtral TTS in te schakelen',
   'gen.contextTooLarge':
     'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
@@ -100,16 +99,13 @@ export const nl: Record<string, string> = {
 
   'settings.title': 'Instellingen',
   'settings.apiStatus': 'API-status',
-  'settings.aiModels': 'AI-modellen',
-  'settings.aiModel': 'AI-model',
+  'settings.aiModels': 'AI-engines',
+  'settings.aiModel': 'Generatie',
   'settings.aiModelHint': 'Gebruikt voor samenvattingen, flashcards, quiz, podcast en chat',
   'settings.recommended': 'Aanbevolen',
-  'settings.voiceTts': 'Stem & TTS',
-  'settings.ttsProvider': 'TTS-provider',
-  'settings.ttsModel': 'TTS-model',
-  'settings.ttsModelHint': 'Tekst-naar-spraakmodel',
-  'settings.voiceHost': 'Hoofdstem',
-  'settings.voiceGuest': 'Tweede stem',
+  'settings.voiceTts': 'Stemmen',
+  'settings.voiceHost': 'Primair',
+  'settings.voiceGuest': 'Secundair',
   'emotion.Angry': 'Boos',
   'emotion.Cheerful': 'Vrolijk',
   'emotion.Confident': 'Zelfverzekerd',
@@ -130,6 +126,7 @@ export const nl: Record<string, string> = {
   'settings.quiz': 'Quiz',
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
+  'settings.tts': 'TTS',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',
@@ -279,10 +276,8 @@ export const nl: Record<string, string> = {
   'podcast.script': 'Script',
   'podcast.lines': '({count} regels)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs':
-    'Configureer ELEVENLABS_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
   'podcast.noTts':
-    'Configureer een TTS-provider (Mistral of ElevenLabs) om audiopodcasts in te schakelen',
+    'Configureer MISTRAL_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
 
   'image.heading': 'Illustraties',
   'image.new': 'Illustreren',
@@ -374,6 +369,8 @@ export const nl: Record<string, string> = {
   'toast.autoError': 'Automatische generatie mislukt. Probeer het opnieuw.',
   'toast.audioDone': 'Audio gegenereerd!',
   'toast.audioPartial': 'Gedeeltelijke audio: sommige secties mislukt',
+  'toast.audioAuthRequired': 'Ongeldige of ontbrekende Mistral API-sleutel',
+  'toast.audioQuotaExceeded': 'TTS-quotum bereikt, probeer het later opnieuw',
   'toast.audioError': 'Fout bij het genereren van audio',
   'toast.genDeleted': 'Generatie verwijderd',
   'toast.settingsSaved': 'Instellingen opgeslagen',

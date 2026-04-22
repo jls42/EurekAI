@@ -110,7 +110,11 @@ describe('createState', () => {
   it('initializes settings state', () => {
     const state = createState();
     expect(state.showSettings).toBe(false);
-    expect(state.apiStatus).toEqual({ mistral: false, elevenlabs: false, ttsAvailable: false });
+    expect(state.apiStatus).toEqual({
+      mistral: false,
+      ttsAvailable: false,
+      voiceCacheReady: false,
+    });
     expect(state.mistralVoicesList).toEqual([]);
   });
 
@@ -291,7 +295,6 @@ describe('createState', () => {
 
   it('configDraft has correct default structure', () => {
     const state = createState();
-    expect(state.configDraft.ttsProvider).toBe('mistral');
     expect(state.configDraft.models).toEqual({
       summary: '',
       flashcards: '',
@@ -299,10 +302,8 @@ describe('createState', () => {
       podcast: '',
       translate: '',
       ocr: '',
-    });
-    expect(state.configDraft.voices).toEqual({
-      host: { id: '', name: '' },
-      guest: { id: '', name: '' },
+      quizVerify: '',
+      chat: '',
     });
     expect(state.configDraft.mistralVoices).toEqual({ host: 'Oliver', guest: 'Marie' });
   });

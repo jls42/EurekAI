@@ -8,15 +8,14 @@ npm outdated 2>/dev/null || true
 
 echo ""
 echo "=== Critical SDK versions ==="
-for pkg in @mistralai/mistralai @elevenlabs/elevenlabs-js; do
-  current=$(node -e "try{const v=JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
-  latest=$(npm view "$pkg" version 2>/dev/null | sed 's/^v//' || echo "N/A")
-  if [ "$current" = "$latest" ]; then
-    echo "  ✓ $pkg: $current"
-  else
-    echo "  ⬆ $pkg: $current -> $latest (UPDATE AVAILABLE)"
-  fi
-done
+pkg="@mistralai/mistralai"
+current=$(node -e "try{const v=JSON.parse(require('fs').readFileSync(require('path').resolve('node_modules','$pkg','package.json'),'utf8')).version; console.log(v.replace(/^v/,''))}catch{console.log('N/A')}" 2>/dev/null)
+latest=$(npm view "$pkg" version 2>/dev/null | sed 's/^v//' || echo "N/A")
+if [ "$current" = "$latest" ]; then
+  echo "  ✓ $pkg: $current"
+else
+  echo "  ⬆ $pkg: $current -> $latest (UPDATE AVAILABLE)"
+fi
 
 # Load env if needed
 if [ -z "${MISTRAL_API_KEY:-}" ]; then
@@ -64,34 +63,6 @@ else
   fi
 fi
 
-echo ""
-echo "=== ElevenLabs API check ==="
-if [ -z "${ELEVENLABS_API_KEY:-}" ]; then
-  echo "  ELEVENLABS_API_KEY not set, skipping"
-else
-  status=$(curl -s -o /dev/null -w "%{http_code}" https://api.elevenlabs.io/v1/models \
-    -H "xi-api-key: $ELEVENLABS_API_KEY" 2>/dev/null || echo "ERR")
-  if [ "$status" = "200" ]; then
-    echo "  ✓ API key valid"
-    # Check if eleven_v3 model exists
-    has_v3=$(curl -s https://api.elevenlabs.io/v1/models \
-      -H "xi-api-key: $ELEVENLABS_API_KEY" 2>/dev/null | node -e "
-        let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{
-          try{const m=JSON.parse(d);console.log(m.some(x=>x.model_id==='eleven_v3')?'yes':'no')}
-          catch{console.log('unknown')}
-        })" 2>/dev/null || echo "unknown")
-    if [ "$has_v3" = "yes" ]; then
-      echo "  ✓ eleven_v3 model available"
-    elif [ "$has_v3" = "no" ]; then
-      echo "  ✗ eleven_v3 model NOT found — check ElevenLabs docs"
-    else
-      echo "  ? eleven_v3 model status unknown"
-    fi
-  else
-    echo "  ✗ API key invalid or service down (HTTP $status)"
-  fi
-fi
-
 # ── Changelogs with persistent state (disable strict mode for robustness) ──
 set +eo pipefail
 echo ""
@@ -104,7 +75,6 @@ MAX_PER_PKG=5
 # Packages to watch: "npm-name|github-owner/repo"
 WATCHED_PKGS=(
   "@mistralai/mistralai|mistralai/client-ts"
-  "@elevenlabs/elevenlabs-js|elevenlabs/elevenlabs-js"
   "@google/genai|googleapis/js-genai"
   "alpinejs|alpinejs/alpine"
   "lucide|lucide-icons/lucide"
@@ -235,7 +205,6 @@ grep -roh 'x-[a-z]*' src/ 2>/dev/null | sort | uniq -c | sort -rn | head -15 || 
 echo ""
 echo "--- SDK imports ---"
 grep -rn "from '@mistralai" generators/ helpers/ routes/ 2>/dev/null | head -15 || true
-grep -rn "from '@elevenlabs" generators/ helpers/ routes/ 2>/dev/null | head -10 || true
 grep -rn "from '@google/genai" generators/ helpers/ routes/ 2>/dev/null | head -10 || true
 
 echo ""

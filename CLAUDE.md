@@ -1,13 +1,13 @@
 # EurekAI
 
 Application educative IA : photo/texte/voix -> fiches + flashcards + quiz + podcast + traduction.
-Concu pour un enfant de 9 ans. Powered by Mistral AI (+ ElevenLabs optionnel).
+Concu pour un enfant de 9 ans. Powered by Mistral AI.
 
 ## Stack & Lancement
 
 - **Backend** : TypeScript, Express, tsx (dev)
 - **Frontend** : Vite + HTML + TailwindCSS + Alpine.js (src/)
-- **APIs** : Mistral AI (chat, OCR, STT, TTS Voxtral, agents, moderation), ElevenLabs (TTS alternatif)
+- **APIs** : Mistral AI (chat, OCR, STT, TTS Voxtral, agents, moderation)
 
 ```bash
 npm install
@@ -27,10 +27,8 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation entre toutes les langues
 
 ### TTS (Text-to-Speech)
-- Deux providers : Mistral (Voxtral TTS) ou ElevenLabs, configurable dans les settings
-- Mistral TTS : utilise `MISTRAL_API_KEY` (deja requis), pas de cle supplementaire
-- ElevenLabs : necessite `ELEVENLABS_API_KEY`
-- `apiStatus.ttsAvailable` indique si le provider actif est configure
+- Provider unique : Mistral Voxtral TTS (`MISTRAL_API_KEY` suffit, pas de clé supplémentaire). Le support ElevenLabs historique (hackathon) a été retiré 2026-04 faute d'intégration au niveau Mistral (voix par langue, cost tracking) — une migration one-time dans `initConfig` nettoie les `config.json` legacy (`ttsProvider`/`voices`/`eleven_*`). Réintégration ElevenLabs envisagée plus tard au même niveau de qualité.
+- `apiStatus.ttsAvailable === apiStatus.mistral` (une seule source, plus de champ `elevenlabs`).
 - Griser les boutons TTS avec `:disabled="!apiStatus.ttsAvailable"` + tooltip `t('gen.needsTts')`
 - **Voix par langue** : `resolveVoices(config, profileVoices?, lang?, profileId?, flow?)` dans `config.ts` résout la voix finale selon la priorité : profil > override global explicite (`mistralVoicesSource === 'user'`) > sélection dynamique `selectVoices` (9 langues UI) > DEFAULT_CONFIG. Le flag `mistralVoicesSource` (`'default' | 'user'`) est migré one-time dans `initConfig` via `LEGACY_DEFAULT_HOSTS/GUESTS` — un config.json existant avec un ancien ID par défaut reste classé `'default'` pour que l'utilisateur bénéficie automatiquement des voix EN/ES/etc.
 - **Appels `resolveVoices()`** : sur tout nouveau chemin TTS, TOUJOURS passer `profileId` et `flow` (ex: `'podcast' | 'quiz-vocal' | 'read-aloud'`). Sinon la rotation déterministe par profil se casse (seed `__default__` partagé) et les logs de fallback portent `flow='unknown'` — observabilité dégradée.
@@ -62,6 +60,11 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Chaîne de calcul** : `helpers/tracked-client.ts` wrappe le client Mistral (capture `ApiUsage`) → `helpers/usage-context.ts` (AsyncLocalStorage pour propager l'usage dans les pipelines async) → `helpers/cost-calc.ts` (conversion usage → € selon l'unité : `tokens` / `characters` / `pages` / `audio-seconds`) → `helpers/cost-persist.ts` (écriture dans `Project.costLog` + mise à jour `totalCost`) → `helpers/cost-middleware.ts` (injection du `costDelta` dans la réponse HTTP).
 - **Contrat endpoint** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation ou Source) avec `estimatedCost: number`, `usage: GenerationUsage`, `costBreakdown: string[]`. **Seul** `POST /generate/auto/route` renvoie un champ top-level `costDelta: number` (coût du routage seul) — les autres `/generate/*` exposent leur coût via `gen.estimatedCost` uniquement. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + `costLog[]` historique.
 - **Règle OBLIGATOIRE** : tout nouvel appel Mistral DOIT passer par `tracked-client` (jamais `new Mistral(...)` direct dans un generator). Sinon le coût échappe au tracking silencieusement — bug observabilité invisible côté UI.
+
+### Persistance config.json
+- **Dans `config.ts`**, toute écriture de `config.json` DOIT passer par le helper interne `persistConfig()` (jamais `writeFileSync(configPath, …)` direct). Sinon le backup `.corrupt.bak` n'est pas créé avant overwrite d'un fichier corrompu préservé → perte silencieuse du contenu user original. Ne s'applique pas aux fichiers ≠ `config.json` (logs, caches, etc.).
+- Le flag module `lastLoadFailed` tracke l'état. Reset à `false` après le premier backup (un seul `.corrupt.bak` par cycle corrompu → restore).
+- **Rejection legacy à saveConfig** : tout préfixe de champ migré one-time (actuellement `ttsModel: 'eleven_*'`) doit être rejeté côté `saveConfig` aussi, pas seulement dans `migrateLegacyElevenLabsFields`. Sinon une UI pré-PR ou client automatisé peut POSTer la valeur legacy entre 2 restart → fenêtre d'incohérence opaque. Pattern : `logger.warn` + garder la valeur courante (déjà non-legacy après boot), jamais reset vers DEFAULT.
 
 ### OCR confidence scores
 - **Type** : `OcrConfidence = { average: number }` dans `types.ts` — stocké en `Source.ocrConfidence?` pour les sources PDF/image.
@@ -139,9 +142,10 @@ Cas concrets (non exhaustif) :
 
 **Anti-pattern documenté** : série de 5 commits (`977b535..68ed476`) sur un faux positif Lizard `matchStatus` résolus en 2 min dès qu'on a lancé `pipx run lizard` local — cause racine = parseur TS de Lizard qui agglomère les `function foo()` top-level consécutives. Fix propre via extraction dans `helpers/error-matchers.ts` (chaque matcher `export function` délimité proprement). Leçon : ne JAMAIS itérer à l'aveugle sur un signal d'outil externe.
 
-Garde-fou local actuel : `npm test` déclenche `pretest` → enchaîne **`lint:complexity` + `lint:ci` + `lint:deadcode`** (sortie pipeline en cas d'échec d'un seul). `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8 strict, scope **full-repo `-l typescript`** depuis 2026-04-20 — 0 fonction > CCN 8 confirmée, toute régression bloque `npm test`). Pièges connus :
+Garde-fou local actuel : `npm test` déclenche `pretest` → enchaîne **`typecheck` + `lint:complexity` + `lint:ci` + `lint:deadcode`** (sortie pipeline en cas d'échec d'un seul). `lint:complexity` → `scripts/check-complexity.sh` (Lizard CCN 8 strict, scope **full-repo `-l typescript`** depuis 2026-04-20 — 0 fonction > CCN 8 confirmée, toute régression bloque `npm test`). Pièges connus :
 - **`-l javascript` ne parse pas les `.ts` en walk-dossier** — Lizard doit être invoqué avec `-l typescript` explicitement, sinon 0 violation silencieusement (faux positif "tout est clean"). Bug vécu 2026-04-18, Codacy a révélé 23 fonctions cachées.
 - **`??=` pèse 2 dans le comptage Lizard** (nullish check + assignment) — à retenir lors de l'application du fix `prefer-nullish-coalescing` (cf. `dccd645` : re-fix via boucle).
+- **`function foo()` top-level consécutives agglomérées** — parseur Lizard TS agglomère les `function` déclarations consécutives en une seule fonction pour compter le CCN (bug vécu 3× : `matchStatus` `977b535..`, `removeLegacyTtsFields` 2026-04-21, `persistConfig` 2026-04-22). Fix standard : convertir un des helpers adjacents en `const foo = (): T => { ... }` arrow — Lizard ne les agglomère pas. `export function` délimite aussi correctement (cf. `helpers/error-matchers.ts`). À retenir quand on ajoute un helper privé à côté d'un existant.
 
 ## Conventions detaillees
 

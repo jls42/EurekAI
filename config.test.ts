@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -11,6 +11,9 @@ import {
   resolveVoices,
   setVoiceCache,
 } from './config.js';
+import { logger } from './helpers/logger.js';
+import { asVoiceId } from './helpers/voice-types.js';
+import type { AppConfig } from './types.js';
 
 let tempDir: string;
 
@@ -21,6 +24,7 @@ beforeEach(() => {
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
   vi.unstubAllEnvs();
+  vi.restoreAllMocks();
 });
 
 describe('initConfig', () => {
@@ -30,7 +34,30 @@ describe('initConfig', () => {
     expect(cfg.models.summary).toBe('mistral-large-latest');
     expect(cfg.models.quizVerify).toBe('mistral-large-latest');
     expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
-    expect(cfg.ttsProvider).toBe('mistral');
+  });
+
+  it('migration 2026-04 : ttsProvider legacy et ttsModel eleven_* sont normalisés vers Mistral', () => {
+    // Un config.json pré-retrait ElevenLabs (ttsProvider + ttsModel eleven_*) doit
+    // ressortir de initConfig() nettoyé et réécrit sur disque pour que les anciens
+    // utilisateurs basculent silencieusement sur Mistral Voxtral.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        ttsProvider: 'elevenlabs',
+        ttsModel: 'eleven_v3',
+        voices: { host: { id: 'old', name: 'old' }, guest: { id: 'old', name: 'old' } },
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { ttsProvider?: string; voices?: unknown };
+    expect(cfg.ttsProvider).toBeUndefined();
+    expect(cfg.voices).toBeUndefined();
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    // Le fichier a été réécrit sans les champs legacy.
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.ttsProvider).toBeUndefined();
+    expect(onDisk.voices).toBeUndefined();
+    expect(onDisk.ttsModel).toBe('voxtral-mini-tts-latest');
   });
 
   it('avec fichier existant merge avec les defauts', () => {
@@ -44,11 +71,46 @@ describe('initConfig', () => {
     expect(cfg.models.quiz).toBe('mistral-large-latest'); // defaut preserve
   });
 
-  it('fichier JSON invalide fallback sur defaut', () => {
-    writeFileSync(join(tempDir, 'config.json'), 'not json{{{');
+  it('fichier JSON invalide: fallback in-memory DEFAULT + disque préservé + log error', () => {
+    // Régression à prévenir : un config.json corrompu déclenchait auparavant
+    // classify/migrate/writeFileSync sur DEFAULT_CONFIG et écrasait silencieusement
+    // le fichier user (perte de config invisible). Le loadFailed gate doit préserver
+    // le disque intact et émettre un logger.error explicite.
+    const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    writeFileSync(join(tempDir, 'config.json'), '{invalid json');
     initConfig(tempDir);
-    const cfg = getConfig();
-    expect(cfg.models.summary).toBe('mistral-large-latest');
+    expect(getConfig().models.summary).toBe('mistral-large-latest'); // in-memory DEFAULT
+    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+    // Disque préservé (aucune réécriture par classify/migrate)
+    expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe('{invalid json');
+    // logger.error émis avec le message "Failed to parse" + SyntaxError
+    expect(errSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining('Failed to parse'),
+      expect.any(SyntaxError),
+    );
+  });
+
+  it('fichier corrompu + saveConfig: .corrupt.bak créé avant overwrite, une seule fois', () => {
+    // Après loadFailed, la prochaine action UI (saveConfig) doit backup le fichier
+    // corrompu pour éviter la perte silencieuse du contenu user original.
+    const corruptContent = '{invalid json but user data inside}';
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    writeFileSync(configPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    initConfig(tempDir);
+    // Avant saveConfig : aucun backup
+    expect(existsSync(backupPath)).toBe(false);
+    // 1er saveConfig : crée le backup + overwrite
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    expect(existsSync(backupPath)).toBe(true);
+    expect(readFileSync(backupPath, 'utf-8')).toBe(corruptContent);
+    expect(JSON.parse(readFileSync(configPath, 'utf-8')).ttsModel).toBe('voxtral-mini-tts-latest');
+    // 2e saveConfig : ne recrée pas un 2e backup (lastLoadFailed reset à false)
+    writeFileSync(backupPath, 'this should NOT be overwritten');
+    saveConfig({ ttsModel: 'other' });
+    expect(readFileSync(backupPath, 'utf-8')).toBe('this should NOT be overwritten');
   });
 
   it('migration one-time: config.json sans mistralVoicesSource → classé default', () => {
@@ -64,6 +126,18 @@ describe('initConfig', () => {
     );
     initConfig(tempDir);
     expect(getConfig().mistralVoicesSource).toBe('default');
+  });
+
+  it('classification mistralVoicesSource sans champ legacy est persistée sur disque', () => {
+    // Régression à prévenir : avant le fix, classifyMistralVoicesSource() modifiait
+    // currentConfig en mémoire mais rien n'était écrit — re-classif à chaque boot.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({ models: { summary: 'mistral-large-latest' } }),
+    );
+    initConfig(tempDir);
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.mistralVoicesSource).toBe('default');
   });
 
   it('migration one-time: config.json avec legacy default host → classé default', () => {
@@ -96,6 +170,94 @@ describe('initConfig', () => {
     initConfig(tempDir);
     expect(getConfig().mistralVoicesSource).toBe('user');
   });
+
+  it('migration partielle: voices seul legacy → removed, ttsModel intouché', () => {
+    // Cas dégénéré mais possible : un config.json pré-removal avec `voices` legacy
+    // mais un ttsModel déjà migré manuellement. La migration ne doit toucher que
+    // ce qui a besoin de l'être.
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        voices: { host: { id: 'x', name: 'x' }, guest: { id: 'y', name: 'y' } },
+        ttsModel: 'voxtral-mini-tts-latest',
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { voices?: unknown };
+    expect(cfg.voices).toBeUndefined();
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.voices).toBeUndefined();
+  });
+
+  it("migration partielle: ttsModel 'eleven_*' seul → reset, pas de ttsProvider/voices touché", () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        ttsModel: 'eleven_multilingual_v2',
+      }),
+    );
+    initConfig(tempDir);
+    const cfg = getConfig() as AppConfig & { ttsProvider?: string; voices?: unknown };
+    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(cfg.ttsProvider).toBeUndefined();
+    expect(cfg.voices).toBeUndefined();
+  });
+
+  it('idempotent double-boot: aucune réécriture quand config est déjà migré+classifié', () => {
+    // Régression à prévenir : si initConfig réécrit même quand rien n'a changé, on rotate
+    // le mtime inutilement et on crée du bruit filesystem (backup systems, docker layers).
+    // Pattern B content-check (FS-agnostic, pas dépendant de mtime sur ext3/FAT/tmpfs).
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        models: { summary: 'custom' },
+        mistralVoicesSource: 'default',
+      }),
+    );
+    initConfig(tempDir); // 1er boot : classify sera false (source déjà présente), migrate false → rien à écrire
+    const content1 = readFileSync(join(tempDir, 'config.json'), 'utf-8');
+    initConfig(tempDir); // 2e boot : toujours rien à faire
+    const content2 = readFileSync(join(tempDir, 'config.json'), 'utf-8');
+    expect(content2).toBe(content1);
+  });
+
+  it('shape hostile: saved.models = null → fallback DEFAULT sans crash', () => {
+    // Protection contre config.json avec types invalides (corruption partielle, édition
+    // manuelle erronée, downgrade schéma). Sans mergeSafe, `currentConfig.models.chat`
+    // crasherait plus tard à l'appel.
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: null }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+    expect(getConfig().models.summary).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved.models = string → fallback DEFAULT', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: 'haxor' }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved.models = array → fallback DEFAULT', () => {
+    // {...[]} produit {}, mais {...['a','b']} produit {0:'a', 1:'b'} qui casse l'accès .chat.
+    // La garde !Array.isArray prévient les deux cas.
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: ['a', 'b'] }));
+    initConfig(tempDir);
+    expect(getConfig().models.chat).toBe('mistral-large-latest');
+  });
+
+  it('shape hostile: saved = array au top-level → fallback DEFAULT', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify([1, 2, 3]));
+    initConfig(tempDir);
+    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+  });
+
+  it('shape hostile: saved.mistralVoices = string → fallback DEFAULT', () => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ mistralVoices: 'haxor' }));
+    initConfig(tempDir);
+    expect(getConfig().mistralVoices.host).toBeTruthy();
+    expect(getConfig().mistralVoices.guest).toBeTruthy();
+  });
 });
 
 describe('getConfig', () => {
@@ -103,7 +265,7 @@ describe('getConfig', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     expect(cfg).toHaveProperty('models');
-    expect(cfg).toHaveProperty('voices');
+    expect(cfg).toHaveProperty('mistralVoices');
     expect(cfg).toHaveProperty('ttsModel');
   });
 });
@@ -120,23 +282,20 @@ describe('saveConfig', () => {
     expect(onDisk.models.summary).toBe('new-model');
   });
 
-  it('merge partiel voices', () => {
-    initConfig(tempDir);
-    saveConfig({ voices: { host: { id: 'new-id', name: 'Nouvelle voix' } } as any });
-    const cfg = getConfig();
-    expect(cfg.voices.host.id).toBe('new-id');
-    expect(cfg.voices.guest.name).toBeTruthy(); // guest preserve
-  });
-
   it("preserve la source 'default' quand un save complet renvoie les memes mistralVoices", () => {
     initConfig(tempDir);
     const cfg = getConfig();
     expect(cfg.mistralVoicesSource).toBe('default');
 
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -171,56 +330,41 @@ describe('saveConfig', () => {
 });
 
 describe('getApiStatus', () => {
-  it('detecte les cles API presentes', () => {
+  it('detecte MISTRAL_API_KEY presente', () => {
     vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key-2');
     const status = getApiStatus();
     expect(status.mistral).toBe(true);
-    expect(status.elevenlabs).toBe(true);
+    expect(status.ttsAvailable).toBe(true);
   });
 
-  it('detecte les cles API absentes', () => {
+  it('detecte MISTRAL_API_KEY absente', () => {
     vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
     const status = getApiStatus();
     expect(status.mistral).toBe(false);
-    expect(status.elevenlabs).toBe(false);
-  });
-
-  it('ttsAvailable vrai quand provider mistral et MISTRAL_API_KEY presente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'mistral' });
-    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(true);
-  });
-
-  it('ttsAvailable faux quand provider mistral et MISTRAL_API_KEY absente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'mistral' });
-    vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
-    const status = getApiStatus();
     expect(status.ttsAvailable).toBe(false);
   });
 
-  it('ttsAvailable vrai quand provider elevenlabs et ELEVENLABS_API_KEY presente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
+  it('invariant: ttsAvailable === mistral (provider TTS unique)', () => {
+    // Mistral Voxtral est l'unique provider TTS : ttsAvailable et mistral doivent
+    // rester équivalents tant qu'aucun autre provider n'est réintroduit.
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    const s1 = getApiStatus();
+    expect(s1.ttsAvailable).toBe(s1.mistral);
     vi.stubEnv('MISTRAL_API_KEY', '');
-    vi.stubEnv('ELEVENLABS_API_KEY', 'test-key');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(true);
+    const s2 = getApiStatus();
+    expect(s2.ttsAvailable).toBe(s2.mistral);
   });
 
-  it('ttsAvailable faux quand provider elevenlabs et ELEVENLABS_API_KEY absente', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
-    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
-    vi.stubEnv('ELEVENLABS_API_KEY', '');
-    const status = getApiStatus();
-    expect(status.ttsAvailable).toBe(false);
+  it('voiceCacheReady reflète le succès du warmup listVoices', () => {
+    // Au boot avant warmup : voiceCacheReady=false (warmup async non terminé ou en erreur).
+    // Après setVoiceCache avec voix : true. Avec voix vides : false (la sélection dynamique
+    // par langue retombe sur DEFAULT_CONFIG).
+    setVoiceCache([]);
+    expect(getApiStatus().voiceCacheReady).toBe(false);
+    setVoiceCache([{ id: asVoiceId('v1'), name: 'V1', languages: ['fr_FR'] }]);
+    expect(getApiStatus().voiceCacheReady).toBe(true);
+    setVoiceCache([]);
+    expect(getApiStatus().voiceCacheReady).toBe(false);
   });
 });
 
@@ -237,46 +381,40 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
-  it('retourne mistralVoices quand provider est mistral (tier 2 global config)', () => {
+  it('retourne les mistralVoices de la config par défaut (tier 2 global config)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     const voices = resolveVoices(cfg);
     expect(voices).toEqual(cfg.mistralVoices);
-  });
-
-  it('retourne elevenlabs voices quand provider est elevenlabs', () => {
-    initConfig(tempDir);
-    const cfg = getConfig();
-    cfg.ttsProvider = 'elevenlabs';
-    const voices = resolveVoices(cfg);
-    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
-  });
-
-  it('ignore les voix profil quand provider est elevenlabs', () => {
-    initConfig(tempDir);
-    const cfg = getConfig();
-    cfg.ttsProvider = 'elevenlabs';
-    const voices = resolveVoices(cfg, { host: 'mistral-host', guest: 'mistral-guest' }, 'fr');
-    expect(voices).toEqual({ host: cfg.voices.host.id, guest: cfg.voices.guest.id });
   });
 
   it('tier 1: retourne les voix du profil si definies', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
-    const profileVoices = { host: 'profile-host-id', guest: 'profile-guest-id' };
+    const profileVoices = {
+      host: asVoiceId('profile-host-id'),
+      guest: asVoiceId('profile-guest-id'),
+    };
     expect(resolveVoices(cfg, profileVoices, 'fr')).toEqual(profileVoices);
   });
 
   it('tier 2: retourne config globale si settings utilisateur explicites (mistralVoicesSource=user)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
-      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+      {
+        id: asVoiceId('marie-excited'),
+        name: 'Marie - Excited',
+        languages: ['fr_fr'],
+        tags: ['excited'],
+      },
+      {
+        id: asVoiceId('marie-curious'),
+        name: 'Marie - Curious',
+        languages: ['fr_fr'],
+        tags: ['curious'],
+      },
     ]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual(cfg.mistralVoices);
@@ -286,11 +424,15 @@ describe('resolveVoices', () => {
   it('tier 2: retourne config globale meme si cache EN rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -304,13 +446,17 @@ describe('resolveVoices', () => {
   it('preserve config globale custom pour EN si mistralVoicesSource=user', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
-    cfg.mistralVoices = { host: 'custom-host', guest: 'custom-guest' };
+    cfg.mistralVoices = { host: asVoiceId('custom-host'), guest: asVoiceId('custom-guest') };
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -324,11 +470,20 @@ describe('resolveVoices', () => {
   it('tier 3: fallback langue si config globale vide et cache rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
-    cfg.mistralVoices = { host: '', guest: '' };
+    cfg.mistralVoices = { host: asVoiceId(''), guest: asVoiceId('') };
     setVoiceCache([
-      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
-      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+      {
+        id: asVoiceId('marie-excited'),
+        name: 'Marie - Excited',
+        languages: ['fr_fr'],
+        tags: ['excited'],
+      },
+      {
+        id: asVoiceId('marie-curious'),
+        name: 'Marie - Curious',
+        languages: ['fr_fr'],
+        tags: ['curious'],
+      },
     ]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual({ host: 'marie-excited', guest: 'marie-curious' });
@@ -338,7 +493,6 @@ describe('resolveVoices', () => {
   it('tier 3: fallback config globale si cache vide', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual(cfg.mistralVoices);
@@ -347,9 +501,8 @@ describe('resolveVoices', () => {
   it('merge voix profil partielles (host seul → host custom + guest default)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
-    const partial = { host: 'only-host', guest: '' };
+    const partial = { host: asVoiceId('only-host'), guest: asVoiceId('') };
     const voices = resolveVoices(cfg, partial, 'fr');
     expect(voices).toEqual({ host: 'only-host', guest: cfg.mistralVoices.guest });
   });
@@ -357,9 +510,8 @@ describe('resolveVoices', () => {
   it('merge voix profil partielles (guest seul → host default + guest custom)', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([]);
-    const partial = { host: '', guest: 'only-guest' };
+    const partial = { host: asVoiceId(''), guest: asVoiceId('only-guest') };
     const voices = resolveVoices(cfg, partial, 'fr');
     expect(voices).toEqual({ host: cfg.mistralVoices.host, guest: 'only-guest' });
   });
@@ -369,15 +521,19 @@ describe('resolveVoices', () => {
     // doit quand même récupérer Jane en EN, pas conserver l'ancienne Marie FR.
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = {
-      host: 'e3596645-b1af-469e-b857-f18ddedc7652',
+      host: asVoiceId('e3596645-b1af-469e-b857-f18ddedc7652'),
       guest: cfg.mistralVoices.guest,
     };
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -391,15 +547,19 @@ describe('resolveVoices', () => {
   it('migration path: legacy default guest reste traité comme default pour EN', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     cfg.mistralVoices = {
       host: cfg.mistralVoices.host,
-      guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
+      guest: asVoiceId('5a271406-039d-46fe-835b-fbbb00eaf08d'),
     };
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -413,17 +573,25 @@ describe('resolveVoices', () => {
   it('profile voices overrident les defaults même avec lang EN et cache rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
       },
     ]);
-    const voices = resolveVoices(cfg, { host: 'custom-h', guest: 'custom-g' }, 'en');
+    const voices = resolveVoices(
+      cfg,
+      { host: asVoiceId('custom-h'), guest: asVoiceId('custom-g') },
+      'en',
+    );
     expect(voices).toEqual({ host: 'custom-h', guest: 'custom-g' });
     setVoiceCache([]);
   });
@@ -431,14 +599,18 @@ describe('resolveVoices', () => {
   it('combine override partiel utilisateur (mistralVoicesSource=user) + fallback langue pour champ restant', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.ttsProvider = 'mistral';
     const defaultGuest = cfg.mistralVoices.guest;
-    cfg.mistralVoices = { host: 'custom-host', guest: defaultGuest };
+    cfg.mistralVoices = { host: asVoiceId('custom-host'), guest: defaultGuest };
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('jane-curious'),
+        name: 'Jane - Curious',
+        languages: ['en_gb'],
+        tags: ['curious'],
+      },
+      {
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -464,15 +636,6 @@ describe('saveConfig (additional fields)', () => {
     expect(onDisk.ttsModel).toBe('custom-tts-model');
   });
 
-  it('persiste ttsProvider', () => {
-    initConfig(tempDir);
-    saveConfig({ ttsProvider: 'elevenlabs' });
-    const cfg = getConfig();
-    expect(cfg.ttsProvider).toBe('elevenlabs');
-    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
-    expect(onDisk.ttsProvider).toBe('elevenlabs');
-  });
-
   it('merge partiel mistralVoices', () => {
     initConfig(tempDir);
     saveConfig({ mistralVoices: { host: 'new-host-voice' } as any });
@@ -481,5 +644,21 @@ describe('saveConfig (additional fields)', () => {
     expect(cfg.mistralVoices.guest).toBeTruthy(); // guest preserve
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.mistralVoices.host).toBe('new-host-voice');
+  });
+
+  it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante", () => {
+    // Une UI pré-PR ou client automatisé peut POSTer encore 'eleven_*' entre 2 restarts.
+    // saveConfig doit IGNORER la valeur legacy (pas reset aggressif vers DEFAULT) et preserver
+    // le choix utilisateur courant (deja non-legacy apres le boot migration).
+    initConfig(tempDir);
+    saveConfig({ ttsModel: 'voxtral-custom' });
+    expect(getConfig().ttsModel).toBe('voxtral-custom');
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({ ttsModel: 'eleven_v3' });
+    expect(getConfig().ttsModel).toBe('voxtral-custom'); // preserve, pas ecrase
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy ttsModel 'eleven_v3'"),
+    );
   });
 });

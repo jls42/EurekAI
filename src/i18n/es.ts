@@ -36,8 +36,7 @@ export const es: Record<string, string> = {
   'gen.voice': 'Leer en voz alta',
   'gen.websearch': 'B\u00fasqueda web',
   'gen.questionCount': 'Cantidad:',
-  'gen.needsElevenLabs': 'Requiere una clave API de ElevenLabs',
-  'gen.needsTts': 'Requiere un proveedor TTS configurado',
+  'gen.needsTts': 'Requiere MISTRAL_API_KEY para habilitar TTS Voxtral',
   'gen.contextTooLarge':
     'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
 
@@ -100,16 +99,13 @@ export const es: Record<string, string> = {
 
   'settings.title': 'Configuraci\u00f3n',
   'settings.apiStatus': 'Estado de la API',
-  'settings.aiModels': 'Modelos de IA',
-  'settings.aiModel': 'Modelo de IA',
+  'settings.aiModels': 'Motores de IA',
+  'settings.aiModel': 'Generación',
   'settings.aiModelHint': 'Usado para fichas, flashcards, quiz, podcast y chat',
   'settings.recommended': 'Recomendado',
-  'settings.voiceTts': 'Voz y TTS',
-  'settings.ttsProvider': 'Proveedor TTS',
-  'settings.ttsModel': 'Modelo TTS',
-  'settings.ttsModelHint': 'Modelo de s\u00edntesis de voz',
-  'settings.voiceHost': 'Voz principal',
-  'settings.voiceGuest': 'Voz secundaria',
+  'settings.voiceTts': 'Voces',
+  'settings.voiceHost': 'Principal',
+  'settings.voiceGuest': 'Secundaria',
   'emotion.Angry': 'Enojado',
   'emotion.Cheerful': 'Alegre',
   'emotion.Confident': 'Seguro',
@@ -130,6 +126,7 @@ export const es: Record<string, string> = {
   'settings.quiz': 'Quiz',
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
+  'settings.tts': 'TTS',
 
   'dashboard.subtitle': 'Panel',
   'dashboard.addFirstSources': 'Agrega tus primeras fuentes',
@@ -279,10 +276,7 @@ export const es: Record<string, string> = {
   'podcast.script': 'Guion',
   'podcast.lines': '({count} l\u00edneas)',
   'podcast.prompt': 'Prompt: {text}',
-  'podcast.noElevenLabs':
-    'Configura ELEVENLABS_API_KEY en tu archivo .env para habilitar podcasts con audio',
-  'podcast.noTts':
-    'Configura un proveedor TTS (Mistral o ElevenLabs) para habilitar podcasts con audio',
+  'podcast.noTts': 'Configura MISTRAL_API_KEY en tu archivo .env para habilitar podcasts con audio',
 
   'image.heading': 'Ilustraciones',
   'image.new': 'Ilustrar',
@@ -375,6 +369,8 @@ export const es: Record<string, string> = {
   'toast.autoError': 'La generaci\u00f3n autom\u00e1tica fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.audioDone': '\u00a1Audio generado!',
   'toast.audioPartial': 'Audio parcial: algunas secciones fallaron',
+  'toast.audioAuthRequired': 'Clave API de Mistral inválida o ausente',
+  'toast.audioQuotaExceeded': 'Cuota TTS alcanzada, inténtalo más tarde',
   'toast.audioError': 'Error al generar audio',
   'toast.genDeleted': 'Generaci\u00f3n eliminada',
   'toast.settingsSaved': 'Configuraci\u00f3n guardada',

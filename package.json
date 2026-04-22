@@ -1,6 +1,6 @@
 {
   "name": "eurekai",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n srv,web -c blue,green \"tsx watch server.ts\" \"vite\"",
@@ -14,8 +14,9 @@
     "lint:ci": "eslint . --max-warnings 0",
     "lint:complexity": "./scripts/check-complexity.sh",
     "lint:deadcode": "knip",
+    "typecheck": "tsc --noEmit",
     "security": "./scripts/check-security.sh",
-    "pretest": "npm run lint:complexity && npm run lint:ci && npm run lint:deadcode",
+    "pretest": "npm run typecheck && npm run lint:complexity && npm run lint:ci && npm run lint:deadcode",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
@@ -24,7 +25,6 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@elevenlabs/elevenlabs-js": "^2.36.0",
     "@lightpanda/browser": "^1.2.0",
     "@mistralai/mistralai": "^2.2.0",
     "@mozilla/readability": "^0.6.0",

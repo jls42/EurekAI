@@ -9,12 +9,14 @@ import type {
   SummaryGeneration,
   FillBlankGeneration,
   FillBlankAttempt,
+  FailedSection,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
+import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
@@ -102,14 +104,14 @@ const batchSectionsFor = (d: SummaryGeneration['data']): string[] => {
 
 const generateBatchAudio = async (
   gen: SummaryGeneration,
-  voiceId: string,
+  voiceId: VoiceId,
   ttsOpts: TtsOptions,
   projectDir: string,
   pid: string,
-): Promise<{ audioUrls: Record<string, string>; failedSections: string[] }> => {
+): Promise<{ audioUrls: Record<string, string>; failedSections: FailedSection[] }> => {
   const d = gen.data;
   const audioUrls: Record<string, string> = {};
-  const failedSections: string[] = [];
+  const failedSections: FailedSection[] = [];
   const baseId = gen.id.slice(0, 8);
   for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
@@ -119,7 +121,7 @@ const generateBatchAudio = async (
       audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
     } catch (err) {
       logger.error('tts', `section ${s} failed:`, err);
-      failedSections.push(s);
+      failedSections.push({ section: s, code: extractErrorCode(err, 'tts') });
     }
   }
   return { audioUrls, failedSections };
@@ -127,7 +129,7 @@ const generateBatchAudio = async (
 
 interface BatchSummaryCtx {
   audioUrls: Record<string, string>;
-  failedSections: string[];
+  failedSections: FailedSection[];
   summaryGen: SummaryGeneration;
   store: ProjectStore;
   pid: string;
@@ -145,7 +147,12 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     } as Partial<SummaryGeneration>);
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
-    res.status(500).json({ error: 'TTS failed for all sections' });
+    // All-fail: use the last captured error as the terminal batch failure code.
+    // If codes diverge across sections (rare in practice since the pipeline is
+    // sequential and a single upstream failure usually propagates), the last is
+    // chosen as a convention, not a claim of superior representativeness.
+    const lastCode = failedSections.at(-1)!.code;
+    res.status(500).json({ error: lastCode });
     return;
   }
   res.json({
@@ -157,7 +164,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
 
 async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
-  voices: { host: string; guest: string },
+  voices: { host: VoiceId; guest: VoiceId },
   ttsOpts: TtsOptions,
 ): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
@@ -174,7 +181,7 @@ async function generateFlashcardsAudio(
 interface SectionAudioCtx {
   gen: Generation;
   section: string;
-  voiceId: string;
+  voiceId: VoiceId;
   ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;
@@ -222,7 +229,6 @@ function resolveReadAloudContext(
   // s'applique aussi ici et que les logs de fallback soient contextualisés.
   const voices = resolveVoices(config, profile?.mistralVoices, lang, profileId, 'read-aloud');
   const ttsOpts = {
-    provider: config.ttsProvider,
     model: config.ttsModel,
     mistralClient: client,
   } as const;
