@@ -40,7 +40,7 @@ export async function textToSpeech(
   return Buffer.from(response.audioData, 'base64');
 }
 
-// --- Voice management ---
+// --- Voice listing helpers ---
 
 function pickField<T>(obj: Record<string, unknown>, key: string, fallback: T): T {
   return (obj[key] ?? fallback) as T;

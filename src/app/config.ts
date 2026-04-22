@@ -17,6 +17,11 @@ interface VoicesEnrichedEntry {
   langFull: string;
 }
 
+/**
+ * @invariant ttsAvailable === mistral — Mistral Voxtral est l'unique provider TTS.
+ * Verrouillage runtime : `config.test.ts` "invariant: ttsAvailable === mistral".
+ * Si un futur provider TTS non-Mistral est réintroduit, remplacer par `ttsAvailable = mistral || <autre>`.
+ */
 type ApiStatus = { mistral: boolean; ttsAvailable: boolean };
 
 type ModerationCategoriesPayload = {
