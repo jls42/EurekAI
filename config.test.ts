@@ -570,4 +570,20 @@ describe('saveConfig (additional fields)', () => {
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.mistralVoices.host).toBe('new-host-voice');
   });
+
+  it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante (review #8)", () => {
+    // Une UI pré-PR ou client automatisé peut POSTer encore 'eleven_*' entre 2 restarts.
+    // saveConfig doit IGNORER la valeur legacy (pas reset aggressif vers DEFAULT) et preserver
+    // le choix utilisateur courant (deja non-legacy apres le boot migration).
+    initConfig(tempDir);
+    saveConfig({ ttsModel: 'voxtral-custom' });
+    expect(getConfig().ttsModel).toBe('voxtral-custom');
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({ ttsModel: 'eleven_v3' });
+    expect(getConfig().ttsModel).toBe('voxtral-custom'); // preserve, pas ecrase
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy ttsModel 'eleven_v3'"),
+    );
+  });
 });

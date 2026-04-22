@@ -256,7 +256,19 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
   }
-  if (partial.ttsModel) currentConfig.ttsModel = partial.ttsModel;
+  if (partial.ttsModel) {
+    // Rejection legacy : une UI pré-PR ou client automatisé peut encore POSTer un ttsModel
+    // 'eleven_*' entre le boot (qui a nettoyé via resetLegacyTtsModel) et le restart suivant.
+    // Ignore la valeur legacy, preserve le choix courant (déjà non-legacy).
+    if (partial.ttsModel.startsWith('eleven_')) {
+      logger.warn(
+        'config',
+        `rejected legacy ttsModel '${partial.ttsModel}' at saveConfig, keeping current value '${currentConfig.ttsModel}'`,
+      );
+    } else {
+      currentConfig.ttsModel = partial.ttsModel;
+    }
+  }
   applyMistralVoicesPatch(partial);
   persistConfig();
   return currentConfig;
