@@ -151,7 +151,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     // If codes diverge across sections (rare in practice since the pipeline is
     // sequential and a single upstream failure usually propagates), the last is
     // chosen as a convention, not a claim of superior representativeness.
-    const lastCode = failedSections[failedSections.length - 1].code;
+    const lastCode = failedSections.at(-1)!.code;
     res.status(500).json({ error: lastCode });
     return;
   }
