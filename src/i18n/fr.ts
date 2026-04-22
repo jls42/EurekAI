@@ -109,15 +109,13 @@ export const fr: Record<string, string> = {
   // Settings
   'settings.title': 'Paramètres',
   'settings.apiStatus': 'Statut API',
-  'settings.aiModels': 'Modèles IA',
-  'settings.aiModel': 'Modèle IA',
+  'settings.aiModels': 'Moteurs IA',
+  'settings.aiModel': 'Génération',
   'settings.aiModelHint': 'Utilisé pour fiches, flashcards, quiz, podcast et chat',
   'settings.recommended': 'Recommandé',
-  'settings.voiceTts': 'Voix & TTS',
-  'settings.ttsModel': 'Modèle TTS',
-  'settings.ttsModelHint': 'Modèle de synthèse vocale',
-  'settings.voiceHost': 'Voix principale',
-  'settings.voiceGuest': 'Voix secondaire',
+  'settings.voiceTts': 'Voix',
+  'settings.voiceHost': 'Principale',
+  'settings.voiceGuest': 'Secondaire',
   'emotion.Angry': 'En colère',
   'emotion.Cheerful': 'Joyeux',
   'emotion.Confident': 'Confiant',
@@ -138,6 +136,7 @@ export const fr: Record<string, string> = {
   'settings.quiz': 'Quiz',
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
+  'settings.tts': 'TTS',
 
   // Dashboard
   'dashboard.subtitle': 'Tableau de bord',

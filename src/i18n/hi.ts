@@ -125,17 +125,14 @@ export const hi: Record<string, string> = {
 
   'settings.title': '\u0938\u0947\u091F\u093F\u0902\u0917\u094D\u0938',
   'settings.apiStatus': 'API \u0938\u094D\u0925\u093F\u0924\u093F',
-  'settings.aiModels': 'AI \u092E\u0949\u0921\u0932',
-  'settings.aiModel': 'AI \u092E\u0949\u0921\u0932',
+  'settings.aiModels': 'AI \u0907\u0902\u091c\u0928',
+  'settings.aiModel': '\u091c\u0928\u0930\u0947\u0936\u0928',
   'settings.aiModelHint':
     '\u0928\u094B\u091F\u094D\u0938, Flashcards, Quiz, Podcast \u0914\u0930 Chat \u0915\u0947 \u0932\u093F\u090F \u0909\u092A\u092F\u094B\u0917 \u0939\u094B\u0924\u093E \u0939\u0948',
   'settings.recommended': '\u0905\u0928\u0941\u0936\u0902\u0938\u093F\u0924',
-  'settings.voiceTts': '\u0906\u0935\u093E\u091C\u093C \u0914\u0930 TTS',
-  'settings.ttsModel': 'TTS \u092E\u0949\u0921\u0932',
-  'settings.ttsModelHint':
-    '\u091F\u0947\u0915\u094D\u0938\u094D\u091F-\u091F\u0942-\u0938\u094D\u092A\u0940\u091A \u092E\u0949\u0921\u0932',
-  'settings.voiceHost': '\u092E\u0941\u0916\u094D\u092F \u0906\u0935\u093E\u091C\u093C',
-  'settings.voiceGuest': '\u0938\u0939\u093E\u092F\u0915 \u0906\u0935\u093E\u091C\u093C',
+  'settings.voiceTts': '\u0906\u0935\u093E\u091C\u093C\u0947\u0902',
+  'settings.voiceHost': '\u092e\u0941\u0916\u094d\u092f',
+  'settings.voiceGuest': '\u0938\u0939\u093e\u092f\u0915',
   'emotion.Angry': '\u0917\u0941\u0938\u094D\u0938\u093E',
   'emotion.Cheerful': '\u0916\u0941\u0936\u092E\u093F\u091C\u093E\u091C',
   'emotion.Confident': '\u0906\u0924\u094D\u092E\u0935\u093F\u0936\u094D\u0935\u093E\u0938\u0940',
@@ -156,6 +153,7 @@ export const hi: Record<string, string> = {
   'settings.quiz': 'Quiz',
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
+  'settings.tts': 'TTS',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':
