@@ -12,6 +12,7 @@ import type {
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
+import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../config.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
@@ -111,7 +112,7 @@ interface GenContext {
   sourceIds: string[];
   count?: number;
   pid: string;
-  profileVoices?: { host: string; guest: string };
+  profileVoices?: { host: VoiceId; guest: VoiceId };
   // Propagé pour que resolveVoices() applique la rotation déterministe par profil
   // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
   profileId?: string;
@@ -584,7 +585,7 @@ export function generateRoutes(
     pid: string;
     store: ProjectStore;
     generations: Generation[];
-    profileVoices?: { host: string; guest: string };
+    profileVoices?: { host: VoiceId; guest: VoiceId };
     profileId?: string;
   }
 

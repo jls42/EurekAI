@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { textToSpeech, listVoices, type TtsOptions } from './tts-provider.js';
+import { asVoiceId } from '../helpers/voice-types.js';
 import type { Mistral } from '@mistralai/mistralai';
 
 function makeMistralClient(overrides: Partial<Mistral> = {}): Mistral {
@@ -23,12 +24,12 @@ describe('textToSpeech', () => {
     vi.mocked(client.audio.speech.complete).mockResolvedValue({
       audioData: Buffer.from('audio-bytes').toString('base64'),
     } as Awaited<ReturnType<typeof client.audio.speech.complete>>);
-    const result = await textToSpeech('bonjour', 'voice-1', { ...ttsOptions, mistralClient: client });
+    const result = await textToSpeech('bonjour', asVoiceId('voice-1'), { ...ttsOptions, mistralClient: client });
     expect(result.toString()).toBe('audio-bytes');
     expect(client.audio.speech.complete).toHaveBeenCalledWith({
       input: 'bonjour',
       model: 'voxtral-mini-tts-latest',
-      voiceId: 'voice-1',
+      voiceId: asVoiceId('voice-1'),
       responseFormat: 'mp3',
     });
   });
@@ -39,7 +40,7 @@ describe('textToSpeech', () => {
       {} as Awaited<ReturnType<typeof client.audio.speech.complete>>,
     );
     await expect(
-      textToSpeech('bonjour', 'voice-xyz', { ...ttsOptions, mistralClient: client, model: 'voxtral-v1' }),
+      textToSpeech('bonjour', asVoiceId('voice-xyz'), { ...ttsOptions, mistralClient: client, model: 'voxtral-v1' }),
     ).rejects.toThrow('mistral_tts_empty_response (voiceId=voice-xyz, model=voxtral-v1)');
   });
 
@@ -53,7 +54,7 @@ describe('textToSpeech', () => {
     );
     let caught: (Error & { stage?: unknown }) | undefined;
     try {
-      await textToSpeech('x', 'v', { ...ttsOptions, mistralClient: client });
+      await textToSpeech('x', asVoiceId('v'), { ...ttsOptions, mistralClient: client });
     } catch (e) {
       caught = e as Error & { stage?: unknown };
     }

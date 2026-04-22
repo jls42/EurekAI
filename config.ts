@@ -1,7 +1,8 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig } from './types.js';
-import type { MistralVoice } from './helpers/voice-types.js';
+import type { MistralVoice, VoiceId } from './helpers/voice-types.js';
+import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
 
@@ -23,8 +24,8 @@ const DEFAULT_CONFIG: AppConfig = {
     // Marie - Excited (host) + Marie - Curious (guest) — voix françaises cohérentes par défaut.
     // Pour d'autres langues, `selectVoices` (helpers/voice-selection.ts) prend le relais
     // via `resolveMistralDefaults` (FR fallback sinon).
-    host: '2f62b1af-aea3-4079-9d10-7ca665ee7243',
-    guest: 'e0580ce5-e63c-4cbe-88c8-a983b80c5f1f',
+    host: asVoiceId('2f62b1af-aea3-4079-9d10-7ca665ee7243'),
+    guest: asVoiceId('e0580ce5-e63c-4cbe-88c8-a983b80c5f1f'),
   },
 };
 
@@ -304,16 +305,18 @@ export function setVoiceCache(voices: MistralVoice[]): void {
 // IDs de voix Mistral qui ont été les defaults avant des releases précédentes.
 // Conservé pour la migration mistralVoicesSource (cf. initConfig) : un config.json
 // existant avec un de ces IDs est classé 'default', pas 'user'.
-const LEGACY_DEFAULT_HOSTS: ReadonlySet<string> = new Set(['e3596645-b1af-469e-b857-f18ddedc7652']);
-const LEGACY_DEFAULT_GUESTS: ReadonlySet<string> = new Set([
-  '5a271406-039d-46fe-835b-fbbb00eaf08d',
+const LEGACY_DEFAULT_HOSTS: ReadonlySet<VoiceId> = new Set([
+  asVoiceId('e3596645-b1af-469e-b857-f18ddedc7652'),
+]);
+const LEGACY_DEFAULT_GUESTS: ReadonlySet<VoiceId> = new Set([
+  asVoiceId('5a271406-039d-46fe-835b-fbbb00eaf08d'),
 ]);
 
-function isDefaultHost(id: string | undefined): boolean {
+function isDefaultHost(id: VoiceId | undefined): boolean {
   return !id || id === DEFAULT_CONFIG.mistralVoices.host || LEGACY_DEFAULT_HOSTS.has(id);
 }
 
-function isDefaultGuest(id: string | undefined): boolean {
+function isDefaultGuest(id: VoiceId | undefined): boolean {
   return !id || id === DEFAULT_CONFIG.mistralVoices.guest || LEGACY_DEFAULT_GUESTS.has(id);
 }
 
@@ -323,7 +326,7 @@ function resolveMistralDefaults(
   lang: string | undefined,
   profileId: string | undefined,
   flow: string,
-): { host: string; guest: string } | null {
+): { host: VoiceId; guest: VoiceId } | null {
   if (!lang) return null;
   const result = selectVoices({ voices: voiceCache, lang, profileId });
   if (!result) {
@@ -345,12 +348,12 @@ function resolveMistralDefaults(
 // 3. sélection dynamique via selectVoices (9 langues UI)
 // 4. fallback legacy DEFAULT_CONFIG.mistralVoices si voiceCache vide
 function pickMistralVoice(
-  profile: string | undefined,
+  profile: VoiceId | undefined,
   userConfigured: boolean,
-  configured: string,
-  dynamic: string | undefined,
-  defaultVoice: string,
-): string {
+  configured: VoiceId,
+  dynamic: VoiceId | undefined,
+  defaultVoice: VoiceId,
+): VoiceId {
   if (profile) return profile;
   if (userConfigured) return configured;
   return dynamic || configured || defaultVoice;
@@ -358,11 +361,11 @@ function pickMistralVoice(
 
 export function resolveVoices(
   config: AppConfig,
-  profileVoices?: { host: string; guest: string },
+  profileVoices?: { host: VoiceId; guest: VoiceId },
   lang?: string,
   profileId?: string,
   flow = 'unknown',
-): { host: string; guest: string } {
+): { host: VoiceId; guest: VoiceId } {
   const userConfigured = config.mistralVoicesSource === 'user';
   const dynamic = resolveMistralDefaults(lang, profileId, flow);
   return {

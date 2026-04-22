@@ -12,6 +12,7 @@ import {
   setVoiceCache,
 } from './config.js';
 import { logger } from './helpers/logger.js';
+import { asVoiceId } from './helpers/voice-types.js';
 import type { AppConfig } from './types.js';
 
 let tempDir: string;
@@ -287,9 +288,9 @@ describe('saveConfig', () => {
     expect(cfg.mistralVoicesSource).toBe('default');
 
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -373,7 +374,7 @@ describe('resolveVoices', () => {
   it('tier 1: retourne les voix du profil si definies', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    const profileVoices = { host: 'profile-host-id', guest: 'profile-guest-id' };
+    const profileVoices = { host: asVoiceId('profile-host-id'), guest: asVoiceId('profile-guest-id') };
     expect(resolveVoices(cfg, profileVoices, 'fr')).toEqual(profileVoices);
   });
 
@@ -382,8 +383,8 @@ describe('resolveVoices', () => {
     const cfg = getConfig();
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
-      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+      { id: asVoiceId('marie-excited'), name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
+      { id: asVoiceId('marie-curious'), name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
     ]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual(cfg.mistralVoices);
@@ -394,9 +395,9 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -410,12 +411,12 @@ describe('resolveVoices', () => {
   it('preserve config globale custom pour EN si mistralVoicesSource=user', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.mistralVoices = { host: 'custom-host', guest: 'custom-guest' };
+    cfg.mistralVoices = { host: asVoiceId('custom-host'), guest: asVoiceId('custom-guest') };
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -429,10 +430,10 @@ describe('resolveVoices', () => {
   it('tier 3: fallback langue si config globale vide et cache rempli', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    cfg.mistralVoices = { host: '', guest: '' };
+    cfg.mistralVoices = { host: asVoiceId(''), guest: asVoiceId('') };
     setVoiceCache([
-      { id: 'marie-excited', name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
-      { id: 'marie-curious', name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
+      { id: asVoiceId('marie-excited'), name: 'Marie - Excited', languages: ['fr_fr'], tags: ['excited'] },
+      { id: asVoiceId('marie-curious'), name: 'Marie - Curious', languages: ['fr_fr'], tags: ['curious'] },
     ]);
     const voices = resolveVoices(cfg, undefined, 'fr');
     expect(voices).toEqual({ host: 'marie-excited', guest: 'marie-curious' });
@@ -451,7 +452,7 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     setVoiceCache([]);
-    const partial = { host: 'only-host', guest: '' };
+    const partial = { host: asVoiceId('only-host'), guest: asVoiceId('') };
     const voices = resolveVoices(cfg, partial, 'fr');
     expect(voices).toEqual({ host: 'only-host', guest: cfg.mistralVoices.guest });
   });
@@ -460,7 +461,7 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     setVoiceCache([]);
-    const partial = { host: '', guest: 'only-guest' };
+    const partial = { host: asVoiceId(''), guest: asVoiceId('only-guest') };
     const voices = resolveVoices(cfg, partial, 'fr');
     expect(voices).toEqual({ host: cfg.mistralVoices.host, guest: 'only-guest' });
   });
@@ -471,13 +472,13 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     cfg.mistralVoices = {
-      host: 'e3596645-b1af-469e-b857-f18ddedc7652',
+      host: asVoiceId('e3596645-b1af-469e-b857-f18ddedc7652'),
       guest: cfg.mistralVoices.guest,
     };
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -493,12 +494,12 @@ describe('resolveVoices', () => {
     const cfg = getConfig();
     cfg.mistralVoices = {
       host: cfg.mistralVoices.host,
-      guest: '5a271406-039d-46fe-835b-fbbb00eaf08d',
+      guest: asVoiceId('5a271406-039d-46fe-835b-fbbb00eaf08d'),
     };
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
@@ -513,15 +514,15 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],
       },
     ]);
-    const voices = resolveVoices(cfg, { host: 'custom-h', guest: 'custom-g' }, 'en');
+    const voices = resolveVoices(cfg, { host: asVoiceId('custom-h'), guest: asVoiceId('custom-g') }, 'en');
     expect(voices).toEqual({ host: 'custom-h', guest: 'custom-g' });
     setVoiceCache([]);
   });
@@ -530,12 +531,12 @@ describe('resolveVoices', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     const defaultGuest = cfg.mistralVoices.guest;
-    cfg.mistralVoices = { host: 'custom-host', guest: defaultGuest };
+    cfg.mistralVoices = { host: asVoiceId('custom-host'), guest: defaultGuest };
     cfg.mistralVoicesSource = 'user';
     setVoiceCache([
-      { id: 'jane-curious', name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
+      { id: asVoiceId('jane-curious'), name: 'Jane - Curious', languages: ['en_gb'], tags: ['curious'] },
       {
-        id: 'oliver-cheerful',
+        id: asVoiceId('oliver-cheerful'),
         name: 'Oliver - Cheerful',
         languages: ['en_gb'],
         tags: ['cheerful'],

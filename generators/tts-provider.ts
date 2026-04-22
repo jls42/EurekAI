@@ -9,10 +9,11 @@
  * sémantiquement correct et un dispatcher pourra être ajouté ici sans rename destructif.
  */
 import type { Mistral } from '@mistralai/mistralai';
-import type { MistralVoice } from '../helpers/voice-types.js';
+import type { MistralVoice, VoiceId } from '../helpers/voice-types.js';
+import { asVoiceId } from '../helpers/voice-types.js';
 
 // Re-export pour conserver la surface API publique de ce module.
-export type { MistralVoice } from '../helpers/voice-types.js';
+export type { MistralVoice, VoiceId } from '../helpers/voice-types.js';
 
 // --- Types ---
 
@@ -25,7 +26,7 @@ export interface TtsOptions {
 
 export async function textToSpeech(
   text: string,
-  voiceId: string,
+  voiceId: VoiceId,
   options: TtsOptions,
 ): Promise<Buffer> {
   const response = await options.mistralClient.audio.speech.complete({
@@ -56,7 +57,8 @@ function pickField<T>(obj: Record<string, unknown>, key: string, fallback: T): T
 function toMistralVoice(v: unknown): MistralVoice {
   const o = v as Record<string, unknown>;
   return {
-    id: pickField<string>(o, 'id', ''),
+    // SDK response boundary : cast string -> VoiceId ici (cf. helpers/voice-types.ts).
+    id: asVoiceId(pickField<string>(o, 'id', '')),
     name: pickField<string>(o, 'name', ''),
     languages: pickField<string[]>(o, 'languages', []),
     gender: pickField<string | undefined>(o, 'gender', undefined),

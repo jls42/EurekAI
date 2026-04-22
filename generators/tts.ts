@@ -6,12 +6,13 @@ import { join } from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
+import type { VoiceId } from '../helpers/voice-types.js';
 
 const execFileAsync = promisify(execFile);
 
 export interface TtsVoiceConfig {
-  host: string;
-  guest: string;
+  host: VoiceId;
+  guest: VoiceId;
 }
 
 export async function generateSilence(durationMs: number): Promise<Buffer> {
@@ -81,6 +82,33 @@ export async function concatMp3(segments: Buffer[]): Promise<Buffer> {
   }
 }
 
+// Retry avec backoff exponentiel pour absorber les glitches transient Mistral
+// (empty audioData, timeout réseau, 5xx). 3 tentatives max, délais 200ms → 600ms.
+// Au-delà, remonte l'erreur telle quelle — la route mappe en tts_upstream_error.
+const MAX_TTS_RETRIES = 3;
+const TTS_RETRY_BASE_DELAY_MS = 200;
+
+const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
+
+async function textToSpeechWithRetry(
+  text: string,
+  voiceId: VoiceId,
+  ttsOptions: TtsOptions,
+): Promise<Buffer> {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
+    try {
+      return await textToSpeech(text, voiceId, ttsOptions);
+    } catch (e) {
+      lastErr = e;
+      if (attempt < MAX_TTS_RETRIES - 1) {
+        await delay(TTS_RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 export async function generateAudio(
   script: PodcastLine[],
   voices: TtsVoiceConfig,
@@ -90,7 +118,7 @@ export async function generateAudio(
 
   for (const line of script) {
     const voiceId = line.speaker === 'host' ? voices.host : voices.guest;
-    const audioBytes = await textToSpeech(line.text, voiceId, ttsOptions);
+    const audioBytes = await textToSpeechWithRetry(line.text, voiceId, ttsOptions);
     segments.push(audioBytes);
   }
 

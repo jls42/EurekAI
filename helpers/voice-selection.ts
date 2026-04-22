@@ -23,7 +23,7 @@
 // La sélection de deux voix distinctes bénéficie aux flows podcast et
 // flashcards read-aloud.
 
-import type { MistralVoice } from './voice-types.js';
+import type { MistralVoice, VoiceId } from './voice-types.js';
 
 export type VoiceSelectionSource = 'lang-match' | 'en-fallback' | 'any-fallback';
 
@@ -34,8 +34,8 @@ export interface VoiceSelectionInput {
 }
 
 export interface VoiceSelectionResult {
-  host: string;
-  guest: string;
+  host: VoiceId;
+  guest: VoiceId;
   source: VoiceSelectionSource;
   /** Taille du bucket retenu (pour observabilité). */
   bucketSize: number;

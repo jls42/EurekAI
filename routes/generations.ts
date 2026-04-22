@@ -15,6 +15,7 @@ import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
 import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
+import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
@@ -102,7 +103,7 @@ const batchSectionsFor = (d: SummaryGeneration['data']): string[] => {
 
 const generateBatchAudio = async (
   gen: SummaryGeneration,
-  voiceId: string,
+  voiceId: VoiceId,
   ttsOpts: TtsOptions,
   projectDir: string,
   pid: string,
@@ -157,7 +158,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
 
 async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
-  voices: { host: string; guest: string },
+  voices: { host: VoiceId; guest: VoiceId },
   ttsOpts: TtsOptions,
 ): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
@@ -174,7 +175,7 @@ async function generateFlashcardsAudio(
 interface SectionAudioCtx {
   gen: Generation;
   section: string;
-  voiceId: string;
+  voiceId: VoiceId;
   ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;

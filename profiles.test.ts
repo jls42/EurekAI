@@ -14,6 +14,7 @@ import {
   ProfileStore,
 } from './profiles.js';
 import type { Profile } from './types.js';
+import { asVoiceId } from './helpers/voice-types.js';
 
 // =============================================================================
 // Pure functions (no mocks needed)
@@ -339,7 +340,7 @@ describe('ProfileStore.update', () => {
   it('updates mistralVoices', () => {
     const p = store.create('VoiceUser', 12);
     expect(p.mistralVoices).toBeUndefined();
-    const voices = { host: 'voice-host-id', guest: 'voice-guest-id' };
+    const voices = { host: asVoiceId('voice-host-id'), guest: asVoiceId('voice-guest-id') };
     const updated = store.update(p.id, { mistralVoices: voices });
     expect(updated!.mistralVoices).toEqual(voices);
   });

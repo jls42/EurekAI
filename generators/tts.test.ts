@@ -27,13 +27,14 @@ import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, unlink } from 'node:fs/promises';
 import type { TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
+import { asVoiceId } from '../helpers/voice-types.js';
 
 const ttsOptions: TtsOptions = {
   model: 'voxtral-mini-tts-2603',
   mistralClient: {} as any,
 };
 
-const voices = { host: 'host-voice-id', guest: 'guest-voice-id' };
+const voices = { host: asVoiceId('host-voice-id'), guest: asVoiceId('guest-voice-id') };
 
 describe('generateSilence', () => {
   it('calls ffmpeg with correct args and returns buffer', async () => {
@@ -112,5 +113,35 @@ describe('generateAudio', () => {
     expect(textToSpeech).toHaveBeenNthCalledWith(1, 'Line 1', 'host-voice-id', ttsOptions);
     expect(textToSpeech).toHaveBeenNthCalledWith(2, 'Line 2', 'guest-voice-id', ttsOptions);
     expect(textToSpeech).toHaveBeenNthCalledWith(3, 'Line 3', 'host-voice-id', ttsOptions);
+  });
+
+  it('retry sur transient empty audioData: 1 fail -> success, 1 seule ligne réussie (review #10)', async () => {
+    // Une ligne transient-fail (1re tentative) suivie d'un succès doit donner 2 appels
+    // textToSpeech pour cette ligne (mais un seul segment dans l'output final).
+    const ttsError = Object.assign(new Error('mistral_tts_empty_response'), { stage: 'tts' });
+    vi.mocked(textToSpeech)
+      .mockReset()
+      .mockRejectedValueOnce(ttsError)
+      .mockResolvedValueOnce(Buffer.from('retry-success'));
+
+    const script: PodcastLine[] = [{ speaker: 'host', text: 'flaky-line' }];
+    const result = await generateAudio(script, voices, ttsOptions);
+
+    expect(textToSpeech).toHaveBeenCalledTimes(2); // 1 fail + 1 success
+    expect(result.toString()).toBe('retry-success');
+  });
+
+  it('retry: 3 failures consécutives remontent la dernière erreur (max 3 attempts)', async () => {
+    const ttsError = Object.assign(new Error('mistral_tts_empty_response'), { stage: 'tts' });
+    vi.mocked(textToSpeech).mockReset().mockRejectedValue(ttsError);
+
+    const script: PodcastLine[] = [{ speaker: 'host', text: 'always-fails' }];
+
+    await expect(generateAudio(script, voices, ttsOptions)).rejects.toBe(ttsError);
+    expect(textToSpeech).toHaveBeenCalledTimes(3); // 3 tentatives max
+    // .stage='tts' preservé sur l'erreur remontée -> mappage tts_upstream_error OK.
+
+    // Restore default mock for other tests
+    vi.mocked(textToSpeech).mockReset().mockResolvedValue(Buffer.from('segment-audio'));
   });
 });

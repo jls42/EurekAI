@@ -1,4 +1,5 @@
 import type { GenerationUsage } from './helpers/pricing.js';
+import type { VoiceId } from './helpers/voice-types.js';
 
 // --- Profiles ---
 
@@ -15,7 +16,7 @@ export interface Profile {
   moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
-  mistralVoices?: { host: string; guest: string };
+  mistralVoices?: { host: VoiceId; guest: VoiceId };
   theme?: 'dark' | 'light';
   pinHash?: string;
   hasPin?: boolean;
@@ -285,8 +286,8 @@ export interface AppConfig {
   };
   ttsModel: string;
   mistralVoices: {
-    host: string;
-    guest: string;
+    host: VoiceId;
+    guest: VoiceId;
   };
   // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
   // 'user'    : l'utilisateur a explicitement configuré les voix via settings.
