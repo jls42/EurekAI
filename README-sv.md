@@ -1,20 +1,20 @@
 <p align="center">
-  <img src="public/assets/logo.webp" alt="EurekAI Logotyp" width="120" />
+  <img src="public/assets/logo.webp" alt="EurekAI Logo" width="120" />
 </p>
 
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Förvandla vilket innehåll som helst till en interaktiv lärandeupplevelse — drivet av <a href="https://mistral.ai">Mistral AI</a>.</strong>
+  <strong>Förvandla vilket innehåll som helst till en interaktiv inlärningsupplevelse — driven av <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
-  <a href="README-en.md">🇬🇧 Engelska</a> · <a href="README-es.md">🇪🇸 Spanska</a> · <a href="README-pt.md">🇧🇷 Portugisiska</a> · <a href="README-de.md">🇩🇪 Tyska</a> · <a href="README-it.md">🇮🇹 Italienska</a> · <a href="README-nl.md">🇳🇱 Nederländska</a> · <a href="README-ar.md">🇸🇦 عربiska</a><br>
+  <a href="README-en.md">🇬🇧 Engelska</a> · <a href="README-es.md">🇪🇸 Spanska</a> · <a href="README-pt.md">🇧🇷 Portugisiska</a> · <a href="README-de.md">🇩🇪 Tyska</a> · <a href="README-it.md">🇮🇹 Italienska</a> · <a href="README-nl.md">🇳🇱 Nederländska</a> · <a href="README-ar.md">🇸🇦 Arabiska</a><br>
   <a href="README-hi.md">🇮🇳 Hindi</a> · <a href="README-zh.md">🇨🇳 Kinesiska</a> · <a href="README-ja.md">🇯🇵 Japanska</a> · <a href="README-ko.md">🇰🇷 Koreanska</a> · <a href="README-pl.md">🇵🇱 Polska</a> · <a href="README-ro.md">🇷🇴 Rumänska</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Se_demonstrationen-YouTube-red?style=for-the-badge&logo=youtube" alt="YouTube-demo"></a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="YouTube-demo"></a>
 </p>
 
 <h4 align="center">📊 Kodkvalitet</h4>
@@ -40,11 +40,11 @@
 
 ## Historien — Varför EurekAI?
 
-**EurekAI** föddes under [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([officiell webbplats](https://worldwide-hackathon.mistral.ai/)) (mars 2026). Jag behövde ett ämne — och idén kom från något mycket konkret: jag förbereder regelbundet proven med min dotter, och jag tänkte att det måste gå att göra det här mer lekfullt och interaktivt med hjälp av AI.
+**EurekAI** föddes under [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([officiell webbplats](https://worldwide-hackathon.mistral.ai/)) (mars 2026). Jag behövde ett ämne — och idén kom från något väldigt konkret: jag förbereder regelbundet proven tillsammans med min dotter, och jag tänkte att det måste vara möjligt att göra det mer lekfullt och interaktivt med hjälp av AI.
 
-Målet: ta **vilken inmatning som helst** — ett foto av läxan, en kopierad och inklistrad text, en röstinspelning, en webbsökning — och förvandla den till **repetitionsblad, flashcards, quiz, poddar, lucktexter, illustrationer och mycket mer**. Allt drivet av Mistral AI:s franska modeller, vilket gör det till en naturligt passande lösning för fransktalande elever.
+Målet: ta **vilken input som helst** — ett foto av läxan, en kopierad text, en röstinspelning, en webbsökning — och omvandla den till **repetitionsblad, flashcards, quiz, poddar, lucktexter, illustrationer och mycket mer**. Allt drivet av Mistral AI:s franska modeller, vilket gör det till en naturlig lösning för fransktalande elever.
 
-Den [ursprungliga prototypen](https://github.com/jls42/worldwide-hackathon.mistral.ai) skapades på 48 timmar under hackathonet som ett proof of concept kring Mistrals tjänster — redan fungerande, men begränsad. Sedan dess har EurekAI blivit ett riktigt projekt: lucktexter, navigering i övningar, webbskrapning, konfigurerbar föräldrakontroll, djup kodgranskning och mycket mer. Hela koden genereras av AI — främst [Claude Code](https://code.claude.com/), med några bidrag via [Codex](https://openai.com/codex/) och [Gemini CLI](https://geminicli.com/).
+Den [första prototypen](https://github.com/jls42/worldwide-hackathon.mistral.ai) skapades på 48 timmar under hackathonet som ett proof of concept kring Mistrals tjänster — redan fungerande, men begränsad. Sedan dess har EurekAI blivit ett riktigt projekt: lucktexter, navigering i övningar, webbscraping, konfigurerbar föräldramodering, djup kodgranskning och mycket mer. Hela koden genereras av AI — främst [Claude Code](https://code.claude.com/), med vissa bidrag via [Codex](https://openai.com/codex/) och [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -52,39 +52,39 @@ Den [ursprungliga prototypen](https://github.com/jls42/worldwide-hackathon.mistr
 
 | | Funktion | Beskrivning |
 |---|---|---|
-| 📷 | **Filimport** | Importera dina lektioner — foto, PDF (via Mistral OCR med genomsnittlig tillförlitlighetspoäng, nivå `high`/`medium`/`low`) eller textfil (TXT, MD). Uppladdningssessioner med återförsök per fil och individuell förloppsindikator |
-| 📝 | **Textinmatning** | Skriv eller klistra in vilken text som helst direkt |
+| 📷 | **Filimport** | Importera dina lektioner — foto, PDF (via Mistral OCR med genomsnittligt förtroendepoäng, nivå `high`/`medium`/`low`) eller textfil (TXT, MD). Uppladdningssessioner med omförsök per fil och individuell progress |
+| 📝 | **Textinmatning** | Skriv eller klistra in valfri text direkt |
 | 🎤 | **Röstinmatning** | Spela in dig själv — Voxtral STT transkriberar din röst |
-| 🌐 | **Webb / URL** | Klistra in en URL (direkt skrapning via Readability + Lightpanda) eller skriv en sökning (Mistral-agent web_search) |
+| 🌐 | **Webb / URL** | Klistra in en URL (direkt scraping via Readability + Lightpanda) eller skriv en sökning (Mistral web_search-agent) |
 | 📄 | **Repetitionsblad** | Strukturerade anteckningar med nyckelpunkter, ordförråd, citat, anekdoter |
-| 🃏 | **Flashcards** | Interaktiva Q/A-kort, dialogbaserad ljuduppspelning |
-| ❓ | **Flervalsquiz** | Flervalsfrågor med adaptiv repetition av misstag (konfigurerbart antal) |
-| ✏️ | **Lucktexter** | Övningar med ifyllnad, ledtrådar och tolerant validering |
-| 🎙️ | **Podcast** | Mini-podcast i två röster i ljud — Mistral-röst som standard eller anpassade röster (föräldrar!) |
+| 🃏 | **Flashcards** | Interaktiva frågor/svar-kort, dialogbaserad ljuduppläsning |
+| ❓ | **Flervalsquiz** | Flervalsfrågor med adaptiv repetition av fel (konfigurerbart antal) |
+| ✏️ | **Lucktexter** | Övningar att fylla i med ledtrådar och tolerant validering |
+| 🎙️ | **Podcast** | Mini-podcast med två röster i ljud — Mistral-röst som standard eller anpassade röster (föräldrar!) |
 | 🖼️ | **Illustrationer** | Utbildningsbilder genererade av en Mistral-agent |
 | 🗣️ | **Röstquiz** | Frågor läses upp högt (anpassad röst möjlig), muntligt svar, AI-verifiering |
-| 💬 | **AI-handledare** | Kontextuell chatt med dina kursdokument, med verktygskall |
+| 💬 | **AI-handledare** | Kontextuell chatt med dina kursdokument, med verktygsanrop |
 | 🧠 | **Automatisk router** | En router baserad på `mistral-small-latest` analyserar innehållet och föreslår en kombination av generatorer bland de 7 tillgängliga typerna |
-| 🔒 | **Föräldrakontroll** | Konfigurerbar moderering per profil (anpassningsbara kategorier), föräldra-PIN, chattbegränsningar |
-| 🌍 | **Flerspråkig** | Gränssnitt tillgängligt på 9 språk; AI-generering kan styras på 15 språk via prompts |
-| 🔊 | **Uppläsning** | Lyssna på repetitionsblad och flashcards (fråga/svar-dialog) via Mistral Voxtral TTS |
-| 💶 | **API-kostnadsuppföljning** | Transparent uppskattning av kostnaden € för varje generering och källa (tokens / tecken / sidor / ljudsekunder). Badge per kort + total per projekt, synlig i dashboarden |
-| 🎨 | **Tema per profil** | Varje profil väljer sitt tema `dark` eller `light` — består vid profilbyte |
+| 🔒 | **Föräldrakontroll** | Konfigurerbar moderering per profil (anpassningsbara kategorier), föräldra-PIN, chattrestriktioner |
+| 🌍 | **Flerspråkig** | Gränssnitt tillgängligt på 9 språk; AI-generering kan styras på 15 språk via promptar |
+| 🔊 | **Uppläsning** | Lyssna på repetionsblad och flashcards (fråga/svar-dialog) via Mistral Voxtral TTS |
+| 💶 | **Uppföljning av API-kostnader** | Transparent uppskattning av kostnaden i € för varje generering och källa (tokens / tecken / sidor / ljudsekunder). Badge per kort + total per projekt, synlig i dashboarden |
+| 🎨 | **Tema per profil** | Varje profil väljer sitt `dark`- eller `light`-tema — bevaras vid profilbyte |
 
 ---
 
 ## Översikt över arkitekturen
 
 <p align="center">
-  <img src="public/assets/architecture-overview.webp" alt="Översikt över arkitekturen" width="800" />
+  <img src="public/assets/architecture-overview.webp" alt="Architecture Overview" width="800" />
 </p>
 
 ---
 
-## Modellkarta för användning
+## Modelleringskarta för användning
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="Koppling mellan AI-modell och uppgift" width="800" />
+  <img src="public/assets/model-map.webp" alt="AI Model-to-Task Mapping" width="800" />
 </p>
 
 ---
@@ -92,109 +92,109 @@ Den [ursprungliga prototypen](https://github.com/jls42/worldwide-hackathon.mistr
 ## Användarresa
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="Elevens läranderesa" width="800" />
+  <img src="public/assets/user-journey.webp" alt="Student Learning Journey" width="800" />
 </p>
 
 ---
 
-## Fördjupning — Funktioner
+## Djupdykning — Funktioner
 
-### Flernivåinmatning
+### Flerformatinmatning
 
 EurekAI accepterar 4 typer av källor, modererade enligt profil (aktiverat som standard för barn och tonåringar) :
 
-- **Filimport** — JPG-, PNG- eller PDF-filer behandlas av `mistral-ocr-latest` (tryckt text, tabeller, handskrift), eller textfiler (TXT, MD) importeras direkt. Uppladdningar med flera filer använder ett system med **uppladdningssessioner**: individuell förlopp per fil, återförsök för misslyckad fil utan att skicka om de andra, avbryt sessionen när den är klar. OCR exponerar en **genomsnittlig tillförlitlighetspoäng** (`average`, begränsad till `[0,1]`, beräknad utifrån `averagePageConfidenceScore` som returneras av Mistral), visad i gränssnittet som en badge på nivå `high` / `medium` / `low` (trösklar ~0.9 / ~0.7) — varnar utan att blockera om skanningen håller dålig kvalitet.
-- **Fri text** — Skriv eller klistra in vilket innehåll som helst. Modereras innan lagring om moderering är aktiv.
+- **Filimport** — JPG-, PNG- eller PDF-filer bearbetade av `mistral-ocr-latest` (tryckt text, tabeller, handskrift), eller textfiler (TXT, MD) importerade direkt. Multi-filuppladdningar använder ett system med **uppladdningssessioner**: individuell progress per fil, omförsök för den misslyckade filen utan att skicka in de andra på nytt, avfärdande av sessionen när den är klar. OCR exponerar en **genomsnittlig förtroendepoäng** (`average`, klampad i `[0,1]`, beräknad från `averagePageConfidenceScore` som returneras av Mistral), visad i gränssnittet som en nivåbadge `high` / `medium` / `low` (trösklar ~0.9 / ~0.7) — varnar utan att blockera om skanningen håller dålig kvalitet.
+- **Fri text** — Skriv eller klistra in valfritt innehåll. Modérerat före lagring om moderering är aktiv.
 - **Röstinmatning** — Spela in ljud i webbläsaren. Transkriberas av `voxtral-mini-latest`. Parametern `language="fr"` optimerar igenkänningen.
-- **Webb / URL** — Klistra in en eller flera URL:er för att skrapa innehållet direkt (Readability + Lightpanda för JS-sidor), eller skriv nyckelord för en webbsökning via Mistral Agent. Det enda fältet accepterar båda — URL:er och nyckelord separeras automatiskt, och varje resultat skapar en oberoende källa.
+- **Webb / URL** — Klistra in en eller flera URL:er för att scrapa innehållet direkt (Readability + Lightpanda för JS-sidor), eller skriv nyckelord för en webbsökning via Mistral Agent. Det enda fältet accepterar båda — URL:er och nyckelord separeras automatiskt, och varje resultat skapar en separat källa.
 
 ### AI-generering av innehåll
 
-Sju typer av genererat lärmaterial:
+Sju typer av genererat läromaterial:
 
 | Generator | Modell | Utdata |
 |---|---|---|
 | **Repetitionsblad** | `mistral-large-latest` | Titel, sammanfattning, nyckelpunkter, ordförråd, citat, anekdot |
-| **Flashcards** | `mistral-large-latest` | Q/A-kort med källhänvisningar (konfigurerbart antal) |
+| **Flashcards** | `mistral-large-latest` | Fråga/svar-kort med referenser till källor (konfigurerbart antal) |
 | **Flervalsquiz** | `mistral-large-latest` | Flervalsfrågor, förklaringar, adaptiv repetition (konfigurerbart antal) |
 | **Lucktexter** | `mistral-large-latest` | Meningar att fylla i med ledtrådar, tolerant validering (Levenshtein) |
-| **Podcast** | `mistral-large-latest` + Voxtral TTS | Manus i 2 röster → MP3-ljud |
+| **Podcast** | `mistral-large-latest` + Voxtral TTS | Manus med 2 röster → MP3-ljud |
 | **Illustration** | Agent `mistral-large-latest` | Utbildningsbild via verktyget `image_generation` |
 | **Röstquiz** | `mistral-large-latest` + Voxtral TTS + STT | Frågor TTS → svar STT → AI-verifiering |
 
 ### AI-handledare via chatt
 
-En konversationshandledare med full åtkomst till kursdokumenten:
+En konversationshandledare med full tillgång till kursdokumenten:
 
 - Använder `mistral-large-latest`
-- **Verktygskall**: kan generera repetitionsblad, flashcards, quiz eller lucktexter under konversationen
-- Historik med 50 meddelanden per kurs
-- Innehållsmoderering om den är aktiverad för profilen
+- **Verktygsanrop**: kan generera repetitionsblad, flashcards, quiz eller lucktexter under samtalet
+- Historik på 50 meddelanden per kurs
+- Innehållsmoderering om aktiverat för profilen
 
 ### Automatisk router
 
-Routern använder `mistral-small-latest` för att analysera innehållet i källorna och föreslå de mest relevanta generatorerna bland de 7 tillgängliga. Gränssnittet visar förloppet i realtid: först en analysfas, sedan individuella genereringar med möjlighet till avbrytning.
+Routern använder `mistral-small-latest` för att analysera innehållet i källorna och föreslå de mest relevanta generatorerna bland de 7 tillgängliga. Gränssnittet visar förloppet i realtid: först en analysfas, sedan de individuella genereringarna med möjlighet att avbryta.
 
 ### Adaptivt lärande
 
-- **Quizstatistik**: uppföljning av försök och träffsäkerhet per fråga
+- **Quizstatistik**: spårning av försök och träffsäkerhet per fråga
 - **Quizrepetition**: genererar 5–10 nya frågor som riktar in sig på svaga koncept
-- **Instruktionsdetektering**: upptäcker repetitionsinstruktioner ("Jag kan min läxa om jag kan...") och prioriterar dem i kompatibla textgeneratorer (blad, flashcards, quiz, lucktexter)
+- **Instruktionsdetektion**: upptäcker repetitionsinstruktioner ("Jag kan min läxa om jag kan...") och prioriterar dem i kompatibla textgeneratorer (blad, flashcards, quiz, lucktexter)
 
-### Säkerhet och föräldrakontroll
+### Säkerhet & föräldrakontroll
 
 - **4 åldersgrupper**: barn (≤10 år), tonåring (11–15), student (16–25), vuxen (26+)
-- **Innehållsmoderering**: `mistral-moderation-latest` med 10 tillgängliga kategorier, 5 blockerade som standard för barn/tonåring (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Anpassningsbara kategorier per profil i inställningarna.
-- **Föräldra-PIN**: SHA-256-hash, krävs för profiler under 15 år. För produktion rekommenderas en långsam hash med salt (Argon2id, bcrypt).
-- **Chattbegränsningar**: AI-chatten är avstängd som standard för personer under 16 år, kan aktiveras av föräldrar
+- **Innehållsmoderering**: `mistral-moderation-latest` med 10 tillgängliga kategorier, 5 blockerade som standard för barn/tonåringar (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Kategorier kan anpassas per profil i inställningarna.
+- **Föräldra-PIN**: SHA-256-hash, krävs för profiler under 15 år. För en produktionssättning, använd en långsam hash med salt (Argon2id, bcrypt).
+- **Chattrestriktioner**: AI-chatt inaktiverad som standard för under 16 år, kan aktiveras av föräldrar
 
-### Flernivåsystem med flera profiler
+### Flerprofilssystem
 
-- Flera profiler med namn, ålder, avatar, språkpreferenser
-- **Röster per profil** (`Profile.mistralVoices?: { host, guest }`) — varje barn kan ha sitt par av röster för podcast/röstquiz
-- **Tema per profil** (`Profile.theme: 'dark' | 'light'`) — automatisk växling vid profilbyte, sparas på backend-sidan
+- Flera profiler med namn, ålder, avatar, språkinställningar
+- **Röster per profil** (`Profile.mistralVoices?: { host, guest }`) — varje barn kan ha sitt eget par podcast-/röstquiz-röster
+- **Tema per profil** (`Profile.theme: 'dark' | 'light'`) — automatisk växling vid profilbyte, sparas i backend
 - Projekt kopplade till profiler via `profileId`
-- Kaskadborttagning: att ta bort en profil tar bort alla dess projekt
+- Kaskaderadering: att radera en profil tar bort alla dess projekt
 
-### API-kostnadsuppföljning
+### Uppföljning av API-kostnader
 
-Varje Mistral-anrop (chatt, OCR, STT, TTS, moderering, agenter) instrumenteras för att ge en **transparent** kostnadsuppskattning € till användaren — inga överraskningar på fakturan.
+Varje Mistral-anrop (chatt, OCR, STT, TTS, moderering, agenter) instrumenteras för att ge en **transparent** kostnadsuppskattning i € till användaren — inga överraskningar i faktureringen.
 
-- **Sanningskälla**: `helpers/pricing.ts` — `MODEL_PRICING` per modellprefix (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` med Mistral-dokumentations-URL:er för periodisk omskrapning
-- **Stödda enheter**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — konvertering styrd av `helpers/cost-calc.ts`
+- **Sanningens källa**: `helpers/pricing.ts` — `MODEL_PRICING` per modellprefix (t.ex. `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` med Mistral-dokumentations-URL:er för periodisk omskrapning
+- **Stödda enheter**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — konvertering styrs av `helpers/cost-calc.ts`
 - **Instrumenteringskedja**: `helpers/tracked-client.ts` (wrap Mistral-klient) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injektion i HTTP-svaret)
-- **UI**: kostnadsbadge per generering (`src/partials/cost-badge-gen.html`), per källa (`cost-badge-src.html`), total ackumulerad i dashboarden (`Project.totalCost`)
-- **Endpoints**: svaren `/generate/*` och `/sources/*` dekorerar det returnerade objektet (Generation / Source) med `estimatedCost`, `usage` och `costBreakdown`. `POST /generate/auto/route` lägger till ett fält `costDelta: number` för kostnaden för endast routningen. `GET /projects/:pid` returnerar projektet berikat med `totalCost` (summa beräknad från `costLog[]`) + hela historiken
+- **UI**: kostnadsbadge per generering (`src/partials/cost-badge-gen.html`), per källa (`cost-badge-src.html`), ackumulerat totalbelopp i dashboarden (`Project.totalCost`)
+- **Endpoints**: svaren `/generate/*` och `/sources/*` dekorerar det returnerade objektet (Generation / Source) med `estimatedCost`, `usage` och `costBreakdown`. `POST /generate/auto/route` lägger till ett fält `costDelta: number` för kostnaden för enbart routing. `GET /projects/:pid` returnerar projektet berikat med `totalCost` (summa beräknad från `costLog[]`) + hela historiken
 
-### Flerleverantörs-TTS och anpassade röster
+### Flera TTS-leverantörer & anpassade röster
 
-- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100 % Mistral-tal-syntes, ingen extra nyckel krävs
-- **Anpassade röster**: föräldrar kan skapa sina egna röster via Mistral Voices-API:t (utifrån ett ljudprov) och tilldela dem till rollerna värd/gäst — poddar och röstquiz läses då med en förälders röst, vilket gör upplevelsen ännu mer engagerande för barnet
-- Två konfigurerbara rösteroller: **värd** (huvudberättare) och **gäst** (poddens andra röst)
-- Hela katalogen av Mistral-röster finns tillgänglig i inställningarna, filtrerbar efter språk
+- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100 % Mistral-röstsyntes, ingen extra nyckel behövs
+- **Anpassade röster**: föräldrar kan skapa egna röster via Mistral Voices API (från ett ljudprov) och tilldela dem till värd-/gästrollerna — poddar och röstquiz läses då med en förälders röst, vilket gör upplevelsen ännu mer uppslukande för barnet
+- Två konfigurerbara röstroller: **värd** (huvudberättare) och **gäst** (andra rösten i podden)
+- Komplett katalog över Mistral-röster tillgänglig i inställningarna, filtrerbar efter språk
 
 ### Internationalisering
 
 - Gränssnitt tillgängligt på 9 språk: fr, en, es, pt, it, nl, de, hi, ar
-- AI-prompter stöder 15 språk (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
+- AI-promptar stöder 15 språk (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
 - Språk kan konfigureras per profil
 
 ---
 
-## Teknisk stack
+## Tekniskt stack
 
-| Lager | Teknologi | Roll |
+| Lager | Teknik | Roll |
 |---|---|---|
-| **Runtime** | Node.js + TypeScript 6.x | Server och typsäkerhet |
-| **Backend** | Express 5.x | REST API |
-| **Dev-server** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars-partials, proxy |
+| **Runtime** | Node.js + TypeScript 6.x | Server och typ-säkerhet |
+| **Backend** | Express 5.x | REST-API |
+| **Devserver** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars-partials, proxy |
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Responsivt gränssnitt, TypeScript kompilerat av Vite |
-| **Templating** | vite-plugin-handlebars | HTML-komposition via partials |
+| **Templating** | vite-plugin-handlebars | HTML-komposition med partials |
 | **AI** | Mistral AI SDK 2.x | Chatt, OCR, STT, TTS, agenter, moderering |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, inbyggd tal-syntes |
-| **Ikoner** | Lucide 1.x | SVG-ikonbibliotek |
-| **Webbskrapning** | Readability + linkedom | Extrahering av huvudinnehåll från webbsidor (Firefox Reader View-teknik) |
-| **Headless browser** | Lightpanda | Ultralätt headless-webbläsare (Zig + V8) för JS-/SPA-sidor — fallback-skrapning |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, inbyggd röstsyntes |
+| **Ikoner** | Lucide 1.x | Bibliotek med SVG-ikoner |
+| **Webbscraping** | Readability + linkedom | Extrahering av sidornas huvudinnehåll (Firefox Reader View-teknik) |
+| **Headless-browser** | Lightpanda | Ultralätt headless-webbläsare (Zig + V8) för JS/SPA-sidor — fallback-scraping |
 | **Markdown** | Marked | Markdown-rendering i chatten |
 | **Filuppladdning** | Multer 2.x | Hantering av multipart-formulär |
 | **Ljud** | ffmpeg-static | Sammanfogning av ljudsegment |
@@ -205,12 +205,12 @@ Varje Mistral-anrop (chatt, OCR, STT, TTS, moderering, agenter) instrumenteras f
 
 ## Modellreferens | Modell | Användning | Varför |
 |---|---|---|
-| `mistral-large-latest` | Studieblad, flashcards, podcast, quiz, lucktexter, chatt, kontroll av muntligt quiz, bildagent, webbsökningsagent, detektering av instruktioner | Bäst multilingual + instruktionföljning |
-| `mistral-ocr-latest` | OCR för dokument | Tryckt text, tabeller, handskriven text |
+| `mistral-large-latest` | Fikablad, flashcards, podcast, quiz, text med luckor, chatt, kontroll av muntligt quiz, bildagent, webbsöksagent, upptäckt av instruktioner | Bäst för flerspråkighet + följsamhet till instruktioner |
+| `mistral-ocr-latest` | OCR för dokument | Tryckt text, tabeller, handskrift |
 | `voxtral-mini-latest` | Taligenkänning (STT) | Flerspråkig STT, optimerad med `language="fr"` |
-| `voxtral-mini-tts-latest` | Text-till-tal (TTS) | Poddar, muntliga quiz, uppläsning |
-| `mistral-moderation-latest` | Innehållsmoderering | 5 blockerade kategorier för barn/ungdomar (+ jailbreaking) |
-| `mistral-small-latest` | Automatisk router | Snabb analys av innehållet för routningsbeslut |
+| `voxtral-mini-tts-latest` | Talsyntes (TTS) | Poddar, muntligt quiz, uppläsning |
+| `mistral-moderation-latest` | Innehållsmoderering | 5 blockerade kategorier för barn/tonåringar (+ jailbreaking) |
+| `mistral-small-latest` | Automatisk router | Snabb innehållsanalys för routningsbeslut |
 
 ---
 
@@ -243,9 +243,9 @@ npm run dev
 | Variabel | Krävs | Standard | Roll |
 |---|---|---|---|
 | `MISTRAL_API_KEY` | ✅ | — | Mistral API-nyckel (chatt, OCR, STT, Voxtral TTS, agenter, moderering) |
-| `PORT` | valfri | `3000` | Express-backendens HTTP-port |
-| `NODE_ENV` | valfri | `development` | Om `production` → Express serverar frontend från `dist/` (annars `public/`) |
-| `SONAR_TOKEN` | valfri CI | — | Används endast av GitHub Actions-workflowet SonarCloud |
+| `PORT` | valfritt | `3000` | HTTP-port för Express-backend |
+| `NODE_ENV` | valfritt | `development` | Om `production` → Express serverar frontend från `dist/` (annars `public/`) |
+| `SONAR_TOKEN` | valfritt CI | — | Används endast av GitHub Actions-workflödet SonarCloud |
 
 ### Tester, kodkvalitet och bidrag
 
@@ -274,7 +274,7 @@ Utan dessa verktyg misslyckas `npm test` vid `pretest` (lizard saknas) och `npm 
 
 ---
 
-## Distribuering med container
+## Containerdistribution
 
 Bilden publiceras på **GitHub Container Registry**:
 
@@ -292,7 +292,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`** är en rootless Podman-flagga som automatiskt justerar volymbehörigheterna.
+> **`:U`** är en Podman rootless-flagga som automatiskt justerar volymbehörigheter.
 
 ```bash
 # Build local
@@ -327,7 +327,7 @@ generators/
   chat.ts                 — Tuteur IA par chat avec appel d'outils
   router.ts               — Routeur automatique (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
-  tts-provider.ts         — TTS Mistral Voxtral (+ voice management : list/get/create/delete)
+  tts-provider.ts         — TTS Mistral Voxtral (synthèse vocale + listing des voix)
   tts.ts                  — Génération audio multi-voix (podcast + flashcards, concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search (fallback)
@@ -424,8 +424,8 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `PUT` | `/api/config` | Ändra konfigurationen (modeller, röster, TTS-modell) |
 | `GET` | `/api/config/status` | API-status: `mistral` (Mistral-nyckel definierad), `ttsAvailable` (alias för `mistral`, Mistral Voxtral är den enda TTS-leverantören) |
 | `POST` | `/api/config/reset` | Återställ standardkonfigurationen |
-| `GET` | `/api/config/voices` | Lista Mistral TTS-röster (valfri `?lang=fr`) |
-| `GET` | `/api/moderation-categories` | Tillgängliga modereringskategorier + standarder per ålder |
+| `GET` | `/api/config/voices` | Lista Mistral TTS-rösterna (valfritt `?lang=fr`) |
+| `GET` | `/api/moderation-categories` | Tillgängliga modereringskategorier + standardvärden per ålder |
 
 ### Profiler
 | Metod | Endpoint | Beskrivning |
@@ -433,14 +433,14 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/profiles` | Lista alla profiler |
 | `POST` | `/api/profiles` | Skapa en profil |
 | `PUT` | `/api/profiles/:id` | Ändra en profil (PIN krävs för < 15 år) |
-| `DELETE` | `/api/profiles/:id` | Ta bort en profil + kaskadprojekt `{pin?}` → `{ok, deletedProjects}` |
+| `DELETE` | `/api/profiles/:id` | Ta bort en profil + kaskad för projekt `{pin?}` → `{ok, deletedProjects}` |
 
 ### Projekt
 | Metod | Endpoint | Beskrivning |
 |---|---|---|
-| `GET` | `/api/projects` | Lista projekten (`?profileId=` valfri) |
+| `GET` | `/api/projects` | Lista projekten (`?profileId=` valfritt) |
 | `POST` | `/api/projects` | Skapa ett projekt `{name, profileId}` |
-| `GET` | `/api/projects/:pid` | Projektinformation |
+| `GET` | `/api/projects/:pid` | Projektdetaljer |
 | `PUT` | `/api/projects/:pid` | Byt namn på `{name}` |
 | `DELETE` | `/api/projects/:pid` | Ta bort projektet |
 
@@ -448,26 +448,26 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | Metod | Endpoint | Beskrivning |
 |---|---|---|
 | `POST` | `/api/projects/:pid/sources/upload` | Importera multipart-filer (OCR för JPG/PNG/PDF, direktläsning för TXT/MD) |
-| `POST` | `/api/projects/:pid/sources/text` | Fritext `{text}` |
+| `POST` | `/api/projects/:pid/sources/text` | Fri text `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | STT-röst (multipart-ljud) |
-| `POST` | `/api/projects/:pid/sources/websearch` | Skrapa URL eller webbsökning `{query}` — returnerar en lista med källor |
+| `POST` | `/api/projects/:pid/sources/websearch` | URL-scraping eller webbsökning `{query}` — returnerar en källtabell |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | Ta bort en källa |
 | `POST` | `/api/projects/:pid/moderate` | Moderera `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | Upptäck granskningsinstruktioner |
+| `POST` | `/api/projects/:pid/detect-consigne` | Identifiera repetitionsinstruktioner |
 
 ### Generering
 | Metod | Endpoint | Beskrivning |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | Studieblad |
+| `POST` | `/api/projects/:pid/generate/summary` | Repetitionsblad |
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
 | `POST` | `/api/projects/:pid/generate/quiz` | Flervalsquiz |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | Lucktexter |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | Text med luckor |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustration |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Muntligt quiz |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptiv repetition `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/route` | Routningsanalys (plan för generatorer som ska köras) — returnerar `{plan, costDelta}` (kostnad endast för routning) |
-| `POST` | `/api/projects/:pid/generate/auto` | Automatisk backendgenerering (routning + 7 typer: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). Körs parallellt — förutsätter en Mistral-tier med rate limit ≥ 7 samtidiga förfrågningar; annars kan flera 429:or skickas vidare i `failedSteps`. |
+| `POST` | `/api/projects/:pid/generate/route` | Routningsanalys (plan för generatorer att köra) — returnerar `{plan, costDelta}` (kostnad för enbart routning) |
+| `POST` | `/api/projects/:pid/generate/auto` | Automatisk backend-generering (routing + 7 typer: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). Körs parallellt — förutsätter en Mistral-tier med rate-limit ≥ 7 samtidiga förfrågningar; annars kan flera 429:or bubbla upp i `failedSteps`. |
 
 Alla genereringsrutter accepterar `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` kräver dessutom `{generationId, weakQuestions}`.
 
@@ -475,9 +475,9 @@ Alla genereringsrutter accepterar `{sourceIds?, lang?, ageGroup?, count?, useCon
 | Metod | Endpoint | Beskrivning |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Skicka in quizsvar `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Skicka in svar för lucktexter `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Skicka in svar för text med luckor `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Kontrollera ett muntligt svar (ljud + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Läs upp med TTS (studieblad/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Läs upp TTS högt (blad/flashcards) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Byt namn på `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | Ta bort genereringen |
 
@@ -490,34 +490,34 @@ Alla genereringsrutter accepterar `{sourceIds?, lang?, ageGroup?, count?, useCon
 
 ---
 
-## Arkitektoniska beslut
+## Arkitekturbeslut
 
 | Beslut | Motivering |
 |---|---|
-| **Alpine.js istället för React/Vue** | Minimal fotavtryck, lättviktig reaktivitet med TypeScript kompilerat av Vite. Perfekt för en hackathon där snabbhet räknas. |
+| **Alpine.js i stället för React/Vue** | Minimal footprint, lättviktig reaktivitet med TypeScript kompilerat av Vite. Perfekt för en hackathon där hastighet räknas. |
 | **Persistens i JSON-filer** | Noll beroenden, omedelbar start. Ingen databas att konfigurera — vi startar och kör. |
 | **Vite + Handlebars** | Det bästa av två världar: snabb HMR för utveckling, HTML-partials för kodorganisation, Tailwind JIT. |
-| **Centraliserade prompts** | Alla AI-prompts i `prompts.ts` — lätt att iterera, testa och anpassa per språk/åldersgrupp. |
-| **System för flera genereringar** | Varje generering är ett fristående objekt med eget ID — möjliggör flera studieblad, quiz osv. per kurs. |
-| **Åldersanpassade prompts** | 4 åldersgrupper med olika ordförråd, komplexitet och ton — samma innehåll lär ut olika beroende på eleven. |
-| **Funktioner baserade på agenter** | Bildgenerering och webbsökning använder tillfälliga Mistral-agenter — ren livscykel med automatisk städning. |
-| **Intelligent URL-skrapning** | Ett enda fält accepterar blandade URL:er och nyckelord — URL:er skrapas via Readability (statiska sidor) med fallback till Lightpanda (JS/SPA-sidor), nyckelord utlöser en Mistral web_search-agent. Varje resultat skapar en fristående källa. |
-| **100 % Mistral-TTS** | Mistral Voxtral TTS (ingen extra nyckel utöver `MISTRAL_API_KEY`) — talsyntes integrerad i kostnadskedjan och röstlösning per språk. |
+| **Centraliserade prompts** | Alla AI-prompts i `prompts.ts` — enkelt att iterera, testa och anpassa per språk/åldersgrupp. |
+| **Multi-genereringssystem** | Varje generering är ett självständigt objekt med eget ID — möjliggör flera blad, quiz osv. per kurs. |
+| **Åldersanpassade prompts** | 4 åldersgrupper med olika ordförråd, komplexitet och ton — samma innehåll lär olika beroende på lärande. |
+| **Funktionsbaserat på agenter** | Bildgenerering och webbsökning använder tillfälliga Mistral-agenter — ren livscykel med automatisk städning. |
+| **Smart URL-scraping** | Ett enda fält accepterar blandade URL:er och nyckelord — URL:er scrapas via Readability (statiska sidor) med fallback Lightpanda (JS/SPA-sidor), nyckelord triggar en Mistral web_search-agent. Varje resultat skapar en oberoende källa. |
+| **TTS 100% Mistral** | Mistral Voxtral TTS (ingen extra nyckel utöver `MISTRAL_API_KEY`) — talsyntes integrerad i kostnadskedjan och röstupplösning per språk. |
 
 ---
 
-## Krediter & tack
+## Krediter och tack
 
 - **[Mistral AI](https://mistral.ai)** — AI-modeller (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
 - **[Alpine.js](https://alpinejs.dev)** — Lättviktigt reaktivt ramverk
-- **[TailwindCSS](https://tailwindcss.com)** — Utility-first CSS-ramverk
-- **[Vite](https://vitejs.dev)** — Frontend-byggverktyg
+- **[TailwindCSS](https://tailwindcss.com)** — Verktygsbaserat CSS-ramverk
+- **[Vite](https://vitejs.dev)** — Frontend build-verktyg
 - **[Lucide](https://lucide.dev)** — Ikonbibliotek
-- **[Marked](https://marked.js.org)** — Markdown-tolk
-- **[Readability](https://github.com/mozilla/readability)** — Extrahering av webbinnehåll (Firefox Reader View-teknik)
-- **[Lightpanda](https://lightpanda.io)** — Ultralätt headless-webbläsare för skrapning av JS/SPA-sidor
+- **[Marked](https://marked.js.org)** — Markdown-parserare
+- **[Readability](https://github.com/mozilla/readability)** — Extraktion av webbinnehåll (Firefox Reader View-teknik)
+- **[Lightpanda](https://lightpanda.io)** — Ultralätt headless-webbläsare för scraping av JS/SPA-sidor
 
-Initierat under Mistral AI Worldwide Hackathon (mars 2026), utvecklat helt av AI med [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) och [Gemini CLI](https://geminicli.com/).
+Påbörjat under Mistral AI Worldwide Hackathon (mars 2026), utvecklat helt av AI med [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) och [Gemini CLI](https://geminicli.com/).
 
 ---
 

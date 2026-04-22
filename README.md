@@ -329,7 +329,7 @@ generators/
   chat.ts                 — Tuteur IA par chat avec appel d'outils
   router.ts               — Routeur automatique (contenu → générateurs recommandés)
   consigne.ts             — Détection de consignes de révision
-  tts-provider.ts         — TTS Mistral Voxtral (+ voice management : list/get/create/delete)
+  tts-provider.ts         — TTS Mistral Voxtral (synthèse vocale + listing des voix)
   tts.ts                  — Génération audio multi-voix (podcast + flashcards, concaténation de segments)
   stt.ts                  — Voxtral STT (audio → texte)
   websearch.ts            — Agent Mistral avec outil web_search (fallback)
