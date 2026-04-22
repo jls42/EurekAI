@@ -164,11 +164,23 @@ function classifyMistralVoicesSource(): boolean {
 }
 
 // Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
-// (lastLoadFailed), crée d'abord un `.corrupt.bak` à côté du fichier à écraser — évite la
-// perte silencieuse du contenu user original (il pouvait contenir des valeurs que le user
-// voulait récupérer manuellement après debug).
-// const arrow plutôt que `function` pour contourner le parseur TS de Lizard qui agglomère
-// les `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
+// (lastLoadFailed), tente d'abord un `.corrupt.bak` à côté du fichier à écraser.
+//
+// Trade-off explicite quand le backup échoue (EACCES différentiel, ENOSPC borderline) :
+// on log warn et on continue le write principal. Rationale :
+// - Le contenu corrompu est déjà non-utilisable automatiquement (JSON.parse a fail au load)
+// - Sa seule valeur résiduelle est la lecture post-mortem manuelle par un admin
+// - Bloquer le write (throw) refuserait une save légitime de l'user pour préserver un fichier
+//   inexploitable — pire UX
+// - Early-return silencieux serait pire encore : 200 OK côté API (saveConfig retourne sans
+//   throw → server.ts répond 200) alors que rien sur disque
+//
+// Le code actuel privilégie la préservation du nouveau contenu user. Si une garantie
+// "ne jamais perdre le corrompu" devient contractuelle, refactorer la signature de
+// saveConfig pour retourner {config, warnings} et exposer le warning à la route.
+//
+// const arrow (pas function) : contournement parseur TS Lizard qui agglomère les
+// `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const persistConfig = (): void => {
   if (lastLoadFailed && existsSync(configPath)) {
     const backupPath = `${configPath}.corrupt.bak`;
