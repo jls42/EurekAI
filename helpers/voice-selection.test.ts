@@ -90,6 +90,20 @@ describe('selectVoices', () => {
       const r2 = selectVoices({ voices, lang: 'pt-BR', profileId: 'p1' });
       expect(r1?.host).toBe(r2?.host);
     });
+
+    it('unsupported locales sharing en-fallback produce the same rotation seed', () => {
+      const voices = [
+        makeVoice({ id: 'a', languages: ['en_US'] }),
+        makeVoice({ id: 'b', languages: ['en_GB'] }),
+        makeVoice({ id: 'c', languages: ['en_GB'] }),
+      ];
+      const es = selectVoices({ voices, lang: 'es', profileId: 'p1' });
+      const ar = selectVoices({ voices, lang: 'ar', profileId: 'p1' });
+      expect(es?.source).toBe('en-fallback');
+      expect(ar?.source).toBe('en-fallback');
+      expect(es?.host).toBe(ar?.host);
+      expect(es?.guest).toBe(ar?.guest);
+    });
   });
 
   describe('scoring', () => {
@@ -122,6 +136,67 @@ describe('selectVoices', () => {
   });
 
   describe('distinct voices', () => {
+    it('uses the product default pair for French voices when available', () => {
+      const voices = [
+        makeVoice({
+          id: 'fr-neutral',
+          name: 'Marie - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['fr_FR'],
+        }),
+        makeVoice({
+          id: 'fr-excited',
+          name: 'Marie - Excited',
+          gender: 'female',
+          tags: ['excited'],
+          languages: ['fr_FR'],
+        }),
+        makeVoice({
+          id: 'fr-curious',
+          name: 'Marie - Curious',
+          gender: 'female',
+          tags: ['curious'],
+          languages: ['fr_FR'],
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'fr', profileId: 'any-profile' });
+      expect(res?.host).toBe('fr-excited');
+      expect(res?.guest).toBe('fr-curious');
+    });
+
+    it('uses the product default pair for English and en-fallback voices when available', () => {
+      const voices = [
+        makeVoice({
+          id: 'jane-confident',
+          name: 'Jane - Confident',
+          gender: 'female',
+          tags: ['confident'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'jane-neutral',
+          name: 'Jane - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'oliver-curious',
+          name: 'Oliver - Curious',
+          tags: ['curious'],
+          languages: ['en_US'],
+        }),
+      ];
+      const en = selectVoices({ voices, lang: 'en', profileId: 'any-profile' });
+      const es = selectVoices({ voices, lang: 'es', profileId: 'any-profile' });
+      expect(en?.host).toBe('jane-confident');
+      expect(en?.guest).toBe('oliver-curious');
+      expect(es?.source).toBe('en-fallback');
+      expect(es?.host).toBe('jane-confident');
+      expect(es?.guest).toBe('oliver-curious');
+    });
+
     it('returns two distinct voices when bucket has at least 2', () => {
       const voices = [
         makeVoice({ id: 'a', languages: ['fr_FR'] }),
@@ -129,6 +204,34 @@ describe('selectVoices', () => {
       ];
       const res = selectVoices({ voices, lang: 'fr' });
       expect(res?.host).not.toBe(res?.guest);
+    });
+
+    it('prefers a different guest speaker when the bucket allows it', () => {
+      const voices = [
+        makeVoice({
+          id: 'jane-confident',
+          name: 'Jane - Confident',
+          gender: 'female',
+          tags: ['confident'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'jane-neutral',
+          name: 'Jane - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'oliver-cheerful',
+          name: 'Oliver - Cheerful',
+          tags: ['cheerful'],
+          languages: ['en_US'],
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'en', profileId: 'same-speaker' });
+      expect(res?.host).toBe('jane-confident');
+      expect(res?.guest).toBe('oliver-cheerful');
     });
 
     it('reuses the same voice when bucket has only one', () => {

@@ -438,6 +438,7 @@ export const de: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Stimmen fuer Audioinhalte anpassen (Podcasts, Sprachquiz, Vorlesen)',
   'profile.voiceDefault': 'Standard (sprachabhaengig)',
+  'profile.voiceDefaultSuffix': '(Standard)',
   'profile.voiceCurrentDefault': 'Standard f\u00fcr Felder auf \u201eStandard\u201c:',
   'profile.resetDefaults': 'Zuruecksetzen',
   'profile.backToProfiles': 'Zurueck',

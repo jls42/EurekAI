@@ -455,12 +455,14 @@
                   @change="autoSaveProfile(true)"
                   class="w-full input-modern px-3 py-2 text-body-sm"
                 >
-                  <option value="" x-text="t('profile.voiceDefault')">Default</option>
+                  <option
+                    value=""
+                    x-text="defaultVoiceOptionLabel('host', editingProfile.locale, editingProfile.id)"
+                  >
+                    Default
+                  </option>
                   <template x-for="v in mistralVoicesList" :key="'ph-'+v.id">
-                    <option
-                      :value="v.id"
-                      x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
-                    ></option>
+                    <option :value="v.id" x-text="voiceLabel(v)"></option>
                   </template>
                 </select>
               </div>
@@ -477,24 +479,17 @@
                   @change="autoSaveProfile(true)"
                   class="w-full input-modern px-3 py-2 text-body-sm"
                 >
-                  <option value="" x-text="t('profile.voiceDefault')">Default</option>
+                  <option
+                    value=""
+                    x-text="defaultVoiceOptionLabel('guest', editingProfile.locale, editingProfile.id)"
+                  >
+                    Default
+                  </option>
                   <template x-for="v in mistralVoicesList" :key="'pg-'+v.id">
-                    <option
-                      :value="v.id"
-                      x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
-                    ></option>
+                    <option :value="v.id" x-text="voiceLabel(v)"></option>
                   </template>
                 </select>
               </div>
-            </div>
-            <div
-              x-show="(!editingProfile.mistralVoices.host || !editingProfile.mistralVoices.guest) && defaultVoiceHint(editingProfile.locale, editingProfile.id)"
-              class="mt-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400 flex items-center gap-1.5"
-            >
-              <span>🎙️</span>
-              <span
-                x-text="t('profile.voiceCurrentDefault') + ' ' + defaultVoiceHint(editingProfile.locale, editingProfile.id)"
-              ></span>
             </div>
           </div>
 

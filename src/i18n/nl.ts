@@ -432,6 +432,7 @@ export const nl: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Pas stemmen aan voor audiocontent (podcasts, spraakquiz, voorlezen)',
   'profile.voiceDefault': 'Standaard (op basis van taal)',
+  'profile.voiceDefaultSuffix': '(standaard)',
   'profile.voiceCurrentDefault': 'Standaard voor velden op \u201cStandaard\u201d:',
   'profile.resetDefaults': 'Herstellen',
   'profile.backToProfiles': 'Terug',

@@ -1375,7 +1375,7 @@ describe('createProfiles', () => {
       expect(ctx.updateProfile).toHaveBeenCalledWith(
         'p1',
         expect.objectContaining({
-          mistralVoices: { host: 'custom-host', guest: '' },
+          mistralVoices: { host: 'custom-host' },
         }),
         expect.any(AbortSignal),
       );

@@ -440,6 +440,7 @@ export const pt: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personalize as vozes para conteudo de audio (podcasts, quiz vocais, leitura)',
   'profile.voiceDefault': 'Padrao (de acordo com o idioma)',
+  'profile.voiceDefaultSuffix': '(padrão)',
   'profile.voiceCurrentDefault': 'Padr\u00e3o para campos em \u00abPadr\u00e3o\u00bb:',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Voltar',

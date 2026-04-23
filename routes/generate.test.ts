@@ -108,7 +108,6 @@ vi.mock('../config.js', () => ({
       chat: 'm',
     },
     ttsModel: 'voxtral-mini-tts-2603',
-    mistralVoices: { host: 'mh', guest: 'mg' },
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
   getModelLimits: vi.fn(() => ({})),

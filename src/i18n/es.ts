@@ -433,6 +433,7 @@ export const es: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personaliza las voces para contenido de audio (podcasts, quiz vocales, lectura)',
   'profile.voiceDefault': 'Por defecto (segun el idioma)',
+  'profile.voiceDefaultSuffix': '(predeterminada)',
   'profile.voiceCurrentDefault': 'Por defecto para campos en \u00abPor defecto\u00bb:',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Volver',

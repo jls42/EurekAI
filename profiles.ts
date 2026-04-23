@@ -2,6 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
+import type { VoiceId } from './helpers/voice-types.js';
 
 // --- Age group derivation ---
 
@@ -74,6 +75,21 @@ export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { 
   return { ...rest, hasPin: !!pinHash };
 }
 
+type MistralVoicesInput = Partial<Record<'host' | 'guest', unknown>> | null | undefined;
+
+const toVoiceIdOrUndefined = (value: unknown): VoiceId | undefined =>
+  typeof value === 'string' && value ? (value as VoiceId) : undefined;
+
+function normalizeMistralVoices(
+  voices: MistralVoicesInput,
+): { host?: VoiceId; guest?: VoiceId } | undefined {
+  if (!voices || typeof voices !== 'object') return undefined;
+  const host = toVoiceIdOrUndefined(voices.host);
+  const guest = toVoiceIdOrUndefined(voices.guest);
+  if (!host && !guest) return undefined;
+  return { ...(host ? { host } : {}), ...(guest ? { guest } : {}) };
+}
+
 function migrateProfile(p: Profile): boolean {
   let changed = false;
   if (!p.locale) {
@@ -90,6 +106,11 @@ function migrateProfile(p: Profile): boolean {
   }
   if (!p.updatedAt) {
     p.updatedAt = p.createdAt || new Date().toISOString();
+    changed = true;
+  }
+  const normalizedVoices = normalizeMistralVoices(p.mistralVoices);
+  if (JSON.stringify(normalizedVoices) !== JSON.stringify(p.mistralVoices)) {
+    p.mistralVoices = normalizedVoices;
     changed = true;
   }
   return changed;
@@ -192,12 +213,9 @@ export class ProfileStore {
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
     if (
       updates.mistralVoices !== undefined &&
-      (updates.mistralVoices === null ||
-        (typeof updates.mistralVoices === 'object' &&
-          typeof updates.mistralVoices.host === 'string' &&
-          typeof updates.mistralVoices.guest === 'string'))
+      (updates.mistralVoices === null || typeof updates.mistralVoices === 'object')
     ) {
-      profile.mistralVoices = updates.mistralVoices || undefined;
+      profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
     }
     if (
       updates.theme !== undefined &&

@@ -104,7 +104,14 @@ export interface AppContext extends AppState {
 
   translateEmotion(emotion: string): string;
   langToFlag(lang: string): string;
-  defaultVoiceHint(locale: string, profileId?: string): string;
+  voiceLabel(voice: {
+    id?: string;
+    name?: string;
+    speaker?: string;
+    emotion?: string;
+    lang?: string;
+  }): string;
+  defaultVoiceOptionLabel(role: 'host' | 'guest', locale: string, profileId?: string): string;
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;

@@ -16,7 +16,7 @@ export interface Profile {
   moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
-  mistralVoices?: { host: VoiceId; guest: VoiceId };
+  mistralVoices?: { host?: VoiceId; guest?: VoiceId };
   theme?: 'dark' | 'light';
   pinHash?: string;
   hasPin?: boolean;
@@ -295,13 +295,4 @@ export interface AppConfig {
     chat: string;
   };
   ttsModel: string;
-  mistralVoices: {
-    host: VoiceId;
-    guest: VoiceId;
-  };
-  // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
-  // 'user'    : l'utilisateur a explicitement configuré les voix via settings.
-  // Permet de traiter l'override global comme intentionnel ou non sans allonger
-  // LEGACY_DEFAULT_* à chaque release qui change le défaut.
-  mistralVoicesSource?: 'default' | 'user';
 }

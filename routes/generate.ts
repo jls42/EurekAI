@@ -112,7 +112,7 @@ interface GenContext {
   sourceIds: string[];
   count?: number;
   pid: string;
-  profileVoices?: { host: VoiceId; guest: VoiceId };
+  profileVoices?: { host?: VoiceId; guest?: VoiceId };
   // Propagé pour que resolveVoices() applique la rotation déterministe par profil
   // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
   profileId?: string;
@@ -366,7 +366,7 @@ export function generateRoutes(
         logger.info('podcast', 'Generating audio...');
         const audioBuffer = await generateAudio(
           podcastResult.script,
-          resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
+          resolveVoices(ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
           { model: ctx.config.ttsModel, mistralClient: client },
         );
         const audioUrl = saveAudioFile(
@@ -462,7 +462,6 @@ export function generateRoutes(
         const audioUrls: string[] = [];
         const projectDir = store.getProjectDir(ctx.pid);
         const hostVoice = resolveVoices(
-          ctx.config,
           ctx.profileVoices,
           ctx.lang,
           ctx.profileId,
@@ -585,7 +584,7 @@ export function generateRoutes(
     pid: string;
     store: ProjectStore;
     generations: Generation[];
-    profileVoices?: { host: VoiceId; guest: VoiceId };
+    profileVoices?: { host?: VoiceId; guest?: VoiceId };
     profileId?: string;
   }
 
@@ -665,7 +664,7 @@ export function generateRoutes(
       );
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
+        resolveVoices(ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
         { model: ctx.config.ttsModel, mistralClient: ctx.client },
       );
       const audioUrl = saveAudioFile(
@@ -697,13 +696,7 @@ export function generateRoutes(
       );
       const audioUrls: string[] = [];
       const projectDir = ctx.store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices(
-        ctx.config,
-        ctx.profileVoices,
-        ctx.lang,
-        ctx.profileId,
-        QUIZ_VOCAL,
-      ).host;
+      const hostVoice = resolveVoices(ctx.profileVoices, ctx.lang, ctx.profileId, QUIZ_VOCAL).host;
       const ttsOpts = {
         model: ctx.config.ttsModel,
         mistralClient: ctx.client,

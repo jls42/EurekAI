@@ -6,15 +6,15 @@
 // 1. bucket langue exacte/préfixée  -> source 'lang-match'
 // 2. sinon bucket en                -> source 'en-fallback'
 // 3. sinon bucket global            -> source 'any-fallback'
-// 4. sinon null (voiceCache vide)   -> appelant retombe sur DEFAULT_CONFIG.mistralVoices
+// 4. sinon null (voiceCache vide)   -> appelant retombe sur son fallback interne
 //
 // Classement du bucket retenu :
 //   - score DESC (préférence female + tags émotionnels)
 //   - id ASC comme tie-breaker de stabilité cross-release
 //
-// Rotation déterministe par (profileId, lang) via djb2 pour donner un offset
-// sur le bucket trié -> deux profils distincts peuvent obtenir des voix
-// différentes, dans la limite de la taille réelle du bucket (best-effort).
+// Rotation déterministe par (profileId, langue du bucket retenu) via djb2 pour donner
+// un offset sur le bucket trié -> deux profils distincts peuvent obtenir des voix
+// différentes, sans changer arbitrairement entre locales qui partagent un fallback EN.
 //
 // Stabilité : déterministe tant qu'aucune voix n'est ajoutée/supprimée
 // dans le bucket de la langue concernée.
@@ -105,6 +105,47 @@ const rotateDeterministic = <T>(list: T[], seed: string): T[] => {
   return [...list.slice(offset), ...list.slice(0, offset)];
 };
 
+const speakerName = (voice: MistralVoice): string => (voice.name || voice.id).split(' - ')[0];
+
+const emotionName = (voice: MistralVoice): string => (voice.name || '').split(' - ')[1] || '';
+
+const matchesVoice = (voice: MistralVoice, speaker: string, emotion: string): boolean =>
+  speakerName(voice).toLowerCase() === speaker &&
+  (emotionName(voice).toLowerCase() === emotion ||
+    (voice.tags ?? []).some((tag) => tag.toLowerCase() === emotion));
+
+const findVoice = (voices: MistralVoice[], speaker: string, emotion: string): MistralVoice | null =>
+  voices.find((voice) => matchesVoice(voice, speaker, emotion)) ?? null;
+
+const preferredPair = (
+  voices: MistralVoice[],
+  langMatched: string | null,
+): MistralVoice[] | null => {
+  let preferred: string[][] | null = null;
+  if (langMatched === 'fr') {
+    preferred = [
+      ['marie', 'excited'],
+      ['marie', 'curious'],
+    ];
+  }
+  if (langMatched === 'en') {
+    preferred = [
+      ['jane', 'confident'],
+      ['oliver', 'curious'],
+    ];
+  }
+  if (!preferred) return null;
+  const [hostPref, guestPref] = preferred;
+  const host = findVoice(voices, hostPref[0], hostPref[1]);
+  const guest = findVoice(voices, guestPref[0], guestPref[1]);
+  return host && guest ? [host, guest] : null;
+};
+
+const pickGuest = (rotated: MistralVoice[], host: MistralVoice): MistralVoice => {
+  const hostSpeaker = speakerName(host);
+  return rotated.find((voice) => speakerName(voice) !== hostSpeaker) ?? rotated[1] ?? host;
+};
+
 type ResolvedBucket = {
   bucket: MistralVoice[];
   source: VoiceSelectionSource;
@@ -132,12 +173,24 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
   if (!resolved) return null;
 
   const sorted = sortByScoreThenId(resolved.bucket);
-  // Seed basé sur la langue normalisée pour que pt-BR et pt produisent la même voix.
-  const seed = `${input.profileId ?? '__default__'}|${normalizeLang(input.lang)}`;
+  const preferred = preferredPair(sorted, resolved.langMatched);
+  if (preferred) {
+    return {
+      host: preferred[0].id,
+      guest: preferred[1].id,
+      source: resolved.source,
+      bucketSize: resolved.bucket.length,
+      langMatched: resolved.langMatched,
+    };
+  }
+  // Seed basé sur la langue effectivement retenue: pt-BR et pt restent stables,
+  // et es/ar/etc. qui tombent sur le fallback EN partagent une paire EN cohérente.
+  const seedLang = resolved.langMatched ?? normalizeLang(input.lang);
+  const seed = `${input.profileId ?? '__default__'}|${seedLang}`;
   const rotated = rotateDeterministic(sorted, seed);
 
   const host = rotated[0];
-  const guest = rotated.length > 1 ? rotated[1] : rotated[0];
+  const guest = pickGuest(rotated, host);
 
   return {
     host: host.id,

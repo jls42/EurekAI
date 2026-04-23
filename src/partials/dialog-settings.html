@@ -82,61 +82,6 @@
         </div>
       </div>
     </div>
-    <div>
-      <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-      <h3
-        class="font-heading font-semibold text-sm text-text-secondary mb-2"
-        x-text="t('settings.voiceTts')"
-      >
-        Voices
-      </h3>
-      <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label
-              for="cfg-mistral-voice-host"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceHost')"
-              >Main</label
-            >
-            <select
-              id="cfg-mistral-voice-host"
-              x-model="configDraft.mistralVoices.host"
-              @change="configDraft.mistralVoicesSource = 'user'"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            >
-              <template x-for="v in mistralVoicesList" :key="'h-'+v.id">
-                <option
-                  :value="v.id"
-                  x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
-                ></option>
-              </template>
-            </select>
-          </div>
-          <div>
-            <label
-              for="cfg-mistral-voice-guest"
-              class="text-sm text-text-secondary block mb-1"
-              x-text="t('settings.voiceGuest')"
-              >Secondary</label
-            >
-            <select
-              id="cfg-mistral-voice-guest"
-              x-model="configDraft.mistralVoices.guest"
-              @change="configDraft.mistralVoicesSource = 'user'"
-              class="w-full input-modern px-3 py-2 text-body-sm"
-            >
-              <template x-for="v in mistralVoicesList" :key="'g-'+v.id">
-                <option
-                  :value="v.id"
-                  x-text="langToFlag(v.lang) + ' ' + v.speaker + ' - ' + translateEmotion(v.emotion)"
-                ></option>
-              </template>
-            </select>
-          </div>
-        </div>
-      </div>
-    </div>
     <div class="flex gap-3">
       <button
         @click="resetSettings()"

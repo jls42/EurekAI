@@ -70,9 +70,12 @@ export function isProfileFormValid(p: EditingProfile | null | undefined): boolea
 
 export function buildVoicesUpdate(
   mistralVoices: MistralVoicesPartial,
-): { host: string; guest: string } | null {
+): { host?: string; guest?: string } | null {
   if (!mistralVoices?.host && !mistralVoices?.guest) return null;
-  return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
+  const voices: { host?: string; guest?: string } = {};
+  if (mistralVoices.host) voices.host = mistralVoices.host;
+  if (mistralVoices.guest) voices.guest = mistralVoices.guest;
+  return voices;
 }
 
 type ValidationResult = 'ok' | 'invalid' | 'pin_mismatch';

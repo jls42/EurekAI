@@ -127,6 +127,9 @@ export function createState() {
     mistralVoicesList: [] as Array<{
       id: string;
       name: string;
+      languages: string[];
+      gender?: string;
+      tags?: string[];
       speaker: string;
       emotion: string;
       lang: string;
@@ -144,7 +147,6 @@ export function createState() {
         chat: '',
       },
       ttsModel: '',
-      mistralVoices: { host: 'Oliver', guest: 'Marie' },
     },
 
     // Theme

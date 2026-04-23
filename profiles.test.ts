@@ -345,6 +345,25 @@ describe('ProfileStore.update', () => {
     expect(updated!.mistralVoices).toEqual(voices);
   });
 
+  it('normalizes partial mistralVoices without persisting empty strings', () => {
+    const p = store.create('VoiceUser', 12);
+    const updated = store.update(p.id, {
+      mistralVoices: { host: asVoiceId('voice-host-id'), guest: asVoiceId('') },
+    });
+    expect(updated!.mistralVoices).toEqual({ host: 'voice-host-id' });
+  });
+
+  it('clears mistralVoices when both fields are empty', () => {
+    const p = store.create('VoiceUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: asVoiceId('voice-host-id'), guest: asVoiceId('voice-guest-id') },
+    });
+    const updated = store.update(p.id, {
+      mistralVoices: { host: asVoiceId(''), guest: asVoiceId('') },
+    });
+    expect(updated!.mistralVoices).toBeUndefined();
+  });
+
   it('updates theme', () => {
     const p = store.create('ThemeUser', 10);
     expect(p.theme).toBeUndefined();
