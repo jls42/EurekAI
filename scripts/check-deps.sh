@@ -22,13 +22,26 @@ echo "=== Security audit (transitive vulnerabilities) ==="
 # npm audit exit non-zero quand des vulns sont trouvees -> ne pas propager au script.
 # Couvre les deps transitives (npm outdated ne les voit pas : bug historique protobufjs
 # via @google/genai, detecte seulement par Dependabot, rate par ce script avant fix).
+# NB: registry/proxy down -> npm audit --json renvoie un payload `{"error": {...}}`
+# sans metadata. Checker `a.error` avant de conclure "clean" pour eviter un faux negatif.
 audit_json=$(npm audit --json 2>/dev/null || true)
 if [ -n "$audit_json" ]; then
   echo "$audit_json" | node -e "
     const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
       try{
         const a=JSON.parse(d.join(''));
-        const v=a.metadata&&a.metadata.vulnerabilities||{};
+        if(a.error){
+          const code=a.error.code||'?';
+          const msg=a.error.summary||a.error.detail||'unknown';
+          console.log('  ⚠ audit unavailable ('+code+'): '+msg);
+          console.log('  (registry/proxy issue — security status unknown for this run)');
+          return;
+        }
+        if(!a.metadata||!a.metadata.vulnerabilities){
+          console.log('  ⚠ audit output missing metadata.vulnerabilities — cannot confirm clean');
+          return;
+        }
+        const v=a.metadata.vulnerabilities;
         const total=Object.values(v).reduce((s,n)=>s+n,0);
         if(total===0){console.log('  ✓ No known vulnerabilities');return;}
         const parts=['critical','high','moderate','low','info']

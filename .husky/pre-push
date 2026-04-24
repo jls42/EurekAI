@@ -1,13 +1,50 @@
 # Bloque le push sur les vulns critiques transitives (detectees AVANT que Dependabot
 # ouvre une PR). --audit-level=critical : moderate/high ne bloquent pas (souvent non
-# actionnable au moment du push, bruit trop important). ~1s, pas de reseau.
-if ! npm audit --audit-level=critical >/dev/null 2>&1; then
-  echo ""
-  echo "✗ Vulnerabilite critique detectee (dep transitive)."
-  echo "  Details : npm audit"
-  echo "  Fix : npm audit fix (auto), bump parent dep, ou merger PR Dependabot."
-  echo "  Forcer le push malgre tout : git push --no-verify"
-  exit 1
-fi
+# actionnable au moment du push, bruit trop important). ~1s avec reseau, ~instant
+# avec cache npm chaud. npm audit fait un POST au registry : si offline/proxy down,
+# le JSON renvoyé contient `{"error": {...}}` sans metadata. Dans ce cas on laisse
+# passer avec un warning plutot que bloquer un push legitime sur un faux signal.
+#
+# Fail-closed sur verdicts inconnus : `no-metadata` (shape audit cassée, breaking
+# change npm, OOM tronquant stdout) et `parse-error` (JSON invalide, node bin
+# introuvable) bloquent le push. Seul `transport:*` (erreur reseau identifiee via
+# a.error côté registry) est explicitement non-bloquant — c'est le seul état ou on
+# peut distinguer "vulnerabilité absente" de "vulnérabilité inconnue".
+audit_json=$(npm audit --json 2>/dev/null || true)
+audit_verdict=$(echo "$audit_json" | node -e "
+  const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+    try{
+      const a=JSON.parse(d.join(''));
+      if(a.error){console.log('transport:'+(a.error.code||'?'));return;}
+      if(!a.metadata||!a.metadata.vulnerabilities){console.log('no-metadata');return;}
+      const c=a.metadata.vulnerabilities.critical||0;
+      console.log(c>0?'critical:'+c:'ok');
+    }catch{console.log('parse-error');}
+  })
+" 2>/dev/null || echo "parse-error")
+case "$audit_verdict" in
+  ok) ;;
+  transport:*)
+    echo ""
+    echo "⚠ npm audit unavailable (${audit_verdict#transport:}) — skipping transitive vuln gate."
+    echo "  Registry/proxy issue, not a vulnerability. Retry with network access."
+    ;;
+  critical:*)
+    echo ""
+    echo "✗ Vulnerabilite critique detectee (dep transitive, ${audit_verdict#critical:} finding(s))."
+    echo "  Details : npm audit"
+    echo "  Fix : npm audit fix (auto), bump parent dep, ou merger PR Dependabot."
+    echo "  Forcer le push malgre tout : git push --no-verify"
+    exit 1
+    ;;
+  *)
+    echo ""
+    echo "✗ pre-push audit gate broken (verdict: $audit_verdict)."
+    echo "  Diagnostic : npm audit --json | head -c 500"
+    echo "  Causes possibles : shape audit cassee, node bin introuvable, OOM stdout."
+    echo "  Forcer le push malgre tout (apres diagnostic) : git push --no-verify"
+    exit 1
+    ;;
+esac
 
 npm run security
