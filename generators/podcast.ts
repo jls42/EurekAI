@@ -1,7 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
-import { podcastSystem, podcastUser } from '../prompts.js';
+import { podcastSystem, podcastUser, pickPodcastNames } from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration } from '../types.js';
 
 export interface PodcastResult {
@@ -39,8 +39,9 @@ export async function generatePodcastScript(
   ageGroup: AgeGroup = 'enfant',
   exclusions?: string,
 ): Promise<PodcastResult> {
+  const names = pickPodcastNames();
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: podcastSystem(ageGroup) },
+    { role: 'system', content: podcastSystem(ageGroup, names) },
     { role: 'user', content: podcastUser(markdown, lang, exclusions) },
   ];
 

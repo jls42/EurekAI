@@ -376,20 +376,49 @@ Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 
 // ── Podcast ──────────────────────────────────────────────────────────
 
-export function podcastSystem(ageGroup: AgeGroup = 'enfant'): string {
+// Pool de prenoms epicenes (neutres en genre) pour les personnages du podcast.
+// Tous validees 100% epicenes en francais moderne, courts, faciles a prononcer par
+// TTS pour un public enfant/ado. Cross-locale friendly (noms egalement usuels en
+// EN/ES/IT/PT/DE) donc pas de i18n specifique.
+export const PODCAST_NAME_POOL = [
+  'Alex',
+  'Charlie',
+  'Camille',
+  'Sasha',
+  'Claude',
+  'Dominique',
+  'Andrea',
+  'Morgan',
+  'Mika',
+  'Valéry',
+] as const;
+
+// Tire deux prenoms distincts du pool via un RNG injectable (tests deterministes).
+// Le decalage `j >= i` garantit host != guest sans boucle retry.
+export function pickPodcastNames(rng: () => number = Math.random): { host: string; guest: string } {
+  const i = Math.floor(rng() * PODCAST_NAME_POOL.length);
+  let j = Math.floor(rng() * (PODCAST_NAME_POOL.length - 1));
+  if (j >= i) j += 1;
+  return { host: PODCAST_NAME_POOL[i], guest: PODCAST_NAME_POOL[j] };
+}
+
+export function podcastSystem(
+  ageGroup: AgeGroup = 'enfant',
+  names: { host: string; guest: string } = { host: 'Alex', guest: 'Charlie' },
+): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
 PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
-- "host" = Alex : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir Zoe.
-- "guest" = Zoe : eleve curieuse qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+- "host" = ${names.host} : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir ${names.guest}.
+- "guest" = ${names.guest} : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
 Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
 
 STRUCTURE :
-- Accroche : Alex pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
-- Developpement : alternance Alex/Zoe avec progression logique. Zoe relance par des questions, Alex repond avec des exemples concrets.
+- Accroche : ${names.host} pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
+- Developpement : alternance ${names.host}/${names.guest} avec progression logique. ${names.guest} relance par des questions, ${names.host} repond avec des exemples concrets.
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 ${sourceRefsInstruction('podcast')}
