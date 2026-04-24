@@ -85,6 +85,11 @@ export interface PodcastLine {
   text: string;
 }
 
+export interface PodcastSpeakers {
+  host: string;
+  guest: string;
+}
+
 // --- Generation system (multi-results) ---
 
 export interface GenerationMeta {
@@ -118,7 +123,12 @@ export interface QuizGeneration extends GenerationMeta {
 
 export interface PodcastGeneration extends GenerationMeta {
   type: 'podcast';
-  data: { script: PodcastLine[]; audioUrl: string; sourceRefs?: string[] };
+  data: {
+    script: PodcastLine[];
+    audioUrl: string;
+    sourceRefs?: string[];
+    speakers?: PodcastSpeakers;
+  };
   // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
   // Aligné sur QuizVocalGeneration (cf. ligne plus bas) : les anciennes générations
   // sans `lang` ne porteront pas de badge beta audio, pas de backfill.

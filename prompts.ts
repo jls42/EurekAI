@@ -1,6 +1,6 @@
 import { logger } from './helpers/logger.js';
 import { spokenChoiceLabel } from './helpers/choice-labels.js';
-import type { AgeGroup } from './types.js';
+import type { AgeGroup, PodcastSpeakers } from './types.js';
 
 // ── Language helper ──────────────────────────────────────────────────
 
@@ -395,7 +395,7 @@ export const PODCAST_NAME_POOL = [
 
 // Tire deux prenoms distincts du pool via un RNG injectable (tests deterministes).
 // Le decalage `j >= i` garantit host != guest sans boucle retry.
-export function pickPodcastNames(rng: () => number = Math.random): { host: string; guest: string } {
+export function pickPodcastNames(rng: () => number = Math.random): PodcastSpeakers {
   const i = Math.floor(rng() * PODCAST_NAME_POOL.length);
   let j = Math.floor(rng() * (PODCAST_NAME_POOL.length - 1));
   if (j >= i) j += 1;
@@ -408,7 +408,7 @@ const DEFAULT_PODCAST_NAMES = { host: 'Alex', guest: 'Charlie' } as const;
 
 export function podcastSystem(
   ageGroup: AgeGroup = 'enfant',
-  names: { host: string; guest: string } = DEFAULT_PODCAST_NAMES,
+  names: PodcastSpeakers = DEFAULT_PODCAST_NAMES,
 ): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 

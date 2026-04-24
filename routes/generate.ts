@@ -390,7 +390,12 @@ export function generateRoutes(
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'podcast',
-          data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          data: {
+            script: podcastResult.script,
+            audioUrl,
+            sourceRefs: podcastResult.sourceRefs,
+            speakers: podcastResult.names,
+          },
           lang: ctx.lang,
         });
       },
@@ -686,7 +691,12 @@ export function generateRoutes(
       return {
         ...makeGen(
           'podcast',
-          { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          {
+            script: podcastResult.script,
+            audioUrl,
+            sourceRefs: podcastResult.sourceRefs,
+            speakers: podcastResult.names,
+          },
           ctx,
         ),
         // Figer lang pour le badge beta audio (hi/ar) — même contrat que la route dédiée.

@@ -2,11 +2,15 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { podcastSystem, podcastUser, pickPodcastNames } from '../prompts.js';
-import type { PodcastLine, AgeGroup, PodcastGeneration } from '../types.js';
+import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
 
-export interface PodcastResult {
+interface ParsedPodcastResponse {
   script: PodcastLine[];
   sourceRefs?: string[];
+}
+
+export interface PodcastResult extends ParsedPodcastResponse {
+  names: PodcastSpeakers;
 }
 
 function isValidPodcast(data: PodcastLine[]): boolean {
@@ -21,7 +25,7 @@ function isValidPodcast(data: PodcastLine[]): boolean {
   );
 }
 
-function parsePodcastResponse(raw: string): PodcastResult {
+function parsePodcastResponse(raw: string): ParsedPodcastResponse {
   const parsed = safeParseJson(raw) as Record<string, unknown>;
   // Extract sourceRefs before unwrapping the array
   const sourceRefs = Array.isArray(parsed?.sourceRefs)
@@ -55,7 +59,7 @@ export async function generatePodcastScript(
   const raw = getContent(response);
   const result = parsePodcastResponse(raw);
 
-  if (isValidPodcast(result.script)) return result;
+  if (isValidPodcast(result.script)) return { ...result, names };
 
   console.warn(
     'Podcast validation failed, retrying. Got:',
@@ -81,7 +85,7 @@ export async function generatePodcastScript(
   if (!isValidPodcast(retryResult.script)) {
     throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");
   }
-  return retryResult;
+  return { ...retryResult, names };
 }
 
 export function createPodcastGeneration(

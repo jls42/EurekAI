@@ -57,6 +57,7 @@ vi.mock('../generators/podcast.js', () => ({
       { speaker: 'guest', text: 'Hi' },
     ],
     sourceRefs: ['ref1'],
+    names: { host: 'Camille', guest: 'Sasha' },
   }),
   createPodcastGeneration: (fields: unknown) => fields,
 }));
@@ -774,6 +775,7 @@ describe('generateRoutes', () => {
       expect(gen.data.script).toHaveLength(2);
       expect(gen.data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
       expect(gen.data.sourceRefs).toEqual(['ref1']);
+      expect(gen.data.speakers).toEqual({ host: 'Camille', guest: 'Sasha' });
 
       // C2: flow='podcast' doit etre passe pour la rotation deterministe par profil
       const { resolveVoices } = await import('../config.js');
@@ -1429,6 +1431,7 @@ describe('generateRoutes', () => {
       expect(result.generations[0].data.script).toHaveLength(2);
       expect(result.generations[0].data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
       expect(result.generations[0].data.sourceRefs).toEqual(['ref1']);
+      expect(result.generations[0].data.speakers).toEqual({ host: 'Camille', guest: 'Sasha' });
       expect(result.failedSteps).toBeUndefined();
 
       // Verify stored
