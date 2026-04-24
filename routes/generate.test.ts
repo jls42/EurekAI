@@ -774,6 +774,10 @@ describe('generateRoutes', () => {
       expect(gen.data.script).toHaveLength(2);
       expect(gen.data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
       expect(gen.data.sourceRefs).toEqual(['ref1']);
+
+      // C2: flow='podcast' doit etre passe pour la rotation deterministe par profil
+      const { resolveVoices } = await import('../config.js');
+      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'podcast' }));
     });
   });
 
@@ -799,6 +803,10 @@ describe('generateRoutes', () => {
       expect(gen.data).toHaveLength(1);
       expect(gen.audioUrls).toHaveLength(1);
       expect(gen.audioUrls[0]).toContain(`/output/projects/${pid}/quiz-vocal-q0-`);
+
+      // C2: flow='quiz-vocal' doit etre passe pour la rotation deterministe par profil
+      const { resolveVoices } = await import('../config.js');
+      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'quiz-vocal' }));
     });
   });
 

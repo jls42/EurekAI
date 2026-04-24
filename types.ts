@@ -281,6 +281,13 @@ export interface ChatHistory {
   messages: ChatMessage[];
 }
 
+// --- TTS flow (voice selection context) ---
+
+// Identifie le contexte d'appel TTS pour la rotation déterministe par profil dans
+// selectVoices (seed = profileId+flow). Sans flow explicite, tous les flux d'un
+// profil partageraient le seed et produiraient la même voix — bug d'observabilité.
+export type VoiceFlow = 'podcast' | 'quiz-vocal' | 'read-aloud';
+
 // --- App config ---
 
 export interface AppConfig {

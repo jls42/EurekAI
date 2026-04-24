@@ -758,6 +758,11 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
 
     await handler(req, res);
 
+    // C2: rotation déterministe par profil exige flow='read-aloud' explicite sur ce chemin TTS.
+    expect(resolveVoices).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'read-aloud', lang: 'fr' }),
+    );
+
     // 4 TTS calls: 2 questions (host) + 2 answers (guest)
     expect(textToSpeech).toHaveBeenCalledTimes(4);
     const calls = (textToSpeech as any).mock.calls;

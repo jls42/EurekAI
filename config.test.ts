@@ -286,8 +286,22 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
+  // Helper de test pour réduire le boilerplate — les tests ici exercent la logique
+  // de résolution (profileVoices override, bucket lang, fallback EN), pas les
+  // comportements flow/profileId qui sont couverts dans helpers/voice-selection.test.ts.
+  const resolve = (
+    profileVoices?: { host?: ReturnType<typeof asVoiceId>; guest?: ReturnType<typeof asVoiceId> },
+    lang = 'fr',
+  ) =>
+    resolveVoices({
+      profileVoices,
+      lang,
+      profileId: null,
+      flow: 'podcast',
+    });
+
   it('fallback interne quand cache vide', () => {
-    expect(resolveVoices(undefined, 'fr')).toEqual({
+    expect(resolve(undefined, 'fr')).toEqual({
       host: FALLBACK_HOST,
       guest: FALLBACK_GUEST,
     });
@@ -298,7 +312,7 @@ describe('resolveVoices', () => {
       host: asVoiceId('profile-host-id'),
       guest: asVoiceId('profile-guest-id'),
     };
-    expect(resolveVoices(profileVoices, 'fr')).toEqual(profileVoices);
+    expect(resolve(profileVoices, 'fr')).toEqual(profileVoices);
   });
 
   it('selectionne les voix de la langue quand le profil ne force rien', () => {
@@ -318,7 +332,7 @@ describe('resolveVoices', () => {
         gender: 'female',
       },
     ]);
-    expect(resolveVoices(undefined, 'fr')).toEqual({
+    expect(resolve(undefined, 'fr')).toEqual({
       host: 'marie-excited',
       guest: 'marie-curious',
     });
@@ -340,7 +354,7 @@ describe('resolveVoices', () => {
         tags: ['curious'],
       },
     ]);
-    expect(resolveVoices(undefined, 'es')).toEqual({
+    expect(resolve(undefined, 'es')).toEqual({
       host: 'jane-confident',
       guest: 'oliver-curious',
     });
@@ -362,12 +376,12 @@ describe('resolveVoices', () => {
         tags: ['cheerful'],
       },
     ]);
-    const voices = resolveVoices({ host: asVoiceId('only-host') }, 'en');
+    const voices = resolve({ host: asVoiceId('only-host') }, 'en');
     expect(voices).toEqual({ host: 'only-host', guest: 'jane-curious' });
   });
 
   it('merge voix profil partielles: guest custom + host fallback interne', () => {
-    const voices = resolveVoices({ guest: asVoiceId('only-guest') }, 'fr');
+    const voices = resolve({ guest: asVoiceId('only-guest') }, 'fr');
     expect(voices).toEqual({ host: FALLBACK_HOST, guest: 'only-guest' });
   });
 
@@ -386,10 +400,7 @@ describe('resolveVoices', () => {
         tags: ['cheerful'],
       },
     ]);
-    const voices = resolveVoices(
-      { host: asVoiceId('custom-h'), guest: asVoiceId('custom-g') },
-      'en',
-    );
+    const voices = resolve({ host: asVoiceId('custom-h'), guest: asVoiceId('custom-g') }, 'en');
     expect(voices).toEqual({ host: 'custom-h', guest: 'custom-g' });
   });
 });

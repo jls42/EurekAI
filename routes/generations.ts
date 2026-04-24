@@ -227,7 +227,12 @@ function resolveReadAloudContext(
   const profile = profileId ? profileStore.get(profileId) : null;
   // Passe profileId + flow='read-aloud' pour que la rotation déterministe par profil
   // s'applique aussi ici et que les logs de fallback soient contextualisés.
-  const voices = resolveVoices(profile?.mistralVoices, lang, profileId, 'read-aloud');
+  const voices = resolveVoices({
+    profileVoices: profile?.mistralVoices,
+    lang: lang || profile?.locale || 'fr',
+    profileId: profileId ?? null,
+    flow: 'read-aloud',
+  });
   const ttsOpts = {
     model: config.ttsModel,
     mistralClient: client,

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AppConfig } from './types.js';
+import type { AppConfig, VoiceFlow } from './types.js';
 import type { MistralVoice, VoiceId } from './helpers/voice-types.js';
 import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
@@ -284,13 +284,16 @@ export function setVoiceCache(voices: MistralVoice[]): void {
 
 // Résout host + guest via le helper partagé selectVoices, avec logging des fallbacks.
 // Retourne null si voiceCache est entièrement vide (cas dégradé).
-function resolveMistralDefaults(
-  lang: string | undefined,
-  profileId: string | undefined,
-  flow: string,
-): { host: VoiceId; guest: VoiceId } | null {
-  if (!lang) return null;
-  const result = selectVoices({ voices: voiceCache, lang, profileId });
+const resolveMistralDefaults = (
+  lang: string,
+  profileId: string | null,
+  flow: VoiceFlow,
+): { host: VoiceId; guest: VoiceId } | null => {
+  const result = selectVoices({
+    voices: voiceCache,
+    lang,
+    profileId: profileId ?? undefined,
+  });
   if (!result) {
     logger.warn('voice-selection', `no voice available (lang=${lang}, flow=${flow})`);
     return null;
@@ -302,17 +305,19 @@ function resolveMistralDefaults(
     );
   }
   return { host: result.host, guest: result.guest };
+};
+
+export interface ResolveVoicesArgs {
+  profileVoices?: { host?: VoiceId; guest?: VoiceId };
+  lang: string;
+  profileId: string | null;
+  flow: VoiceFlow;
 }
 
-export function resolveVoices(
-  profileVoices?: { host?: VoiceId; guest?: VoiceId },
-  lang?: string,
-  profileId?: string,
-  flow = 'unknown',
-): { host: VoiceId; guest: VoiceId } {
-  const dynamic = resolveMistralDefaults(lang, profileId, flow);
+export function resolveVoices(opts: ResolveVoicesArgs): { host: VoiceId; guest: VoiceId } {
+  const dynamic = resolveMistralDefaults(opts.lang, opts.profileId, opts.flow);
   return {
-    host: profileVoices?.host || dynamic?.host || DEFAULT_VOICES_FALLBACK.host,
-    guest: profileVoices?.guest || dynamic?.guest || DEFAULT_VOICES_FALLBACK.guest,
+    host: opts.profileVoices?.host || dynamic?.host || DEFAULT_VOICES_FALLBACK.host,
+    guest: opts.profileVoices?.guest || dynamic?.guest || DEFAULT_VOICES_FALLBACK.guest,
   };
 }
