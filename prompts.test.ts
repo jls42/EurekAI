@@ -141,6 +141,15 @@ describe('PODCAST', () => {
   it('podcastUser inclut le markdown complet', () => {
     expect(podcastUser('b'.repeat(5000)).length).toBeGreaterThan(5000);
   });
+
+  it('contient une consigne bornee invitant a interpeller le guest par son prenom', () => {
+    const podcast = podcastSystem('enfant', { host: 'Camille', guest: 'Sasha' });
+    // Substring stable : couvre "interpelle <guest> sur un point precis" pour
+    // garantir que la consigne est ancree sur les noms injectes (pas sur des
+    // tokens generiques) sans rigidifier la formulation entiere.
+    expect(podcast).toContain('interpelle Sasha sur un point precis');
+    expect(podcast).toContain('Ne commence pas systematiquement une replique par un prenom');
+  });
 });
 
 describe('FILL_BLANK', () => {

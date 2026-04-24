@@ -415,6 +415,7 @@ export function podcastSystem(
 PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
 - "host" = ${names.host} : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir ${names.guest}.
 - "guest" = ${names.guest} : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+Dans quelques repliques, les personnages peuvent s'appeler par leur prenom — notamment quand ${names.host} interpelle ${names.guest} sur un point precis. Ne commence pas systematiquement une replique par un prenom.
 Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
