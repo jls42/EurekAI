@@ -402,9 +402,13 @@ export function pickPodcastNames(rng: () => number = Math.random): { host: strin
   return { host: PODCAST_NAME_POOL[i], guest: PODCAST_NAME_POOL[j] };
 }
 
+// Defauts figes (as const + reference partagee) : evite l'object literal inline en
+// default param, flagge par SonarQube comme confusing pitfall (re-cree a chaque appel).
+const DEFAULT_PODCAST_NAMES = { host: 'Alex', guest: 'Charlie' } as const;
+
 export function podcastSystem(
   ageGroup: AgeGroup = 'enfant',
-  names: { host: string; guest: string } = { host: 'Alex', guest: 'Charlie' },
+  names: { host: string; guest: string } = DEFAULT_PODCAST_NAMES,
 ): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
