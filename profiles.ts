@@ -152,14 +152,20 @@ export class ProfileStore {
   private save(profiles: Profile[]) {
     // Si le boot précédent a détecté un fichier corrompu, tenter un backup `.corrupt.bak`
     // avant overwrite. Une seule fois par cycle (idempotent via lastLoadFailed reset).
-    if (this.lastLoadFailed && existsSync(this.filePath)) {
-      const backupPath = `${this.filePath}.corrupt.bak`;
-      if (!existsSync(backupPath)) {
-        try {
-          copyFileSync(this.filePath, backupPath);
-          logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
-        } catch (e) {
-          logger.warn('profiles', 'failed to create .corrupt.bak (proceeding with save):', e);
+    // Le reset du flag se fait INCONDITIONNELLEMENT après la première save : si le
+    // fichier corrompu a été supprimé manuellement entre list() et save(), on ne doit
+    // pas garder le flag à true — sinon la save suivante sur un fichier entre-temps
+    // recréé avec des données valides les backuperait à tort comme `.corrupt.bak`.
+    if (this.lastLoadFailed) {
+      if (existsSync(this.filePath)) {
+        const backupPath = `${this.filePath}.corrupt.bak`;
+        if (!existsSync(backupPath)) {
+          try {
+            copyFileSync(this.filePath, backupPath);
+            logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
+          } catch (e) {
+            logger.warn('profiles', 'failed to create .corrupt.bak (proceeding with save):', e);
+          }
         }
       }
       this.lastLoadFailed = false;

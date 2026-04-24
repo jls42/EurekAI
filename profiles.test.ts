@@ -273,6 +273,33 @@ describe('ProfileStore.list', () => {
     freshStore.create('Bob', 10);
     expect(readFileSync(backupPath, 'utf-8')).toBe('MANUAL_OVERRIDE');
   });
+
+  // I4: race window — corrupt file deleted between list() and first save().
+  // Flag doit être reset quand même, sinon la 2e save backuperait des données
+  // valides comme .corrupt.bak.
+  it('resets lastLoadFailed even when corrupt file is deleted between list() and save()', () => {
+    const corruptContent = '{ legacy user data corrupted }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed=true, file still on disk
+
+    // simulate manual deletion between list() and save()
+    rmSync(profilesPath);
+    expect(existsSync(profilesPath)).toBe(false);
+
+    // first save: file absent, no backup created, flag must reset anyway
+    freshStore.create('Alice', 9);
+    expect(existsSync(backupPath)).toBe(false);
+
+    // second save: flag déjà reset → pas de backup Alice-as-corrupt
+    freshStore.create('Bob', 10);
+    expect(existsSync(backupPath)).toBe(false);
+  });
 });
 
 describe('ProfileStore.create', () => {
