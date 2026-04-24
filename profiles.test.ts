@@ -14,7 +14,7 @@ import {
   ProfileStore,
 } from './profiles.js';
 import type { Profile } from './types.js';
-import { asVoiceId } from './helpers/voice-types.js';
+import { asVoiceId, type VoiceId } from './helpers/voice-types.js';
 import { logger } from './helpers/logger.js';
 
 // =============================================================================
@@ -244,7 +244,7 @@ describe('ProfileStore.list', () => {
     expect(result).toEqual([]);
     expect(errSpy).toHaveBeenCalledWith(
       'profiles',
-      expect.stringContaining('Failed to load profiles'),
+      expect.stringContaining('Failed to parse profiles.json'),
       expect.any(SyntaxError),
     );
     // file is preserved on disk, not silently overwritten
@@ -272,6 +272,21 @@ describe('ProfileStore.list', () => {
     writeFileSync(backupPath, 'MANUAL_OVERRIDE');
     freshStore.create('Bob', 10);
     expect(readFileSync(backupPath, 'utf-8')).toBe('MANUAL_OVERRIDE');
+  });
+
+  it('shape invalide (JSON valide mais pas un array) log dédié, pas confondu avec corruption JSON', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    // JSON parseable mais pas un array → distinct de la vraie corruption
+    writeFileSync(profilesPath, '{"profiles": []}');
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+    expect(result).toEqual([]);
+    const shapeError = errorSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('invalid shape'),
+    );
+    expect(shapeError).toBe(true);
+    errorSpy.mockRestore();
   });
 
   // I4: race window — corrupt file deleted between list() and first save().
@@ -432,6 +447,19 @@ describe('ProfileStore.update', () => {
       mistralVoices: { host: asVoiceId(''), guest: asVoiceId('') },
     });
     expect(updated!.mistralVoices).toBeUndefined();
+  });
+
+  it('logger.warn quand un champ mistralVoices est defini non-string (observabilite drop)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('VoiceUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: 42 as unknown as VoiceId, guest: asVoiceId('valid-guest-id') },
+    });
+    const warnedForHost = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('voices.host'),
+    );
+    expect(warnedForHost).toBe(true);
+    warnSpy.mockRestore();
   });
 
   it('updates theme', () => {

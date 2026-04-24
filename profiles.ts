@@ -81,12 +81,28 @@ type MistralVoicesInput = Partial<Record<'host' | 'guest', unknown>> | null | un
 const toVoiceIdOrUndefined = (value: unknown): VoiceId | undefined =>
   typeof value === 'string' && value ? (value as VoiceId) : undefined;
 
+// Avertit l'admin quand un champ host/guest était défini en input non-falsy mais
+// rejeté (nombre, null explicite, objet, etc.) — le drop silencieux masque des bugs
+// client (UI stale, storage altéré) ou des régressions de validation côté route.
+// Ne throw pas : la normalisation reste best-effort pour ne jamais bloquer le flux
+// profil-update. C'est la route qui devrait retourner 400 si elle veut être stricte.
+const warnIfSilentDrop = (field: 'host' | 'guest', rawValue: unknown): void => {
+  if (rawValue === undefined) return;
+  if (typeof rawValue === 'string' && rawValue) return;
+  logger.warn(
+    'profiles',
+    `normalizeMistralVoices: dropped invalid voices.${field} (type=${typeof rawValue})`,
+  );
+};
+
 function normalizeMistralVoices(
   voices: MistralVoicesInput,
 ): { host?: VoiceId; guest?: VoiceId } | undefined {
   if (!voices || typeof voices !== 'object') return undefined;
   const host = toVoiceIdOrUndefined(voices.host);
   const guest = toVoiceIdOrUndefined(voices.guest);
+  warnIfSilentDrop('host', voices.host);
+  warnIfSilentDrop('guest', voices.guest);
   if (!host && !guest) return undefined;
   return { ...(host ? { host } : {}), ...(guest ? { guest } : {}) };
 }
@@ -110,16 +126,30 @@ function migrateProfile(p: Profile): boolean {
     changed = true;
   }
   const normalizedVoices = normalizeMistralVoices(p.mistralVoices);
-  if (JSON.stringify(normalizedVoices) !== JSON.stringify(p.mistralVoices)) {
+  if (!sameVoices(normalizedVoices, p.mistralVoices)) {
     p.mistralVoices = normalizedVoices;
     changed = true;
   }
   return changed;
 }
 
+// Comparaison structurée plutôt que JSON.stringify : robuste à l'ordre des clés
+// et aux champs optionnels undefined (host? | guest?). Les deux operandes sont
+// toujours normalizedMistralVoices ou undefined, pas de cas pathologiques.
+// Arrow `const` et pas `function` : agglomération Lizard adjacente à migrateProfile
+// (cf. CLAUDE.md "Pièges connus").
+const sameVoices = (
+  a: { host?: VoiceId; guest?: VoiceId } | undefined,
+  b: { host?: VoiceId; guest?: VoiceId } | null | undefined,
+): boolean => {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return a.host === b.host && a.guest === b.guest;
+};
+
 export class ProfileStore {
   private readonly filePath: string;
-  // I4 : mirror du pattern `lastLoadFailed` de config.ts — évite un overwrite silencieux
+  // Mirror du pattern `lastLoadFailed` de config.ts — évite un overwrite silencieux
   // d'un profiles.json corrompu sans backup, en forçant un `.corrupt.bak` au prochain
   // save. Réinitialisé à false dès qu'un load réussit ou qu'un backup a été créé.
   private lastLoadFailed = false;
@@ -133,44 +163,82 @@ export class ProfileStore {
       this.lastLoadFailed = false;
       return [];
     }
+    const parsed = this.readAndParse();
+    if (parsed === null) return [];
+    return this.migrateAndPersist(parsed);
+  }
+
+  // Scinde le catch monolithique : JSON.parse fail = vraie corruption, shape invalide
+  // (pas un array) = fichier écrit par un client cassé, ni fail de migration ni fail de
+  // save ne sont signalés comme "corrupt". Chaque cause a son log dédié, le flag
+  // lastLoadFailed ne se déclenche que sur corruption/shape invalide réelle.
+  private readAndParse(): Profile[] | null {
+    let raw: unknown;
     try {
-      const profiles: Profile[] = JSON.parse(readFileSync(this.filePath, 'utf-8'));
-      let migrated = false;
-      for (const p of profiles) {
-        if (migrateProfile(p)) migrated = true;
-      }
-      this.lastLoadFailed = false;
-      if (migrated) this.save(profiles);
-      return profiles;
+      raw = JSON.parse(readFileSync(this.filePath, 'utf-8'));
     } catch (e) {
-      logger.error('profiles', 'Failed to load profiles (file preserved on disk):', e);
+      logger.error('profiles', 'Failed to parse profiles.json (corrupt, preserved on disk):', e);
       this.lastLoadFailed = true;
-      return [];
+      return null;
     }
+    if (!Array.isArray(raw)) {
+      logger.error('profiles', 'profiles.json has invalid shape (not an array, preserved on disk)');
+      this.lastLoadFailed = true;
+      return null;
+    }
+    return raw as Profile[];
+  }
+
+  private migrateAndPersist(profiles: Profile[]): Profile[] {
+    let migrated = false;
+    for (const p of profiles) {
+      if (migrateProfile(p)) migrated = true;
+    }
+    this.lastLoadFailed = false;
+    if (migrated) {
+      try {
+        this.save(profiles);
+      } catch (e) {
+        // Migration auto-save failure : on ne re-throw pas (le load de base reste
+        // valide en mémoire), mais on log.error pour observabilité. L'appelant obtient
+        // les profiles migrés même si la persistence a échoué.
+        logger.error('profiles', 'migration persist failed (continuing in-memory):', e);
+      }
+    }
+    return profiles;
   }
 
   private save(profiles: Profile[]) {
     // Si le boot précédent a détecté un fichier corrompu, tenter un backup `.corrupt.bak`
-    // avant overwrite. Une seule fois par cycle (idempotent via lastLoadFailed reset).
-    // Le reset du flag se fait INCONDITIONNELLEMENT après la première save : si le
-    // fichier corrompu a été supprimé manuellement entre list() et save(), on ne doit
-    // pas garder le flag à true — sinon la save suivante sur un fichier entre-temps
-    // recréé avec des données valides les backuperait à tort comme `.corrupt.bak`.
+    // avant overwrite. Fichier supprimé manuellement entre list() et save() : reset OK
+    // (rien à préserver). Backup échoue : on garde le flag à true pour retenter au
+    // prochain save. Write échoue : flag préservé quel que soit le cas.
+    let shouldResetFlag = !this.lastLoadFailed;
     if (this.lastLoadFailed) {
-      if (existsSync(this.filePath)) {
+      if (!existsSync(this.filePath)) {
+        shouldResetFlag = true;
+      } else {
         const backupPath = `${this.filePath}.corrupt.bak`;
-        if (!existsSync(backupPath)) {
+        if (existsSync(backupPath)) {
+          shouldResetFlag = true;
+        } else {
           try {
             copyFileSync(this.filePath, backupPath);
             logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
+            shouldResetFlag = true;
           } catch (e) {
-            logger.warn('profiles', 'failed to create .corrupt.bak (proceeding with save):', e);
+            logger.warn('profiles', 'failed to create .corrupt.bak (keeping flag for retry):', e);
           }
         }
       }
-      this.lastLoadFailed = false;
     }
-    writeFileSync(this.filePath, JSON.stringify(profiles, null, 2));
+    try {
+      writeFileSync(this.filePath, JSON.stringify(profiles, null, 2));
+    } catch (e) {
+      logger.error('profiles', 'failed to persist profiles.json:', e);
+      throw e;
+    }
+    if (shouldResetFlag) this.lastLoadFailed = false;
   }
 
   create(
