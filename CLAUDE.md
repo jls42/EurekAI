@@ -27,11 +27,11 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Le test `src/i18n/i18n-sync.test.ts` verifie la synchronisation entre toutes les langues
 
 ### TTS (Text-to-Speech)
-- Provider unique : Mistral Voxtral TTS (`MISTRAL_API_KEY` suffit, pas de clé supplémentaire). Le support ElevenLabs historique (hackathon) a été retiré 2026-04 faute d'intégration au niveau Mistral (voix par langue, cost tracking) — une migration one-time dans `initConfig` nettoie les `config.json` legacy (`ttsProvider`/`voices`/`eleven_*`). Réintégration ElevenLabs envisagée plus tard au même niveau de qualité.
+- Provider unique : Mistral Voxtral TTS (`MISTRAL_API_KEY` suffit, pas de clé supplémentaire). Le support ElevenLabs historique (hackathon) a été retiré 2026-04 faute d'intégration au niveau Mistral (voix par langue, cost tracking) — une migration one-time dans `initConfig` nettoie les `config.json` legacy (`ttsProvider`/`voices`/`eleven_*`/`mistralVoices`/`mistralVoicesSource`). Réintégration ElevenLabs envisagée plus tard au même niveau de qualité.
 - `apiStatus.ttsAvailable === apiStatus.mistral` (une seule source, plus de champ `elevenlabs`).
 - Griser les boutons TTS avec `:disabled="!apiStatus.ttsAvailable"` + tooltip `t('gen.needsTts')`
-- **Voix par langue** : `resolveVoices(profileVoices?, lang?, profileId?, flow?)` dans `config.ts` résout la voix finale selon la priorité : override profil non vide > sélection dynamique `selectVoices` (bucket langue, puis EN, puis any) > fallback interne. Les voix globales `mistralVoices`/`mistralVoicesSource` sont legacy et supprimées de `config.json` par `initConfig`.
-- **Appels `resolveVoices()`** : sur tout nouveau chemin TTS, TOUJOURS passer `profileId` et `flow` (ex: `'podcast' | 'quiz-vocal' | 'read-aloud'`). Sinon la rotation déterministe par profil se casse (seed `__default__` partagé) et les logs de fallback portent `flow='unknown'` — observabilité dégradée.
+- **Voix par langue** : `resolveVoices({ profileVoices?, lang, profileId, flow })` dans `config.ts` résout la voix finale selon la priorité : override profil non vide > sélection dynamique `selectVoices` (bucket langue, puis EN, puis any) > fallback interne. Les voix globales `mistralVoices`/`mistralVoicesSource` sont legacy, supprimées de `config.json` par `initConfig` ET rejetées avec `logger.warn` dans `saveConfig` (protection client stale entre deux restarts).
+- **Appels `resolveVoices()`** : la signature impose un arg objet avec `lang: string`, `profileId: string | null`, `flow: VoiceFlow` (union `'podcast' | 'quiz-vocal' | 'read-aloud'` exportée depuis `types.ts`). Le typechecker bloque tout call site qui oublie `profileId` ou `flow` — sinon la rotation déterministe par profil se casse et les logs de fallback perdent leur contexte.
 
 ### Prompts IA (anti-leak lexical)
 - Centralisés dans `prompts.ts` — les generators importent, ne redefinissent jamais de prompt inline

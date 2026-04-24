@@ -208,8 +208,9 @@ describe('saveConfig', () => {
     expect(onDisk.models.summary).toBe('new-model');
   });
 
-  it('ignore les anciennes voix globales postées par un vieux client', () => {
+  it('ignore les anciennes voix globales postées par un vieux client avec logger.warn', () => {
     initConfig(tempDir);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     saveConfig({
       mistralVoices: { host: 'new-host-voice', guest: 'new-guest-voice' },
       mistralVoicesSource: 'user',
@@ -223,6 +224,15 @@ describe('saveConfig', () => {
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.mistralVoices).toBeUndefined();
     expect(onDisk.mistralVoicesSource).toBeUndefined();
+    // C1: les deux champs legacy doivent déclencher un logger.warn pour observabilité
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy field 'mistralVoices'"),
+    );
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy field 'mistralVoicesSource'"),
+    );
   });
 
   it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante", () => {

@@ -43,8 +43,8 @@ export interface VoiceSelectionResult {
   langMatched: string | null;
 }
 
-// Ordre de préférence pour les tags émotionnels. Les valeurs sont additives :
-// prendre le meilleur tag disponible sur une voix donnée.
+// Ordre de préférence pour les tags émotionnels. Score = meilleur tag match (pas sommé) ;
+// une voix taggée à la fois 'excited' et 'curious' scorera 50 (excited), pas 75.
 const TAG_SCORES: Record<string, number> = {
   excited: 50,
   cheerful: 40,
@@ -56,7 +56,6 @@ const TAG_SCORES: Record<string, number> = {
 
 const FEMALE_BONUS = 100;
 
-// cf. CLAUDE.md "Pièges Lizard"
 const scoreVoice = (v: MistralVoice): number => {
   let score = 0;
   if (v.gender === 'female') score += FEMALE_BONUS;

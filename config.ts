@@ -143,10 +143,15 @@ function migrateLegacyElevenLabsFields(): boolean {
   return changed;
 }
 
-function removeLegacyGlobalVoiceFields(): boolean {
+const LEGACY_GLOBAL_VOICE_KEYS = ['mistralVoices', 'mistralVoicesSource'] as const;
+
+// S3: arrow `const` plutôt que `function` — adjacence avec migrateLegacyElevenLabsFields
+// ci-dessus déclencherait autrement l'agglomération du parseur TS de Lizard
+// (cf. CLAUDE.md "Mesurer > deviner").
+const removeLegacyGlobalVoiceFields = (): boolean => {
   const legacy = currentConfig as unknown as Record<string, unknown>;
   let changed = false;
-  for (const key of ['mistralVoices', 'mistralVoicesSource']) {
+  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
     if (legacy[key] !== undefined) {
       delete legacy[key];
       changed = true;
@@ -154,7 +159,7 @@ function removeLegacyGlobalVoiceFields(): boolean {
     }
   }
   return changed;
-}
+};
 
 // Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
 // (lastLoadFailed), tente d'abord un `.corrupt.bak` à côté du fichier à écraser.
@@ -239,6 +244,16 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
       );
     } else {
       currentConfig.ttsModel = partial.ttsModel;
+    }
+  }
+  // C1: meme discipline que ttsModel 'eleven_*' pour les champs voix globales retires
+  // de AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
+  // silencieusement par saveConfig (branches ci-dessus n'y touchent pas) — mais une
+  // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilite.
+  const legacy = partial as Record<string, unknown>;
+  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
+    if (legacy[key] !== undefined) {
+      logger.warn('config', `rejected legacy field '${key}' at saveConfig (cleaned at boot)`);
     }
   }
   persistConfig();
