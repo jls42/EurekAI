@@ -105,7 +105,6 @@ export const de: Record<string, string> = {
   'settings.aiModelHint':
     'Verwendet f\u00fcr Zusammenfassungen, Lernkarten, Quiz, Podcast und Chat',
   'settings.recommended': 'Empfohlen',
-  'settings.voiceTts': 'Stimmen',
   'settings.voiceHost': 'Primär',
   'settings.voiceGuest': 'Sekundär',
   'emotion.Angry': 'W\u00fctend',
@@ -439,7 +438,6 @@ export const de: Record<string, string> = {
     'Stimmen fuer Audioinhalte anpassen (Podcasts, Sprachquiz, Vorlesen)',
   'profile.voiceDefault': 'Standard (sprachabhaengig)',
   'profile.voiceDefaultSuffix': '(Standard)',
-  'profile.voiceCurrentDefault': 'Standard f\u00fcr Felder auf \u201eStandard\u201c:',
   'profile.resetDefaults': 'Zuruecksetzen',
   'profile.backToProfiles': 'Zurueck',
 

@@ -130,7 +130,6 @@ export const hi: Record<string, string> = {
   'settings.aiModelHint':
     '\u0928\u094B\u091F\u094D\u0938, Flashcards, Quiz, Podcast \u0914\u0930 Chat \u0915\u0947 \u0932\u093F\u090F \u0909\u092A\u092F\u094B\u0917 \u0939\u094B\u0924\u093E \u0939\u0948',
   'settings.recommended': '\u0905\u0928\u0941\u0936\u0902\u0938\u093F\u0924',
-  'settings.voiceTts': '\u0906\u0935\u093E\u091C\u093C\u0947\u0902',
   'settings.voiceHost': '\u092e\u0941\u0916\u094d\u092f',
   'settings.voiceGuest': '\u0938\u0939\u093e\u092f\u0915',
   'emotion.Angry': '\u0917\u0941\u0938\u094D\u0938\u093E',
@@ -606,8 +605,6 @@ export const hi: Record<string, string> = {
   'profile.voiceDefault':
     '\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F (\u092D\u093E\u0937\u093E \u0915\u0947 \u0905\u0928\u0941\u0938\u093E\u0930)',
   'profile.voiceDefaultSuffix': '(\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F)',
-  'profile.voiceCurrentDefault':
-    '\u0022\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F\u0022 \u092A\u0930 \u091B\u094B\u0921\u093C\u0947 \u0917\u090F \u092B\u093C\u0940\u0932\u094D\u0921 \u0915\u0947 \u0932\u093F\u090F \u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F:',
   'profile.resetDefaults': 'रीसेट',
   'profile.backToProfiles': 'वापस',
 

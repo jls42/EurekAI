@@ -103,7 +103,6 @@ export const nl: Record<string, string> = {
   'settings.aiModel': 'Generatie',
   'settings.aiModelHint': 'Gebruikt voor samenvattingen, flashcards, quiz, podcast en chat',
   'settings.recommended': 'Aanbevolen',
-  'settings.voiceTts': 'Stemmen',
   'settings.voiceHost': 'Primair',
   'settings.voiceGuest': 'Secundair',
   'emotion.Angry': 'Boos',
@@ -433,7 +432,6 @@ export const nl: Record<string, string> = {
     'Pas stemmen aan voor audiocontent (podcasts, spraakquiz, voorlezen)',
   'profile.voiceDefault': 'Standaard (op basis van taal)',
   'profile.voiceDefaultSuffix': '(standaard)',
-  'profile.voiceCurrentDefault': 'Standaard voor velden op \u201cStandaard\u201d:',
   'profile.resetDefaults': 'Herstellen',
   'profile.backToProfiles': 'Terug',
 

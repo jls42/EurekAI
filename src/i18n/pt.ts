@@ -104,7 +104,6 @@ export const pt: Record<string, string> = {
   'settings.aiModel': 'Geração',
   'settings.aiModelHint': 'Usado para fichas, flashcards, quiz, podcast e chat',
   'settings.recommended': 'Recomendado',
-  'settings.voiceTts': 'Vozes',
   'settings.voiceHost': 'Principal',
   'settings.voiceGuest': 'Secund\u00e1ria',
   'emotion.Angry': 'Com raiva',
@@ -441,7 +440,6 @@ export const pt: Record<string, string> = {
     'Personalize as vozes para conteudo de audio (podcasts, quiz vocais, leitura)',
   'profile.voiceDefault': 'Padrao (de acordo com o idioma)',
   'profile.voiceDefaultSuffix': '(padrão)',
-  'profile.voiceCurrentDefault': 'Padr\u00e3o para campos em \u00abPadr\u00e3o\u00bb:',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Voltar',
 

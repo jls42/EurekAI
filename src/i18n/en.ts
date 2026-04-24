@@ -102,7 +102,6 @@ export const en: Record<string, string> = {
   'settings.aiModel': 'Generation',
   'settings.aiModelHint': 'Used for notes, flashcards, quiz, podcast and chat',
   'settings.recommended': 'Recommended',
-  'settings.voiceTts': 'Voices',
   'settings.voiceHost': 'Main',
   'settings.voiceGuest': 'Secondary',
   'emotion.Angry': 'Angry',
@@ -437,7 +436,6 @@ export const en: Record<string, string> = {
     'Customize voices for audio content (podcasts, vocal quizzes, read-aloud)',
   'profile.voiceDefault': 'Default (based on language)',
   'profile.voiceDefaultSuffix': '(default)',
-  'profile.voiceCurrentDefault': 'Default for fields left on "Default":',
   'profile.resetDefaults': 'Reset defaults',
   'profile.backToProfiles': 'Back',
 

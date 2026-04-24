@@ -113,7 +113,6 @@ export const fr: Record<string, string> = {
   'settings.aiModel': 'Génération',
   'settings.aiModelHint': 'Utilisé pour fiches, flashcards, quiz, podcast et chat',
   'settings.recommended': 'Recommandé',
-  'settings.voiceTts': 'Voix',
   'settings.voiceHost': 'Principale',
   'settings.voiceGuest': 'Secondaire',
   'emotion.Angry': 'En colère',
@@ -462,7 +461,6 @@ export const fr: Record<string, string> = {
     'Personnalise les voix pour le contenu audio (podcasts, quiz vocaux, lectures)',
   'profile.voiceDefault': 'Par défaut (selon la langue)',
   'profile.voiceDefaultSuffix': '(par défaut)',
-  'profile.voiceCurrentDefault': 'Par défaut pour les champs laissés sur « Par défaut » :',
   'profile.resetDefaults': 'Réinitialiser',
   'profile.backToProfiles': 'Retour',
 
