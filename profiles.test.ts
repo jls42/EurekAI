@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { createHash } from 'crypto';
@@ -15,6 +15,7 @@ import {
 } from './profiles.js';
 import type { Profile } from './types.js';
 import { asVoiceId } from './helpers/voice-types.js';
+import { logger } from './helpers/logger.js';
 
 // =============================================================================
 // Pure functions (no mocks needed)
@@ -229,6 +230,48 @@ describe('ProfileStore.list', () => {
     const profiles = store.list();
     expect(profiles).toHaveLength(1);
     expect(profiles[0].name).toBe('Alice');
+  });
+
+  // I4: corrupt profiles.json - list() logs error, returns [], sets lastLoadFailed
+  it('logs error and returns [] when profiles.json is corrupt (file preserved)', () => {
+    const corruptContent = '{ not valid json at all ';
+    writeFileSync(join(tempDir, 'profiles.json'), corruptContent);
+    const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    expect(result).toEqual([]);
+    expect(errSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('Failed to load profiles'),
+      expect.any(SyntaxError),
+    );
+    // file is preserved on disk, not silently overwritten
+    expect(readFileSync(join(tempDir, 'profiles.json'), 'utf-8')).toBe(corruptContent);
+  });
+
+  it('creates .corrupt.bak on first save after corrupt load, then only once per cycle', () => {
+    const corruptContent = '{ legacy user data corrupted }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed
+    expect(existsSync(backupPath)).toBe(false);
+
+    // first save triggers backup
+    freshStore.create('Alice', 9);
+    expect(existsSync(backupPath)).toBe(true);
+    expect(readFileSync(backupPath, 'utf-8')).toBe(corruptContent);
+
+    // second save does NOT overwrite backup (idempotent, flag reset)
+    writeFileSync(backupPath, 'MANUAL_OVERRIDE');
+    freshStore.create('Bob', 10);
+    expect(readFileSync(backupPath, 'utf-8')).toBe('MANUAL_OVERRIDE');
   });
 });
 

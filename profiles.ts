@@ -1,8 +1,9 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
 import type { VoiceId } from './helpers/voice-types.js';
+import { logger } from './helpers/logger.js';
 
 // --- Age group derivation ---
 
@@ -118,28 +119,51 @@ function migrateProfile(p: Profile): boolean {
 
 export class ProfileStore {
   private readonly filePath: string;
+  // I4 : mirror du pattern `lastLoadFailed` de config.ts — évite un overwrite silencieux
+  // d'un profiles.json corrompu sans backup, en forçant un `.corrupt.bak` au prochain
+  // save. Réinitialisé à false dès qu'un load réussit ou qu'un backup a été créé.
+  private lastLoadFailed = false;
 
   constructor(outputDir: string) {
     this.filePath = join(outputDir, 'profiles.json');
   }
 
   list(): Profile[] {
-    if (!existsSync(this.filePath)) return [];
+    if (!existsSync(this.filePath)) {
+      this.lastLoadFailed = false;
+      return [];
+    }
     try {
       const profiles: Profile[] = JSON.parse(readFileSync(this.filePath, 'utf-8'));
       let migrated = false;
       for (const p of profiles) {
         if (migrateProfile(p)) migrated = true;
       }
+      this.lastLoadFailed = false;
       if (migrated) this.save(profiles);
       return profiles;
     } catch (e) {
-      console.error('Failed to load profiles:', e);
+      logger.error('profiles', 'Failed to load profiles (file preserved on disk):', e);
+      this.lastLoadFailed = true;
       return [];
     }
   }
 
   private save(profiles: Profile[]) {
+    // Si le boot précédent a détecté un fichier corrompu, tenter un backup `.corrupt.bak`
+    // avant overwrite. Une seule fois par cycle (idempotent via lastLoadFailed reset).
+    if (this.lastLoadFailed && existsSync(this.filePath)) {
+      const backupPath = `${this.filePath}.corrupt.bak`;
+      if (!existsSync(backupPath)) {
+        try {
+          copyFileSync(this.filePath, backupPath);
+          logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
+        } catch (e) {
+          logger.warn('profiles', 'failed to create .corrupt.bak (proceeding with save):', e);
+        }
+      }
+      this.lastLoadFailed = false;
+    }
     writeFileSync(this.filePath, JSON.stringify(profiles, null, 2));
   }
 
