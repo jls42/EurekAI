@@ -127,6 +127,47 @@ describe('initConfig', () => {
     expect(readFileSync(backupPath, 'utf-8')).toBe('this should NOT be overwritten');
   });
 
+  // Parité avec ProfileStore : race window — corrupt file supprimé entre initConfig()
+  // et le premier saveConfig(). Flag doit être reset quand même, sinon la save suivante
+  // backuperait des données valides à tort comme .corrupt.bak.
+  it('reset lastLoadFailed même si le fichier corrompu est supprimé entre init et save', () => {
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    writeFileSync(configPath, '{invalid user data}');
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    initConfig(tempDir); // flag=true, fichier encore là
+    rmSync(configPath);
+    expect(existsSync(configPath)).toBe(false);
+
+    // 1er save: fichier absent, pas de backup, flag doit reset malgré tout
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    expect(existsSync(backupPath)).toBe(false);
+
+    // 2e save sur fichier désormais valide : ne doit pas être backup'é
+    saveConfig({ ttsModel: 'other' });
+    expect(existsSync(backupPath)).toBe(false);
+  });
+
+  // Note : la branche "copyFileSync throw" est couverte au niveau du code mais pas
+  // par un test unitaire (ESM interdit vi.spyOn sur node:fs et mocker fs complètement
+  // pour un seul throw est disproportionné). Le test "backup existe déjà" ci-dessous
+  // couvre la sortie via idempotence, et la branche throw reste documentée par le
+  // commentaire de persistConfig (CLAUDE.md "Persistance config.json").
+
+  it('backup existe déjà (cycle précédent) → préservé, pas écrasé par nouvelle corruption', () => {
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    // Simule un .corrupt.bak laissé par un cycle antérieur non résolu
+    writeFileSync(backupPath, 'original-corrupt-from-previous-cycle');
+    writeFileSync(configPath, '{new corrupt content}');
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    // Le backup d'origine est préservé, pas écrasé
+    expect(readFileSync(backupPath, 'utf-8')).toBe('original-corrupt-from-previous-cycle');
+  });
+
   it('migration partielle: voices seul legacy → removed, ttsModel intouché', () => {
     writeFileSync(
       join(tempDir, 'config.json'),

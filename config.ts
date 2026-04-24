@@ -180,17 +180,41 @@ const removeLegacyGlobalVoiceFields = (): boolean => {
 // const arrow (pas function) : contournement parseur TS Lizard qui agglomère les
 // `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const persistConfig = (): void => {
-  if (lastLoadFailed && existsSync(configPath)) {
-    const backupPath = `${configPath}.corrupt.bak`;
-    try {
-      copyFileSync(configPath, backupPath);
-      logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
-    } catch (e) {
-      logger.warn('config', 'could not create .corrupt.bak backup (proceeding with overwrite):', e);
+  // Calcul du reset avant le write : on garde lastLoadFailed=true si le backup
+  // a échoué, pour retenter au prochain save. Si le writeFileSync lui-même throw
+  // (ENOSPC/EACCES), le reset n'est jamais appliqué → prochain appel retentera
+  // le backup ET le write sur le même fichier corrompu préservé.
+  //
+  // Idempotence cross-cycle (miroir de ProfileStore.save) : si `.corrupt.bak` existe
+  // déjà (cycle précédent non résolu), on NE l'écrase PAS avec la nouvelle corruption
+  // — on préserve le post-mortem d'origine. Conséquence assumée : seul le premier
+  // backup par cycle corrompu est conservé (idem profiles.ts).
+  let shouldResetFlag = !lastLoadFailed;
+  if (lastLoadFailed) {
+    if (!existsSync(configPath)) {
+      shouldResetFlag = true;
+    } else {
+      const backupPath = `${configPath}.corrupt.bak`;
+      if (existsSync(backupPath)) {
+        logger.info('config', `backup ${backupPath} already exists, skipping copy`);
+        shouldResetFlag = true;
+      } else {
+        try {
+          copyFileSync(configPath, backupPath);
+          logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
+          shouldResetFlag = true;
+        } catch (e) {
+          logger.warn(
+            'config',
+            'could not create .corrupt.bak backup (keeping flag for retry):',
+            e,
+          );
+        }
+      }
     }
-    lastLoadFailed = false;
   }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  if (shouldResetFlag) lastLoadFailed = false;
 };
 
 export function initConfig(outputDir: string): void {
@@ -246,10 +270,10 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
       currentConfig.ttsModel = partial.ttsModel;
     }
   }
-  // C1: meme discipline que ttsModel 'eleven_*' pour les champs voix globales retires
-  // de AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
+  // Même discipline que ttsModel 'eleven_*' pour les champs voix globales retirés de
+  // AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
   // silencieusement par saveConfig (branches ci-dessus n'y touchent pas) — mais une
-  // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilite.
+  // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilité.
   const legacy = partial as Record<string, unknown>;
   for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
     if (legacy[key] !== undefined) {
