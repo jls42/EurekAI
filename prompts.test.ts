@@ -142,13 +142,16 @@ describe('PODCAST', () => {
     expect(podcastUser('b'.repeat(5000)).length).toBeGreaterThan(5000);
   });
 
-  it('contient une consigne bornee invitant a interpeller le guest par son prenom', () => {
+  it('contient une consigne bornee ancree sur les noms injectes avec un exemple unique', () => {
     const podcast = podcastSystem('enfant', { host: 'Camille', guest: 'Sasha' });
-    // Substring stable : couvre "interpelle <guest> sur un point precis" pour
-    // garantir que la consigne est ancree sur les noms injectes (pas sur des
-    // tokens generiques) sans rigidifier la formulation entiere.
-    expect(podcast).toContain('interpelle Sasha sur un point precis');
-    expect(podcast).toContain('Ne commence pas systematiquement une replique par un prenom');
+    // Règle positive bornée : "une seule fois au maximum" + UN SEUL exemple positif,
+    // avec le prénom en cœur de phrase (pas en accroche "Prenom, ..."). Éviter plusieurs
+    // exemples (risque de template-isation documenté dans .claude/rules/prompts.md).
+    expect(podcast).toContain('une seule fois au maximum');
+    expect(podcast).toContain('Camille, tu peux me redire pourquoi');
+    // Sanity check : plus d'exemple "Tu vois, ..." / "Attends, ..." qui créaient le motif.
+    expect(podcast).not.toContain('Tu vois, Sasha');
+    expect(podcast).not.toContain('Attends, Camille');
   });
 });
 

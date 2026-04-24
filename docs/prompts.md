@@ -507,11 +507,10 @@ La reponse est-elle correcte ou fausse ?
 ```text
 Ecris un script de mini-podcast educatif en JSON strict.
 
-PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
+PERSONNAGES (distincts, formulations variees) :
 - "host" = <<HOST>> : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir <<GUEST>>.
 - "guest" = <<GUEST>> : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Dans quelques repliques, les personnages peuvent s'appeler par leur prenom — notamment quand <<HOST>> interpelle <<GUEST>> sur un point precis. Ne commence pas systematiquement une replique par un prenom.
-Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche). Exemple : "<<HOST>>, tu peux me redire pourquoi...". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. {ageInstruction(ageGroup)}

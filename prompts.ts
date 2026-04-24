@@ -412,11 +412,10 @@ export function podcastSystem(
 ): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
-PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
+PERSONNAGES (distincts, formulations variees) :
 - "host" = ${names.host} : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir ${names.guest}.
 - "guest" = ${names.guest} : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Dans quelques repliques, les personnages peuvent s'appeler par leur prenom — notamment quand ${names.host} interpelle ${names.guest} sur un point precis. Ne commence pas systematiquement une replique par un prenom.
-Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche). Exemple : "${names.host}, tu peux me redire pourquoi...". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
