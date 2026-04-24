@@ -116,6 +116,12 @@ const matchesVoice = (voice: MistralVoice, speaker: string, emotion: string): bo
 const findVoice = (voices: MistralVoice[], speaker: string, emotion: string): MistralVoice | null =>
   voices.find((voice) => matchesVoice(voice, speaker, emotion)) ?? null;
 
+// Paires curated pour fr/en : choix produit explicite — le catalogue Mistral FR ne
+// contient que 6 voix (rotation cycle trop vite, l'user perçoit les répétitions) et
+// les combos Marie(FR) / Jane+Oliver(EN) ont été validés UX comme les meilleures
+// combinaisons hôte/invité. Ces deux langues bypassent donc intentionnellement la
+// rotation déterministe par profil. Pour toutes les autres langues (lang-match direct
+// hors fr/en, ou en-fallback sans match curated), la rotation profileId-based reste active.
 const preferredPair = (
   voices: MistralVoice[],
   langMatched: string | null,
