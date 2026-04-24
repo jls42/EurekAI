@@ -1,1 +1,13 @@
+# Bloque le push sur les vulns critiques transitives (detectees AVANT que Dependabot
+# ouvre une PR). --audit-level=critical : moderate/high ne bloquent pas (souvent non
+# actionnable au moment du push, bruit trop important). ~1s, pas de reseau.
+if ! npm audit --audit-level=critical >/dev/null 2>&1; then
+  echo ""
+  echo "✗ Vulnerabilite critique detectee (dep transitive)."
+  echo "  Details : npm audit"
+  echo "  Fix : npm audit fix (auto), bump parent dep, ou merger PR Dependabot."
+  echo "  Forcer le push malgre tout : git push --no-verify"
+  exit 1
+fi
+
 npm run security
