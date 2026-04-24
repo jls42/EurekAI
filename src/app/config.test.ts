@@ -319,9 +319,16 @@ describe('defaultVoiceOptionLabel', () => {
     expect(result).toContain('(default)');
   });
 
-  it('returns empty string when voice list is empty', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    expect(config.defaultVoiceOptionLabel.call(ctx, 'host', 'fr')).toBe('');
+  it('falls back to profile.voiceDefault translation when voice list is empty', () => {
+    const ctx = makeContext({
+      mistralVoicesList: [],
+      t: vi.fn((key: string) =>
+        key === 'profile.voiceDefault' ? 'Par défaut (selon la langue)' : key,
+      ),
+    });
+    expect(config.defaultVoiceOptionLabel.call(ctx, 'host', 'fr')).toBe(
+      'Par défaut (selon la langue)',
+    );
   });
 });
 

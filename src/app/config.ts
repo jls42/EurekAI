@@ -36,6 +36,7 @@ type ModerationCategoriesPayload = {
 
 const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
+const PROFILE_VOICE_DEFAULT_KEY = 'profile.voiceDefault';
 
 export function createConfig() {
   return {
@@ -123,13 +124,13 @@ export function createConfig() {
       profileId?: string,
     ): string {
       const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
-      if (!list || list.length === 0) return '';
+      if (!list || list.length === 0) return this.t(PROFILE_VOICE_DEFAULT_KEY);
       const lang = (locale || 'fr').slice(0, 2);
       const voices = list as unknown as MistralVoice[];
       const result = selectVoices({ voices, lang, profileId });
-      if (!result) return '';
+      if (!result) return this.t(PROFILE_VOICE_DEFAULT_KEY);
       const match = list.find((v) => v.id === result[role]);
-      if (!match) return '';
+      if (!match) return this.t(PROFILE_VOICE_DEFAULT_KEY);
       return `${this.voiceLabel(match)} ${this.t('profile.voiceDefaultSuffix')}`;
     },
 
