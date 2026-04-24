@@ -150,7 +150,7 @@ export function createConfig() {
         if (draft.ttsModel?.startsWith('eleven_')) {
           draft.ttsModel = 'voxtral-mini-tts-latest';
         }
-        const payload = structuredClone(draft) as ConfigDraft & Record<string, unknown>;
+        const payload = { ...draft } as ConfigDraft & Record<string, unknown>;
         delete payload._mainModel;
         delete payload.mistralVoices;
         delete payload.mistralVoicesSource;

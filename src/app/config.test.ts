@@ -3,11 +3,6 @@ import { createConfig } from './config';
 
 globalThis.fetch = vi.fn();
 
-// Polyfill structuredClone for vitest/jsdom if missing
-if (typeof globalThis.structuredClone === 'undefined') {
-  globalThis.structuredClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
-}
-
 const config = createConfig();
 
 function makeContext(overrides: any = {}) {
@@ -408,6 +403,37 @@ describe('saveSettings', () => {
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.mistralVoices).toBeUndefined();
     expect(sentBody.mistralVoicesSource).toBeUndefined();
+  });
+
+  it('does not fail on Alpine-like Proxy configDraft (DataCloneError regression)', async () => {
+    // Regression guard for src/app/config.ts:153 — spread {...draft} must replace structuredClone(draft),
+    // otherwise Alpine reactive proxies (which expose non-cloneable magic methods like $watch) throw
+    // DataCloneError in the browser. Native structuredClone on a Proxy whose target carries a function
+    // property throws — this test reproduces that pre-fix symptom.
+    const proxyDraft = new Proxy(
+      {
+        models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
+        ttsModel: 'voxtral-mini-tts-latest',
+        _mainModel: 'mistral-large-latest',
+        $watch: () => {
+          /* simulate Alpine magic method */
+        },
+      } as any,
+      {},
+    );
+    mockFetchOk({
+      models: { summary: 'mistral-large-latest' },
+      ttsModel: 'voxtral-mini-tts-latest',
+    });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
+
+    const ctx = makeContext({ configDraft: proxyDraft as any });
+    await expect(config.saveSettings.call(ctx)).resolves.toBeUndefined();
+
+    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
+    const sentBody = JSON.parse(putCall[1].body as string);
+    expect(sentBody._mainModel).toBeUndefined();
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.settingsSaved', 'success');
   });
 
   it('shows error toast on save failure', async () => {
