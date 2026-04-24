@@ -1,5 +1,12 @@
 import type { createState } from './state';
-import type { Consigne, Generation, Profile, Source } from '../../types';
+import type {
+  Consigne,
+  Generation,
+  PodcastGeneration,
+  PodcastLine,
+  Profile,
+  Source,
+} from '../../types';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -104,6 +111,9 @@ export interface AppContext extends AppState {
 
   translateEmotion(emotion: string): string;
   langToFlag(lang: string): string;
+  podcastSpeakerName(gen: PodcastGeneration, line: PodcastLine): string;
+  podcastSpeakerInitial(gen: PodcastGeneration, line: PodcastLine): string;
+  podcastSpeakerTitle(gen: PodcastGeneration, line: PodcastLine): string;
   voiceLabel(voice: {
     id?: string;
     name?: string;

@@ -277,6 +277,8 @@ export const nl: Record<string, string> = {
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
     'Configureer MISTRAL_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
+  'podcast.speakerHost': 'Presentator',
+  'podcast.speakerGuest': 'Gast',
 
   'image.heading': 'Illustraties',
   'image.new': 'Illustreren',

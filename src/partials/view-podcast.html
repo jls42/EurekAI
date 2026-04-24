@@ -88,9 +88,9 @@
                 <span
                   class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
                   :class="line.speaker === 'host' ? 'bg-gen-podcast' : 'bg-accent'"
-                  :title="line.speaker === 'host' ? (gen.data.speakers?.host || 'Host') : (gen.data.speakers?.guest || 'Guest')"
-                  x-text="((line.speaker === 'host' ? gen.data.speakers?.host : gen.data.speakers?.guest) || (line.speaker === 'host' ? 'A' : 'Z')).charAt(0).toUpperCase()"
-                  >A</span
+                  :title="podcastSpeakerTitle(gen, line)"
+                  x-text="podcastSpeakerInitial(gen, line)"
+                  >&nbsp;</span
                 >
                 <div
                   class="flex-1 p-3 rounded-card text-body-sm"

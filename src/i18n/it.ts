@@ -276,6 +276,8 @@ export const it: Record<string, string> = {
   'podcast.lines': '({count} battute)',
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts': 'Configura MISTRAL_API_KEY nel file .env per abilitare i podcast audio',
+  'podcast.speakerHost': 'Conduttore',
+  'podcast.speakerGuest': 'Ospite',
 
   'image.heading': 'Illustrazioni',
   'image.new': 'Illustra',

@@ -280,6 +280,8 @@ export const de: Record<string, string> = {
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
     'Konfiguriere MISTRAL_API_KEY in deiner .env-Datei um Audio-Podcasts zu aktivieren',
+  'podcast.speakerHost': 'Moderator',
+  'podcast.speakerGuest': 'Gast',
 
   'image.heading': 'Illustrationen',
   'image.new': 'Illustrieren',

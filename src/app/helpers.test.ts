@@ -1567,3 +1567,61 @@ describe('metaPopoverStyle', () => {
     if (origInnerHeight !== undefined) globalThis.window = { innerHeight: origInnerHeight } as any;
   });
 });
+
+describe('podcastSpeaker* helpers', () => {
+  const makeGen = (speakers?: { host?: string; guest?: string }) =>
+    ({ type: 'podcast', data: { script: [], speakers } }) as any;
+  const hostLine = { speaker: 'host' as const, text: '' };
+  const guestLine = { speaker: 'guest' as const, text: '' };
+
+  describe('podcastSpeakerName', () => {
+    it('returns host/guest name when speakers present', () => {
+      const gen = makeGen({ host: 'Camille', guest: 'Sasha' });
+      expect(helpers.podcastSpeakerName(gen, hostLine)).toBe('Camille');
+      expect(helpers.podcastSpeakerName(gen, guestLine)).toBe('Sasha');
+    });
+
+    it('returns empty string when speakers absent (legacy gen)', () => {
+      expect(helpers.podcastSpeakerName(makeGen(undefined), hostLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen(undefined), guestLine)).toBe('');
+    });
+
+    it('returns empty string when speaker field is empty or whitespace', () => {
+      expect(helpers.podcastSpeakerName(makeGen({ host: '', guest: 'X' }), hostLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen({ host: '   ', guest: 'X' }), hostLine)).toBe('');
+    });
+  });
+
+  describe('podcastSpeakerInitial', () => {
+    it('uses first char of name uppercased when present', () => {
+      const gen = makeGen({ host: 'camille', guest: 'sasha' });
+      expect(helpers.podcastSpeakerInitial(gen, hostLine)).toBe('C');
+      expect(helpers.podcastSpeakerInitial(gen, guestLine)).toBe('S');
+    });
+
+    it('falls back to role initial (H/G) when name is empty', () => {
+      expect(helpers.podcastSpeakerInitial(makeGen(undefined), hostLine)).toBe('H');
+      expect(helpers.podcastSpeakerInitial(makeGen(undefined), guestLine)).toBe('G');
+      expect(helpers.podcastSpeakerInitial(makeGen({ host: '' }), hostLine)).toBe('H');
+    });
+  });
+
+  describe('podcastSpeakerTitle', () => {
+    it('returns the speaker name when present', () => {
+      const ctx = { t: (k: string) => k };
+      const gen = makeGen({ host: 'Camille', guest: 'Sasha' });
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, gen, hostLine)).toBe('Camille');
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, gen, guestLine)).toBe('Sasha');
+    });
+
+    it('falls back to i18n keys when name is missing', () => {
+      const ctx = { t: (k: string) => (k === 'podcast.speakerHost' ? 'Animateur' : 'Invité') };
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), hostLine)).toBe(
+        'Animateur',
+      );
+      expect(
+        callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), guestLine),
+      ).toBe('Invité');
+    });
+  });
+});
