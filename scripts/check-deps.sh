@@ -17,6 +17,38 @@ else
   echo "  ⬆ $pkg: $current -> $latest (UPDATE AVAILABLE)"
 fi
 
+echo ""
+echo "=== Security audit (transitive vulnerabilities) ==="
+# npm audit exit non-zero quand des vulns sont trouvees -> ne pas propager au script.
+# Couvre les deps transitives (npm outdated ne les voit pas : bug historique protobufjs
+# via @google/genai, detecte seulement par Dependabot, rate par ce script avant fix).
+audit_json=$(npm audit --json 2>/dev/null || true)
+if [ -n "$audit_json" ]; then
+  echo "$audit_json" | node -e "
+    const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
+      try{
+        const a=JSON.parse(d.join(''));
+        const v=a.metadata&&a.metadata.vulnerabilities||{};
+        const total=Object.values(v).reduce((s,n)=>s+n,0);
+        if(total===0){console.log('  ✓ No known vulnerabilities');return;}
+        const parts=['critical','high','moderate','low','info']
+          .filter(k=>v[k]>0).map(k=>k+': '+v[k]);
+        console.log('  ⚠ '+total+' vuln(s) — '+parts.join(', '));
+        const advs=a.vulnerabilities||{};
+        for(const name of Object.keys(advs).slice(0,10)){
+          const info=advs[name];
+          const sev=info.severity||'?';
+          const via=(info.via||[]).map(x=>typeof x==='string'?x:x.title||x.source).slice(0,2).join('; ');
+          console.log('    - '+name+' ('+sev+') '+via);
+        }
+        console.log('  Run: npm audit fix  (or merge pending Dependabot PR)');
+      }catch(e){console.log('  (audit parse failed: '+e.message+')');}
+    })
+  "
+else
+  echo "  (npm audit returned no output)"
+fi
+
 # Load env if needed
 if [ -z "${MISTRAL_API_KEY:-}" ]; then
   # shellcheck disable=SC1091
