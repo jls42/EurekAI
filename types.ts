@@ -293,9 +293,12 @@ export interface ChatHistory {
 
 // --- TTS flow (voice selection context) ---
 
-// Identifie le contexte d'appel TTS pour la rotation déterministe par profil dans
-// selectVoices (seed = profileId+flow). Sans flow explicite, tous les flux d'un
-// profil partageraient le seed et produiraient la même voix — bug d'observabilité.
+// Identifie le contexte d'appel TTS. Utilisé uniquement pour contextualiser les logs
+// de fallback dans resolveMistralDefaults (config.ts) — la rotation déterministe de
+// selectVoices a pour seed `profileId + langMatched` (helpers/voice-selection.ts), pas
+// `flow`. Intentionnel : un même profil garde une identité sonore cohérente entre les
+// flux (podcast, quiz-vocal, read-aloud). Ce paramètre existe surtout pour que les
+// logs de fallback identifient quel pipeline a tiré la voix quand on debug.
 export type VoiceFlow = 'podcast' | 'quiz-vocal' | 'read-aloud';
 
 // --- App config ---

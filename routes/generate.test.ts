@@ -777,7 +777,8 @@ describe('generateRoutes', () => {
       expect(gen.data.sourceRefs).toEqual(['ref1']);
       expect(gen.data.speakers).toEqual({ host: 'Camille', guest: 'Sasha' });
 
-      // C2: flow='podcast' doit etre passe pour la rotation deterministe par profil
+      // flow='podcast' doit etre propage pour contextualiser les logs de fallback
+      // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
       const { resolveVoices } = await import('../config.js');
       expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'podcast' }));
     });
@@ -806,7 +807,8 @@ describe('generateRoutes', () => {
       expect(gen.audioUrls).toHaveLength(1);
       expect(gen.audioUrls[0]).toContain(`/output/projects/${pid}/quiz-vocal-q0-`);
 
-      // C2: flow='quiz-vocal' doit etre passe pour la rotation deterministe par profil
+      // flow='quiz-vocal' doit etre propage pour contextualiser les logs de fallback
+      // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
       const { resolveVoices } = await import('../config.js');
       expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'quiz-vocal' }));
     });

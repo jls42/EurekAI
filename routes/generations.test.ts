@@ -758,7 +758,9 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
 
     await handler(req, res);
 
-    // C2: rotation déterministe par profil exige flow='read-aloud' explicite sur ce chemin TTS.
+    // flow='read-aloud' doit être câblé explicitement pour contextualiser les logs de
+    // fallback dans resolveMistralDefaults (le seed de rotation est profileId+langMatched,
+    // pas flow — cf. types.ts VoiceFlow).
     expect(resolveVoices).toHaveBeenCalledWith(
       expect.objectContaining({ flow: 'read-aloud', lang: 'fr' }),
     );
