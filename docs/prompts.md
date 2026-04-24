@@ -500,24 +500,25 @@ La reponse est-elle correcte ou fausse ?
 
 ## 8. Podcast
 
-**Contexte** : `generators/podcast.ts::generatePodcastScript()`. Dialogue host (Alex) / guest (Zoé), 6-8 répliques. Les sourceRefs sont **exclues du texte parlé** (metadonnées uniquement).
+**Contexte** : `generators/podcast.ts::generatePodcastScript()`. Dialogue entre deux personnages (`host` et `guest`) dont les prénoms sont tirés aléatoirement par `pickPodcastNames()` depuis `PODCAST_NAME_POOL` (Alex, Charlie, Camille, Sasha, Claude, Dominique, Andrea, Morgan, Mika, Valéry — épicènes). Defauts si `names` non fourni : `Alex`/`Charlie`. 6-8 répliques. Les sourceRefs sont **exclues du texte parlé** (metadonnées uniquement).
 
-### 8.1 `podcastSystem(ageGroup)`
+### 8.1 `podcastSystem(ageGroup, names?)`
 
 ```text
 Ecris un script de mini-podcast educatif en JSON strict.
 
 PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
-- "host" = Alex : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir Zoe.
-- "guest" = Zoe : eleve curieuse qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+- "host" = <<HOST>> : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir <<GUEST>>.
+- "guest" = <<GUEST>> : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+Dans quelques repliques, les personnages peuvent s'appeler par leur prenom — notamment quand <<HOST>> interpelle <<GUEST>> sur un point precis. Ne commence pas systematiquement une replique par un prenom.
 Varie les formulations — ne force pas d'interjection repetitive qui rendrait le dialogue template.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. {ageInstruction(ageGroup)}
 
 STRUCTURE :
-- Accroche : Alex pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
-- Developpement : alternance Alex/Zoe avec progression logique. Zoe relance par des questions, Alex repond avec des exemples concrets.
+- Accroche : <<HOST>> pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
+- Developpement : alternance <<HOST>>/<<GUEST>> avec progression logique. <<GUEST>> relance par des questions, <<HOST>> repond avec des exemples concrets.
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 {sourceRefsInstruction('podcast')}
@@ -756,7 +757,7 @@ Analyse ces documents et detecte les consignes de revision, programmes de contro
 | `quizReviewSystem` | `generators/quiz.ts` | Remédiation sur échecs | JSON tableau | Oui |
 | `quizVocalSystem` | `generators/quiz.ts` | QCM oral (TTS-friendly) | JSON tableau | Oui |
 | `verifyAnswerSystem` | `generators/quiz-vocal.ts` | Correction réponse orale | JSON binaire | Non |
-| `podcastSystem` | `generators/podcast.ts` | Dialogue Alex/Zoé | JSON script | Oui |
+| `podcastSystem` | `generators/podcast.ts` | Dialogue host/guest (pool épicène) | JSON script | Oui |
 | `fillBlankSystem` | `generators/fill-blank.ts` | Phrases à trous | JSON tableau | Oui |
 | `imageSystem` | `generators/image.ts` | Illustration pédagogique | Image (agent) | Non |
 | `chatSystem` | `generators/chat.ts` | Tuteur conversationnel + tools | Texte + toolCalls | Non |
