@@ -274,7 +274,10 @@ export function createProfiles() {
       this.editingProfile = {
         ...profile,
         locale: profile.locale || 'fr',
-        mistralVoices: profile.mistralVoices || { host: '', guest: '' },
+        mistralVoices: {
+          host: profile.mistralVoices?.host ?? '',
+          guest: profile.mistralVoices?.guest ?? '',
+        },
         theme: profile.theme,
       };
       this.showProfilePicker = true;

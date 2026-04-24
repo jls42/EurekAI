@@ -548,6 +548,48 @@ describe('createProfiles', () => {
 
       expect(ctx.editingProfile).toBeNull();
     });
+
+    it('normalizes partial mistralVoices (host only) to both-keys-as-string', () => {
+      // Regression: avec le fallback `|| { host: '', guest: '' }`, un profil
+      // {mistralVoices: {host: 'v1'}} laissait editingProfile.mistralVoices.guest
+      // === undefined, ce qui casse le binding Alpine x-model sur <select> (la
+      // <option value=""> default n'est pas sélectionnée).
+      const ctx = makeCtx({
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Alice',
+            hasPin: false,
+            locale: 'fr',
+            mistralVoices: { host: 'custom-host' },
+          },
+        ],
+      });
+      callMethod('startEditProfile', ctx, 'p1');
+      expect(ctx.editingProfile.mistralVoices).toEqual({
+        host: 'custom-host',
+        guest: '',
+      });
+    });
+
+    it('normalizes partial mistralVoices (guest only) to both-keys-as-string', () => {
+      const ctx = makeCtx({
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Alice',
+            hasPin: false,
+            locale: 'fr',
+            mistralVoices: { guest: 'custom-guest' },
+          },
+        ],
+      });
+      callMethod('startEditProfile', ctx, 'p1');
+      expect(ctx.editingProfile.mistralVoices).toEqual({
+        host: '',
+        guest: 'custom-guest',
+      });
+    });
   });
 
   describe('requireParentalAccess', () => {
