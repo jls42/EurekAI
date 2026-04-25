@@ -142,15 +142,31 @@ export function buildProfileUpdates(editingProfile: EditingProfile): Record<stri
   return updates;
 }
 
+// Sépare le fetch + handling erreur du flow de sélection de profil pour rester sous
+// CCN 8 dans loadProfiles. Surface les erreurs serveur (500 sur ENOSPC/EACCES côté
+// ProfileStore) via toast — sinon l'user voit un picker vide et invente un nouveau
+// profil au-dessus de ses données existantes.
+async function fetchProfilesInto(state: AppContext): Promise<void> {
+  try {
+    const res = await fetch('/api/profiles');
+    if (res.ok) {
+      state.profiles = await res.json();
+      return;
+    }
+    const err = await res.json().catch(() => ({}));
+    console.error('Failed to load profiles:', res.status, err);
+    state.showToast(state.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
+  } catch (e: unknown) {
+    console.error('Failed to load profiles:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
+  }
+}
+
 export function createProfiles() {
   return {
     async loadProfiles(this: AppContext) {
-      try {
-        const res = await fetch('/api/profiles');
-        if (res.ok) this.profiles = await res.json();
-      } catch (e: unknown) {
-        console.error('Failed to load profiles:', e);
-      }
+      await fetchProfilesInto(this);
       // Restore last selected profile
       const saved = localStorage.getItem(LS_PROFILE_ID);
       if (saved && this.profiles.some((p: Profile) => p.id === saved)) {

@@ -25,6 +25,7 @@ function mockRes() {
   const res: any = {};
   res.status = vi.fn(() => res);
   res.json = vi.fn(() => res);
+  res.headersSent = false;
   return res;
 }
 
@@ -93,6 +94,32 @@ describe('profileRoutes', () => {
       expect(profiles[0].hasPin).toBe(true);
       expect(profiles[1].name).toBe('Bob');
       expect(profiles[1].hasPin).toBe(false);
+    });
+
+    it('catch les erreurs de persistence ProfileStore et renvoie 500 typé', async () => {
+      // Mocke ProfileStore.list au niveau prototype : couvre tous les profileRoutes
+      // créés ensuite. Sans le wrapper handle(), Express renverrait une stacktrace HTML
+      // qui peut fuiter le filePath absolu (~/.eurekai/output/profiles.json) en dev.
+      const listSpy = vi
+        .spyOn(ProfileStore.prototype, 'list')
+        .mockImplementation(() => {
+          throw new Error('ENOSPC: no space left on device');
+        });
+
+      const buggyRouter = profileRoutes(tmpDir, projectStore);
+      const handler = getHandler(buggyRouter, 'get', '/');
+      const req = mockReq();
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: expect.any(String) });
+      // Vérifie que le message d'erreur ne fuit pas le path filesystem
+      const payload = res.json.mock.calls[0][0];
+      expect(payload.error).not.toContain('ENOSPC');
+      expect(payload.error).not.toContain(tmpDir);
+
+      listSpy.mockRestore();
     });
   });
 

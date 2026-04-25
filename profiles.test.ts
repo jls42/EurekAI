@@ -289,6 +289,63 @@ describe('ProfileStore.list', () => {
     errorSpy.mockRestore();
   });
 
+  // I4 race admin manuel : si admin répare le fichier entre list() et save(), on ne
+  // doit PAS backup le contenu désormais valide comme .corrupt.bak (false positive).
+  it('skip backup quand admin a reparé profiles.json entre list() et save()', () => {
+    const corruptContent = '{ corrupt initial }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed=true
+    expect(existsSync(backupPath)).toBe(false);
+
+    // Admin répare le fichier manuellement (array JSON valide)
+    writeFileSync(profilesPath, '[]');
+    freshStore.create('Alice', 9);
+
+    // Pas de backup créé : le contenu disque était valide au moment du save
+    expect(existsSync(backupPath)).toBe(false);
+  });
+
+  it('skip malformed entries (null, primitives, arrays) sans crasher list()', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    const validProfile = {
+      id: 'p1',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    // Mix d'entries valides + entries malformées (null, string, array)
+    writeFileSync(
+      profilesPath,
+      JSON.stringify([validProfile, null, 'legacy-string', [1, 2], { age: 'NaN' }]),
+    );
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // Au moins le profile valide est conservé. Les entries malformed sont droppées.
+    expect(result.find((p) => p.id === 'p1')).toBeTruthy();
+    expect(result.length).toBeLessThan(5);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('dropped malformed entry'),
+    );
+  });
+
   // I4: race window — corrupt file deleted between list() and first save().
   // Flag doit être reset quand même, sinon la 2e save backuperait des données
   // valides comme .corrupt.bak.
@@ -459,6 +516,19 @@ describe('ProfileStore.update', () => {
       (c) => typeof c[1] === 'string' && c[1].includes('voices.host'),
     );
     expect(warnedForHost).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('logger.warn quand mistralVoices est une primitive (string/number) — pas un objet', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('PrimUser', 12);
+    store.update(p.id, {
+      mistralVoices: 'Marie' as unknown as { host?: VoiceId; guest?: VoiceId },
+    });
+    const warnedNonObject = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('rejected non-object mistralVoices'),
+    );
+    expect(warnedNonObject).toBe(true);
     warnSpy.mockRestore();
   });
 

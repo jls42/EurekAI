@@ -1292,6 +1292,26 @@ describe('createProfiles', () => {
       expect(ctx.showProfilePicker).toBe(true);
     });
 
+    it('surface une erreur serveur (500) via toast au lieu de silencieux picker vide', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: () => Promise.resolve({ error: 'internal_error' }),
+        }),
+      );
+      const ctx = makeCtx();
+      ctx.selectProfile = vi.fn();
+      ctx.showToast = vi.fn();
+
+      await callMethod('loadProfiles', ctx);
+
+      expect(ctx.showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+      expect(ctx.profiles).toEqual([]);
+    });
+
     it('selects first profile when no saved ID exists', async () => {
       const profileList = [
         { id: 'p1', name: 'Alice', locale: 'fr' },

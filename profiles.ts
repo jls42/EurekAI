@@ -172,6 +172,14 @@ const sameVoices = (
   return a.host === b.host && a.guest === b.guest;
 };
 
+// Helper de logs pour filterValidEntries — séparé pour rester sous CCN 8 et
+// garder un message diagnostique précis (null/array/string/number/etc.).
+const describeEntryShape = (value: unknown): string => {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  return typeof value;
+};
+
 export class ProfileStore {
   private readonly filePath: string;
   // Mirror du pattern `lastLoadFailed` de config.ts — évite un overwrite silencieux
@@ -214,15 +222,48 @@ export class ProfileStore {
     return raw as Profile[];
   }
 
+  // Skip les entries non-object (null, primitives, arrays imbriqués) plutôt que de
+  // laisser remonter l'exception à list(). Avant ce filet, un tableau JSON valide avec
+  // une seule entrée corrompue (ex: legacy row=null) faisait crasher tous les endpoints
+  // /api/profiles en 500 — alors que le pre-refactor try/catch monolithique convertissait
+  // ça en [] silencieusement. Compromis : on log.warn par entrée invalide (visibilité)
+  // et on garde les entries valides (résilience). Le fichier disque reste intact, l'admin
+  // peut intervenir via .corrupt.bak si la corruption s'étend.
+  private filterValidEntries(profiles: unknown[]): Profile[] {
+    const valid: Profile[] = [];
+    for (const [idx, entry] of profiles.entries()) {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        logger.warn(
+          'profiles',
+          `dropped malformed entry at index ${idx} (type=${describeEntryShape(entry)})`,
+        );
+        continue;
+      }
+      valid.push(entry as Profile);
+    }
+    return valid;
+  }
+
   private migrateAndPersist(profiles: Profile[]): Profile[] {
-    let migrated = false;
-    for (const p of profiles) {
-      if (migrateProfile(p)) migrated = true;
+    const valid = this.filterValidEntries(profiles);
+    let migrated = valid.length !== profiles.length;
+    for (const p of valid) {
+      try {
+        if (migrateProfile(p)) migrated = true;
+      } catch (e) {
+        // migrateProfile peut throw sur des shapes hostiles qui passent le typeof object
+        // (ex: champ obligatoire manquant lu comme undefined → cascade de TypeError).
+        // On drop l'entrée plutôt que crasher tout le load.
+        logger.warn('profiles', `dropped entry id=${p.id ?? '<no-id>'} (migration failed):`, e);
+        const idx = valid.indexOf(p);
+        if (idx >= 0) valid.splice(idx, 1);
+        migrated = true;
+      }
     }
     this.lastLoadFailed = false;
     if (migrated) {
       try {
-        this.save(profiles);
+        this.save(valid);
       } catch (e) {
         // Migration auto-save failure : on ne re-throw pas (le load de base reste
         // valide en mémoire), mais on log.error pour observabilité. L'appelant obtient
@@ -230,7 +271,7 @@ export class ProfileStore {
         logger.error('profiles', 'migration persist failed (continuing in-memory):', e);
       }
     }
-    return profiles;
+    return valid;
   }
 
   private save(profiles: Profile[]) {
@@ -240,20 +281,8 @@ export class ProfileStore {
     // l'exception propage avant le reset → flag préservé → retry correct au prochain save.
     // Si write réussit mais backup avait échoué, le contenu corrompu est de toute façon
     // perdu (overwrite) — garder le flag risquerait de backup le NOUVEAU contenu valide.
-    if (this.lastLoadFailed && existsSync(this.filePath)) {
-      const backupPath = `${this.filePath}.corrupt.bak`;
-      if (!existsSync(backupPath)) {
-        try {
-          copyFileSync(this.filePath, backupPath);
-          logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
-        } catch (e) {
-          logger.warn(
-            'profiles',
-            'failed to create .corrupt.bak (corrupt content will be lost on overwrite):',
-            e,
-          );
-        }
-      }
+    if (this.lastLoadFailed && existsSync(this.filePath) && this.diskStillCorrupt()) {
+      this.backupCorrupt();
     }
     try {
       writeFileSync(this.filePath, JSON.stringify(profiles, null, 2));
@@ -262,6 +291,34 @@ export class ProfileStore {
       throw e;
     }
     this.lastLoadFailed = false;
+  }
+
+  // Re-vérifie le contenu disque avant de créer .corrupt.bak. Couvre le scénario où
+  // l'admin a réparé manuellement profiles.json entre le list() qui a flag lastLoadFailed
+  // et le save() courant — sans cette garde on backup le contenu désormais valide comme
+  // s'il était corrompu (false positive .corrupt.bak qui peut affoler le post-mortem).
+  private diskStillCorrupt(): boolean {
+    try {
+      const raw = JSON.parse(readFileSync(this.filePath, 'utf-8'));
+      return !Array.isArray(raw);
+    } catch {
+      return true;
+    }
+  }
+
+  private backupCorrupt(): void {
+    const backupPath = `${this.filePath}.corrupt.bak`;
+    if (existsSync(backupPath)) return;
+    try {
+      copyFileSync(this.filePath, backupPath);
+      logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
+    } catch (e) {
+      logger.warn(
+        'profiles',
+        'failed to create .corrupt.bak (corrupt content will be lost on overwrite):',
+        e,
+      );
+    }
   }
 
   create(
@@ -329,11 +386,19 @@ export class ProfileStore {
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
-    if (
-      updates.mistralVoices !== undefined &&
-      (updates.mistralVoices === null || typeof updates.mistralVoices === 'object')
-    ) {
-      profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
+    if (updates.mistralVoices !== undefined) {
+      // Accepte uniquement null (reset) ou objet structuré. Primitives (string/number/
+      // boolean) sont rejetées avec warn — sans ça, un client buggé qui POSTe
+      // `mistralVoices: "Marie"` reçoit 200 OK alors que sa voix est silencieusement
+      // ignorée. Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
+      if (updates.mistralVoices === null || typeof updates.mistralVoices === 'object') {
+        profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
+      } else {
+        logger.warn(
+          'profiles',
+          `update: rejected non-object mistralVoices (type=${typeof updates.mistralVoices})`,
+        );
+      }
     }
     if (updates.theme !== undefined) {
       applyTheme(profile, updates.theme);
