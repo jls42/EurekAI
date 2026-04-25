@@ -54,6 +54,8 @@ export const fr: Record<string, string> = {
   'errorCode.llm_invalid_json': "Réponse invalide de l'IA",
   'errorCode.upload_failed': "Échec de l'envoi",
   'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
+  'errorCode.profile_delete_partial':
+    "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",
 
   // Header
   'header.menuProjects': 'Menu projets',

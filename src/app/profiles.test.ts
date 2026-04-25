@@ -1388,6 +1388,43 @@ describe('createProfiles', () => {
       expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('toast.error'), 'error');
       vi.stubGlobal('fetch', vi.fn());
     });
+
+    it('does not finalize local state on partial profile delete failure', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          statusText: 'Internal Server Error',
+          json: async () => ({
+            error: 'profile_delete_partial',
+            deletedProjects: 1,
+            failedProjects: ['project-2'],
+          }),
+        }),
+      );
+      const profile = { id: 'p-del', name: 'Test', hasPin: false };
+      let deletePromise: Promise<void> | undefined;
+      const ctx = makeCtx({
+        profiles: [profile],
+        currentProfile: { id: 'p-del' },
+        t: vi.fn((key: string, params?: Record<string, string>) => {
+          if (key === 'errorCode.profile_delete_partial') return 'Partial delete translated';
+          if (key === 'toast.error') return `Error: ${params?.error}`;
+          return key;
+        }),
+        confirmDelete: vi.fn((_msg: string, cb: () => void) => {
+          deletePromise = cb() as any;
+        }),
+      });
+
+      callMethod('deleteProfile', ctx, 'p-del');
+      await deletePromise;
+
+      expect(ctx.profiles).toEqual([profile]);
+      expect(clearProfileLocale).not.toHaveBeenCalledWith('p-del');
+      expect(ctx.showToast).toHaveBeenCalledWith('Error: Partial delete translated', 'error');
+      vi.stubGlobal('fetch', vi.fn());
+    });
   });
 
   // --- toggleModerationCategory ---

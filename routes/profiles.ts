@@ -7,6 +7,7 @@ import type { Profile } from '../types.js';
 
 const ERR_PROFILE_NOT_FOUND = 'Profil introuvable';
 const ERR_PIN_WRONG = 'Code PIN incorrect';
+const ERR_PROFILE_DELETE_PARTIAL = 'profile_delete_partial';
 
 const isValidName = (name: unknown): boolean => typeof name === 'string' && name.trim().length > 0;
 
@@ -59,6 +60,9 @@ const isValidLocale = (locale: unknown): boolean =>
   typeof locale === 'string' && locale.trim().length > 0;
 
 const isValidAvatar = (avatar: unknown): boolean => typeof avatar === 'string';
+const isValidBoolean = (value: unknown): boolean => typeof value === 'boolean';
+const isValidModerationCategories = (value: unknown): boolean =>
+  Array.isArray(value) && value.every((category) => typeof category === 'string');
 
 // Symétrique à validateCreateProfileInput, mais champs optionnels (PUT partial update).
 // Lookup table plutôt qu'une chaîne de `if`s — garde la fonction sous CCN 8 (cf. CLAUDE.md).
@@ -67,7 +71,15 @@ const isValidAvatar = (avatar: unknown): boolean => typeof avatar === 'string';
 // pour age négatif, name écrit en number/empty). Le store reste un layer persistance
 // best-effort, la validation HTTP doit fail-closed à la frontière.
 const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
-  field: 'name' | 'age' | 'locale' | 'avatar';
+  field:
+    | 'name'
+    | 'age'
+    | 'locale'
+    | 'avatar'
+    | 'useModeration'
+    | 'moderationCategories'
+    | 'useConsigne'
+    | 'chatEnabled';
   isValid: (v: unknown) => boolean;
   error: string;
 }> = [
@@ -75,6 +87,14 @@ const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
   { field: 'age', isValid: isValidAge, error: 'Age invalide (4-120)' },
   { field: 'locale', isValid: isValidLocale, error: 'Locale invalide' },
   { field: 'avatar', isValid: isValidAvatar, error: 'Avatar invalide' },
+  { field: 'useModeration', isValid: isValidBoolean, error: 'Modération invalide' },
+  {
+    field: 'moderationCategories',
+    isValid: isValidModerationCategories,
+    error: 'Catégories de modération invalides',
+  },
+  { field: 'useConsigne', isValid: isValidBoolean, error: 'Consigne invalide' },
+  { field: 'chatEnabled', isValid: isValidBoolean, error: 'Chat invalide' },
 ];
 
 const validateUpdateProfileInput = (fields: Record<string, unknown>): string | null => {
@@ -98,6 +118,11 @@ const PARENTAL_FIELDS = ['useModeration', 'moderationCategories', 'chatEnabled',
 
 type ProfileRecord = ReturnType<ProfileStore['get']> & {};
 type ProfileUpdateFields = Partial<Profile>;
+type UpdateBody = Record<string, unknown>;
+type UpdateGuardResult = { status?: number; body: Record<string, unknown> };
+
+const isUpdateBody = (body: unknown): body is UpdateBody =>
+  !!body && typeof body === 'object' && !Array.isArray(body);
 
 const parentalFieldChanged = (
   profile: ProfileRecord,
@@ -133,10 +158,33 @@ const isStaleWrite = (profile: ProfileRecord, updatedAt: unknown): boolean => {
   return updatedAt < profile.updatedAt;
 };
 
+const buildUpdateGuardResult = (
+  profile: ProfileRecord,
+  pin: unknown,
+  fields: ProfileUpdateFields & UpdateBody,
+  updatedAt: unknown,
+): UpdateGuardResult | null => {
+  if (pinMismatch(profile, pin)) return { status: 403, body: { error: ERR_PIN_WRONG } };
+  if (Object.keys(fields).length === 0) return { body: profileToPublic(profile) };
+  const validationError = validateUpdateProfileInput(fields);
+  if (validationError) return { status: 400, body: { error: validationError } };
+  if (requiresPinForParentalChange(profile, pin, fields)) {
+    return { status: 403, body: { error: ERR_PIN_WRONG } };
+  }
+  if (isStaleWrite(profile, updatedAt)) {
+    return { status: 409, body: { error: 'stale', profile: profileToPublic(profile) } };
+  }
+  return null;
+};
+
+const sendUpdateGuardResult = (res: Response, result: UpdateGuardResult): void => {
+  if (result.status) res.status(result.status);
+  res.json(result.body);
+};
+
 // Cascade isolée par projet : un fail rmSync (EBUSY/EACCES Windows, FS RO) ou
-// writeIndex throw n'interrompt plus la boucle — on collecte les ids restants pour
-// que le client puisse réessayer. Avant cette protection, le compteur retourné dans
-// la 200 OK mentait sur les projets effectivement supprimés.
+// writeIndex throw n'interrompt plus la boucle. On supprime le profil uniquement si
+// tous ses projets ont disparu ; sinon le profil reste présent pour permettre un retry.
 const cascadeDeleteProjects = (
   projectStore: ProjectStore,
   profileId: string,
@@ -229,27 +277,14 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
         res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
         return;
       }
+      if (!isUpdateBody(req.body)) {
+        res.status(400).json({ error: 'Payload invalide' });
+        return;
+      }
       const { pin, _updatedAt, ...fields } = req.body;
-
-      if (pinMismatch(profile, pin)) {
-        res.status(403).json({ error: ERR_PIN_WRONG });
-        return;
-      }
-      if (Object.keys(fields).length === 0) {
-        res.json(profileToPublic(profile));
-        return;
-      }
-      const validationError = validateUpdateProfileInput(fields);
-      if (validationError) {
-        res.status(400).json({ error: validationError });
-        return;
-      }
-      if (requiresPinForParentalChange(profile, pin, fields)) {
-        res.status(403).json({ error: ERR_PIN_WRONG });
-        return;
-      }
-      if (isStaleWrite(profile, _updatedAt)) {
-        res.status(409).json({ error: 'stale', profile: profileToPublic(profile) });
+      const guardResult = buildUpdateGuardResult(profile, pin, fields, _updatedAt);
+      if (guardResult) {
+        sendUpdateGuardResult(res, guardResult);
         return;
       }
       const updated = store.update(id, fields);
@@ -277,27 +312,28 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
           return;
         }
       }
-      // Delete profile AVANT cascade : si store.delete fail (race avec un autre DELETE,
-      // corruption détectée à la save), on ne touche pas aux projets. Sinon le user
-      // verrait "404 Profil introuvable" alors que ses projets ont déjà été supprimés.
+      const { deleted, failed } = cascadeDeleteProjects(projectStore, profileId);
+      if (failed.length > 0) {
+        logger.warn(
+          'profiles',
+          `${failed.length} project(s) blocked profile ${profileId} delete: ${failed.join(', ')}`,
+        );
+        res.status(500).json({
+          error: ERR_PROFILE_DELETE_PARTIAL,
+          deletedProjects: deleted,
+          failedProjects: failed,
+        });
+        return;
+      }
       const ok = store.delete(profileId);
       if (!ok) {
         res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
         return;
       }
-      const { deleted, failed } = cascadeDeleteProjects(projectStore, profileId);
-      if (failed.length > 0) {
-        logger.warn(
-          'profiles',
-          `${failed.length} project(s) orphaned after profile ${profileId} delete: ${failed.join(', ')}`,
-        );
-      }
       const response: {
         ok: true;
         deletedProjects: number;
-        failedProjects?: string[];
       } = { ok: true, deletedProjects: deleted };
-      if (failed.length > 0) response.failedProjects = failed;
       res.json(response);
     }),
   );

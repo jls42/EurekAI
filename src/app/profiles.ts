@@ -23,6 +23,7 @@ const I18N_KNOWN_ERROR_CODES = new Set([
   'tts_upstream_error',
   'context_length_exceeded',
   'llm_invalid_json',
+  'profile_delete_partial',
 ]);
 
 export function mapServerErrorCode(state: AppContext, raw: unknown): string {

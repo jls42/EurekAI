@@ -5,6 +5,7 @@ export type AuditVerdict =
   | 'ok'
   | 'parse-error'
   | 'no-metadata'
+  | `audit-error:${string}`
   | `transport:${string}`
   | `critical:${number}`;
 

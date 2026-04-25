@@ -621,6 +621,91 @@ describe('profileRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Locale invalide' });
     });
 
+    it('rejects PUT with null body', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: null,
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Payload invalide' });
+    });
+
+    it('rejects PUT with array body', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: [{ name: 'Array' }],
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Payload invalide' });
+    });
+
+    it('rejects PUT with non-array moderationCategories', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { moderationCategories: 'sexual' },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Catégories de modération invalides' });
+    });
+
+    it('rejects PUT with non-string moderationCategories entries', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { moderationCategories: ['sexual', 42] },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Catégories de modération invalides' });
+    });
+
+    it('rejects PUT with non-boolean parental toggles', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const cases = [
+        [{ useModeration: 'false' }, 'Modération invalide'],
+        [{ useConsigne: 'true' }, 'Consigne invalide'],
+        [{ chatEnabled: 1 }, 'Chat invalide'],
+      ] as const;
+
+      for (const [body, error] of cases) {
+        const req = mockReq({ params: { id: created.id }, body });
+        const res = mockRes();
+        await handler(req, res);
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error });
+      }
+    });
+
     it('isStaleWrite ignore les _updatedAt non-string (number/object) sans bloquer', async () => {
       // Avant le typage strict, `1 < 'iso-string'` retournait false silencieusement,
       // équivalent à "pas stale" mais sans contrôle conscient. Désormais on traite
@@ -782,9 +867,8 @@ describe('profileRoutes', () => {
 
     it('cascade partial-failure : surfaces failedProjects[] sans interrompre la boucle', async () => {
       // Si projectStore.deleteProject throw EBUSY/EACCES sur un projet (Windows lock,
-      // FS RO), le code historique propageait l'exception → le profil restait orphelin
-      // de tous ses projets, plus aucun n'était supprimé. Désormais on collecte les ids
-      // failed et on retourne une réponse partielle pour que le client puisse réessayer.
+      // FS RO), on collecte les ids failed, on conserve le profil et on retourne une
+      // erreur stable pour que le client puisse réessayer sans orpheliner le projet.
       const store = new ProfileStore(tmpDir);
       const created = store.create('Adulte', 30, '0', 'fr');
       const project1 = projectStore.createProject('Project A', created.id);
@@ -807,12 +891,13 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       const response = res.json.mock.calls[0][0];
-      expect(response.ok).toBe(true);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(response.error).toBe('profile_delete_partial');
       expect(response.deletedProjects).toBe(2);
       expect(response.failedProjects).toEqual([project2.meta.id]);
-      // Le profil est supprimé même si la cascade est partielle
-      expect(store.get(created.id)).toBeNull();
-      // Project1 et project3 sont supprimés, project2 reste orphelin
+      // Le profil reste disponible pour un retry de suppression.
+      expect(store.get(created.id)).not.toBeNull();
+      // Project1 et project3 sont supprimés, project2 reste rattaché au profil conservé.
       expect(projectStore.getProject(project1.meta.id)).toBeNull();
       expect(projectStore.getProject(project3.meta.id)).toBeNull();
       expect(projectStore.getProject(project2.meta.id)).not.toBeNull();
@@ -835,11 +920,10 @@ describe('profileRoutes', () => {
       expect(response).not.toHaveProperty('failedProjects');
     });
 
-    it('ne touche pas aux projets si store.delete échoue (404 avant cascade)', async () => {
-      // Inversion d'ordre durci par 31b773a : delete-AVANT-cascade. Si store.delete
-      // retourne false (race condition entre deux DELETE concurrents, ou corruption
-      // store détectée à la save), aucun projet n'est touché — sinon le user verrait
-      // "404 Profil introuvable" alors que ses projets ont déjà été supprimés.
+    it('retourne 404 si store.delete échoue après cascade complète', async () => {
+      // La cascade passe avant store.delete pour éviter les projets orphelins. Si la
+      // suppression profil échoue malgré le get initial (race/corruption), le handler
+      // remonte encore le 404 stable.
       const store = new ProfileStore(tmpDir);
       const created = store.create('Adulte', 30, '0', 'fr');
       const project1 = projectStore.createProject('Project A', created.id);
@@ -854,9 +938,9 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(cascadeSpy).not.toHaveBeenCalled();
-      // Projet intact
-      expect(projectStore.getProject(project1.meta.id)).not.toBeNull();
+      expect(res.json).toHaveBeenCalledWith({ error: 'Profil introuvable' });
+      expect(cascadeSpy).toHaveBeenCalledWith(project1.meta.id);
+      expect(projectStore.getProject(project1.meta.id)).toBeNull();
     });
 
     it('cascades deletion with correct PIN for child profile', async () => {

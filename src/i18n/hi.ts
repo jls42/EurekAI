@@ -54,6 +54,8 @@ export const hi: Record<string, string> = {
   'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
   'errorCode.upload_failed': 'अपलोड विफल',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
+  'errorCode.profile_delete_partial':
+    'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',

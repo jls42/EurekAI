@@ -51,6 +51,8 @@ export const de: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Ung\u00fcltige KI-Antwort',
   'errorCode.upload_failed': 'Upload fehlgeschlagen',
   'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
+  'errorCode.profile_delete_partial':
+    'Profil loeschen unvollstaendig: einige Projekte konnten nicht geloescht werden',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',

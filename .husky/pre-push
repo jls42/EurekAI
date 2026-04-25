@@ -7,8 +7,8 @@
 #
 # Fail-closed sur verdicts inconnus : `no-metadata` (shape audit cassée, breaking
 # change npm, OOM tronquant stdout) et `parse-error` (JSON invalide, node bin
-# introuvable) bloquent le push. Seul `transport:*` (erreur reseau identifiee via
-# a.error côté registry) est explicitement non-bloquant — c'est le seul état ou on
+# introuvable) bloquent le push. Seul `transport:*` (code reseau/registry allowlisté)
+# est explicitement non-bloquant — c'est le seul état ou on
 # peut distinguer "vulnerabilité absente" de "vulnérabilité inconnue".
 audit_stderr=$(mktemp -t eurekai-audit.XXXXXX)
 audit_json=$(npm audit --json 2>"$audit_stderr" || true)

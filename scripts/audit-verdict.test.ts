@@ -21,7 +21,22 @@ describe('computeAuditVerdict', () => {
     expect(computeAuditVerdict('{"error":{"code":"ENETUNREACH","summary":"network down"}}')).toBe(
       'transport:ENETUNREACH',
     );
-    expect(computeAuditVerdict('{"error":{"summary":"unknown"}}')).toBe('transport:?');
+    expect(computeAuditVerdict('{"error":{"code":"E503","summary":"registry down"}}')).toBe(
+      'transport:E503',
+    );
+  });
+
+  it('error audit locale ou inconnue -> audit-error:<code> (fail-closed)', () => {
+    expect(computeAuditVerdict('{"error":{"code":"EAUDITNOLOCK","summary":"no lockfile"}}')).toBe(
+      'audit-error:EAUDITNOLOCK',
+    );
+    expect(computeAuditVerdict('{"error":{"code":"ENOLOCK","summary":"missing lockfile"}}')).toBe(
+      'audit-error:ENOLOCK',
+    );
+    expect(
+      computeAuditVerdict('{"error":{"code":"EJSONPARSE","summary":"invalid lockfile"}}'),
+    ).toBe('audit-error:EJSONPARSE');
+    expect(computeAuditVerdict('{"error":{"summary":"unknown"}}')).toBe('audit-error:?');
   });
 
   it('aucune vuln critique -> ok (pass)', () => {
@@ -81,13 +96,13 @@ describe('computeAuditVerdict', () => {
     expect(computeAuditVerdict(json)).toBe('critical:3');
   });
 
-  it('priorité error > metadata : un transport masque les chiffres', () => {
-    // npm peut renvoyer error+metadata simultanement pendant une erreur partielle.
-    // La logique pre-push privilégie transport pour rester fail-open dans ce cas.
+  it('metadata critical prioritaire sur error transport', () => {
+    // npm peut renvoyer error+metadata simultanement pendant une erreur partielle :
+    // les critiques connues doivent bloquer au lieu d'être masquées par transport.
     const json = JSON.stringify({
       error: { code: 'ENETDOWN' },
       metadata: { vulnerabilities: { critical: 99 } },
     });
-    expect(computeAuditVerdict(json)).toBe('transport:ENETDOWN');
+    expect(computeAuditVerdict(json)).toBe('critical:99');
   });
 });

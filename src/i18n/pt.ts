@@ -51,6 +51,8 @@ export const pt: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
   'errorCode.upload_failed': 'Falha no envio',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
+  'errorCode.profile_delete_partial':
+    'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',

@@ -57,6 +57,8 @@ export const ar: Record<string, string> = {
   'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
   'errorCode.upload_failed': 'فشل التحميل',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
+  'errorCode.profile_delete_partial':
+    'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',

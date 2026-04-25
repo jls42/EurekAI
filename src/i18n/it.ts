@@ -50,6 +50,8 @@ export const it: Record<string, string> = {
   'errorCode.llm_invalid_json': "Risposta non valida dell'IA",
   'errorCode.upload_failed': 'Caricamento non riuscito',
   'errorCode.all_steps_failed': 'Tutte le generazioni sono fallite',
+  'errorCode.profile_delete_partial':
+    'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',
 
   'header.menuProjects': 'Menu progetti',
   'header.switchToLight': 'Passa alla modalit\u00e0 chiara',

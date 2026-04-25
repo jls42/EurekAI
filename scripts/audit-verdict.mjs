@@ -1,8 +1,27 @@
 #!/usr/bin/env node
 // Calcule un verdict bash-friendly à partir du JSON de `npm audit --json`.
 // Lecture stdin pour rester compatible avec le pipe utilisé par .husky/pre-push.
-// Sortie : `ok` | `critical:N` | `transport:<code>` | `no-metadata` | `parse-error`.
+// Sortie : `ok` | `critical:N` | `transport:<code>` | `audit-error:<code>` |
+// `no-metadata` | `parse-error`.
 // Voir CLAUDE.md "Couverture actuelle" et `.husky/pre-push` pour les invariants.
+
+const TRANSPORT_ERROR_CODES = new Set([
+  'EAI_AGAIN',
+  'ECONNABORTED',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'EHOSTUNREACH',
+  'ENETDOWN',
+  'ENETRESET',
+  'ENETUNREACH',
+  'ENOTFOUND',
+  'ETIMEDOUT',
+  'EPIPE',
+  'E500',
+  'E502',
+  'E503',
+  'E504',
+]);
 
 export function computeAuditVerdict(rawJson) {
   let parsed;
@@ -16,18 +35,27 @@ export function computeAuditVerdict(rawJson) {
   return classifyVulnerabilities(parsed.metadata.vulnerabilities);
 }
 
-// Détecte les shapes top-level non-vulnérabilités : `error` (npm offline/proxy down) ou
-// metadata absente (réponse partielle / JSON null). Retourne null si la shape attendue
-// `metadata.vulnerabilities` est présente — laisse classifyVulnerabilities décider.
+// Détecte les shapes top-level non-vulnérabilités. Quand metadata.vulnerabilities est
+// présente, on la lit d'abord pour ne jamais masquer des critiques derrière error.
 // Découpée pour tenir computeAuditVerdict sous la limite CCN 8 (Codacy mesure ~13 sinon).
 function classifyShape(parsed) {
-  if (parsed && typeof parsed === 'object' && parsed.error) {
-    return 'transport:' + (parsed.error.code || '?');
+  if (!parsed || typeof parsed !== 'object') return 'no-metadata';
+  if (parsed.metadata?.vulnerabilities) {
+    const vulnerabilityVerdict = classifyVulnerabilities(parsed.metadata.vulnerabilities);
+    if (vulnerabilityVerdict !== 'ok') return vulnerabilityVerdict;
+  }
+  if (parsed.error) {
+    return classifyAuditError(parsed.error);
   }
   if (!parsed || !parsed.metadata || !parsed.metadata.vulnerabilities) {
     return 'no-metadata';
   }
   return null;
+}
+
+function classifyAuditError(error) {
+  const code = typeof error.code === 'string' && error.code ? error.code : '?';
+  return TRANSPORT_ERROR_CODES.has(code) ? 'transport:' + code : 'audit-error:' + code;
 }
 
 function classifyVulnerabilities(vulnerabilities) {

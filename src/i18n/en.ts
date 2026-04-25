@@ -49,6 +49,8 @@ export const en: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Invalid AI response',
   'errorCode.upload_failed': 'Upload failed',
   'errorCode.all_steps_failed': 'All generations failed',
+  'errorCode.profile_delete_partial':
+    'Profile deletion incomplete: some projects could not be deleted',
 
   'header.menuProjects': 'Projects menu',
   'header.switchToLight': 'Switch to light mode',

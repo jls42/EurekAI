@@ -50,6 +50,8 @@ export const es: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Respuesta inv\u00e1lida de la IA',
   'errorCode.upload_failed': 'Error al subir',
   'errorCode.all_steps_failed': 'Todas las generaciones han fallado',
+  'errorCode.profile_delete_partial':
+    'Eliminacion del perfil incompleta: algunos proyectos no se pudieron eliminar',
 
   'header.menuProjects': 'Men\u00fa de proyectos',
   'header.switchToLight': 'Cambiar a modo claro',

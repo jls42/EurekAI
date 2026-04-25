@@ -50,6 +50,8 @@ export const nl: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Ongeldig AI-antwoord',
   'errorCode.upload_failed': 'Uploaden mislukt',
   'errorCode.all_steps_failed': 'Alle generaties mislukt',
+  'errorCode.profile_delete_partial':
+    'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
