@@ -10,7 +10,8 @@
 # introuvable) bloquent le push. Seul `transport:*` (erreur reseau identifiee via
 # a.error côté registry) est explicitement non-bloquant — c'est le seul état ou on
 # peut distinguer "vulnerabilité absente" de "vulnérabilité inconnue".
-audit_json=$(npm audit --json 2>/dev/null || true)
+audit_stderr=$(mktemp -t eurekai-audit.XXXXXX)
+audit_json=$(npm audit --json 2>"$audit_stderr" || true)
 audit_verdict=$(echo "$audit_json" | node -e "
   const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
     try{
@@ -42,9 +43,18 @@ case "$audit_verdict" in
     echo "✗ pre-push audit gate broken (verdict: $audit_verdict)."
     echo "  Diagnostic : npm audit --json | head -c 500"
     echo "  Causes possibles : shape audit cassee, node bin introuvable, OOM stdout."
+    if [ -s "$audit_stderr" ]; then
+      echo "  --- stderr capture ($audit_stderr, premieres 500 lignes) ---"
+      head -c 2000 "$audit_stderr"
+      echo ""
+    else
+      echo "  (npm audit n'a rien ecrit sur stderr)"
+    fi
     echo "  Forcer le push malgre tout (apres diagnostic) : git push --no-verify"
+    rm -f "$audit_stderr"
     exit 1
     ;;
 esac
 
+rm -f "$audit_stderr"
 npm run security
