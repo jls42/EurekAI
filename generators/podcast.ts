@@ -1,6 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
+import { logger } from '../helpers/logger.js';
 import { podcastSystem, podcastUser, pickPodcastNames } from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
 
@@ -61,8 +62,9 @@ export async function generatePodcastScript(
 
   if (isValidPodcast(result.script)) return { ...result, names };
 
-  console.warn(
-    'Podcast validation failed, retrying. Got:',
+  logger.warn(
+    'podcast',
+    'validation failed, retrying:',
     JSON.stringify(result.script).slice(0, 200),
   );
   messages.push(

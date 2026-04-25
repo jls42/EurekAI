@@ -118,8 +118,6 @@ export const nl: Record<string, string> = {
   'emotion.Sad': 'Verdrietig',
   'emotion.Sarcasm': 'Sarcasme',
   'emotion.Shameful': 'Beschaamd',
-  'settings.mistralVoicesHint':
-    'Mistral-stemmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Samenvatting',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',

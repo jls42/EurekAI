@@ -143,8 +143,6 @@ export const ar: Record<string, string> = {
   'emotion.Sad': '\u062d\u0632\u064a\u0646',
   'emotion.Sarcasm': '\u0633\u0627\u062e\u0631',
   'emotion.Shameful': '\u062e\u062c\u0648\u0644',
-  'settings.mistralVoicesHint':
-    '\u0623\u0635\u0648\u0627\u062a Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': '\u0645\u0644\u062e\u0651\u0635',
   'settings.flashcards':
     '\u0628\u0637\u0627\u0642\u0627\u062a \u062a\u0639\u0644\u064a\u0645\u064a\u0629',

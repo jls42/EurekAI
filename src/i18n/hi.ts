@@ -145,8 +145,6 @@ export const hi: Record<string, string> = {
   'emotion.Sad': '\u0926\u0941\u0916\u0940',
   'emotion.Sarcasm': '\u0935\u094D\u092F\u0902\u0917\u094D\u092F',
   'emotion.Shameful': '\u0936\u0930\u094D\u092E\u093F\u0902\u0926\u093E',
-  'settings.mistralVoicesHint':
-    'Mistral \u0906\u0935\u093E\u091C\u093C\u0947\u0902: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': '\u0928\u094B\u091F',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',

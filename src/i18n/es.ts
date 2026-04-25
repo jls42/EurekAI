@@ -118,8 +118,6 @@ export const es: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarc\u00e1stico',
   'emotion.Shameful': 'Avergonzado',
-  'settings.mistralVoicesHint':
-    'Voces Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Ficha',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
