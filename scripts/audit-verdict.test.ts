@@ -52,6 +52,27 @@ describe('computeAuditVerdict', () => {
     expect(computeAuditVerdict(stringNonNumeric)).toBe('parse-error');
   });
 
+  it('shapes silencieuses fail-open (string vide / boolean / array) -> parse-error', () => {
+    // Number("") === 0, Number(false) === 0, Number([]) === 0 — la coercion brute
+    // laisserait passer ces shapes hostiles en 'ok' silencieux. On détecte explicitement.
+    const emptyString = JSON.stringify({ metadata: { vulnerabilities: { critical: '' } } });
+    expect(computeAuditVerdict(emptyString)).toBe('parse-error');
+    const booleanFalse = JSON.stringify({ metadata: { vulnerabilities: { critical: false } } });
+    expect(computeAuditVerdict(booleanFalse)).toBe('parse-error');
+    const arrayShape = JSON.stringify({ metadata: { vulnerabilities: { critical: [] } } });
+    expect(computeAuditVerdict(arrayShape)).toBe('parse-error');
+  });
+
+  it('absence explicite (null/undefined sur critical) -> ok (équivalent à 0)', () => {
+    // null et undefined sont traités comme "champ absent" (pas de vulns critiques),
+    // pas comme une shape invalide. Cohérent avec le comportement npm normal.
+    const nullCritical = JSON.stringify({ metadata: { vulnerabilities: { critical: null } } });
+    expect(computeAuditVerdict(nullCritical)).toBe('ok');
+    // undefined ne sérialise pas en JSON ; simule via objet sans la clé.
+    const noCritical = JSON.stringify({ metadata: { vulnerabilities: { high: 1 } } });
+    expect(computeAuditVerdict(noCritical)).toBe('ok');
+  });
+
   it('critical en string numérique reste tolerant -> coerce en Number', () => {
     // Les versions npm passées ont parfois sérialisé en string ("3"). On accepte.
     const json = JSON.stringify({

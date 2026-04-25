@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { profileRoutes } from './profiles.js';
 import { ProfileStore } from '../profiles.js';
 import { ProjectStore } from '../store.js';
+import { logger } from '../helpers/logger.js';
 
 // --- Helpers ---
 
@@ -25,6 +26,7 @@ function mockRes() {
   const res: any = {};
   res.status = vi.fn(() => res);
   res.json = vi.fn(() => res);
+  res.setHeader = vi.fn(() => res);
   res.headersSent = false;
   return res;
 }
@@ -94,6 +96,55 @@ describe('profileRoutes', () => {
       expect(profiles[0].hasPin).toBe(true);
       expect(profiles[1].name).toBe('Bob');
       expect(profiles[1].hasPin).toBe(false);
+    });
+
+    it('émet header X-Profiles-Dropped quand des rows malformées sont droppées', async () => {
+      // Écrit directement un profiles.json avec une row null + un profil valide → le
+      // store.list() drop la row malformée, getLastDroppedCount() retourne 1, et le
+      // route handler doit émettre un header HTTP pour que le frontend affiche un toast.
+      // Sans ce signal, l'utilisateur voyait un picker partiel sans diagnostic possible.
+      const profilesPath = join(tmpDir, 'profiles.json');
+      const validProfile = {
+        id: 'p1',
+        name: 'Alice',
+        age: 9,
+        ageGroup: 'enfant',
+        avatar: '0',
+        locale: 'fr',
+        useModeration: true,
+        moderationCategories: [],
+        useConsigne: true,
+        chatEnabled: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      writeFileSync(profilesPath, JSON.stringify([validProfile, null, 'legacy-string']));
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+      const freshRouter = profileRoutes(tmpDir, projectStore);
+      const handler = getHandler(freshRouter, 'get', '/');
+      const req = mockReq();
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.setHeader).toHaveBeenCalledWith('X-Profiles-Dropped', '2');
+      const profiles = res.json.mock.calls[0][0];
+      expect(profiles).toHaveLength(1);
+      expect(profiles[0].id).toBe('p1');
+    });
+
+    it("n'émet PAS le header X-Profiles-Dropped quand aucune row n'est droppée", async () => {
+      const store = new ProfileStore(tmpDir);
+      store.create('Alice', 9, '0', 'fr', '1234');
+
+      const handler = getHandler(router, 'get', '/');
+      const req = mockReq();
+      const res = mockRes();
+      await handler(req, res);
+
+      // Aucun header sur le chemin nominal — sinon faux positif côté toast frontend
+      expect(res.setHeader).not.toHaveBeenCalledWith('X-Profiles-Dropped', expect.anything());
     });
 
     it('catch les erreurs de persistence ProfileStore et renvoie 500 typé', async () => {
@@ -501,6 +552,94 @@ describe('profileRoutes', () => {
       expect(store.get(created.id)!.updatedAt).toBe(initialUpdatedAt);
     });
 
+    it('rejects PUT with negative age (validation HTTP frontière)', async () => {
+      // Sans validation PUT, store.update acceptait age:-50 et recalculait
+      // ageGroup → 'enfant' (ageToGroup(-50) tombe dans la première branche).
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { age: -50 },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Age invalide (4-120)' });
+      // Profil inchangé sur disque
+      expect(store.get(created.id)!.age).toBe(20);
+    });
+
+    it('rejects PUT with non-string name', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { name: 12345 },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Nom invalide' });
+      expect(store.get(created.id)!.name).toBe('User');
+    });
+
+    it('rejects PUT with empty name', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { name: '   ' },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Nom invalide' });
+    });
+
+    it('rejects PUT with non-string locale', async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { locale: { lang: 'en' } },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Locale invalide' });
+    });
+
+    it('isStaleWrite ignore les _updatedAt non-string (number/object) sans bloquer', async () => {
+      // Avant le typage strict, `1 < 'iso-string'` retournait false silencieusement,
+      // équivalent à "pas stale" mais sans contrôle conscient. Désormais on traite
+      // ces shapes comme "client n'a pas envoyé de tag" — write passe, pas de faux pass.
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('User', 20, '0', 'fr');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: { name: 'New', _updatedAt: 0 },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].name).toBe('New');
+    });
+
     it('rejects stale write via _updatedAt optimistic concurrency', async () => {
       const store = new ProfileStore(tmpDir);
       const created = store.create('User', 20, '0', 'fr');
@@ -639,6 +778,85 @@ describe('profileRoutes', () => {
 
       // Verify unrelated project still exists
       expect(projectStore.getProject(otherProject.meta.id)).not.toBeNull();
+    });
+
+    it('cascade partial-failure : surfaces failedProjects[] sans interrompre la boucle', async () => {
+      // Si projectStore.deleteProject throw EBUSY/EACCES sur un projet (Windows lock,
+      // FS RO), le code historique propageait l'exception → le profil restait orphelin
+      // de tous ses projets, plus aucun n'était supprimé. Désormais on collecte les ids
+      // failed et on retourne une réponse partielle pour que le client puisse réessayer.
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Adulte', 30, '0', 'fr');
+      const project1 = projectStore.createProject('Project A', created.id);
+      const project2 = projectStore.createProject('Project B', created.id);
+      const project3 = projectStore.createProject('Project C', created.id);
+
+      // Mock deleteProject pour fail UNIQUEMENT sur project2 — les autres succès.
+      const realDelete = projectStore.deleteProject.bind(projectStore);
+      const deleteSpy = vi.spyOn(projectStore, 'deleteProject').mockImplementation((id: string) => {
+        if (id === project2.meta.id) {
+          throw new Error('EBUSY: resource busy or locked');
+        }
+        return realDelete(id);
+      });
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+      const handler = getHandler(router, 'delete', '/:id');
+      const req = mockReq({ params: { id: created.id }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const response = res.json.mock.calls[0][0];
+      expect(response.ok).toBe(true);
+      expect(response.deletedProjects).toBe(2);
+      expect(response.failedProjects).toEqual([project2.meta.id]);
+      // Le profil est supprimé même si la cascade est partielle
+      expect(store.get(created.id)).toBeNull();
+      // Project1 et project3 sont supprimés, project2 reste orphelin
+      expect(projectStore.getProject(project1.meta.id)).toBeNull();
+      expect(projectStore.getProject(project3.meta.id)).toBeNull();
+      expect(projectStore.getProject(project2.meta.id)).not.toBeNull();
+
+      deleteSpy.mockRestore();
+    });
+
+    it("n'émet PAS failedProjects sur cascade nominale (chemin happy)", async () => {
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Adulte', 30, '0', 'fr');
+      projectStore.createProject('Project A', created.id);
+
+      const handler = getHandler(router, 'delete', '/:id');
+      const req = mockReq({ params: { id: created.id }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      const response = res.json.mock.calls[0][0];
+      expect(response).toEqual({ ok: true, deletedProjects: 1 });
+      expect(response).not.toHaveProperty('failedProjects');
+    });
+
+    it('ne touche pas aux projets si store.delete échoue (404 avant cascade)', async () => {
+      // Inversion d'ordre durci par 31b773a : delete-AVANT-cascade. Si store.delete
+      // retourne false (race condition entre deux DELETE concurrents, ou corruption
+      // store détectée à la save), aucun projet n'est touché — sinon le user verrait
+      // "404 Profil introuvable" alors que ses projets ont déjà été supprimés.
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Adulte', 30, '0', 'fr');
+      const project1 = projectStore.createProject('Project A', created.id);
+
+      // Mock store.delete pour return false (simule race window)
+      vi.spyOn(ProfileStore.prototype, 'delete').mockReturnValueOnce(false);
+      const cascadeSpy = vi.spyOn(projectStore, 'deleteProject');
+
+      const handler = getHandler(router, 'delete', '/:id');
+      const req = mockReq({ params: { id: created.id }, body: {} });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(cascadeSpy).not.toHaveBeenCalled();
+      // Projet intact
+      expect(projectStore.getProject(project1.meta.id)).not.toBeNull();
     });
 
     it('cascades deletion with correct PIN for child profile', async () => {

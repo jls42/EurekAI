@@ -815,7 +815,7 @@ export function generateRoutes(
         );
       }
       logger.error('route', 'analysis error:', e);
-      res.status(500).json({ error: extractErrorCode(e) });
+      res.status(500).json({ error: extractErrorCode(e, 'route') });
     }
   });
 

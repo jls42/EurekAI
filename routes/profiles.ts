@@ -55,6 +55,35 @@ const validateCreateProfileInput = (body: RawCreateProfileBody): string | null =
   return null;
 };
 
+const isValidLocale = (locale: unknown): boolean =>
+  typeof locale === 'string' && locale.trim().length > 0;
+
+const isValidAvatar = (avatar: unknown): boolean => typeof avatar === 'string';
+
+// Symétrique à validateCreateProfileInput, mais champs optionnels (PUT partial update).
+// Lookup table plutôt qu'une chaîne de `if`s — garde la fonction sous CCN 8 (cf. CLAUDE.md).
+// Sans cette validation, un client buggé qui POST `age:-50` ou `name: 12345` voyait
+// `store.update` accepter le payload silencieusement (ageGroup recalculé en 'enfant'
+// pour age négatif, name écrit en number/empty). Le store reste un layer persistance
+// best-effort, la validation HTTP doit fail-closed à la frontière.
+const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
+  field: 'name' | 'age' | 'locale' | 'avatar';
+  isValid: (v: unknown) => boolean;
+  error: string;
+}> = [
+  { field: 'name', isValid: isValidName, error: 'Nom invalide' },
+  { field: 'age', isValid: isValidAge, error: 'Age invalide (4-120)' },
+  { field: 'locale', isValid: isValidLocale, error: 'Locale invalide' },
+  { field: 'avatar', isValid: isValidAvatar, error: 'Avatar invalide' },
+];
+
+const validateUpdateProfileInput = (fields: Record<string, unknown>): string | null => {
+  for (const { field, isValid, error } of UPDATE_FIELD_VALIDATORS) {
+    if (fields[field] !== undefined && !isValid(fields[field])) return error;
+  }
+  return null;
+};
+
 type CreateProfileArgs = Parameters<ProfileStore['create']>;
 
 const buildCreateProfileArgs = (body: RawCreateProfileBody): CreateProfileArgs => [
@@ -94,8 +123,15 @@ const requiresPinForParentalChange = (
 const pinMismatch = (profile: ProfileRecord, pin: unknown): boolean =>
   !!profile.pinHash && !!pin && !verifyPin(pin as string, profile.pinHash);
 
-const isStaleWrite = (profile: ProfileRecord, updatedAt: unknown): boolean =>
-  !!updatedAt && !!profile.updatedAt && (updatedAt as string) < profile.updatedAt;
+const isStaleWrite = (profile: ProfileRecord, updatedAt: unknown): boolean => {
+  // Refuse les types non-string (number, object, array...) qui coerceraient en NaN
+  // dans le `<` : `0 < 'iso-string'` retourne `false` silencieusement → stale-write
+  // protection contournée. On traite ces shapes comme "client n'a pas envoyé de tag",
+  // équivalent à `_updatedAt` absent — pas de blocage mais pas de faux pass non plus.
+  if (typeof updatedAt !== 'string' || !updatedAt) return false;
+  if (!profile.updatedAt) return false;
+  return updatedAt < profile.updatedAt;
+};
 
 // Cascade isolée par projet : un fail rmSync (EBUSY/EACCES Windows, FS RO) ou
 // writeIndex throw n'interrompt plus la boucle — on collecte les ids restants pour
@@ -198,6 +234,11 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
       }
       if (Object.keys(fields).length === 0) {
         res.json(profileToPublic(profile));
+        return;
+      }
+      const validationError = validateUpdateProfileInput(fields);
+      if (validationError) {
+        res.status(400).json({ error: validationError });
         return;
       }
       if (requiresPinForParentalChange(profile, pin, fields)) {

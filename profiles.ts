@@ -277,19 +277,19 @@ export class ProfileStore {
     const { migrated: migratedFromLoop, droppedByMigration } = this.migrateInPlace(valid);
     this.lastDroppedCount = before - valid.length;
     this.lastLoadFailed = false;
+    // Backup AVANT le early return droppedByMigration : si filterDropped et migration
+    // throw coexistent (rows null + rows hostiles dans le même fichier), on retournait
+    // sans aucun backup créé — l'admin n'avait alors aucun signal disque que des shapes
+    // invalides traînaient. Le backup est idempotent (skip si déjà créé), donc safe à
+    // déclencher avant le branchement. Le disque reste intact dans tous les cas (pas de
+    // save sur droppedByMigration — cf. ligne au-dessous).
+    if (filterDropped && existsSync(this.filePath)) {
+      this.backupCorrupt();
+    }
     // Drops par migration (throw) : NE save PAS la liste filtrée, sinon les profils
     // corrompus seraient définitivement perdus du disque. Le user perd l'accès tant
     // qu'un correctif n'est pas déployé, mais ses données restent inspectables.
     if (droppedByMigration) return valid;
-    // Drops par filterValidEntries (rows non-object : null, primitive, array imbriqué) :
-    // forcer le backup AVANT que `lastLoadFailed` soit reset à false (ligne au-dessus
-    // ou via le save() qui suit). Sans ce déclenchement explicite ici, save() ne
-    // backuperait pas car `diskStillCorrupt()` ne vérifie que `Array.isArray`, pas
-    // le contenu — un fichier `[null, {valid}]` passe le shape check mais on a perdu
-    // la row malformée. Idempotent via backupCorrupt() (skip si déjà créé).
-    if (filterDropped && existsSync(this.filePath)) {
-      this.backupCorrupt();
-    }
     if (filterDropped || migratedFromLoop) {
       try {
         this.save(valid);

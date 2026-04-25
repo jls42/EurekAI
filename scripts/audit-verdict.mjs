@@ -17,17 +17,22 @@ export function computeAuditVerdict(rawJson) {
   if (!parsed || !parsed.metadata || !parsed.metadata.vulnerabilities) {
     return 'no-metadata';
   }
-  // Coerce explicite : si npm change la shape (ex: critical={count:N} ou string non-numeric),
-  // `raw || 0` masquerait la mutation par truthy — un objet `{count:5}` passerait
-  // `> 0` en `false` (NaN > 0) → faux verdict 'ok' alors qu'il y a 5 critiques.
-  // Number(...) || 0 force la coercion numérique, et NaN devient 0 (fail-open documenté
-  // par 'no-metadata' au-dessus, mais ici on signale 'parse-error' car la shape est cassée).
-  const raw = parsed.metadata.vulnerabilities.critical;
-  const critical = Number(raw);
-  if (raw !== undefined && raw !== null && !Number.isFinite(critical)) {
-    return 'parse-error';
-  }
-  return critical > 0 ? 'critical:' + critical : 'ok';
+  const count = coerceCriticalCount(parsed.metadata.vulnerabilities.critical);
+  if (count === null) return 'parse-error';
+  return count > 0 ? 'critical:' + count : 'ok';
+}
+
+// Distingue "absent" (npm omet le champ) de "shape invalide" (boolean/array/object/empty).
+// `Number(...)` seul est trop laxiste : Number("") = 0, Number(false) = 0, Number([]) = 0
+// → faux verdict 'ok' silencieux sur shapes hostiles. On accepte uniquement number direct
+// ou string trim non-vide (npm a déjà sérialisé en "3" dans des versions passées).
+function coerceCriticalCount(raw) {
+  if (raw === undefined || raw === null) return 0;
+  if (typeof raw !== 'number' && typeof raw !== 'string') return null;
+  const trimmed = typeof raw === 'string' ? raw.trim() : raw;
+  if (trimmed === '') return null;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : null;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
