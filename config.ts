@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AppConfig, VoiceFlow } from './types.js';
+import type { AppConfig, Profile, VoiceFlow } from './types.js';
 import type { MistralVoice, VoiceId } from './helpers/voice-types.js';
 import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
@@ -190,16 +190,17 @@ const removeLegacyGlobalVoiceFields = (): boolean => {
 // `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const persistConfig = (): void => {
   // Idempotence cross-cycle (miroir de ProfileStore.save) : si `.corrupt.bak` existe
-  // déjà (cycle précédent non résolu), on NE l'écrase PAS avec la nouvelle corruption
-  // — on préserve le post-mortem d'origine. Conséquence assumée : seul le premier
+  // déjà (cycle précédent non résolu), on NE l'écrase PAS — on préserve le backup
+  // d'origine pour permettre le post-mortem. Conséquence assumée : seul le premier
   // backup par cycle corrompu est conservé (idem profiles.ts).
   //
   // Reset du flag : on reset systématiquement après un writeFileSync réussi,
   // même si le backup `.corrupt.bak` a échoué. Rationale : après le write, le
   // contenu corrompu d'origine n'existe plus sur disque (overwrite). Garder
-  // lastLoadFailed=true risquerait de backup le NOUVEAU contenu (valide) comme
-  // `.corrupt.bak` au prochain cycle. Si writeFileSync lui-même throw, l'exception
-  // se propage avant le reset → flag préservé → retry correct au prochain save.
+  // lastLoadFailed=true ferait que le prochain saveConfig backup le NOUVEAU contenu
+  // (désormais valide) sous `.corrupt.bak` — fausse alerte post-mortem. Si
+  // writeFileSync lui-même throw, l'exception se propage avant le reset → flag
+  // préservé → retry correct au prochain save.
   if (lastLoadFailed && existsSync(configPath)) {
     const backupPath = `${configPath}.corrupt.bak`;
     if (existsSync(backupPath)) {
@@ -209,7 +210,11 @@ const persistConfig = (): void => {
         copyFileSync(configPath, backupPath);
         logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
       } catch (e) {
-        logger.warn(
+        // logger.error (pas warn) : on est sur le chemin "fichier corrompu va être
+        // écrasé sans backup possible" — perte de données réelle, pas une simple
+        // condition warn. Sévérité ERROR = un humain doit savoir, sinon l'admin
+        // découvre la perte uniquement quand il en a besoin (post-mortem).
+        logger.error(
           'config',
           'could not create .corrupt.bak backup (corrupt content will be lost on overwrite):',
           e,
@@ -359,7 +364,9 @@ const resolveMistralDefaults = (
 };
 
 export interface ResolveVoicesArgs {
-  profileVoices?: { host?: VoiceId; guest?: VoiceId };
+  // Réutilise la shape de Profile.mistralVoices pour empêcher un drift silencieux
+  // entre le format stocké (profile JSON) et celui consommé ici.
+  profileVoices?: Profile['mistralVoices'];
   lang: string;
   // `string` (profile actif) ou `undefined` (anonyme/sans profil). Pas de `null` :
   // un seul sentinel "absent" simplifie les call sites — sinon chacun fait `?? null`

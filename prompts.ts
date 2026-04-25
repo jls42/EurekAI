@@ -4,7 +4,12 @@ import type { AgeGroup, PodcastSpeakers } from './types.js';
 
 // ── Language helper ──────────────────────────────────────────────────
 
-const LANG_NAMES: Record<string, string> = {
+// Liste exhaustive des codes locale supportés par les prompts. Exposée en `as const`
+// pour permettre à un futur consommateur de produire `keyof typeof LANG_NAMES`
+// (boundary HTTP guard, runtime validator). `langInstruction(lang)` accepte
+// délibérément une string arbitraire en runtime (fallback `lang` brut au lieu de
+// crash si lang non listé).
+const LANG_NAMES = {
   fr: 'français',
   en: 'English',
   es: 'español',
@@ -20,10 +25,10 @@ const LANG_NAMES: Record<string, string> = {
   pl: 'polski',
   ro: 'română',
   sv: 'svenska',
-};
+} as const;
 
 export function langInstruction(lang = 'fr'): string {
-  const name = LANG_NAMES[lang] || lang;
+  const name = (LANG_NAMES as Record<string, string>)[lang] || lang;
   return `\n\nIMPORTANT : génère TOUT le contenu en ${name} (textes, titres, explications, vocabulaire). Ne mélange pas les langues.`;
 }
 
@@ -395,9 +400,13 @@ export const PODCAST_NAME_POOL = [
 
 // Tire deux prenoms distincts du pool via un RNG injectable (tests deterministes).
 // Le decalage `j >= i` garantit host != guest sans boucle retry.
+// Math.min clamp : Math.random() ne retourne jamais 1 (spec ECMAScript), mais un test
+// injectant `() => 1` produirait floor(1 * N) = N (out of bounds → undefined). Clamp
+// défensif sur l'index, peu coûteux.
 export function pickPodcastNames(rng: () => number = Math.random): PodcastSpeakers {
-  const i = Math.floor(rng() * PODCAST_NAME_POOL.length);
-  let j = Math.floor(rng() * (PODCAST_NAME_POOL.length - 1));
+  const N = PODCAST_NAME_POOL.length;
+  const i = Math.min(Math.floor(rng() * N), N - 1);
+  let j = Math.min(Math.floor(rng() * (N - 1)), N - 2);
   if (j >= i) j += 1;
   return { host: PODCAST_NAME_POOL[i], guest: PODCAST_NAME_POOL[j] };
 }
@@ -415,7 +424,7 @@ export function podcastSystem(
 PERSONNAGES (distincts, formulations variees) :
 - "host" = ${names.host} : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir ${names.guest}.
 - "guest" = ${names.guest} : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche). Exemple : "${names.host}, tu peux me redire pourquoi...". Varie les formulations pour eviter que les repliques se ressemblent.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche, pas en debut de replique). Exemple : "Tu peux me redire pourquoi ${names.host} ?". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
@@ -459,7 +468,8 @@ export function imageUser(lang: string, markdown: string): string {
     .filter((l) => l.trim() && !l.startsWith('# Source '))
     .join('\n');
 
-  const langLabel = lang === 'fr' ? 'français' : LANG_NAMES[lang] || lang;
+  const langLabel =
+    lang === 'fr' ? 'français' : (LANG_NAMES as Record<string, string>)[lang] || lang;
   return `Genere une illustration pedagogique a partir de ce contenu (contexte ${langLabel}).
 
 RAPPEL CRUCIAL — INTERDICTION TOTALE DE TEXTE :

@@ -90,8 +90,14 @@ export async function generatePodcastScript(
   return { ...retryResult, names };
 }
 
-export function createPodcastGeneration(
-  fields: Omit<PodcastGeneration, 'lang'> & { lang: string },
-): PodcastGeneration {
+// Force `data.speakers` non-undefined à la création (le `?` du type vit pour la
+// rétrocompat de lecture des anciennes générations DB sans speakers — pas pour
+// permettre une création sans). Symétrique de la contrainte `lang: string`.
+type PodcastGenerationCreateFields = Omit<PodcastGeneration, 'lang' | 'data'> & {
+  lang: string;
+  data: PodcastGeneration['data'] & { speakers: PodcastSpeakers };
+};
+
+export function createPodcastGeneration(fields: PodcastGenerationCreateFields): PodcastGeneration {
   return fields;
 }

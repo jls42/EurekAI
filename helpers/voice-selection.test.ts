@@ -318,6 +318,20 @@ describe('selectVoices', () => {
       const b = selectVoices({ voices: bucket, lang: 'fr' });
       expect(a?.host).toBe(b?.host);
     });
+
+    // Verrou : le préfixe `p:` dans le seed (cf. voice-selection.ts L212-216) doit
+    // empêcher qu'un profileId='__default__' explicite collide avec le bucket anonyme
+    // (sentinel historique '__default__|<lang>'). Sans ce préfixe, un futur fixture
+    // ou un user qui crée un profil nommé '__default__' tomberait sur le même seed
+    // que les sessions sans profil — bug d'identité sonore silencieux.
+    it("namespace `p:` empêche la collision profileId='__default__' explicite vs absent", () => {
+      const explicit = selectVoices({ voices: bucket, lang: 'fr', profileId: '__default__' });
+      const anonymous = selectVoices({ voices: bucket, lang: 'fr' });
+      // Au moins l'un des deux champs doit différer ; sinon le préfixe ne sert plus.
+      const sameHost = explicit?.host === anonymous?.host;
+      const sameGuest = explicit?.guest === anonymous?.guest;
+      expect(sameHost && sameGuest).toBe(false);
+    });
   });
 
   describe('bucketSize reporting', () => {

@@ -514,6 +514,25 @@ describe('resolveVoices', () => {
     warnSpy.mockRestore();
   });
 
+  // Verrou de l'invariant produit "flow n'entre PAS dans le seed de rotation"
+  // (cf. CLAUDE.md "TTS"). Si un futur refactor incluait flow dans le seed, l'identité
+  // sonore d'un même profil divergerait selon le pipeline (podcast/quiz-vocal/read-aloud)
+  // — régression silencieuse difficile à détecter sans ce test.
+  it('flow n influence PAS la rotation : même profileId+lang -> même couple host/guest', () => {
+    setVoiceCache([
+      { id: asVoiceId('a'), name: 'Alice - Excited', languages: ['de_de'] },
+      { id: asVoiceId('b'), name: 'Bob - Confident', languages: ['de_de'] },
+      { id: asVoiceId('c'), name: 'Carol - Curious', languages: ['de_de'] },
+      { id: asVoiceId('d'), name: 'Dan - Happy', languages: ['de_de'] },
+      { id: asVoiceId('e'), name: 'Eve - Neutral', languages: ['de_de'] },
+    ]);
+    const podcast = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'podcast' });
+    const quizVocal = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'quiz-vocal' });
+    const readAloud = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'read-aloud' });
+    expect(podcast).toEqual(quizVocal);
+    expect(quizVocal).toEqual(readAloud);
+  });
+
   it('log fallback inclut le token flow quand lang inconnu retombe sur EN', () => {
     setVoiceCache([
       {

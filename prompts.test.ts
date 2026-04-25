@@ -148,7 +148,11 @@ describe('PODCAST', () => {
     // avec le prénom en cœur de phrase (pas en accroche "Prenom, ..."). Éviter plusieurs
     // exemples (risque de template-isation documenté dans .claude/rules/prompts.md).
     expect(podcast).toContain('une seule fois au maximum');
-    expect(podcast).toContain('Camille, tu peux me redire pourquoi');
+    expect(podcast).toContain('Tu peux me redire pourquoi Camille');
+    // Verrou : l'exemple ne doit JAMAIS commencer par le prenom (anti-pattern accroche
+    // qui contredisait la consigne — cf. PR review I1).
+    expect(podcast).not.toMatch(/Exemple : "Camille,/);
+    expect(podcast).not.toMatch(/Exemple : "Sasha,/);
     // Sanity check : plus d'exemple "Tu vois, ..." / "Attends, ..." qui créaient le motif.
     expect(podcast).not.toContain('Tu vois, Sasha');
     expect(podcast).not.toContain('Attends, Camille');

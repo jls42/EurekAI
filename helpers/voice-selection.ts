@@ -16,6 +16,10 @@
 // un offset sur le bucket trié -> deux profils distincts peuvent obtenir des voix
 // différentes, sans changer arbitrairement entre locales qui partagent un fallback EN.
 //
+// Exception fr/en : ces deux langues bypassent la rotation et utilisent une paire
+// curated (`preferredPair` ci-dessous) — choix produit explicite validé UX, cf.
+// commentaire de cette fonction.
+//
 // Stabilité : déterministe tant qu'aucune voix n'est ajoutée/supprimée
 // dans le bucket de la langue concernée.
 //
@@ -205,8 +209,11 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
   }
   // Seed basé sur la langue effectivement retenue: pt-BR et pt restent stables,
   // et es/ar/etc. qui tombent sur le fallback EN partagent une paire EN cohérente.
+  // Préfixe `p:` namespace les profileId pour éviter qu'un futur fixture/test passant
+  // `profileId='__default__'` collide avec le bucket anonyme. La branche anon garde le
+  // sentinel historique `__default__` pour stabilité des tests existants.
   const seedLang = resolved.langMatched ?? normalizeLang(input.lang);
-  const seed = `${input.profileId ?? '__default__'}|${seedLang}`;
+  const seed = input.profileId ? `p:${input.profileId}|${seedLang}` : `__default__|${seedLang}`;
   const rotated = rotateDeterministic(sorted, seed);
 
   const host = rotated[0];
