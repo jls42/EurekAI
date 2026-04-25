@@ -649,7 +649,7 @@ Appelant :
 Contexte :
 - construit un mini-dialogue entre `${names.host}` et `${names.guest}` — prenoms epicenes tires aleatoirement depuis le pool (Alex, Charlie, Camille, Sasha, Claude, Dominique, Andrea, Morgan, Mika, Valéry). Defauts si `names` non fourni : `Alex`/`Charlie`.
 - impose un format JSON `script + sourceRefs`
-- consigne bornee + exemple positif unique : "interpelle l'autre par son prenom une seule fois au maximum", avec UN SEUL exemple positif ("<<HOST>>, tu peux me redire pourquoi..."). Un exemple unique et prenom au cœur de la phrase (pas en accroche) pour eviter template-isation (cf. `.claude/rules/prompts.md`).
+- consigne bornee + exemple positif unique : "interpelle l'autre par son prenom une seule fois au maximum", avec UN SEUL exemple positif ("Tu peux me redire pourquoi <<HOST>> ?"). Prenom strictement en cœur de phrase (pas en accroche, pas en debut de replique) pour eviter template-isation (cf. `.claude/rules/prompts.md`).
 - interdit explicitement de prononcer les sources dans le dialogue
 
 Template :
@@ -660,7 +660,7 @@ Ecris un script de mini-podcast educatif en JSON strict.
 PERSONNAGES (distincts, formulations variees) :
 - "host" = <<HOST>> : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir <<GUEST>>.
 - "guest" = <<GUEST>> : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche). Exemple : "<<HOST>>, tu peux me redire pourquoi...". Varie les formulations pour eviter que les repliques se ressemblent.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche, pas en debut de replique). Exemple : "Tu peux me redire pourquoi <<HOST>> ?". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. <<AGE_INSTRUCTION>>

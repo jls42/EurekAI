@@ -12,17 +12,9 @@
 # peut distinguer "vulnerabilité absente" de "vulnérabilité inconnue".
 audit_stderr=$(mktemp -t eurekai-audit.XXXXXX)
 audit_json=$(npm audit --json 2>"$audit_stderr" || true)
-audit_verdict=$(echo "$audit_json" | node -e "
-  const d=[];process.stdin.on('data',c=>d.push(c));process.stdin.on('end',()=>{
-    try{
-      const a=JSON.parse(d.join(''));
-      if(a.error){console.log('transport:'+(a.error.code||'?'));return;}
-      if(!a.metadata||!a.metadata.vulnerabilities){console.log('no-metadata');return;}
-      const c=a.metadata.vulnerabilities.critical||0;
-      console.log(c>0?'critical:'+c:'ok');
-    }catch{console.log('parse-error');}
-  })
-" 2>/dev/null || echo "parse-error")
+# Logique extraite dans scripts/audit-verdict.mjs pour permettre des tests unitaires
+# (cf. scripts/audit-verdict.test.ts). Trim final \n via tr.
+audit_verdict=$(echo "$audit_json" | node "$(dirname "$0")/../scripts/audit-verdict.mjs" 2>/dev/null | tr -d '\n' || echo "parse-error")
 case "$audit_verdict" in
   ok) ;;
   transport:*)

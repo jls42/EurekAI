@@ -42,7 +42,10 @@ if [ -n "$audit_json" ]; then
           return;
         }
         const v=a.metadata.vulnerabilities;
-        const total=Object.values(v).reduce((s,n)=>s+n,0);
+        // npm audit metadata.vulnerabilities = {info, low, moderate, high, critical, total}.
+        // total est précalculé par npm — Object.values inclurait total dans la somme et
+        // doublerait le compte. Préférer v.total, fallback explicit sum sur les severities.
+        const total=v.total ?? ['critical','high','moderate','low','info'].reduce((s,k)=>s+(v[k]||0),0);
         if(total===0){console.log('  ✓ No known vulnerabilities');return;}
         const parts=['critical','high','moderate','low','info']
           .filter(k=>v[k]>0).map(k=>k+': '+v[k]);

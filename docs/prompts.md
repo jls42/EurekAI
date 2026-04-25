@@ -183,6 +183,8 @@ Où `AGE_LABELS` = `{ enfant: "un enfant de 6-10 ans", ado: "un adolescent de 11
 
 **Contexte** : fournit un `reason` par défaut quand `normalizePlan` ajoute un agent (summary invariant, enrichissement audio). 7 langues supportées (fr, en, es, de, it, pt, nl), fallback FR.
 
+**Périmètre** : couvre les 5 agents que `router.ts` (`enrichPlanForLearning` / `normalizePlan`) peut injecter via fallback (`summary`, `flashcards`, `quiz`, `podcast`, `quiz-vocal`). Les 2 autres agents (`image`, `fill-blank`) sont toujours choisis explicitement par le LLM, jamais ajoutés via fallback — donc absents de `DEFAULT_REASONS`.
+
 Exemples FR :
 - `summary` → "Fiche de synthèse du cours (invariant pédagogique)"
 - `flashcards` → "Flashcards pour ancrer le vocabulaire et les faits clés"
@@ -510,7 +512,7 @@ Ecris un script de mini-podcast educatif en JSON strict.
 PERSONNAGES (distincts, formulations variees) :
 - "host" = <<HOST>> : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir <<GUEST>>.
 - "guest" = <<GUEST>> : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche). Exemple : "<<HOST>>, tu peux me redire pourquoi...". Varie les formulations pour eviter que les repliques se ressemblent.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche, pas en debut de replique). Exemple : "Tu peux me redire pourquoi <<HOST>> ?". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. {ageInstruction(ageGroup)}
