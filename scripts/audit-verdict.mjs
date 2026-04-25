@@ -39,18 +39,28 @@ export function computeAuditVerdict(rawJson) {
 // présente, on la lit d'abord pour ne jamais masquer des critiques derrière error.
 // Découpée pour tenir computeAuditVerdict sous la limite CCN 8 (Codacy mesure ~13 sinon).
 function classifyShape(parsed) {
-  if (!parsed || typeof parsed !== 'object') return 'no-metadata';
-  if (parsed.metadata?.vulnerabilities) {
-    const vulnerabilityVerdict = classifyVulnerabilities(parsed.metadata.vulnerabilities);
-    if (vulnerabilityVerdict !== 'ok') return vulnerabilityVerdict;
-  }
+  if (!isAuditObject(parsed)) return 'no-metadata';
+  const vulnerabilities = readVulnerabilities(parsed);
+  const vulnerabilityVerdict = classifyKnownVulnerabilities(vulnerabilities);
+  if (vulnerabilityVerdict) return vulnerabilityVerdict;
   if (parsed.error) {
     return classifyAuditError(parsed.error);
   }
-  if (!parsed || !parsed.metadata || !parsed.metadata.vulnerabilities) {
-    return 'no-metadata';
-  }
-  return null;
+  return vulnerabilities ? null : 'no-metadata';
+}
+
+function isAuditObject(parsed) {
+  return !!parsed && typeof parsed === 'object';
+}
+
+function readVulnerabilities(parsed) {
+  return parsed.metadata?.vulnerabilities;
+}
+
+function classifyKnownVulnerabilities(vulnerabilities) {
+  if (!vulnerabilities) return null;
+  const verdict = classifyVulnerabilities(vulnerabilities);
+  return verdict === 'ok' ? null : verdict;
 }
 
 function classifyAuditError(error) {
