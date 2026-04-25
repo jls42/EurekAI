@@ -181,7 +181,7 @@ Où `AGE_LABELS` = `{ enfant: "un enfant de 6-10 ans", ado: "un adolescent de 11
 
 ### 2.3 `defaultReasonFor(agent, lang)`
 
-**Contexte** : fournit un `reason` par défaut quand `normalizePlan` ajoute un agent (summary invariant, enrichissement audio). 6 langues supportées (fr, en, es, de, it, pt, nl), fallback FR.
+**Contexte** : fournit un `reason` par défaut quand `normalizePlan` ajoute un agent (summary invariant, enrichissement audio). 7 langues supportées (fr, en, es, de, it, pt, nl), fallback FR.
 
 Exemples FR :
 - `summary` → "Fiche de synthèse du cours (invariant pédagogique)"

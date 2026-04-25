@@ -647,7 +647,7 @@ Appelant :
 - `generatePodcastScript()` dans `generators/podcast.ts` (qui tire `names` via `pickPodcastNames()` depuis `PODCAST_NAME_POOL`)
 
 Contexte :
-- construit un mini-dialogue entre `${names.host}` et `${names.guest}` — prenoms epicenes tires aleatoirement depuis le pool (Alex, Charlie, Camille, Sasha, Claude, Dominique, Andrea, Morgan, Mika, Valery). Defauts si `names` non fourni : `Alex`/`Charlie`.
+- construit un mini-dialogue entre `${names.host}` et `${names.guest}` — prenoms epicenes tires aleatoirement depuis le pool (Alex, Charlie, Camille, Sasha, Claude, Dominique, Andrea, Morgan, Mika, Valéry). Defauts si `names` non fourni : `Alex`/`Charlie`.
 - impose un format JSON `script + sourceRefs`
 - consigne bornee + exemple positif unique : "interpelle l'autre par son prenom une seule fois au maximum", avec UN SEUL exemple positif ("<<HOST>>, tu peux me redire pourquoi..."). Un exemple unique et prenom au cœur de la phrase (pas en accroche) pour eviter template-isation (cf. `.claude/rules/prompts.md`).
 - interdit explicitement de prononcer les sources dans le dialogue
