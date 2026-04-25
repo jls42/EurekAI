@@ -41,6 +41,11 @@ export interface VoiceSelectionResult {
   bucketSize: number;
   /** Langue effectivement matchée (bucket). Null si fallback 'any'. */
   langMatched: string | null;
+  /**
+   * True si host === guest (bucket avec un seul speaker distinct). Le podcast
+   * jouera les deux rôles avec la même voix — l'appelant peut logger.warn.
+   */
+  singleSpeakerBucket: boolean;
 }
 
 // Ordre de préférence pour les tags émotionnels. Score = meilleur tag match (pas sommé) ;
@@ -186,6 +191,7 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
       source: resolved.source,
       bucketSize: resolved.bucket.length,
       langMatched: resolved.langMatched,
+      singleSpeakerBucket: preferred[0].id === preferred[1].id,
     };
   }
   // Seed basé sur la langue effectivement retenue: pt-BR et pt restent stables,
@@ -203,5 +209,6 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
     source: resolved.source,
     bucketSize: resolved.bucket.length,
     langMatched: resolved.langMatched,
+    singleSpeakerBucket: host.id === guest.id,
   };
 }

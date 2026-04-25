@@ -240,6 +240,21 @@ describe('selectVoices', () => {
       expect(res?.host).toBe('solo');
       expect(res?.guest).toBe('solo');
     });
+
+    it('flag singleSpeakerBucket=true quand host===guest (1 voix dans le bucket)', () => {
+      const voices = [makeVoice({ id: 'solo', languages: ['fr_FR'] })];
+      const res = selectVoices({ voices, lang: 'fr' });
+      expect(res?.singleSpeakerBucket).toBe(true);
+    });
+
+    it('flag singleSpeakerBucket=false quand bucket contient 2+ voix distinctes', () => {
+      const voices = [
+        makeVoice({ id: 'a', languages: ['fr_FR'] }),
+        makeVoice({ id: 'b', languages: ['fr_FR'] }),
+      ];
+      const res = selectVoices({ voices, lang: 'fr' });
+      expect(res?.singleSpeakerBucket).toBe(false);
+    });
   });
 
   describe('deterministic rotation by profileId', () => {
