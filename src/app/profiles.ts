@@ -9,6 +9,28 @@ type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined
 const LS_PROFILE_ID = 'sf-profileId';
 const TOAST_ERROR = 'toast.error';
 
+// Codes stables FailedStepCode + erreurs profiles connues pour lesquels on a une
+// traduction i18n via `errorCode.<code>`. Tout autre code retourne le code brut
+// (mieux que rien — debug-friendly pour l'admin, mais pas user-friendly).
+// Ajout d'un code = clé `errorCode.<code>` dans les 9 fichiers i18n.
+// Cf. CLAUDE.md "Codes d'erreur API".
+const I18N_KNOWN_ERROR_CODES = new Set([
+  'internal_error',
+  'no_sources',
+  'auth_required',
+  'quota_exceeded',
+  'upstream_unavailable',
+  'tts_upstream_error',
+  'context_length_exceeded',
+  'llm_invalid_json',
+  'profile_delete_partial',
+]);
+
+export function mapServerErrorCode(state: AppContext, raw: unknown): string {
+  if (typeof raw !== 'string' || !raw) return '';
+  return I18N_KNOWN_ERROR_CODES.has(raw) ? state.t('errorCode.' + raw) : raw;
+}
+
 export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
   if (pin) {
@@ -46,7 +68,10 @@ export async function executeDeleteProfile(
     const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      state.showToast(state.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
+      state.showToast(
+        state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
+        'error',
+      );
       return;
     }
     finalizeDeleteProfile(state, id);
@@ -70,9 +95,12 @@ export function isProfileFormValid(p: EditingProfile | null | undefined): boolea
 
 export function buildVoicesUpdate(
   mistralVoices: MistralVoicesPartial,
-): { host: string; guest: string } | null {
+): { host?: string; guest?: string } | null {
   if (!mistralVoices?.host && !mistralVoices?.guest) return null;
-  return { host: mistralVoices.host || '', guest: mistralVoices.guest || '' };
+  const voices: { host?: string; guest?: string } = {};
+  if (mistralVoices.host) voices.host = mistralVoices.host;
+  if (mistralVoices.guest) voices.guest = mistralVoices.guest;
+  return voices;
 }
 
 type ValidationResult = 'ok' | 'invalid' | 'pin_mismatch';
@@ -139,15 +167,42 @@ export function buildProfileUpdates(editingProfile: EditingProfile): Record<stri
   return updates;
 }
 
+// Sépare le fetch + handling erreur du flow de sélection de profil pour rester sous
+// CCN 8 dans loadProfiles. Surface les erreurs serveur (500 sur ENOSPC/EACCES côté
+// ProfileStore) via toast — sinon l'user voit un picker vide et invente un nouveau
+// profil au-dessus de ses données existantes.
+async function fetchProfilesInto(state: AppContext): Promise<void> {
+  try {
+    const res = await fetch('/api/profiles');
+    if (res.ok) {
+      state.profiles = await res.json();
+      // Surface les drops silencieux (rows malformées ou migration failed côté serveur) —
+      // sans ce signal, l'user voit un picker partiel et invente un profil au-dessus
+      // de ses anciennes données. Toast warning, pas erreur : le picker est utilisable.
+      const droppedRaw = res.headers.get('X-Profiles-Dropped');
+      const dropped = droppedRaw ? Number.parseInt(droppedRaw, 10) : 0;
+      if (Number.isFinite(dropped) && dropped > 0) {
+        state.showToast(state.t('toast.profilesPartial', { count: dropped }), 'warning');
+      }
+      return;
+    }
+    const err = await res.json().catch(() => ({}));
+    console.error('Failed to load profiles:', res.status, err);
+    state.showToast(
+      state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
+      'error',
+    );
+  } catch (e: unknown) {
+    console.error('Failed to load profiles:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
+  }
+}
+
 export function createProfiles() {
   return {
     async loadProfiles(this: AppContext) {
-      try {
-        const res = await fetch('/api/profiles');
-        if (res.ok) this.profiles = await res.json();
-      } catch (e: unknown) {
-        console.error('Failed to load profiles:', e);
-      }
+      await fetchProfilesInto(this);
       // Restore last selected profile
       const saved = localStorage.getItem(LS_PROFILE_ID);
       if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
@@ -202,7 +257,10 @@ export function createProfiles() {
           applyCreateProfileSuccess(this, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
-          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error');
+          this.showToast(
+            this.t(TOAST_ERROR, { error: mapServerErrorCode(this, err.error) || res.statusText }),
+            'error',
+          );
         }
       } catch (e: unknown) {
         console.error('Failed to create profile:', e);
@@ -244,6 +302,8 @@ export function createProfiles() {
       signal?: AbortSignal,
     ) {
       try {
+        // SSRF: literal `/api/profiles/` inline pour préserver l'analyse taint Codacy
+        // (cf. executeDeleteProfile + CLAUDE.md section Sécurité).
         const res = await fetch('/api/profiles/' + id, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -255,7 +315,14 @@ export function createProfiles() {
           this.applyProfileUpdate(id, await res.json());
         } else {
           const err = await res.json().catch(() => ({}));
-          if (err.error) this.showToast(err.error, 'error');
+          // Toujours surfacer un toast — sans ce fallback un 5xx avec body HTML, un 413
+          // payload-too-large, ou un parse fail produirait silence total côté UI alors
+          // que l'état serveur diverge.
+          console.error('Failed to update profile:', res.status, err);
+          this.showToast(
+            this.t(TOAST_ERROR, { error: mapServerErrorCode(this, err.error) || res.statusText }),
+            'error',
+          );
         }
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
@@ -271,14 +338,22 @@ export function createProfiles() {
       this.editingProfile = {
         ...profile,
         locale: profile.locale || 'fr',
-        mistralVoices: profile.mistralVoices || { host: '', guest: '' },
+        mistralVoices: {
+          host: profile.mistralVoices?.host ?? '',
+          guest: profile.mistralVoices?.guest ?? '',
+        },
         theme: profile.theme,
       };
       this.showProfilePicker = true;
       this.showProfileForm = false;
       // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
-      // a publié de nouvelles voix depuis le chargement initial. Non bloquant.
-      this.loadMistralVoices?.();
+      // a publié de nouvelles voix depuis le chargement initial. Non bloquant —
+      // loadMistralVoices avale ses propres erreurs (try/catch + console.error
+      // dans src/app/config.ts). `.catch()` défensif si le contrat interne change un
+      // jour — UnhandledPromiseRejection silencieuse n'aide pas au diagnostic.
+      this.loadMistralVoices?.()?.catch((e: unknown) => {
+        console.error('voice catalog refresh failed:', e);
+      });
     },
 
     requireParentalAccess(this: AppContext, callback: () => void) {
@@ -294,6 +369,7 @@ export function createProfiles() {
       if (!editing) return;
       this.requirePin(async (pin: string) => {
         try {
+          // SSRF: literal `/api/profiles/` inline (cf. executeDeleteProfile).
           const res = await fetch('/api/profiles/' + editing.id, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },

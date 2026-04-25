@@ -48,6 +48,8 @@ export const ar: Record<string, string> = {
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.no_sources': 'لا يوجد مصدر متاح',
+  'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
   'errorCode.quota_exceeded': 'تم تجاوز الحصة، أعد المحاولة لاحقا',
   'errorCode.upstream_unavailable': 'الخدمة غير متاحة مؤقتا، أعد المحاولة قريبا',
@@ -55,6 +57,8 @@ export const ar: Record<string, string> = {
   'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
   'errorCode.upload_failed': 'فشل التحميل',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
+  'errorCode.profile_delete_partial':
+    'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',
@@ -128,7 +132,6 @@ export const ar: Record<string, string> = {
   'settings.aiModelHint':
     '\u064a\u064f\u0633\u062a\u062e\u062f\u0645 \u0644\u0644\u0645\u0644\u062e\u0651\u0635\u0627\u062a \u0648\u0627\u0644\u0628\u0637\u0627\u0642\u0627\u062a \u0648\u0627\u0644\u0627\u062e\u062a\u0628\u0627\u0631 \u0648\u0627\u0644\u0628\u0648\u062f\u0643\u0627\u0633\u062a \u0648\u0627\u0644\u0645\u062d\u0627\u062f\u062b\u0629',
   'settings.recommended': '\u0645\u0648\u0635\u0649 \u0628\u0647',
-  'settings.voiceTts': '\u0627\u0644\u0623\u0635\u0648\u0627\u062a',
   'settings.voiceHost': '\u0631\u0626\u064a\u0633\u064a',
   'settings.voiceGuest': '\u062b\u0627\u0646\u0648\u064a',
   'emotion.Angry': '\u063a\u0627\u0636\u0628',
@@ -144,8 +147,6 @@ export const ar: Record<string, string> = {
   'emotion.Sad': '\u062d\u0632\u064a\u0646',
   'emotion.Sarcasm': '\u0633\u0627\u062e\u0631',
   'emotion.Shameful': '\u062e\u062c\u0648\u0644',
-  'settings.mistralVoicesHint':
-    '\u0623\u0635\u0648\u0627\u062a Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': '\u0645\u0644\u062e\u0651\u0635',
   'settings.flashcards':
     '\u0628\u0637\u0627\u0642\u0627\u062a \u062a\u0639\u0644\u064a\u0645\u064a\u0629',
@@ -358,6 +359,8 @@ export const ar: Record<string, string> = {
   'podcast.prompt': '\u0627\u0644\u0623\u0645\u0631: {text}',
   'podcast.noTts':
     '\u0642\u0645 \u0628\u062a\u0647\u064a\u0626\u0629 MISTRAL_API_KEY \u0641\u064a \u0645\u0644\u0641 .env \u0644\u062a\u0641\u0639\u064a\u0644 \u0627\u0644\u0628\u0648\u062f\u0643\u0627\u0633\u062a \u0627\u0644\u0635\u0648\u062a\u064a',
+  'podcast.speakerHost': '\u0627\u0644\u0645\u0636\u064a\u0641',
+  'podcast.speakerGuest': '\u0627\u0644\u0636\u064a\u0641',
 
   'image.heading': '\u0631\u0633\u0648\u0645 \u062a\u0648\u0636\u064a\u062d\u064a\u0629',
   'image.new': '\u0631\u0633\u0645 \u062a\u0648\u0636\u064a\u062d\u064a',
@@ -490,6 +493,8 @@ export const ar: Record<string, string> = {
     '\u062a\u0645\u0651 \u062a\u0648\u0644\u064a\u062f \u0627\u0644\u0643\u0644!',
   'toast.partialGenerated':
     '\u0646\u062c\u062d {count}/3 \u0639\u0645\u0644\u064a\u0627\u062a \u062a\u0648\u0644\u064a\u062f',
+  'toast.profilesPartial':
+    '\u0625\u062e\u0641\u0627\u0621 {count} \u0645\u0644\u0641(\u0627\u062a) \u0634\u062e\u0635\u064a \u2014 \u0645\u0644\u0641 \u062e\u0627\u062f\u0645 \u062a\u0627\u0644\u0641\u060c \u0627\u062a\u0635\u0644 \u0628\u0627\u0644\u0645\u0633\u0624\u0648\u0644',
   'toast.magicDone': '\u0627\u0643\u062a\u0645\u0644 \u0627\u0644\u0633\u062d\u0631!',
   'toast.autoError':
     '\u0641\u0634\u0644 \u0627\u0644\u062a\u0648\u0644\u064a\u062f \u0627\u0644\u062a\u0644\u0642\u0627\u0626\u064a. \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.',
@@ -598,8 +603,7 @@ export const ar: Record<string, string> = {
     '\u062E\u0635\u0651\u0635 \u0627\u0644\u0623\u0635\u0648\u0627\u062A \u0644\u0644\u0645\u062D\u062A\u0648\u0649 \u0627\u0644\u0635\u0648\u062A\u064A (\u0628\u0648\u062F\u0643\u0627\u0633\u062A\u060C \u0627\u062E\u062A\u0628\u0627\u0631\u0627\u062A \u0635\u0648\u062A\u064A\u0629\u060C \u0642\u0631\u0627\u0621\u0629)',
   'profile.voiceDefault':
     '\u0627\u0641\u062a\u0631\u0627\u0636\u064a (\u062d\u0633\u0628 \u0627\u0644\u0644\u063a\u0629)',
-  'profile.voiceCurrentDefault':
-    '\u0627\u0644\u0627\u0641\u062A\u0631\u0627\u0636\u064A \u0644\u0644\u062D\u0642\u0648\u0644 \u0627\u0644\u0645\u062A\u0631\u0648\u0643\u0629 \u0639\u0644\u0649 \u00ab\u0627\u0641\u062A\u0631\u0627\u0636\u064A\u00bb:',
+  'profile.voiceDefaultSuffix': '(\u0627\u0641\u062a\u0631\u0627\u0636\u064a)',
   'profile.resetDefaults': 'إعادة ضبط',
   'profile.backToProfiles': 'رجوع',
 

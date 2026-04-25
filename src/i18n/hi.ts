@@ -45,6 +45,8 @@ export const hi: Record<string, string> = {
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
+  'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
   'errorCode.quota_exceeded': 'कोटा समाप्त, कुछ समय बाद पुनः प्रयास करें',
   'errorCode.upstream_unavailable': 'सेवा अस्थायी रूप से अनुपलब्ध, जल्द ही पुनः प्रयास करें',
@@ -52,6 +54,8 @@ export const hi: Record<string, string> = {
   'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
   'errorCode.upload_failed': 'अपलोड विफल',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
+  'errorCode.profile_delete_partial':
+    'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
@@ -130,7 +134,6 @@ export const hi: Record<string, string> = {
   'settings.aiModelHint':
     '\u0928\u094B\u091F\u094D\u0938, Flashcards, Quiz, Podcast \u0914\u0930 Chat \u0915\u0947 \u0932\u093F\u090F \u0909\u092A\u092F\u094B\u0917 \u0939\u094B\u0924\u093E \u0939\u0948',
   'settings.recommended': '\u0905\u0928\u0941\u0936\u0902\u0938\u093F\u0924',
-  'settings.voiceTts': '\u0906\u0935\u093E\u091C\u093C\u0947\u0902',
   'settings.voiceHost': '\u092e\u0941\u0916\u094d\u092f',
   'settings.voiceGuest': '\u0938\u0939\u093e\u092f\u0915',
   'emotion.Angry': '\u0917\u0941\u0938\u094D\u0938\u093E',
@@ -146,8 +149,6 @@ export const hi: Record<string, string> = {
   'emotion.Sad': '\u0926\u0941\u0916\u0940',
   'emotion.Sarcasm': '\u0935\u094D\u092F\u0902\u0917\u094D\u092F',
   'emotion.Shameful': '\u0936\u0930\u094D\u092E\u093F\u0902\u0926\u093E',
-  'settings.mistralVoicesHint':
-    'Mistral \u0906\u0935\u093E\u091C\u093C\u0947\u0902: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': '\u0928\u094B\u091F',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -363,6 +364,8 @@ export const hi: Record<string, string> = {
   'podcast.prompt': '\u092A\u094D\u0930\u0949\u092E\u094D\u092A\u094D\u091F: {text}',
   'podcast.noTts':
     '\u0911\u0921\u093F\u092F\u094B Podcast \u0938\u0915\u094D\u0937\u092E \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0905\u092A\u0928\u0940 .env \u092B\u093C\u093E\u0907\u0932 \u092E\u0947\u0902 MISTRAL_API_KEY \u0915\u0949\u0928\u094D\u092B\u093C\u093F\u0917\u0930 \u0915\u0930\u0947\u0902',
+  'podcast.speakerHost': '\u092e\u0947\u091c\u092c\u093e\u0928',
+  'podcast.speakerGuest': '\u092e\u0947\u0939\u092e\u093e\u0928',
 
   'image.heading': '\u091A\u093F\u0924\u094D\u0930',
   'image.new': '\u091A\u093F\u0924\u094D\u0930 \u092C\u0928\u093E\u090F\u0901',
@@ -500,6 +503,8 @@ export const hi: Record<string, string> = {
   'toast.allGenerated': '\u0938\u092C \u092C\u0928 \u0917\u090F!',
   'toast.partialGenerated':
     '{count}/3 \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0938\u092B\u0932 \u0939\u0941\u090F',
+  'toast.profilesPartial':
+    '{count} \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u091B\u093F\u092A\u093E\u090F \u0917\u090F \u2014 \u0938\u0930\u094D\u0935\u0930 \u092A\u0930 \u092B\u093C\u093E\u0907\u0932 \u0926\u0942\u0937\u093F\u0924, \u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093E\u092A\u0915 \u0938\u0947 \u0938\u0902\u092A\u0930\u094D\u0915 \u0915\u0930\u0947\u0902',
   'toast.magicDone': '\u091C\u093E\u0926\u0942 \u092A\u0942\u0930\u093E \u0939\u0941\u0906!',
   'toast.autoError':
     '\u0911\u091F\u094B \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0935\u093F\u092B\u0932\u0964 \u0926\u094B\u092C\u093E\u0930\u093E \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u094B\u0964',
@@ -605,8 +610,7 @@ export const hi: Record<string, string> = {
     '\u0911\u0921\u093F\u092F\u094B \u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0915\u0947 \u0932\u093F\u090F \u0906\u0935\u093E\u091C\u093C\u0947\u0902 \u0915\u0938\u094D\u091F\u092E\u093E\u0907\u091C\u093C \u0915\u0930\u0947\u0902 (\u092A\u0949\u0921\u0915\u093E\u0938\u094D\u091F\u060C \u0935\u094B\u0915\u0932 \u0915\u094D\u0935\u093F\u091C\u093C\u060C \u092A\u0922\u093C\u0928\u093E)',
   'profile.voiceDefault':
     '\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F (\u092D\u093E\u0937\u093E \u0915\u0947 \u0905\u0928\u0941\u0938\u093E\u0930)',
-  'profile.voiceCurrentDefault':
-    '\u0022\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F\u0022 \u092A\u0930 \u091B\u094B\u0921\u093C\u0947 \u0917\u090F \u092B\u093C\u0940\u0932\u094D\u0921 \u0915\u0947 \u0932\u093F\u090F \u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F:',
+  'profile.voiceDefaultSuffix': '(\u0921\u093F\u092B\u093C\u0949\u0932\u094D\u091F)',
   'profile.resetDefaults': 'रीसेट',
   'profile.backToProfiles': 'वापस',
 

@@ -12,6 +12,8 @@ import {
   quizReviewUser,
   podcastSystem,
   podcastUser,
+  pickPodcastNames,
+  PODCAST_NAME_POOL,
   fillBlankSystem,
   fillBlankUser,
   chatSystem,
@@ -120,15 +122,40 @@ describe('QUIZ_REVIEW', () => {
 });
 
 describe('PODCAST', () => {
-  it('contient host, guest, Alex, Zoe', () => {
+  it('contient host, guest et les noms par defaut (Alex, Charlie)', () => {
     const podcast = podcastSystem('enfant');
-    for (const kw of ['host', 'guest', 'Alex', 'Zoe']) {
+    for (const kw of ['host', 'guest', 'Alex', 'Charlie']) {
       expect(podcast).toContain(kw);
     }
   });
 
+  it('accepte des noms injectes et les insere dans le template', () => {
+    const podcast = podcastSystem('enfant', { host: 'Camille', guest: 'Sasha' });
+    expect(podcast).toContain('Camille');
+    expect(podcast).toContain('Sasha');
+    // Les defauts ne doivent pas apparaitre quand on override
+    expect(podcast).not.toContain('"host" = Alex');
+    expect(podcast).not.toContain('"guest" = Charlie');
+  });
+
   it('podcastUser inclut le markdown complet', () => {
     expect(podcastUser('b'.repeat(5000)).length).toBeGreaterThan(5000);
+  });
+
+  it('contient une consigne bornee ancree sur les noms injectes avec un exemple unique', () => {
+    const podcast = podcastSystem('enfant', { host: 'Camille', guest: 'Sasha' });
+    // Règle positive bornée : "une seule fois au maximum" + UN SEUL exemple positif,
+    // avec le prénom en cœur de phrase (pas en accroche "Prenom, ..."). Éviter plusieurs
+    // exemples (risque de template-isation documenté dans .claude/rules/prompts.md).
+    expect(podcast).toContain('une seule fois au maximum');
+    expect(podcast).toContain('Tu peux me redire pourquoi Camille');
+    // Verrou : l'exemple ne doit JAMAIS commencer par le prenom (anti-pattern accroche
+    // qui contredisait la consigne — cf. PR review I1).
+    expect(podcast).not.toMatch(/Exemple : "Camille,/);
+    expect(podcast).not.toMatch(/Exemple : "Sasha,/);
+    // Sanity check : plus d'exemple "Tu vois, ..." / "Attends, ..." qui créaient le motif.
+    expect(podcast).not.toContain('Tu vois, Sasha');
+    expect(podcast).not.toContain('Attends, Camille');
   });
 });
 
@@ -308,7 +335,7 @@ describe('chatSystem approche pédagogique', () => {
 // ── podcastSystem personnages sans tics imposés ─────────────────
 
 describe('podcastSystem personnages', () => {
-  it("ne force pas d'interjection répétitive imposée à Zoé", () => {
+  it("ne force pas d'interjection répétitive imposée au guest", () => {
     const result = podcastSystem('enfant');
     // Les 3 tics sur main-HEAD ne doivent plus apparaître en liste imposée
     expect(result).not.toContain('"Ah oui !"');
@@ -316,10 +343,50 @@ describe('podcastSystem personnages', () => {
     expect(result).not.toContain('"Ca alors !"');
   });
 
-  it('conserve la différenciation des personnages Alex/Zoe', () => {
+  it('conserve la différenciation host/guest (defauts Alex/Charlie)', () => {
     const result = podcastSystem('enfant');
     expect(result).toContain('Alex');
-    expect(result).toContain('Zoe');
+    expect(result).toContain('Charlie');
+  });
+
+  it("n'injecte plus d'adjectif genré (curieuse) dans la description guest", () => {
+    const result = podcastSystem('enfant');
+    expect(result).not.toContain('curieuse');
+  });
+});
+
+describe('pickPodcastNames', () => {
+  it('retourne deux noms distincts issus du pool (valeurs par defaut)', () => {
+    const { host, guest } = pickPodcastNames();
+    expect(PODCAST_NAME_POOL).toContain(host);
+    expect(PODCAST_NAME_POOL).toContain(guest);
+    expect(host).not.toBe(guest);
+  });
+
+  it('RNG=0 retourne les deux premiers noms du pool (i=0, j=1)', () => {
+    const { host, guest } = pickPodcastNames(() => 0);
+    expect(host).toBe(PODCAST_NAME_POOL[0]);
+    expect(guest).toBe(PODCAST_NAME_POOL[1]);
+  });
+
+  it('RNG≈1 retourne le dernier puis l’avant-dernier (i=N-1, j décalé)', () => {
+    // 0.999... -> floor(0.999 * 10) = 9, floor(0.999 * 9) = 8, j<i donc pas de +1
+    const { host, guest } = pickPodcastNames(() => 0.9999);
+    expect(host).toBe(PODCAST_NAME_POOL[PODCAST_NAME_POOL.length - 1]);
+    expect(guest).toBe(PODCAST_NAME_POOL[PODCAST_NAME_POOL.length - 2]);
+    expect(host).not.toBe(guest);
+  });
+
+  it('garantit host != guest même quand le RNG forcerait une collision', () => {
+    // RNG qui retourne toujours 0 -> i=0, j=0 puis j+=1 -> j=1
+    const { host, guest } = pickPodcastNames(() => 0);
+    expect(host).not.toBe(guest);
+  });
+
+  it('le pool contient au moins 10 noms pour varier cross-podcasts', () => {
+    expect(PODCAST_NAME_POOL.length).toBeGreaterThanOrEqual(10);
+    // Tous uniques
+    expect(new Set(PODCAST_NAME_POOL).size).toBe(PODCAST_NAME_POOL.length);
   });
 });
 

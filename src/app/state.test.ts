@@ -305,7 +305,7 @@ describe('createState', () => {
       quizVerify: '',
       chat: '',
     });
-    expect(state.configDraft.mistralVoices).toEqual({ host: 'Oliver', guest: 'Marie' });
+    expect(state.configDraft).not.toHaveProperty('mistralVoices');
   });
 
   it('abortControllers defaults to empty object', () => {

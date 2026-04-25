@@ -40,6 +40,8 @@ export const en: Record<string, string> = {
   'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'errorCode.internal_error': 'Internal server error',
+  'errorCode.no_sources': 'No source available',
+  'errorCode.auth_required': 'Missing or invalid Mistral API key',
   'errorCode.tts_upstream_error': 'Audio service error (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota exceeded, try again shortly',
   'errorCode.upstream_unavailable': 'Service temporarily unavailable, please retry soon',
@@ -47,6 +49,8 @@ export const en: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Invalid AI response',
   'errorCode.upload_failed': 'Upload failed',
   'errorCode.all_steps_failed': 'All generations failed',
+  'errorCode.profile_delete_partial':
+    'Profile deletion incomplete: some projects could not be deleted',
 
   'header.menuProjects': 'Projects menu',
   'header.switchToLight': 'Switch to light mode',
@@ -102,7 +106,6 @@ export const en: Record<string, string> = {
   'settings.aiModel': 'Generation',
   'settings.aiModelHint': 'Used for notes, flashcards, quiz, podcast and chat',
   'settings.recommended': 'Recommended',
-  'settings.voiceTts': 'Voices',
   'settings.voiceHost': 'Main',
   'settings.voiceGuest': 'Secondary',
   'emotion.Angry': 'Angry',
@@ -118,8 +121,6 @@ export const en: Record<string, string> = {
   'emotion.Sad': 'Sad',
   'emotion.Sarcasm': 'Sarcasm',
   'emotion.Shameful': 'Shameful',
-  'settings.mistralVoicesHint':
-    'Mistral voices: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Note',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -276,6 +277,8 @@ export const en: Record<string, string> = {
   'podcast.lines': '({count} lines)',
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts': 'Configure MISTRAL_API_KEY in your .env file to enable audio podcasts',
+  'podcast.speakerHost': 'Host',
+  'podcast.speakerGuest': 'Guest',
 
   // Image view
   'image.heading': 'Illustrations',
@@ -367,6 +370,7 @@ export const en: Record<string, string> = {
   'toast.generationError': 'Generation failed. Try again in a moment.',
   'toast.allGenerated': 'All generated!',
   'toast.partialGenerated': '{count}/3 generations succeeded',
+  'toast.profilesPartial': '{count} profile(s) hidden — corrupt server-side file, contact an admin',
   'toast.magicDone': 'Magic complete!',
   'toast.autoError': 'Automatic generation failed. Try again.',
   'toast.audioDone': 'Audio generated!',
@@ -436,7 +440,7 @@ export const en: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Customize voices for audio content (podcasts, vocal quizzes, read-aloud)',
   'profile.voiceDefault': 'Default (based on language)',
-  'profile.voiceCurrentDefault': 'Default for fields left on "Default":',
+  'profile.voiceDefaultSuffix': '(default)',
   'profile.resetDefaults': 'Reset defaults',
   'profile.backToProfiles': 'Back',
 

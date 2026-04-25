@@ -41,6 +41,8 @@ export const es: Record<string, string> = {
     'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
 
   'errorCode.internal_error': 'Error interno del servidor',
+  'errorCode.no_sources': 'Ninguna fuente disponible',
+  'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',
@@ -48,6 +50,8 @@ export const es: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Respuesta inv\u00e1lida de la IA',
   'errorCode.upload_failed': 'Error al subir',
   'errorCode.all_steps_failed': 'Todas las generaciones han fallado',
+  'errorCode.profile_delete_partial':
+    'Eliminacion del perfil incompleta: algunos proyectos no se pudieron eliminar',
 
   'header.menuProjects': 'Men\u00fa de proyectos',
   'header.switchToLight': 'Cambiar a modo claro',
@@ -103,7 +107,6 @@ export const es: Record<string, string> = {
   'settings.aiModel': 'Generación',
   'settings.aiModelHint': 'Usado para fichas, flashcards, quiz, podcast y chat',
   'settings.recommended': 'Recomendado',
-  'settings.voiceTts': 'Voces',
   'settings.voiceHost': 'Principal',
   'settings.voiceGuest': 'Secundaria',
   'emotion.Angry': 'Enojado',
@@ -119,8 +122,6 @@ export const es: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarc\u00e1stico',
   'emotion.Shameful': 'Avergonzado',
-  'settings.mistralVoicesHint':
-    'Voces Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Ficha',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -277,6 +278,8 @@ export const es: Record<string, string> = {
   'podcast.lines': '({count} l\u00edneas)',
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts': 'Configura MISTRAL_API_KEY en tu archivo .env para habilitar podcasts con audio',
+  'podcast.speakerHost': 'Presentador',
+  'podcast.speakerGuest': 'Invitado',
 
   'image.heading': 'Ilustraciones',
   'image.new': 'Ilustrar',
@@ -365,6 +368,8 @@ export const es: Record<string, string> = {
   'toast.generationError': 'La generaci\u00f3n fall\u00f3. Int\u00e9ntalo de nuevo en un momento.',
   'toast.allGenerated': '\u00a1Todo generado!',
   'toast.partialGenerated': '{count}/3 generaciones exitosas',
+  'toast.profilesPartial':
+    '{count} perfil(es) oculto(s) — archivo corrupto en servidor, contacta un administrador',
   'toast.magicDone': '\u00a1Magia completada!',
   'toast.autoError': 'La generaci\u00f3n autom\u00e1tica fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.audioDone': '\u00a1Audio generado!',
@@ -433,7 +438,7 @@ export const es: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personaliza las voces para contenido de audio (podcasts, quiz vocales, lectura)',
   'profile.voiceDefault': 'Por defecto (segun el idioma)',
-  'profile.voiceCurrentDefault': 'Por defecto para campos en \u00abPor defecto\u00bb:',
+  'profile.voiceDefaultSuffix': '(predeterminada)',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Volver',
 

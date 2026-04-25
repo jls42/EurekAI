@@ -1,0 +1,108 @@
+import { describe, it, expect } from 'vitest';
+import { computeAuditVerdict } from './audit-verdict.mjs';
+
+// Verrous des 5 verdicts du gate npm audit pre-push (cf. .husky/pre-push).
+// Sans ce filet, un futur refactor qui inverse une branche `case` ou casse le
+// parser JSON laisserait passer des vulns critiques sans aucun signal.
+describe('computeAuditVerdict', () => {
+  it('JSON invalide -> parse-error (fail-closed)', () => {
+    expect(computeAuditVerdict('<html>500</html>')).toBe('parse-error');
+    expect(computeAuditVerdict('')).toBe('parse-error');
+    expect(computeAuditVerdict('{ malformed')).toBe('parse-error');
+  });
+
+  it('absence metadata.vulnerabilities -> no-metadata (fail-closed)', () => {
+    expect(computeAuditVerdict('{}')).toBe('no-metadata');
+    expect(computeAuditVerdict('{"metadata":{}}')).toBe('no-metadata');
+    expect(computeAuditVerdict('{"unrelated":true}')).toBe('no-metadata');
+  });
+
+  it('error réseau (offline, proxy down) -> transport:<code> (fail-open)', () => {
+    expect(computeAuditVerdict('{"error":{"code":"ENETUNREACH","summary":"network down"}}')).toBe(
+      'transport:ENETUNREACH',
+    );
+    expect(computeAuditVerdict('{"error":{"code":"E503","summary":"registry down"}}')).toBe(
+      'transport:E503',
+    );
+  });
+
+  it('error audit locale ou inconnue -> audit-error:<code> (fail-closed)', () => {
+    expect(computeAuditVerdict('{"error":{"code":"EAUDITNOLOCK","summary":"no lockfile"}}')).toBe(
+      'audit-error:EAUDITNOLOCK',
+    );
+    expect(computeAuditVerdict('{"error":{"code":"ENOLOCK","summary":"missing lockfile"}}')).toBe(
+      'audit-error:ENOLOCK',
+    );
+    expect(
+      computeAuditVerdict('{"error":{"code":"EJSONPARSE","summary":"invalid lockfile"}}'),
+    ).toBe('audit-error:EJSONPARSE');
+    expect(computeAuditVerdict('{"error":{"summary":"unknown"}}')).toBe('audit-error:?');
+  });
+
+  it('aucune vuln critique -> ok (pass)', () => {
+    const json = JSON.stringify({
+      metadata: { vulnerabilities: { critical: 0, high: 5, total: 5 } },
+    });
+    expect(computeAuditVerdict(json)).toBe('ok');
+  });
+
+  it('vulns critiques > 0 -> critical:N (fail-closed)', () => {
+    const json = JSON.stringify({
+      metadata: { vulnerabilities: { critical: 3, high: 2, total: 5 } },
+    });
+    expect(computeAuditVerdict(json)).toBe('critical:3');
+  });
+
+  it('shape mutation critical -> parse-error (fail-closed sur coercion)', () => {
+    // Si npm publie une nouvelle shape (ex: {count:N} au lieu d'un Number direct),
+    // l'ancien `raw || 0` retournait truthy et `obj > 0 → false` (NaN coerce) →
+    // faux verdict 'ok'. Maintenant on détecte la mutation et on fail-closed.
+    const objectShape = JSON.stringify({
+      metadata: { vulnerabilities: { critical: { count: 5 } } },
+    });
+    expect(computeAuditVerdict(objectShape)).toBe('parse-error');
+    const stringNonNumeric = JSON.stringify({
+      metadata: { vulnerabilities: { critical: 'high' } },
+    });
+    expect(computeAuditVerdict(stringNonNumeric)).toBe('parse-error');
+  });
+
+  it('shapes silencieuses fail-open (string vide / boolean / array) -> parse-error', () => {
+    // Number("") === 0, Number(false) === 0, Number([]) === 0 — la coercion brute
+    // laisserait passer ces shapes hostiles en 'ok' silencieux. On détecte explicitement.
+    const emptyString = JSON.stringify({ metadata: { vulnerabilities: { critical: '' } } });
+    expect(computeAuditVerdict(emptyString)).toBe('parse-error');
+    const booleanFalse = JSON.stringify({ metadata: { vulnerabilities: { critical: false } } });
+    expect(computeAuditVerdict(booleanFalse)).toBe('parse-error');
+    const arrayShape = JSON.stringify({ metadata: { vulnerabilities: { critical: [] } } });
+    expect(computeAuditVerdict(arrayShape)).toBe('parse-error');
+  });
+
+  it('absence explicite (null/undefined sur critical) -> ok (équivalent à 0)', () => {
+    // null et undefined sont traités comme "champ absent" (pas de vulns critiques),
+    // pas comme une shape invalide. Cohérent avec le comportement npm normal.
+    const nullCritical = JSON.stringify({ metadata: { vulnerabilities: { critical: null } } });
+    expect(computeAuditVerdict(nullCritical)).toBe('ok');
+    // undefined ne sérialise pas en JSON ; simule via objet sans la clé.
+    const noCritical = JSON.stringify({ metadata: { vulnerabilities: { high: 1 } } });
+    expect(computeAuditVerdict(noCritical)).toBe('ok');
+  });
+
+  it('critical en string numérique reste tolerant -> coerce en Number', () => {
+    // Les versions npm passées ont parfois sérialisé en string ("3"). On accepte.
+    const json = JSON.stringify({
+      metadata: { vulnerabilities: { critical: '3' } },
+    });
+    expect(computeAuditVerdict(json)).toBe('critical:3');
+  });
+
+  it('metadata critical prioritaire sur error transport', () => {
+    // npm peut renvoyer error+metadata simultanement pendant une erreur partielle :
+    // les critiques connues doivent bloquer au lieu d'être masquées par transport.
+    const json = JSON.stringify({
+      error: { code: 'ENETDOWN' },
+      metadata: { vulnerabilities: { critical: 99 } },
+    });
+    expect(computeAuditVerdict(json)).toBe('critical:99');
+  });
+});

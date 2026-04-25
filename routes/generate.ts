@@ -37,13 +37,24 @@ const QUIZ_VOCAL = 'quiz-vocal';
 const FILL_BLANK = 'fill-blank';
 const ROUTER_MODEL = 'mistral-small-latest';
 
-export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
+// Variante non-throw : retourne null quand aucune source ne matche, pour permettre aux
+// call sites internes (`buildGenContext`, `quiz-review`, `route` analysis) de répondre
+// 400 'no_sources' explicite plutôt que de retomber sur 500/'internal_error'. Le helper
+// public `getMarkdown` (utilisé par routes/chat.ts et routes/sources.ts) garde sa
+// sémantique throw pour ne pas changer leur contrat externe.
+export function getMarkdownOrNull(sources: Source[], sourceIds?: string[]): string | null {
   const selected =
     sourceIds && sourceIds.length > 0 ? sources.filter((s) => sourceIds.includes(s.id)) : sources;
-  if (selected.length === 0) throw new Error('Aucune source disponible');
+  if (selected.length === 0) return null;
   return selected
     .map((s, i) => `# Source ${i + 1} — ${s.filename}\n\n${s.markdown}`)
     .join('\n\n---\n\n');
+}
+
+export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
+  const md = getMarkdownOrNull(sources, sourceIds);
+  if (md === null) throw new Error('Aucune source disponible');
+  return md;
 }
 
 export function applyConsigne(markdown: string, consigne?: Consigne): string {
@@ -112,7 +123,7 @@ interface GenContext {
   sourceIds: string[];
   count?: number;
   pid: string;
-  profileVoices?: { host: VoiceId; guest: VoiceId };
+  profileVoices?: { host?: VoiceId; guest?: VoiceId };
   // Propagé pour que resolveVoices() applique la rotation déterministe par profil
   // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
   profileId?: string;
@@ -162,7 +173,8 @@ function buildGenContext(
   const unsafeSource = checkModeration(store, profileStore, pid, body.sourceIds);
   if (unsafeSource) return { ok: false, error: 'moderation.blocked', status: 400 };
 
-  const rawMarkdown = getMarkdown(project.sources, body.sourceIds);
+  const rawMarkdown = getMarkdownOrNull(project.sources, body.sourceIds);
+  if (rawMarkdown === null) return { ok: false, error: 'no_sources', status: 400 };
   const useConsigne = body.useConsigne !== false;
   const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
   const hasConsigne =
@@ -366,7 +378,12 @@ export function generateRoutes(
         logger.info('podcast', 'Generating audio...');
         const audioBuffer = await generateAudio(
           podcastResult.script,
-          resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
+          resolveVoices({
+            profileVoices: ctx.profileVoices,
+            lang: ctx.lang,
+            profileId: ctx.profileId,
+            flow: 'podcast',
+          }),
           { model: ctx.config.ttsModel, mistralClient: client },
         );
         const audioUrl = saveAudioFile(
@@ -385,7 +402,12 @@ export function generateRoutes(
           createdAt: new Date().toISOString(),
           sourceIds: ctx.sourceIds,
           type: 'podcast',
-          data: { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          data: {
+            script: podcastResult.script,
+            audioUrl,
+            sourceRefs: podcastResult.sourceRefs,
+            speakers: podcastResult.names,
+          },
           lang: ctx.lang,
         });
       },
@@ -410,7 +432,11 @@ export function generateRoutes(
           ctx.res.status(404).json({ error: 'Quiz original introuvable' });
           return null;
         }
-        const markdown = getMarkdown(ctx.project.sources, originalGen.sourceIds);
+        const markdown = getMarkdownOrNull(ctx.project.sources, originalGen.sourceIds);
+        if (markdown === null) {
+          ctx.res.status(400).json({ error: 'no_sources' });
+          return null;
+        }
         const ctxError = checkContextLimit(markdown, ctx.config.models.quiz);
         if (ctxError) {
           ctx.res.status(400).json({ error: ctxError });
@@ -461,13 +487,12 @@ export function generateRoutes(
         logger.info(QUIZ_VOCAL, 'Generating TTS for each question...');
         const audioUrls: string[] = [];
         const projectDir = store.getProjectDir(ctx.pid);
-        const hostVoice = resolveVoices(
-          ctx.config,
-          ctx.profileVoices,
-          ctx.lang,
-          ctx.profileId,
-          QUIZ_VOCAL,
-        ).host;
+        const hostVoice = resolveVoices({
+          profileVoices: ctx.profileVoices,
+          lang: ctx.lang,
+          profileId: ctx.profileId,
+          flow: QUIZ_VOCAL,
+        }).host;
         const ttsOpts = {
           model: ctx.config.ttsModel,
           mistralClient: client,
@@ -585,7 +610,7 @@ export function generateRoutes(
     pid: string;
     store: ProjectStore;
     generations: Generation[];
-    profileVoices?: { host: VoiceId; guest: VoiceId };
+    profileVoices?: { host?: VoiceId; guest?: VoiceId };
     profileId?: string;
   }
 
@@ -665,7 +690,12 @@ export function generateRoutes(
       );
       const audioBuffer = await generateAudio(
         podcastResult.script,
-        resolveVoices(ctx.config, ctx.profileVoices, ctx.lang, ctx.profileId, 'podcast'),
+        resolveVoices({
+          profileVoices: ctx.profileVoices,
+          lang: ctx.lang,
+          profileId: ctx.profileId,
+          flow: 'podcast',
+        }),
         { model: ctx.config.ttsModel, mistralClient: ctx.client },
       );
       const audioUrl = saveAudioFile(
@@ -677,7 +707,12 @@ export function generateRoutes(
       return {
         ...makeGen(
           'podcast',
-          { script: podcastResult.script, audioUrl, sourceRefs: podcastResult.sourceRefs },
+          {
+            script: podcastResult.script,
+            audioUrl,
+            sourceRefs: podcastResult.sourceRefs,
+            speakers: podcastResult.names,
+          },
           ctx,
         ),
         // Figer lang pour le badge beta audio (hi/ar) — même contrat que la route dédiée.
@@ -697,13 +732,12 @@ export function generateRoutes(
       );
       const audioUrls: string[] = [];
       const projectDir = ctx.store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices(
-        ctx.config,
-        ctx.profileVoices,
-        ctx.lang,
-        ctx.profileId,
-        QUIZ_VOCAL,
-      ).host;
+      const hostVoice = resolveVoices({
+        profileVoices: ctx.profileVoices,
+        lang: ctx.lang,
+        profileId: ctx.profileId,
+        flow: QUIZ_VOCAL,
+      }).host;
       const ttsOpts = {
         model: ctx.config.ttsModel,
         mistralClient: ctx.client,
@@ -744,7 +778,11 @@ export function generateRoutes(
       }
       const lang = req.body.lang || 'fr';
       const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const rawMarkdown = getMarkdown(project.sources, req.body.sourceIds);
+      const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
+      if (rawMarkdown === null) {
+        res.status(400).json({ error: 'no_sources' });
+        return;
+      }
       const useConsigneRoute = req.body.useConsigne !== false;
       const markdown = useConsigneRoute
         ? applyConsigne(rawMarkdown, project.consigne)
@@ -777,7 +815,7 @@ export function generateRoutes(
         );
       }
       logger.error('route', 'analysis error:', e);
-      res.status(500).json({ error: extractErrorCode(e) });
+      res.status(500).json({ error: extractErrorCode(e, 'route') });
     }
   });
 

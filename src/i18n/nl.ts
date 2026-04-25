@@ -41,6 +41,8 @@ export const nl: Record<string, string> = {
     'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
   'errorCode.internal_error': 'Interne serverfout',
+  'errorCode.no_sources': 'Geen bron beschikbaar',
+  'errorCode.auth_required': 'Mistral API-sleutel ontbreekt of ongeldig',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
   'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
   'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',
@@ -48,6 +50,8 @@ export const nl: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Ongeldig AI-antwoord',
   'errorCode.upload_failed': 'Uploaden mislukt',
   'errorCode.all_steps_failed': 'Alle generaties mislukt',
+  'errorCode.profile_delete_partial':
+    'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
@@ -103,7 +107,6 @@ export const nl: Record<string, string> = {
   'settings.aiModel': 'Generatie',
   'settings.aiModelHint': 'Gebruikt voor samenvattingen, flashcards, quiz, podcast en chat',
   'settings.recommended': 'Aanbevolen',
-  'settings.voiceTts': 'Stemmen',
   'settings.voiceHost': 'Primair',
   'settings.voiceGuest': 'Secundair',
   'emotion.Angry': 'Boos',
@@ -119,8 +122,6 @@ export const nl: Record<string, string> = {
   'emotion.Sad': 'Verdrietig',
   'emotion.Sarcasm': 'Sarcasme',
   'emotion.Shameful': 'Beschaamd',
-  'settings.mistralVoicesHint':
-    'Mistral-stemmen: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Samenvatting',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -278,6 +279,8 @@ export const nl: Record<string, string> = {
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
     'Configureer MISTRAL_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
+  'podcast.speakerHost': 'Presentator',
+  'podcast.speakerGuest': 'Gast',
 
   'image.heading': 'Illustraties',
   'image.new': 'Illustreren',
@@ -365,6 +368,8 @@ export const nl: Record<string, string> = {
   'toast.generationError': 'Generatie mislukt. Probeer het zo opnieuw.',
   'toast.allGenerated': 'Alles gegenereerd!',
   'toast.partialGenerated': '{count}/3 generaties geslaagd',
+  'toast.profilesPartial':
+    '{count} profiel(en) verborgen — corrupt bestand op server, neem contact op met een beheerder',
   'toast.magicDone': 'Magie voltooid!',
   'toast.autoError': 'Automatische generatie mislukt. Probeer het opnieuw.',
   'toast.audioDone': 'Audio gegenereerd!',
@@ -432,7 +437,7 @@ export const nl: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Pas stemmen aan voor audiocontent (podcasts, spraakquiz, voorlezen)',
   'profile.voiceDefault': 'Standaard (op basis van taal)',
-  'profile.voiceCurrentDefault': 'Standaard voor velden op \u201cStandaard\u201d:',
+  'profile.voiceDefaultSuffix': '(standaard)',
   'profile.resetDefaults': 'Herstellen',
   'profile.backToProfiles': 'Terug',
 

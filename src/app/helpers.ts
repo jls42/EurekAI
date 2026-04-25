@@ -1,7 +1,7 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
-import type { Consigne, Generation, Source } from '../../types';
+import type { Consigne, Generation, PodcastGeneration, PodcastLine, Source } from '../../types';
 
 const TEXT_TEXT_PRIMARY = 'text-text-primary';
 const TEXT_TEXT_SECONDARY = 'text-text-secondary';
@@ -30,6 +30,21 @@ function resolveItemSources(ctx: SourceResolverCtx, gen: Generation, item: ItemW
 }
 
 const SUMMARY_ARRAY_KEYS = ['citations', 'vocabulary', 'key_points'] as const;
+
+// Source unique pour les 3 helpers podcastSpeaker* : résout le nom du speaker
+// pour une ligne donnée et garantit que les 3 méthodes restent cohérentes entre
+// elles (name/initial/title dérivent tous du même couple gen+line). `name = ''`
+// signifie "speakers absent" (legacy) OU "speakers présent mais champ vide"
+// (bug générateur) — les méthodes appelantes décident du fallback visuel.
+function resolvePodcastSpeaker(
+  gen: PodcastGeneration,
+  line: PodcastLine,
+): { name: string; role: 'host' | 'guest' } {
+  const speakers = gen.data?.speakers;
+  const role = line.speaker === 'host' ? 'host' : 'guest';
+  const raw = role === 'host' ? speakers?.host : speakers?.guest;
+  return { name: (raw ?? '').trim(), role };
+}
 
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
 export function normalizeSummaryData(gen: Generation): void {
@@ -201,6 +216,23 @@ export function createHelpers() {
 
     moderationStatus(src: Source): string | null {
       return src?.moderation?.status ?? null;
+    },
+
+    podcastSpeakerName(gen: PodcastGeneration, line: PodcastLine): string {
+      return resolvePodcastSpeaker(gen, line).name;
+    },
+
+    podcastSpeakerInitial(gen: PodcastGeneration, line: PodcastLine): string {
+      const { name, role } = resolvePodcastSpeaker(gen, line);
+      // Fallback sur la 1re lettre du rôle (H/G) plutôt que des lettres arbitraires —
+      // reste cohérent avec le title i18n-isé ci-dessous sans exposer du texte anglais.
+      return (name || role).charAt(0).toUpperCase();
+    },
+
+    podcastSpeakerTitle(this: AppContext, gen: PodcastGeneration, line: PodcastLine): string {
+      const { name, role } = resolvePodcastSpeaker(gen, line);
+      if (name) return name;
+      return this.t(role === 'host' ? 'podcast.speakerHost' : 'podcast.speakerGuest');
     },
 
     moderationBadgeColor(this: AppContext, src: Source) {

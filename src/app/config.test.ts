@@ -3,11 +3,6 @@ import { createConfig } from './config';
 
 globalThis.fetch = vi.fn();
 
-// Polyfill structuredClone for vitest/jsdom if missing
-if (typeof globalThis.structuredClone === 'undefined') {
-  globalThis.structuredClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj));
-}
-
 const config = createConfig();
 
 function makeContext(overrides: any = {}) {
@@ -19,7 +14,6 @@ function makeContext(overrides: any = {}) {
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
       ttsModel: 'voxtral-mini-tts-2603',
-      mistralVoices: { host: 'Oliver', guest: 'Marie' },
       _mainModel: 'mistral-large-latest',
     } as any,
     t: vi.fn((key: string) => key),
@@ -29,6 +23,8 @@ function makeContext(overrides: any = {}) {
     loadMistralVoices: config.loadMistralVoices,
     translateEmotion: config.translateEmotion,
     langToFlag: config.langToFlag,
+    voiceLabel: config.voiceLabel,
+    defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
     saveSettings: config.saveSettings,
     resetSettings: config.resetSettings,
     closeSettingsDialog: config.closeSettingsDialog,
@@ -172,6 +168,13 @@ describe('translateEmotion', () => {
     const result = config.translateEmotion.call(ctx, 'Joyful');
     expect(result).toBe('emotion.Joyful');
   });
+
+  it('returns empty string for empty emotion', () => {
+    const ctx = makeContext();
+    const result = config.translateEmotion.call(ctx, '');
+    expect(result).toBe('');
+    expect(ctx.t).not.toHaveBeenCalledWith('emotion.');
+  });
 });
 
 // --- langToFlag ---
@@ -207,10 +210,39 @@ describe('langToFlag', () => {
   });
 });
 
-// --- defaultVoiceHint ---
+// --- voiceLabel ---
 
-describe('defaultVoiceHint', () => {
-  it('returns voice names for FR locale with matching voices in list', () => {
+describe('voiceLabel', () => {
+  it('formats flag, speaker and translated emotion', () => {
+    const ctx = makeContext({
+      mistralVoicesList: [{ lang: 'fr', langFull: 'fr_FR' }],
+      t: vi.fn((key: string) => (key === 'emotion.Excited' ? 'Excited' : key)),
+    });
+    const result = config.voiceLabel.call(ctx, {
+      name: 'Marie - Excited',
+      speaker: 'Marie',
+      emotion: 'Excited',
+      lang: 'fr',
+    });
+    expect(result).toBe('🇫🇷 Marie - Excited');
+  });
+
+  it('does not add a dash or emotion key for empty emotion', () => {
+    const ctx = makeContext({ mistralVoicesList: [] });
+    const result = config.voiceLabel.call(ctx, {
+      name: 'marie',
+      speaker: 'marie',
+      emotion: '',
+      lang: '',
+    });
+    expect(result).toBe('marie');
+  });
+});
+
+// --- defaultVoiceOptionLabel ---
+
+describe('defaultVoiceOptionLabel', () => {
+  it('returns concrete host and guest labels for FR locale', () => {
     const ctx = makeContext({
       mistralVoicesList: [
         {
@@ -222,6 +254,7 @@ describe('defaultVoiceHint', () => {
           speaker: 'Marie',
           emotion: 'Excited',
           lang: 'fr',
+          langFull: 'fr_FR',
         },
         {
           id: 'v2',
@@ -232,149 +265,70 @@ describe('defaultVoiceHint', () => {
           speaker: 'Marie',
           emotion: 'Curious',
           lang: 'fr',
+          langFull: 'fr_FR',
         },
       ],
+      t: vi.fn((key: string) => {
+        if (key === 'profile.voiceDefaultSuffix') return '(par défaut)';
+        if (key.startsWith('emotion.')) return key.slice('emotion.'.length);
+        return key;
+      }),
     });
-    const result = config.defaultVoiceHint.call(ctx, 'fr');
-    expect(result).toContain('Marie');
-    expect(result).toContain('/');
+    expect(config.defaultVoiceOptionLabel.call(ctx, 'host', 'fr')).toBe(
+      '🇫🇷 Marie - Excited (par défaut)',
+    );
+    expect(config.defaultVoiceOptionLabel.call(ctx, 'guest', 'fr')).toBe(
+      '🇫🇷 Marie - Curious (par défaut)',
+    );
   });
 
-  it('returns voice names for EN locale', () => {
+  it('uses EN fallback for unsupported profile locales', () => {
     const ctx = makeContext({
       mistralVoicesList: [
         {
-          id: 'v1',
-          name: 'Jane - Curious',
+          id: 'en1',
+          name: 'Jane - Confident',
           languages: ['en_GB'],
           gender: 'female',
-          tags: ['curious'],
+          tags: ['confident'],
           speaker: 'Jane',
-          emotion: 'Curious',
+          emotion: 'Confident',
           lang: 'en',
+          langFull: 'en_GB',
         },
         {
-          id: 'v2',
-          name: 'Oliver - Cheerful',
+          id: 'en2',
+          name: 'Oliver - Curious',
           languages: ['en_GB'],
           gender: 'male',
-          tags: ['cheerful'],
+          tags: ['curious'],
           speaker: 'Oliver',
-          emotion: 'Cheerful',
+          emotion: 'Curious',
           lang: 'en',
+          langFull: 'en_GB',
         },
       ],
+      t: vi.fn((key: string) => {
+        if (key === 'profile.voiceDefaultSuffix') return '(default)';
+        if (key.startsWith('emotion.')) return key.slice('emotion.'.length);
+        return key;
+      }),
     });
-    const result = config.defaultVoiceHint.call(ctx, 'en');
-    // Jane (female, tags=curious) score > Oliver (male, tags=cheerful) → host = Jane
+    const result = config.defaultVoiceOptionLabel.call(ctx, 'host', 'es');
     expect(result).toContain('Jane');
+    expect(result).toContain('(default)');
   });
 
-  it('returns empty string when voice list is empty (hint repose sur le catalogue réel)', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    const result = config.defaultVoiceHint.call(ctx, 'fr');
-    expect(result).toBe('');
-  });
-
-  it('returns empty string for unsupported locale even with empty list', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    expect(config.defaultVoiceHint.call(ctx, 'ja')).toBe('');
-  });
-
-  it('returns empty string when locale is empty and list is empty', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    const result = config.defaultVoiceHint.call(ctx, '');
-    expect(result).toBe('');
-  });
-
-  it('selects any-fallback voice when no lang or en match', () => {
-    // 9 langues UI = 9 langues Voxtral, mais un catalogue dégradé peut ne contenir
-    // que du japonais. Le hint doit tomber sur any-fallback et afficher cette voix.
+  it('falls back to profile.voiceDefault translation when voice list is empty', () => {
     const ctx = makeContext({
-      mistralVoicesList: [
-        {
-          id: 'ja1',
-          name: 'Kenji - Neutral',
-          languages: ['ja_JP'],
-          gender: 'male',
-          tags: ['neutral'],
-          speaker: 'Kenji',
-          emotion: 'Neutral',
-          lang: 'ja',
-        },
-      ],
+      mistralVoicesList: [],
+      t: vi.fn((key: string) =>
+        key === 'profile.voiceDefault' ? 'Par défaut (selon la langue)' : key,
+      ),
     });
-    const result = config.defaultVoiceHint.call(ctx, 'hi');
-    expect(result).toContain('Kenji');
-  });
-
-  // Cas override global explicite (mistralVoicesSource === 'user') : le hint doit refléter
-  // les voix que le backend utilisera réellement, pas le résultat de selectVoices.
-  // Cf. addendum post-review §1.
-  describe('with mistralVoicesSource === user (global override)', () => {
-    const voicesCatalog = [
-      {
-        id: 'user-host',
-        name: 'Oliver - Confident',
-        languages: ['en_US'],
-        gender: 'male',
-        tags: ['confident'],
-        speaker: 'Oliver',
-        emotion: 'Confident',
-        lang: 'en',
-      },
-      {
-        id: 'user-guest',
-        name: 'Jane - Cheerful',
-        languages: ['en_US'],
-        gender: 'female',
-        tags: ['cheerful'],
-        speaker: 'Jane',
-        emotion: 'Cheerful',
-        lang: 'en',
-      },
-      {
-        id: 'marie-exc',
-        name: 'Marie - Excited',
-        languages: ['fr_FR'],
-        gender: 'female',
-        tags: ['excited'],
-        speaker: 'Marie',
-        emotion: 'Excited',
-        lang: 'fr',
-      },
-    ];
-
-    it('affiche les IDs globaux quand user les a définis', () => {
-      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
-      ctx.configDraft.mistralVoicesSource = 'user';
-      ctx.configDraft.mistralVoices = { host: 'user-host', guest: 'user-guest' };
-      const result = config.defaultVoiceHint.call(ctx, 'fr');
-      // Le backend utilise user-host/user-guest ; le hint doit le dire, même si selectVoices
-      // aurait retourné Marie pour lang=fr.
-      expect(result).toContain('Oliver');
-      expect(result).toContain('Jane');
-      expect(result).not.toContain('Marie');
-    });
-
-    it('retombe sur selectVoices si ID global introuvable (voix supprimée côté Mistral)', () => {
-      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
-      ctx.configDraft.mistralVoicesSource = 'user';
-      ctx.configDraft.mistralVoices = { host: 'deleted-id', guest: 'also-deleted' };
-      const result = config.defaultVoiceHint.call(ctx, 'fr');
-      // Pas vide : selectVoices trouve Marie.
-      expect(result).toContain('Marie');
-    });
-
-    it('ignore source=default et passe par selectVoices normalement', () => {
-      const ctx = makeContext({ mistralVoicesList: voicesCatalog });
-      ctx.configDraft.mistralVoicesSource = 'default';
-      ctx.configDraft.mistralVoices = { host: 'user-host', guest: 'user-guest' };
-      const result = config.defaultVoiceHint.call(ctx, 'fr');
-      // Source=default → selectVoices prend le dessus → Marie pour lang=fr.
-      expect(result).toContain('Marie');
-      expect(result).not.toContain('Oliver');
-    });
+    expect(config.defaultVoiceOptionLabel.call(ctx, 'host', 'fr')).toBe(
+      'Par défaut (selon la langue)',
+    );
   });
 });
 
@@ -408,6 +362,9 @@ describe('saveSettings', () => {
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.models.summary).toBe('mistral-large-latest');
     expect(sentBody.models.ocr).toBe('mistral-ocr-latest');
+    expect(sentBody._mainModel).toBeUndefined();
+    expect(sentBody.mistralVoices).toBeUndefined();
+    expect(sentBody.mistralVoicesSource).toBeUndefined();
 
     expect(ctx.showToast).toHaveBeenCalledWith('toast.settingsSaved', 'success');
     expect(ctx.$refs.settingsDialog.close).toHaveBeenCalled();
@@ -434,6 +391,56 @@ describe('saveSettings', () => {
     const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.ttsModel).toBe('voxtral-mini-tts-latest');
+  });
+
+  it('strips stale global voice fields before saving settings', async () => {
+    mockFetchOk({ models: { summary: 'mistral-large-latest' }, ttsModel: 'voxtral-mini-tts-2603' });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
+
+    const ctx = makeContext({
+      configDraft: {
+        ...makeContext().configDraft,
+        mistralVoices: { host: 'old-host', guest: 'old-guest' },
+        mistralVoicesSource: 'user',
+      },
+    });
+    await config.saveSettings.call(ctx);
+
+    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
+    const sentBody = JSON.parse(putCall[1].body as string);
+    expect(sentBody.mistralVoices).toBeUndefined();
+    expect(sentBody.mistralVoicesSource).toBeUndefined();
+  });
+
+  it('does not fail on Alpine-like Proxy configDraft (DataCloneError regression)', async () => {
+    // Regression guard for src/app/config.ts:153 — spread {...draft} must replace structuredClone(draft),
+    // otherwise Alpine reactive proxies (which expose non-cloneable magic methods like $watch) throw
+    // DataCloneError in the browser. Native structuredClone on a Proxy whose target carries a function
+    // property throws — this test reproduces that pre-fix symptom.
+    const proxyDraft = new Proxy(
+      {
+        models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
+        ttsModel: 'voxtral-mini-tts-latest',
+        _mainModel: 'mistral-large-latest',
+        $watch: () => {
+          /* simulate Alpine magic method */
+        },
+      } as any,
+      {},
+    );
+    mockFetchOk({
+      models: { summary: 'mistral-large-latest' },
+      ttsModel: 'voxtral-mini-tts-latest',
+    });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
+
+    const ctx = makeContext({ configDraft: proxyDraft as any });
+    await expect(config.saveSettings.call(ctx)).resolves.toBeUndefined();
+
+    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
+    const sentBody = JSON.parse(putCall[1].body as string);
+    expect(sentBody._mainModel).toBeUndefined();
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.settingsSaved', 'success');
   });
 
   it('shows error toast on save failure', async () => {

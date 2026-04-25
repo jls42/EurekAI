@@ -90,6 +90,20 @@ describe('selectVoices', () => {
       const r2 = selectVoices({ voices, lang: 'pt-BR', profileId: 'p1' });
       expect(r1?.host).toBe(r2?.host);
     });
+
+    it('unsupported locales sharing en-fallback produce the same rotation seed', () => {
+      const voices = [
+        makeVoice({ id: 'a', languages: ['en_US'] }),
+        makeVoice({ id: 'b', languages: ['en_GB'] }),
+        makeVoice({ id: 'c', languages: ['en_GB'] }),
+      ];
+      const es = selectVoices({ voices, lang: 'es', profileId: 'p1' });
+      const ar = selectVoices({ voices, lang: 'ar', profileId: 'p1' });
+      expect(es?.source).toBe('en-fallback');
+      expect(ar?.source).toBe('en-fallback');
+      expect(es?.host).toBe(ar?.host);
+      expect(es?.guest).toBe(ar?.guest);
+    });
   });
 
   describe('scoring', () => {
@@ -122,6 +136,67 @@ describe('selectVoices', () => {
   });
 
   describe('distinct voices', () => {
+    it('uses the product default pair for French voices when available', () => {
+      const voices = [
+        makeVoice({
+          id: 'fr-neutral',
+          name: 'Marie - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['fr_FR'],
+        }),
+        makeVoice({
+          id: 'fr-excited',
+          name: 'Marie - Excited',
+          gender: 'female',
+          tags: ['excited'],
+          languages: ['fr_FR'],
+        }),
+        makeVoice({
+          id: 'fr-curious',
+          name: 'Marie - Curious',
+          gender: 'female',
+          tags: ['curious'],
+          languages: ['fr_FR'],
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'fr', profileId: 'any-profile' });
+      expect(res?.host).toBe('fr-excited');
+      expect(res?.guest).toBe('fr-curious');
+    });
+
+    it('uses the product default pair for English and en-fallback voices when available', () => {
+      const voices = [
+        makeVoice({
+          id: 'jane-confident',
+          name: 'Jane - Confident',
+          gender: 'female',
+          tags: ['confident'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'jane-neutral',
+          name: 'Jane - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'oliver-curious',
+          name: 'Oliver - Curious',
+          tags: ['curious'],
+          languages: ['en_US'],
+        }),
+      ];
+      const en = selectVoices({ voices, lang: 'en', profileId: 'any-profile' });
+      const es = selectVoices({ voices, lang: 'es', profileId: 'any-profile' });
+      expect(en?.host).toBe('jane-confident');
+      expect(en?.guest).toBe('oliver-curious');
+      expect(es?.source).toBe('en-fallback');
+      expect(es?.host).toBe('jane-confident');
+      expect(es?.guest).toBe('oliver-curious');
+    });
+
     it('returns two distinct voices when bucket has at least 2', () => {
       const voices = [
         makeVoice({ id: 'a', languages: ['fr_FR'] }),
@@ -131,11 +206,86 @@ describe('selectVoices', () => {
       expect(res?.host).not.toBe(res?.guest);
     });
 
+    it('prefers a different guest speaker when the bucket allows it', () => {
+      const voices = [
+        makeVoice({
+          id: 'jane-confident',
+          name: 'Jane - Confident',
+          gender: 'female',
+          tags: ['confident'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'jane-neutral',
+          name: 'Jane - Neutral',
+          gender: 'female',
+          tags: ['neutral'],
+          languages: ['en_US'],
+        }),
+        makeVoice({
+          id: 'oliver-cheerful',
+          name: 'Oliver - Cheerful',
+          tags: ['cheerful'],
+          languages: ['en_US'],
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'en', profileId: 'same-speaker' });
+      expect(res?.host).toBe('jane-confident');
+      expect(res?.guest).toBe('oliver-cheerful');
+    });
+
     it('reuses the same voice when bucket has only one', () => {
       const voices = [makeVoice({ id: 'solo', languages: ['fr_FR'] })];
       const res = selectVoices({ voices, lang: 'fr' });
       expect(res?.host).toBe('solo');
       expect(res?.guest).toBe('solo');
+    });
+
+    it('flag singleSpeakerBucket=true quand host===guest (1 voix dans le bucket)', () => {
+      const voices = [makeVoice({ id: 'solo', languages: ['fr_FR'] })];
+      const res = selectVoices({ voices, lang: 'fr' });
+      expect(res?.singleSpeakerBucket).toBe(true);
+    });
+
+    it('flag singleSpeakerBucket=false quand bucket contient 2+ voix distinctes', () => {
+      const voices = [
+        makeVoice({ id: 'a', languages: ['fr_FR'] }),
+        makeVoice({ id: 'b', languages: ['fr_FR'] }),
+      ];
+      const res = selectVoices({ voices, lang: 'fr' });
+      expect(res?.singleSpeakerBucket).toBe(false);
+    });
+
+    it('flag sameCharacterBucket=true quand 2 voix partagent le speakerName (variantes)', () => {
+      // Marie-Excited + Marie-Curious : ids distincts mais même personnage.
+      const voices = [
+        makeVoice({
+          id: 'marie-excited',
+          name: 'Marie - Excited',
+          languages: ['de_DE'], // langue sans curated pair pour exercer la rotation
+          tags: ['excited'],
+          gender: 'female',
+        }),
+        makeVoice({
+          id: 'marie-curious',
+          name: 'Marie - Curious',
+          languages: ['de_DE'],
+          tags: ['curious'],
+          gender: 'female',
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'de' });
+      expect(res?.singleSpeakerBucket).toBe(false);
+      expect(res?.sameCharacterBucket).toBe(true);
+    });
+
+    it('flag sameCharacterBucket=false quand 2 personnages distincts', () => {
+      const voices = [
+        makeVoice({ id: 'jane', name: 'Jane - Confident', languages: ['de_DE'] }),
+        makeVoice({ id: 'oliver', name: 'Oliver - Curious', languages: ['de_DE'] }),
+      ];
+      const res = selectVoices({ voices, lang: 'de' });
+      expect(res?.sameCharacterBucket).toBe(false);
     });
   });
 
@@ -167,6 +317,20 @@ describe('selectVoices', () => {
       const a = selectVoices({ voices: bucket, lang: 'fr' });
       const b = selectVoices({ voices: bucket, lang: 'fr' });
       expect(a?.host).toBe(b?.host);
+    });
+
+    // Verrou : le préfixe `p:` dans le seed (cf. voice-selection.ts L212-216) doit
+    // empêcher qu'un profileId='__default__' explicite collide avec le bucket anonyme
+    // (sentinel historique '__default__|<lang>'). Sans ce préfixe, un futur fixture
+    // ou un user qui crée un profil nommé '__default__' tomberait sur le même seed
+    // que les sessions sans profil — bug d'identité sonore silencieux.
+    it("namespace `p:` empêche la collision profileId='__default__' explicite vs absent", () => {
+      const explicit = selectVoices({ voices: bucket, lang: 'fr', profileId: '__default__' });
+      const anonymous = selectVoices({ voices: bucket, lang: 'fr' });
+      // Au moins l'un des deux champs doit différer ; sinon le préfixe ne sert plus.
+      const sameHost = explicit?.host === anonymous?.host;
+      const sameGuest = explicit?.guest === anonymous?.guest;
+      expect(sameHost && sameGuest).toBe(false);
     });
   });
 

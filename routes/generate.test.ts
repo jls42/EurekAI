@@ -57,6 +57,7 @@ vi.mock('../generators/podcast.js', () => ({
       { speaker: 'guest', text: 'Hi' },
     ],
     sourceRefs: ['ref1'],
+    names: { host: 'Camille', guest: 'Sasha' },
   }),
   createPodcastGeneration: (fields: unknown) => fields,
 }));
@@ -108,7 +109,6 @@ vi.mock('../config.js', () => ({
       chat: 'm',
     },
     ttsModel: 'voxtral-mini-tts-2603',
-    mistralVoices: { host: 'mh', guest: 'mg' },
   })),
   resolveVoices: vi.fn(() => ({ host: 'mh', guest: 'mg' })),
   getModelLimits: vi.fn(() => ({})),
@@ -280,6 +280,29 @@ describe('generateRoutes', () => {
       // Should not be blocked, should succeed
       expect(res.status).not.toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
+    });
+
+    it('returns 400 no_sources when sourceIds match nothing', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({
+        params: { pid },
+        body: { sourceIds: ['nonexistent-source-id'], lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
     });
 
     it('does not block when moderation status is safe', async () => {
@@ -775,6 +798,12 @@ describe('generateRoutes', () => {
       expect(gen.data.script).toHaveLength(2);
       expect(gen.data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
       expect(gen.data.sourceRefs).toEqual(['ref1']);
+      expect(gen.data.speakers).toEqual({ host: 'Camille', guest: 'Sasha' });
+
+      // flow='podcast' doit etre propage pour contextualiser les logs de fallback
+      // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
+      const { resolveVoices } = await import('../config.js');
+      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'podcast' }));
     });
   });
 
@@ -800,6 +829,11 @@ describe('generateRoutes', () => {
       expect(gen.data).toHaveLength(1);
       expect(gen.audioUrls).toHaveLength(1);
       expect(gen.audioUrls[0]).toContain(`/output/projects/${pid}/quiz-vocal-q0-`);
+
+      // flow='quiz-vocal' doit etre propage pour contextualiser les logs de fallback
+      // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
+      const { resolveVoices } = await import('../config.js');
+      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'quiz-vocal' }));
     });
   });
 
@@ -1003,6 +1037,38 @@ describe('generateRoutes', () => {
       expect(gen.sourceIds).toEqual(['src-1']);
     });
 
+    it('returns 400 no_sources when original quiz references missing sources', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      // Aucune source ajoutée -> sourceIds du quiz original sont orphelins
+      store.addGeneration(pid, {
+        id: 'gen-quiz',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['ghost-src'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const req = mockReq({
+        params: { pid },
+        body: {
+          generationId: 'gen-quiz',
+          weakQuestions: [
+            { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
+          ],
+          lang: 'fr',
+        },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+    });
+
     it('uses English label for review when lang=en', async () => {
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1104,6 +1170,29 @@ describe('generateRoutes', () => {
       const serialized = JSON.stringify(res.json.mock.calls[0][0]);
       expect(serialized).not.toContain('sk-1234');
       expect(serialized).not.toContain('api.internal');
+    });
+
+    it('returns 400 no_sources when sourceIds match nothing', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({
+        params: { pid },
+        body: { sourceIds: ['ghost'], lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
     });
 
     it('applies consigne when present and useConsigne is not false', async () => {
@@ -1422,6 +1511,7 @@ describe('generateRoutes', () => {
       expect(result.generations[0].data.script).toHaveLength(2);
       expect(result.generations[0].data.audioUrl).toContain(`/output/projects/${pid}/podcast-`);
       expect(result.generations[0].data.sourceRefs).toEqual(['ref1']);
+      expect(result.generations[0].data.speakers).toEqual({ host: 'Camille', guest: 'Sasha' });
       expect(result.failedSteps).toBeUndefined();
 
       // Verify stored

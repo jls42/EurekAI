@@ -40,7 +40,6 @@ const MOCK_CONFIG = {
     chat: 'm',
   },
   ttsModel: 'voxtral-mini-tts-2603',
-  mistralVoices: { host: 'mh', guest: 'mg' },
 };
 
 vi.mock('../config.js', () => ({
@@ -758,6 +757,13 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     const res = mockRes();
 
     await handler(req, res);
+
+    // flow='read-aloud' doit être câblé explicitement pour contextualiser les logs de
+    // fallback dans resolveMistralDefaults (le seed de rotation est profileId+langMatched,
+    // pas flow — cf. types.ts VoiceFlow).
+    expect(resolveVoices).toHaveBeenCalledWith(
+      expect.objectContaining({ flow: 'read-aloud', lang: 'fr' }),
+    );
 
     // 4 TTS calls: 2 questions (host) + 2 answers (guest)
     expect(textToSpeech).toHaveBeenCalledTimes(4);

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { createHash } from 'crypto';
@@ -14,7 +14,8 @@ import {
   ProfileStore,
 } from './profiles.js';
 import type { Profile } from './types.js';
-import { asVoiceId } from './helpers/voice-types.js';
+import { asVoiceId, type VoiceId } from './helpers/voice-types.js';
+import { logger } from './helpers/logger.js';
 
 // =============================================================================
 // Pure functions (no mocks needed)
@@ -230,6 +231,235 @@ describe('ProfileStore.list', () => {
     expect(profiles).toHaveLength(1);
     expect(profiles[0].name).toBe('Alice');
   });
+
+  // I4: corrupt profiles.json - list() logs error, returns [], sets lastLoadFailed
+  it('logs error and returns [] when profiles.json is corrupt (file preserved)', () => {
+    const corruptContent = '{ not valid json at all ';
+    writeFileSync(join(tempDir, 'profiles.json'), corruptContent);
+    const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    expect(result).toEqual([]);
+    expect(errSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('Failed to parse profiles.json'),
+      expect.any(SyntaxError),
+    );
+    // file is preserved on disk, not silently overwritten
+    expect(readFileSync(join(tempDir, 'profiles.json'), 'utf-8')).toBe(corruptContent);
+  });
+
+  it('creates .corrupt.bak on first save after corrupt load, then only once per cycle', () => {
+    const corruptContent = '{ legacy user data corrupted }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed
+    expect(existsSync(backupPath)).toBe(false);
+
+    // first save triggers backup
+    freshStore.create('Alice', 9);
+    expect(existsSync(backupPath)).toBe(true);
+    expect(readFileSync(backupPath, 'utf-8')).toBe(corruptContent);
+
+    // second save does NOT overwrite backup (idempotent, flag reset)
+    writeFileSync(backupPath, 'MANUAL_OVERRIDE');
+    freshStore.create('Bob', 10);
+    expect(readFileSync(backupPath, 'utf-8')).toBe('MANUAL_OVERRIDE');
+  });
+
+  it('shape invalide (JSON valide mais pas un array) log dédié, pas confondu avec corruption JSON', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    // JSON parseable mais pas un array → distinct de la vraie corruption
+    writeFileSync(profilesPath, '{"profiles": []}');
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+    expect(result).toEqual([]);
+    const shapeError = errorSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('invalid shape'),
+    );
+    expect(shapeError).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  // I4 race admin manuel : si admin répare le fichier entre list() et save(), on ne
+  // doit PAS backup le contenu désormais valide comme .corrupt.bak (false positive).
+  it('skip backup quand admin a reparé profiles.json entre list() et save()', () => {
+    const corruptContent = '{ corrupt initial }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed=true
+    expect(existsSync(backupPath)).toBe(false);
+
+    // Admin répare le fichier manuellement (array JSON valide)
+    writeFileSync(profilesPath, '[]');
+    freshStore.create('Alice', 9);
+
+    // Pas de backup créé : le contenu disque était valide au moment du save
+    expect(existsSync(backupPath)).toBe(false);
+  });
+
+  it('skip malformed entries (null, primitives, arrays) sans crasher list()', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    const validProfile = {
+      id: 'p1',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    // Mix d'entries valides + entries malformées (null, string, array)
+    writeFileSync(
+      profilesPath,
+      JSON.stringify([validProfile, null, 'legacy-string', [1, 2], { age: 'NaN' }]),
+    );
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // Au moins le profile valide est conservé. Les entries malformed sont droppées.
+    expect(result.find((p) => p.id === 'p1')).toBeTruthy();
+    expect(result.length).toBeLessThan(5);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('dropped malformed entry'),
+    );
+  });
+
+  it('crée .corrupt.bak quand filterValidEntries drop des rows non-object avant overwrite', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    const validProfile = {
+      id: 'p1',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      moderationCategories: [],
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    // Mix valide + null (legacy row) — déclenche filterValidEntries drop + auto-save
+    writeFileSync(profilesPath, JSON.stringify([validProfile, null, 'legacy-string']));
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // Le profil valide est gardé
+    expect(result.find((p) => p.id === 'p1')).toBeTruthy();
+    // .corrupt.bak existe et contient la version originale (avec null + 'legacy-string')
+    expect(existsSync(backupPath)).toBe(true);
+    const backupContent = JSON.parse(readFileSync(backupPath, 'utf-8'));
+    expect(backupContent).toHaveLength(3);
+    expect(backupContent[1]).toBeNull();
+    expect(backupContent[2]).toBe('legacy-string');
+  });
+
+  it('preserves on-disk data when migrateProfile throws (no auto-save of dropped entries)', async () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    // Crée 2 profils valides via le store, lit le disque, puis remplace par un fichier
+    // contenant 2 entrées dont 1 fait crasher migrateProfile.
+    const baseProfile = {
+      id: 'good',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      moderationCategories: [],
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const hostileEntry = {
+      id: 'bad',
+      // age manquant + ageGroup invalide → MODERATION_CATEGORIES[p.ageGroup] → undefined
+      // → spread d'un undefined throw "is not iterable"
+      ageGroup: 'unknown-group',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: false,
+      useConsigne: false,
+      chatEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
+    writeFileSync(profilesPath, JSON.stringify([baseProfile, hostileEntry]));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // L'entrée hostile est droppée IN-MEMORY, le profile valide reste
+    expect(result.find((p) => p.id === 'good')).toBeTruthy();
+    expect(result.find((p) => p.id === 'bad')).toBeFalsy();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('migration failed'),
+      expect.anything(), // id ou '<no-id>'
+      expect.anything(), // erreur
+    );
+    // Le disque doit conserver les 2 entrées d'origine — pas d'auto-save destructif
+    const onDisk = JSON.parse(readFileSync(profilesPath, 'utf-8'));
+    expect(Array.isArray(onDisk)).toBe(true);
+    expect(onDisk).toHaveLength(2);
+    expect(onDisk.find((p: { id: string }) => p.id === 'bad')).toBeTruthy();
+  });
+
+  // I4: race window — corrupt file deleted between list() and first save().
+  // Flag doit être reset quand même, sinon la 2e save backuperait des données
+  // valides comme .corrupt.bak.
+  it('resets lastLoadFailed even when corrupt file is deleted between list() and save()', () => {
+    const corruptContent = '{ legacy user data corrupted }';
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    writeFileSync(profilesPath, corruptContent);
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    freshStore.list(); // sets lastLoadFailed=true, file still on disk
+
+    // simulate manual deletion between list() and save()
+    rmSync(profilesPath);
+    expect(existsSync(profilesPath)).toBe(false);
+
+    // first save: file absent, no backup created, flag must reset anyway
+    freshStore.create('Alice', 9);
+    expect(existsSync(backupPath)).toBe(false);
+
+    // second save: flag déjà reset → pas de backup Alice-as-corrupt
+    freshStore.create('Bob', 10);
+    expect(existsSync(backupPath)).toBe(false);
+  });
 });
 
 describe('ProfileStore.create', () => {
@@ -345,6 +575,71 @@ describe('ProfileStore.update', () => {
     expect(updated!.mistralVoices).toEqual(voices);
   });
 
+  it('normalizes partial mistralVoices without persisting empty strings', () => {
+    const p = store.create('VoiceUser', 12);
+    const updated = store.update(p.id, {
+      mistralVoices: { host: asVoiceId('voice-host-id'), guest: asVoiceId('') },
+    });
+    expect(updated!.mistralVoices).toEqual({ host: 'voice-host-id' });
+  });
+
+  it('clears mistralVoices when both fields are empty', () => {
+    const p = store.create('VoiceUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: asVoiceId('voice-host-id'), guest: asVoiceId('voice-guest-id') },
+    });
+    const updated = store.update(p.id, {
+      mistralVoices: { host: asVoiceId(''), guest: asVoiceId('') },
+    });
+    expect(updated!.mistralVoices).toBeUndefined();
+  });
+
+  it('logger.warn quand un champ mistralVoices est defini non-string (observabilite drop)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('VoiceUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: 42 as unknown as VoiceId, guest: asVoiceId('valid-guest-id') },
+    });
+    const warnedForHost = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('voices.host'),
+    );
+    expect(warnedForHost).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('logger.warn quand mistralVoices est une primitive (string/number) — pas un objet', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('PrimUser', 12);
+    store.update(p.id, {
+      mistralVoices: 'Marie' as unknown as { host?: VoiceId; guest?: VoiceId },
+    });
+    const warnedNonObject = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('rejected non-object mistralVoices'),
+    );
+    expect(warnedNonObject).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('rejette mistralVoices: [] sans écraser les voix existantes', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ArrayUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: asVoiceId('keep-host'), guest: asVoiceId('keep-guest') },
+    });
+
+    const updated = store.update(p.id, {
+      mistralVoices: [] as unknown as { host?: VoiceId; guest?: VoiceId },
+    });
+
+    // Les voix existantes ne sont PAS effacées par un payload array stale
+    expect(updated!.mistralVoices).toEqual({ host: 'keep-host', guest: 'keep-guest' });
+    const warnedArray = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('rejected array mistralVoices'),
+    );
+    expect(warnedArray).toBe(true);
+    warnSpy.mockRestore();
+  });
+
   it('updates theme', () => {
     const p = store.create('ThemeUser', 10);
     expect(p.theme).toBeUndefined();
@@ -357,6 +652,41 @@ describe('ProfileStore.update', () => {
     store.update(p.id, { theme: 'light' });
     const updated = store.update(p.id, { theme: '' as any });
     expect(updated!.theme).toBeUndefined();
+  });
+
+  // Sentinel reset = null doit comporter comme '' / undefined : reset silencieux
+  // (pas de warn). Verrou pour qu'un futur durcissement de applyTheme ne casse pas
+  // le contrat avec le frontend qui POSTe `theme: null` via buildProfileUpdates.
+  it('clears theme when set to null (sentinel reset, no warn)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ThemeUser4', 10);
+    store.update(p.id, { theme: 'dark' });
+    const updated = store.update(p.id, { theme: null as any });
+    expect(updated!.theme).toBeUndefined();
+    const themeWarn = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes('rejected invalid theme'),
+    );
+    expect(themeWarn).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('theme invalide: logger.warn et valeur courante préservée (drop non silencieux)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ThemeUser3', 10);
+    store.update(p.id, { theme: 'dark' });
+    const updated = store.update(p.id, { theme: 'midnight' as any });
+    expect(updated!.theme).toBe('dark');
+    const matched = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes("rejected invalid theme 'midnight'"),
+    );
+    expect(matched).toBe(true);
+    warnSpy.mockRestore();
   });
 
   it('returns null for unknown id', () => {
@@ -522,6 +852,22 @@ describe('ProfileStore.update moderationCategories', () => {
     const p = store.create('Test2', 9);
     const updated = store.update(p.id, { moderationCategories: ['sexual', 'fake_category'] });
     expect(updated!.moderationCategories).toEqual(['sexual']);
+  });
+
+  it('logger.warn liste les catégories rejetées (drop non silencieux)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('Test3', 9);
+    store.update(p.id, { moderationCategories: ['sexual', 'TYPO', 'selfharm', 'BAD'] });
+    const matched = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes('rejected unknown moderation categories') &&
+        call[1].includes('TYPO') &&
+        call[1].includes('BAD'),
+    );
+    expect(matched).toBe(true);
+    warnSpy.mockRestore();
   });
 
   it('allows empty array to disable all categories', () => {

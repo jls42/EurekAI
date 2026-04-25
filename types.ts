@@ -16,7 +16,7 @@ export interface Profile {
   moderationCategories?: string[];
   useConsigne: boolean;
   chatEnabled: boolean;
-  mistralVoices?: { host: VoiceId; guest: VoiceId };
+  mistralVoices?: { host?: VoiceId; guest?: VoiceId };
   theme?: 'dark' | 'light';
   pinHash?: string;
   hasPin?: boolean;
@@ -85,6 +85,11 @@ export interface PodcastLine {
   text: string;
 }
 
+export interface PodcastSpeakers {
+  host: string;
+  guest: string;
+}
+
 // --- Generation system (multi-results) ---
 
 export interface GenerationMeta {
@@ -118,7 +123,12 @@ export interface QuizGeneration extends GenerationMeta {
 
 export interface PodcastGeneration extends GenerationMeta {
   type: 'podcast';
-  data: { script: PodcastLine[]; audioUrl: string; sourceRefs?: string[] };
+  data: {
+    script: PodcastLine[];
+    audioUrl: string;
+    sourceRefs?: string[];
+    speakers?: PodcastSpeakers;
+  };
   // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION.
   // Aligné sur QuizVocalGeneration (cf. ligne plus bas) : les anciennes générations
   // sans `lang` ne porteront pas de badge beta audio, pas de backfill.
@@ -281,6 +291,16 @@ export interface ChatHistory {
   messages: ChatMessage[];
 }
 
+// --- TTS flow (voice selection context) ---
+
+// Identifie le contexte d'appel TTS. Utilisé uniquement pour contextualiser les logs
+// de fallback dans resolveMistralDefaults (config.ts) — la rotation déterministe de
+// selectVoices a pour seed `profileId + langMatched` (helpers/voice-selection.ts), pas
+// `flow`. Intentionnel : un même profil garde une identité sonore cohérente entre les
+// flux (podcast, quiz-vocal, read-aloud). Ce paramètre existe surtout pour que les
+// logs de fallback identifient quel pipeline a tiré la voix quand on debug.
+export type VoiceFlow = 'podcast' | 'quiz-vocal' | 'read-aloud';
+
 // --- App config ---
 
 export interface AppConfig {
@@ -295,13 +315,4 @@ export interface AppConfig {
     chat: string;
   };
   ttsModel: string;
-  mistralVoices: {
-    host: VoiceId;
-    guest: VoiceId;
-  };
-  // 'default' : valeurs initiales ou matchant LEGACY_DEFAULT_* (pas un choix utilisateur).
-  // 'user'    : l'utilisateur a explicitement configuré les voix via settings.
-  // Permet de traiter l'override global comme intentionnel ou non sans allonger
-  // LEGACY_DEFAULT_* à chaque release qui change le défaut.
-  mistralVoicesSource?: 'default' | 'user';
 }

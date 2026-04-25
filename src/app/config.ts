@@ -4,6 +4,7 @@ import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
 
 type ConfigDraft = AppConfig & { _mainModel?: string };
+type VoiceRole = 'host' | 'guest';
 
 interface VoicesEnrichedEntry {
   id: string;
@@ -35,6 +36,7 @@ type ModerationCategoriesPayload = {
 
 const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
+const PROFILE_VOICE_DEFAULT_I18N = 'profile.voiceDefault';
 
 export function createConfig() {
   return {
@@ -92,6 +94,7 @@ export function createConfig() {
     },
 
     translateEmotion(this: AppContext, emotion: string): string {
+      if (!emotion) return '';
       return this.t('emotion.' + emotion) || emotion;
     },
 
@@ -106,50 +109,29 @@ export function createConfig() {
       );
     },
 
-    // Hint affiché dans l'éditeur de profil (cf. profile-picker.html:383).
-    // Reflète la sélection par défaut pour les champs profil laissés sur "Par défaut".
-    // Converge avec resolveVoices() backend à config et liste de voix égales.
-    //
-    // Priorités alignées sur le backend :
-    // 1. Si l'utilisateur a configuré explicitement des voix globales
-    //    (mistralVoicesSource === 'user'), afficher ces voix — le backend les utilisera.
-    // 2. Sinon, selectVoices() sur le catalogue (rotation par profileId).
-    defaultVoiceHint(this: AppContext, locale: string, profileId?: string): string {
+    voiceLabel(this: AppContext, voice: Partial<VoicesEnrichedEntry>): string {
+      const speaker = voice.speaker || voice.name || voice.id || '';
+      const emotion = this.translateEmotion(voice.emotion || '');
+      const flag = this.langToFlag(voice.lang || '');
+      const name = emotion ? `${speaker} - ${emotion}` : speaker;
+      return [flag, name].filter(Boolean).join(' ');
+    },
+
+    defaultVoiceOptionLabel(
+      this: AppContext,
+      role: VoiceRole,
+      locale: string,
+      profileId?: string,
+    ): string {
       const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
-      if (!list || list.length === 0) return '';
-      const formatName = (id: string): string => {
-        const match = list.find((v) => v.id === id);
-        if (!match) return '';
-        const emotion = match.emotion ? this.translateEmotion(match.emotion) : '';
-        return emotion ? `${match.speaker} - ${emotion}` : match.speaker;
-      };
-
-      // Priorité 1 : override global explicite ("mistralVoicesSource === 'user'").
-      const cfg = this.configDraft as unknown as ConfigDraft & {
-        mistralVoicesSource?: 'default' | 'user';
-        mistralVoices?: { host?: string; guest?: string };
-      };
-      if (
-        cfg?.mistralVoicesSource === 'user' &&
-        cfg.mistralVoices?.host &&
-        cfg.mistralVoices?.guest
-      ) {
-        const globalHost = formatName(cfg.mistralVoices.host);
-        const globalGuest = formatName(cfg.mistralVoices.guest);
-        if (globalHost && globalGuest) return `${globalHost} / ${globalGuest}`;
-        // Si l'ID global n'est pas retrouvable dans la liste (voix supprimée côté Mistral),
-        // on retombe sur selectVoices plutôt que d'afficher vide.
-      }
-
-      // Priorité 2 : sélection dynamique.
+      if (!list || list.length === 0) return this.t(PROFILE_VOICE_DEFAULT_I18N);
       const lang = (locale || 'fr').slice(0, 2);
       const voices = list as unknown as MistralVoice[];
       const result = selectVoices({ voices, lang, profileId });
-      if (!result) return '';
-      const hostName = formatName(result.host);
-      const guestName = formatName(result.guest);
-      if (!hostName || !guestName) return '';
-      return `${hostName} / ${guestName}`;
+      if (!result) return this.t(PROFILE_VOICE_DEFAULT_I18N);
+      const match = list.find((v) => v.id === result[role]);
+      if (!match) return this.t(PROFILE_VOICE_DEFAULT_I18N);
+      return `${this.voiceLabel(match)} ${this.t('profile.voiceDefaultSuffix')}`;
     },
 
     async saveSettings(this: AppContext) {
@@ -169,10 +151,14 @@ export function createConfig() {
         if (draft.ttsModel?.startsWith('eleven_')) {
           draft.ttsModel = 'voxtral-mini-tts-latest';
         }
+        const payload = { ...draft } as ConfigDraft & Record<string, unknown>;
+        delete payload._mainModel;
+        delete payload.mistralVoices;
+        delete payload.mistralVoicesSource;
         const res = await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(draft),
+          body: JSON.stringify(payload),
         });
         if (res.ok) {
           const saved = (await res.json()) as AppConfig;

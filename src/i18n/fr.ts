@@ -45,6 +45,8 @@ export const fr: Record<string, string> = {
 
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
+  'errorCode.no_sources': 'Aucune source disponible',
+  'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
   'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',
@@ -52,6 +54,8 @@ export const fr: Record<string, string> = {
   'errorCode.llm_invalid_json': "Réponse invalide de l'IA",
   'errorCode.upload_failed': "Échec de l'envoi",
   'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
+  'errorCode.profile_delete_partial':
+    "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -113,7 +117,6 @@ export const fr: Record<string, string> = {
   'settings.aiModel': 'Génération',
   'settings.aiModelHint': 'Utilisé pour fiches, flashcards, quiz, podcast et chat',
   'settings.recommended': 'Recommandé',
-  'settings.voiceTts': 'Voix',
   'settings.voiceHost': 'Principale',
   'settings.voiceGuest': 'Secondaire',
   'emotion.Angry': 'En colère',
@@ -129,8 +132,6 @@ export const fr: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarcastique',
   'emotion.Shameful': 'Honteux',
-  'settings.mistralVoicesHint':
-    'Voix Mistral : Marie, Oliver, Nick, Margaret, Sanchit, Angèle, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Fiche',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -297,6 +298,8 @@ export const fr: Record<string, string> = {
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
     'Configurez MISTRAL_API_KEY dans le fichier .env pour activer les podcasts audio',
+  'podcast.speakerHost': 'Animateur',
+  'podcast.speakerGuest': 'Invité',
 
   // Image view
   'image.heading': 'Illustrations',
@@ -392,6 +395,8 @@ export const fr: Record<string, string> = {
   'toast.generationError': 'La génération a échoué. Réessaye dans un instant.',
   'toast.allGenerated': 'Tout généré !',
   'toast.partialGenerated': '{count}/3 générations réussies',
+  'toast.profilesPartial':
+    '{count} profil(s) masqué(s) — fichier corrompu côté serveur, contacte un admin',
   'toast.magicDone': 'Magie terminée !',
   'toast.autoError': 'La génération automatique a échoué. Réessaye.',
   'toast.audioDone': 'Audio généré !',
@@ -461,7 +466,7 @@ export const fr: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personnalise les voix pour le contenu audio (podcasts, quiz vocaux, lectures)',
   'profile.voiceDefault': 'Par défaut (selon la langue)',
-  'profile.voiceCurrentDefault': 'Par défaut pour les champs laissés sur « Par défaut » :',
+  'profile.voiceDefaultSuffix': '(par défaut)',
   'profile.resetDefaults': 'Réinitialiser',
   'profile.backToProfiles': 'Retour',
 

@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AppConfig } from './types.js';
+import type { AppConfig, Profile, VoiceFlow } from './types.js';
 import type { MistralVoice, VoiceId } from './helpers/voice-types.js';
 import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
@@ -20,13 +20,12 @@ const DEFAULT_CONFIG: AppConfig = {
     chat: MISTRAL_LARGE_LATEST,
   },
   ttsModel: 'voxtral-mini-tts-latest',
-  mistralVoices: {
-    // Marie - Excited (host) + Marie - Curious (guest) — voix françaises cohérentes par défaut.
-    // Pour d'autres langues, `selectVoices` (helpers/voice-selection.ts) prend le relais
-    // via `resolveMistralDefaults` (FR fallback sinon).
-    host: asVoiceId('2f62b1af-aea3-4079-9d10-7ca665ee7243'),
-    guest: asVoiceId('e0580ce5-e63c-4cbe-88c8-a983b80c5f1f'),
-  },
+};
+
+const DEFAULT_VOICES_FALLBACK: { host: VoiceId; guest: VoiceId } = {
+  // Marie - Excited (host) + Marie - Curious (guest), used only when the voice catalog is empty.
+  host: asVoiceId('2f62b1af-aea3-4079-9d10-7ca665ee7243'),
+  guest: asVoiceId('e0580ce5-e63c-4cbe-88c8-a983b80c5f1f'),
 };
 
 let configPath: string;
@@ -44,22 +43,26 @@ let lastLoadFailed = false;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 
-function mergeSafe(saved: unknown): AppConfig {
+interface MergeResult {
+  config: AppConfig;
+  shapeInvalid: boolean;
+}
+
+function mergeSafe(saved: unknown): MergeResult {
   if (!isPlainObject(saved)) {
-    logger.warn('config', `invalid shape for config root (got ${Array.isArray(saved) ? 'array' : typeof saved}), resetting`);
-    return { ...DEFAULT_CONFIG };
+    logger.warn('config', `invalid shape for config root (got ${describeShape(saved)}), resetting`);
+    return { config: { ...DEFAULT_CONFIG }, shapeInvalid: true };
   }
   const savedModels = isPlainObject(saved.models)
     ? (saved.models as Partial<AppConfig['models']>)
     : logAndFallback('models', saved.models);
-  const savedVoices = isPlainObject(saved.mistralVoices)
-    ? (saved.mistralVoices as Partial<AppConfig['mistralVoices']>)
-    : logAndFallback('mistralVoices', saved.mistralVoices);
   return {
-    ...DEFAULT_CONFIG,
-    ...saved,
-    models: { ...DEFAULT_CONFIG.models, ...savedModels },
-    mistralVoices: { ...DEFAULT_CONFIG.mistralVoices, ...savedVoices },
+    config: {
+      ...DEFAULT_CONFIG,
+      ...saved,
+      models: { ...DEFAULT_CONFIG.models, ...savedModels },
+    },
+    shapeInvalid: false,
   };
 }
 
@@ -95,7 +98,11 @@ function loadSavedConfig(): { config: AppConfig; loadFailed: boolean } {
     return { config: { ...DEFAULT_CONFIG }, loadFailed: true };
   }
   try {
-    return { config: mergeSafe(JSON.parse(raw)), loadFailed: false };
+    const merged = mergeSafe(JSON.parse(raw));
+    // shapeInvalid : JSON parsait, mais la racine n'était pas un plain object
+    // (`null`/`array`/`scalaire`). Symétrie avec ProfileStore.list() : on flag loadFailed
+    // pour que le prochain saveConfig crée un .corrupt.bak avant overwrite.
+    return { config: merged.config, loadFailed: merged.shapeInvalid };
   } catch (e) {
     logger.error(
       'config',
@@ -145,23 +152,23 @@ function migrateLegacyElevenLabsFields(): boolean {
   return changed;
 }
 
-/**
- * First-boot classifier (pas une migration au sens strict).
- * Classe `mistralVoicesSource` à 'default' ou 'user' selon les IDs de voix présents, si le
- * champ est absent du config. Aucune réécriture in-place — le champ est ajouté.
- * Tout config qui match DEFAULT_CONFIG ou LEGACY_DEFAULT_* est 'default', sinon 'user'.
- * Evite d'étendre LEGACY_DEFAULT_* à chaque release qui change le défaut.
- * Retourne true quand la classification a été écrite en mémoire, pour que initConfig persiste
- * le fichier — sinon au prochain boot on reclasserait à chaque fois.
- */
-function classifyMistralVoicesSource(): boolean {
-  if (currentConfig.mistralVoicesSource) return false;
-  const isDefault =
-    isDefaultHost(currentConfig.mistralVoices.host) &&
-    isDefaultGuest(currentConfig.mistralVoices.guest);
-  currentConfig.mistralVoicesSource = isDefault ? 'default' : 'user';
-  return true;
-}
+const LEGACY_GLOBAL_VOICE_KEYS = ['mistralVoices', 'mistralVoicesSource'] as const;
+
+// S3: arrow `const` plutôt que `function` — adjacence avec migrateLegacyElevenLabsFields
+// ci-dessus déclencherait autrement l'agglomération du parseur TS de Lizard
+// (cf. CLAUDE.md "Mesurer > deviner").
+const removeLegacyGlobalVoiceFields = (): boolean => {
+  const legacy = currentConfig as unknown as Record<string, unknown>;
+  let changed = false;
+  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
+    if (legacy[key] !== undefined) {
+      delete legacy[key];
+      changed = true;
+      logger.info('config', `migration: removed legacy field '${key}'`);
+    }
+  }
+  return changed;
+};
 
 // Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
 // (lastLoadFailed), tente d'abord un `.corrupt.bak` à côté du fichier à écraser.
@@ -182,17 +189,41 @@ function classifyMistralVoicesSource(): boolean {
 // const arrow (pas function) : contournement parseur TS Lizard qui agglomère les
 // `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const persistConfig = (): void => {
+  // Idempotence cross-cycle (miroir de ProfileStore.save) : si `.corrupt.bak` existe
+  // déjà (cycle précédent non résolu), on NE l'écrase PAS — on préserve le backup
+  // d'origine pour permettre le post-mortem. Conséquence assumée : seul le premier
+  // backup par cycle corrompu est conservé (idem profiles.ts).
+  //
+  // Reset du flag : on reset systématiquement après un writeFileSync réussi,
+  // même si le backup `.corrupt.bak` a échoué. Rationale : après le write, le
+  // contenu corrompu d'origine n'existe plus sur disque (overwrite). Garder
+  // lastLoadFailed=true ferait que le prochain saveConfig backup le NOUVEAU contenu
+  // (désormais valide) sous `.corrupt.bak` — fausse alerte post-mortem. Si
+  // writeFileSync lui-même throw, l'exception se propage avant le reset → flag
+  // préservé → retry correct au prochain save.
   if (lastLoadFailed && existsSync(configPath)) {
     const backupPath = `${configPath}.corrupt.bak`;
-    try {
-      copyFileSync(configPath, backupPath);
-      logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
-    } catch (e) {
-      logger.warn('config', 'could not create .corrupt.bak backup (proceeding with overwrite):', e);
+    if (existsSync(backupPath)) {
+      logger.info('config', `backup ${backupPath} already exists, skipping copy`);
+    } else {
+      try {
+        copyFileSync(configPath, backupPath);
+        logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
+      } catch (e) {
+        // logger.error (pas warn) : on est sur le chemin "fichier corrompu va être
+        // écrasé sans backup possible" — perte de données réelle, pas une simple
+        // condition warn. Sévérité ERROR = un humain doit savoir, sinon l'admin
+        // découvre la perte uniquement quand il en a besoin (post-mortem).
+        logger.error(
+          'config',
+          'could not create .corrupt.bak backup (corrupt content will be lost on overwrite):',
+          e,
+        );
+      }
     }
-    lastLoadFailed = false;
   }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
+  lastLoadFailed = false;
 };
 
 export function initConfig(outputDir: string): void {
@@ -210,13 +241,9 @@ export function initConfig(outputDir: string): void {
     currentConfig = { ...DEFAULT_CONFIG };
     lastLoadFailed = false;
   }
-  // Ordre: classify AVANT migrate. Invariant actuel: aucune migration ne touche
-  // `mistralVoices.host/guest`, donc classify lit un état cohérent. Si une future migration
-  // touche `mistralVoices`, inverser l'ordre (migrate → classify) pour éviter de classer
-  // sur des IDs sur le point d'être migrés.
-  const classified = classifyMistralVoicesSource();
   const migrated = migrateLegacyElevenLabsFields();
-  if (classified || migrated) {
+  const globalVoicesRemoved = removeLegacyGlobalVoiceFields();
+  if (migrated || globalVoicesRemoved) {
     try {
       persistConfig();
     } catch (e) {
@@ -233,36 +260,6 @@ export function resetConfig(): AppConfig {
   currentConfig = { ...DEFAULT_CONFIG };
   persistConfig();
   return currentConfig;
-}
-
-function hasVoiceIdChange(
-  next: Partial<AppConfig['mistralVoices']>,
-  current: AppConfig['mistralVoices'],
-): boolean {
-  const hostChanged = next.host !== undefined && next.host !== current.host;
-  const guestChanged = next.guest !== undefined && next.guest !== current.guest;
-  return hostChanged || guestChanged;
-}
-
-// Un round-trip complet du configDraft ne doit pas transformer une config
-// "default" en override utilisateur si les IDs n'ont pas réellement changé.
-function applyMistralVoicesPatch(partial: Partial<AppConfig>): void {
-  if (!partial.mistralVoices) {
-    if (partial.mistralVoicesSource !== undefined) {
-      currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
-    }
-    return;
-  }
-  const hasExplicitVoiceChange = hasVoiceIdChange(
-    partial.mistralVoices,
-    currentConfig.mistralVoices,
-  );
-  currentConfig.mistralVoices = { ...currentConfig.mistralVoices, ...partial.mistralVoices };
-  if (partial.mistralVoicesSource !== undefined) {
-    currentConfig.mistralVoicesSource = partial.mistralVoicesSource;
-  } else if (hasExplicitVoiceChange) {
-    currentConfig.mistralVoicesSource = 'user';
-  }
 }
 
 export function saveConfig(partial: Partial<AppConfig>): AppConfig {
@@ -282,7 +279,16 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
       currentConfig.ttsModel = partial.ttsModel;
     }
   }
-  applyMistralVoicesPatch(partial);
+  // Même discipline que ttsModel 'eleven_*' pour les champs voix globales retirés de
+  // AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
+  // silencieusement par saveConfig (branches ci-dessus n'y touchent pas) — mais une
+  // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilité.
+  const legacy = partial as Record<string, unknown>;
+  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
+    if (legacy[key] !== undefined) {
+      logger.warn('config', `rejected legacy field '${key}' at saveConfig (cleaned at boot)`);
+    }
+  }
   persistConfig();
   return currentConfig;
 }
@@ -324,86 +330,55 @@ export function setVoiceCache(voices: MistralVoice[]): void {
   voiceCacheReady = voices.length > 0;
 }
 
-// IDs de voix Mistral qui ont été les defaults avant des releases précédentes.
-// Conservé pour la migration mistralVoicesSource (cf. initConfig) : un config.json
-// existant avec un de ces IDs est classé 'default', pas 'user'.
-const LEGACY_DEFAULT_HOSTS: ReadonlySet<VoiceId> = new Set([
-  asVoiceId('e3596645-b1af-469e-b857-f18ddedc7652'),
-]);
-const LEGACY_DEFAULT_GUESTS: ReadonlySet<VoiceId> = new Set([
-  asVoiceId('5a271406-039d-46fe-835b-fbbb00eaf08d'),
-]);
-
-function isDefaultHost(id: VoiceId | undefined): boolean {
-  return !id || id === DEFAULT_CONFIG.mistralVoices.host || LEGACY_DEFAULT_HOSTS.has(id);
-}
-
-function isDefaultGuest(id: VoiceId | undefined): boolean {
-  return !id || id === DEFAULT_CONFIG.mistralVoices.guest || LEGACY_DEFAULT_GUESTS.has(id);
-}
+const VOICE_SELECTION_LOG = 'voice-selection';
 
 // Résout host + guest via le helper partagé selectVoices, avec logging des fallbacks.
 // Retourne null si voiceCache est entièrement vide (cas dégradé).
-function resolveMistralDefaults(
-  lang: string | undefined,
+const resolveMistralDefaults = (
+  lang: string,
   profileId: string | undefined,
-  flow: string,
-): { host: VoiceId; guest: VoiceId } | null {
-  if (!lang) return null;
-  const result = selectVoices({ voices: voiceCache, lang, profileId });
+  flow: VoiceFlow,
+): { host: VoiceId; guest: VoiceId } | null => {
+  const result = selectVoices({
+    voices: voiceCache,
+    lang,
+    profileId,
+  });
   if (!result) {
-    logger.warn('voice-selection', `no voice available (lang=${lang}, flow=${flow})`);
+    logger.warn(VOICE_SELECTION_LOG, `no voice available (lang=${lang}, flow=${flow})`);
     return null;
   }
   if (result.source !== 'lang-match') {
     logger.info(
-      'voice-selection',
+      VOICE_SELECTION_LOG,
       `fallback lang_input=${lang} lang_matched=${result.langMatched ?? 'none'} source=${result.source} bucketSize=${result.bucketSize} flow=${flow}`,
     );
   }
+  if (result.sameCharacterBucket) {
+    logger.warn(
+      VOICE_SELECTION_LOG,
+      `single-speaker bucket: host et guest partagent le même personnage (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — podcast jouera les deux rôles avec la même voix`,
+    );
+  }
   return { host: result.host, guest: result.guest };
+};
+
+export interface ResolveVoicesArgs {
+  // Réutilise la shape de Profile.mistralVoices pour empêcher un drift silencieux
+  // entre le format stocké (profile JSON) et celui consommé ici.
+  profileVoices?: Profile['mistralVoices'];
+  lang: string;
+  // `string` (profile actif) ou `undefined` (anonyme/sans profil). Pas de `null` :
+  // un seul sentinel "absent" simplifie les call sites — sinon chacun fait `?? null`
+  // alors que selectVoices attend `?: string`. Le typechecker garde le champ obligatoire.
+  profileId: string | undefined;
+  flow: VoiceFlow;
 }
 
-// Priorités backend :
-// 1. override par profil (per-field)
-// 2. override global explicite (mistralVoicesSource === 'user')
-// 3. sélection dynamique via selectVoices (9 langues UI)
-// 4. fallback legacy DEFAULT_CONFIG.mistralVoices si voiceCache vide
-function pickMistralVoice(
-  profile: VoiceId | undefined,
-  userConfigured: boolean,
-  configured: VoiceId,
-  dynamic: VoiceId | undefined,
-  defaultVoice: VoiceId,
-): VoiceId {
-  if (profile) return profile;
-  if (userConfigured) return configured;
-  return dynamic || configured || defaultVoice;
-}
-
-export function resolveVoices(
-  config: AppConfig,
-  profileVoices?: { host: VoiceId; guest: VoiceId },
-  lang?: string,
-  profileId?: string,
-  flow = 'unknown',
-): { host: VoiceId; guest: VoiceId } {
-  const userConfigured = config.mistralVoicesSource === 'user';
-  const dynamic = resolveMistralDefaults(lang, profileId, flow);
+export function resolveVoices(opts: ResolveVoicesArgs): { host: VoiceId; guest: VoiceId } {
+  const dynamic = resolveMistralDefaults(opts.lang, opts.profileId, opts.flow);
   return {
-    host: pickMistralVoice(
-      profileVoices?.host,
-      userConfigured,
-      config.mistralVoices.host,
-      dynamic?.host,
-      DEFAULT_CONFIG.mistralVoices.host,
-    ),
-    guest: pickMistralVoice(
-      profileVoices?.guest,
-      userConfigured,
-      config.mistralVoices.guest,
-      dynamic?.guest,
-      DEFAULT_CONFIG.mistralVoices.guest,
-    ),
+    host: opts.profileVoices?.host || dynamic?.host || DEFAULT_VOICES_FALLBACK.host,
+    guest: opts.profileVoices?.guest || dynamic?.guest || DEFAULT_VOICES_FALLBACK.guest,
   };
 }

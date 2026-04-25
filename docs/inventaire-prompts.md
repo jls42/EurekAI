@@ -639,16 +639,17 @@ Contexte :
 
 ## Podcast
 
-### `podcastSystem(ageGroup)`
+### `podcastSystem(ageGroup, names?)`
 
 Type : `system`
 
 Appelant :
-- `generatePodcastScript()` dans `generators/podcast.ts`
+- `generatePodcastScript()` dans `generators/podcast.ts` (qui tire `names` via `pickPodcastNames()` depuis `PODCAST_NAME_POOL`)
 
 Contexte :
-- construit un mini-dialogue entre `Alex` et `Zoe`
+- construit un mini-dialogue entre `${names.host}` et `${names.guest}` — prenoms epicenes tires aleatoirement depuis le pool (Alex, Charlie, Camille, Sasha, Claude, Dominique, Andrea, Morgan, Mika, Valéry). Defauts si `names` non fourni : `Alex`/`Charlie`.
 - impose un format JSON `script + sourceRefs`
+- consigne bornee + exemple positif unique : "interpelle l'autre par son prenom une seule fois au maximum", avec UN SEUL exemple positif ("Tu peux me redire pourquoi <<HOST>> ?"). Prenom strictement en cœur de phrase (pas en accroche, pas en debut de replique) pour eviter template-isation (cf. `.claude/rules/prompts.md`).
 - interdit explicitement de prononcer les sources dans le dialogue
 
 Template :
@@ -656,17 +657,17 @@ Template :
 ```txt
 Ecris un script de mini-podcast educatif en JSON strict.
 
-PERSONNAGES (distincts mais naturels, sans interjections systematiques) :
-- "host" = Alex : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir Zoe.
-- "guest" = Zoe : eleve curieuse qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
-Varie les formulations - ne force pas d'interjection repetitive qui rendrait le dialogue template.
+PERSONNAGES (distincts, formulations variees) :
+- "host" = <<HOST>> : prof enthousiaste qui vulgarise avec des analogies du quotidien et pose des questions ouvertes pour faire reflechir <<GUEST>>.
+- "guest" = <<GUEST>> : eleve qui pose les "pourquoi" et demande des precisions quand quelque chose n'est pas clair.
+Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche, pas en debut de replique). Exemple : "Tu peux me redire pourquoi <<HOST>> ?". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
 6-8 repliques. Ton ludique, engageant, naturel. <<AGE_INSTRUCTION>>
 
 STRUCTURE :
-- Accroche : Alex pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
-- Developpement : alternance Alex/Zoe avec progression logique. Zoe relance par des questions, Alex repond avec des exemples concrets.
+- Accroche : <<HOST>> pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
+- Developpement : alternance <<HOST>>/<<GUEST>> avec progression logique. <<GUEST>> relance par des questions, <<HOST>> repond avec des exemples concrets.
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 <<SOURCE_REFS(podcast)>>

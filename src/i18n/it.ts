@@ -41,6 +41,8 @@ export const it: Record<string, string> = {
     'Contenuto troppo lungo ({pct}% della capacita del modello). Seleziona meno fonti.',
 
   'errorCode.internal_error': 'Errore interno del server',
+  'errorCode.no_sources': 'Nessuna fonte disponibile',
+  'errorCode.auth_required': 'Chiave API Mistral mancante o non valida',
   'errorCode.tts_upstream_error': 'Errore del servizio audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota superata, riprova tra poco',
   'errorCode.upstream_unavailable': 'Servizio temporaneamente non disponibile, riprova presto',
@@ -48,6 +50,8 @@ export const it: Record<string, string> = {
   'errorCode.llm_invalid_json': "Risposta non valida dell'IA",
   'errorCode.upload_failed': 'Caricamento non riuscito',
   'errorCode.all_steps_failed': 'Tutte le generazioni sono fallite',
+  'errorCode.profile_delete_partial':
+    'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',
 
   'header.menuProjects': 'Menu progetti',
   'header.switchToLight': 'Passa alla modalit\u00e0 chiara',
@@ -103,7 +107,6 @@ export const it: Record<string, string> = {
   'settings.aiModel': 'Generazione',
   'settings.aiModelHint': 'Usato per schede, flashcards, quiz, podcast e chat',
   'settings.recommended': 'Consigliato',
-  'settings.voiceTts': 'Voci',
   'settings.voiceHost': 'Principale',
   'settings.voiceGuest': 'Secondaria',
   'emotion.Angry': 'Arrabbiato',
@@ -119,8 +122,6 @@ export const it: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarcasmo',
   'emotion.Shameful': 'Vergognoso',
-  'settings.mistralVoicesHint':
-    'Voci Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Scheda',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -277,6 +278,8 @@ export const it: Record<string, string> = {
   'podcast.lines': '({count} battute)',
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts': 'Configura MISTRAL_API_KEY nel file .env per abilitare i podcast audio',
+  'podcast.speakerHost': 'Conduttore',
+  'podcast.speakerGuest': 'Ospite',
 
   'image.heading': 'Illustrazioni',
   'image.new': 'Illustra',
@@ -364,6 +367,8 @@ export const it: Record<string, string> = {
   'toast.generationError': 'La generazione non \u00e8 riuscita. Riprova tra poco.',
   'toast.allGenerated': 'Tutto generato!',
   'toast.partialGenerated': '{count}/3 generazioni riuscite',
+  'toast.profilesPartial':
+    '{count} profilo(i) nascosto(i) — file corrotto lato server, contatta un amministratore',
   'toast.magicDone': 'Magia completata!',
   'toast.autoError': 'La generazione automatica non \u00e8 riuscita. Riprova.',
   'toast.audioDone': 'Audio generato!',
@@ -432,7 +437,7 @@ export const it: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personalizza le voci per i contenuti audio (podcast, quiz vocali, lettura)',
   'profile.voiceDefault': 'Predefinito (in base alla lingua)',
-  'profile.voiceCurrentDefault': 'Predefinito per i campi lasciati su \u00abPredefinito\u00bb:',
+  'profile.voiceDefaultSuffix': '(predefinita)',
   'profile.resetDefaults': 'Ripristina',
   'profile.backToProfiles': 'Indietro',
 

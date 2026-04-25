@@ -41,6 +41,8 @@ export const pt: Record<string, string> = {
     'Conteudo muito longo ({pct}% da capacidade do modelo). Selecione menos fontes.',
 
   'errorCode.internal_error': 'Erro interno do servidor',
+  'errorCode.no_sources': 'Nenhuma fonte disponivel',
+  'errorCode.auth_required': 'Chave API Mistral ausente ou invalida',
   'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
   'errorCode.upstream_unavailable':
@@ -49,6 +51,8 @@ export const pt: Record<string, string> = {
   'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
   'errorCode.upload_failed': 'Falha no envio',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
+  'errorCode.profile_delete_partial':
+    'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
@@ -104,7 +108,6 @@ export const pt: Record<string, string> = {
   'settings.aiModel': 'Geração',
   'settings.aiModelHint': 'Usado para fichas, flashcards, quiz, podcast e chat',
   'settings.recommended': 'Recomendado',
-  'settings.voiceTts': 'Vozes',
   'settings.voiceHost': 'Principal',
   'settings.voiceGuest': 'Secund\u00e1ria',
   'emotion.Angry': 'Com raiva',
@@ -120,8 +123,6 @@ export const pt: Record<string, string> = {
   'emotion.Sad': 'Triste',
   'emotion.Sarcasm': 'Sarc\u00e1stico',
   'emotion.Shameful': 'Envergonhado',
-  'settings.mistralVoicesHint':
-    'Vozes Mistral: Marie, Oliver, Nick, Margaret, Sanchit, Angele, Gustavo, Khyathi, Yassir, Patrick',
   'settings.summary': 'Ficha',
   'settings.flashcards': 'Flashcards',
   'settings.quiz': 'Quiz',
@@ -281,6 +282,8 @@ export const pt: Record<string, string> = {
   'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
     'Configure MISTRAL_API_KEY no arquivo .env para habilitar podcasts com \u00e1udio',
+  'podcast.speakerHost': 'Apresentador',
+  'podcast.speakerGuest': 'Convidado',
 
   'image.heading': 'Ilustra\u00e7\u00f5es',
   'image.new': 'Ilustrar',
@@ -371,6 +374,8 @@ export const pt: Record<string, string> = {
   'toast.generationError': 'A gera\u00e7\u00e3o falhou. Tenta de novo daqui a pouco.',
   'toast.allGenerated': 'Tudo gerado!',
   'toast.partialGenerated': '{count}/3 gera\u00e7\u00f5es conclu\u00eddas',
+  'toast.profilesPartial':
+    '{count} perfil(is) oculto(s) \u2014 ficheiro corrompido no servidor, contacta um administrador',
   'toast.magicDone': 'Magia conclu\u00edda!',
   'toast.autoError': 'A gera\u00e7\u00e3o autom\u00e1tica falhou. Tenta de novo.',
   'toast.audioDone': '\u00c1udio gerado!',
@@ -440,7 +445,7 @@ export const pt: Record<string, string> = {
   'profile.voicePreferencesHint':
     'Personalize as vozes para conteudo de audio (podcasts, quiz vocais, leitura)',
   'profile.voiceDefault': 'Padrao (de acordo com o idioma)',
-  'profile.voiceCurrentDefault': 'Padr\u00e3o para campos em \u00abPadr\u00e3o\u00bb:',
+  'profile.voiceDefaultSuffix': '(padrão)',
   'profile.resetDefaults': 'Reiniciar',
   'profile.backToProfiles': 'Voltar',
 

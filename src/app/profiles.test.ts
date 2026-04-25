@@ -455,6 +455,8 @@ describe('createProfiles', () => {
         'fetch',
         vi.fn().mockResolvedValue({
           ok: false,
+          status: 403,
+          statusText: 'Forbidden',
           json: () => Promise.resolve({ error: 'Bad PIN' }),
         }),
       );
@@ -464,7 +466,28 @@ describe('createProfiles', () => {
       });
       await callMethod('updateProfile', ctx, 'p1', { name: 'X' });
 
-      expect(ctx.showToast).toHaveBeenCalledWith('Bad PIN', 'error');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+    });
+
+    it('shows error toast on non-ok response without err.error (5xx HTML, 413, parse fail)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          statusText: 'Bad Gateway',
+          // body sans .error (proxy HTML, parse fail catché en {})
+          json: () => Promise.resolve({}),
+        }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice' }],
+      });
+      await callMethod('updateProfile', ctx, 'p1', { name: 'X' });
+
+      // Toast surfacé même sans .error — fix C1 : silent-fail empêché
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
     });
 
     it('shows error toast on fetch failure', async () => {
@@ -547,6 +570,48 @@ describe('createProfiles', () => {
       callMethod('startEditProfile', ctx, 'nonexistent');
 
       expect(ctx.editingProfile).toBeNull();
+    });
+
+    it('normalizes partial mistralVoices (host only) to both-keys-as-string', () => {
+      // Regression: avec le fallback `|| { host: '', guest: '' }`, un profil
+      // {mistralVoices: {host: 'v1'}} laissait editingProfile.mistralVoices.guest
+      // === undefined, ce qui casse le binding Alpine x-model sur <select> (la
+      // <option value=""> default n'est pas sélectionnée).
+      const ctx = makeCtx({
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Alice',
+            hasPin: false,
+            locale: 'fr',
+            mistralVoices: { host: 'custom-host' },
+          },
+        ],
+      });
+      callMethod('startEditProfile', ctx, 'p1');
+      expect(ctx.editingProfile.mistralVoices).toEqual({
+        host: 'custom-host',
+        guest: '',
+      });
+    });
+
+    it('normalizes partial mistralVoices (guest only) to both-keys-as-string', () => {
+      const ctx = makeCtx({
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Alice',
+            hasPin: false,
+            locale: 'fr',
+            mistralVoices: { guest: 'custom-guest' },
+          },
+        ],
+      });
+      callMethod('startEditProfile', ctx, 'p1');
+      expect(ctx.editingProfile.mistralVoices).toEqual({
+        host: '',
+        guest: 'custom-guest',
+      });
     });
   });
 
@@ -1250,6 +1315,26 @@ describe('createProfiles', () => {
       expect(ctx.showProfilePicker).toBe(true);
     });
 
+    it('surface une erreur serveur (500) via toast au lieu de silencieux picker vide', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 500,
+          statusText: 'Internal Server Error',
+          json: () => Promise.resolve({ error: 'internal_error' }),
+        }),
+      );
+      const ctx = makeCtx();
+      ctx.selectProfile = vi.fn();
+      ctx.showToast = vi.fn();
+
+      await callMethod('loadProfiles', ctx);
+
+      expect(ctx.showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+      expect(ctx.profiles).toEqual([]);
+    });
+
     it('selects first profile when no saved ID exists', async () => {
       const profileList = [
         { id: 'p1', name: 'Alice', locale: 'fr' },
@@ -1301,6 +1386,43 @@ describe('createProfiles', () => {
       // Profile should NOT be removed since res.ok was false
       expect(ctx.profiles).toHaveLength(1);
       expect(ctx.showToast).toHaveBeenCalledWith(expect.stringContaining('toast.error'), 'error');
+      vi.stubGlobal('fetch', vi.fn());
+    });
+
+    it('does not finalize local state on partial profile delete failure', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          statusText: 'Internal Server Error',
+          json: async () => ({
+            error: 'profile_delete_partial',
+            deletedProjects: 1,
+            failedProjects: ['project-2'],
+          }),
+        }),
+      );
+      const profile = { id: 'p-del', name: 'Test', hasPin: false };
+      let deletePromise: Promise<void> | undefined;
+      const ctx = makeCtx({
+        profiles: [profile],
+        currentProfile: { id: 'p-del' },
+        t: vi.fn((key: string, params?: Record<string, string>) => {
+          if (key === 'errorCode.profile_delete_partial') return 'Partial delete translated';
+          if (key === 'toast.error') return `Error: ${params?.error}`;
+          return key;
+        }),
+        confirmDelete: vi.fn((_msg: string, cb: () => void) => {
+          deletePromise = cb() as any;
+        }),
+      });
+
+      callMethod('deleteProfile', ctx, 'p-del');
+      await deletePromise;
+
+      expect(ctx.profiles).toEqual([profile]);
+      expect(clearProfileLocale).not.toHaveBeenCalledWith('p-del');
+      expect(ctx.showToast).toHaveBeenCalledWith('Error: Partial delete translated', 'error');
       vi.stubGlobal('fetch', vi.fn());
     });
   });
@@ -1375,7 +1497,7 @@ describe('createProfiles', () => {
       expect(ctx.updateProfile).toHaveBeenCalledWith(
         'p1',
         expect.objectContaining({
-          mistralVoices: { host: 'custom-host', guest: '' },
+          mistralVoices: { host: 'custom-host' },
         }),
         expect.any(AbortSignal),
       );
