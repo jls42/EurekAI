@@ -43,21 +43,26 @@ let lastLoadFailed = false;
 const isPlainObject = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
 
-function mergeSafe(saved: unknown): AppConfig {
+interface MergeResult {
+  config: AppConfig;
+  shapeInvalid: boolean;
+}
+
+function mergeSafe(saved: unknown): MergeResult {
   if (!isPlainObject(saved)) {
-    logger.warn(
-      'config',
-      `invalid shape for config root (got ${Array.isArray(saved) ? 'array' : typeof saved}), resetting`,
-    );
-    return { ...DEFAULT_CONFIG };
+    logger.warn('config', `invalid shape for config root (got ${describeShape(saved)}), resetting`);
+    return { config: { ...DEFAULT_CONFIG }, shapeInvalid: true };
   }
   const savedModels = isPlainObject(saved.models)
     ? (saved.models as Partial<AppConfig['models']>)
     : logAndFallback('models', saved.models);
   return {
-    ...DEFAULT_CONFIG,
-    ...saved,
-    models: { ...DEFAULT_CONFIG.models, ...savedModels },
+    config: {
+      ...DEFAULT_CONFIG,
+      ...saved,
+      models: { ...DEFAULT_CONFIG.models, ...savedModels },
+    },
+    shapeInvalid: false,
   };
 }
 
@@ -93,7 +98,11 @@ function loadSavedConfig(): { config: AppConfig; loadFailed: boolean } {
     return { config: { ...DEFAULT_CONFIG }, loadFailed: true };
   }
   try {
-    return { config: mergeSafe(JSON.parse(raw)), loadFailed: false };
+    const merged = mergeSafe(JSON.parse(raw));
+    // shapeInvalid : JSON parsait, mais la racine n'était pas un plain object
+    // (`null`/`array`/`scalaire`). Symétrie avec ProfileStore.list() : on flag loadFailed
+    // pour que le prochain saveConfig crée un .corrupt.bak avant overwrite.
+    return { config: merged.config, loadFailed: merged.shapeInvalid };
   } catch (e) {
     logger.error(
       'config',
@@ -180,41 +189,36 @@ const removeLegacyGlobalVoiceFields = (): boolean => {
 // const arrow (pas function) : contournement parseur TS Lizard qui agglomère les
 // `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const persistConfig = (): void => {
-  // Calcul du reset avant le write : on garde lastLoadFailed=true si le backup
-  // a échoué, pour retenter au prochain save. Si le writeFileSync lui-même throw
-  // (ENOSPC/EACCES), le reset n'est jamais appliqué → prochain appel retentera
-  // le backup ET le write sur le même fichier corrompu préservé.
-  //
   // Idempotence cross-cycle (miroir de ProfileStore.save) : si `.corrupt.bak` existe
   // déjà (cycle précédent non résolu), on NE l'écrase PAS avec la nouvelle corruption
   // — on préserve le post-mortem d'origine. Conséquence assumée : seul le premier
   // backup par cycle corrompu est conservé (idem profiles.ts).
-  let shouldResetFlag = !lastLoadFailed;
-  if (lastLoadFailed) {
-    if (!existsSync(configPath)) {
-      shouldResetFlag = true;
+  //
+  // Reset du flag : on reset systématiquement après un writeFileSync réussi,
+  // même si le backup `.corrupt.bak` a échoué. Rationale : après le write, le
+  // contenu corrompu d'origine n'existe plus sur disque (overwrite). Garder
+  // lastLoadFailed=true risquerait de backup le NOUVEAU contenu (valide) comme
+  // `.corrupt.bak` au prochain cycle. Si writeFileSync lui-même throw, l'exception
+  // se propage avant le reset → flag préservé → retry correct au prochain save.
+  if (lastLoadFailed && existsSync(configPath)) {
+    const backupPath = `${configPath}.corrupt.bak`;
+    if (existsSync(backupPath)) {
+      logger.info('config', `backup ${backupPath} already exists, skipping copy`);
     } else {
-      const backupPath = `${configPath}.corrupt.bak`;
-      if (existsSync(backupPath)) {
-        logger.info('config', `backup ${backupPath} already exists, skipping copy`);
-        shouldResetFlag = true;
-      } else {
-        try {
-          copyFileSync(configPath, backupPath);
-          logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
-          shouldResetFlag = true;
-        } catch (e) {
-          logger.warn(
-            'config',
-            'could not create .corrupt.bak backup (keeping flag for retry):',
-            e,
-          );
-        }
+      try {
+        copyFileSync(configPath, backupPath);
+        logger.info('config', `backup corrupt config.json -> ${backupPath} before overwrite`);
+      } catch (e) {
+        logger.warn(
+          'config',
+          'could not create .corrupt.bak backup (corrupt content will be lost on overwrite):',
+          e,
+        );
       }
     }
   }
   writeFileSync(configPath, JSON.stringify(currentConfig, null, 2));
-  if (shouldResetFlag) lastLoadFailed = false;
+  lastLoadFailed = false;
 };
 
 export function initConfig(outputDir: string): void {
@@ -321,6 +325,8 @@ export function setVoiceCache(voices: MistralVoice[]): void {
   voiceCacheReady = voices.length > 0;
 }
 
+const VOICE_SELECTION_LOG = 'voice-selection';
+
 // Résout host + guest via le helper partagé selectVoices, avec logging des fallbacks.
 // Retourne null si voiceCache est entièrement vide (cas dégradé).
 const resolveMistralDefaults = (
@@ -334,13 +340,19 @@ const resolveMistralDefaults = (
     profileId: profileId ?? undefined,
   });
   if (!result) {
-    logger.warn('voice-selection', `no voice available (lang=${lang}, flow=${flow})`);
+    logger.warn(VOICE_SELECTION_LOG, `no voice available (lang=${lang}, flow=${flow})`);
     return null;
   }
   if (result.source !== 'lang-match') {
     logger.info(
-      'voice-selection',
+      VOICE_SELECTION_LOG,
       `fallback lang_input=${lang} lang_matched=${result.langMatched ?? 'none'} source=${result.source} bucketSize=${result.bucketSize} flow=${flow}`,
+    );
+  }
+  if (result.singleSpeakerBucket) {
+    logger.warn(
+      VOICE_SELECTION_LOG,
+      `single-speaker bucket: host==guest (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — podcast jouera les deux rôles avec la même voix`,
     );
   }
   return { host: result.host, guest: result.guest };

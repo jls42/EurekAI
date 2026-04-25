@@ -154,6 +154,33 @@ describe('initConfig', () => {
   // couvre la sortie via idempotence, et la branche throw reste documentée par le
   // commentaire de persistConfig (CLAUDE.md "Persistance config.json").
 
+  // Symétrie avec ProfileStore : un JSON syntaxiquement valide mais avec une racine
+  // non-objet (`null`, `array`, `scalaire`) doit aussi déclencher loadFailed=true et
+  // créer un .corrupt.bak avant overwrite — sinon la save suivante perd silencieusement
+  // le contenu user d'origine.
+  it('shape-invalide racine (array) → loadFailed=true → .corrupt.bak créé au prochain saveConfig', () => {
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    const shapeInvalid = '[1, 2, 3]';
+    writeFileSync(configPath, shapeInvalid);
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(getConfig().models.summary).toBe('mistral-large-latest'); // DEFAULT
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    expect(existsSync(backupPath)).toBe(true);
+    expect(readFileSync(backupPath, 'utf-8')).toBe(shapeInvalid);
+  });
+
+  it('shape-invalide racine (scalaire) → backup créé', () => {
+    const configPath = join(tempDir, 'config.json');
+    const backupPath = `${configPath}.corrupt.bak`;
+    writeFileSync(configPath, '"just a string"');
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    initConfig(tempDir);
+    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    expect(existsSync(backupPath)).toBe(true);
+  });
+
   it('backup existe déjà (cycle précédent) → préservé, pas écrasé par nouvelle corruption', () => {
     const configPath = join(tempDir, 'config.json');
     const backupPath = `${configPath}.corrupt.bak`;
