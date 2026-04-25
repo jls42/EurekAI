@@ -374,7 +374,7 @@ describe('resolveVoices', () => {
     resolveVoices({
       profileVoices,
       lang,
-      profileId: null,
+      profileId: undefined,
       flow: 'podcast',
     });
 
@@ -480,5 +480,86 @@ describe('resolveVoices', () => {
     ]);
     const voices = resolve({ host: asVoiceId('custom-h'), guest: asVoiceId('custom-g') }, 'en');
     expect(voices).toEqual({ host: 'custom-h', guest: 'custom-g' });
+  });
+
+  it('warn `single-speaker bucket` quand bucket résolu ne contient qu un seul personnage', () => {
+    // Bucket FR avec 2 voix Marie variantes (même speakerName, ids distincts) →
+    // sameCharacterBucket=true via le helper, le warn doit fire au niveau orchestrateur.
+    setVoiceCache([
+      {
+        id: asVoiceId('marie-excited'),
+        name: 'Marie - Excited',
+        languages: ['fr_fr'],
+        tags: ['excited'],
+        gender: 'female',
+      },
+      {
+        id: asVoiceId('marie-curious'),
+        name: 'Marie - Curious',
+        languages: ['fr_fr'],
+        tags: ['curious'],
+        gender: 'female',
+      },
+    ]);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    resolveVoices({ lang: 'fr', profileId: undefined, flow: 'podcast' });
+    const matched = warnSpy.mock.calls.some(
+      (c) =>
+        c[0] === 'voice-selection' &&
+        typeof c[1] === 'string' &&
+        c[1].includes('single-speaker bucket') &&
+        c[1].includes('flow=podcast'),
+    );
+    expect(matched).toBe(true);
+    warnSpy.mockRestore();
+  });
+
+  it('log fallback inclut le token flow quand lang inconnu retombe sur EN', () => {
+    setVoiceCache([
+      {
+        id: asVoiceId('jane-confident'),
+        name: 'Jane - Confident',
+        languages: ['en_us'],
+        tags: ['confident'],
+        gender: 'female',
+      },
+      {
+        id: asVoiceId('oliver-curious'),
+        name: 'Oliver - Curious',
+        languages: ['en_us'],
+        tags: ['curious'],
+      },
+    ]);
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    resolveVoices({ lang: 'hi', profileId: undefined, flow: 'read-aloud' });
+    const matched = infoSpy.mock.calls.some(
+      (c) =>
+        c[0] === 'voice-selection' &&
+        typeof c[1] === 'string' &&
+        c[1].includes('flow=read-aloud') &&
+        c[1].includes('source=en-fallback'),
+    );
+    expect(matched).toBe(true);
+    infoSpy.mockRestore();
+  });
+});
+
+describe('migration legacy ttsModel observability', () => {
+  it('logger.info trace le mapping eleven_* -> voxtral-mini-tts-latest', () => {
+    const configPath = join(tempDir, 'config.json');
+    writeFileSync(
+      configPath,
+      JSON.stringify({ models: {}, ttsModel: 'eleven_multilingual_v2' }, null, 2),
+    );
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    const matched = infoSpy.mock.calls.some(
+      (c) =>
+        c[0] === 'config' &&
+        typeof c[1] === 'string' &&
+        c[1].includes("ttsModel 'eleven_multilingual_v2' -> 'voxtral-mini-tts-latest'"),
+    );
+    expect(matched).toBe(true);
+    infoSpy.mockRestore();
   });
 });

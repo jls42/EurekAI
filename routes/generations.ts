@@ -230,7 +230,7 @@ function resolveReadAloudContext(
   const voices = resolveVoices({
     profileVoices: profile?.mistralVoices,
     lang: lang || profile?.locale || 'fr',
-    profileId: profileId ?? null,
+    profileId,
     flow: 'read-aloud',
   });
   const ttsOpts = {

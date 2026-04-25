@@ -369,7 +369,7 @@ export function generateRoutes(
           resolveVoices({
             profileVoices: ctx.profileVoices,
             lang: ctx.lang,
-            profileId: ctx.profileId ?? null,
+            profileId: ctx.profileId,
             flow: 'podcast',
           }),
           { model: ctx.config.ttsModel, mistralClient: client },
@@ -474,7 +474,7 @@ export function generateRoutes(
         const hostVoice = resolveVoices({
           profileVoices: ctx.profileVoices,
           lang: ctx.lang,
-          profileId: ctx.profileId ?? null,
+          profileId: ctx.profileId,
           flow: QUIZ_VOCAL,
         }).host;
         const ttsOpts = {
@@ -677,7 +677,7 @@ export function generateRoutes(
         resolveVoices({
           profileVoices: ctx.profileVoices,
           lang: ctx.lang,
-          profileId: ctx.profileId ?? null,
+          profileId: ctx.profileId,
           flow: 'podcast',
         }),
         { model: ctx.config.ttsModel, mistralClient: ctx.client },
@@ -719,7 +719,7 @@ export function generateRoutes(
       const hostVoice = resolveVoices({
         profileVoices: ctx.profileVoices,
         lang: ctx.lang,
-        profileId: ctx.profileId ?? null,
+        profileId: ctx.profileId,
         flow: QUIZ_VOCAL,
       }).host;
       const ttsOpts = {

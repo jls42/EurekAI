@@ -42,10 +42,18 @@ export interface VoiceSelectionResult {
   /** Langue effectivement matchée (bucket). Null si fallback 'any'. */
   langMatched: string | null;
   /**
-   * True si host === guest (bucket avec un seul speaker distinct). Le podcast
-   * jouera les deux rôles avec la même voix — l'appelant peut logger.warn.
+   * True si host.id === guest.id (bucket avec une seule voix). Cas extrême :
+   * podcast joue les deux rôles avec exactement la même piste audio.
    */
   singleSpeakerBucket: boolean;
+  /**
+   * True si host et guest partagent le même speakerName (même personnage), même
+   * quand leurs IDs diffèrent (variantes émotionnelles : Marie-Excited / Marie-Curious).
+   * Couvre singleSpeakerBucket + le cas où le bucket d'une langue ne contient qu'un
+   * seul personnage avec plusieurs émotions — l'auditeur perçoit toujours "la même
+   * personne". L'appelant peut logger.warn pour observabilité.
+   */
+  sameCharacterBucket: boolean;
 }
 
 // Ordre de préférence pour les tags émotionnels. Score = meilleur tag match (pas sommé) ;
@@ -192,6 +200,7 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
       bucketSize: resolved.bucket.length,
       langMatched: resolved.langMatched,
       singleSpeakerBucket: preferred[0].id === preferred[1].id,
+      sameCharacterBucket: speakerName(preferred[0]) === speakerName(preferred[1]),
     };
   }
   // Seed basé sur la langue effectivement retenue: pt-BR et pt restent stables,
@@ -210,5 +219,6 @@ export function selectVoices(input: VoiceSelectionInput): VoiceSelectionResult |
     bucketSize: resolved.bucket.length,
     langMatched: resolved.langMatched,
     singleSpeakerBucket: host.id === guest.id,
+    sameCharacterBucket: speakerName(host) === speakerName(guest),
   };
 }

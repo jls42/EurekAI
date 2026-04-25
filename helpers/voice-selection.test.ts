@@ -255,6 +255,38 @@ describe('selectVoices', () => {
       const res = selectVoices({ voices, lang: 'fr' });
       expect(res?.singleSpeakerBucket).toBe(false);
     });
+
+    it('flag sameCharacterBucket=true quand 2 voix partagent le speakerName (variantes)', () => {
+      // Marie-Excited + Marie-Curious : ids distincts mais même personnage.
+      const voices = [
+        makeVoice({
+          id: 'marie-excited',
+          name: 'Marie - Excited',
+          languages: ['de_DE'], // langue sans curated pair pour exercer la rotation
+          tags: ['excited'],
+          gender: 'female',
+        }),
+        makeVoice({
+          id: 'marie-curious',
+          name: 'Marie - Curious',
+          languages: ['de_DE'],
+          tags: ['curious'],
+          gender: 'female',
+        }),
+      ];
+      const res = selectVoices({ voices, lang: 'de' });
+      expect(res?.singleSpeakerBucket).toBe(false);
+      expect(res?.sameCharacterBucket).toBe(true);
+    });
+
+    it('flag sameCharacterBucket=false quand 2 personnages distincts', () => {
+      const voices = [
+        makeVoice({ id: 'jane', name: 'Jane - Confident', languages: ['de_DE'] }),
+        makeVoice({ id: 'oliver', name: 'Oliver - Curious', languages: ['de_DE'] }),
+      ];
+      const res = selectVoices({ voices, lang: 'de' });
+      expect(res?.sameCharacterBucket).toBe(false);
+    });
   });
 
   describe('deterministic rotation by profileId', () => {

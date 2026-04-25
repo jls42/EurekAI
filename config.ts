@@ -331,13 +331,13 @@ const VOICE_SELECTION_LOG = 'voice-selection';
 // Retourne null si voiceCache est entièrement vide (cas dégradé).
 const resolveMistralDefaults = (
   lang: string,
-  profileId: string | null,
+  profileId: string | undefined,
   flow: VoiceFlow,
 ): { host: VoiceId; guest: VoiceId } | null => {
   const result = selectVoices({
     voices: voiceCache,
     lang,
-    profileId: profileId ?? undefined,
+    profileId,
   });
   if (!result) {
     logger.warn(VOICE_SELECTION_LOG, `no voice available (lang=${lang}, flow=${flow})`);
@@ -349,10 +349,10 @@ const resolveMistralDefaults = (
       `fallback lang_input=${lang} lang_matched=${result.langMatched ?? 'none'} source=${result.source} bucketSize=${result.bucketSize} flow=${flow}`,
     );
   }
-  if (result.singleSpeakerBucket) {
+  if (result.sameCharacterBucket) {
     logger.warn(
       VOICE_SELECTION_LOG,
-      `single-speaker bucket: host==guest (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — podcast jouera les deux rôles avec la même voix`,
+      `single-speaker bucket: host et guest partagent le même personnage (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — podcast jouera les deux rôles avec la même voix`,
     );
   }
   return { host: result.host, guest: result.guest };
@@ -361,7 +361,10 @@ const resolveMistralDefaults = (
 export interface ResolveVoicesArgs {
   profileVoices?: { host?: VoiceId; guest?: VoiceId };
   lang: string;
-  profileId: string | null;
+  // `string` (profile actif) ou `undefined` (anonyme/sans profil). Pas de `null` :
+  // un seul sentinel "absent" simplifie les call sites — sinon chacun fait `?? null`
+  // alors que selectVoices attend `?: string`. Le typechecker garde le champ obligatoire.
+  profileId: string | undefined;
   flow: VoiceFlow;
 }
 
