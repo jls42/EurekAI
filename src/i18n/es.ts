@@ -41,6 +41,8 @@ export const es: Record<string, string> = {
     'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
 
   'errorCode.internal_error': 'Error interno del servidor',
+  'errorCode.no_sources': 'Ninguna fuente disponible',
+  'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',
@@ -364,6 +366,8 @@ export const es: Record<string, string> = {
   'toast.generationError': 'La generaci\u00f3n fall\u00f3. Int\u00e9ntalo de nuevo en un momento.',
   'toast.allGenerated': '\u00a1Todo generado!',
   'toast.partialGenerated': '{count}/3 generaciones exitosas',
+  'toast.profilesPartial':
+    '{count} perfil(es) oculto(s) — archivo corrupto en servidor, contacta un administrador',
   'toast.magicDone': '\u00a1Magia completada!',
   'toast.autoError': 'La generaci\u00f3n autom\u00e1tica fall\u00f3. Int\u00e9ntalo de nuevo.',
   'toast.audioDone': '\u00a1Audio generado!',

@@ -48,6 +48,8 @@ export const ar: Record<string, string> = {
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.no_sources': 'لا يوجد مصدر متاح',
+  'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
   'errorCode.quota_exceeded': 'تم تجاوز الحصة، أعد المحاولة لاحقا',
   'errorCode.upstream_unavailable': 'الخدمة غير متاحة مؤقتا، أعد المحاولة قريبا',
@@ -489,6 +491,8 @@ export const ar: Record<string, string> = {
     '\u062a\u0645\u0651 \u062a\u0648\u0644\u064a\u062f \u0627\u0644\u0643\u0644!',
   'toast.partialGenerated':
     '\u0646\u062c\u062d {count}/3 \u0639\u0645\u0644\u064a\u0627\u062a \u062a\u0648\u0644\u064a\u062f',
+  'toast.profilesPartial':
+    '\u0625\u062e\u0641\u0627\u0621 {count} \u0645\u0644\u0641(\u0627\u062a) \u0634\u062e\u0635\u064a \u2014 \u0645\u0644\u0641 \u062e\u0627\u062f\u0645 \u062a\u0627\u0644\u0641\u060c \u0627\u062a\u0635\u0644 \u0628\u0627\u0644\u0645\u0633\u0624\u0648\u0644',
   'toast.magicDone': '\u0627\u0643\u062a\u0645\u0644 \u0627\u0644\u0633\u062d\u0631!',
   'toast.autoError':
     '\u0641\u0634\u0644 \u0627\u0644\u062a\u0648\u0644\u064a\u062f \u0627\u0644\u062a\u0644\u0642\u0627\u0626\u064a. \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.',

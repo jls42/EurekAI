@@ -100,11 +100,9 @@ describe('profileRoutes', () => {
       // Mocke ProfileStore.list au niveau prototype : couvre tous les profileRoutes
       // créés ensuite. Sans le wrapper handle(), Express renverrait une stacktrace HTML
       // qui peut fuiter le filePath absolu (~/.eurekai/output/profiles.json) en dev.
-      const listSpy = vi
-        .spyOn(ProfileStore.prototype, 'list')
-        .mockImplementation(() => {
-          throw new Error('ENOSPC: no space left on device');
-        });
+      const listSpy = vi.spyOn(ProfileStore.prototype, 'list').mockImplementation(() => {
+        throw new Error('ENOSPC: no space left on device');
+      });
 
       const buggyRouter = profileRoutes(tmpDir, projectStore);
       const handler = getHandler(buggyRouter, 'get', '/');

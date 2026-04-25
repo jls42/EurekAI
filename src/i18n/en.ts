@@ -40,6 +40,8 @@ export const en: Record<string, string> = {
   'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'errorCode.internal_error': 'Internal server error',
+  'errorCode.no_sources': 'No source available',
+  'errorCode.auth_required': 'Missing or invalid Mistral API key',
   'errorCode.tts_upstream_error': 'Audio service error (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota exceeded, try again shortly',
   'errorCode.upstream_unavailable': 'Service temporarily unavailable, please retry soon',
@@ -366,6 +368,7 @@ export const en: Record<string, string> = {
   'toast.generationError': 'Generation failed. Try again in a moment.',
   'toast.allGenerated': 'All generated!',
   'toast.partialGenerated': '{count}/3 generations succeeded',
+  'toast.profilesPartial': '{count} profile(s) hidden — corrupt server-side file, contact an admin',
   'toast.magicDone': 'Magic complete!',
   'toast.autoError': 'Automatic generation failed. Try again.',
   'toast.audioDone': 'Audio generated!',

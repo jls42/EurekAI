@@ -5,8 +5,6 @@ import type { AgeGroup, Profile } from './types.js';
 import type { VoiceId } from './helpers/voice-types.js';
 import { logger } from './helpers/logger.js';
 
-// --- Age group derivation ---
-
 export function ageToGroup(age: number): AgeGroup {
   if (age <= 10) return 'enfant';
   if (age <= 15) return 'ado';
@@ -14,9 +12,6 @@ export function ageToGroup(age: number): AgeGroup {
   return 'adulte';
 }
 
-// --- Defaults per age group ---
-
-// All categories available from mistral-moderation-latest
 export const ALL_MODERATION_CATEGORIES = [
   'sexual',
   'hate_and_discrimination',
@@ -30,7 +25,6 @@ export const ALL_MODERATION_CATEGORIES = [
   'jailbreaking',
 ] as const;
 
-// Default blocked categories per age group
 // dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
 export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {
   enfant: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
@@ -52,8 +46,6 @@ export const AGE_GROUP_CONFIG: Record<
   etudiant: { moderationDefault: false, consigneDefault: false, chatDefault: true },
   adulte: { moderationDefault: false, consigneDefault: false, chatDefault: true },
 };
-
-// --- PIN helpers ---
 
 export function hashPin(pin: string): string {
   return createHash('sha256').update(pin).digest('hex');
@@ -186,12 +178,17 @@ export class ProfileStore {
   // d'un profiles.json corrompu sans backup, en forçant un `.corrupt.bak` au prochain
   // save. Réinitialisé à false dès qu'un load réussit ou qu'un backup a été créé.
   private lastLoadFailed = false;
+  // Compte des entrées droppées au dernier list() (rows malformées + migrations échouées).
+  // Permet aux routes de surfacer un signal au frontend (header X-Profiles-Dropped)
+  // sinon le user voit un picker partiel sans savoir que des profils ont été masqués.
+  private lastDroppedCount = 0;
 
   constructor(outputDir: string) {
     this.filePath = join(outputDir, 'profiles.json');
   }
 
   list(): Profile[] {
+    this.lastDroppedCount = 0;
     if (!existsSync(this.filePath)) {
       this.lastLoadFailed = false;
       return [];
@@ -199,6 +196,10 @@ export class ProfileStore {
     const parsed = this.readAndParse();
     if (parsed === null) return [];
     return this.migrateAndPersist(parsed);
+  }
+
+  getLastDroppedCount(): number {
+    return this.lastDroppedCount;
   }
 
   // Scinde le catch monolithique : JSON.parse fail = vraie corruption, shape invalide
@@ -244,30 +245,58 @@ export class ProfileStore {
     return valid;
   }
 
-  private migrateAndPersist(profiles: Profile[]): Profile[] {
-    const valid = this.filterValidEntries(profiles);
-    let migrated = valid.length !== profiles.length;
-    for (const p of valid) {
+  // Itérer sur une copie : valid peut être muté par splice (drop on throw), et `for…of`
+  // standard saute alors l'entrée d'après. Retourne {migrated, droppedByMigration}.
+  // migrateProfile peut throw sur des shapes hostiles qui passent le typeof object
+  // (ex: champ obligatoire manquant lu comme undefined → cascade TypeError) — on drop
+  // l'entrée IN-MEMORY mais on N'EFFACE PAS la donnée du disque (caller-side).
+  // Arrow class field plutôt que `private method()` : casse l'agglomération du parseur
+  // TS Lizard avec migrateAndPersist (cf. CLAUDE.md "Pièges connus").
+  private migrateInPlace = (
+    valid: Profile[],
+  ): { migrated: boolean; droppedByMigration: boolean } => {
+    let migrated = false;
+    let droppedByMigration = false;
+    for (const p of [...valid]) {
       try {
         if (migrateProfile(p)) migrated = true;
       } catch (e) {
-        // migrateProfile peut throw sur des shapes hostiles qui passent le typeof object
-        // (ex: champ obligatoire manquant lu comme undefined → cascade de TypeError).
-        // On drop l'entrée plutôt que crasher tout le load.
         logger.warn('profiles', `dropped entry id=${p.id ?? '<no-id>'} (migration failed):`, e);
         const idx = valid.indexOf(p);
         if (idx >= 0) valid.splice(idx, 1);
-        migrated = true;
+        droppedByMigration = true;
       }
     }
+    return { migrated, droppedByMigration };
+  };
+
+  private migrateAndPersist(profiles: Profile[]): Profile[] {
+    const before = profiles.length;
+    const valid = this.filterValidEntries(profiles);
+    const filterDropped = valid.length !== profiles.length;
+    const { migrated: migratedFromLoop, droppedByMigration } = this.migrateInPlace(valid);
+    this.lastDroppedCount = before - valid.length;
     this.lastLoadFailed = false;
-    if (migrated) {
+    // Drops par migration (throw) : NE save PAS la liste filtrée, sinon les profils
+    // corrompus seraient définitivement perdus du disque. Le user perd l'accès tant
+    // qu'un correctif n'est pas déployé, mais ses données restent inspectables.
+    if (droppedByMigration) return valid;
+    // Drops par filterValidEntries (rows non-object : null, primitive, array imbriqué) :
+    // forcer le backup AVANT que `lastLoadFailed` soit reset à false (ligne au-dessus
+    // ou via le save() qui suit). Sans ce déclenchement explicite ici, save() ne
+    // backuperait pas car `diskStillCorrupt()` ne vérifie que `Array.isArray`, pas
+    // le contenu — un fichier `[null, {valid}]` passe le shape check mais on a perdu
+    // la row malformée. Idempotent via backupCorrupt() (skip si déjà créé).
+    if (filterDropped && existsSync(this.filePath)) {
+      this.backupCorrupt();
+    }
+    if (filterDropped || migratedFromLoop) {
       try {
         this.save(valid);
       } catch (e) {
-        // Migration auto-save failure : on ne re-throw pas (le load de base reste
-        // valide en mémoire), mais on log.error pour observabilité. L'appelant obtient
-        // les profiles migrés même si la persistence a échoué.
+        // Migration auto-save failure : on ne re-throw pas (le load reste valide en
+        // mémoire), log.error pour observabilité. La prochaine save() user-initiée
+        // tentera à nouveau (idempotent en pratique).
         logger.error('profiles', 'migration persist failed (continuing in-memory):', e);
       }
     }
@@ -313,7 +342,10 @@ export class ProfileStore {
       copyFileSync(this.filePath, backupPath);
       logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
     } catch (e) {
-      logger.warn(
+      // logger.error (pas warn) : on est sur le chemin "fichier corrompu va être
+      // écrasé sans backup possible" — perte de données réelle, pas une simple
+      // condition warn. Sévérité ERROR alignée sur config.ts:217 (même cas).
+      logger.error(
         'profiles',
         'failed to create .corrupt.bak (corrupt content will be lost on overwrite):',
         e,
@@ -388,10 +420,14 @@ export class ProfileStore {
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
     if (updates.mistralVoices !== undefined) {
       // Accepte uniquement null (reset) ou objet structuré. Primitives (string/number/
-      // boolean) sont rejetées avec warn — sans ça, un client buggé qui POSTe
-      // `mistralVoices: "Marie"` reçoit 200 OK alors que sa voix est silencieusement
-      // ignorée. Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
-      if (updates.mistralVoices === null || typeof updates.mistralVoices === 'object') {
+      // boolean) ET arrays sont rejetés avec warn — sans ça, un client buggé qui POSTe
+      // `mistralVoices: "Marie"` ou `mistralVoices: []` recevrait 200 OK alors que ses
+      // voix existantes seraient écrasées (typeof [] === 'object', donc passerait dans
+      // normalizeMistralVoices qui retournerait undefined faute de host/guest).
+      // Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
+      if (Array.isArray(updates.mistralVoices)) {
+        logger.warn('profiles', 'update: rejected array mistralVoices payload');
+      } else if (updates.mistralVoices === null || typeof updates.mistralVoices === 'object') {
         profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
       } else {
         logger.warn(

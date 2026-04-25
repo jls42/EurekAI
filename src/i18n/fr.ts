@@ -45,6 +45,8 @@ export const fr: Record<string, string> = {
 
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
+  'errorCode.no_sources': 'Aucune source disponible',
+  'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
   'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',
@@ -391,6 +393,8 @@ export const fr: Record<string, string> = {
   'toast.generationError': 'La génération a échoué. Réessaye dans un instant.',
   'toast.allGenerated': 'Tout généré !',
   'toast.partialGenerated': '{count}/3 générations réussies',
+  'toast.profilesPartial':
+    '{count} profil(s) masqué(s) — fichier corrompu côté serveur, contacte un admin',
   'toast.magicDone': 'Magie terminée !',
   'toast.autoError': 'La génération automatique a échoué. Réessaye.',
   'toast.audioDone': 'Audio généré !',

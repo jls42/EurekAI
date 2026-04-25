@@ -282,6 +282,29 @@ describe('generateRoutes', () => {
       expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
     });
 
+    it('returns 400 no_sources when sourceIds match nothing', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({
+        params: { pid },
+        body: { sourceIds: ['nonexistent-source-id'], lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+    });
+
     it('does not block when moderation status is safe', async () => {
       const profile = profileStore.create('Kid', 9, '0', 'fr');
       const project = store.createProject('Test', profile.id);
@@ -1014,6 +1037,38 @@ describe('generateRoutes', () => {
       expect(gen.sourceIds).toEqual(['src-1']);
     });
 
+    it('returns 400 no_sources when original quiz references missing sources', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      // Aucune source ajoutée -> sourceIds du quiz original sont orphelins
+      store.addGeneration(pid, {
+        id: 'gen-quiz',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['ghost-src'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const req = mockReq({
+        params: { pid },
+        body: {
+          generationId: 'gen-quiz',
+          weakQuestions: [
+            { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
+          ],
+          lang: 'fr',
+        },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+    });
+
     it('uses English label for review when lang=en', async () => {
       const project = store.createProject('Test');
       const pid = project.meta.id;
@@ -1115,6 +1170,29 @@ describe('generateRoutes', () => {
       const serialized = JSON.stringify(res.json.mock.calls[0][0]);
       expect(serialized).not.toContain('sk-1234');
       expect(serialized).not.toContain('api.internal');
+    });
+
+    it('returns 400 no_sources when sourceIds match nothing', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const req = mockReq({
+        params: { pid },
+        body: { sourceIds: ['ghost'], lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
     });
 
     it('applies consigne when present and useConsigne is not false', async () => {

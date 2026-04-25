@@ -23,6 +23,22 @@ interface RawCreateProfileBody {
   pin?: unknown;
 }
 
+// Champs acceptés à la création (cf. buildCreateProfileArgs). Tout autre champ est
+// silencieusement ignoré par store.create — un client UI stale qui POSTerait
+// `mistralVoices` ou `theme` croirait avoir setté une valeur. On warn pour signaler
+// le drop, symétrique au warn dans store.update().
+const CREATE_PROFILE_ALLOWED_FIELDS = new Set(['name', 'age', 'avatar', 'locale', 'pin']);
+
+const warnUnknownCreateFields = (body: Record<string, unknown>): void => {
+  const unknown = Object.keys(body).filter((k) => !CREATE_PROFILE_ALLOWED_FIELDS.has(k));
+  if (unknown.length > 0) {
+    logger.warn(
+      'profiles',
+      `POST /: ignored fields not supported on creation: ${unknown.join(', ')}`,
+    );
+  }
+};
+
 export interface CreateProfileBody {
   name: string;
   age: number;
@@ -81,16 +97,28 @@ const pinMismatch = (profile: ProfileRecord, pin: unknown): boolean =>
 const isStaleWrite = (profile: ProfileRecord, updatedAt: unknown): boolean =>
   !!updatedAt && !!profile.updatedAt && (updatedAt as string) < profile.updatedAt;
 
-const cascadeDeleteProjects = (projectStore: ProjectStore, profileId: string): number => {
+// Cascade isolée par projet : un fail rmSync (EBUSY/EACCES Windows, FS RO) ou
+// writeIndex throw n'interrompt plus la boucle — on collecte les ids restants pour
+// que le client puisse réessayer. Avant cette protection, le compteur retourné dans
+// la 200 OK mentait sur les projets effectivement supprimés.
+const cascadeDeleteProjects = (
+  projectStore: ProjectStore,
+  profileId: string,
+): { deleted: number; failed: string[] } => {
   const projects = projectStore.listProjects(profileId);
   let deleted = 0;
+  const failed: string[] = [];
   for (const p of projects) {
-    if (p.profileId === profileId) {
+    if (p.profileId !== profileId) continue;
+    try {
       projectStore.deleteProject(p.id);
       deleted++;
+    } catch (e) {
+      logger.warn('profiles', `cascade delete failed for project ${p.id}:`, e);
+      failed.push(p.id);
     }
   }
-  return deleted;
+  return { deleted, failed };
 };
 
 export function profileRoutes(outputDir: string, projectStore: ProjectStore): Router {
@@ -102,23 +130,40 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
   // exposer le path absolu ~/.eurekai/output/profiles.json. Pattern aligné sur
   // routes/generate.ts (extractErrorCode + logger.error côté serveur).
   // Le générique préserve l'inférence Express<P, ...> pour que req.params.id reste typé `string`.
+  // Garde-fou async : si un futur handler retourne une Promise, on attache un .catch()
+  // — le `try/catch` sync ne capturerait sinon que le throw synchrone et un async error
+  // remonterait au error-handler Express par défaut (fuite path en dev).
+  const reportHandlerError = (req: Request, res: Response, e: unknown) => {
+    logger.error('profiles', `${req.method} ${req.url} error:`, e);
+    if (!res.headersSent) {
+      res.status(500).json({ error: extractErrorCode(e, 'profiles') });
+    }
+  };
   const handle =
-    <H extends (req: Request, res: Response) => void>(fn: H) =>
+    <H extends (req: Request, res: Response) => void | Promise<void>>(fn: H) =>
     (req: Parameters<H>[0], res: Parameters<H>[1]) => {
       try {
-        fn(req, res);
-      } catch (e) {
-        logger.error('profiles', `${req.method} ${req.url} error:`, e);
-        if (!res.headersSent) {
-          res.status(500).json({ error: extractErrorCode(e, 'profiles') });
+        const result = fn(req, res) as unknown;
+        if (result && typeof (result as Promise<unknown>).then === 'function') {
+          (result as Promise<unknown>).catch((e) => reportHandlerError(req, res, e));
         }
+      } catch (e) {
+        reportHandlerError(req, res, e);
       }
     };
 
   router.get(
     '/',
     handle((_req, res) => {
-      res.json(store.list().map(profileToPublic));
+      const profiles = store.list().map(profileToPublic);
+      // Signal au frontend les entrées masquées (rows malformées, migration failed) —
+      // sinon le user voit un picker partiel sans savoir que des profils existent
+      // sur disque mais ne sont pas exposés (cf. PR review I3).
+      const dropped = store.getLastDroppedCount();
+      if (dropped > 0) {
+        res.setHeader('X-Profiles-Dropped', String(dropped));
+      }
+      res.json(profiles);
     }),
   );
 
@@ -130,6 +175,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
         res.status(400).json({ error: validationError });
         return;
       }
+      warnUnknownCreateFields(req.body);
       const profile = store.create(...buildCreateProfileArgs(req.body));
       res.json(profileToPublic(profile));
     }),
@@ -187,13 +233,28 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
           return;
         }
       }
-      const deletedProjects = cascadeDeleteProjects(projectStore, profileId);
+      // Delete profile AVANT cascade : si store.delete fail (race avec un autre DELETE,
+      // corruption détectée à la save), on ne touche pas aux projets. Sinon le user
+      // verrait "404 Profil introuvable" alors que ses projets ont déjà été supprimés.
       const ok = store.delete(profileId);
       if (!ok) {
         res.status(404).json({ error: ERR_PROFILE_NOT_FOUND });
         return;
       }
-      res.json({ ok: true, deletedProjects });
+      const { deleted, failed } = cascadeDeleteProjects(projectStore, profileId);
+      if (failed.length > 0) {
+        logger.warn(
+          'profiles',
+          `${failed.length} project(s) orphaned after profile ${profileId} delete: ${failed.join(', ')}`,
+        );
+      }
+      const response: {
+        ok: true;
+        deletedProjects: number;
+        failedProjects?: string[];
+      } = { ok: true, deletedProjects: deleted };
+      if (failed.length > 0) response.failedProjects = failed;
+      res.json(response);
     }),
   );
 

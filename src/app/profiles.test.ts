@@ -455,6 +455,8 @@ describe('createProfiles', () => {
         'fetch',
         vi.fn().mockResolvedValue({
           ok: false,
+          status: 403,
+          statusText: 'Forbidden',
           json: () => Promise.resolve({ error: 'Bad PIN' }),
         }),
       );
@@ -464,7 +466,28 @@ describe('createProfiles', () => {
       });
       await callMethod('updateProfile', ctx, 'p1', { name: 'X' });
 
-      expect(ctx.showToast).toHaveBeenCalledWith('Bad PIN', 'error');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+    });
+
+    it('shows error toast on non-ok response without err.error (5xx HTML, 413, parse fail)', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: false,
+          status: 502,
+          statusText: 'Bad Gateway',
+          // body sans .error (proxy HTML, parse fail catché en {})
+          json: () => Promise.resolve({}),
+        }),
+      );
+
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice' }],
+      });
+      await callMethod('updateProfile', ctx, 'p1', { name: 'X' });
+
+      // Toast surfacé même sans .error — fix C1 : silent-fail empêché
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
     });
 
     it('shows error toast on fetch failure', async () => {

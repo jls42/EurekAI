@@ -346,6 +346,93 @@ describe('ProfileStore.list', () => {
     );
   });
 
+  it('crée .corrupt.bak quand filterValidEntries drop des rows non-object avant overwrite', () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    const backupPath = `${profilesPath}.corrupt.bak`;
+    const validProfile = {
+      id: 'p1',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      moderationCategories: [],
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    // Mix valide + null (legacy row) — déclenche filterValidEntries drop + auto-save
+    writeFileSync(profilesPath, JSON.stringify([validProfile, null, 'legacy-string']));
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // Le profil valide est gardé
+    expect(result.find((p) => p.id === 'p1')).toBeTruthy();
+    // .corrupt.bak existe et contient la version originale (avec null + 'legacy-string')
+    expect(existsSync(backupPath)).toBe(true);
+    const backupContent = JSON.parse(readFileSync(backupPath, 'utf-8'));
+    expect(backupContent).toHaveLength(3);
+    expect(backupContent[1]).toBeNull();
+    expect(backupContent[2]).toBe('legacy-string');
+  });
+
+  it('preserves on-disk data when migrateProfile throws (no auto-save of dropped entries)', async () => {
+    const profilesPath = join(tempDir, 'profiles.json');
+    // Crée 2 profils valides via le store, lit le disque, puis remplace par un fichier
+    // contenant 2 entrées dont 1 fait crasher migrateProfile.
+    const baseProfile = {
+      id: 'good',
+      name: 'Alice',
+      age: 9,
+      ageGroup: 'enfant',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: true,
+      moderationCategories: [],
+      useConsigne: true,
+      chatEnabled: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    const hostileEntry = {
+      id: 'bad',
+      // age manquant + ageGroup invalide → MODERATION_CATEGORIES[p.ageGroup] → undefined
+      // → spread d'un undefined throw "is not iterable"
+      ageGroup: 'unknown-group',
+      avatar: '0',
+      locale: 'fr',
+      useModeration: false,
+      useConsigne: false,
+      chatEnabled: true,
+      createdAt: new Date().toISOString(),
+    };
+    writeFileSync(profilesPath, JSON.stringify([baseProfile, hostileEntry]));
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const freshStore = new ProfileStore(tempDir);
+    const result = freshStore.list();
+
+    // L'entrée hostile est droppée IN-MEMORY, le profile valide reste
+    expect(result.find((p) => p.id === 'good')).toBeTruthy();
+    expect(result.find((p) => p.id === 'bad')).toBeFalsy();
+    expect(warnSpy).toHaveBeenCalledWith(
+      'profiles',
+      expect.stringContaining('migration failed'),
+      expect.anything(),
+    );
+    // Le disque doit conserver les 2 entrées d'origine — pas d'auto-save destructif
+    const onDisk = JSON.parse(readFileSync(profilesPath, 'utf-8'));
+    expect(Array.isArray(onDisk)).toBe(true);
+    expect(onDisk).toHaveLength(2);
+    expect(onDisk.find((p: { id: string }) => p.id === 'bad')).toBeTruthy();
+  });
+
   // I4: race window — corrupt file deleted between list() and first save().
   // Flag doit être reset quand même, sinon la 2e save backuperait des données
   // valides comme .corrupt.bak.
@@ -532,6 +619,26 @@ describe('ProfileStore.update', () => {
     warnSpy.mockRestore();
   });
 
+  it('rejette mistralVoices: [] sans écraser les voix existantes', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ArrayUser', 12);
+    store.update(p.id, {
+      mistralVoices: { host: asVoiceId('keep-host'), guest: asVoiceId('keep-guest') },
+    });
+
+    const updated = store.update(p.id, {
+      mistralVoices: [] as unknown as { host?: VoiceId; guest?: VoiceId },
+    });
+
+    // Les voix existantes ne sont PAS effacées par un payload array stale
+    expect(updated!.mistralVoices).toEqual({ host: 'keep-host', guest: 'keep-guest' });
+    const warnedArray = warnSpy.mock.calls.some(
+      (c) => typeof c[1] === 'string' && c[1].includes('rejected array mistralVoices'),
+    );
+    expect(warnedArray).toBe(true);
+    warnSpy.mockRestore();
+  });
+
   it('updates theme', () => {
     const p = store.create('ThemeUser', 10);
     expect(p.theme).toBeUndefined();
@@ -544,6 +651,25 @@ describe('ProfileStore.update', () => {
     store.update(p.id, { theme: 'light' });
     const updated = store.update(p.id, { theme: '' as any });
     expect(updated!.theme).toBeUndefined();
+  });
+
+  // Sentinel reset = null doit comporter comme '' / undefined : reset silencieux
+  // (pas de warn). Verrou pour qu'un futur durcissement de applyTheme ne casse pas
+  // le contrat avec le frontend qui POSTe `theme: null` via buildProfileUpdates.
+  it('clears theme when set to null (sentinel reset, no warn)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ThemeUser4', 10);
+    store.update(p.id, { theme: 'dark' });
+    const updated = store.update(p.id, { theme: null as any });
+    expect(updated!.theme).toBeUndefined();
+    const themeWarn = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes('rejected invalid theme'),
+    );
+    expect(themeWarn).toBe(false);
+    warnSpy.mockRestore();
   });
 
   it('theme invalide: logger.warn et valeur courante préservée (drop non silencieux)', () => {

@@ -41,6 +41,8 @@ export const de: Record<string, string> = {
     'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
 
   'errorCode.internal_error': 'Interner Serverfehler',
+  'errorCode.no_sources': 'Keine Quelle verfuegbar',
+  'errorCode.auth_required': 'Mistral-API-Schluessel fehlt oder ungueltig',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
   'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
   'errorCode.upstream_unavailable':
@@ -369,6 +371,8 @@ export const de: Record<string, string> = {
   'toast.generationError': 'Die Generierung ist fehlgeschlagen. Versuch es gleich noch einmal.',
   'toast.allGenerated': 'Alles generiert!',
   'toast.partialGenerated': '{count}/3 Generierungen erfolgreich',
+  'toast.profilesPartial':
+    '{count} Profil(e) ausgeblendet — beschädigte Datei auf Server, kontaktiere einen Admin',
   'toast.magicDone': 'Magie abgeschlossen!',
   'toast.autoError': 'Die automatische Generierung ist fehlgeschlagen. Versuch es erneut.',
   'toast.audioDone': 'Audio generiert!',

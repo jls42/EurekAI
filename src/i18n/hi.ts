@@ -45,6 +45,8 @@ export const hi: Record<string, string> = {
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
+  'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
   'errorCode.quota_exceeded': 'कोटा समाप्त, कुछ समय बाद पुनः प्रयास करें',
   'errorCode.upstream_unavailable': 'सेवा अस्थायी रूप से अनुपलब्ध, जल्द ही पुनः प्रयास करें',
@@ -499,6 +501,8 @@ export const hi: Record<string, string> = {
   'toast.allGenerated': '\u0938\u092C \u092C\u0928 \u0917\u090F!',
   'toast.partialGenerated':
     '{count}/3 \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0938\u092B\u0932 \u0939\u0941\u090F',
+  'toast.profilesPartial':
+    '{count} \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u091B\u093F\u092A\u093E\u090F \u0917\u090F \u2014 \u0938\u0930\u094D\u0935\u0930 \u092A\u0930 \u092B\u093C\u093E\u0907\u0932 \u0926\u0942\u0937\u093F\u0924, \u0935\u094D\u092F\u0935\u0938\u094D\u0925\u093E\u092A\u0915 \u0938\u0947 \u0938\u0902\u092A\u0930\u094D\u0915 \u0915\u0930\u0947\u0902',
   'toast.magicDone': '\u091C\u093E\u0926\u0942 \u092A\u0942\u0930\u093E \u0939\u0941\u0906!',
   'toast.autoError':
     '\u0911\u091F\u094B \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0935\u093F\u092B\u0932\u0964 \u0926\u094B\u092C\u093E\u0930\u093E \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u094B\u0964',
