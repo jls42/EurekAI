@@ -107,6 +107,31 @@ function normalizeMistralVoices(
   return { ...(host ? { host } : {}), ...(guest ? { guest } : {}) };
 }
 
+// Filtre et warn les catégories inconnues. Extraction depuis update() pour
+// limiter la cognitive complexity Sonar et isoler la responsabilité.
+const applyModerationCategories = (raw: string[]): string[] => {
+  const allowed = ALL_MODERATION_CATEGORIES as readonly string[];
+  const rejected = raw.filter((c) => !allowed.includes(c));
+  if (rejected.length > 0) {
+    logger.warn(
+      'profiles',
+      `update: rejected unknown moderation categories: ${rejected.join(', ')}`,
+    );
+  }
+  return raw.filter((c) => allowed.includes(c));
+};
+
+// Mute le profile.theme si valide ('dark' | 'light' | falsy=undefined), sinon
+// warn. Extraction symétrique à applyModerationCategories.
+const applyTheme = (profile: Profile, theme: 'dark' | 'light' | undefined): void => {
+  const isValid = !theme || theme === 'dark' || theme === 'light';
+  if (isValid) {
+    profile.theme = theme || undefined;
+  } else {
+    logger.warn('profiles', `update: rejected invalid theme '${theme}'`);
+  }
+};
+
 function migrateProfile(p: Profile): boolean {
   let changed = false;
   if (!p.locale) {
@@ -210,25 +235,23 @@ export class ProfileStore {
 
   private save(profiles: Profile[]) {
     // Si le boot précédent a détecté un fichier corrompu, tenter un backup `.corrupt.bak`
-    // avant overwrite. Fichier supprimé manuellement entre list() et save() : reset OK
-    // (rien à préserver). Backup échoue : on garde le flag à true pour retenter au
-    // prochain save. Write échoue : flag préservé quel que soit le cas.
-    let shouldResetFlag = !this.lastLoadFailed;
-    if (this.lastLoadFailed) {
-      if (!existsSync(this.filePath)) {
-        shouldResetFlag = true;
-      } else {
-        const backupPath = `${this.filePath}.corrupt.bak`;
-        if (existsSync(backupPath)) {
-          shouldResetFlag = true;
-        } else {
-          try {
-            copyFileSync(this.filePath, backupPath);
-            logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
-            shouldResetFlag = true;
-          } catch (e) {
-            logger.warn('profiles', 'failed to create .corrupt.bak (keeping flag for retry):', e);
-          }
+    // avant overwrite. Fichier supprimé manuellement entre list() et save() : rien à backup.
+    // Reset systématique après writeFileSync réussi (miroir config.ts) : si write throw,
+    // l'exception propage avant le reset → flag préservé → retry correct au prochain save.
+    // Si write réussit mais backup avait échoué, le contenu corrompu est de toute façon
+    // perdu (overwrite) — garder le flag risquerait de backup le NOUVEAU contenu valide.
+    if (this.lastLoadFailed && existsSync(this.filePath)) {
+      const backupPath = `${this.filePath}.corrupt.bak`;
+      if (!existsSync(backupPath)) {
+        try {
+          copyFileSync(this.filePath, backupPath);
+          logger.warn('profiles', `backed up corrupt profiles.json to ${backupPath}`);
+        } catch (e) {
+          logger.warn(
+            'profiles',
+            'failed to create .corrupt.bak (corrupt content will be lost on overwrite):',
+            e,
+          );
         }
       }
     }
@@ -238,7 +261,7 @@ export class ProfileStore {
       logger.error('profiles', 'failed to persist profiles.json:', e);
       throw e;
     }
-    if (shouldResetFlag) this.lastLoadFailed = false;
+    this.lastLoadFailed = false;
   }
 
   create(
@@ -302,10 +325,7 @@ export class ProfileStore {
     if (updates.locale !== undefined) profile.locale = updates.locale;
     if (updates.useModeration !== undefined) profile.useModeration = updates.useModeration;
     if (updates.moderationCategories !== undefined) {
-      const valid = updates.moderationCategories.filter((c) =>
-        (ALL_MODERATION_CATEGORIES as readonly string[]).includes(c),
-      );
-      profile.moderationCategories = valid;
+      profile.moderationCategories = applyModerationCategories(updates.moderationCategories);
     }
     if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
     if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
@@ -315,11 +335,8 @@ export class ProfileStore {
     ) {
       profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
     }
-    if (
-      updates.theme !== undefined &&
-      (!updates.theme || updates.theme === 'dark' || updates.theme === 'light')
-    ) {
-      profile.theme = updates.theme || undefined;
+    if (updates.theme !== undefined) {
+      applyTheme(profile, updates.theme);
     }
     if (updates.age !== undefined) {
       profile.age = updates.age;

@@ -476,6 +476,22 @@ describe('ProfileStore.update', () => {
     expect(updated!.theme).toBeUndefined();
   });
 
+  it('theme invalide: logger.warn et valeur courante préservée (drop non silencieux)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('ThemeUser3', 10);
+    store.update(p.id, { theme: 'dark' });
+    const updated = store.update(p.id, { theme: 'midnight' as any });
+    expect(updated!.theme).toBe('dark');
+    const matched = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes("rejected invalid theme 'midnight'"),
+    );
+    expect(matched).toBe(true);
+    warnSpy.mockRestore();
+  });
+
   it('returns null for unknown id', () => {
     expect(store.update('nonexistent', { name: 'X' })).toBeNull();
   });
@@ -639,6 +655,22 @@ describe('ProfileStore.update moderationCategories', () => {
     const p = store.create('Test2', 9);
     const updated = store.update(p.id, { moderationCategories: ['sexual', 'fake_category'] });
     expect(updated!.moderationCategories).toEqual(['sexual']);
+  });
+
+  it('logger.warn liste les catégories rejetées (drop non silencieux)', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('Test3', 9);
+    store.update(p.id, { moderationCategories: ['sexual', 'TYPO', 'selfharm', 'BAD'] });
+    const matched = warnSpy.mock.calls.some(
+      (call) =>
+        call[0] === 'profiles' &&
+        typeof call[1] === 'string' &&
+        call[1].includes('rejected unknown moderation categories') &&
+        call[1].includes('TYPO') &&
+        call[1].includes('BAD'),
+    );
+    expect(matched).toBe(true);
+    warnSpy.mockRestore();
   });
 
   it('allows empty array to disable all categories', () => {
