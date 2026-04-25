@@ -424,7 +424,8 @@ describe('ProfileStore.list', () => {
     expect(warnSpy).toHaveBeenCalledWith(
       'profiles',
       expect.stringContaining('migration failed'),
-      expect.anything(),
+      expect.anything(), // id ou '<no-id>'
+      expect.anything(), // erreur
     );
     // Le disque doit conserver les 2 entrées d'origine — pas d'auto-save destructif
     const onDisk = JSON.parse(readFileSync(profilesPath, 'utf-8'));

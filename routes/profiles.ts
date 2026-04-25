@@ -150,7 +150,10 @@ const cascadeDeleteProjects = (
       projectStore.deleteProject(p.id);
       deleted++;
     } catch (e) {
-      logger.warn('profiles', `cascade delete failed for project ${p.id}:`, e);
+      // Logger args list (pas de template literal) : évite le faux positif Codacy
+      // 'tainted-sql-string' qui flagge ${p.id} dans un string contenant 'delete'.
+      // Pas de SQL ici, mais la rule pattern-match sur keyword + user input.
+      logger.warn('profiles', 'cascade delete failed for project', p.id, e);
       failed.push(p.id);
     }
   }

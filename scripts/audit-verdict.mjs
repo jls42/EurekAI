@@ -11,13 +11,27 @@ export function computeAuditVerdict(rawJson) {
   } catch {
     return 'parse-error';
   }
+  const shapeVerdict = classifyShape(parsed);
+  if (shapeVerdict) return shapeVerdict;
+  return classifyVulnerabilities(parsed.metadata.vulnerabilities);
+}
+
+// Détecte les shapes top-level non-vulnérabilités : `error` (npm offline/proxy down) ou
+// metadata absente (réponse partielle / JSON null). Retourne null si la shape attendue
+// `metadata.vulnerabilities` est présente — laisse classifyVulnerabilities décider.
+// Découpée pour tenir computeAuditVerdict sous la limite CCN 8 (Codacy mesure ~13 sinon).
+function classifyShape(parsed) {
   if (parsed && typeof parsed === 'object' && parsed.error) {
     return 'transport:' + (parsed.error.code || '?');
   }
   if (!parsed || !parsed.metadata || !parsed.metadata.vulnerabilities) {
     return 'no-metadata';
   }
-  const count = coerceCriticalCount(parsed.metadata.vulnerabilities.critical);
+  return null;
+}
+
+function classifyVulnerabilities(vulnerabilities) {
+  const count = coerceCriticalCount(vulnerabilities.critical);
   if (count === null) return 'parse-error';
   return count > 0 ? 'critical:' + count : 'ok';
 }

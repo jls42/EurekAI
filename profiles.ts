@@ -245,25 +245,26 @@ export class ProfileStore {
     return valid;
   }
 
-  // Itérer sur une copie : valid peut être muté par splice (drop on throw), et `for…of`
-  // standard saute alors l'entrée d'après. Retourne {migrated, droppedByMigration}.
-  // migrateProfile peut throw sur des shapes hostiles qui passent le typeof object
-  // (ex: champ obligatoire manquant lu comme undefined → cascade TypeError) — on drop
-  // l'entrée IN-MEMORY mais on N'EFFACE PAS la donnée du disque (caller-side).
-  // Arrow class field plutôt que `private method()` : casse l'agglomération du parseur
-  // TS Lizard avec migrateAndPersist (cf. CLAUDE.md "Pièges connus").
-  private migrateInPlace = (
+  // Boucle inversée plutôt que `for…of [...valid]` : permet `splice(i, 1)` safe sans
+  // cloner le tableau (Sonar L260) tout en évitant le skip d'entrée que produirait un
+  // `for…of` direct + splice en avant. migrateProfile peut throw sur des shapes hostiles
+  // qui passent le typeof object (ex: champ obligatoire manquant → cascade TypeError) —
+  // on drop l'entrée IN-MEMORY mais on N'EFFACE PAS la donnée du disque (caller-side).
+  // `readonly` sur l'arrow field : Sonar L255 + intention immutable. Arrow plutôt que
+  // `private method()` : casse l'agglomération du parseur TS Lizard avec migrateAndPersist
+  // (cf. CLAUDE.md "Pièges connus").
+  private readonly migrateInPlace = (
     valid: Profile[],
   ): { migrated: boolean; droppedByMigration: boolean } => {
     let migrated = false;
     let droppedByMigration = false;
-    for (const p of [...valid]) {
+    for (let i = valid.length - 1; i >= 0; i--) {
+      const p = valid[i];
       try {
         if (migrateProfile(p)) migrated = true;
       } catch (e) {
-        logger.warn('profiles', `dropped entry id=${p.id ?? '<no-id>'} (migration failed):`, e);
-        const idx = valid.indexOf(p);
-        if (idx >= 0) valid.splice(idx, 1);
+        logger.warn('profiles', 'dropped entry (migration failed) id=', p.id ?? '<no-id>', e);
+        valid.splice(i, 1);
         droppedByMigration = true;
       }
     }
