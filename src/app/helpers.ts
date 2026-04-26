@@ -8,6 +8,20 @@ const TEXT_TEXT_SECONDARY = 'text-text-secondary';
 const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
 
+// Types Generation suivis par le pending tracker (cf. types.ts TrackedGenerationType).
+// Garde locale pour éviter d'importer un type runtime côté Alpine — la définition
+// reste single-source côté types.ts et toute évolution casse à compile-time les
+// call sites qui s'écarteraient.
+const TRACKED_TYPES: ReadonlySet<string> = new Set([
+  'summary',
+  'flashcards',
+  'quiz',
+  'podcast',
+  'quiz-vocal',
+  'image',
+  'fill-blank',
+]);
+
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
 function extractItemRefs(item: ItemWithRefs | null | undefined): string[] {
   if (!item) return [];
@@ -460,13 +474,55 @@ export function createHelpers() {
       return colors[index % colors.length];
     },
 
+    // 7 types Generation persistés. Pour ces types, isLoading consulte
+    // pendingById en plus de loading[type] — permet de couvrir les pendings
+    // hydratés depuis le tracker serveur (refresh, multi-onglets, /generate/auto).
+    // Les autres types (auto/all/voice/websearch) restent purement booléens
+    // dans loading{} car ils ne produisent pas de Generation persistée.
+    hasPendingOfType(this: AppContext, type: string): boolean {
+      return Object.values(this.pendingById).some(
+        (p) => p.type === type && p.status === 'pending',
+      );
+    },
+
+    isLoading(this: AppContext, type: string): boolean {
+      if (TRACKED_TYPES.has(type)) {
+        return this.loading[type] === true || this.hasPendingOfType(type);
+      }
+      return this.loading[type] === true;
+    },
+
+    canStartGenerate(this: AppContext, type: string): boolean {
+      return !this.isLoading(type);
+    },
+
+    // Idempotence côté client : remplace une Generation existante au même id,
+    // sinon push. Évite les doublons quand le payload 200 fallback ET l'event
+    // SSE 'completed' arrivent tous les deux dans le même onglet.
+    upsertGenerationById(this: AppContext, gen: Generation): void {
+      const idx = this.generations.findIndex((g) => g.id === gen.id);
+      if (idx === -1) this.generations.push(gen);
+      else this.generations[idx] = gen;
+    },
+
     isGenerating(this: AppContext) {
-      return Object.values(this.loading).some(Boolean);
+      const pendingValues = Object.values(this.pendingById ?? {});
+      return (
+        Object.values(this.loading).some(Boolean) ||
+        pendingValues.some((p) => p.status === 'pending')
+      );
     },
 
     activeGenerations(
       this: AppContext,
     ): Array<{ key: string; label: string; color: string; icon: string }> {
+      // Fallback `?? {}` pour les tests qui mockent un AppContext partiel sans
+      // pendingById. En prod, Alpine merge tout dans le state du composant.
+      const pendings = Object.values(this.pendingById ?? {});
+      const isActiveType = (key: string): boolean =>
+        this.loading[key] === true ||
+        (TRACKED_TYPES.has(key) && pendings.some((p) => p.type === key && p.status === 'pending'));
+
       const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
         auto: { labelKey: 'gen.auto', icon: 'sparkles', color: COLOR_PRIMARY },
         voice: { labelKey: 'gen.voice', icon: 'volume-2', color: COLOR_ACCENT },
@@ -474,7 +530,7 @@ export function createHelpers() {
       };
       const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
       for (const cat of this.categories) {
-        if (this.loading[cat.key]) {
+        if (isActiveType(cat.key)) {
           result.push({
             key: cat.key,
             label: this.t('gen.' + cat.key),
@@ -484,7 +540,7 @@ export function createHelpers() {
         }
       }
       for (const [key, meta] of Object.entries(EXTRA_KEYS)) {
-        if (this.loading[key]) {
+        if (isActiveType(key)) {
           result.push({ key, label: this.t(meta.labelKey), color: meta.color, icon: meta.icon });
         }
       }

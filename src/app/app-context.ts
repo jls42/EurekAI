@@ -193,6 +193,10 @@ export interface AppContext extends AppState {
   projectColor(index: number): string;
   isGenerating(): boolean;
   activeGenerations(): Array<{ key: string; label: string; color: string; icon: string }>;
+  hasPendingOfType(type: string): boolean;
+  isLoading(type: string): boolean;
+  canStartGenerate(type: string): boolean;
+  upsertGenerationById(gen: Generation): void;
   getQuizScores(): Array<{
     gen: Generation;
     lastScore: number;

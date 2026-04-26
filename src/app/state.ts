@@ -7,6 +7,7 @@ import type {
   ProjectMeta,
   Source,
   ChatMessage,
+  PendingTrackerEntry,
 } from '../../types';
 import type { Toast } from './toast';
 
@@ -116,8 +117,30 @@ export function createState() {
       websearch: false,
     } as Record<string, boolean>,
 
-    // AbortControllers for cancellation
+    // AbortControllers for cancellation (legacy par type, conservé pour le commit
+    // pending lifecycle qui migrera vers abortControllersByGid).
     abortControllers: {} as Record<string, AbortController>,
+
+    // --- Pending lifecycle (post-PR) ---
+    // Source de vérité pour les 7 Generation persistées. Multi-pendings même type
+    // possibles (multi-onglets, /generate/auto parallel). Hydraté depuis
+    // project.results.pendingTracker au selectProject + via events SSE.
+    pendingById: {} as Record<string, PendingTrackerEntry>,
+
+    // AbortControllers indexés par gid (UUID v4 généré côté client) — permet de
+    // cibler précisément un pending à canceller même quand plusieurs pendings du
+    // même type coexistent.
+    abortControllersByGid: {} as Record<string, AbortController>,
+
+    // Dédup toast UI per-tab (mémoire onglet, non persistée). Combiné avec
+    // appendNotification (dédup persistée localStorage), garantit qu'un même
+    // eventKey produit max 1 toast UI par onglet ET max 1 notif persistée
+    // cross-tabs (cf. notifications.ts).
+    shownToastEventKeys: new Set<string>(),
+
+    // Compteur incrémenté à chaque appendNotification réussi pour déclencher
+    // la reactivity Alpine sur la cloche header (badge unread + liste).
+    notificationsVersion: 0,
 
     // Settings
     showSettings: false,
