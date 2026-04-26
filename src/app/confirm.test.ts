@@ -12,6 +12,9 @@ function makeContext(overrides: any = {}) {
     confirmCallback: null as (() => void) | null,
     confirmTrigger: null as any,
     abortControllers: {} as Record<string, AbortController>,
+    abortControllersByGid: {} as Record<string, AbortController>,
+    pendingById: {} as Record<string, any>,
+    currentProjectId: 'pid-1',
     loading: {
       summary: false,
       flashcards: false,
