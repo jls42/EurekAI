@@ -10,6 +10,8 @@ import type {
   FailedStep,
   FailedStepCode,
   Consigne,
+  TrackedGenerationType,
+  PendingTrackerEntry,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -34,8 +36,8 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
-const QUIZ_VOCAL = 'quiz-vocal';
-const FILL_BLANK = 'fill-blank';
+const QUIZ_VOCAL = 'quiz-vocal' as const;
+const FILL_BLANK = 'fill-blank' as const;
 const ROUTER_MODEL = 'mistral-small-latest';
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -262,46 +264,159 @@ function validateQuizReviewInputs(
   };
 }
 
+interface HandleGenerationOptions {
+  skipContextCheck?: boolean;
+  checkRawMarkdown?: boolean;
+  agentName?: string;
+  // Si défini, active le pending lifecycle :
+  // 1. addPendingEntry au début (409 duplicate_gid si gid déjà pris)
+  // 2. promoteToGeneration au succès (PromoteResult dispatch ou 409 si race cancel/fail)
+  // 3. markPendingFailed au catch
+  // Si absent, fallback comportement legacy (addGeneration direct).
+  trackedType?: TrackedGenerationType;
+}
+
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
+// randomUUID. Le client génère son propre gid avant le fetch pour avoir
+// abortControllersByGid[gid] immédiatement opérationnel + identifiant stable
+// utilisable au moment du payload 200 fallback ou de l'event SSE.
+function readClientGid(req: Request): string {
+  const candidate = (req.body as { gid?: unknown })?.gid;
+  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate)
+    ? candidate
+    : randomUUID();
+}
+
+function makeTrackerEntry(
+  type: TrackedGenerationType,
+  gid: string,
+  sourceIds: string[],
+): PendingTrackerEntry {
+  return {
+    id: gid,
+    type,
+    status: 'pending',
+    startedAt: new Date().toISOString(),
+    sourceIds,
+  };
+}
+
+interface PersistedCostFields {
+  usage?: Generation['usage'];
+  estimatedCost?: number;
+  costBreakdown?: string[];
+}
+
+function buildFinalGeneration(
+  gid: string,
+  gen: Generation,
+  persisted: PersistedCostFields | null,
+): Generation {
+  const final = { ...gen, id: gid } as Generation;
+  if (persisted) {
+    final.usage = persisted.usage;
+    final.estimatedCost = persisted.estimatedCost;
+    final.costBreakdown = persisted.costBreakdown;
+  }
+  return final;
+}
+
+async function runGeneratorAndPersist(
+  store: ProjectStore,
+  generatorFn: (ctx: GenContext) => Promise<Generation | null>,
+  ctx: GenContext,
+  pid: string,
+  gid: string,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): Promise<void> {
+  const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
+  if (!gen) {
+    // Defense en profondeur : aucune closure ne devrait return null après le commit
+    // d'extraction des validations early. Si ça arrive, le pending devient failed.
+    if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
+    return;
+  }
+  const persisted = persistUsage(
+    store,
+    pid,
+    `POST /api/projects/${pid}/generate/${gen.type}`,
+    usage,
+  );
+  const finalGen = buildFinalGeneration(gid, gen, persisted);
+  if (options?.trackedType) {
+    const promoteResult = store.promoteToGeneration(pid, gid, finalGen);
+    if (promoteResult.kind === 'promoted') {
+      res.json(promoteResult.generation);
+      return;
+    }
+    // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
+    // 200 fantôme — le client refresh le projet pour voir l'état réel.
+    res.status(409).json({ error: promoteResult.kind, gid });
+    return;
+  }
+  store.addGeneration(pid, finalGen);
+  res.json(finalGen);
+}
+
+function handleGenerationFailure(
+  store: ProjectStore,
+  pid: string,
+  gid: string,
+  e: unknown,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): void {
+  const code = extractErrorCode(e, options?.agentName);
+  if (options?.trackedType) store.markPendingFailed(pid, gid, code);
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
+  }
+  logger.error('generate', 'error:', e);
+  res.status(500).json({ error: code });
+}
+
 function handleGeneration(
   store: ProjectStore,
   profileStore: ProfileStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
   modelId?: string,
-  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean; agentName?: string },
+  options?: HandleGenerationOptions,
 ) {
   return async (req: Request, res: Response) => {
     const pid = req.params.pid as string;
-    try {
-      const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
-      if (!result.ok) {
-        res.status(result.status).json({ error: result.error });
+    const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    const gid = readClientGid(req);
+    if (options?.trackedType) {
+      const added = store.addPendingEntry(
+        pid,
+        makeTrackerEntry(options.trackedType, gid, result.ctx.sourceIds),
+      );
+      if (!added) {
+        res.status(409).json({ error: 'duplicate_gid', gid });
         return;
       }
-      const { result: gen, usage } = await runWithUsageTracking(() =>
-        generatorFn({ ...result.ctx, req, res }),
+    }
+    try {
+      await runGeneratorAndPersist(
+        store,
+        generatorFn,
+        { ...result.ctx, req, res },
+        pid,
+        gid,
+        options,
+        res,
       );
-      if (gen) {
-        const persisted = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/generate/${gen.type}`,
-          usage,
-        );
-        if (persisted) {
-          gen.usage = persisted.usage;
-          gen.estimatedCost = persisted.cost;
-          gen.costBreakdown = persisted.costBreakdown;
-        }
-        store.addGeneration(pid, gen);
-        res.json(gen);
-      }
     } catch (e) {
-      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
-      }
-      logger.error('generate', 'error:', e);
-      res.status(500).json({ error: extractErrorCode(e, options?.agentName) });
+      handleGenerationFailure(store, pid, gid, e, options, res);
     }
   };
 }
@@ -347,7 +462,7 @@ export function generateRoutes(
         };
       },
       undefined,
-      { agentName: 'summary' },
+      { agentName: 'summary', trackedType: 'summary' },
     ),
   );
 
@@ -377,7 +492,7 @@ export function generateRoutes(
         };
       },
       'flashcards',
-      { agentName: 'flashcards' },
+      { agentName: 'flashcards', trackedType: 'flashcards' },
     ),
   );
 
@@ -407,7 +522,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { agentName: 'quiz' },
+      { agentName: 'quiz', trackedType: 'quiz' },
     ),
   );
 
@@ -466,7 +581,7 @@ export function generateRoutes(
         });
       },
       'podcast',
-      { agentName: 'podcast' },
+      { agentName: 'podcast', trackedType: 'podcast' },
     ),
   );
 
@@ -504,7 +619,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { skipContextCheck: true, agentName: 'quiz-review' },
+      { skipContextCheck: true, agentName: 'quiz-review', trackedType: 'quiz' },
     )(req, res);
   });
 
@@ -564,7 +679,7 @@ export function generateRoutes(
         });
       },
       'quiz',
-      { agentName: QUIZ_VOCAL },
+      { agentName: QUIZ_VOCAL, trackedType: QUIZ_VOCAL },
     ),
   );
 
@@ -599,7 +714,7 @@ export function generateRoutes(
         };
       },
       'mistral-large-latest',
-      { checkRawMarkdown: true, agentName: 'image' },
+      { checkRawMarkdown: true, agentName: 'image', trackedType: 'image' },
     ),
   );
 
@@ -634,7 +749,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { agentName: FILL_BLANK },
+      { agentName: FILL_BLANK, trackedType: FILL_BLANK },
     ),
   );
 
