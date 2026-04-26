@@ -42,6 +42,22 @@ export const nl: Record<string, string> = {
 
   'errorCode.internal_error': 'Interne serverfout',
   'errorCode.cancelled': 'Generatie geannuleerd',
+
+  // Notifications center
+  'notif.openBell': 'Notificatiecentrum openen',
+  'notif.title': 'Notificaties',
+  'notif.empty': 'Geen notificaties',
+  'notif.markAllRead': 'Alles als gelezen markeren',
+  'notif.clear': 'Wissen',
+  'notif.timeAgo': '{time} geleden',
+  'notif.justNow': 'zojuist',
+  'notif.minutesAgo': '{count} min',
+  'notif.hoursAgo': '{count} u',
+  'notif.daysAgo': '{count} d',
+  'notif.unreadBadge': '{count} ongelezen',
+  'notif.generationDone': '{type} voltooid',
+  'notif.generationFailed': '{type} mislukt',
+  'notif.generationCancelled': '{type} geannuleerd',
   'errorCode.no_sources': 'Geen bron beschikbaar',
   'errorCode.auth_required': 'Mistral API-sleutel ontbreekt of ongeldig',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',

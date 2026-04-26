@@ -42,3 +42,22 @@ document.addEventListener('alpine:initialized', () => createIcons({ icons }));
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => createIcons({ icons }), 100);
 });
+
+// Cross-tab synchronization de la cloche notifications.
+// Le 'storage' event ne fire QUE dans les autres tabs (pas dans celui qui a
+// écrit), donc combiné avec le bump local sur appendNotification, cela couvre
+// les deux cas. Un 5+ tabs ouverts → 4+ events par écriture, charge négligeable.
+//
+// Guard `typeof window` pour ne pas péter en environnement Vitest (Node).
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key !== 'sf-profile-notifications') return;
+    const root = document.querySelector('[x-data="app"]') as HTMLElement & {
+      _x_dataStack?: Array<{ notificationsVersion?: number }>;
+    } | null;
+    const stack = root?._x_dataStack?.[0];
+    if (stack && typeof stack.notificationsVersion === 'number') {
+      stack.notificationsVersion++;
+    }
+  });
+}

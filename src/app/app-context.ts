@@ -201,6 +201,12 @@ export interface AppContext extends AppState {
   canStartGenerate(type: string): boolean;
   upsertGenerationById(gen: Generation): void;
   resetSession(): void;
+  profileNotifications(): import('./notifications').PersistedNotification[];
+  unreadNotificationsCount(): number;
+  markAllNotificationsRead(): void;
+  markNotificationRead(eventKey: string): void;
+  clearProfileNotifications(): void;
+  formatRelativeTime(iso: string): string;
   applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
   hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;

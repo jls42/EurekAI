@@ -42,6 +42,22 @@ export const it: Record<string, string> = {
 
   'errorCode.internal_error': 'Errore interno del server',
   'errorCode.cancelled': 'Generazione annullata',
+
+  // Notifications center
+  'notif.openBell': 'Apri centro notifiche',
+  'notif.title': 'Notifiche',
+  'notif.empty': 'Nessuna notifica',
+  'notif.markAllRead': 'Segna tutto come letto',
+  'notif.clear': 'Svuota',
+  'notif.timeAgo': '{time} fa',
+  'notif.justNow': 'proprio ora',
+  'notif.minutesAgo': '{count} min',
+  'notif.hoursAgo': '{count} h',
+  'notif.daysAgo': '{count} g',
+  'notif.unreadBadge': '{count} non lette',
+  'notif.generationDone': '{type} completata',
+  'notif.generationFailed': '{type} fallita',
+  'notif.generationCancelled': '{type} annullata',
   'errorCode.no_sources': 'Nessuna fonte disponibile',
   'errorCode.auth_required': 'Chiave API Mistral mancante o non valida',
   'errorCode.tts_upstream_error': 'Errore del servizio audio (TTS/STT)',

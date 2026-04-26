@@ -46,6 +46,22 @@ export const hi: Record<string, string> = {
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
   'errorCode.cancelled': 'जनरेशन रद्द कर दी गई',
+
+  // Notifications center
+  'notif.openBell': 'सूचना केंद्र खोलें',
+  'notif.title': 'सूचनाएँ',
+  'notif.empty': 'कोई सूचना नहीं',
+  'notif.markAllRead': 'सभी को पढ़ा हुआ चिह्नित करें',
+  'notif.clear': 'साफ़ करें',
+  'notif.timeAgo': '{time} पहले',
+  'notif.justNow': 'अभी',
+  'notif.minutesAgo': '{count} मिनट',
+  'notif.hoursAgo': '{count} घंटे',
+  'notif.daysAgo': '{count} दिन',
+  'notif.unreadBadge': '{count} अनपढ़ी',
+  'notif.generationDone': '{type} पूर्ण',
+  'notif.generationFailed': '{type} विफल',
+  'notif.generationCancelled': '{type} रद्द',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',

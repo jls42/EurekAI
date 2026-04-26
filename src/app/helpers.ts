@@ -13,8 +13,13 @@ import type {
 } from '../../types';
 import {
   appendNotification,
+  clearNotifications,
   getProjectLastSeen,
+  listProfileNotifications,
+  markAllRead,
+  markRead,
   setProjectLastSeen,
+  type PersistedNotification,
 } from './notifications';
 
 const TEXT_TEXT_PRIMARY = 'text-text-primary';
@@ -662,6 +667,51 @@ export function createHelpers() {
           projectId,
         });
       }
+    },
+
+    // --- Notifications cloche header ---
+    profileNotifications(this: AppContext): PersistedNotification[] {
+      // notificationsVersion référencé pour Alpine reactivity (re-render quand
+      // appendNotification ou storage event bumpe le compteur). Le && évite
+      // le `void` operator que sonarjs interdit, sans changer la sémantique.
+      if (this.notificationsVersion < 0) return [];
+      if (!this.currentProfile) return [];
+      return listProfileNotifications(this.currentProfile.id);
+    },
+
+    unreadNotificationsCount(this: AppContext): number {
+      if (this.notificationsVersion < 0) return 0;
+      if (!this.currentProfile) return 0;
+      return listProfileNotifications(this.currentProfile.id).filter((n) => !n.read).length;
+    },
+
+    markAllNotificationsRead(this: AppContext): void {
+      if (!this.currentProfile) return;
+      markAllRead(this.currentProfile.id);
+      this.notificationsVersion++;
+    },
+
+    markNotificationRead(this: AppContext, eventKey: string): void {
+      if (!this.currentProfile) return;
+      markRead(this.currentProfile.id, eventKey);
+      this.notificationsVersion++;
+    },
+
+    clearProfileNotifications(this: AppContext): void {
+      if (!this.currentProfile) return;
+      clearNotifications(this.currentProfile.id);
+      this.notificationsVersion++;
+    },
+
+    formatRelativeTime(this: AppContext, iso: string): string {
+      const elapsed = Date.now() - Date.parse(iso);
+      if (elapsed < 60_000) return this.t('notif.justNow');
+      const minutes = Math.floor(elapsed / 60_000);
+      if (minutes < 60) return this.t('notif.minutesAgo', { count: minutes });
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return this.t('notif.hoursAgo', { count: hours });
+      const days = Math.floor(hours / 24);
+      return this.t('notif.daysAgo', { count: days });
     },
 
     isGenerating(this: AppContext) {

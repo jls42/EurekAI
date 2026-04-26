@@ -49,6 +49,22 @@ export const ar: Record<string, string> = {
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
   'errorCode.cancelled': 'تم إلغاء التوليد',
+
+  // Notifications center
+  'notif.openBell': 'فتح مركز الإشعارات',
+  'notif.title': 'الإشعارات',
+  'notif.empty': 'لا توجد إشعارات',
+  'notif.markAllRead': 'تعليم الكل كمقروء',
+  'notif.clear': 'مسح',
+  'notif.timeAgo': 'منذ {time}',
+  'notif.justNow': 'الآن',
+  'notif.minutesAgo': '{count} د',
+  'notif.hoursAgo': '{count} س',
+  'notif.daysAgo': '{count} ي',
+  'notif.unreadBadge': '{count} غير مقروء',
+  'notif.generationDone': 'اكتمل {type}',
+  'notif.generationFailed': 'فشل {type}',
+  'notif.generationCancelled': 'تم إلغاء {type}',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
