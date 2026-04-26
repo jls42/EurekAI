@@ -524,6 +524,65 @@ describe('DELETE /:pid/generations/:gid', () => {
 });
 
 // ================================================================
+// Cancel pending: POST /:pid/generations/:gid/cancel
+// ================================================================
+
+describe('POST /:pid/generations/:gid/cancel', () => {
+  it('marque le pending comme cancelled et retourne ok', () => {
+    // Créer un pending entry direct via store
+    const cancelGid = 'gid-to-cancel';
+    store.addPendingEntry(pid, {
+      id: cancelGid,
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/cancel');
+    const req = mockReq({ params: { pid, gid: cancelGid } });
+    const res = mockRes();
+
+    handler(req, res);
+
+    expect(res.json).toHaveBeenCalledWith({ ok: true, status: 'cancelled' });
+    const data = store.getProject(pid)!;
+    const entry = data.results.pendingTracker!.find((e) => e.id === cancelGid);
+    expect(entry?.status).toBe('cancelled');
+  });
+
+  it('retourne 404 quand le pending n existe pas', () => {
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/cancel');
+    const req = mockReq({ params: { pid, gid: 'unknown-gid' } });
+    const res = mockRes();
+
+    handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+
+  it('retourne 404 quand le pending est déjà cancelled (idempotence rejet)', () => {
+    const cancelGid = 'gid-already-cancelled';
+    store.addPendingEntry(pid, {
+      id: cancelGid,
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    store.markPendingCancelled(pid, cancelGid);
+
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/cancel');
+    const req = mockReq({ params: { pid, gid: cancelGid } });
+    const res = mockRes();
+
+    handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+  });
+});
+
+// ================================================================
 // Vocal answer: POST /:pid/generations/:gid/vocal-answer
 // ================================================================
 
