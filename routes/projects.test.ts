@@ -378,3 +378,124 @@ describe('DELETE /:pid', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: true });
   });
 });
+
+describe('GET /:pid/events (SSE)', () => {
+  function mockSseRes() {
+    const res: any = {
+      writes: [] as string[],
+      headers: {} as Record<string, string>,
+    };
+    res.setHeader = vi.fn((k: string, v: string) => {
+      res.headers[k] = v;
+      return res;
+    });
+    res.flushHeaders = vi.fn();
+    res.write = vi.fn((chunk: string) => {
+      res.writes.push(chunk);
+      return true;
+    });
+    return res;
+  }
+
+  function mockSseReq(pid: string) {
+    const handlers: Record<string, () => void> = {};
+    return {
+      params: { pid },
+      on: vi.fn((event: string, fn: () => void) => {
+        handlers[event] = fn;
+      }),
+      _trigger: (event: string) => handlers[event]?.(),
+    } as any;
+  }
+
+  it('positionne les headers SSE et flush', () => {
+    const project = store.createProject('SSE test');
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(project.meta.id);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    expect(res.headers['Content-Type']).toBe('text/event-stream');
+    expect(res.headers['Cache-Control']).toBe('no-cache');
+    expect(res.headers['Connection']).toBe('keep-alive');
+    expect(res.headers['X-Accel-Buffering']).toBe('no');
+    expect(res.flushHeaders).toHaveBeenCalled();
+
+    // Cleanup pour ne pas laisser de listener du store en fuite
+    req._trigger('close');
+  });
+
+  it('écrit un event au format event: generation\\ndata: {...}\\n\\n quand le store émet', () => {
+    const project = store.createProject('SSE emit');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Trigger un event via le store (addPendingEntry émet automatiquement)
+    store.addPendingEntry(pid, {
+      id: 'gid-sse',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+
+    const generationWrites = res.writes.filter((w: string) => w.startsWith('event: generation'));
+    expect(generationWrites).toHaveLength(1);
+    expect(res.writes.join('')).toContain('event: generation\n');
+    expect(res.writes.join('')).toContain('"gid":"gid-sse"');
+    expect(res.writes.join('')).toContain('"status":"pending"');
+
+    req._trigger('close');
+  });
+
+  it('filtre les events des autres projets', () => {
+    const project = store.createProject('SSE filter');
+    const otherProject = store.createProject('Other');
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(project.meta.id);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Event sur l'autre projet : ne doit PAS arriver dans cette response
+    store.addPendingEntry(otherProject.meta.id, {
+      id: 'gid-other',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+
+    const generationWrites = res.writes.filter((w: string) => w.startsWith('event: generation'));
+    expect(generationWrites).toHaveLength(0);
+
+    req._trigger('close');
+  });
+
+  it('cleanup unsubscribe + clearInterval sur req close', () => {
+    const project = store.createProject('SSE cleanup');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+    req._trigger('close');
+
+    // Après close, un nouvel event ne doit plus déclencher d'écriture
+    const writesBeforeAdd = res.writes.length;
+    store.addPendingEntry(pid, {
+      id: 'gid-after-close',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    expect(res.writes.length).toBe(writesBeforeAdd);
+  });
+});
