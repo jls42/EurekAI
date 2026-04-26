@@ -264,13 +264,16 @@ export interface ProjectResults {
   pendingTracker?: PendingTrackerEntry[];
 }
 
+// Statut du cycle de vie d'une génération suivie par le tracker.
+// - 'pending' : génération en cours côté serveur (pas encore complétée)
+// - 'completed' : déplacée vers `generations[]` via promoteToGeneration (entrée retirée du tracker)
+// - 'failed' : erreur durant la génération, conserve `failureCode`
+// - 'cancelled' : annulée explicitement (POST /cancel) ou au boot (process précédent mort)
+export type GenerationStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
+
 // Limité aux 7 agents avec persistance Generation. PAS voice/websearch/read-aloud
 // (flows séparés non couverts par le pending lifecycle). Doit rester en sync avec
 // `Generation['type']`.
-//
-// Note : le type `GenerationStatus` (union plus large 'pending' | 'completed' |
-// 'failed' | 'cancelled') sera ajouté au commit event-bus, où il devient
-// immédiatement consommé par l'interface `GenerationEvent`.
 export type TrackedGenerationType =
   | 'summary'
   | 'flashcards'
