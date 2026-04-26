@@ -41,6 +41,7 @@ export const de: Record<string, string> = {
     'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
 
   'errorCode.internal_error': 'Interner Serverfehler',
+  'errorCode.cancelled': 'Generierung abgebrochen',
   'errorCode.no_sources': 'Keine Quelle verfuegbar',
   'errorCode.auth_required': 'Mistral-API-Schluessel fehlt oder ungueltig',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',

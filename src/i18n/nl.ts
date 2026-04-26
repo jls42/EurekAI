@@ -41,6 +41,7 @@ export const nl: Record<string, string> = {
     'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
   'errorCode.internal_error': 'Interne serverfout',
+  'errorCode.cancelled': 'Generatie geannuleerd',
   'errorCode.no_sources': 'Geen bron beschikbaar',
   'errorCode.auth_required': 'Mistral API-sleutel ontbreekt of ongeldig',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',

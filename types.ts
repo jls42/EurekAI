@@ -100,6 +100,10 @@ export interface GenerationMeta {
   usage?: GenerationUsage;
   estimatedCost?: number;
   costBreakdown?: string[];
+  // Posé par store.promoteToGeneration uniquement (post-PR pending lifecycle).
+  // Absent sur les générations pré-PR → ignorées par la réconciliation client
+  // (évite le spam de notifications historiques au 1er load post-PR).
+  completedAt?: string;
 }
 
 export interface SummaryGeneration extends GenerationMeta {
@@ -205,7 +209,10 @@ export type FailedStepCode =
   | 'auth_required'
   | 'tts_upstream_error'
   | 'context_length_exceeded'
-  | 'internal_error';
+  | 'internal_error'
+  // Posé explicitement par store.markPendingCancelled / cancelAllPendingsAtBoot.
+  // Jamais dérivé d'une exception via extractErrorCode (pas de mapping dans error-matchers).
+  | 'cancelled';
 
 export interface FailedStep {
   // Toujours un agent exécutable par /generate/auto (cf. AUTO_AGENTS_SET) :
@@ -250,6 +257,41 @@ export interface ProjectMeta {
 
 export interface ProjectResults {
   generations: Generation[];
+  // Cycle de vie des générations en cours / échouées / annulées (ajouté post-PR
+  // pending lifecycle). Séparé de `generations[]` pour ne pas contaminer les call
+  // sites qui lisent `g.data` sans guard. Le tracker contient uniquement les
+  // métadonnées de cycle de vie (pas de payload data).
+  pendingTracker?: PendingTrackerEntry[];
+}
+
+// Limité aux 7 agents avec persistance Generation. PAS voice/websearch/read-aloud
+// (flows séparés non couverts par le pending lifecycle). Doit rester en sync avec
+// `Generation['type']`.
+//
+// Note : le type `GenerationStatus` (union plus large 'pending' | 'completed' |
+// 'failed' | 'cancelled') sera ajouté au commit event-bus, où il devient
+// immédiatement consommé par l'interface `GenerationEvent`.
+export type TrackedGenerationType =
+  | 'summary'
+  | 'flashcards'
+  | 'quiz'
+  | 'podcast'
+  | 'quiz-vocal'
+  | 'image'
+  | 'fill-blank';
+
+export interface PendingTrackerEntry {
+  // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour /generate/auto).
+  // Identique au `id` de la `Generation` finale après promotion.
+  id: string;
+  type: TrackedGenerationType;
+  // Le tracker ne stocke jamais 'completed' : à la promotion, l'entrée est retirée
+  // du tracker et la Generation est ajoutée à `generations[]`.
+  status: 'pending' | 'failed' | 'cancelled';
+  startedAt: string;
+  completedAt?: string;
+  failureCode?: FailedStepCode;
+  sourceIds: string[];
 }
 
 export interface CostEntry {

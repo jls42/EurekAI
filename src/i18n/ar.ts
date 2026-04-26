@@ -48,6 +48,7 @@ export const ar: Record<string, string> = {
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.cancelled': 'تم إلغاء التوليد',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',

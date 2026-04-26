@@ -41,6 +41,7 @@ export const it: Record<string, string> = {
     'Contenuto troppo lungo ({pct}% della capacita del modello). Seleziona meno fonti.',
 
   'errorCode.internal_error': 'Errore interno del server',
+  'errorCode.cancelled': 'Generazione annullata',
   'errorCode.no_sources': 'Nessuna fonte disponibile',
   'errorCode.auth_required': 'Chiave API Mistral mancante o non valida',
   'errorCode.tts_upstream_error': 'Errore del servizio audio (TTS/STT)',
