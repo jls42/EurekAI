@@ -15,7 +15,9 @@ import type {
   ModerationResult,
   PendingTrackerEntry,
   FailedStepCode,
+  GenerationStatus,
 } from './types.js';
+import { emitGenerationEvent, buildEventKey } from './helpers/event-bus.js';
 
 // Résultat d'une tentative de promotion d'un pending vers une Generation finale.
 // Permet au handler HTTP de répondre 200 (promoted) ou 409 (cancelled/failed/missing)
@@ -282,6 +284,7 @@ export class ProjectStore {
     if (tracker.some((e) => e.id === entry.id)) return false;
     tracker.push(entry);
     this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, entry.status);
     return true;
   }
 
@@ -305,6 +308,7 @@ export class ProjectStore {
     data.results.generations.push(finalGen);
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, 'completed', finalGen);
     return { kind: 'promoted', generation: finalGen };
   }
 
@@ -325,19 +329,22 @@ export class ProjectStore {
       const data = this.getProject(meta.id);
       if (!data) continue;
       const tracker = data.results.pendingTracker ?? [];
-      let dirty = false;
+      const cancelled: PendingTrackerEntry[] = [];
       for (const entry of tracker) {
         if (entry.status === 'pending') {
           entry.status = 'cancelled';
           entry.failureCode = 'cancelled';
           entry.completedAt = new Date().toISOString();
-          dirty = true;
+          cancelled.push(entry);
           total++;
         }
       }
-      if (dirty) {
+      if (cancelled.length > 0) {
         this.pruneTrackerIfNeeded(data);
         this.saveProject(meta.id, data);
+        for (const entry of cancelled) {
+          this.emitTrackerEvent(meta.id, entry, 'cancelled');
+        }
       }
     }
     return total;
@@ -372,7 +379,29 @@ export class ProjectStore {
     entry.completedAt = new Date().toISOString();
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, nextStatus);
     return true;
+  }
+
+  // Construit et émet un GenerationEvent à partir d'une entrée de tracker.
+  // Centralisé pour que tous les helpers (add/promote/fail/cancel/boot sweep)
+  // émettent au même format avec la même clé eventKey stable.
+  private emitTrackerEvent(
+    pid: string,
+    entry: PendingTrackerEntry,
+    status: GenerationStatus,
+    generation?: Generation,
+  ): void {
+    emitGenerationEvent({
+      pid,
+      gid: entry.id,
+      type: entry.type,
+      status,
+      failureCode: entry.failureCode,
+      generation,
+      at: entry.completedAt ?? entry.startedAt ?? new Date().toISOString(),
+      eventKey: buildEventKey(entry.id, status),
+    });
   }
 
   private pruneTrackerIfNeeded(data: ProjectData): void {
