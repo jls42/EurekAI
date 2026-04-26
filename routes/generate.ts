@@ -5,6 +5,7 @@ import type {
   Source,
   Generation,
   QuizQuestion,
+  QuizGeneration,
   AgeGroup,
   FailedStep,
   FailedStepCode,
@@ -36,6 +37,7 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 const QUIZ_VOCAL = 'quiz-vocal';
 const FILL_BLANK = 'fill-blank';
 const ROUTER_MODEL = 'mistral-small-latest';
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
 // Variante non-throw : retourne null quand aucune source ne matche, pour permettre aux
 // call sites internes (`buildGenContext`, `quiz-review`, `route` analysis) de répondre
@@ -168,7 +170,7 @@ function buildGenContext(
   | { ok: true; ctx: Omit<GenContext, 'req' | 'res'> }
   | { ok: false; error: string; status: number } {
   const project = store.getProject(pid);
-  if (!project) return { ok: false, error: 'Projet introuvable', status: 404 };
+  if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
 
   const unsafeSource = checkModeration(store, profileStore, pid, body.sourceIds);
   if (unsafeSource) return { ok: false, error: 'moderation.blocked', status: 400 };
@@ -204,6 +206,58 @@ function buildGenContext(
       pid,
       profileVoices: profile?.mistralVoices,
       profileId: profileId || undefined,
+    },
+  };
+}
+
+// Pré-validation des inputs de quiz-review. Sortie en amont de handleGeneration
+// pour éviter qu'un pending tracker entry (ajouté au commit pending lifecycle)
+// ne reste orphelin quand une validation échoue. Toutes les erreurs de cette
+// validation produisent un 400/404 sans avoir touché le tracker.
+interface QuizReviewValidated {
+  originalGen: QuizGeneration;
+  weakQuestions: QuizQuestion[];
+  markdown: string;
+  reviewLabel: string;
+}
+
+type ValidationResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; status: number; error: string };
+
+const reviewLabelForLang = (lang: string): string => (lang === 'en' ? 'Review' : 'Revision');
+
+function validateQuizReviewInputs(
+  store: ProjectStore,
+  pid: string,
+  body: { generationId?: string; weakQuestions?: unknown; lang?: string },
+): ValidationResult<QuizReviewValidated> {
+  if (!body.generationId || !Array.isArray(body.weakQuestions)) {
+    return { ok: false, status: 400, error: 'generationId et weakQuestions requis' };
+  }
+  const originalGen = store.getGeneration(pid, body.generationId);
+  if (originalGen?.type !== 'quiz') {
+    return { ok: false, status: 404, error: 'Quiz original introuvable' };
+  }
+  const project = store.getProject(pid);
+  if (!project) {
+    return { ok: false, status: 404, error: ERR_PROJECT_NOT_FOUND };
+  }
+  const markdown = getMarkdownOrNull(project.sources, originalGen.sourceIds);
+  if (markdown === null) {
+    return { ok: false, status: 400, error: 'no_sources' };
+  }
+  const ctxError = checkContextLimit(markdown, getConfig().models.quiz);
+  if (ctxError) {
+    return { ok: false, status: 400, error: ctxError };
+  }
+  return {
+    ok: true,
+    data: {
+      originalGen: originalGen as QuizGeneration,
+      weakQuestions: body.weakQuestions as QuizQuestion[],
+      markdown,
+      reviewLabel: reviewLabelForLang(body.lang || 'fr'),
     },
   };
 }
@@ -416,41 +470,30 @@ export function generateRoutes(
     ),
   );
 
-  router.post(
-    '/:pid/generate/quiz-review',
-    handleGeneration(
+  // Quiz-review : validations early en pre-handler. La closure passée à
+  // handleGeneration n'a plus aucun `return null` ni `ctx.res.status` — tout
+  // ce qui pourrait échouer côté input est déjà validé. Permet au commit
+  // pending lifecycle d'ajouter un tracker entry sans risquer de pendings
+  // orphelins quand un input est rejeté.
+  router.post('/:pid/generate/quiz-review', async (req, res) => {
+    const validation = validateQuizReviewInputs(store, req.params.pid, req.body);
+    if (!validation.ok) {
+      res.status(validation.status).json({ error: validation.error });
+      return;
+    }
+    const { originalGen, weakQuestions, markdown, reviewLabel } = validation.data;
+    await handleGeneration(
       store,
       profileStore,
       async (ctx) => {
-        const { generationId, weakQuestions } = ctx.req.body;
-        if (!generationId || !weakQuestions || !Array.isArray(weakQuestions)) {
-          ctx.res.status(400).json({ error: 'generationId et weakQuestions requis' });
-          return null;
-        }
-        const originalGen = store.getGeneration(ctx.pid, generationId);
-        if (originalGen?.type !== 'quiz') {
-          ctx.res.status(404).json({ error: 'Quiz original introuvable' });
-          return null;
-        }
-        const markdown = getMarkdownOrNull(ctx.project.sources, originalGen.sourceIds);
-        if (markdown === null) {
-          ctx.res.status(400).json({ error: 'no_sources' });
-          return null;
-        }
-        const ctxError = checkContextLimit(markdown, ctx.config.models.quiz);
-        if (ctxError) {
-          ctx.res.status(400).json({ error: ctxError });
-          return null;
-        }
         const data = await generateQuizReview(
           client,
           markdown,
-          weakQuestions as QuizQuestion[],
+          weakQuestions,
           ctx.config.models.quiz,
           ctx.lang,
           ctx.ageGroup,
         );
-        const reviewLabel = ctx.lang === 'en' ? 'Review' : 'Revision';
         return {
           id: randomUUID(),
           title: `${reviewLabel} — ${originalGen.title}`,
@@ -462,8 +505,8 @@ export function generateRoutes(
       },
       'quiz',
       { skipContextCheck: true, agentName: 'quiz-review' },
-    ),
-  );
+    )(req, res);
+  });
 
   router.post(
     '/:pid/generate/quiz-vocal',
@@ -773,7 +816,7 @@ export function generateRoutes(
     try {
       const project = store.getProject(req.params.pid);
       if (!project) {
-        res.status(404).json({ error: 'Projet introuvable' });
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
       }
       const lang = req.body.lang || 'fr';
