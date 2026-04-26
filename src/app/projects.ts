@@ -99,6 +99,14 @@ export function createProjects() {
           this.activeView = 'dashboard';
         }
         this.$nextTick(() => this.refreshIcons());
+        // Démarre le stream SSE après le snapshot initial. La méthode interne
+        // re-fetche le projet (réconciliation des notifs ratées) puis ouvre
+        // l'EventSource. Stoppé par resetSession au switch projet/profil.
+        if (typeof this.startPendingsStream === 'function') {
+          this.startPendingsStream(id).catch(() => {
+            /* silent: SSE optionnel, le snapshot ci-dessus suffit pour l'UI */
+          });
+        }
       } catch {
         /* silent: offline project select, state reset deja fait */
       }

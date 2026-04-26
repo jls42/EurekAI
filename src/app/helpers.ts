@@ -1,12 +1,51 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
-import type { Consigne, Generation, PodcastGeneration, PodcastLine, Source } from '../../types';
+import type {
+  Consigne,
+  Generation,
+  GenerationStatus,
+  PendingTrackerEntry,
+  PodcastGeneration,
+  PodcastLine,
+  ProjectData,
+  Source,
+} from '../../types';
+import {
+  appendNotification,
+  getProjectLastSeen,
+  setProjectLastSeen,
+} from './notifications';
 
 const TEXT_TEXT_PRIMARY = 'text-text-primary';
 const TEXT_TEXT_SECONDARY = 'text-text-secondary';
 const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
+
+// Event SSE poussé par le serveur sur GET /api/projects/:pid/events.
+// Schéma aligné sur helpers/event-bus.ts (côté serveur). Pas d'import direct
+// car ce module sert au frontend (Vite) et le shape reste stable côté backend.
+export interface GenerationEvent {
+  pid: string;
+  gid: string;
+  type: PendingTrackerEntry['type'];
+  status: GenerationStatus;
+  failureCode?: string;
+  generation?: Generation;
+  at: string;
+  eventKey: string;
+}
+
+// Calcul du cutoff utilisé par reconcilePendings : si lastSeenAt absent (1er load
+// post-PR), retombe sur reconcileStartedAt → zéro backfill historique.
+function computeReconcileCutoff(
+  profileId: string,
+  projectId: string,
+  reconcileStartedAt: string,
+): number {
+  const lastSeenIso = getProjectLastSeen(profileId, projectId);
+  return Date.parse(lastSeenIso ?? reconcileStartedAt);
+}
 
 // Types Generation suivis par le pending tracker (cf. types.ts TrackedGenerationType).
 // Garde locale pour éviter d'importer un type runtime côté Alpine — la définition
@@ -503,6 +542,126 @@ export function createHelpers() {
       const idx = this.generations.findIndex((g) => g.id === gen.id);
       if (idx === -1) this.generations.push(gen);
       else this.generations[idx] = gen;
+    },
+
+    // Applique un event SSE au state local. Idempotent par gid (upsertById)
+    // et par eventKey (showToast/appendNotification dédup). Si payload 200 a
+    // déjà appliqué la même transition, l'event SSE est absorbé sans effet.
+    applyGenerationEvent(this: AppContext, event: GenerationEvent): void {
+      if (!this.currentProfile) return;
+      const { gid, type, status, eventKey, generation } = event;
+      if (status === 'pending') {
+        // Hydrate / refresh le pending optimiste (peut écraser un déjà existant
+        // côté client avec les vrais startedAt/sourceIds backend).
+        this.pendingById[gid] = {
+          id: gid,
+          type,
+          status: 'pending',
+          startedAt: event.at,
+          sourceIds: [],
+        } as PendingTrackerEntry;
+        return;
+      }
+      // Transition terminale : retirer du pendingById
+      delete this.pendingById[gid];
+      if (status === 'completed' && generation) {
+        this.upsertGenerationById(generation);
+        this.showToast(
+          this.t('notif.generationDone', { type: this.t('gen.' + type) }),
+          'success',
+          null,
+          null,
+          eventKey,
+        );
+        return;
+      }
+      const toastType = status === 'cancelled' ? 'info' : 'error';
+      const messageKey = status === 'cancelled' ? 'notif.generationCancelled' : 'notif.generationFailed';
+      this.showToast(this.t(messageKey, { type: this.t('gen.' + type) }), toastType, null, null, eventKey);
+    },
+
+    // Phase de réconciliation au selectProject + reconnect SSE :
+    // 1. Hydrate state.generations + pendingById depuis le snapshot serveur.
+    // 2. Backfill notifs persistées pour les events ratés depuis lastSeenAt
+    //    (zéro spam historique au 1er load post-PR : lastSeenAt = now).
+    // 3. Set lastSeenAt = reconcileStartedAt (watermark conservateur, pré-fetch).
+    async reconcilePendings(
+      this: AppContext,
+      projectId: string,
+      reconcileStartedAt: string,
+    ): Promise<void> {
+      if (!this.currentProfile) return;
+      const profileId = this.currentProfile.id;
+      try {
+        const res = await fetch('/api/projects/' + projectId);
+        if (!res.ok) return;
+        const project = (await res.json()) as ProjectData;
+        if (this.currentProjectId !== projectId) return;
+        this.hydratePendingByIdFromTracker(project.results.pendingTracker ?? []);
+        const cutoff = computeReconcileCutoff(profileId, projectId, reconcileStartedAt);
+        this.backfillCompletedNotifs(project.results.generations, cutoff, profileId, projectId);
+        this.backfillTerminalNotifs(
+          project.results.pendingTracker ?? [],
+          cutoff,
+          profileId,
+          projectId,
+        );
+        // Watermark écrit avec le timestamp PRÉ-fetch : si une génération se
+        // termine entre le snapshot et l'ouverture SSE, son event sera quand
+        // même surfacé au prochain reconnect/reload (pas masqué par lastSeenAt).
+        setProjectLastSeen(profileId, projectId, reconcileStartedAt);
+        this.notificationsVersion++;
+      } catch {
+        /* silent: réseau down, on retentera au reconnect SSE */
+      }
+    },
+
+    hydratePendingByIdFromTracker(this: AppContext, tracker: PendingTrackerEntry[]): void {
+      this.pendingById = {};
+      for (const t of tracker) {
+        if (t.status === 'pending') this.pendingById[t.id] = t;
+      }
+    },
+
+    backfillCompletedNotifs(
+      this: AppContext,
+      generations: Generation[],
+      cutoff: number,
+      profileId: string,
+      projectId: string,
+    ): void {
+      for (const gen of generations) {
+        if (!gen.completedAt) continue;
+        if (Date.parse(gen.completedAt) <= cutoff) continue;
+        appendNotification(profileId, {
+          eventKey: `generation:${gen.id}:completed`,
+          message: this.t('notif.generationDone', { type: this.t('gen.' + gen.type) }),
+          type: 'success',
+          projectId,
+        });
+      }
+    },
+
+    backfillTerminalNotifs(
+      this: AppContext,
+      tracker: PendingTrackerEntry[],
+      cutoff: number,
+      profileId: string,
+      projectId: string,
+    ): void {
+      for (const t of tracker) {
+        if (t.status === 'pending') continue;
+        if (!t.completedAt || Date.parse(t.completedAt) <= cutoff) continue;
+        const cancelled = t.status === 'cancelled';
+        appendNotification(profileId, {
+          eventKey: `generation:${t.id}:${t.status}`,
+          message: this.t(cancelled ? 'notif.generationCancelled' : 'notif.generationFailed', {
+            type: this.t('gen.' + t.type),
+          }),
+          type: cancelled ? 'info' : 'error',
+          projectId,
+        });
+      }
     },
 
     isGenerating(this: AppContext) {
