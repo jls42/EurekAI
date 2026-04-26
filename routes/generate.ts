@@ -977,54 +977,92 @@ export function generateRoutes(
     }
   });
 
-  // Exécute un step en parallèle : retourne soit la génération, soit l'erreur encapsulée.
-  // Les mutations du store (persistUsage, addGeneration) restent séquentielles au niveau JS
-  // (event-loop single-thread), mais l'agrégation dans generations[]/failedSteps[] est
-  // remontée par l'appelant pour contrôler l'ordre de sortie (= ordre du plan).
+  type StepOutcome =
+    | { ok: true; gen: Generation }
+    | { ok: false; agent: AutoAgentType; code: FailedStepCode };
+
+  // Le UI ne passe pas par /generate/auto (il fait runAutoSteps avec N
+  // /generate/<type>), mais cette route reste utilisable pour appels batch.
+  // Chaque step a son propre gid serveur (le body.gid global serait incohérent
+  // avec N générations en parallèle). Le pending lifecycle suit les mêmes
+  // invariants que handleGeneration : pas de req.on('close') cancel.
   async function runStep(
     step: { agent: AutoAgentType },
     autoCtx: AutoCtx,
     st: ProjectStore,
     pid: string,
-  ): Promise<
-    { ok: true; gen: Generation } | { ok: false; agent: AutoAgentType; code: FailedStepCode }
-  > {
+  ): Promise<StepOutcome> {
     const executor = AUTO_EXECUTORS[step.agent];
     if (!executor) {
       // Cas impossible : executablePlan est déjà filtré via splitByAutoExecutable.
-      // Filet de sécurité en cas de dérive future du typage.
       logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
       return { ok: false, agent: step.agent, code: 'internal_error' };
     }
+    const gid = randomUUID();
+    const added = st.addPendingEntry(
+      pid,
+      makeTrackerEntry(step.agent, gid, autoCtx.sourceIds),
+    );
+    if (!added) {
+      // Improbable : gid serveur fresh à chaque step (UUID v4 unique).
+      logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
+      return { ok: false, agent: step.agent, code: 'internal_error' };
+    }
     try {
-      const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
-      const persisted = persistUsage(
+      return await runStepBody(step, executor, autoCtx, st, pid, gid);
+    } catch (err) {
+      return runStepCatch(err, step, st, pid, gid);
+    }
+  }
+
+  async function runStepBody(
+    step: { agent: AutoAgentType },
+    executor: (ctx: AutoCtx) => Promise<Generation>,
+    autoCtx: AutoCtx,
+    st: ProjectStore,
+    pid: string,
+    gid: string,
+  ): Promise<StepOutcome> {
+    const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+    const persisted = persistUsage(
+      st,
+      pid,
+      `POST /api/projects/${pid}/generate/auto/${step.agent}`,
+      usage,
+    );
+    const finalGen = buildFinalGeneration(gid, gen, persisted);
+    const promoteResult = st.promoteToGeneration(pid, gid, finalGen);
+    if (promoteResult.kind === 'promoted') {
+      logger.info('auto', `${step.agent} OK`);
+      return { ok: true, gen: promoteResult.generation };
+    }
+    // Race cancel/fail : signaler dans le résultat du plan agrégé
+    logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
+    const code: FailedStepCode =
+      promoteResult.kind === 'failed' ? promoteResult.code : 'cancelled';
+    return { ok: false, agent: step.agent, code };
+  }
+
+  function runStepCatch(
+    err: unknown,
+    step: { agent: AutoAgentType },
+    st: ProjectStore,
+    pid: string,
+    gid: string,
+  ): StepOutcome {
+    const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(
         st,
         pid,
-        `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-        usage,
+        `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+        failedUsage,
       );
-      if (persisted) {
-        gen.usage = persisted.usage;
-        gen.estimatedCost = persisted.cost;
-        gen.costBreakdown = persisted.costBreakdown;
-      }
-      st.addGeneration(pid, gen);
-      logger.info('auto', `${step.agent} OK`);
-      return { ok: true, gen };
-    } catch (err) {
-      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(
-          st,
-          pid,
-          `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-          failedUsage,
-        );
-      }
-      logger.error('auto', `${step.agent} FAILED:`, err);
-      return { ok: false, agent: step.agent, code: extractErrorCode(err, step.agent) };
     }
+    const code = extractErrorCode(err, step.agent);
+    st.markPendingFailed(pid, gid, code);
+    logger.error('auto', `${step.agent} FAILED:`, err);
+    return { ok: false, agent: step.agent, code };
   }
 
   // Parallélisation alignée sur le comportement UI (cf. src/app/generate.ts:260).
