@@ -346,6 +346,22 @@ export function generationCrudRoutes(
     res.json({ ok: true });
   });
 
+  // --- Cancel pending generation ---
+  // Marque le pending tracker entry comme 'cancelled'. Émet un event SSE pour
+  // que les clients connectés mettent à jour leur UI. Limite acceptée : la
+  // requête Mistral en cours côté serveur n'est PAS interruptible (SDK ne le
+  // permet pas), donc la facturation peut continuer. Le cancel signifie "on
+  // ignore la réponse quand elle arrive" — promoteToGeneration retournera
+  // {kind: 'cancelled'} et le handler initial répondra 409 (sans 200 fantôme).
+  router.post('/:pid/generations/:gid/cancel', (req, res) => {
+    const ok = store.markPendingCancelled(req.params.pid, req.params.gid);
+    if (!ok) {
+      res.status(404).json({ error: 'Pending introuvable ou déjà terminé' });
+      return;
+    }
+    res.json({ ok: true, status: 'cancelled' });
+  });
+
   // --- Quiz vocal: verify spoken answer ---
   router.post('/:pid/generations/:gid/vocal-answer', upload.single('audio'), async (req, res) => {
     try {
