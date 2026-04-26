@@ -72,6 +72,15 @@ initConfig(outputDir);
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));
 
+// Au boot, tout pendingTracker entry restant en status 'pending' est par
+// construction d'un process précédent mort (le current process n'en a écrit
+// aucun encore). Marque-les tous comme 'cancelled' pour ne pas laisser de
+// bannière "génération en cours" coincée à l'infini après un crash serveur.
+const cancelledAtBoot = store.cancelAllPendingsAtBoot();
+if (cancelledAtBoot > 0) {
+  logger.info('store', `boot: cancelled ${cancelledAtBoot} pendings inherited from previous process`);
+}
+
 // --- Config API ---
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => {
