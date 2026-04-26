@@ -2,10 +2,12 @@ import type { createState } from './state';
 import type {
   Consigne,
   Generation,
+  PendingTrackerEntry,
   PodcastGeneration,
   PodcastLine,
   Profile,
   Source,
+  StudyFiche,
 } from '../../types';
 
 export type AppState = ReturnType<typeof createState>;
@@ -45,6 +47,7 @@ export interface AppContext extends AppState {
     type?: string,
     retryFn?: (() => void) | null,
     action?: ToastAction | null,
+    eventKey?: string,
   ): void;
   dismissToast(id: number): void;
 
@@ -95,7 +98,7 @@ export interface AppContext extends AppState {
 
   renderMarkdown(content: string): string;
   renderWithSources(content: string, gen: Generation): string;
-  summaryData(gen: Generation): import('../../types').StudyFiche;
+  summaryData(gen: Generation): StudyFiche;
 
   sendChatMessage(): Promise<void>;
   loadChatHistory(): Promise<void>;
@@ -198,6 +201,23 @@ export interface AppContext extends AppState {
   canStartGenerate(type: string): boolean;
   upsertGenerationById(gen: Generation): void;
   resetSession(): void;
+  applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
+  reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
+  hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;
+  backfillCompletedNotifs(
+    generations: Generation[],
+    cutoff: number,
+    profileId: string,
+    projectId: string,
+  ): void;
+  backfillTerminalNotifs(
+    tracker: PendingTrackerEntry[],
+    cutoff: number,
+    profileId: string,
+    projectId: string,
+  ): void;
+  startPendingsStream(projectId: string): Promise<void>;
+  stopPendingsStream(): void;
   getQuizScores(): Array<{
     gen: Generation;
     lastScore: number;
