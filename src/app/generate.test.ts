@@ -34,6 +34,15 @@ function makeContext(overrides: any = {}) {
       websearch: false,
     },
     abortControllers: {},
+    abortControllersByGid: {},
+    pendingById: {},
+    shownToastEventKeys: new Set<string>(),
+    notificationsVersion: 0,
+    upsertGenerationById(gen: any) {
+      const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+      if (idx === -1) this.generations.push(gen);
+      else this.generations[idx] = gen;
+    },
     openGens: {},
     useConsigne: false,
     generateCount: 10,
@@ -204,6 +213,7 @@ describe('generate', () => {
       'success',
       null,
       expect.objectContaining({ label: 'toast.view' }),
+      expect.stringMatching(/^generation:.+:completed$/),
     );
     expect(ctx.loading.summary).toBe(false);
   });
