@@ -46,6 +46,22 @@ export const fr: Record<string, string> = {
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
   'errorCode.cancelled': 'Génération annulée',
+
+  // Notifications center (cloche header)
+  'notif.openBell': 'Ouvrir le centre de notifications',
+  'notif.title': 'Notifications',
+  'notif.empty': 'Aucune notification',
+  'notif.markAllRead': 'Tout marquer comme lu',
+  'notif.clear': 'Vider',
+  'notif.timeAgo': 'il y a {time}',
+  'notif.justNow': "à l'instant",
+  'notif.minutesAgo': '{count} min',
+  'notif.hoursAgo': '{count} h',
+  'notif.daysAgo': '{count} j',
+  'notif.unreadBadge': '{count} non lue(s)',
+  'notif.generationDone': '{type} terminé(e)',
+  'notif.generationFailed': "Échec de {type}",
+  'notif.generationCancelled': '{type} annulé(e)',
   'errorCode.no_sources': 'Aucune source disponible',
   'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',

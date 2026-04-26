@@ -42,6 +42,22 @@ export const pt: Record<string, string> = {
 
   'errorCode.internal_error': 'Erro interno do servidor',
   'errorCode.cancelled': 'Geração cancelada',
+
+  // Notifications center
+  'notif.openBell': 'Abrir centro de notificações',
+  'notif.title': 'Notificações',
+  'notif.empty': 'Sem notificações',
+  'notif.markAllRead': 'Marcar tudo como lido',
+  'notif.clear': 'Limpar',
+  'notif.timeAgo': 'há {time}',
+  'notif.justNow': 'agora mesmo',
+  'notif.minutesAgo': '{count} min',
+  'notif.hoursAgo': '{count} h',
+  'notif.daysAgo': '{count} d',
+  'notif.unreadBadge': '{count} não lidas',
+  'notif.generationDone': '{type} concluída',
+  'notif.generationFailed': 'Falha em {type}',
+  'notif.generationCancelled': '{type} cancelada',
   'errorCode.no_sources': 'Nenhuma fonte disponivel',
   'errorCode.auth_required': 'Chave API Mistral ausente ou invalida',
   'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
