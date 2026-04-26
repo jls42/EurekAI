@@ -45,6 +45,7 @@ export const fr: Record<string, string> = {
 
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
+  'errorCode.cancelled': 'Génération annulée',
   'errorCode.no_sources': 'Aucune source disponible',
   'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',

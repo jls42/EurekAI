@@ -40,6 +40,7 @@ export const en: Record<string, string> = {
   'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',
 
   'errorCode.internal_error': 'Internal server error',
+  'errorCode.cancelled': 'Generation cancelled',
   'errorCode.no_sources': 'No source available',
   'errorCode.auth_required': 'Missing or invalid Mistral API key',
   'errorCode.tts_upstream_error': 'Audio service error (TTS/STT)',

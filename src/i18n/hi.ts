@@ -45,6 +45,7 @@ export const hi: Record<string, string> = {
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.cancelled': 'जनरेशन रद्द कर दी गई',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
