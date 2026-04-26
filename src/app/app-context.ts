@@ -197,6 +197,7 @@ export interface AppContext extends AppState {
   isLoading(type: string): boolean;
   canStartGenerate(type: string): boolean;
   upsertGenerationById(gen: Generation): void;
+  resetSession(): void;
   getQuizScores(): Array<{
     gen: Generation;
     lastScore: number;

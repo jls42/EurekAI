@@ -76,6 +76,7 @@ export function createProjects() {
     async selectProject(this: AppContext, id: string) {
       this.currentProjectId = id;
       localStorage.setItem(LS_LAST_PROJECT_ID, id);
+      this.resetSession();
       this.resetState();
       try {
         const res = await fetch('/api/projects/' + id);
@@ -110,6 +111,7 @@ export function createProjects() {
         this.currentProjectId = null;
         this.currentProject = null;
         localStorage.removeItem(LS_LAST_PROJECT_ID);
+        this.resetSession();
         this.resetState();
       }
       this.showToast(this.t('toast.projectDeleted'), 'info');

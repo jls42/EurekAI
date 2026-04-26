@@ -3,6 +3,7 @@ import { createI18n } from './i18n';
 import { createHelpers } from './helpers';
 import { createNavigation } from './navigation';
 import { createToast } from './toast';
+import { createSession } from './session';
 import { createConfirm } from './confirm';
 import { createProfiles } from './profiles';
 import { createProjects } from './projects';
@@ -24,6 +25,7 @@ export function app() {
     ...createHelpers(),
     ...createNavigation(),
     ...createToast(),
+    ...createSession(),
     ...createConfirm(),
     ...createProfiles(),
     ...createProjects(),
