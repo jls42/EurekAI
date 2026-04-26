@@ -52,6 +52,7 @@ function makeContext(overrides: any = {}) {
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: {},
     initGenProps: vi.fn(),
+    resetSession: vi.fn(),
     resetState: proj.resetState,
     selectProject: proj.selectProject,
     sortedProjects: proj.sortedProjects,

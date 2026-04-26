@@ -45,6 +45,7 @@ function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
     currentProject: null as any,
     setLocale: vi.fn(),
     resetState: vi.fn(),
+    resetSession: vi.fn(),
     loadProjects: vi.fn(),
     showToast: vi.fn(),
     t: vi.fn((key: string) => key),

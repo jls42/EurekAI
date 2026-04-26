@@ -233,9 +233,12 @@ export function createProfiles() {
         this.theme = stored || system;
         document.documentElement.dataset.theme = this.theme;
       }
-      // Reset project state and reload projects for this profile
+      // Reset project state and reload projects for this profile.
+      // resetSession() abort les fetches en vol et vide loading/toasts/pendings :
+      // empêche un toast `generationDone` du profil précédent d'apparaître ici.
       this.currentProjectId = null;
       this.currentProject = null;
+      this.resetSession();
       this.resetState();
       this.loadProjects();
     },
