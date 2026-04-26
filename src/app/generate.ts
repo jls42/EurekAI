@@ -39,11 +39,15 @@ export function postJson(body: unknown, signal: AbortSignal): RequestInit {
 export function registerGeneration(state: AppContext, gen: Generation): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
+  // openGens AVANT upsert pour préserver la valeur initiale du `x-init $watch`
+  // dans quizVocalComponent (cf. helpers.ts applyGenerationEvent même fix). Si
+  // openGens est posé après le push, la transition undefined→true déclenche
+  // playQuestion() et le quiz vocal démarre tout seul.
+  state.openGens[gen.id] = true;
   // Idempotent : upsertGenerationById évite les doublons quand le payload 200
   // fallback ET l'event SSE 'completed' arrivent tous les deux dans le même
   // onglet. Si gid existe déjà dans state.generations, remplace au lieu de push.
   state.upsertGenerationById(gen);
-  state.openGens[gen.id] = true;
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 

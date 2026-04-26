@@ -570,6 +570,15 @@ export function createHelpers() {
       // Transition terminale : retirer du pendingById
       delete this.pendingById[gid];
       if (status === 'completed' && generation) {
+        // openGens AVANT upsert : la generation est `push` dans state.generations
+        // par upsertGenerationById, ce qui déclenche l'instanciation du composant
+        // quizVocalComponent côté Alpine. Son `x-init $watch(() => openGens[gen.id])`
+        // lirait `undefined` comme valeur initiale si on ne pose pas openGens
+        // d'abord — puis le payload 200 fallback set openGens=true et le watch
+        // détecte la transition undefined→true → playQuestion() lance l'audio
+        // automatiquement (bug observé). En posant openGens AVANT le push, la
+        // valeur initiale du watch est déjà `true` donc pas de transition.
+        this.openGens[generation.id] = true;
         this.upsertGenerationById(generation);
         this.showToast(
           this.t('notif.generationDone', { type: this.t('gen.' + type) }),
