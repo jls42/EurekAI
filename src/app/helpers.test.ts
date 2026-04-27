@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHelpers } from './helpers';
 
 const helpers = createHelpers();
@@ -1677,6 +1677,266 @@ describe('podcastSpeaker* helpers', () => {
         callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), guestLine),
       ).toBe('Invité');
     });
+  });
+});
+
+// --- applyGenerationEvent: SSE event application ---
+describe('applyGenerationEvent', () => {
+  function makeCtx() {
+    return {
+      currentProfile: { id: 'p1' } as { id: string } | null,
+      currentProjectId: 'pid-1',
+      pendingById: {} as Record<string, any>,
+      generations: [] as any[],
+      openGens: {} as Record<string, boolean>,
+      shownToastEventKeys: new Set<string>(),
+      notificationsVersion: 0,
+      showToast: vi.fn(),
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      t: (k: string) => k,
+      applyGenerationEvent: helpers.applyGenerationEvent,
+    };
+  }
+
+  it('hydrates pendingById on pending event', () => {
+    const ctx = makeCtx();
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g1',
+      type: 'summary',
+      status: 'pending',
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g1:pending',
+    } as any);
+
+    expect(ctx.pendingById['g1']).toBeDefined();
+    expect(ctx.pendingById['g1'].type).toBe('summary');
+  });
+
+  it('completed event: openGens before upsert + push gen + toast with eventKey', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g2: { id: 'g2', type: 'quiz', status: 'pending' } };
+    const gen = { id: 'g2', type: 'quiz', data: {} };
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g2',
+      type: 'quiz',
+      status: 'completed',
+      generation: gen,
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g2:completed',
+    } as any);
+
+    expect(ctx.pendingById['g2']).toBeUndefined();
+    expect(ctx.generations).toContainEqual(gen);
+    expect(ctx.openGens['g2']).toBe(true);
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationDone',
+      'success',
+      null,
+      null,
+      'generation:g2:completed',
+    );
+  });
+
+  it('cancelled event: removes pending + info toast (no upsert)', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g3: { id: 'g3', type: 'podcast', status: 'pending' } };
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g3',
+      type: 'podcast',
+      status: 'cancelled',
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g3:cancelled',
+    } as any);
+
+    expect(ctx.pendingById['g3']).toBeUndefined();
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationCancelled',
+      'info',
+      null,
+      null,
+      'generation:g3:cancelled',
+    );
+  });
+
+  it('failed event: removes pending + error toast', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g4: { id: 'g4', type: 'image', status: 'pending' } };
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g4',
+      type: 'image',
+      status: 'failed',
+      failureCode: 'quota_exceeded',
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g4:failed',
+    } as any);
+
+    expect(ctx.pendingById['g4']).toBeUndefined();
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationFailed',
+      'error',
+      null,
+      null,
+      'generation:g4:failed',
+    );
+  });
+
+  it('completed event without generation payload: removes pending but no upsert', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g5: { id: 'g5', type: 'flashcards', status: 'pending' } };
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g5',
+      type: 'flashcards',
+      status: 'completed',
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g5:completed',
+    } as any);
+
+    expect(ctx.pendingById['g5']).toBeUndefined();
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('skips entirely when currentProfile is null', () => {
+    const ctx = makeCtx();
+    ctx.currentProfile = null;
+    ctx.applyGenerationEvent.call(ctx as any, {
+      pid: 'pid-1',
+      gid: 'g6',
+      type: 'summary',
+      status: 'pending',
+      at: '2026-04-26T10:00:00Z',
+      eventKey: 'generation:g6:pending',
+    } as any);
+
+    expect(ctx.pendingById['g6']).toBeUndefined();
+  });
+});
+
+// --- reconcilePendings: snapshot-driven reconciliation ---
+describe('reconcilePendings', () => {
+  let storage: Record<string, string>;
+  beforeEach(() => {
+    storage = {};
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => storage[k] ?? null,
+      setItem: (k: string, v: string) => {
+        storage[k] = v;
+      },
+    };
+  });
+
+  function makeCtx(currentProjectId: string | null = 'pid-1') {
+    return {
+      currentProfile: { id: 'profile-A' } as { id: string } | null,
+      currentProjectId,
+      pendingById: {} as Record<string, any>,
+      generations: [] as any[],
+      notificationsVersion: 0,
+      hydratePendingByIdFromTracker: helpers.hydratePendingByIdFromTracker,
+      mergeReconciledGenerations: helpers.mergeReconciledGenerations,
+      backfillCompletedNotifs: helpers.backfillCompletedNotifs,
+      backfillTerminalNotifs: helpers.backfillTerminalNotifs,
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      t: (k: string) => k,
+      reconcilePendings: helpers.reconcilePendings,
+    };
+  }
+
+  function mockProjectFetch(project: any): void {
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => project,
+    });
+  }
+
+  it('hydrates pendingById + merges new completed gens + bumps notificationsVersion', async () => {
+    const ctx = makeCtx();
+    mockProjectFetch({
+      results: {
+        pendingTracker: [
+          { id: 'p1', type: 'summary', status: 'pending', startedAt: '2026-04-26T10:00:00Z' },
+        ],
+        generations: [
+          {
+            id: 'g-completed',
+            type: 'quiz',
+            data: {},
+            completedAt: '2026-04-26T11:30:00Z',
+          },
+        ],
+      },
+    });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById['p1']).toBeDefined();
+    expect(ctx.generations).toHaveLength(1);
+    expect(ctx.generations[0].id).toBe('g-completed');
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('aborts silently when fetch returns non-ok', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.notificationsVersion).toBe(0);
+  });
+
+  it('aborts when currentProjectId changed during await fetch (race)', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        ctx.currentProjectId = 'pid-other';
+        return {
+          results: {
+            pendingTracker: [{ id: 'p1', type: 'summary', status: 'pending' }],
+            generations: [],
+          },
+        };
+      },
+    });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById).toEqual({});
+  });
+
+  it('skips when currentProfile is null', async () => {
+    const ctx = makeCtx();
+    ctx.currentProfile = null;
+    const fetchMock = vi.fn();
+    (globalThis as any).fetch = fetchMock;
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('catches network error silently (silent: réseau down)', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockRejectedValue(new Error('network down'));
+
+    await expect(
+      ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z'),
+    ).resolves.toBeUndefined();
   });
 });
 

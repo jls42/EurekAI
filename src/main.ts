@@ -48,14 +48,14 @@ document.addEventListener('DOMContentLoaded', () => {
 // écrit), donc combiné avec le bump local sur appendNotification, cela couvre
 // les deux cas. Un 5+ tabs ouverts → 4+ events par écriture, charge négligeable.
 //
-// Guard `typeof window` pour ne pas péter en environnement Vitest (Node).
-if (typeof window !== 'undefined') {
+// Guard `typeof globalThis.window` pour ne pas péter en environnement Vitest (Node).
+if (typeof globalThis.window !== 'undefined') {
   // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
   // chemin silencieusement. Warn une fois par session si la structure
   // attendue est absente, pour surfacer le drift avant le bug "cloche ne
   // bumpe plus en cross-tab".
   let alpineDriftWarned = false;
-  window.addEventListener('storage', (e) => {
+  globalThis.addEventListener('storage', (e) => {
     if (e.key !== 'sf-profile-notifications') return;
     const root = document.querySelector('[x-data="app()"]') as
       | (HTMLElement & {

@@ -8,6 +8,10 @@ function makeContext() {
     $nextTick: vi.fn((cb: () => void) => cb()),
     refreshIcons: vi.fn(),
     dismissToast: null as any,
+    currentProfile: null as { id: string } | null,
+    currentProjectId: null as string | null,
+    notificationsVersion: 0,
+    shownToastEventKeys: new Set<string>(),
   };
 }
 
@@ -20,9 +24,9 @@ describe('createToast', () => {
     vi.useFakeTimers();
     const toast = createToast();
     ctx = makeContext();
-    ctx.dismissToast = toast.dismissToast.bind(ctx);
-    showToast = toast.showToast.bind(ctx);
-    dismissToast = toast.dismissToast.bind(ctx);
+    ctx.dismissToast = toast.dismissToast.bind(ctx as any);
+    showToast = toast.showToast.bind(ctx as any);
+    dismissToast = toast.dismissToast.bind(ctx as any);
   });
 
   afterEach(() => {
@@ -167,5 +171,70 @@ describe('createToast', () => {
     expect(ctx.toasts[0].message).toBe('Slow');
     vi.advanceTimersByTime(2000);
     expect(ctx.toasts).toHaveLength(0);
+  });
+
+  describe('eventKey idempotence (PR notifs)', () => {
+    let storage: Record<string, string>;
+
+    beforeEach(() => {
+      storage = {};
+      (globalThis as any).localStorage = {
+        getItem: (k: string) => storage[k] ?? null,
+        setItem: (k: string, v: string) => {
+          storage[k] = v;
+        },
+      };
+      ctx.currentProfile = { id: 'profile-1' };
+      ctx.currentProjectId = 'project-1';
+    });
+
+    it('appendNotification fires when eventKey is provided and persists notif', () => {
+      showToast('Hello', 'success', null, null, 'generation:gid-1:completed');
+
+      const persisted = JSON.parse(storage['sf-profile-notifications']);
+      expect(persisted['profile-1']).toHaveLength(1);
+      expect(persisted['profile-1'][0].eventKey).toBe('generation:gid-1:completed');
+      expect(ctx.notificationsVersion).toBe(1);
+      expect(ctx.shownToastEventKeys.has('generation:gid-1:completed')).toBe(true);
+      expect(ctx.toasts).toHaveLength(1);
+    });
+
+    it('skips toast UI if eventKey already shown in this tab', () => {
+      ctx.shownToastEventKeys.add('generation:gid-1:completed');
+
+      showToast('Hello', 'success', null, null, 'generation:gid-1:completed');
+
+      expect(ctx.toasts).toHaveLength(0);
+    });
+
+    it('does not push to ledger when currentProfile is null', () => {
+      ctx.currentProfile = null;
+      showToast('Hello', 'success', null, null, 'generation:gid-1:completed');
+
+      expect(storage['sf-profile-notifications']).toBeUndefined();
+      expect(ctx.notificationsVersion).toBe(0);
+      // Toast UI still shows even without profile
+      expect(ctx.toasts).toHaveLength(1);
+    });
+
+    it('does not bump notificationsVersion if appendNotification was idempotent', () => {
+      // Pre-seed seenEvents ledger so appendNotification returns false
+      storage['sf-profile-seen-events'] = JSON.stringify({
+        'profile-1': ['generation:gid-1:completed'],
+      });
+      showToast('Hello', 'success', null, null, 'generation:gid-1:completed');
+
+      expect(ctx.notificationsVersion).toBe(0);
+      // Toast UI still shows (per-tab dedup is independent from ledger)
+      expect(ctx.toasts).toHaveLength(1);
+    });
+
+    it('passes projectId through to appendNotification', () => {
+      ctx.currentProjectId = 'proj-xyz';
+      showToast('Done', 'success', null, null, 'generation:gid-2:completed');
+
+      const persisted = JSON.parse(storage['sf-profile-notifications']);
+      expect(persisted['profile-1'][0].projectId).toBe('proj-xyz');
+    });
   });
 });

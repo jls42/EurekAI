@@ -31,7 +31,9 @@
     class="absolute right-0 top-full mt-1 bg-surface rounded-card shadow-float w-80 sm:w-96 max-h-[480px] flex flex-col z-50"
   >
     <header class="flex items-center justify-between px-3 py-2 border-b border-text-secondary/20">
-      <h2 class="font-heading text-body font-semibold" x-text="t('notif.title')"></h2>
+      <h2 class="font-heading text-body font-semibold" x-text="t('notif.title')">
+        Notifications
+      </h2>
       <div class="flex items-center gap-2">
         <button
           @click="markAllNotificationsRead()"

@@ -254,7 +254,8 @@ function validateQuizReviewInputs(
   return {
     ok: true,
     data: {
-      originalGen: originalGen as QuizGeneration,
+      // type-narrowed via `originalGen?.type !== 'quiz'` early-return ci-dessus
+      originalGen,
       weakQuestions: body.weakQuestions as QuizQuestion[],
       markdown,
       reviewLabel: reviewLabelForLang(body.lang || 'fr'),
