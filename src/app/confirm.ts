@@ -10,6 +10,28 @@ const GID_UUID_V4 =
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
 const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
+// Helpers isolés pour l'appel /cancel : pid + gid pré-validés par les regex
+// PID_SAFE + GID_UUID_V4 dans canPostCancel. L'isolation limite la portée de
+// la taint analysis Codacy `rule-node-ssrf` au strict minimum (cf. CLAUDE.md
+// Sécurité — pattern utilisé par `executeDeleteProfile` dans profiles.ts).
+const canPostCancel = (pid: string | null | undefined, gid: string): pid is string =>
+  Boolean(pid && PID_SAFE.test(pid) && GID_UUID_V4.test(gid));
+
+// nosemgrep: javascript.lang.security.audit.ssrf.rule-node-ssrf -- inputs validated by canPostCancel above
+function postCancel(pid: string, gid: string): void {
+  const url = '/api/projects/' + pid + '/generations/' + gid + '/cancel';
+  // nosemgrep: javascript.lang.security.audit.ssrf.rule-node-ssrf -- inputs validated by canPostCancel above
+  fetch(url, { method: 'POST' })
+    .then((res) => {
+      if (!res.ok) {
+        console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+      }
+    })
+    .catch((err) => {
+      console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
+    });
+}
+
 // Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
 // Best-effort sur la POST mais on log les erreurs (4xx/5xx/réseau) pour ne pas
 // masquer un bug serveur ou un desync client/serveur. UI optimiste : retire de
@@ -26,19 +48,9 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     delete state.abortControllersByGid[gid];
   }
   const pid = state.currentProjectId;
-  // Validation gid UUID v4 + pid safe : élimine le chemin SSRF avant fetch
-  // (cf. CLAUDE.md section Sécurité, pattern `rule-node-ssrf`).
-  if (pid && PID_SAFE.test(pid) && GID_UUID_V4.test(gid)) {
-    const url = '/api/projects/' + pid + '/generations/' + gid + '/cancel';
-    fetch(url, { method: 'POST' })
-      .then((res) => {
-        if (!res.ok) {
-          console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
-        }
-      })
-      .catch((err) => {
-        console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
-      });
+  // Validation déléguée à canPostCancel (élimine le chemin SSRF avant fetch).
+  if (canPostCancel(pid, gid)) {
+    postCancel(pid, gid);
   }
   delete state.pendingById[gid];
   // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
