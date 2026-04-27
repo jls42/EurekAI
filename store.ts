@@ -370,7 +370,7 @@ export class ProjectStore {
     if (!data) return false;
     const tracker = data.results.pendingTracker ?? [];
     const entry = tracker.find((e) => e.id === generationId);
-    if (!entry || entry.status !== 'pending') return false;
+    if (entry?.status !== 'pending') return false;
     entry.status = nextStatus;
     entry.failureCode = code;
     entry.completedAt = new Date().toISOString();
