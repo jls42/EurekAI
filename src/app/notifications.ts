@@ -41,8 +41,10 @@ type SeenMap = Record<string, string[]>;
 type ProjectsSeenMap = Record<string, Record<string, string>>;
 
 // --- Helpers de lecture/écriture sécurisée ---
+// Arrow function pour éviter le faux positif Codacy "Method has 9 parameters"
+// déclenché par le type generic <T> sur la signature classique `function`.
 
-function readJson<T>(storage: StorageLike, key: string, fallback: T): T {
+const readJson = <T>(storage: StorageLike, key: string, fallback: T): T => {
   const raw = storage.getItem(key);
   if (!raw) return fallback;
   try {
@@ -50,11 +52,11 @@ function readJson<T>(storage: StorageLike, key: string, fallback: T): T {
   } catch {
     return fallback;
   }
-}
+};
 
-function writeJson(storage: StorageLike, key: string, value: unknown): void {
+const writeJson = (storage: StorageLike, key: string, value: unknown): void => {
   storage.setItem(key, JSON.stringify(value));
-}
+};
 
 // --- Notifs visibles ---
 
