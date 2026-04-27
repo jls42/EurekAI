@@ -39,8 +39,15 @@ export function postJson(body: unknown, signal: AbortSignal): RequestInit {
 export function registerGeneration(state: AppContext, gen: Generation): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
-  state.generations.push(gen);
+  // openGens AVANT upsert pour préserver la valeur initiale du `x-init $watch`
+  // dans quizVocalComponent (cf. helpers.ts applyGenerationEvent même fix). Si
+  // openGens est posé après le push, la transition undefined→true déclenche
+  // playQuestion() et le quiz vocal démarre tout seul.
   state.openGens[gen.id] = true;
+  // Idempotent : upsertGenerationById évite les doublons quand le payload 200
+  // fallback ET l'event SSE 'completed' arrivent tous les deux dans le même
+  // onglet. Si gid existe déjà dans state.generations, remplace au lieu de push.
+  state.upsertGenerationById(gen);
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
@@ -141,6 +148,22 @@ export function populateAutoPlan(
 
 type StepResult = 'success' | 'aborted' | 'failed';
 
+// Parse le body d'une réponse !ok pour extraire un code d'erreur lisible.
+// Si JSON valide → utilise body.error. Si non-JSON (HTML 502 proxy / timeout) →
+// retourne un snippet du raw text (max 200 chars) pour ne pas perdre le
+// diagnostic FailedStepCode silencieusement (cf. CLAUDE.md error codes API).
+// Arrow function pour éviter agglomération Lizard TS sur runAutoStep voisine.
+const parseStepErrorDetail = async (res: Response, fallback: string): Promise<string> => {
+  const raw = await res.text().catch(() => '');
+  try {
+    const errorCode = JSON.parse(raw)?.error;
+    if (errorCode) return errorCode;
+  } catch {
+    /* non-JSON body, fallback raw snippet */
+  }
+  return raw.slice(0, 200) || fallback;
+};
+
 export async function runAutoStep(
   state: AppContext,
   type: string,
@@ -159,16 +182,22 @@ export async function runAutoStep(
     const res = await fetch(url, postJson(body, controller.signal));
     if (state.currentProjectId !== projectId) return 'aborted';
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
+      const detail = await parseStepErrorDetail(res, res.statusText);
+      console.error(`auto: ${type} failed (${res.status}):`, detail);
       return 'failed';
     }
-    registerGeneration(state, await res.json());
+    const gen = await res.json();
+    registerGeneration(state, gen);
+    // eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts
+    // applyGenerationEvent) : dédup tab-locale du toast UI + persistance
+    // notif via showToast → appendNotification (toast.ts). Le HTTP
+    // devient un chemin de persistance complet quand SSE est down.
     state.showToast(
       state.t('toast.generationDone', { type: state.t('gen.' + type) }),
       'success',
       null,
       { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+      `generation:${gen.id}:completed`,
     );
     return 'success';
   } catch (e: unknown) {
@@ -233,11 +262,15 @@ export function handleGenerateHttpError(
 
 export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
   registerGeneration(state, gen);
+  // showToast avec eventKey idempotent : si l'event SSE 'completed' arrive en
+  // premier (peu probable mais possible), le toast UI ne sera pas dupliqué et
+  // la notif persistée n'aura qu'une seule entrée pour ce gid.
   state.showToast(
     state.t('toast.generationDone', { type: state.t('gen.' + type) }),
     'success',
     null,
     { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+    `generation:${gen.id}:completed`,
   );
 }
 
@@ -336,27 +369,63 @@ export function createGenerate() {
       if (!canStartGenerate(this, type)) return;
       const projectId = this.currentProjectId;
       if (!projectId) return;
+      // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
+      // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
+      // Pas besoin d'attendre la réponse serveur pour relier l'event SSE au fetch.
+      const gid = crypto.randomUUID();
       this.loading[type] = true;
       const controller = new AbortController();
       this.abortControllers[type] = controller;
+      this.abortControllersByGid[gid] = controller;
+      this.pendingById[gid] = {
+        id: gid,
+        type: type as
+          | 'summary'
+          | 'flashcards'
+          | 'quiz'
+          | 'podcast'
+          | 'quiz-vocal'
+          | 'image'
+          | 'fill-blank',
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+        sourceIds: [...this.selectedIds],
+      };
       try {
         // fetch inline avec projectId lu directement de this.currentProjectId pour
         // préserver l'analyse taint Codacy `rule-node-ssrf` — cf. CLAUDE.md section Sécurité.
         const res = await fetch(
           '/api/projects/' + projectId + '/generate/' + type,
-          postJson(buildGenerateBody(this), controller.signal),
+          postJson({ ...buildGenerateBody(this), gid }, controller.signal),
         );
+        if (this.currentProjectId !== projectId) return;
         if (!res.ok) {
+          // Validation early serveur (no_sources, context_too_large, moderation,
+          // duplicate_gid, race cancel/fail = 409). Aucun event SSE ne nettoiera
+          // le pending optimiste — cleanup local ici.
+          delete this.pendingById[gid];
           handleGenerateHttpError(this, type, res, await res.json().catch(() => ({})));
           return;
         }
-        if (this.currentProjectId !== projectId) return;
+        // Payload 200 fallback IDEMPOTENT avec SSE : si SSE down au moment du
+        // retour, cette branche garantit le feedback. SSE rejouera mais
+        // upsertGenerationById + showToast(eventKey) sont idempotents.
+        delete this.pendingById[gid];
         handleGenerateSuccess(this, type, await res.json());
       } catch (e: unknown) {
+        if (this.currentProjectId !== projectId) return;
+        // AbortError (cancel local) ou autre : cleanup pending optimiste local.
+        delete this.pendingById[gid];
         handleGenerateError(this, type, e);
       } finally {
-        this.loading[type] = false;
-        delete this.abortControllers[type];
+        // Guard projectId au cleanup pour ne pas effacer un nouveau pending si
+        // l'utilisateur a switché de projet entre temps. Le pending courant
+        // est nettoyé par les branches above ou par event SSE.
+        if (this.currentProjectId === projectId) {
+          this.loading[type] = false;
+          delete this.abortControllers[type];
+          delete this.abortControllersByGid[gid];
+        }
         this.$nextTick(() => this.refreshIcons());
       }
     },

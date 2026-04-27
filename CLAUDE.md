@@ -77,6 +77,27 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Utiliser `<div role="button" tabindex="0" @click @keydown.enter>` quand le conteneur cliquable contient des boutons enfants
 - Les boutons de generation dans view-sources sont dynamiques via `x-for` sur `categories` — ne pas hardcoder
 
+### Pending generations & notifications
+
+Cycle de vie des générations en cours (post-PR `feat/notifications-and-pending-generations`) :
+
+- **Refresh / switch profil ≠ cancel**. Invariant absolu : la fermeture du socket HTTP côté client (refresh, switch onglet, switch profil, navigation, perte réseau) **ne déclenche AUCUN cancel serveur**. La génération continue, persiste son résultat en `completed` même si `res.json()` part dans le vide. Le seul chemin d'annulation = `POST /api/projects/:pid/generations/:gid/cancel` explicite. Ne JAMAIS brancher `req.on('close')` pour annuler une génération.
+- **gid généré côté client** (`crypto.randomUUID()` dans `src/app/generate.ts`), passé au backend via `body.gid`. Permet `abortControllersByGid[gid]` immédiat et identifiant stable utilisable au moment du payload 200 fallback ou de l'event SSE. Le backend valide UUID v4 (`readClientGid` dans `routes/generate.ts`) ou retombe sur `randomUUID()` en cas de gid invalide. Pour `/generate/auto` (batch), le gid est généré serveur par step (un body.gid global serait incohérent avec N générations).
+- **Race promote/cancel** : `store.promoteToGeneration` retourne `PromoteResult = { kind: 'promoted', generation } | { kind: 'cancelled' } | { kind: 'failed', code } | { kind: 'missing' }`. Le handler dispatche : `200 generation` si promoted, `409 {error: kind, gid}` sinon. Plus de réponse 200 fantôme quand un cancel arrive pendant que Mistral travaille.
+- **Boot sweep** : `store.cancelAllPendingsAtBoot()` au démarrage marque tous les `pendingTracker[].status === 'pending'` comme `cancelled`. Pas de TTL — par construction, tout pending sur disque vient d'un process mort.
+- **`pendingTracker` séparé de `generations[]`** dans `ProjectData.results` (`types.ts`). Évite de polluer `generations: Generation[]` avec des entrées sans `data`. Promotion = remove du tracker + push dans generations atomique dans le même `saveProject`.
+- **SSE format obligatoire** sur `GET /api/projects/:pid/events` : `event: generation\ndata: {...}\n\n`. La ligne `event:` est obligatoire pour matcher `addEventListener('generation', ...)` côté client. Sans elle, l'event tombe sur le canal `'message'` générique. Heartbeat `: keep-alive\n\n` toutes les 25s.
+- **Idempotence à 2 niveaux côté client** :
+  - `appendNotification(profileId, {eventKey, ...})` dans `src/app/notifications.ts` est idempotent par `eventKey` via le ledger localStorage `sf-profile-seen-events` (LRU cap 1000/profil, **JAMAIS cleared** — sinon réconciliation recrée les notifs supprimées).
+  - `shownToastEventKeys: Set<string>` dans le state Alpine est la dédup tab-locale du toast UI. Un même eventKey produit max 1 toast UI par onglet.
+  - Combinés : payload 200 + event SSE `completed` dans le même onglet → 1 toast et 1 notif persistée. SSE dans 2 onglets → 2 toasts (UX cohérente où l'user regarde) + 1 notif persistée cross-tabs.
+- **Watermark conservateur lastSeenAt** : `reconcileStartedAt = new Date().toISOString()` capturé AVANT le fetch snapshot. Cutoff de réconciliation = `Date.parse(lastSeenIso ?? reconcileStartedAt)`. Au 1er load post-PR, `lastSeenAt` est absent → cutoff = now → zéro backfill historique (pas de spam de 200 notifs sur un projet existant). Set du watermark se fait avec `reconcileStartedAt` (pas `now` post-backfill) pour ne jamais masquer un event arrivé entre snapshot et ouverture SSE.
+- **`resetSession()`** (`src/app/session.ts`) invoqué par `selectProfile`, `selectProject`, `deleteProject`. Stop EventSource SSE, abort tous les `abortControllers` + `abortControllersByGid`, vide `loading{}`, `pendingById`, `toasts[]`, `shownToastEventKeys`, reset `confirmCallback`. **NE TOUCHE PAS** au ledger `seenEventKeys` ni à la liste `notifications` (mémoire persistante du profil, replay au retour).
+- **Validations early extraites des generators** (`routes/generate.ts`) : tout `return null + res.status(4xx)` doit être SORTI en pre-handler AVANT `addPendingEntry`. Sinon un input invalide laisse un pending tracker entry orphelin. Helper `validateQuizReviewInputs` montre le pattern.
+- **`storage` event cross-tab** : `src/main.ts` enregistre `window.addEventListener('storage', ...)` qui bumpe `state.notificationsVersion` quand `sf-profile-notifications` change dans un autre onglet. Le storage event ne fire pas dans le tab qui écrit, donc combiné avec le bump local sur `appendNotification`, tous les onglets convergent.
+- **`sf-lastProjectId` namespacé par profil** : map `sf-profile-last-project: {profileId: projectId}` (cf. `src/app/projects.ts` helpers en arrow). Migration silencieuse one-time au boot de la clé legacy `sf-lastProjectId`. Idempotent.
+- **Limite documentée Mistral SDK** : la requête en cours côté serveur n'est PAS interruptible. Le cancel ne stoppe pas la facturation, il signifie "on ignore la réponse quand elle arrive" (via `promoteToGeneration` qui retourne `cancelled` et le handler 409).
+
 ## Code quality
 
 - Fonctions courtes et focalisees (~30 lignes max, ~50 en cas de necessite)

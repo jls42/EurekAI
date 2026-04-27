@@ -5,19 +5,22 @@
     <h2 class="font-heading font-bold text-xl title-gradient" x-text="t('quiz.heading')">Quiz</h2>
     <button
       @click="generate('quiz')"
-      :disabled="loading.quiz || sources.length === 0"
+      :disabled="isLoading('quiz') || sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-quiz/10 text-gen-quiz hover:bg-gen-quiz/20 disabled:opacity-50"
     >
-      <i x-show="!loading.quiz" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('quiz')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading.quiz"
+        x-show="isLoading('quiz')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-quiz border-t-transparent"
       ></span>
-      <span x-text="loading.quiz ? t('common.loading') : t('quiz.new')"></span>
+      <span x-text="isLoading('quiz') ? t('common.loading') : t('quiz.new')"></span>
     </button>
   </div>
 
-  <div x-show="generationsByType('quiz').length === 0 && !loading.quiz" class="text-center py-12">
+  <div
+    x-show="generationsByType('quiz').length === 0 && !isLoading('quiz')"
+    class="text-center py-12"
+  >
     <div
       class="w-16 h-16 mx-auto mb-3 bg-purple-50 rounded-[1rem] border border-gen-quiz/20 flex items-center justify-center"
     >

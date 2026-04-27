@@ -1,0 +1,75 @@
+<div
+  class="relative shrink-0"
+  x-data="{ notifOpen: false }"
+  x-show="currentProfile"
+  @keydown.escape.window="notifOpen = false"
+>
+  <!-- Cloche header avec badge unread. notificationsVersion est bumpé à chaque
+       appendNotification (et par le storage event listener cross-tab dans
+       main.ts) pour forcer le re-render Alpine via x-effect. -->
+  <button
+    @click="notifOpen = !notifOpen; if (notifOpen) refreshIcons()"
+    @click.outside="notifOpen = false"
+    class="min-h-touch min-w-[40px] sm:min-w-[44px] flex items-center justify-center focus-ring rounded-button btn-press relative"
+    :aria-label="t('notif.openBell')"
+    :title="t('notif.openBell')"
+  >
+    <i data-lucide="bell" class="w-5 h-5"></i>
+    <template x-if="notificationsVersion >= 0 && unreadNotificationsCount() > 0">
+      <span
+        class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center"
+        :aria-label="t('notif.unreadBadge', { count: unreadNotificationsCount() })"
+        x-text="unreadNotificationsCount()"
+      ></span>
+    </template>
+  </button>
+
+  <!-- Panneau dropdown -->
+  <div
+    x-show="notifOpen"
+    x-transition
+    class="absolute right-0 top-full mt-1 bg-surface rounded-card shadow-float w-80 sm:w-96 max-h-[480px] flex flex-col z-50"
+  >
+    <header class="flex items-center justify-between px-3 py-2 border-b border-text-secondary/20">
+      <h2 class="font-heading text-body font-semibold" x-text="t('notif.title')">
+        Notifications
+      </h2>
+      <div class="flex items-center gap-2">
+        <button
+          @click="markAllNotificationsRead()"
+          x-show="profileNotifications().length > 0"
+          class="text-body-sm text-text-secondary hover:text-text-primary transition-colors"
+          x-text="t('notif.markAllRead')"
+        ></button>
+        <button
+          @click="clearProfileNotifications()"
+          x-show="profileNotifications().length > 0"
+          class="text-body-sm text-danger hover:opacity-80 transition-opacity"
+          x-text="t('notif.clear')"
+        ></button>
+      </div>
+    </header>
+
+    <ul class="flex-1 overflow-y-auto" x-show="profileNotifications().length > 0">
+      <template x-for="notif in profileNotifications().slice().reverse()" :key="notif.eventKey">
+        <li
+          class="px-3 py-2 border-b border-text-secondary/10 last:border-b-0 hover:bg-primary/5 transition-colors cursor-pointer"
+          :class="!notif.read && 'bg-primary/5 font-medium'"
+          @click="markNotificationRead(notif.eventKey)"
+        >
+          <p class="text-body-sm" x-text="notif.message"></p>
+          <p
+            class="text-body-sm text-text-secondary text-xs mt-1"
+            x-text="t('notif.timeAgo', { time: formatRelativeTime(notif.createdAt) })"
+          ></p>
+        </li>
+      </template>
+    </ul>
+
+    <p
+      x-show="profileNotifications().length === 0"
+      class="px-3 py-6 text-center text-body-sm text-text-secondary"
+      x-text="t('notif.empty')"
+    ></p>
+  </div>
+</div>

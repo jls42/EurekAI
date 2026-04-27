@@ -41,6 +41,23 @@ export const es: Record<string, string> = {
     'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
 
   'errorCode.internal_error': 'Error interno del servidor',
+  'errorCode.cancelled': 'Generación cancelada',
+
+  // Notifications center
+  'notif.openBell': 'Abrir centro de notificaciones',
+  'notif.title': 'Notificaciones',
+  'notif.empty': 'Sin notificaciones',
+  'notif.markAllRead': 'Marcar todo como leído',
+  'notif.clear': 'Limpiar',
+  'notif.timeAgo': 'hace {time}',
+  'notif.justNow': 'ahora mismo',
+  'notif.minutesAgo': '{count} min',
+  'notif.hoursAgo': '{count} h',
+  'notif.daysAgo': '{count} d',
+  'notif.unreadBadge': '{count} no leídas',
+  'notif.generationDone': '{type} completada',
+  'notif.generationFailed': 'Falló {type}',
+  'notif.generationCancelled': '{type} cancelada',
   'errorCode.no_sources': 'Ninguna fuente disponible',
   'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',

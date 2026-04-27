@@ -7,21 +7,21 @@
     </h2>
     <button
       @click="generate('summary')"
-      :disabled="loading.summary || sources.length === 0"
+      :disabled="isLoading('summary') || sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
     >
-      <i x-show="!loading.summary" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('summary')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading.summary"
+        x-show="isLoading('summary')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
       ></span>
-      <span x-text="loading.summary ? t('common.loading') : t('summary.new')"></span>
+      <span x-text="isLoading('summary') ? t('common.loading') : t('summary.new')"></span>
     </button>
   </div>
 
   <!-- Empty state -->
   <div
-    x-show="generationsByType('summary').length === 0 && !loading.summary"
+    x-show="generationsByType('summary').length === 0 && !isLoading('summary')"
     class="text-center py-12"
   >
     <div

@@ -34,6 +34,15 @@ function makeContext(overrides: any = {}) {
       websearch: false,
     },
     abortControllers: {},
+    abortControllersByGid: {},
+    pendingById: {},
+    shownToastEventKeys: new Set<string>(),
+    notificationsVersion: 0,
+    upsertGenerationById(gen: any) {
+      const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+      if (idx === -1) this.generations.push(gen);
+      else this.generations[idx] = gen;
+    },
     openGens: {},
     useConsigne: false,
     generateCount: 10,
@@ -204,6 +213,7 @@ describe('generate', () => {
       'success',
       null,
       expect.objectContaining({ label: 'toast.view' }),
+      expect.stringMatching(/^generation:.+:completed$/),
     );
     expect(ctx.loading.summary).toBe(false);
   });
@@ -510,6 +520,85 @@ describe('generateAuto', () => {
 
     expect(ctx.showToast).not.toHaveBeenCalled();
     expect(ctx.loading.auto).toBe(false);
+  });
+
+  it('passes eventKey on per-step toast for SSE/HTTP idempotence', async () => {
+    // Fix 4 : runAutoStep doit passer `generation:${gen.id}:completed` comme
+    // eventKey à showToast. Idempotent avec l'event SSE 'completed' qui passe
+    // le même eventKey via applyGenerationEvent → notif persistée et toast UI
+    // dédupés. Sans ça, l'utilisateur verrait 2 toasts par génération auto.
+    const routeResult = {
+      plan: [{ agent: 'summary', reason: 'test' }],
+      context: 'test context',
+    };
+    mockFetchOk(routeResult);
+    mockFetchOk({ id: 'gen-summary-1', type: 'summary' });
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    const successCall = ctx.showToast.mock.calls.find(
+      (c: any[]) => c[1] === 'success' && c[0] === 'toast.generationDone',
+    );
+    expect(successCall).toBeDefined();
+    // Signature : (message, type, retryFn, action, eventKey)
+    expect(successCall![4]).toBe('generation:gen-summary-1:completed');
+  });
+
+  it('emits distinct eventKeys across multi-step auto plan', async () => {
+    // Régression : si un refactor cachait gen.id (closure capture) entre les
+    // itérations de plan, les 2 toasts auraient le même eventKey et le 2e
+    // serait dédupé via shownToastEventKeys → user voit 1 toast au lieu de 2.
+    const routeResult = {
+      plan: [
+        { agent: 'summary', reason: 'a' },
+        { agent: 'quiz', reason: 'b' },
+      ],
+      context: 'ctx',
+    };
+    mockFetchOk(routeResult);
+    mockFetchOk({ id: 'gen-summary-1', type: 'summary' });
+    mockFetchOk({ id: 'gen-quiz-2', type: 'quiz' });
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    const successCalls = ctx.showToast.mock.calls.filter(
+      (c: any[]) => c[1] === 'success' && c[0] === 'toast.generationDone',
+    );
+    expect(successCalls).toHaveLength(2);
+    const eventKeys = successCalls.map((c: any[]) => c[4]).sort();
+    expect(eventKeys).toEqual([
+      'generation:gen-quiz-2:completed',
+      'generation:gen-summary-1:completed',
+    ]);
+  });
+
+  it('logs error code from non-JSON failure body (raw text snippet)', async () => {
+    // Fix : si le body !ok n'est pas JSON (HTML 502 proxy / plain-text upstream),
+    // res.json().catch(()=>({})) jetait le body silencieusement. Désormais on lit
+    // le body en text() et on log un snippet pour ne pas perdre le diagnostic.
+    const routeResult = { plan: [{ agent: 'summary', reason: 'a' }], context: '' };
+    mockFetchOk(routeResult);
+    // Step request returns non-ok with non-JSON body
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 502,
+      statusText: 'Bad Gateway',
+      text: () => Promise.resolve('<html>upstream timeout</html>'),
+      json: () => Promise.reject(new Error('not json')),
+    } as any);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    const matched = errSpy.mock.calls.some(
+      (c) =>
+        String(c[0]).includes('summary failed (502)') && String(c[1]).includes('upstream timeout'),
+    );
+    expect(matched).toBe(true);
+    errSpy.mockRestore();
   });
 });
 

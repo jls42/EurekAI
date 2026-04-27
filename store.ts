@@ -13,7 +13,27 @@ import type {
   ChatMessage,
   CostEntry,
   ModerationResult,
+  PendingTrackerEntry,
+  FailedStepCode,
+  GenerationStatus,
 } from './types.js';
+import { emitGenerationEvent, buildEventKey } from './helpers/event-bus.js';
+
+// Résultat d'une tentative de promotion d'un pending vers une Generation finale.
+// Permet au handler HTTP de répondre 200 (promoted) ou 409 (cancelled/failed/missing)
+// avec une sémantique non ambiguë — pas de réponse 200 fantôme si un cancel a gagné
+// la course pendant que Mistral renvoyait son résultat.
+export type PromoteResult =
+  | { kind: 'promoted'; generation: Generation }
+  | { kind: 'cancelled' }
+  | { kind: 'failed'; code: FailedStepCode }
+  | { kind: 'missing' };
+
+// Defaults pour le pruning du tracker (failed/cancelled accumulent sinon).
+// maxKeep et maxAgeMs s'appliquent en union : on garde une entrée si elle satisfait
+// LES DEUX critères. Les pendings actifs (status === 'pending') sont toujours préservés.
+const DEFAULT_PRUNE_MAX_KEEP = 50;
+const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class ProjectStore {
   private readonly baseDir: string;
@@ -243,6 +263,169 @@ export class ProjectStore {
     const data = this.getProject(projectId);
     if (!data) return null;
     return data.results.generations.find((g) => g.id === generationId) ?? null;
+  }
+
+  // --- Pending tracker lifecycle ---
+  //
+  // Modèle : pending tracker séparé de generations[]. Permet d'avoir un cycle de
+  // vie (pending → completed/failed/cancelled) sans contaminer le typage strict
+  // de Generation.data partout dans le code. À la promotion, l'entrée est retirée
+  // du tracker et une Generation complète est ajoutée à generations[].
+  //
+  // Les races (réponse Mistral arrive juste après cancel HTTP) sont absorbées par
+  // les checks d'idempotence : promoteToGeneration retourne {kind: 'cancelled'} si
+  // l'entrée a été retirée du tracker entre-temps, et le handler HTTP renvoie 409
+  // au lieu de 200 fantôme.
+
+  addPendingEntry(projectId: string, entry: PendingTrackerEntry): boolean {
+    const data = this.getProject(projectId);
+    if (!data) return false;
+    const tracker = (data.results.pendingTracker ??= []);
+    if (tracker.some((e) => e.id === entry.id)) return false;
+    tracker.push(entry);
+    this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, entry.status);
+    return true;
+  }
+
+  promoteToGeneration(
+    projectId: string,
+    generationId: string,
+    generation: Generation,
+  ): PromoteResult {
+    const data = this.getProject(projectId);
+    if (!data) return { kind: 'missing' };
+    const tracker = data.results.pendingTracker ?? [];
+    const idx = tracker.findIndex((e) => e.id === generationId);
+    if (idx === -1) return { kind: 'missing' };
+    const entry = tracker[idx];
+    if (entry.status === 'cancelled') return { kind: 'cancelled' };
+    if (entry.status === 'failed') {
+      return { kind: 'failed', code: entry.failureCode ?? 'internal_error' };
+    }
+    tracker.splice(idx, 1);
+    const finalGen = { ...generation, completedAt: new Date().toISOString() } as Generation;
+    data.results.generations.push(finalGen);
+    this.pruneTrackerIfNeeded(data);
+    this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, 'completed', finalGen);
+    return { kind: 'promoted', generation: finalGen };
+  }
+
+  markPendingFailed(projectId: string, generationId: string, code: FailedStepCode): boolean {
+    return this.terminatePending(projectId, generationId, 'failed', code);
+  }
+
+  markPendingCancelled(projectId: string, generationId: string): boolean {
+    return this.terminatePending(projectId, generationId, 'cancelled', 'cancelled');
+  }
+
+  // Cas boot : process précédent mort, tous les pendings sur disque sont par
+  // construction orphelins (aucun process ne les portera à terme). Marque tous
+  // les pending → cancelled. Pas de TTL. Retourne le nombre d'entrées affectées.
+  cancelAllPendingsAtBoot(): number {
+    let total = 0;
+    for (const meta of this.readIndex()) {
+      const data = this.getProject(meta.id);
+      if (!data) continue;
+      const tracker = data.results.pendingTracker ?? [];
+      const cancelled: PendingTrackerEntry[] = [];
+      for (const entry of tracker) {
+        if (entry.status === 'pending') {
+          entry.status = 'cancelled';
+          entry.failureCode = 'cancelled';
+          entry.completedAt = new Date().toISOString();
+          cancelled.push(entry);
+          total++;
+        }
+      }
+      if (cancelled.length > 0) {
+        this.pruneTrackerIfNeeded(data);
+        this.saveProject(meta.id, data);
+        for (const entry of cancelled) {
+          this.emitTrackerEvent(meta.id, entry, 'cancelled');
+        }
+      }
+    }
+    return total;
+  }
+
+  prunePendingTracker(projectId: string, opts?: { maxKeep?: number; maxAgeMs?: number }): number {
+    const data = this.getProject(projectId);
+    if (!data) return 0;
+    const before = data.results.pendingTracker?.length ?? 0;
+    this.pruneTracker(data, opts);
+    const after = data.results.pendingTracker?.length ?? 0;
+    if (after !== before) this.saveProject(projectId, data);
+    return before - after;
+  }
+
+  private terminatePending(
+    projectId: string,
+    generationId: string,
+    nextStatus: 'failed' | 'cancelled',
+    code: FailedStepCode,
+  ): boolean {
+    const data = this.getProject(projectId);
+    if (!data) return false;
+    const tracker = data.results.pendingTracker ?? [];
+    const entry = tracker.find((e) => e.id === generationId);
+    if (entry?.status !== 'pending') return false;
+    entry.status = nextStatus;
+    entry.failureCode = code;
+    entry.completedAt = new Date().toISOString();
+    this.pruneTrackerIfNeeded(data);
+    this.saveProject(projectId, data);
+    this.emitTrackerEvent(projectId, entry, nextStatus);
+    return true;
+  }
+
+  // Construit et émet un GenerationEvent à partir d'une entrée de tracker.
+  // Centralisé pour que tous les helpers (add/promote/fail/cancel/boot sweep)
+  // émettent au même format avec la même clé eventKey stable.
+  private emitTrackerEvent(
+    pid: string,
+    entry: PendingTrackerEntry,
+    status: GenerationStatus,
+    generation?: Generation,
+  ): void {
+    emitGenerationEvent({
+      pid,
+      gid: entry.id,
+      type: entry.type,
+      status,
+      failureCode: entry.failureCode,
+      generation,
+      at: entry.completedAt ?? entry.startedAt ?? new Date().toISOString(),
+      eventKey: buildEventKey(entry.id, status),
+    });
+  }
+
+  private pruneTrackerIfNeeded(data: ProjectData): void {
+    const tracker = data.results.pendingTracker;
+    if (!tracker || tracker.length <= DEFAULT_PRUNE_MAX_KEEP) return;
+    this.pruneTracker(data);
+  }
+
+  private pruneTracker(data: ProjectData, opts?: { maxKeep?: number; maxAgeMs?: number }): void {
+    const tracker = data.results.pendingTracker;
+    if (!tracker || tracker.length === 0) return;
+    const maxKeep = opts?.maxKeep ?? DEFAULT_PRUNE_MAX_KEEP;
+    const maxAgeMs = opts?.maxAgeMs ?? DEFAULT_PRUNE_MAX_AGE_MS;
+    const now = Date.now();
+    const pendings = tracker.filter((e) => e.status === 'pending');
+    const terminals = tracker
+      .filter((e) => e.status !== 'pending')
+      .filter((e) => {
+        const ts = e.completedAt ? Date.parse(e.completedAt) : Date.parse(e.startedAt);
+        return now - ts <= maxAgeMs;
+      })
+      .sort(
+        (a, b) =>
+          Date.parse(b.completedAt ?? b.startedAt) - Date.parse(a.completedAt ?? a.startedAt),
+      )
+      .slice(0, Math.max(0, maxKeep - pendings.length));
+    data.results.pendingTracker = [...pendings, ...terminals];
   }
 
   private normalizeModeration(

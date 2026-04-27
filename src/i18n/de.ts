@@ -41,6 +41,23 @@ export const de: Record<string, string> = {
     'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
 
   'errorCode.internal_error': 'Interner Serverfehler',
+  'errorCode.cancelled': 'Generierung abgebrochen',
+
+  // Notifications center
+  'notif.openBell': 'Benachrichtigungszentrum öffnen',
+  'notif.title': 'Benachrichtigungen',
+  'notif.empty': 'Keine Benachrichtigungen',
+  'notif.markAllRead': 'Alle als gelesen markieren',
+  'notif.clear': 'Leeren',
+  'notif.timeAgo': 'vor {time}',
+  'notif.justNow': 'gerade eben',
+  'notif.minutesAgo': '{count} Min',
+  'notif.hoursAgo': '{count} Std',
+  'notif.daysAgo': '{count} T',
+  'notif.unreadBadge': '{count} ungelesen',
+  'notif.generationDone': '{type} fertig',
+  'notif.generationFailed': '{type} fehlgeschlagen',
+  'notif.generationCancelled': '{type} abgebrochen',
   'errorCode.no_sources': 'Keine Quelle verfuegbar',
   'errorCode.auth_required': 'Mistral-API-Schluessel fehlt oder ungueltig',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',

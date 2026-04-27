@@ -69,7 +69,7 @@
       >
         <button
           @click="generate(cat.key)"
-          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
+          :disabled="isLoading(cat.key) || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
           :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
           class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-white shadow-card disabled:opacity-50"
           :style="'color:' + cat.color"

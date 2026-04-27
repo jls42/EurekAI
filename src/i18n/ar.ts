@@ -48,6 +48,23 @@ export const ar: Record<string, string> = {
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.cancelled': 'تم إلغاء التوليد',
+
+  // Notifications center
+  'notif.openBell': 'فتح مركز الإشعارات',
+  'notif.title': 'الإشعارات',
+  'notif.empty': 'لا توجد إشعارات',
+  'notif.markAllRead': 'تعليم الكل كمقروء',
+  'notif.clear': 'مسح',
+  'notif.timeAgo': 'منذ {time}',
+  'notif.justNow': 'الآن',
+  'notif.minutesAgo': '{count} د',
+  'notif.hoursAgo': '{count} س',
+  'notif.daysAgo': '{count} ي',
+  'notif.unreadBadge': '{count} غير مقروء',
+  'notif.generationDone': 'اكتمل {type}',
+  'notif.generationFailed': 'فشل {type}',
+  'notif.generationCancelled': 'تم إلغاء {type}',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
@@ -57,8 +74,7 @@ export const ar: Record<string, string> = {
   'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
   'errorCode.upload_failed': 'فشل التحميل',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
-  'errorCode.profile_delete_partial':
-    'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
+  'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',

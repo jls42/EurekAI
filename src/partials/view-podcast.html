@@ -7,20 +7,20 @@
     <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <button
       @click="generate('podcast')"
-      :disabled="loading.podcast || sources.length === 0 || !apiStatus.ttsAvailable"
+      :disabled="isLoading('podcast') || sources.length === 0 || !apiStatus.ttsAvailable"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-podcast/10 text-gen-podcast hover:bg-gen-podcast/20 disabled:opacity-50"
     >
-      <i x-show="!loading.podcast" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('podcast')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading.podcast"
+        x-show="isLoading('podcast')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-podcast border-t-transparent"
       ></span>
-      <span x-text="loading.podcast ? t('common.loading') : t('podcast.new')"></span>
+      <span x-text="isLoading('podcast') ? t('common.loading') : t('podcast.new')"></span>
     </button>
   </div>
 
   <div
-    x-show="generationsByType('podcast').length === 0 && !loading.podcast"
+    x-show="generationsByType('podcast').length === 0 && !isLoading('podcast')"
     class="text-center py-12"
   >
     <div

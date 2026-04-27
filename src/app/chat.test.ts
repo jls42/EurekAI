@@ -34,6 +34,11 @@ function makeContext(overrides: any = {}) {
     $refs: {},
     apiBase: vi.fn(() => '/api/projects/pid-1'),
     initGenProps: vi.fn(),
+    upsertGenerationById(gen: any) {
+      const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+      if (idx === -1) this.generations.push(gen);
+      else this.generations[idx] = gen;
+    },
     scrollChatBottom: chat.scrollChatBottom,
     loadChatHistory: chat.loadChatHistory,
     sendChatMessage: chat.sendChatMessage,

@@ -7,21 +7,21 @@
     </h2>
     <button
       @click="generate('fill-blank')"
-      :disabled="loading['fill-blank'] || sources.length === 0"
+      :disabled="isLoading('fill-blank') || sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-fillblank/10 text-gen-fillblank hover:bg-gen-fillblank/20 disabled:opacity-50"
     >
-      <i x-show="!loading['fill-blank']" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('fill-blank')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading['fill-blank']"
+        x-show="isLoading('fill-blank')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-fillblank border-t-transparent"
       ></span>
-      <span x-text="loading['fill-blank'] ? t('common.loading') : t('fillBlank.new')"></span>
+      <span x-text="isLoading('fill-blank') ? t('common.loading') : t('fillBlank.new')"></span>
     </button>
   </div>
 
   <!-- Empty state -->
   <div
-    x-show="generationsByType('fill-blank').length === 0 && !loading['fill-blank']"
+    x-show="generationsByType('fill-blank').length === 0 && !isLoading('fill-blank')"
     class="text-center py-12"
   >
     <div

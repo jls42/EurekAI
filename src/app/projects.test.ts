@@ -52,6 +52,7 @@ function makeContext(overrides: any = {}) {
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: {},
     initGenProps: vi.fn(),
+    resetSession: vi.fn(),
     resetState: proj.resetState,
     selectProject: proj.selectProject,
     sortedProjects: proj.sortedProjects,
@@ -240,7 +241,12 @@ describe('selectProject', () => {
     expect(ctx.openGens['g2']).toBe(true);
     expect(ctx.openGens['g3']).toBe(true);
     expect(ctx.activeView).toBe('dashboard');
-    expect(localStorage.setItem).toHaveBeenCalledWith('sf-lastProjectId', 'p1');
+    // Namespacé par profil : la map `sf-profile-last-project` reçoit { 'p1': 'p1' }
+    // (où le 1er 'p1' est le profileId mock et le 2nd 'p1' est le projectId).
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'sf-profile-last-project',
+      expect.stringContaining('"p1":"p1"'),
+    );
   });
 
   it('sets activeView to sources when no sources', async () => {

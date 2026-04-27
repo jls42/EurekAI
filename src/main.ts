@@ -16,6 +16,7 @@ import { quizComponent } from './components/quiz';
 import { quizVocalComponent } from './components/quiz-vocal';
 import { fillBlankComponent } from './components/fill-blank';
 import { flashcardsComponent } from './components/flashcards';
+import { installCrossTabSync } from './app/cross-tab-sync';
 
 // Register i18n locales before Alpine starts
 registerLocale('fr', fr);
@@ -42,3 +43,10 @@ document.addEventListener('alpine:initialized', () => createIcons({ icons }));
 document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => createIcons({ icons }), 100);
 });
+
+// Cross-tab synchronization de la cloche notifications. Logique extraite
+// dans cross-tab-sync.ts pour permettre les tests unitaires (handler appelé
+// avec un Document mocké). Guard pour ne pas péter en environnement Node.
+if (globalThis.window !== undefined) {
+  installCrossTabSync(globalThis, document);
+}

@@ -7,10 +7,37 @@ import type {
   ProjectMeta,
   Source,
   ChatMessage,
+  PendingTrackerEntry,
 } from '../../types';
 import type { Toast } from './toast';
 
 const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
+
+// Catégories de navigation/génération — extraites pour limiter la longueur
+// de createState() (warning Codacy `Method has X lines of code`).
+const CATEGORIES_DEFAULT: ReadonlyArray<{
+  key: string;
+  labelKey: string;
+  icon: string;
+  color: string;
+}> = [
+  { key: 'dashboard', labelKey: 'nav.dashboard', icon: 'layout-grid', color: 'var(--color-primary)' },
+  { key: 'sources', labelKey: 'nav.sources', icon: 'upload-cloud', color: 'var(--color-accent)' },
+  { key: 'chat', labelKey: 'nav.chat', icon: 'message-circle', color: 'var(--color-primary)' },
+  { key: 'summary', labelKey: 'nav.summary', icon: 'file-text', color: 'var(--color-gen-summary)' },
+  { key: 'flashcards', labelKey: 'nav.flashcards', icon: 'layers', color: 'var(--color-gen-flashcards)' },
+  { key: 'quiz', labelKey: 'nav.quiz', icon: 'brain', color: 'var(--color-gen-quiz)' },
+  { key: 'quiz-vocal', labelKey: 'nav.quiz-vocal', icon: 'mic', color: 'var(--color-gen-quizvocal)' },
+  { key: 'podcast', labelKey: 'nav.podcast', icon: 'headphones', color: 'var(--color-gen-podcast)' },
+  { key: 'fill-blank', labelKey: 'nav.fill-blank', icon: 'pencil-line', color: 'var(--color-gen-fillblank)' },
+  { key: 'image', labelKey: 'nav.image', icon: 'image', color: 'var(--color-gen-image)' },
+];
+
+const initialTheme = (): 'dark' | 'light' => {
+  const t = localStorage.getItem('sf-theme');
+  if (t === 'dark' || t === 'light') return t;
+  return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+};
 
 export function createState() {
   return {
@@ -116,8 +143,30 @@ export function createState() {
       websearch: false,
     } as Record<string, boolean>,
 
-    // AbortControllers for cancellation
+    // AbortControllers for cancellation (legacy par type, conservé pour le commit
+    // pending lifecycle qui migrera vers abortControllersByGid).
     abortControllers: {} as Record<string, AbortController>,
+
+    // --- Pending lifecycle (post-PR) ---
+    // Source de vérité pour les 7 Generation persistées. Multi-pendings même type
+    // possibles (multi-onglets, /generate/auto parallel). Hydraté depuis
+    // project.results.pendingTracker au selectProject + via events SSE.
+    pendingById: {} as Record<string, PendingTrackerEntry>,
+
+    // AbortControllers indexés par gid (UUID v4 généré côté client) — permet de
+    // cibler précisément un pending à canceller même quand plusieurs pendings du
+    // même type coexistent.
+    abortControllersByGid: {} as Record<string, AbortController>,
+
+    // Dédup toast UI per-tab (mémoire onglet, non persistée). Combiné avec
+    // appendNotification (dédup persistée localStorage), garantit qu'un même
+    // eventKey produit max 1 toast UI par onglet ET max 1 notif persistée
+    // cross-tabs (cf. notifications.ts).
+    shownToastEventKeys: new Set<string>(),
+
+    // Compteur incrémenté à chaque appendNotification réussi pour déclencher
+    // la reactivity Alpine sur la cloche header (badge unread + liste).
+    notificationsVersion: 0,
 
     // Settings
     showSettings: false,
@@ -150,12 +199,7 @@ export function createState() {
     },
 
     // Theme
-    theme: (function () {
-      const t = localStorage.getItem('sf-theme');
-      if (!t)
-        return globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-      return t;
-    })(),
+    theme: initialTheme(),
 
     // Navigation & Layout
     sidebarOpen: false,
@@ -169,53 +213,7 @@ export function createState() {
     chatInput: '',
     chatLoading: false,
 
-    categories: [
-      {
-        key: 'dashboard',
-        labelKey: 'nav.dashboard',
-        icon: 'layout-grid',
-        color: 'var(--color-primary)',
-      },
-      {
-        key: 'sources',
-        labelKey: 'nav.sources',
-        icon: 'upload-cloud',
-        color: 'var(--color-accent)',
-      },
-      { key: 'chat', labelKey: 'nav.chat', icon: 'message-circle', color: 'var(--color-primary)' },
-      {
-        key: 'summary',
-        labelKey: 'nav.summary',
-        icon: 'file-text',
-        color: 'var(--color-gen-summary)',
-      },
-      {
-        key: 'flashcards',
-        labelKey: 'nav.flashcards',
-        icon: 'layers',
-        color: 'var(--color-gen-flashcards)',
-      },
-      { key: 'quiz', labelKey: 'nav.quiz', icon: 'brain', color: 'var(--color-gen-quiz)' },
-      {
-        key: 'quiz-vocal',
-        labelKey: 'nav.quiz-vocal',
-        icon: 'mic',
-        color: 'var(--color-gen-quizvocal)',
-      },
-      {
-        key: 'podcast',
-        labelKey: 'nav.podcast',
-        icon: 'headphones',
-        color: 'var(--color-gen-podcast)',
-      },
-      {
-        key: 'fill-blank',
-        labelKey: 'nav.fill-blank',
-        icon: 'pencil-line',
-        color: 'var(--color-gen-fillblank)',
-      },
-      { key: 'image', labelKey: 'nav.image', icon: 'image', color: 'var(--color-gen-image)' },
-    ],
+    categories: CATEGORIES_DEFAULT.map((c) => ({ ...c })),
 
     // Lightbox
     lightboxUrl: '',

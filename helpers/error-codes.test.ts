@@ -13,12 +13,14 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
   tts_upstream_error: true,
   context_length_exceeded: true,
   internal_error: true,
+  cancelled: true,
 };
 
 describe('FailedStepCode registry', () => {
-  it('liste exhaustivement les 7 codes contractuels (garde compile-time + runtime)', () => {
+  it('liste exhaustivement les 8 codes contractuels (garde compile-time + runtime)', () => {
     expect(Object.keys(_KNOWN_CODES).sort()).toEqual([
       'auth_required',
+      'cancelled',
       'context_length_exceeded',
       'internal_error',
       'llm_invalid_json',

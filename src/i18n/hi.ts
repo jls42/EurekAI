@@ -45,6 +45,23 @@ export const hi: Record<string, string> = {
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.cancelled': 'जनरेशन रद्द कर दी गई',
+
+  // Notifications center
+  'notif.openBell': 'सूचना केंद्र खोलें',
+  'notif.title': 'सूचनाएँ',
+  'notif.empty': 'कोई सूचना नहीं',
+  'notif.markAllRead': 'सभी को पढ़ा हुआ चिह्नित करें',
+  'notif.clear': 'साफ़ करें',
+  'notif.timeAgo': '{time} पहले',
+  'notif.justNow': 'अभी',
+  'notif.minutesAgo': '{count} मिनट',
+  'notif.hoursAgo': '{count} घंटे',
+  'notif.daysAgo': '{count} दिन',
+  'notif.unreadBadge': '{count} अनपढ़ी',
+  'notif.generationDone': '{type} पूर्ण',
+  'notif.generationFailed': '{type} विफल',
+  'notif.generationCancelled': '{type} रद्द',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
@@ -54,8 +71,7 @@ export const hi: Record<string, string> = {
   'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
   'errorCode.upload_failed': 'अपलोड विफल',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
-  'errorCode.profile_delete_partial':
-    'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
+  'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
