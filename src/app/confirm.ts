@@ -10,19 +10,20 @@ const GID_UUID_V4 =
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
 const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-// Pattern fetch inline avec littéral URL en argument direct (cf. profiles.ts
-// `executeDeleteProfile` qui passe Codacy depuis 2026-04). Pre-validation par
-// regex pour défense en profondeur.
+// Triple sanitization avant fetch — pattern reconnu par Codacy `rule-node-ssrf` :
+// 1. Regex pre-validation (PID_SAFE + GID_UUID_V4) sur les inputs bruts.
+// 2. encodeURIComponent sur chaque segment de path.
+// 3. URL constructor pour résoudre l'origine et bloquer les schemes hostiles.
 async function postCancel(pid: string, gid: string): Promise<void> {
   if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid)) return;
+  const safePid = encodeURIComponent(pid);
+  const safeGid = encodeURIComponent(gid);
+  const url = new URL(
+    `/api/projects/${safePid}/generations/${safeGid}/cancel`,
+    globalThis.location?.origin ?? 'http://localhost',
+  );
   try {
-    // fetch inline (URL littérale concaténée directement dans l'argument) pour
-    // préserver l'analyse taint Codacy : `rule-node-ssrf` a besoin de voir
-    // `/api/projects/` inline dans la fonction qui appelle fetch — cf.
-    // CLAUDE.md section Sécurité, pattern executeDeleteProfile.
-    const res = await fetch('/api/projects/' + pid + '/generations/' + gid + '/cancel', {
-      method: 'POST',
-    });
+    const res = await fetch(url, { method: 'POST' });
     if (!res.ok) {
       console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
     }
