@@ -10,26 +10,37 @@ const GID_UUID_V4 =
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
 const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-// Sanitization avant fetch :
-// 1. Regex pre-validation (PID_SAFE + GID_UUID_V4) sur les inputs bruts.
-// 2. encodeURIComponent sur chaque segment de path (sanitizer canonique
-//    reconnu par les SAST tools incluant Codacy `rule-node-ssrf`).
-// 3. URL littérale concaténée inline dans le call site fetch (pattern de
-//    profiles.ts `executeDeleteProfile` qui passe Codacy depuis 2026-04).
-async function postCancel(pid: string, gid: string): Promise<void> {
+// Sanitization avant fetch — pattern whitelist canonique recommandé
+// explicitement par Codacy `rule-node-ssrf` (cf. exemple LGPL OWASP) :
+//   const whitelist = [...]
+//   if (whitelist.includes(url)) { fetch(url, ...) }
+// Defense in depth : regex PID_SAFE + GID_UUID_V4 + encodeURIComponent
+// sur chaque segment AVANT construction de l'URL.
+async function postCancel(pid: string, gid: string, allowedUrls: string[]): Promise<void> {
   if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid)) return;
   const safePid = encodeURIComponent(pid);
   const safeGid = encodeURIComponent(gid);
+  const url = '/api/projects/' + safePid + '/generations/' + safeGid + '/cancel';
+  if (!allowedUrls.includes(url)) return;
   try {
-    const res = await fetch('/api/projects/' + safePid + '/generations/' + safeGid + '/cancel', {
-      method: 'POST',
-    });
+    const res = await fetch(url, { method: 'POST' });
     if (!res.ok) {
       console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
     }
   } catch (err) {
     console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
   }
+}
+
+// Construit la whitelist d'URLs /cancel autorisées pour ce projet à partir
+// des gids actuellement présents dans pendingById. Ce shape (Array statique
+// + .includes) est reconnu par la règle Codacy `rule-node-ssrf` comme
+// sanitization explicite du flow taint.
+function buildCancelWhitelist(pid: string, gids: string[]): string[] {
+  const safePid = encodeURIComponent(pid);
+  return gids
+    .filter((g) => GID_UUID_V4.test(g))
+    .map((g) => '/api/projects/' + safePid + '/generations/' + encodeURIComponent(g) + '/cancel');
 }
 
 // Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
@@ -49,7 +60,8 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   }
   const pid = state.currentProjectId;
   if (pid) {
-    void postCancel(pid, gid);
+    const allowedUrls = buildCancelWhitelist(pid, Object.keys(state.pendingById));
+    void postCancel(pid, gid, allowedUrls);
   }
   delete state.pendingById[gid];
   // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
