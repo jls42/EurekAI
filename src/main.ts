@@ -16,6 +16,7 @@ import { quizComponent } from './components/quiz';
 import { quizVocalComponent } from './components/quiz-vocal';
 import { fillBlankComponent } from './components/fill-blank';
 import { flashcardsComponent } from './components/flashcards';
+import { installCrossTabSync } from './app/cross-tab-sync';
 
 // Register i18n locales before Alpine starts
 registerLocale('fr', fr);
@@ -43,37 +44,9 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(() => createIcons({ icons }), 100);
 });
 
-// Cross-tab synchronization de la cloche notifications.
-// Le 'storage' event ne fire QUE dans les autres tabs (pas dans celui qui a
-// écrit), donc combiné avec le bump local sur appendNotification, cela couvre
-// les deux cas. Un 5+ tabs ouverts → 4+ events par écriture, charge négligeable.
-//
-// Guard `typeof globalThis.window` pour ne pas péter en environnement Vitest (Node).
-if (typeof globalThis.window !== 'undefined') {
-  // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
-  // chemin silencieusement. Warn une fois par session si la structure
-  // attendue est absente, pour surfacer le drift avant le bug "cloche ne
-  // bumpe plus en cross-tab".
-  let alpineDriftWarned = false;
-  globalThis.addEventListener('storage', (e) => {
-    if (e.key !== 'sf-profile-notifications') return;
-    const root = document.querySelector('[x-data="app()"]') as
-      | (HTMLElement & {
-          _x_dataStack?: Array<{ notificationsVersion?: number }>;
-        })
-      | null;
-    const stack = root?._x_dataStack?.[0];
-    if (stack && typeof stack.notificationsVersion === 'number') {
-      stack.notificationsVersion++;
-      return;
-    }
-    if (!alpineDriftWarned) {
-      console.warn('[notifications] cross-tab sync unavailable', {
-        root: !!root,
-        stack: !!stack,
-        hasField: typeof stack?.notificationsVersion === 'number',
-      });
-      alpineDriftWarned = true;
-    }
-  });
+// Cross-tab synchronization de la cloche notifications. Logique extraite
+// dans cross-tab-sync.ts pour permettre les tests unitaires (handler appelé
+// avec un Document mocké). Guard pour ne pas péter en environnement Node.
+if (globalThis.window !== undefined) {
+  installCrossTabSync(globalThis, document);
 }
