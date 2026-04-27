@@ -157,45 +157,53 @@ describe('createConfirm', () => {
       expect(ctx.showToast).toHaveBeenCalled();
     });
 
+    // UUID v4 valides pour passer la validation `rule-node-ssrf` côté confirm.ts
+    const VALID_GID_1 = '11111111-1111-4111-8111-111111111111';
+    const VALID_GID_2 = '22222222-2222-4222-8222-222222222222';
+    const VALID_GID_3 = '33333333-3333-4333-8333-333333333333';
+    const VALID_GID_4 = '44444444-4444-4444-8444-444444444444';
+    const INVALID_GID = 'gid-not-a-uuid';
+
     it('cancels by gid: aborts byGid controller, POSTs /cancel, removes pendingById entry', () => {
       const ctrl = { abort: vi.fn() } as unknown as AbortController;
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       (globalThis as any).fetch = fetchMock;
-      ctx.abortControllersByGid = { 'gid-abc': ctrl };
+      ctx.abortControllersByGid = { [VALID_GID_1]: ctrl };
       ctx.pendingById = {
-        'gid-abc': { id: 'gid-abc', type: 'summary', status: 'pending' },
+        [VALID_GID_1]: { id: VALID_GID_1, type: 'summary', status: 'pending' },
       };
 
-      confirm.cancelOne.call(ctx, 'gid-abc');
+      confirm.cancelOne.call(ctx, VALID_GID_1);
 
       expect((ctrl as any).abort).toHaveBeenCalled();
-      expect(ctx.abortControllersByGid['gid-abc']).toBeUndefined();
-      expect(ctx.pendingById['gid-abc']).toBeUndefined();
-      expect(fetchMock).toHaveBeenCalledWith('/api/projects/pid-1/generations/gid-abc/cancel', {
-        method: 'POST',
-      });
+      expect(ctx.abortControllersByGid[VALID_GID_1]).toBeUndefined();
+      expect(ctx.pendingById[VALID_GID_1]).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/projects/pid-1/generations/${VALID_GID_1}/cancel`,
+        { method: 'POST' },
+      );
       expect(ctx.showToast).toHaveBeenCalledWith(
         expect.stringContaining('toast.cancelledOne'),
         'info',
       );
     });
 
-    it('cancel by gid: silent when fetch rejects (best-effort backend)', async () => {
+    it('cancel by gid: warns when fetch rejects (best-effort backend)', async () => {
       const ctrl = { abort: vi.fn() } as unknown as AbortController;
       const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
       const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
       (globalThis as any).fetch = fetchMock;
-      ctx.abortControllersByGid = { 'gid-x': ctrl };
-      ctx.pendingById = { 'gid-x': { id: 'gid-x', type: 'quiz', status: 'pending' } };
+      ctx.abortControllersByGid = { [VALID_GID_2]: ctrl };
+      ctx.pendingById = { [VALID_GID_2]: { id: VALID_GID_2, type: 'quiz', status: 'pending' } };
 
-      expect(() => confirm.cancelOne.call(ctx, 'gid-x')).not.toThrow();
-      expect(ctx.pendingById['gid-x']).toBeUndefined();
+      expect(() => confirm.cancelOne.call(ctx, VALID_GID_2)).not.toThrow();
+      expect(ctx.pendingById[VALID_GID_2]).toBeUndefined();
       expect(ctx.showToast).toHaveBeenCalled();
       // Wait for catch handler to fire
       await new Promise((r) => setTimeout(r, 0));
       expect(warnMock).toHaveBeenCalledWith(
         '[cancel] POST /cancel failed',
-        expect.objectContaining({ pid: 'pid-1', gid: 'gid-x' }),
+        expect.objectContaining({ pid: 'pid-1', gid: VALID_GID_2 }),
       );
       warnMock.mockRestore();
     });
@@ -210,17 +218,18 @@ describe('createConfirm', () => {
       (globalThis as any).fetch = fetchMock;
       ctx.abortControllersByGid = {}; // server-owned : pas de controller
       ctx.pendingById = {
-        'gid-srv': { id: 'gid-srv', type: 'podcast', status: 'pending' },
+        [VALID_GID_3]: { id: VALID_GID_3, type: 'podcast', status: 'pending' },
       };
       ctx.loading.podcast = true;
 
-      confirm.cancelOne.call(ctx, 'gid-srv');
+      confirm.cancelOne.call(ctx, VALID_GID_3);
 
-      expect(ctx.pendingById['gid-srv']).toBeUndefined();
+      expect(ctx.pendingById[VALID_GID_3]).toBeUndefined();
       expect(ctx.loading.podcast).toBe(false);
-      expect(fetchMock).toHaveBeenCalledWith('/api/projects/pid-1/generations/gid-srv/cancel', {
-        method: 'POST',
-      });
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/projects/pid-1/generations/${VALID_GID_3}/cancel`,
+        { method: 'POST' },
+      );
     });
 
     it('cancel by gid leaves loading[type] untouched when local controller existed', () => {
@@ -230,14 +239,29 @@ describe('createConfirm', () => {
       const ctrl = { abort: vi.fn() } as unknown as AbortController;
       const fetchMock = vi.fn().mockResolvedValue({ ok: true });
       (globalThis as any).fetch = fetchMock;
-      ctx.abortControllersByGid = { 'gid-loc': ctrl };
-      ctx.pendingById = { 'gid-loc': { id: 'gid-loc', type: 'quiz', status: 'pending' } };
+      ctx.abortControllersByGid = { [VALID_GID_4]: ctrl };
+      ctx.pendingById = { [VALID_GID_4]: { id: VALID_GID_4, type: 'quiz', status: 'pending' } };
       ctx.loading.quiz = true;
 
-      confirm.cancelOne.call(ctx, 'gid-loc');
+      confirm.cancelOne.call(ctx, VALID_GID_4);
 
       // loading.quiz reste true ici — le finally de state.generate le clear
       expect(ctx.loading.quiz).toBe(true);
+    });
+
+    it('skips POST /cancel when gid is not a valid UUID v4 (SSRF defense)', () => {
+      // Garde-fou : si un gid frauduleux atterrit dans pendingById (extension
+      // hostile, bug de sérialisation), la validation regex bloque le fetch
+      // avant qu'il parte. Le state local est quand même nettoyé pour rester
+      // cohérent côté UI (la pending entry est inutilisable de toute façon).
+      const fetchMock = vi.fn();
+      (globalThis as any).fetch = fetchMock;
+      ctx.pendingById = { [INVALID_GID]: { id: INVALID_GID, type: 'summary', status: 'pending' } };
+
+      confirm.cancelOne.call(ctx, INVALID_GID);
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(ctx.pendingById[INVALID_GID]).toBeUndefined();
     });
   });
 
