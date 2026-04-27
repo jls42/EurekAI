@@ -21,14 +21,17 @@ async function postCancel(pid: string, gid: string, allowedUrls: string[]): Prom
   const safePid = encodeURIComponent(pid);
   const safeGid = encodeURIComponent(gid);
   const url = '/api/projects/' + safePid + '/generations/' + safeGid + '/cancel';
-  if (!allowedUrls.includes(url)) return;
-  try {
-    const res = await fetch(url, { method: 'POST' });
-    if (!res.ok) {
-      console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+  // Shape exact recommandé par Codacy `rule-node-ssrf` (OWASP) :
+  // `if (whitelist.includes(url)) { fetch(url, ...) }`.
+  if (allowedUrls.includes(url)) {
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      if (!res.ok) {
+        console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+      }
+    } catch (err) {
+      console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
     }
-  } catch (err) {
-    console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
   }
 }
 
