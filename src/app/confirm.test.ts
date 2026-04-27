@@ -179,9 +179,7 @@ describe('createConfirm', () => {
       expect(ctx.abortControllersByGid[VALID_GID_1]).toBeUndefined();
       expect(ctx.pendingById[VALID_GID_1]).toBeUndefined();
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: `/api/projects/pid-1/generations/${VALID_GID_1}/cancel`,
-        }),
+        `/api/projects/pid-1/generations/${VALID_GID_1}/cancel`,
         { method: 'POST' },
       );
       expect(ctx.showToast).toHaveBeenCalledWith(
@@ -229,9 +227,7 @@ describe('createConfirm', () => {
       expect(ctx.pendingById[VALID_GID_3]).toBeUndefined();
       expect(ctx.loading.podcast).toBe(false);
       expect(fetchMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          pathname: `/api/projects/pid-1/generations/${VALID_GID_3}/cancel`,
-        }),
+        `/api/projects/pid-1/generations/${VALID_GID_3}/cancel`,
         { method: 'POST' },
       );
     });
