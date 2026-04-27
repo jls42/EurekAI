@@ -66,6 +66,43 @@ const TRACKED_TYPES: ReadonlySet<string> = new Set([
   'fill-blank',
 ]);
 
+// Catégories transientes affichées dans la bannière mais hors `categories[]`
+// (auto = orchestration ; voice/websearch = opérations serveur sans tracker UI).
+// Cancel via `cancelOne(type)` fallback legacy = abort local + loading=false.
+const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
+  auto: { labelKey: 'gen.auto', icon: 'sparkles', color: COLOR_PRIMARY },
+  voice: { labelKey: 'gen.voice', icon: 'volume-2', color: COLOR_ACCENT },
+  websearch: { labelKey: 'gen.websearch', icon: 'search', color: COLOR_ACCENT },
+};
+
+type ChipCategory = { key: string; color: string; icon: string };
+type GenerationChip = { key: string; label: string; color: string; icon: string };
+
+// Helper extrait pour respecter la limite Lizard CCN ≤ 8 sur activeGenerations.
+// Arrow plutôt que `function` pour éviter l'agglomération Lizard TS des
+// `function foo()` top-level consécutives (cf. CLAUDE.md règle).
+const buildTrackedChips = (
+  cat: ChipCategory,
+  pendings: PendingTrackerEntry[],
+  loading: Record<string, boolean>,
+  t: (key: string) => string,
+): GenerationChip[] => {
+  const matched = TRACKED_TYPES.has(cat.key)
+    ? pendings.filter((p) => p.type === cat.key && p.status === 'pending')
+    : [];
+  const label = t('gen.' + cat.key);
+  if (matched.length > 0) {
+    // 1 chip par gid : permet `cancelOne(gid)` qui POST /cancel au backend.
+    return matched.map((p) => ({ key: p.id, label, color: cat.color, icon: cat.icon }));
+  }
+  // Fallback type : `loading[type]` actif sans pending tracker hydraté
+  // (fenêtre transitoire HTTP→SSE pour generateAll/generateAuto).
+  if (loading[cat.key] === true) {
+    return [{ key: cat.key, label, color: cat.color, icon: cat.icon }];
+  }
+  return [];
+};
+
 /** Extract source refs from any item (quiz question, flashcard, etc.). */
 function extractItemRefs(item: ItemWithRefs | null | undefined): string[] {
   if (!item) return [];
@@ -524,9 +561,7 @@ export function createHelpers() {
     // Les autres types (auto/all/voice/websearch) restent purement booléens
     // dans loading{} car ils ne produisent pas de Generation persistée.
     hasPendingOfType(this: AppContext, type: string): boolean {
-      return Object.values(this.pendingById).some(
-        (p) => p.type === type && p.status === 'pending',
-      );
+      return Object.values(this.pendingById).some((p) => p.type === type && p.status === 'pending');
     },
 
     isLoading(this: AppContext, type: string): boolean {
@@ -590,8 +625,15 @@ export function createHelpers() {
         return;
       }
       const toastType = status === 'cancelled' ? 'info' : 'error';
-      const messageKey = status === 'cancelled' ? 'notif.generationCancelled' : 'notif.generationFailed';
-      this.showToast(this.t(messageKey, { type: this.t('gen.' + type) }), toastType, null, null, eventKey);
+      const messageKey =
+        status === 'cancelled' ? 'notif.generationCancelled' : 'notif.generationFailed';
+      this.showToast(
+        this.t(messageKey, { type: this.t('gen.' + type) }),
+        toastType,
+        null,
+        null,
+        eventKey,
+      );
     },
 
     // Phase de réconciliation au selectProject + reconnect SSE :
@@ -613,6 +655,10 @@ export function createHelpers() {
         if (this.currentProjectId !== projectId) return;
         this.hydratePendingByIdFromTracker(project.results.pendingTracker ?? []);
         const cutoff = computeReconcileCutoff(profileId, projectId, reconcileStartedAt);
+        // Merge des générations apparues dans le snapshot post-cutoff (events SSE
+        // ratés pendant un drop réseau) : sans ce merge, le notif "généré ✓"
+        // est créé mais la carte reste invisible jusqu'à reload complet.
+        this.mergeReconciledGenerations(project.results.generations, cutoff);
         this.backfillCompletedNotifs(project.results.generations, cutoff, profileId, projectId);
         this.backfillTerminalNotifs(
           project.results.pendingTracker ?? [],
@@ -634,6 +680,18 @@ export function createHelpers() {
       this.pendingById = {};
       for (const t of tracker) {
         if (t.status === 'pending') this.pendingById[t.id] = t;
+      }
+    },
+
+    // Merge les Generation completed > cutoff dans state.generations via
+    // upsertGenerationById (idempotent par id). Couvre la fenêtre où SSE
+    // était down et a manqué l'event 'completed' : sans ce merge, le user
+    // verrait la notif sans la carte associée.
+    mergeReconciledGenerations(this: AppContext, generations: Generation[], cutoff: number): void {
+      for (const gen of generations) {
+        if (!gen.completedAt) continue;
+        if (Date.parse(gen.completedAt) <= cutoff) continue;
+        this.upsertGenerationById(gen);
       }
     },
 
@@ -737,29 +795,21 @@ export function createHelpers() {
       // Fallback `?? {}` pour les tests qui mockent un AppContext partiel sans
       // pendingById. En prod, Alpine merge tout dans le state du composant.
       const pendings = Object.values(this.pendingById ?? {});
-      const isActiveType = (key: string): boolean =>
-        this.loading[key] === true ||
-        (TRACKED_TYPES.has(key) && pendings.some((p) => p.type === key && p.status === 'pending'));
-
-      const EXTRA_KEYS: Record<string, { labelKey: string; icon: string; color: string }> = {
-        auto: { labelKey: 'gen.auto', icon: 'sparkles', color: COLOR_PRIMARY },
-        voice: { labelKey: 'gen.voice', icon: 'volume-2', color: COLOR_ACCENT },
-        websearch: { labelKey: 'gen.websearch', icon: 'search', color: COLOR_ACCENT },
-      };
       const result: Array<{ key: string; label: string; color: string; icon: string }> = [];
+      const t = (k: string): string => this.t(k);
+      // Tracked : 1 chip par gid (cancel précis via POST /cancel) ; fallback
+      // type quand `loading[type]` actif sans pending tracker hydraté
+      // (fenêtre transitoire entre fetch envoyé et SSE 'pending' reçu).
       for (const cat of this.categories) {
-        if (isActiveType(cat.key)) {
-          result.push({
-            key: cat.key,
-            label: this.t('gen.' + cat.key),
-            color: cat.color,
-            icon: cat.icon,
-          });
-        }
+        result.push(...buildTrackedChips(cat, pendings, this.loading, t));
       }
+      // Transients (auto/voice/websearch) : 1 chip par type, fallback legacy
+      // `cancelOne(type)` côté UI (pas de pendingTracker entry direct, donc
+      // pas de POST /cancel envoyé — décision design assumée, cf. CLAUDE.md
+      // limitation SDK Mistral non-interruptible).
       for (const [key, meta] of Object.entries(EXTRA_KEYS)) {
-        if (isActiveType(key)) {
-          result.push({ key, label: this.t(meta.labelKey), color: meta.color, icon: meta.icon });
+        if (this.loading[key] === true) {
+          result.push({ key, label: t(meta.labelKey), color: meta.color, icon: meta.icon });
         }
       }
       return result;

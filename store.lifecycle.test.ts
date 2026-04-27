@@ -19,7 +19,10 @@ afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-const makeEntry = (id: string, overrides: Partial<PendingTrackerEntry> = {}): PendingTrackerEntry => ({
+const makeEntry = (
+  id: string,
+  overrides: Partial<PendingTrackerEntry> = {},
+): PendingTrackerEntry => ({
   id,
   type: 'summary',
   status: 'pending',
@@ -163,7 +166,7 @@ describe('cancelAllPendingsAtBoot', () => {
     expect(failed.failureCode).toBe('internal_error');
   });
 
-  it('retourne 0 si aucun pending n\'existe', () => {
+  it("retourne 0 si aucun pending n'existe", () => {
     expect(store.cancelAllPendingsAtBoot()).toBe(0);
   });
 });
@@ -191,7 +194,11 @@ describe('prunePendingTracker', () => {
       const completedAt = new Date(Date.now() - i * 1000).toISOString();
       store.addPendingEntry(
         projectId,
-        makeEntry(`gid-failed-${i}`, { status: 'failed', failureCode: 'internal_error', completedAt }),
+        makeEntry(`gid-failed-${i}`, {
+          status: 'failed',
+          failureCode: 'internal_error',
+          completedAt,
+        }),
       );
     }
     const removed = store.prunePendingTracker(projectId, { maxKeep: 20 });

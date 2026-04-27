@@ -1,11 +1,12 @@
 import type { AppContext } from './app-context';
 
-// Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP
-// (best-effort silencieux si réseau down — le boot sweep + idempotence du
-// store couvrent les pendings orphelins). UI optimiste : retire de pendingById
-// immédiatement, l'event SSE 'cancelled' confirmera bientôt.
+// Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
+// Best-effort sur la POST mais on log les erreurs (4xx/5xx/réseau) pour ne pas
+// masquer un bug serveur ou un desync client/serveur. UI optimiste : retire de
+// pendingById immédiatement, l'event SSE 'cancelled' confirmera bientôt.
 function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
   const controller = state.abortControllersByGid[gid];
+  const hadLocalController = Boolean(controller);
   if (controller) {
     try {
       controller.abort();
@@ -18,14 +19,25 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   if (pid) {
     fetch('/api/projects/' + pid + '/generations/' + gid + '/cancel', {
       method: 'POST',
-    }).catch(() => {
-      /* silent: best-effort, le boot sweep + idempotence couvrent */
-    });
+    })
+      .then((res) => {
+        if (!res.ok) {
+          console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+        }
+      })
+      .catch((err) => {
+        console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
+      });
   }
   delete state.pendingById[gid];
-  // legacy loading{} pour ce type : on laisse le finally du generate() le
-  // remettre à false (dans le path cancelOne via gid, le finally s'exécute
-  // toujours côté state.generate via AbortError).
+  // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
+  // state.generate) : aucun controller local n'a été aborté donc le finally
+  // de la fetch ne s'exécutera pas pour ce type. Clear loading[type]
+  // explicitement pour libérer le bouton/spinner UI sans attendre la fin du
+  // bulk auto fetch (qui peut être 60s+).
+  if (!hadLocalController && state.loading[type] === true) {
+    state.loading[type] = false;
+  }
   const label = state.t('gen.' + type) || type;
   state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
 }

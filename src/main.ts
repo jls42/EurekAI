@@ -50,14 +50,30 @@ document.addEventListener('DOMContentLoaded', () => {
 //
 // Guard `typeof window` pour ne pas péter en environnement Vitest (Node).
 if (typeof window !== 'undefined') {
+  // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
+  // chemin silencieusement. Warn une fois par session si la structure
+  // attendue est absente, pour surfacer le drift avant le bug "cloche ne
+  // bumpe plus en cross-tab".
+  let alpineDriftWarned = false;
   window.addEventListener('storage', (e) => {
     if (e.key !== 'sf-profile-notifications') return;
-    const root = document.querySelector('[x-data="app"]') as HTMLElement & {
-      _x_dataStack?: Array<{ notificationsVersion?: number }>;
-    } | null;
+    const root = document.querySelector('[x-data="app()"]') as
+      | (HTMLElement & {
+          _x_dataStack?: Array<{ notificationsVersion?: number }>;
+        })
+      | null;
     const stack = root?._x_dataStack?.[0];
     if (stack && typeof stack.notificationsVersion === 'number') {
       stack.notificationsVersion++;
+      return;
+    }
+    if (!alpineDriftWarned) {
+      console.warn('[notifications] cross-tab sync unavailable', {
+        root: !!root,
+        stack: !!stack,
+        hasField: typeof stack?.notificationsVersion === 'number',
+      });
+      alpineDriftWarned = true;
     }
   });
 }

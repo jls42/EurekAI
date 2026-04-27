@@ -148,6 +148,22 @@ export function populateAutoPlan(
 
 type StepResult = 'success' | 'aborted' | 'failed';
 
+// Parse le body d'une réponse !ok pour extraire un code d'erreur lisible.
+// Si JSON valide → utilise body.error. Si non-JSON (HTML 502 proxy / timeout) →
+// retourne un snippet du raw text (max 200 chars) pour ne pas perdre le
+// diagnostic FailedStepCode silencieusement (cf. CLAUDE.md error codes API).
+// Arrow function pour éviter agglomération Lizard TS sur runAutoStep voisine.
+const parseStepErrorDetail = async (res: Response, fallback: string): Promise<string> => {
+  const raw = await res.text().catch(() => '');
+  try {
+    const errorCode = JSON.parse(raw)?.error;
+    if (errorCode) return errorCode;
+  } catch {
+    /* non-JSON body, fallback raw snippet */
+  }
+  return raw.slice(0, 200) || fallback;
+};
+
 export async function runAutoStep(
   state: AppContext,
   type: string,
@@ -166,16 +182,22 @@ export async function runAutoStep(
     const res = await fetch(url, postJson(body, controller.signal));
     if (state.currentProjectId !== projectId) return 'aborted';
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
+      const detail = await parseStepErrorDetail(res, res.statusText);
+      console.error(`auto: ${type} failed (${res.status}):`, detail);
       return 'failed';
     }
-    registerGeneration(state, await res.json());
+    const gen = await res.json();
+    registerGeneration(state, gen);
+    // eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts
+    // applyGenerationEvent) : dédup tab-locale du toast UI + persistance
+    // notif via showToast → appendNotification (toast.ts). Le HTTP
+    // devient un chemin de persistance complet quand SSE est down.
     state.showToast(
       state.t('toast.generationDone', { type: state.t('gen.' + type) }),
       'success',
       null,
       { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+      `generation:${gen.id}:completed`,
     );
     return 'success';
   } catch (e: unknown) {
@@ -357,7 +379,14 @@ export function createGenerate() {
       this.abortControllersByGid[gid] = controller;
       this.pendingById[gid] = {
         id: gid,
-        type: type as 'summary' | 'flashcards' | 'quiz' | 'podcast' | 'quiz-vocal' | 'image' | 'fill-blank',
+        type: type as
+          | 'summary'
+          | 'flashcards'
+          | 'quiz'
+          | 'podcast'
+          | 'quiz-vocal'
+          | 'image'
+          | 'fill-blank',
         status: 'pending',
         startedAt: new Date().toISOString(),
         sourceIds: [...this.selectedIds],

@@ -60,7 +60,7 @@ export const fr: Record<string, string> = {
   'notif.daysAgo': '{count} j',
   'notif.unreadBadge': '{count} non lue(s)',
   'notif.generationDone': '{type} terminé(e)',
-  'notif.generationFailed': "Échec de {type}",
+  'notif.generationFailed': 'Échec de {type}',
   'notif.generationCancelled': '{type} annulé(e)',
   'errorCode.no_sources': 'Aucune source disponible',
   'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',

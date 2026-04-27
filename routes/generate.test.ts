@@ -631,6 +631,87 @@ describe('generateRoutes', () => {
       const gen = res.json.mock.calls[0][0];
       expect(gen.sourceIds).toEqual(['src-2']);
     });
+
+    it('decorates generation with estimatedCost from PersistResult.cost (regression)', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      const { recordUsage } = await import('../helpers/usage-context.js');
+      // Régression vue à la review : le commit 2ea2854 avait introduit
+      // `final.estimatedCost = persisted.estimatedCost` alors que PersistResult
+      // expose `cost` (cf. helpers/cost-persist.ts). Conséquence : toutes les
+      // générations renvoyées au client avaient `estimatedCost = undefined`.
+      // Ce test pin l'invariant : un generator qui enregistre un usage facturable
+      // doit produire une Generation décorée avec estimatedCost numérique > 0.
+      (generateSummary as any).mockImplementationOnce(async () => {
+        recordUsage({
+          model: 'mistral-large-2512',
+          promptTokens: 1_000_000,
+          completionTokens: 0,
+          totalTokens: 1_000_000,
+        });
+        return {
+          title: 'Test',
+          summary: 'r',
+          key_points: [],
+          vocabulary: [],
+          fun_fact: '',
+        };
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'X',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const gen = res.json.mock.calls[0][0];
+      // mistral-large @ 0.5 $/M input → 1M tokens = 0.5
+      expect(typeof gen.estimatedCost).toBe('number');
+      expect(gen.estimatedCost).toBeGreaterThan(0);
+      expect(gen.estimatedCost).toBeCloseTo(0.5, 5);
+      expect(Array.isArray(gen.costBreakdown)).toBe(true);
+    });
+
+    it('returns 500 internal_error and marks pending failed when generator returns null', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      // Defense en profondeur (cf. routes/generate.ts runGeneratorAndPersist) :
+      // si un generator retourne null après les validations early, on doit
+      // répondre 500 (sinon la connexion HTTP reste pendante côté client) ET
+      // marquer le pending tracker entry failed avec code internal_error.
+      (generateSummary as any).mockResolvedValueOnce(null);
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Some content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const project2 = store.getProject(pid);
+      const failedEntry = project2?.results.pendingTracker?.find(
+        (e: any) => e.type === 'summary' && e.status === 'failed',
+      );
+      expect(failedEntry).toBeDefined();
+      expect((failedEntry as any).failureCode).toBe('internal_error');
+    });
   });
 
   // --- Route-level tests ---

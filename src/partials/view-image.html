@@ -7,20 +7,23 @@
     <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <button
       @click="generate('image')"
-      :disabled="loading.image || sources.length === 0"
+      :disabled="isLoading('image') || sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-image/10 text-gen-image hover:bg-gen-image/20 disabled:opacity-50"
     >
-      <i x-show="!loading.image" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('image')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading.image"
+        x-show="isLoading('image')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-image border-t-transparent"
       ></span>
-      <span x-text="loading.image ? t('common.loading') : t('image.new')"></span>
+      <span x-text="isLoading('image') ? t('common.loading') : t('image.new')"></span>
     </button>
   </div>
 
   <!-- Empty state -->
-  <div x-show="generationsByType('image').length === 0 && !loading.image" class="text-center py-12">
+  <div
+    x-show="generationsByType('image').length === 0 && !isLoading('image')"
+    class="text-center py-12"
+  >
     <div
       class="w-16 h-16 mx-auto mb-3 bg-pink-50 rounded-[1rem] border border-gen-image/20 flex items-center justify-center"
     >

@@ -78,7 +78,10 @@ store.migrateFromLegacy(join(outputDir, 'sources.json'));
 // bannière "génération en cours" coincée à l'infini après un crash serveur.
 const cancelledAtBoot = store.cancelAllPendingsAtBoot();
 if (cancelledAtBoot > 0) {
-  logger.info('store', `boot: cancelled ${cancelledAtBoot} pendings inherited from previous process`);
+  logger.info(
+    'store',
+    `boot: cancelled ${cancelledAtBoot} pendings inherited from previous process`,
+  );
 }
 
 // --- Config API ---

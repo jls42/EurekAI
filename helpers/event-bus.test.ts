@@ -34,7 +34,7 @@ describe('event-bus', () => {
     unsubscribe();
   });
 
-  it("unsubscribe arrête de recevoir les événements (pas de fuite de listener)", () => {
+  it('unsubscribe arrête de recevoir les événements (pas de fuite de listener)', () => {
     const handler = vi.fn();
     const unsubscribe = subscribeGeneration('project-1', handler);
     emitGenerationEvent(makeEvent());
@@ -44,7 +44,7 @@ describe('event-bus', () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it('plusieurs souscripteurs sur le même pid reçoivent tous l\'événement', () => {
+  it("plusieurs souscripteurs sur le même pid reçoivent tous l'événement", () => {
     const h1 = vi.fn();
     const h2 = vi.fn();
     const u1 = subscribeGeneration('project-1', h1);

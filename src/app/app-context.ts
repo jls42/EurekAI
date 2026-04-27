@@ -210,6 +210,7 @@ export interface AppContext extends AppState {
   applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
   hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;
+  mergeReconciledGenerations(generations: Generation[], cutoff: number): void;
   backfillCompletedNotifs(
     generations: Generation[],
     cutoff: number,

@@ -11,7 +11,7 @@
 
   <!-- CTA: Generate from sources (visible when sources exist) -->
   <div
-    x-show="sources.length > 0 && !uploading && !loading.voice && !loading.websearch"
+    x-show="sources.length > 0 && !uploading && !isLoading('voice') && !isLoading('websearch')"
     class="mb-5 bg-gradient-to-br from-primary-light/60 to-accent-light/40 border border-primary/20 rounded-card p-4 animate-slide-up"
   >
     <div class="flex items-center gap-3 mb-3">
@@ -41,17 +41,17 @@
       >
         <button
           @click="generate(cat.key)"
-          :disabled="loading[cat.key] || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
+          :disabled="isLoading(cat.key) || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
           :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
           class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
           :style="'color:' + cat.color"
         >
-          <i x-show="!loading[cat.key]" :data-lucide="cat.icon" class="w-4 h-4"></i>
+          <i x-show="!isLoading(cat.key)" :data-lucide="cat.icon" class="w-4 h-4"></i>
           <span
-            x-show="loading[cat.key]"
+            x-show="isLoading(cat.key)"
             class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent"
           ></span>
-          <span x-text="loading[cat.key] ? '...' : t('gen.' + cat.key)"></span>
+          <span x-text="isLoading(cat.key) ? '...' : t('gen.' + cat.key)"></span>
         </button>
       </template>
     </div>
@@ -111,7 +111,7 @@
 
     <button
       @click="toggleRecording()"
-      :disabled="loading.voice"
+      :disabled="isLoading('voice')"
       class="flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-quizvocal hover:bg-orange-50 transition-all card-lift focus-ring"
       :class="recording && 'border-danger bg-danger-light animate-pulse'"
     >
@@ -122,7 +122,7 @@
       ></i>
       <span
         class="font-semibold text-body-sm text-text-primary"
-        x-text="recording ? formatDuration(recordingDuration) : (loading.voice ? t('sources.transcription') : t('sources.voice'))"
+        x-text="recording ? formatDuration(recordingDuration) : (isLoading('voice') ? t('sources.transcription') : t('sources.voice'))"
       ></span>
     </button>
 
@@ -173,11 +173,13 @@
         />
         <button
           @click="searchWeb()"
-          :disabled="!webQuery.trim() || loading.websearch"
+          :disabled="!webQuery.trim() || isLoading('websearch')"
           class="bg-gen-podcast text-white px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring flex items-center gap-2"
         >
           <i data-lucide="search" class="w-4 h-4"></i>
-          <span x-text="loading.websearch ? t('sources.searching') : t('sources.search')"></span>
+          <span
+            x-text="isLoading('websearch') ? t('sources.searching') : t('sources.search')"
+          ></span>
         </button>
       </div>
       <!-- Scrape engine selector -->

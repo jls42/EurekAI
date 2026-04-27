@@ -7,20 +7,20 @@
     <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
     <button
       @click="generate('flashcards')"
-      :disabled="loading.flashcards || sources.length === 0"
+      :disabled="isLoading('flashcards') || sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-flashcards/10 text-gen-flashcards hover:bg-gen-flashcards/20 disabled:opacity-50"
     >
-      <i x-show="!loading.flashcards" data-lucide="plus" class="w-4 h-4"></i>
+      <i x-show="!isLoading('flashcards')" data-lucide="plus" class="w-4 h-4"></i>
       <span
-        x-show="loading.flashcards"
+        x-show="isLoading('flashcards')"
         class="w-4 h-4 animate-spin rounded-full border-2 border-gen-flashcards border-t-transparent"
       ></span>
-      <span x-text="loading.flashcards ? t('common.loading') : t('flashcards.new')"></span>
+      <span x-text="isLoading('flashcards') ? t('common.loading') : t('flashcards.new')"></span>
     </button>
   </div>
 
   <div
-    x-show="generationsByType('flashcards').length === 0 && !loading.flashcards"
+    x-show="generationsByType('flashcards').length === 0 && !isLoading('flashcards')"
     class="text-center py-12"
   >
     <div

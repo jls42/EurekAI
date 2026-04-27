@@ -223,9 +223,7 @@ interface QuizReviewValidated {
   reviewLabel: string;
 }
 
-type ValidationResult<T> =
-  | { ok: true; data: T }
-  | { ok: false; status: number; error: string };
+type ValidationResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 const reviewLabelForLang = (lang: string): string => (lang === 'en' ? 'Review' : 'Revision');
 
@@ -276,8 +274,7 @@ interface HandleGenerationOptions {
   trackedType?: TrackedGenerationType;
 }
 
-const UUID_V4_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
 // randomUUID. Le client génère son propre gid avant le fetch pour avoir
@@ -285,9 +282,7 @@ const UUID_V4_REGEX =
 // utilisable au moment du payload 200 fallback ou de l'event SSE.
 function readClientGid(req: Request): string {
   const candidate = (req.body as { gid?: unknown })?.gid;
-  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate)
-    ? candidate
-    : randomUUID();
+  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate) ? candidate : randomUUID();
 }
 
 function makeTrackerEntry(
@@ -306,7 +301,7 @@ function makeTrackerEntry(
 
 interface PersistedCostFields {
   usage?: Generation['usage'];
-  estimatedCost?: number;
+  cost?: number;
   costBreakdown?: string[];
 }
 
@@ -318,7 +313,9 @@ function buildFinalGeneration(
   const final = { ...gen, id: gid } as Generation;
   if (persisted) {
     final.usage = persisted.usage;
-    final.estimatedCost = persisted.estimatedCost;
+    // PersistResult expose `cost` (cf. helpers/cost-persist.ts), pas `estimatedCost`.
+    // Le contrat client attend `estimatedCost` sur la Generation décorée.
+    final.estimatedCost = persisted.cost;
     final.costBreakdown = persisted.costBreakdown;
   }
   return final;
@@ -336,8 +333,14 @@ async function runGeneratorAndPersist(
   const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
   if (!gen) {
     // Defense en profondeur : aucune closure ne devrait return null après le commit
-    // d'extraction des validations early. Si ça arrive, le pending devient failed.
+    // d'extraction des validations early. Logger UNCONDITIONAL pour Sentry (la
+    // surface de bug doit être visible même si trackedType absent).
+    logger.error(
+      'generate',
+      `generator returned null: type=${options?.trackedType ?? 'unknown'} pid=${pid} gid=${gid}`,
+    );
     if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
+    res.status(500).json({ error: 'internal_error' });
     return;
   }
   const persisted = persistUsage(
@@ -999,10 +1002,7 @@ export function generateRoutes(
       return { ok: false, agent: step.agent, code: 'internal_error' };
     }
     const gid = randomUUID();
-    const added = st.addPendingEntry(
-      pid,
-      makeTrackerEntry(step.agent, gid, autoCtx.sourceIds),
-    );
+    const added = st.addPendingEntry(pid, makeTrackerEntry(step.agent, gid, autoCtx.sourceIds));
     if (!added) {
       // Improbable : gid serveur fresh à chaque step (UUID v4 unique).
       logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
@@ -1038,8 +1038,7 @@ export function generateRoutes(
     }
     // Race cancel/fail : signaler dans le résultat du plan agrégé
     logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
-    const code: FailedStepCode =
-      promoteResult.kind === 'failed' ? promoteResult.code : 'cancelled';
+    const code: FailedStepCode = promoteResult.kind === 'failed' ? promoteResult.code : 'cancelled';
     return { ok: false, agent: step.agent, code };
   }
 
