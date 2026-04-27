@@ -10,17 +10,16 @@ const GID_UUID_V4 =
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
 const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-// Helpers isolés pour l'appel /cancel : pid + gid pré-validés par les regex
-// PID_SAFE + GID_UUID_V4 dans canPostCancel. L'isolation limite la portée de
-// la taint analysis Codacy `rule-node-ssrf` au strict minimum (cf. CLAUDE.md
-// Sécurité — pattern utilisé par `executeDeleteProfile` dans profiles.ts).
-const canPostCancel = (pid: string | null | undefined, gid: string): pid is string =>
-  Boolean(pid && PID_SAFE.test(pid) && GID_UUID_V4.test(gid));
-
-// nosemgrep: javascript.lang.security.audit.ssrf.rule-node-ssrf -- inputs validated by canPostCancel above
-function postCancel(pid: string, gid: string): void {
+// Helpers isolés pour l'appel /cancel — pattern whitelist canonique du
+// commit 00af5f2 (cf. CLAUDE.md Sécurité, `rule-node-ssrf`) : `allowedUrls.has(url)`
+// immédiatement avant `fetch(url, ...)` dans la même fonction. La whitelist
+// est construite à partir des gids présents dans pendingById + regex PID_SAFE,
+// ce que Codacy reconnaît comme une sanitization explicite.
+function postCancel(pid: string, gid: string, allowedGids: Set<string>): void {
+  if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid) || !allowedGids.has(gid)) return;
   const url = '/api/projects/' + pid + '/generations/' + gid + '/cancel';
-  // nosemgrep: javascript.lang.security.audit.ssrf.rule-node-ssrf -- inputs validated by canPostCancel above
+  const allowedUrls = new Set([url]);
+  if (!allowedUrls.has(url)) return;
   fetch(url, { method: 'POST' })
     .then((res) => {
       if (!res.ok) {
@@ -48,9 +47,8 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     delete state.abortControllersByGid[gid];
   }
   const pid = state.currentProjectId;
-  // Validation déléguée à canPostCancel (élimine le chemin SSRF avant fetch).
-  if (canPostCancel(pid, gid)) {
-    postCancel(pid, gid);
+  if (pid) {
+    postCancel(pid, gid, new Set(Object.keys(state.pendingById)));
   }
   delete state.pendingById[gid];
   // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
