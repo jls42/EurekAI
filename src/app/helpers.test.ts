@@ -1035,6 +1035,60 @@ describe('activeGenerations', () => {
     expect(result).toHaveLength(2);
     expect(result.map((r: any) => r.key)).toEqual(['voice', 'websearch']);
   });
+
+  it('returns one chip per gid for tracked pendings', () => {
+    const ctx = {
+      categories,
+      loading: {},
+      pendingById: {
+        'gid-1': { id: 'gid-1', type: 'summary', status: 'pending' },
+        'gid-2': { id: 'gid-2', type: 'summary', status: 'pending' },
+      },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(2);
+    expect(result.map((r: any) => r.key).sort()).toEqual(['gid-1', 'gid-2']);
+    expect(result.every((r: any) => r.label === 'gen.summary')).toBe(true);
+  });
+
+  it('prefers gid over type when both loading and pending exist', () => {
+    const ctx = {
+      categories,
+      loading: { summary: true },
+      pendingById: { 'gid-X': { id: 'gid-X', type: 'summary', status: 'pending' } },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('gid-X');
+  });
+
+  it('falls back to type when loading without pending tracker', () => {
+    const ctx = {
+      categories,
+      loading: { summary: true },
+      pendingById: {},
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('summary');
+  });
+
+  it('ignores cancelled or completed pendings', () => {
+    const ctx = {
+      categories,
+      loading: {},
+      pendingById: {
+        'gid-1': { id: 'gid-1', type: 'summary', status: 'cancelled' },
+        'gid-2': { id: 'gid-2', type: 'quiz', status: 'completed' },
+      },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toEqual([]);
+  });
 });
 
 // --- Moderation helpers ---
@@ -1623,5 +1677,71 @@ describe('podcastSpeaker* helpers', () => {
         callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), guestLine),
       ).toBe('Invité');
     });
+  });
+});
+
+// --- mergeReconciledGenerations: merge completed gens missed by SSE drop ---
+describe('mergeReconciledGenerations', () => {
+  function makeCtx() {
+    return {
+      generations: [] as any[],
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      mergeReconciledGenerations: helpers.mergeReconciledGenerations,
+    };
+  }
+
+  it('upserts completed gens with completedAt > cutoff', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z' },
+      { id: 'g2', type: 'quiz', completedAt: '2026-04-26T10:10:00Z' },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, cutoff);
+
+    expect(ctx.generations).toHaveLength(2);
+    expect(ctx.generations.map((g: any) => g.id).sort()).toEqual(['g1', 'g2']);
+  });
+
+  it('skips gens without completedAt (still pending)', () => {
+    const ctx = makeCtx();
+    const gens = [{ id: 'g1', type: 'summary' }] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, 0);
+
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('skips gens completed before or at cutoff (lastSeenAt watermark)', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens = [
+      { id: 'old', type: 'quiz', completedAt: '2026-04-26T09:00:00Z' },
+      { id: 'edge', type: 'summary', completedAt: '2026-04-26T10:00:00Z' },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, cutoff);
+
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('idempotent: existing gen by id is replaced not duplicated', () => {
+    const ctx = makeCtx();
+    ctx.generations = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z', stale: true },
+    ];
+    const gens = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z', stale: false },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, 0);
+
+    expect(ctx.generations).toHaveLength(1);
+    expect(ctx.generations[0].stale).toBe(false);
   });
 });

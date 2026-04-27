@@ -15,9 +15,7 @@
     :title="t('notif.openBell')"
   >
     <i data-lucide="bell" class="w-5 h-5"></i>
-    <template
-      x-if="notificationsVersion >= 0 && unreadNotificationsCount() > 0"
-    >
+    <template x-if="notificationsVersion >= 0 && unreadNotificationsCount() > 0">
       <span
         class="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-danger text-white text-[10px] font-bold flex items-center justify-center"
         :aria-label="t('notif.unreadBadge', { count: unreadNotificationsCount() })"
@@ -50,14 +48,8 @@
       </div>
     </header>
 
-    <ul
-      class="flex-1 overflow-y-auto"
-      x-show="profileNotifications().length > 0"
-    >
-      <template
-        x-for="notif in profileNotifications().slice().reverse()"
-        :key="notif.eventKey"
-      >
+    <ul class="flex-1 overflow-y-auto" x-show="profileNotifications().length > 0">
+      <template x-for="notif in profileNotifications().slice().reverse()" :key="notif.eventKey">
         <li
           class="px-3 py-2 border-b border-text-secondary/10 last:border-b-0 hover:bg-primary/5 transition-colors cursor-pointer"
           :class="!notif.read && 'bg-primary/5 font-medium'"

@@ -350,10 +350,7 @@ export class ProjectStore {
     return total;
   }
 
-  prunePendingTracker(
-    projectId: string,
-    opts?: { maxKeep?: number; maxAgeMs?: number },
-  ): number {
+  prunePendingTracker(projectId: string, opts?: { maxKeep?: number; maxAgeMs?: number }): number {
     const data = this.getProject(projectId);
     if (!data) return 0;
     const before = data.results.pendingTracker?.length ?? 0;
@@ -410,10 +407,7 @@ export class ProjectStore {
     this.pruneTracker(data);
   }
 
-  private pruneTracker(
-    data: ProjectData,
-    opts?: { maxKeep?: number; maxAgeMs?: number },
-  ): void {
+  private pruneTracker(data: ProjectData, opts?: { maxKeep?: number; maxAgeMs?: number }): void {
     const tracker = data.results.pendingTracker;
     if (!tracker || tracker.length === 0) return;
     const maxKeep = opts?.maxKeep ?? DEFAULT_PRUNE_MAX_KEEP;
@@ -426,7 +420,10 @@ export class ProjectStore {
         const ts = e.completedAt ? Date.parse(e.completedAt) : Date.parse(e.startedAt);
         return now - ts <= maxAgeMs;
       })
-      .sort((a, b) => Date.parse(b.completedAt ?? b.startedAt) - Date.parse(a.completedAt ?? a.startedAt))
+      .sort(
+        (a, b) =>
+          Date.parse(b.completedAt ?? b.startedAt) - Date.parse(a.completedAt ?? a.startedAt),
+      )
       .slice(0, Math.max(0, maxKeep - pendings.length));
     data.results.pendingTracker = [...pendings, ...terminals];
   }

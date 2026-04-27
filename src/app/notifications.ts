@@ -66,9 +66,7 @@ function writeNotifs(storage: StorageLike, all: NotifMap): void {
 
 function pruneExpiredAndCap(items: PersistedNotification[]): PersistedNotification[] {
   const cutoff = Date.now() - TTL_MS;
-  return items
-    .filter((n) => Date.parse(n.createdAt) > cutoff)
-    .slice(-MAX_PER_PROFILE);
+  return items.filter((n) => Date.parse(n.createdAt) > cutoff).slice(-MAX_PER_PROFILE);
 }
 
 // --- Ledger seenEventKeys ---
@@ -144,10 +142,7 @@ export function markRead(
 // "Vider" — supprime les notifs visibles SEULEMENT. Le ledger seenEventKeys
 // est PRÉSERVÉ : sinon une réconciliation future (switch projet, reconnect SSE,
 // reload) recréerait les mêmes notifs supprimées.
-export function clearNotifications(
-  profileId: string,
-  storage: StorageLike = localStorage,
-): void {
+export function clearNotifications(profileId: string, storage: StorageLike = localStorage): void {
   const all = readNotifs(storage);
   if (!(profileId in all)) return;
   delete all[profileId];

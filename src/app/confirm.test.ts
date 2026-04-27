@@ -156,6 +156,89 @@ describe('createConfirm', () => {
       expect(ctx.loading.summary).toBe(false);
       expect(ctx.showToast).toHaveBeenCalled();
     });
+
+    it('cancels by gid: aborts byGid controller, POSTs /cancel, removes pendingById entry', () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = { 'gid-abc': ctrl };
+      ctx.pendingById = {
+        'gid-abc': { id: 'gid-abc', type: 'summary', status: 'pending' },
+      };
+
+      confirm.cancelOne.call(ctx, 'gid-abc');
+
+      expect((ctrl as any).abort).toHaveBeenCalled();
+      expect(ctx.abortControllersByGid['gid-abc']).toBeUndefined();
+      expect(ctx.pendingById['gid-abc']).toBeUndefined();
+      expect(fetchMock).toHaveBeenCalledWith('/api/projects/pid-1/generations/gid-abc/cancel', {
+        method: 'POST',
+      });
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        expect.stringContaining('toast.cancelledOne'),
+        'info',
+      );
+    });
+
+    it('cancel by gid: silent when fetch rejects (best-effort backend)', async () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const fetchMock = vi.fn().mockRejectedValue(new Error('network down'));
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = { 'gid-x': ctrl };
+      ctx.pendingById = { 'gid-x': { id: 'gid-x', type: 'quiz', status: 'pending' } };
+
+      expect(() => confirm.cancelOne.call(ctx, 'gid-x')).not.toThrow();
+      expect(ctx.pendingById['gid-x']).toBeUndefined();
+      expect(ctx.showToast).toHaveBeenCalled();
+      // Wait for catch handler to fire
+      await new Promise((r) => setTimeout(r, 0));
+      expect(warnMock).toHaveBeenCalledWith(
+        '[cancel] POST /cancel failed',
+        expect.objectContaining({ pid: 'pid-1', gid: 'gid-x' }),
+      );
+      warnMock.mockRestore();
+    });
+
+    it('cancels server-owned gid (no local controller): clears loading[type] explicitly', () => {
+      // Scénario /generate/auto : le serveur génère le gid via runStepBody, le
+      // tab reçoit le pending via SSE. abortControllersByGid[gid] est absent
+      // (pas de fetch local pour ce gid) MAIS loading[type] a été set par
+      // installPlanLoading. Sans clear explicite, le spinner persiste jusqu'à
+      // fin du bulk auto fetch (60s+).
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = {}; // server-owned : pas de controller
+      ctx.pendingById = {
+        'gid-srv': { id: 'gid-srv', type: 'podcast', status: 'pending' },
+      };
+      ctx.loading.podcast = true;
+
+      confirm.cancelOne.call(ctx, 'gid-srv');
+
+      expect(ctx.pendingById['gid-srv']).toBeUndefined();
+      expect(ctx.loading.podcast).toBe(false);
+      expect(fetchMock).toHaveBeenCalledWith('/api/projects/pid-1/generations/gid-srv/cancel', {
+        method: 'POST',
+      });
+    });
+
+    it('cancel by gid leaves loading[type] untouched when local controller existed', () => {
+      // Inverse du test précédent : si abortControllersByGid[gid] existait,
+      // c'est state.generate() qui owne le finally → on n'écrase pas son
+      // loading[type] ici (race possible si la finally bumpe entre-temps).
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = { 'gid-loc': ctrl };
+      ctx.pendingById = { 'gid-loc': { id: 'gid-loc', type: 'quiz', status: 'pending' } };
+      ctx.loading.quiz = true;
+
+      confirm.cancelOne.call(ctx, 'gid-loc');
+
+      // loading.quiz reste true ici — le finally de state.generate le clear
+      expect(ctx.loading.quiz).toBe(true);
+    });
   });
 
   describe('cancelGeneration', () => {
