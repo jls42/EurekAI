@@ -70,6 +70,35 @@ describe('appendNotification', () => {
     expect(list[0].eventKey).toBe('gen:10:completed');
     expect(list[49].eventKey).toBe('gen:59:completed');
   });
+
+  // Régression-lock CLAUDE.md "ledger LRU cap 1000/profil" : le ledger
+  // seenEventKeys (qui sert à l'idempotence) ne doit pas grossir indéfiniment.
+  // Si la slice est supprimée par erreur, après ~1001 events un même eventKey
+  // ré-émis ne serait plus dédupliqué et recréerait la notif.
+  it('ledger seenEventKeys : LRU cap 1000 — le 1001e event évince le 1er', () => {
+    // Pousse 1001 events ; les events 0..49 doivent rester visibles dans la
+    // notif list (cap 50) mais le ledger doit cap à 1000.
+    for (let i = 0; i < 1001; i++) {
+      appendNotification('p1', N({ eventKey: `evk-${i}` }), storage);
+    }
+    // Le 1er event (evk-0) doit avoir été évincé du ledger LRU.
+    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(false);
+    // Les 1000 derniers (evk-1 → evk-1000 inclus, mais on a poussé 0..1000)
+    // doivent toujours être présents dans le ledger.
+    expect(hasSeenEvent('p1', 'evk-1000', storage)).toBe(true);
+    expect(hasSeenEvent('p1', 'evk-500', storage)).toBe(true);
+  });
+
+  it('ledger LRU : un eventKey évincé peut être ré-ajouté (pas de blacklist permanente)', () => {
+    for (let i = 0; i < 1001; i++) {
+      appendNotification('p1', N({ eventKey: `evk-${i}` }), storage);
+    }
+    // evk-0 a été évincé ; le ré-appender doit créer une nouvelle notif
+    // (le ledger LRU n'est pas une blacklist permanente, juste une fenêtre).
+    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(false);
+    expect(appendNotification('p1', N({ eventKey: 'evk-0' }), storage)).toBe(true);
+    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(true);
+  });
 });
 
 describe('markAllRead / markRead', () => {

@@ -787,6 +787,171 @@ describe('generateRoutes', () => {
       expect(finalProject.results.generations).toHaveLength(1);
       expect(finalProject.results.generations[0].id).toBe('11111111-1111-4111-8111-111111111111');
     });
+
+    // Régression-lock : readClientGid valide UUID v4 strict ou retombe sur
+    // randomUUID(). Sans ce verrou, un client malveillant peut injecter un
+    // gid arbitraire (v1, hex non-v4, payload SSRF-like) dans pendingTracker[].id.
+    it('readClientGid : gid client invalide (non-UUID-v4) → fallback randomUUID serveur', async () => {
+      const project = store.createProject('GidValidation');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      // Tente d'injecter un gid bidon (pas un UUID v4 — ici une chaîne lambda).
+      const HOSTILE_GID = 'not-a-real-uuid-but-could-be-anything';
+      const req = mockReq({ params: { pid }, body: { gid: HOSTILE_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalled();
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations).toHaveLength(1);
+      // Le gid effectif n'est PAS celui du client : randomUUID() v4 serveur a
+      // pris le relais. Vérification format strict.
+      const effectiveGid = finalProject.results.generations[0].id;
+      expect(effectiveGid).not.toBe(HOSTILE_GID);
+      expect(effectiveGid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    });
+
+    it('readClientGid : UUID v1 (variant non-v4) → fallback randomUUID serveur', async () => {
+      const project = store.createProject('GidV1');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      // UUID v1 timestamp-based : version nibble = 1 (pas 4) → REJETÉ par regex.
+      const V1_GID = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+      const req = mockReq({ params: { pid }, body: { gid: V1_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const finalProject = store.getProject(pid)!;
+      const effectiveGid = finalProject.results.generations[0].id;
+      expect(effectiveGid).not.toBe(V1_GID);
+      // Doit être un v4 (nibble version = 4 et variant = [89ab])
+      expect(effectiveGid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+    });
+
+    // Régression-lock : si markPendingCancelled gagne la course pendant que
+    // Mistral travaille, promoteToGeneration retourne kind='cancelled' et le
+    // handler DOIT répondre 409 avec {error: 'cancelled', gid} — pas 200 avec
+    // les data fantômes. Une régression qui flip le dispatch vers 200 stale
+    // serait silencieuse côté tests store-only ; ce test l'attrape route-level.
+    it('promote cancelled→409 dispatch : markPendingCancelled mid-flight → 409 cancelled', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Cancel race');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const CLIENT_GID = '22222222-2222-4222-8222-222222222222';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+
+      // Laisse le handler s'exécuter jusqu'au addPendingEntry
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Cancel arrive PENDANT que generateSummary est en attente
+      const cancelled = store.markPendingCancelled(pid, CLIENT_GID);
+      expect(cancelled).toBe(true);
+
+      // Maintenant Mistral renvoie son résultat — promoteToGeneration doit
+      // retourner kind='cancelled', le handler doit répondre 409.
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'cancelled', gid: CLIENT_GID });
+      // La generation NE DOIT PAS être ajoutée à generations[] (le cancel a gagné).
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations).toHaveLength(0);
+    });
+
+    it('promote failed→409 dispatch : markPendingFailed mid-flight → 409 failed', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Fail race');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const CLIENT_GID = '33333333-3333-4333-8333-333333333333';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Force un échec côté store pendant l'attente Mistral
+      store.markPendingFailed(pid, CLIENT_GID, 'quota_exceeded');
+
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'failed', gid: CLIENT_GID });
+    });
+
+    it('readClientGid : UUID v4 valide → conservé tel quel', async () => {
+      const project = store.createProject('GidValid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const VALID_GID = '8a3e1d2c-9fb7-4d5a-91e6-7f8c3b2a4d56';
+      const req = mockReq({ params: { pid }, body: { gid: VALID_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations[0].id).toBe(VALID_GID);
+    });
   });
 
   // --- Route-level tests ---

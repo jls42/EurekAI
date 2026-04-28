@@ -520,6 +520,81 @@ describe('GET /:pid/events (SSE)', () => {
     expect(res.flushHeaders).not.toHaveBeenCalled();
   });
 
+  // Régression-lock : writeGenerationEvent doit guarder writableEnded AVANT
+  // d'écrire. Sans ce guard, un event émis après que le socket s'est fermé
+  // (race entre bus.emit et req.on('close')) déclenche ERR_STREAM_WRITE_AFTER_END,
+  // l'EventEmitter propage l'erreur au listener et le process peut crasher.
+  it('writableEnded guard : skip write quand le socket est terminé', () => {
+    const project = store.createProject('SSE writable guard');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Premier event : socket OK → écrit
+    store.addPendingEntry(pid, {
+      id: 'gid-before-end',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    const writesBefore = res.writes.length;
+    expect(writesBefore).toBeGreaterThan(0);
+
+    // Simule la fermeture du flux côté Node : writableEnded=true.
+    // (req.on('close') n'est PAS encore déclenché → unsubscribe pas appelé,
+    // donc le listener bus est encore là — c'est la fenêtre de race).
+    res.writableEnded = true;
+
+    // Deuxième event : doit être skippé par le guard, pas de throw
+    // ERR_STREAM_WRITE_AFTER_END qui crasherait le process.
+    expect(() => {
+      store.addPendingEntry(pid, {
+        id: 'gid-after-end',
+        type: 'summary',
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+        sourceIds: [],
+      });
+    }).not.toThrow();
+    expect(res.writes.length).toBe(writesBefore);
+
+    req._trigger('close');
+  });
+
+  // Régression-lock : si res.write throw (bug Node, race rare), le catch dans
+  // writeGenerationEvent évite que l'erreur remonte à l'EventEmitter (= crash).
+  it('write throw : log warn mais ne crash pas le listener bus', () => {
+    const project = store.createProject('SSE write throw');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Force res.write à throw — simule ERR_STREAM_WRITE_AFTER_END échappant
+    // au guard writableEnded (race extrêmement étroite mais documentée).
+    res.write = vi.fn(() => {
+      throw new Error('ERR_STREAM_WRITE_AFTER_END');
+    });
+
+    expect(() => {
+      store.addPendingEntry(pid, {
+        id: 'gid-write-throw',
+        type: 'summary',
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+        sourceIds: [],
+      });
+    }).not.toThrow();
+
+    req._trigger('close');
+  });
+
   // Test #18 — verrou : heartbeat 25s exact (sans lui, les proxies idle
   // coupent la connexion → notifications stale jusqu'au reconnect EventSource).
   it('écrit un keep-alive heartbeat toutes les 25s', () => {

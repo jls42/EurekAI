@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createSession } from './session.js';
 import type { AppContext } from './app-context.js';
 import type { PendingTrackerEntry } from '../../types.js';
+import { appendNotification, hasSeenEvent, listProfileNotifications } from './notifications.js';
 
 function makeCtx(overrides: Partial<AppContext> = {}): AppContext {
   return {
@@ -99,5 +100,95 @@ describe('resetSession', () => {
     const ctx = makeCtx({ abortControllers: { summary: ctrl } });
 
     expect(() => sessionMixin.resetSession.call(ctx)).not.toThrow();
+  });
+});
+
+// Régression-lock invariant CLAUDE.md "Pending generations & notifications" :
+// resetSession NE TOUCHE PAS au ledger seenEventKeys ni aux notifications
+// persistées. Sinon une réconciliation future recréerait des notifs
+// supprimées et les badges unread spammeraient le user après chaque switch.
+function makeStorage() {
+  const data = new Map<string, string>();
+  return {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      data.set(k, v);
+    },
+    snapshot: () => Object.fromEntries(data),
+  };
+}
+
+describe('resetSession — invariants persistés (négatif)', () => {
+  it('PRÉSERVE le ledger seenEventKeys (LRU localStorage)', () => {
+    const storage = makeStorage();
+    appendNotification(
+      'profile-A',
+      {
+        eventKey: 'generation:gid-X:completed',
+        message: 'Test',
+        type: 'success',
+      },
+      storage,
+    );
+    const before = storage.snapshot();
+    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed', storage)).toBe(true);
+
+    const ctx = makeCtx();
+    sessionMixin.resetSession.call(ctx);
+
+    // Le storage n'a pas été touché par resetSession (resetSession ne reçoit
+    // pas le storage en argument et n'a aucun chemin légitime vers lui).
+    expect(storage.snapshot()).toEqual(before);
+    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed', storage)).toBe(true);
+  });
+
+  it('PRÉSERVE les notifications persistées par profil', () => {
+    const storage = makeStorage();
+    appendNotification(
+      'profile-A',
+      {
+        eventKey: 'generation:gid-Y:completed',
+        message: 'Visible notif',
+        type: 'success',
+      },
+      storage,
+    );
+    expect(listProfileNotifications('profile-A', storage)).toHaveLength(1);
+
+    const ctx = makeCtx();
+    sessionMixin.resetSession.call(ctx);
+
+    // Les notifs cloche restent visibles après resetSession.
+    expect(listProfileNotifications('profile-A', storage)).toHaveLength(1);
+  });
+
+  it('le ledger reste opérant après resetSession (idempotence eventKey conservée)', () => {
+    const storage = makeStorage();
+    appendNotification(
+      'profile-A',
+      {
+        eventKey: 'generation:gid-Z:completed',
+        message: 'First',
+        type: 'success',
+      },
+      storage,
+    );
+
+    const ctx = makeCtx();
+    sessionMixin.resetSession.call(ctx);
+
+    // Tente un nouveau push avec le MÊME eventKey : doit être rejeté car
+    // le ledger persiste à travers le reset.
+    const created = appendNotification(
+      'profile-A',
+      {
+        eventKey: 'generation:gid-Z:completed',
+        message: 'Duplicate would create here if ledger was wiped',
+        type: 'success',
+      },
+      storage,
+    );
+    expect(created).toBe(false);
+    expect(listProfileNotifications('profile-A', storage)).toHaveLength(1);
   });
 });
