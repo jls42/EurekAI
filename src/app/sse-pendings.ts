@@ -15,11 +15,18 @@ import type { AppContext } from './app-context';
 
 const RECONNECT_INITIAL_MS = 1000;
 const RECONNECT_MAX_MS = 30_000;
+// Cap sur les retries consécutifs : si le serveur renvoie 404 (projet supprimé
+// dans un autre tab) ou si le réseau est durablement coupé, l'EventSource boucle
+// sinon en backoff jusqu'à 30s ad vitam. Après 8 échecs (~ 8 × jusqu'à 30s
+// = quelques minutes), on stop et on log explicitement — l'user peut switcher
+// projet/refresh pour relancer.
+const RECONNECT_MAX_RETRIES = 8;
 
 export function createPendingsStream() {
   let source: EventSource | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let backoff = RECONNECT_INITIAL_MS;
+  let consecutiveErrors = 0;
 
   const stop = () => {
     if (source) {
@@ -61,7 +68,9 @@ export function createPendingsStream() {
           // re-throw : on absorbe pour ne pas tuer l'EventSource.
           console.warn('[sse] malformed generation event', err, msg.data);
         }
+        // Connexion saine : reset les compteurs d'échec pour repartir à plat.
         backoff = RECONNECT_INITIAL_MS;
+        consecutiveErrors = 0;
       });
       source.onerror = () => {
         // EventSource auto-reconnect côté browser, mais on contrôle le backoff
@@ -70,12 +79,25 @@ export function createPendingsStream() {
           stop();
           return;
         }
+        consecutiveErrors++;
+        console.warn(
+          `[sse] connection error (attempt ${consecutiveErrors}/${RECONNECT_MAX_RETRIES})`,
+        );
         try {
           source?.close();
         } catch {
           /* ignore */
         }
         source = null;
+        if (consecutiveErrors >= RECONNECT_MAX_RETRIES) {
+          // Probable 404 (projet supprimé) ou réseau down durable. On stop
+          // pour ne pas marteler — un selectProject/refresh ultérieur relance
+          // une connexion fraîche avec compteurs réinitialisés.
+          console.warn(
+            `[sse] giving up after ${RECONNECT_MAX_RETRIES} consecutive errors for project ${projectId}`,
+          );
+          return;
+        }
         reconnectTimer = setTimeout(() => {
           this.startPendingsStream(projectId);
         }, backoff);
@@ -86,6 +108,7 @@ export function createPendingsStream() {
     stopPendingsStream(): void {
       stop();
       backoff = RECONNECT_INITIAL_MS;
+      consecutiveErrors = 0;
     },
   };
 }

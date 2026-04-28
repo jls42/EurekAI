@@ -312,6 +312,54 @@ export interface PendingTrackerEntryTerminal extends PendingTrackerEntryBase {
 // du tracker et la Generation est ajoutée à `generations[]`.
 export type PendingTrackerEntry = PendingTrackerEntryActive | PendingTrackerEntryTerminal;
 
+// Réponse HTTP 409 quand la promotion échoue (route /generate/:type avec
+// trackedType, /generate/auto par step). Découple le contrat HTTP du
+// discriminant interne `PromoteResult.kind` — sinon renommer le discriminant
+// store casserait le client sans warning compile.
+export type PromoteErrorOutcome = 'cancelled' | 'failed' | 'missing';
+export interface PromoteErrorResponse {
+  error: PromoteErrorOutcome;
+  gid: string;
+}
+
+// Event SSE poussé sur GET /api/projects/:pid/events. Discriminated union sur
+// `status` : `generation` est présent UNIQUEMENT sur l'arm 'completed' — sans
+// ce verrou, le call site applyGenerationEvent doit checker `status === 'completed'
+// && generation` à chaque fois et un bug serveur (status='failed' avec generation
+// renseigné par erreur) compilerait silencieusement. Source unique de vérité
+// partagée serveur (helpers/event-bus.ts) ↔ client (src/app/helpers.ts) via
+// `import type` cross-frontière (pas de coût runtime — Vite efface).
+interface GenerationEventBase {
+  pid: string;
+  gid: string;
+  type: TrackedGenerationType;
+  at: string;
+  // Identifiant stable cross-onglets pour la déduplication idempotente.
+  // Format : 'generation:${gid}:${status}'.
+  eventKey: string;
+}
+
+export interface GenerationEventPending extends GenerationEventBase {
+  status: 'pending';
+}
+
+export interface GenerationEventCompleted extends GenerationEventBase {
+  status: 'completed';
+  // Le tracker n'a pas le payload data ; on l'attache à l'event pour permettre
+  // au client de mettre à jour state.generations sans refetch.
+  generation: Generation;
+}
+
+export interface GenerationEventTerminal extends GenerationEventBase {
+  status: 'failed' | 'cancelled';
+  failureCode: FailedStepCode;
+}
+
+export type GenerationEvent =
+  | GenerationEventPending
+  | GenerationEventCompleted
+  | GenerationEventTerminal;
+
 export interface CostEntry {
   timestamp: string;
   route: string;

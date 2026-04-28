@@ -12,6 +12,8 @@ import type {
   Consigne,
   TrackedGenerationType,
   PendingTrackerEntry,
+  PromoteErrorOutcome,
+  PromoteErrorResponse,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -369,7 +371,11 @@ async function runGeneratorAndPersist(
     }
     // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
     // 200 fantôme — le client refresh le projet pour voir l'état réel.
-    res.status(409).json({ error: promoteResult.kind, gid });
+    // Le typage PromoteErrorResponse découple le contrat HTTP du discriminant
+    // store : renommer kind n'aurait plus d'impact sur le client.
+    const errorOutcome: PromoteErrorOutcome = promoteResult.kind;
+    const body: PromoteErrorResponse = { error: errorOutcome, gid };
+    res.status(409).json(body);
     return;
   }
   store.addGeneration(pid, finalGen);

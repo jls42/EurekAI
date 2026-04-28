@@ -3,15 +3,16 @@ import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
-  FailedStepCode,
   Generation,
-  GenerationStatus,
+  GenerationEvent,
   PendingTrackerEntry,
   PodcastGeneration,
   PodcastLine,
   ProjectData,
   Source,
 } from '../../types';
+
+export type { GenerationEvent } from '../../types';
 import {
   appendNotification,
   clearNotifications,
@@ -31,22 +32,12 @@ const COLOR_ACCENT = 'var(--color-accent)';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE_KEY = 'notif.generationDone';
 
-// Event SSE poussé par le serveur sur GET /api/projects/:pid/events.
-// Schéma aligné sur helpers/event-bus.ts (côté serveur). Pas d'import direct
-// du shape complet (le runtime côté Alpine ne l'a pas), mais on importe
-// `FailedStepCode` en `type` (effacé par Vite) pour garder l'union fermée
-// côté client : ajouter un code serveur cassera à compile-time les
-// consommateurs SSE qui font du narrowing dessus.
-export interface GenerationEvent {
-  pid: string;
-  gid: string;
-  type: PendingTrackerEntry['type'];
-  status: GenerationStatus;
-  failureCode?: FailedStepCode;
-  generation?: Generation;
-  at: string;
-  eventKey: string;
-}
+// `GenerationEvent` est désormais une discriminated union sur `status` exportée
+// depuis types.ts (source unique partagée serveur ↔ client). `generation`
+// existe uniquement sur l'arm 'completed', `failureCode` uniquement sur
+// 'failed'/'cancelled'. Vite efface l'import type — pas de coût runtime.
+// Re-export ci-dessus pour garder la rétrocompatibilité des `import` existants
+// (`from './helpers'`).
 
 // Calcul du cutoff utilisé par reconcilePendings : si lastSeenAt absent (1er load
 // post-PR), retombe sur reconcileStartedAt → zéro backfill historique.
@@ -596,7 +587,7 @@ export function createHelpers() {
     // déjà appliqué la même transition, l'event SSE est absorbé sans effet.
     applyGenerationEvent(this: AppContext, event: GenerationEvent): void {
       if (!this.currentProfile) return;
-      const { gid, type, status, eventKey, generation } = event;
+      const { gid, type, status, eventKey } = event;
       if (status === 'pending') {
         // Hydrate / refresh le pending optimiste (peut écraser un déjà existant
         // côté client avec les vrais startedAt/sourceIds backend).
@@ -611,7 +602,16 @@ export function createHelpers() {
       }
       // Transition terminale : retirer du pendingById
       delete this.pendingById[gid];
-      if (status === 'completed' && generation) {
+      if (status === 'completed') {
+        // Le type discriminé garantit `event.generation: Generation`. Mais en
+        // runtime, une régression serveur (ou un payload SSE corrompu en
+        // transit) pourrait envoyer un completed sans generation — on garde
+        // un check défensif qui retire le pending sans crash et sans toast.
+        const generation = event.generation;
+        if (!generation) {
+          console.warn('[sse] completed event missing generation payload', event);
+          return;
+        }
         // openGens AVANT upsert : la generation est `push` dans state.generations
         // par upsertGenerationById, ce qui déclenche l'instanciation du composant
         // quizVocalComponent côté Alpine. Son `x-init $watch(() => openGens[gen.id])`

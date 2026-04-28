@@ -815,7 +815,9 @@ describe('generateRoutes', () => {
       // pris le relais. Vérification format strict.
       const effectiveGid = finalProject.results.generations[0].id;
       expect(effectiveGid).not.toBe(HOSTILE_GID);
-      expect(effectiveGid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(effectiveGid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
     });
 
     it('readClientGid : UUID v1 (variant non-v4) → fallback randomUUID serveur', async () => {
@@ -839,7 +841,9 @@ describe('generateRoutes', () => {
       const effectiveGid = finalProject.results.generations[0].id;
       expect(effectiveGid).not.toBe(V1_GID);
       // Doit être un v4 (nibble version = 4 et variant = [89ab])
-      expect(effectiveGid).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+      expect(effectiveGid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
     });
 
     // Régression-lock : si markPendingCancelled gagne la course pendant que

@@ -14,6 +14,7 @@ import type {
   CostEntry,
   ModerationResult,
   PendingTrackerEntry,
+  PendingTrackerEntryTerminal,
   FailedStepCode,
   GenerationStatus,
 } from './types.js';
@@ -411,28 +412,49 @@ export class ProjectStore {
 
   // Construit et émet un GenerationEvent à partir d'une entrée de tracker.
   // Centralisé pour que tous les helpers (add/promote/fail/cancel/boot sweep)
-  // émettent au même format avec la même clé eventKey stable.
+  // émettent au même format avec la même clé eventKey stable. Le switch sur
+  // status construit la bonne arm de la discriminated union (cf. types.ts) —
+  // generation présent uniquement sur 'completed', failureCode uniquement sur
+  // 'failed'/'cancelled'.
   private emitTrackerEvent(
     pid: string,
     entry: PendingTrackerEntry,
     status: GenerationStatus,
     generation?: Generation,
   ): void {
-    // Narrowing par status pour récupérer les champs du terminal arm. Sur
-    // pending ou completed (passé à la promotion), failureCode/completedAt
-    // n'existent pas et on retombe sur startedAt + Date.now.
     const isTerminal = entry.status === 'failed' || entry.status === 'cancelled';
-    const failureCode = isTerminal ? entry.failureCode : undefined;
     const completedAt = isTerminal ? entry.completedAt : undefined;
-    emitGenerationEvent({
+    const base = {
       pid,
       gid: entry.id,
       type: entry.type,
-      status,
-      failureCode,
-      generation,
       at: completedAt ?? entry.startedAt ?? new Date().toISOString(),
       eventKey: buildEventKey(entry.id, status),
+    };
+    if (status === 'completed') {
+      if (!generation) {
+        // Bug appelant : promoteToGeneration émet 'completed' avec generation
+        // garantie. Si on arrive ici sans generation, on log et on skip plutôt
+        // que de pousser un event invalide qui casserait la discriminated union.
+        console.error(`[store] emitTrackerEvent: 'completed' without generation`);
+        return;
+      }
+      emitGenerationEvent({ ...base, status: 'completed', generation });
+      return;
+    }
+    if (status === 'pending') {
+      emitGenerationEvent({ ...base, status: 'pending' });
+      return;
+    }
+    // Terminal : failed | cancelled — failureCode obligatoire.
+    if (!isTerminal) {
+      console.error(`[store] emitTrackerEvent: terminal status ${status} from non-terminal entry`);
+      return;
+    }
+    emitGenerationEvent({
+      ...base,
+      status,
+      failureCode: (entry as PendingTrackerEntryTerminal).failureCode,
     });
   }
 

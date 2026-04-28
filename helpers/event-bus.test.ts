@@ -5,16 +5,30 @@ import {
   subscribeGeneration,
   type GenerationEvent,
 } from './event-bus.js';
+import type { Generation } from '../types.js';
 
-const makeEvent = (overrides: Partial<GenerationEvent> = {}): GenerationEvent => ({
-  pid: 'project-1',
-  gid: 'gid-1',
+// Generation factice minimale pour les tests bus (l'arm 'completed' impose
+// generation présent — le bus ne lit jamais le contenu, seul le shape compte).
+const fakeGen = {
+  id: 'gid-1',
   type: 'summary',
-  status: 'completed',
-  at: new Date().toISOString(),
-  eventKey: buildEventKey('gid-1', 'completed'),
-  ...overrides,
-});
+  title: 'T',
+  createdAt: new Date().toISOString(),
+  sourceIds: [],
+  data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+} as unknown as Generation;
+
+const makeEvent = (overrides: Partial<GenerationEvent> = {}): GenerationEvent =>
+  ({
+    pid: 'project-1',
+    gid: 'gid-1',
+    type: 'summary',
+    status: 'completed',
+    generation: fakeGen,
+    at: new Date().toISOString(),
+    eventKey: buildEventKey('gid-1', 'completed'),
+    ...overrides,
+  }) as GenerationEvent;
 
 describe('event-bus', () => {
   it('subscribeGeneration relaie les événements du bon projet', () => {

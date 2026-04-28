@@ -1,10 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type {
-  FailedStepCode,
-  Generation,
-  GenerationStatus,
-  TrackedGenerationType,
-} from '../types.js';
+import type { GenerationEvent, GenerationStatus } from '../types.js';
 
 // Bus d'événements en mémoire pour les changements d'état de pending tracker.
 // Utilisé par les routes SSE (`GET /api/projects/:pid/events`) pour pousser les
@@ -15,22 +10,12 @@ import type {
 // Le bus n'a pas de buffering / replay : un client qui se connecte après
 // l'émission ne reçoit pas l'event passé. La réconciliation côté client
 // (snapshot project.json + ledger seenEventKeys) couvre ce cas.
+//
+// `GenerationEvent` est une discriminated union sur `status` exportée depuis
+// types.ts (source unique partagée serveur ↔ client) — `generation` n'existe
+// que sur l'arm 'completed', `failureCode` que sur 'failed'/'cancelled'.
 
-export interface GenerationEvent {
-  pid: string;
-  gid: string;
-  type: TrackedGenerationType;
-  status: GenerationStatus;
-  failureCode?: FailedStepCode;
-  // Présent uniquement si status === 'completed' (le tracker n'a pas le payload
-  // data ; on l'attache à l'event pour permettre au client de mettre à jour son
-  // state.generations sans refetch).
-  generation?: Generation;
-  at: string;
-  // Identifiant stable cross-onglets pour la déduplication idempotente côté
-  // client (notifications.appendNotification + shownToastEventKeys).
-  eventKey: string;
-}
+export type { GenerationEvent } from '../types.js';
 
 const bus = new EventEmitter();
 // 50 listeners suffisent : 1 par client SSE connecté + ~5 marges. Dépasser

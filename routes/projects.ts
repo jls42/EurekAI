@@ -101,21 +101,39 @@ export function projectRoutes(store: ProjectStore): Router {
 
     // Heartbeat pour empêcher les proxies de couper la connexion idle. Les
     // commentaires SSE (`: ...`) sont ignorés par le client mais maintiennent
-    // la connexion vivante.
-    const heartbeat = setInterval(() => {
-      if (res.writableEnded) return;
-      try {
-        res.write(`: keep-alive\n\n`);
-      } catch {
-        /* socket fermé entre tick et write — req.on('close') va cleaner */
-      }
-    }, SSE_HEARTBEAT_MS);
-
+    // la connexion vivante. Compteur de throws consécutifs : si req.on('close')
+    // ne fire jamais (bug Node socket half-open observé en prod), on stoppe
+    // l'interval après 3 échecs au lieu de tourner ad vitam.
+    const HEARTBEAT_MAX_CONSECUTIVE_THROWS = 3;
+    let heartbeatThrows = 0;
+    let cleanedUp = false;
     const cleanup = (reason: string) => {
+      // Idempotent : req.on('close') ET res.on('error') peuvent firer ensemble
+      // sur reset TCP brutal — on ne veut pas double-log + double-unsubscribe.
+      if (cleanedUp) return;
+      cleanedUp = true;
       clearInterval(heartbeat);
       unsubscribe();
       logger.info('sse', `client ${reason} from project ${pid}`);
     };
+    const heartbeat = setInterval(() => {
+      if (res.writableEnded) return;
+      try {
+        res.write(`: keep-alive\n\n`);
+        heartbeatThrows = 0;
+      } catch (err) {
+        heartbeatThrows++;
+        if (heartbeatThrows >= HEARTBEAT_MAX_CONSECUTIVE_THROWS) {
+          // Socket pourri sans close fire — cleanup forcé pour éviter la fuite.
+          logger.warn(
+            'sse',
+            `heartbeat write throwing repeatedly, forcing cleanup: ${String(err)}`,
+          );
+          cleanup('heartbeat-stuck');
+        }
+      }
+    }, SSE_HEARTBEAT_MS);
+
     req.on('close', () => cleanup('disconnected'));
     // Listener err sur res : si le serveur tente d'écrire après reset TCP brutal,
     // Node émet 'error' sur res. Sans listener, ça remonte uncaught et crash.
