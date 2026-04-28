@@ -9,11 +9,7 @@ const GID_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
 const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
-// Sanitization avant fetch — pattern whitelist canonique recommandé
-// explicitement par Codacy `rule-node-ssrf` (cf. exemple LGPL OWASP) :
-//   const whitelist = [...]
-//   if (whitelist.includes(url)) { fetch(url, ...) }
-// Defense in depth : regex PID_SAFE + GID_UUID_V4 + encodeURIComponent
+// Defense in depth avant fetch : PID_SAFE + GID_UUID_V4 + encodeURIComponent
 // sur chaque segment AVANT construction de l'URL.
 //
 // Retourne `true` si le serveur a confirmé le cancel (200) ou est déjà sans
@@ -25,11 +21,10 @@ async function postCancel(pid: string, gid: string, allowedUrls: string[]): Prom
   const safePid = encodeURIComponent(pid);
   const safeGid = encodeURIComponent(gid);
   const url = '/api/projects/' + safePid + '/generations/' + safeGid + '/cancel';
-  // Shape exact recommandé par Codacy `rule-node-ssrf` (OWASP) :
-  // `if (whitelist.includes(url)) { fetch(url, ...) }`. L'early-return
-  // négatif `if (!whitelist.includes(url)) return` est fonctionnellement
-  // équivalent mais NON reconnu par la règle Codacy LGPL — il faut le bloc
-  // positif englobant pour que le taint analysis valide le sink.
+  // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` recommandé
+  // par Codacy `rule-node-ssrf` (OWASP). L'early-return négatif est
+  // fonctionnellement équivalent mais NON reconnu par la règle Codacy LGPL —
+  // il faut le bloc positif englobant pour que le taint analysis valide le sink.
   if (allowedUrls.includes(url)) {
     try {
       const res = await fetch(url, { method: 'POST' });

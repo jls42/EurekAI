@@ -168,11 +168,12 @@ export function createState() {
       websearch: false,
     } as Record<string, boolean>,
 
-    // AbortControllers for cancellation (legacy par type, conservé pour le commit
-    // pending lifecycle qui migrera vers abortControllersByGid).
+    // AbortControllers indexés par type (legacy). Coexiste avec
+    // abortControllersByGid (par gid UUID v4) qui permet le cancel ciblé d'un
+    // pending précis quand plusieurs du même type coexistent.
     abortControllers: {} as Record<string, AbortController>,
 
-    // --- Pending lifecycle (post-PR) ---
+    // --- Pending lifecycle ---
     // Source de vérité pour les 7 Generation persistées. Multi-pendings même type
     // possibles (multi-onglets, /generate/auto parallel). Hydraté depuis
     // project.results.pendingTracker au selectProject + via events SSE.

@@ -100,9 +100,9 @@ export interface GenerationMeta {
   usage?: GenerationUsage;
   estimatedCost?: number;
   costBreakdown?: string[];
-  // Posé par store.promoteToGeneration uniquement (post-PR pending lifecycle).
-  // Absent sur les générations pré-PR → ignorées par la réconciliation client
-  // (évite le spam de notifications historiques au 1er load post-PR).
+  // Posé par store.promoteToGeneration uniquement. Absent sur les générations
+  // pré-pending-lifecycle → ignorées par la réconciliation client (évite le
+  // spam de notifications historiques au 1er load après migration).
   completedAt?: string;
 }
 
@@ -257,10 +257,10 @@ export interface ProjectMeta {
 
 export interface ProjectResults {
   generations: Generation[];
-  // Cycle de vie des générations en cours / échouées / annulées (ajouté post-PR
-  // pending lifecycle). Séparé de `generations[]` pour ne pas contaminer les call
-  // sites qui lisent `g.data` sans guard. Le tracker contient uniquement les
-  // métadonnées de cycle de vie (pas de payload data).
+  // Cycle de vie des générations en cours / échouées / annulées. Séparé de
+  // `generations[]` pour ne pas contaminer les call sites qui lisent `g.data`
+  // sans guard : le tracker contient uniquement les métadonnées de cycle de vie
+  // (pas de payload data).
   pendingTracker?: PendingTrackerEntry[];
 }
 
@@ -295,9 +295,8 @@ interface PendingTrackerEntryBase {
 
 // Discriminated union sur `status` : verrouille à compile-time que les champs
 // terminaux (failureCode, completedAt) sont OBLIGATOIRES dès qu'on flippe le
-// status, et ABSENTS sur l'arm pending. Évite l'état impossible
-// `{status:'pending', failureCode:'cancelled'}` qui était type-valide avant ce
-// refactor (cf. PR #29 review fix #16).
+// status, et ABSENTS sur l'arm pending. Empêche l'état impossible
+// `{status:'pending', failureCode:'cancelled'}` qui contournerait la sémantique.
 export interface PendingTrackerEntryActive extends PendingTrackerEntryBase {
   status: 'pending';
 }
