@@ -30,7 +30,7 @@ const TEXT_TEXT_SECONDARY = 'text-text-secondary';
 const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
 const I18N_GEN_PREFIX = 'gen.';
-const NOTIF_GENERATION_DONE_KEY = 'notif.generationDone';
+const NOTIF_GENERATION_DONE_LABEL = 'notif.generationDone';
 
 // `GenerationEvent` est désormais une discriminated union sur `status` exportée
 // depuis types.ts (source unique partagée serveur ↔ client). `generation`
@@ -623,12 +623,12 @@ export function createHelpers() {
         this.openGens[generation.id] = true;
         this.upsertGenerationById(generation);
         this.showToast(
-          this.t(NOTIF_GENERATION_DONE_KEY, { type: this.t(I18N_GEN_PREFIX + type) }),
+          this.t(NOTIF_GENERATION_DONE_LABEL, { type: this.t(I18N_GEN_PREFIX + type) }),
           'success',
           null,
           null,
           eventKey,
-          { messageKey: NOTIF_GENERATION_DONE_KEY, paramKeys: { type: I18N_GEN_PREFIX + type } },
+          { messageKey: NOTIF_GENERATION_DONE_LABEL, paramKeys: { type: I18N_GEN_PREFIX + type } },
         );
         return;
       }
@@ -720,7 +720,7 @@ export function createHelpers() {
         if (Date.parse(gen.completedAt) <= cutoff) continue;
         appendNotification(profileId, {
           eventKey: `generation:${gen.id}:completed`,
-          messageKey: NOTIF_GENERATION_DONE_KEY,
+          messageKey: NOTIF_GENERATION_DONE_LABEL,
           paramKeys: { type: 'gen.' + gen.type },
           type: 'success',
           projectId,

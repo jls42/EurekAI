@@ -48,7 +48,7 @@ export function renderNotificationMessage(
   t: (key: string, params?: Record<string, string | number>) => string,
 ): string {
   if (!notif.messageKey) return notif.message ?? '';
-  const resolved: Record<string, string | number> = { ...(notif.params ?? {}) };
+  const resolved: Record<string, string | number> = { ...notif.params };
   for (const [paramName, key] of Object.entries(notif.paramKeys ?? {})) {
     resolved[paramName] = t(key);
   }
