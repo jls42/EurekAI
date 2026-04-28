@@ -1,1 +1,10 @@
+#!/usr/bin/env sh
+# Ordre : fail-fast en premier (checks rapides), gros bloc en dernier.
+# 1. Checks rapides (~50ms) : merge conflict, large files, shellcheck si dispo.
+# 2. lint-staged : prettier + eslint sur les fichiers staged uniquement.
+# 3. npm test : typecheck + lint:complexity + lint:ci + lint:deadcode + vitest (~30s).
+#    Reste en filet final — si ça pèse trop sur la boucle commit, à retirer
+#    plus tard et déléguer à la CI.
+bash scripts/pre-commit-fast.sh
+npx --no-install lint-staged
 npm test
