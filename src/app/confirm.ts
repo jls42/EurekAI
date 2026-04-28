@@ -26,21 +26,24 @@ async function postCancel(pid: string, gid: string, allowedUrls: string[]): Prom
   const safeGid = encodeURIComponent(gid);
   const url = '/api/projects/' + safePid + '/generations/' + safeGid + '/cancel';
   // Shape exact recommandé par Codacy `rule-node-ssrf` (OWASP) :
-  // `if (whitelist.includes(url)) { fetch(url, ...) }`.
-  if (!allowedUrls.includes(url)) return false;
-  try {
-    const res = await fetch(url, { method: 'POST' });
-    if (res.ok) return true;
-    // 404 pending_not_found = race avec un completion/cancel précédent : pour
-    // l'UX on accepte (le pending est de toute façon parti). 4xx/5xx autres =
-    // bug serveur, on rollback.
-    if (res.status === 404) return true;
-    console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
-    return false;
-  } catch (err) {
-    console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
-    return false;
+  // `if (whitelist.includes(url)) { fetch(url, ...) }`. L'early-return
+  // négatif `if (!whitelist.includes(url)) return` est fonctionnellement
+  // équivalent mais NON reconnu par la règle Codacy LGPL — il faut le bloc
+  // positif englobant pour que le taint analysis valide le sink.
+  if (allowedUrls.includes(url)) {
+    try {
+      const res = await fetch(url, { method: 'POST' });
+      if (res.ok) return true;
+      // 404 pending_not_found = race avec un completion/cancel précédent : pour
+      // l'UX on accepte (le pending est de toute façon parti). 4xx/5xx autres =
+      // bug serveur, on rollback.
+      if (res.status === 404) return true;
+      console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+    } catch (err) {
+      console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
+    }
   }
+  return false;
 }
 
 // Construit la whitelist d'URLs /cancel autorisées pour ce projet à partir
