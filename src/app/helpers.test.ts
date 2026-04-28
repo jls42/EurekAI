@@ -1746,6 +1746,7 @@ describe('applyGenerationEvent', () => {
       null,
       null,
       'generation:g2:completed',
+      { messageKey: 'notif.generationDone', paramKeys: { type: 'gen.quiz' } },
     );
   });
 
@@ -1772,6 +1773,7 @@ describe('applyGenerationEvent', () => {
       null,
       null,
       'generation:g3:cancelled',
+      { messageKey: 'notif.generationCancelled', paramKeys: { type: 'gen.podcast' } },
     );
   });
 
@@ -1798,6 +1800,7 @@ describe('applyGenerationEvent', () => {
       null,
       null,
       'generation:g4:failed',
+      { messageKey: 'notif.generationFailed', paramKeys: { type: 'gen.image' } },
     );
   });
 

@@ -24,11 +24,35 @@ export interface PersistedNotification {
   // Identifiant stable cross-onglets pour la déduplication idempotente.
   // Format : 'generation:${gid}:${status}'.
   eventKey: string;
-  message: string;
+  // messageKey + params + paramKeys = source de vérité i18n-aware. Le panneau
+  // cloche traduit au render via renderNotificationMessage(t) — la notif reste
+  // synchro avec la langue UI courante même si l'user change de langue après
+  // création. paramKeys porte des sous-clés à traduire (ex: type d'agent).
+  messageKey?: string;
+  params?: Record<string, string | number>;
+  paramKeys?: Record<string, string>;
+  // Legacy : notifs créées avant le refactor i18n-aware ne portent que le
+  // message déjà traduit dans la langue de l'époque. Conservé pour rester
+  // affichable, mais figé dans cette langue.
+  message?: string;
   type: NotificationType;
   createdAt: string;
   read: boolean;
   projectId?: string;
+}
+
+// Résout messageKey + paramKeys → texte traduit dans la langue UI courante.
+// Fallback sur `message` legacy si pas de messageKey. Vide si rien des deux.
+export function renderNotificationMessage(
+  notif: PersistedNotification,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+  if (!notif.messageKey) return notif.message ?? '';
+  const resolved: Record<string, string | number> = { ...(notif.params ?? {}) };
+  for (const [paramName, key] of Object.entries(notif.paramKeys ?? {})) {
+    resolved[paramName] = t(key);
+  }
+  return t(notif.messageKey, resolved);
 }
 
 export interface StorageLike {

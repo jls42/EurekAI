@@ -19,6 +19,7 @@ import {
   listProfileNotifications,
   markAllRead,
   markRead,
+  renderNotificationMessage,
   setProjectLastSeen,
   type PersistedNotification,
 } from './notifications';
@@ -27,6 +28,8 @@ const TEXT_TEXT_PRIMARY = 'text-text-primary';
 const TEXT_TEXT_SECONDARY = 'text-text-secondary';
 const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
+const I18N_GEN_PREFIX = 'gen.';
+const NOTIF_GENERATION_DONE_KEY = 'notif.generationDone';
 
 // Event SSE poussé par le serveur sur GET /api/projects/:pid/events.
 // Schéma aligné sur helpers/event-bus.ts (côté serveur). Pas d'import direct
@@ -620,11 +623,12 @@ export function createHelpers() {
         this.openGens[generation.id] = true;
         this.upsertGenerationById(generation);
         this.showToast(
-          this.t('notif.generationDone', { type: this.t('gen.' + type) }),
+          this.t(NOTIF_GENERATION_DONE_KEY, { type: this.t(I18N_GEN_PREFIX + type) }),
           'success',
           null,
           null,
           eventKey,
+          { messageKey: NOTIF_GENERATION_DONE_KEY, paramKeys: { type: I18N_GEN_PREFIX + type } },
         );
         return;
       }
@@ -632,11 +636,12 @@ export function createHelpers() {
       const messageKey =
         status === 'cancelled' ? 'notif.generationCancelled' : 'notif.generationFailed';
       this.showToast(
-        this.t(messageKey, { type: this.t('gen.' + type) }),
+        this.t(messageKey, { type: this.t(I18N_GEN_PREFIX + type) }),
         toastType,
         null,
         null,
         eventKey,
+        { messageKey, paramKeys: { type: I18N_GEN_PREFIX + type } },
       );
     },
 
@@ -715,7 +720,8 @@ export function createHelpers() {
         if (Date.parse(gen.completedAt) <= cutoff) continue;
         appendNotification(profileId, {
           eventKey: `generation:${gen.id}:completed`,
-          message: this.t('notif.generationDone', { type: this.t('gen.' + gen.type) }),
+          messageKey: NOTIF_GENERATION_DONE_KEY,
+          paramKeys: { type: 'gen.' + gen.type },
           type: 'success',
           projectId,
         });
@@ -735,9 +741,8 @@ export function createHelpers() {
         const cancelled = t.status === 'cancelled';
         appendNotification(profileId, {
           eventKey: `generation:${t.id}:${t.status}`,
-          message: this.t(cancelled ? 'notif.generationCancelled' : 'notif.generationFailed', {
-            type: this.t('gen.' + t.type),
-          }),
+          messageKey: cancelled ? 'notif.generationCancelled' : 'notif.generationFailed',
+          paramKeys: { type: 'gen.' + t.type },
           type: cancelled ? 'info' : 'error',
           projectId,
         });
@@ -776,6 +781,13 @@ export function createHelpers() {
       if (!this.currentProfile) return;
       clearNotifications(this.currentProfile.id);
       this.notificationsVersion++;
+    },
+
+    // Rend le message d'une notif persistée dans la langue UI courante.
+    // Préfère messageKey + paramKeys (i18n-aware) ; fallback sur le legacy
+    // `message` string pour les notifs créées avant le refactor i18n.
+    notificationMessage(this: AppContext, notif: PersistedNotification): string {
+      return renderNotificationMessage(notif, this.t.bind(this));
     },
 
     formatRelativeTime(this: AppContext, iso: string): string {

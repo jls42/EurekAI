@@ -214,6 +214,10 @@ describe('generate', () => {
       null,
       expect.objectContaining({ label: 'toast.view' }),
       expect.stringMatching(/^generation:.+:completed$/),
+      expect.objectContaining({
+        messageKey: 'toast.generationDone',
+        paramKeys: { type: 'gen.summary' },
+      }),
     );
     expect(ctx.loading.summary).toBe(false);
   });

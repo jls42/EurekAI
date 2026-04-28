@@ -35,6 +35,11 @@ export interface ItemWithRefs {
 }
 
 type ToastAction = { label: string; fn: () => void };
+type NotifSpec = {
+  messageKey: string;
+  params?: Record<string, string | number>;
+  paramKeys?: Record<string, string>;
+};
 
 export interface AppContext extends AppState {
   $nextTick(cb?: () => void): Promise<void>;
@@ -48,6 +53,7 @@ export interface AppContext extends AppState {
     retryFn?: (() => void) | null,
     action?: ToastAction | null,
     eventKey?: string,
+    notifSpec?: NotifSpec,
   ): void;
   dismissToast(id: number): void;
 
@@ -206,6 +212,7 @@ export interface AppContext extends AppState {
   markAllNotificationsRead(): void;
   markNotificationRead(eventKey: string): void;
   clearProfileNotifications(): void;
+  notificationMessage(notif: import('./notifications').PersistedNotification): string;
   formatRelativeTime(iso: string): string;
   applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;

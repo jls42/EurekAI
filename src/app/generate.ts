@@ -9,6 +9,8 @@ const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
+const I18N_GEN_PREFIX = 'gen.';
+const NOTIF_GENERATION_DONE = 'toast.generationDone';
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -197,7 +199,7 @@ export async function runAutoStep(
     // notif via showToast → appendNotification (toast.ts). Le HTTP
     // devient un chemin de persistance complet quand SSE est down.
     state.showToast(
-      state.t('toast.generationDone', { type: state.t('gen.' + type) }),
+      state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
       'success',
       null,
       { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
@@ -291,11 +293,12 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
   // premier (peu probable mais possible), le toast UI ne sera pas dupliqué et
   // la notif persistée n'aura qu'une seule entrée pour ce gid.
   state.showToast(
-    state.t('toast.generationDone', { type: state.t('gen.' + type) }),
+    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
     'success',
     null,
     { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
     `generation:${gen.id}:completed`,
+    { messageKey: NOTIF_GENERATION_DONE, paramKeys: { type: I18N_GEN_PREFIX + type } },
   );
 }
 

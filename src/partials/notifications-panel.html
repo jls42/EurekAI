@@ -55,7 +55,7 @@
           :class="!notif.read && 'bg-primary/5 font-medium'"
           @click="markNotificationRead(notif.eventKey)"
         >
-          <p class="text-body-sm" x-text="notif.message"></p>
+          <p class="text-body-sm" x-text="notificationMessage(notif)"></p>
           <p
             class="text-body-sm text-text-secondary text-xs mt-1"
             x-text="t('notif.timeAgo', { time: formatRelativeTime(notif.createdAt) })"

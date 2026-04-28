@@ -9,6 +9,17 @@ export interface Toast {
   action: { label: string; fn: () => void } | null;
 }
 
+export interface NotifSpec {
+  // Clé i18n persistée pour permettre re-traduction au render dans la cloche
+  // (synchro avec la langue UI courante, même si user change après création).
+  messageKey: string;
+  // Paramètres scalaires (non-traduits) — ex: count, percent.
+  params?: Record<string, string | number>;
+  // Sous-clés à traduire au render — ex: { type: 'gen.summary' } pour résoudre
+  // le label d'agent dans la langue UI courante.
+  paramKeys?: Record<string, string>;
+}
+
 export function createToast() {
   return {
     // Signature rétrocompatible : eventKey ajouté en 5e position pour ne pas
@@ -19,6 +30,9 @@ export function createToast() {
     // 2. UI per-tab via shownToastEventKeys (Set en RAM, scope onglet).
     // Si l'eventKey est déjà vu côté UI, retour immédiat — pas de toast UI
     // dupliqué quand payload 200 + event SSE arrivent dans le même onglet.
+    // notifSpec (6e arg) : passe la clé i18n + params au lieu du message déjà
+    // traduit pour persistance i18n-aware. Sans notifSpec, le `message` reste
+    // persisté en string figé (mode legacy compat).
     showToast(
       this: AppContext,
       message: string,
@@ -26,6 +40,7 @@ export function createToast() {
       retryFn: (() => void) | null = null,
       action: { label: string; fn: () => void } | null = null,
       eventKey?: string,
+      notifSpec?: NotifSpec,
     ) {
       if (eventKey) {
         // Dédup persistée : le ledger seenEventKeys empêche les doublons
@@ -35,7 +50,13 @@ export function createToast() {
         if (this.currentProfile) {
           const created = appendNotification(this.currentProfile.id, {
             eventKey,
-            message,
+            ...(notifSpec
+              ? {
+                  messageKey: notifSpec.messageKey,
+                  params: notifSpec.params,
+                  paramKeys: notifSpec.paramKeys,
+                }
+              : { message }),
             type: type as 'info' | 'success' | 'warning' | 'error',
             projectId: this.currentProjectId ?? undefined,
           });

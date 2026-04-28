@@ -8,6 +8,7 @@ import {
   hasSeenEvent,
   getProjectLastSeen,
   setProjectLastSeen,
+  renderNotificationMessage,
   type StorageLike,
   type PersistedNotification,
 } from './notifications.js';
@@ -131,5 +132,97 @@ describe('storage corrompu', () => {
   it('retourne fallback vide si JSON invalide', () => {
     storage.setItem('sf-profile-notifications', 'not-json');
     expect(listProfileNotifications('p1', storage)).toEqual([]);
+  });
+});
+
+describe('renderNotificationMessage (i18n-aware)', () => {
+  // Faux t() qui simule un dictionnaire minimaliste avec interpolation.
+  const dict: Record<string, string> = {
+    'notif.generationDone': '{type} terminé',
+    'gen.summary': 'Fiche',
+    'gen.quiz': 'Quiz',
+    'notif.errorWithCount': '{count} erreurs',
+  };
+  const t = (key: string, params?: Record<string, string | number>) => {
+    let text = dict[key] ?? key;
+    if (params) {
+      for (const [k, v] of Object.entries(params)) {
+        text = text.replaceAll(`{${k}}`, String(v));
+      }
+    }
+    return text;
+  };
+
+  it('résout messageKey + paramKeys au render dans la langue courante', () => {
+    const notif: PersistedNotification = {
+      eventKey: 'k1',
+      messageKey: 'notif.generationDone',
+      paramKeys: { type: 'gen.summary' },
+      type: 'success',
+      createdAt: '2026-04-28T10:00:00Z',
+      read: false,
+    };
+    expect(renderNotificationMessage(notif, t)).toBe('Fiche terminé');
+  });
+
+  it('combine params scalaires et paramKeys (paramKeys traduit, params direct)', () => {
+    const notif: PersistedNotification = {
+      eventKey: 'k2',
+      messageKey: 'notif.errorWithCount',
+      params: { count: 3 },
+      type: 'error',
+      createdAt: '2026-04-28T10:00:00Z',
+      read: false,
+    };
+    expect(renderNotificationMessage(notif, t)).toBe('3 erreurs');
+  });
+
+  it('fallback sur message legacy si messageKey absent (notifs pré-refactor)', () => {
+    const legacy: PersistedNotification = {
+      eventKey: 'k3',
+      message: 'Message figé en français',
+      type: 'info',
+      createdAt: '2026-04-28T10:00:00Z',
+      read: false,
+    };
+    expect(renderNotificationMessage(legacy, t)).toBe('Message figé en français');
+  });
+
+  it('chaîne vide si ni messageKey ni message', () => {
+    const empty: PersistedNotification = {
+      eventKey: 'k4',
+      type: 'info',
+      createdAt: '2026-04-28T10:00:00Z',
+      read: false,
+    };
+    expect(renderNotificationMessage(empty, t)).toBe('');
+  });
+
+  it('change de langue au render : la même notif persistée donne 2 sorties différentes', () => {
+    const notif: PersistedNotification = {
+      eventKey: 'k5',
+      messageKey: 'notif.generationDone',
+      paramKeys: { type: 'gen.quiz' },
+      type: 'success',
+      createdAt: '2026-04-28T10:00:00Z',
+      read: false,
+    };
+    // FR
+    expect(renderNotificationMessage(notif, t)).toBe('Quiz terminé');
+    // EN simulé (autre dictionnaire)
+    const tEn = (key: string, params?: Record<string, string | number>) => {
+      const enDict: Record<string, string> = {
+        'notif.generationDone': '{type} complete',
+        'gen.quiz': 'Quiz',
+      };
+      let text = enDict[key] ?? key;
+      if (params) {
+        for (const [k, v] of Object.entries(params)) {
+          text = text.replaceAll(`{${k}}`, String(v));
+        }
+      }
+      return text;
+    };
+    expect(renderNotificationMessage(notif, tEn)).toBe('Quiz complete');
   });
 });
