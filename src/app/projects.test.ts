@@ -307,6 +307,60 @@ describe('deleteProject', () => {
     expect(ctx.sources).toEqual([]);
     expect(ctx.generations).toEqual([]);
   });
+
+  it('rollback + toast erreur si fetch DELETE throw (network down)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const ctx = makeContext({ projects: [{ id: 'p1' }, { id: 'p2' }] });
+
+    await proj.deleteProject.call(ctx, 'p1');
+
+    // Pas de mutation : projects intact + toast erreur affiché
+    expect(ctx.projects).toHaveLength(2);
+    expect(errorSpy).toHaveBeenCalledWith('[deleteProject] network failure', expect.any(Error));
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectDeleteError',
+      'error',
+      expect.any(Function),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('rollback + toast erreur si fetch DELETE renvoie non-ok (5xx)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: false, status: 500 } as any);
+    const ctx = makeContext({ projects: [{ id: 'p1' }] });
+
+    await proj.deleteProject.call(ctx, 'p1');
+
+    expect(ctx.projects).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[deleteProject] non-ok',
+      expect.objectContaining({ id: 'p1', status: 500 }),
+    );
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectDeleteError',
+      'error',
+      expect.any(Function),
+    );
+    errorSpy.mockRestore();
+  });
+});
+
+describe('openLightbox', () => {
+  it('set lightboxUrl et appelle showModal sur la dialog ref', () => {
+    const showModal = vi.fn();
+    const ctx = makeContext({
+      $refs: { imageLightbox: { showModal } },
+      lightboxUrl: '',
+      openLightbox: proj.openLightbox,
+    });
+
+    ctx.openLightbox.call(ctx, '/image/foo.png');
+
+    expect(ctx.lightboxUrl).toBe('/image/foo.png');
+    expect(showModal).toHaveBeenCalledOnce();
+  });
 });
 
 // --- resetState ---

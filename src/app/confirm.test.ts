@@ -119,6 +119,20 @@ describe('createConfirm', () => {
       expect(ctx.confirmCallback).toBeNull();
       warnSpy.mockRestore();
     });
+
+    it('absorbe un throw synchrone du callback (try/catch sync)', () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const syncError = new Error('sync boom');
+      ctx.confirmCallback = vi.fn(() => {
+        throw syncError;
+      });
+
+      expect(() => confirm.executeConfirm.call(ctx)).not.toThrow();
+
+      expect(warnSpy).toHaveBeenCalledWith('[confirm]', syncError);
+      expect(ctx.confirmCallback).toBeNull();
+      warnSpy.mockRestore();
+    });
   });
 
   describe('closeConfirmDialog', () => {
@@ -262,6 +276,48 @@ describe('createConfirm', () => {
       expect(ctx.loading.quiz).toBe(true);
     });
 
+    it('cancel by gid: 404 race acceptée (pending parti côté serveur)', async () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 404 });
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = { [VALID_GID_1]: ctrl };
+      ctx.pendingById = { [VALID_GID_1]: { id: VALID_GID_1, type: 'summary', status: 'pending' } };
+
+      confirm.cancelOne.call(ctx, VALID_GID_1);
+      await new Promise((r) => setTimeout(r, 0));
+
+      // 404 = race acceptée → pas de warn (return true depuis postCancel)
+      expect(warnMock).not.toHaveBeenCalled();
+      expect(ctx.pendingById[VALID_GID_1]).toBeUndefined();
+      warnMock.mockRestore();
+    });
+
+    it('cancel by gid: 5xx warn et rollback du pending optimiste', async () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 500 });
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (globalThis as any).fetch = fetchMock;
+      ctx.abortControllersByGid = { [VALID_GID_1]: ctrl };
+      const entry = { id: VALID_GID_1, type: 'summary', status: 'pending' };
+      ctx.pendingById = { [VALID_GID_1]: entry };
+
+      confirm.cancelOne.call(ctx, VALID_GID_1);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(warnMock).toHaveBeenCalledWith(
+        '[cancel] POST /cancel non-ok',
+        expect.objectContaining({ pid: 'pid-1', gid: VALID_GID_1, status: 500 }),
+      );
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        expect.stringContaining('toast.cancelFailed'),
+        'error',
+      );
+      // Rollback : la pending entry est restaurée par cancelPendingByGid
+      expect(ctx.pendingById[VALID_GID_1]).toEqual(entry);
+      warnMock.mockRestore();
+    });
+
     it('skips POST /cancel when gid is not a valid UUID v4 (SSRF defense)', () => {
       // Garde-fou : si un gid frauduleux atterrit dans pendingById (extension
       // hostile, bug de sérialisation), la validation regex bloque le fetch
@@ -300,6 +356,22 @@ describe('createConfirm', () => {
       ctx.abortControllers = {};
       confirm.cancelGeneration.call(ctx);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledGeneration', 'info');
+    });
+
+    it('appelle cancelPendingByGid pour chaque gid présent dans pendingById', () => {
+      const VALID_GID = '11111111-1111-4111-8111-111111111111';
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.pendingById = { [VALID_GID]: { id: VALID_GID, type: 'summary', status: 'pending' } };
+
+      confirm.cancelGeneration.call(ctx);
+
+      // Le helper cancelPendingByGid POST /cancel pour ce gid (couvre L186-188)
+      expect(fetchMock).toHaveBeenCalledWith(
+        `/api/projects/pid-1/generations/${VALID_GID}/cancel`,
+        { method: 'POST' },
+      );
+      expect(ctx.pendingById[VALID_GID]).toBeUndefined();
     });
   });
 });
