@@ -1,5 +1,6 @@
 import type { AppContext } from './app-context';
 import { appendNotification } from './notifications';
+import type { EventKey } from '../../helpers/event-bus';
 
 export interface Toast {
   id: number;
@@ -39,7 +40,7 @@ export function createToast() {
       type = 'info',
       retryFn: (() => void) | null = null,
       action: { label: string; fn: () => void } | null = null,
-      eventKey?: string,
+      eventKey?: EventKey,
       notifSpec?: NotifSpec,
     ) {
       if (eventKey) {

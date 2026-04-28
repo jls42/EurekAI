@@ -12,6 +12,7 @@ import {
   type StorageLike,
   type PersistedNotification,
 } from './notifications.js';
+import type { EventKey } from '../../helpers/event-bus.js';
 
 function makeStorage(): StorageLike {
   const data = new Map<string, string>();
@@ -29,12 +30,25 @@ beforeEach(() => {
   storage = makeStorage();
 });
 
-const N = (overrides: Partial<Omit<PersistedNotification, 'createdAt' | 'read'>> = {}) => ({
-  eventKey: 'generation:gid-1:completed',
-  message: 'Test',
-  type: 'success' as const,
-  ...overrides,
-});
+const E = (value: string): EventKey => value as EventKey;
+
+type NotificationOverrides = Omit<
+  Partial<Omit<PersistedNotification, 'createdAt' | 'read'>>,
+  'eventKey'
+> & { eventKey?: string };
+
+const N = (overrides: NotificationOverrides = {}) => {
+  const { eventKey = 'generation:gid-1:completed', ...rest } = overrides as Omit<
+    Partial<Omit<PersistedNotification, 'createdAt' | 'read'>>,
+    'eventKey'
+  > & { eventKey?: string };
+  return {
+    eventKey: E(eventKey),
+    message: 'Test',
+    type: 'success' as const,
+    ...rest,
+  };
+};
 
 describe('appendNotification', () => {
   it('ajoute une notification visible et marque l event vu', () => {
@@ -43,7 +57,7 @@ describe('appendNotification', () => {
     expect(list).toHaveLength(1);
     expect(list[0].eventKey).toBe('generation:gid-1:completed');
     expect(list[0].read).toBe(false);
-    expect(hasSeenEvent('p1', 'generation:gid-1:completed', storage)).toBe(true);
+    expect(hasSeenEvent('p1', E('generation:gid-1:completed'), storage)).toBe(true);
   });
 
   it('est idempotent par eventKey (no-op si déjà vu)', () => {
@@ -57,7 +71,7 @@ describe('appendNotification', () => {
     appendNotification('pB', N({ eventKey: 'generation:b:completed' }), storage);
     expect(listProfileNotifications('pA', storage)).toHaveLength(1);
     expect(listProfileNotifications('pB', storage)).toHaveLength(1);
-    expect(hasSeenEvent('pA', 'generation:b:completed', storage)).toBe(false);
+    expect(hasSeenEvent('pA', E('generation:b:completed'), storage)).toBe(false);
   });
 
   it('cap à MAX_PER_PROFILE (50) avec FIFO drop', () => {
@@ -82,11 +96,11 @@ describe('appendNotification', () => {
       appendNotification('p1', N({ eventKey: `evk-${i}` }), storage);
     }
     // Le 1er event (evk-0) doit avoir été évincé du ledger LRU.
-    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(false);
+    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(false);
     // Les 1000 derniers (evk-1 → evk-1000 inclus, mais on a poussé 0..1000)
     // doivent toujours être présents dans le ledger.
-    expect(hasSeenEvent('p1', 'evk-1000', storage)).toBe(true);
-    expect(hasSeenEvent('p1', 'evk-500', storage)).toBe(true);
+    expect(hasSeenEvent('p1', E('evk-1000'), storage)).toBe(true);
+    expect(hasSeenEvent('p1', E('evk-500'), storage)).toBe(true);
   });
 
   it('ledger LRU : un eventKey évincé peut être ré-ajouté (pas de blacklist permanente)', () => {
@@ -95,9 +109,9 @@ describe('appendNotification', () => {
     }
     // evk-0 a été évincé ; le ré-appender doit créer une nouvelle notif
     // (le ledger LRU n'est pas une blacklist permanente, juste une fenêtre).
-    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(false);
+    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(false);
     expect(appendNotification('p1', N({ eventKey: 'evk-0' }), storage)).toBe(true);
-    expect(hasSeenEvent('p1', 'evk-0', storage)).toBe(true);
+    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(true);
   });
 });
 
@@ -113,7 +127,7 @@ describe('markAllRead / markRead', () => {
   it('markRead cible une notif par eventKey', () => {
     appendNotification('p1', N({ eventKey: 'a' }), storage);
     appendNotification('p1', N({ eventKey: 'b' }), storage);
-    markRead('p1', 'a', storage);
+    markRead('p1', E('a'), storage);
     const list = listProfileNotifications('p1', storage);
     expect(list.find((n) => n.eventKey === 'a')!.read).toBe(true);
     expect(list.find((n) => n.eventKey === 'b')!.read).toBe(false);
@@ -129,7 +143,7 @@ describe('clearNotifications', () => {
     expect(listProfileNotifications('p1', storage)).toHaveLength(0);
 
     // Le ledger reste : un appendNotification avec le même eventKey est rejeté
-    expect(hasSeenEvent('p1', 'persisted-key', storage)).toBe(true);
+    expect(hasSeenEvent('p1', E('persisted-key'), storage)).toBe(true);
     expect(appendNotification('p1', N({ eventKey: 'persisted-key' }), storage)).toBe(false);
     expect(listProfileNotifications('p1', storage)).toHaveLength(0);
   });
@@ -159,8 +173,15 @@ describe('lastSeenAt par projet (watermark réconciliation)', () => {
 
 describe('storage corrompu', () => {
   it('retourne fallback vide si JSON invalide', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     storage.setItem('sf-profile-notifications', 'not-json');
     expect(listProfileNotifications('p1', storage)).toEqual([]);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[notifications] corrupted slot',
+      'sf-profile-notifications',
+      expect.any(SyntaxError),
+    );
+    errorSpy.mockRestore();
   });
 });
 
@@ -184,7 +205,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
 
   it('résout messageKey + paramKeys au render dans la langue courante', () => {
     const notif: PersistedNotification = {
-      eventKey: 'k1',
+      eventKey: E('k1'),
       messageKey: 'notif.generationDone',
       paramKeys: { type: 'gen.summary' },
       type: 'success',
@@ -196,7 +217,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
 
   it('combine params scalaires et paramKeys (paramKeys traduit, params direct)', () => {
     const notif: PersistedNotification = {
-      eventKey: 'k2',
+      eventKey: E('k2'),
       messageKey: 'notif.errorWithCount',
       params: { count: 3 },
       type: 'error',
@@ -208,7 +229,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
 
   it('fallback sur message legacy si messageKey absent (notifs pré-refactor)', () => {
     const legacy: PersistedNotification = {
-      eventKey: 'k3',
+      eventKey: E('k3'),
       message: 'Message figé en français',
       type: 'info',
       createdAt: '2026-04-28T10:00:00Z',
@@ -219,7 +240,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
 
   it('chaîne vide si ni messageKey ni message', () => {
     const empty: PersistedNotification = {
-      eventKey: 'k4',
+      eventKey: E('k4'),
       type: 'info',
       createdAt: '2026-04-28T10:00:00Z',
       read: false,
@@ -229,7 +250,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
 
   it('change de langue au render : la même notif persistée donne 2 sorties différentes', () => {
     const notif: PersistedNotification = {
-      eventKey: 'k5',
+      eventKey: E('k5'),
       messageKey: 'notif.generationDone',
       paramKeys: { type: 'gen.quiz' },
       type: 'success',

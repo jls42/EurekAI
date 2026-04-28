@@ -58,6 +58,7 @@ export const nl: Record<string, string> = {
   'notif.generationDone': '{type} voltooid',
   'notif.generationFailed': '{type} mislukt',
   'notif.generationCancelled': '{type} geannuleerd',
+  'notif.crossTabSyncInactive': 'Synchronisatie tussen tabbladen inactief',
   'errorCode.no_sources': 'Geen bron beschikbaar',
   'errorCode.auth_required': 'Mistral API-sleutel ontbreekt of ongeldig',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',

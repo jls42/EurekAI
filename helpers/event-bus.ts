@@ -16,6 +16,7 @@ import type { GenerationEvent, GenerationStatus } from '../types.js';
 // que sur l'arm 'completed', `failureCode` que sur 'failed'/'cancelled'.
 
 export type { GenerationEvent } from '../types.js';
+export type EventKey = string & { readonly __brand: 'EventKey' };
 
 const bus = new EventEmitter();
 // 50 listeners suffisent : 1 par client SSE connecté + ~5 marges. Dépasser
@@ -61,6 +62,6 @@ export function subscribeGeneration(
 // Utilisé par les helpers store ET par les call sites client (réconciliation,
 // payload 200 fallback) pour garantir que la même transition produit toujours
 // la même clé, indépendamment du chemin (HTTP fetch, SSE, snapshot).
-export function buildEventKey(gid: string, status: GenerationStatus): string {
-  return `generation:${gid}:${status}`;
+export function buildEventKey(gid: string, status: GenerationStatus): EventKey {
+  return `generation:${gid}:${status}` as EventKey;
 }

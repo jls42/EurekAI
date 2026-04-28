@@ -9,6 +9,7 @@ import type {
   Source,
   StudyFiche,
 } from '../../types';
+import type { EventKey } from '../../helpers/event-bus';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -52,7 +53,7 @@ export interface AppContext extends AppState {
     type?: string,
     retryFn?: (() => void) | null,
     action?: ToastAction | null,
-    eventKey?: string,
+    eventKey?: EventKey,
     notifSpec?: NotifSpec,
   ): void;
   dismissToast(id: number): void;
@@ -68,7 +69,7 @@ export interface AppContext extends AppState {
   selectProfile(id: string): void;
   loadMistralVoices?(): Promise<void>;
   requirePin(callback: (pin: string) => void): void;
-  confirmDelete(message: string, callback: () => void): void;
+  confirmDelete(message: string, callback: () => void | Promise<void>): void;
   setLocale(lang: string, skipProfileSync?: boolean): void;
   resetState(): void;
   loadProjects(): Promise<void>;
@@ -210,7 +211,7 @@ export interface AppContext extends AppState {
   profileNotifications(): import('./notifications').PersistedNotification[];
   unreadNotificationsCount(): number;
   markAllNotificationsRead(): void;
-  markNotificationRead(eventKey: string): void;
+  markNotificationRead(eventKey: EventKey): void;
   clearProfileNotifications(): void;
   notificationMessage(notif: import('./notifications').PersistedNotification): string;
   formatRelativeTime(iso: string): string;

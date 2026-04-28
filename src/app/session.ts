@@ -1,4 +1,5 @@
 import type { AppContext } from './app-context';
+import type { EventKey } from '../../helpers/event-bus';
 
 // Reset agressif du state RAM lié à la session courante (toasts, loading,
 // abort controllers, pendings optimistes). À invoquer dès qu'on change de
@@ -45,7 +46,7 @@ export function createSession() {
       this.pendingById = {};
       this.toasts = [];
       this.toastCounter = 0;
-      this.shownToastEventKeys = new Set<string>();
+      this.shownToastEventKeys = new Set<EventKey>();
       // Reset confirm dialog en vol pour éviter qu'un callback orphelin
       // s'exécute sur le nouveau contexte (le user vient de switcher).
       this.confirmCallback = null;

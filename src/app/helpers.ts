@@ -11,6 +11,7 @@ import type {
   ProjectData,
   Source,
 } from '../../types';
+import type { EventKey } from '../../helpers/event-bus';
 
 export type { GenerationEvent } from '../../types';
 import {
@@ -31,6 +32,7 @@ const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE_LABEL = 'notif.generationDone';
+const asEventKey = (value: string): EventKey => value as EventKey;
 
 // `GenerationEvent` est désormais une discriminated union sur `status` exportée
 // depuis types.ts (source unique partagée serveur ↔ client). `generation`
@@ -587,7 +589,8 @@ export function createHelpers() {
     // déjà appliqué la même transition, l'event SSE est absorbé sans effet.
     applyGenerationEvent(this: AppContext, event: GenerationEvent): void {
       if (!this.currentProfile) return;
-      const { gid, type, status, eventKey } = event;
+      const { gid, type, status } = event;
+      const eventKey = asEventKey(event.eventKey);
       if (status === 'pending') {
         // Hydrate / refresh le pending optimiste (peut écraser un déjà existant
         // côté client avec les vrais startedAt/sourceIds backend).
@@ -719,7 +722,7 @@ export function createHelpers() {
         if (!gen.completedAt) continue;
         if (Date.parse(gen.completedAt) <= cutoff) continue;
         appendNotification(profileId, {
-          eventKey: `generation:${gen.id}:completed`,
+          eventKey: asEventKey(`generation:${gen.id}:completed`),
           messageKey: NOTIF_GENERATION_DONE_LABEL,
           paramKeys: { type: 'gen.' + gen.type },
           type: 'success',
@@ -740,7 +743,7 @@ export function createHelpers() {
         if (!t.completedAt || Date.parse(t.completedAt) <= cutoff) continue;
         const cancelled = t.status === 'cancelled';
         appendNotification(profileId, {
-          eventKey: `generation:${t.id}:${t.status}`,
+          eventKey: asEventKey(`generation:${t.id}:${t.status}`),
           messageKey: cancelled ? 'notif.generationCancelled' : 'notif.generationFailed',
           paramKeys: { type: 'gen.' + t.type },
           type: cancelled ? 'info' : 'error',
@@ -771,7 +774,7 @@ export function createHelpers() {
       this.notificationsVersion++;
     },
 
-    markNotificationRead(this: AppContext, eventKey: string): void {
+    markNotificationRead(this: AppContext, eventKey: EventKey): void {
       if (!this.currentProfile) return;
       markRead(this.currentProfile.id, eventKey);
       this.notificationsVersion++;
@@ -780,6 +783,7 @@ export function createHelpers() {
     clearProfileNotifications(this: AppContext): void {
       if (!this.currentProfile) return;
       clearNotifications(this.currentProfile.id);
+      this.shownToastEventKeys.clear();
       this.notificationsVersion++;
     },
 

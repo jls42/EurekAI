@@ -58,6 +58,7 @@ export const es: Record<string, string> = {
   'notif.generationDone': '{type} completada',
   'notif.generationFailed': 'Falló {type}',
   'notif.generationCancelled': '{type} cancelada',
+  'notif.crossTabSyncInactive': 'Sincronización entre pestañas inactiva',
   'errorCode.no_sources': 'Ninguna fuente disponible',
   'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',

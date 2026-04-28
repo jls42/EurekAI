@@ -1,3 +1,5 @@
+import type { EventKey } from '../../helpers/event-bus';
+
 // Persistance des notifications par profil avec idempotence par eventKey.
 //
 // 3 storages séparés pour des durées de vie différentes :
@@ -23,7 +25,7 @@ export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 export interface PersistedNotification {
   // Identifiant stable cross-onglets pour la déduplication idempotente.
   // Format : 'generation:${gid}:${status}'.
-  eventKey: string;
+  eventKey: EventKey;
   // messageKey + params + paramKeys = source de vérité i18n-aware. Le panneau
   // cloche traduit au render via renderNotificationMessage(t) — la notif reste
   // synchro avec la langue UI courante même si l'user change de langue après
@@ -118,7 +120,7 @@ function writeSeen(storage: StorageLike, all: SeenMap): void {
   writeJson(storage, SEEN_EVENTS_SLOT, all);
 }
 
-function recordSeen(storage: StorageLike, profileId: string, eventKey: string): void {
+function recordSeen(storage: StorageLike, profileId: string, eventKey: EventKey): void {
   const all = readSeen(storage);
   const list = all[profileId] ?? [];
   if (list.includes(eventKey)) return;
@@ -166,7 +168,7 @@ export function markAllRead(profileId: string, storage: StorageLike = localStora
 
 export function markRead(
   profileId: string,
-  eventKey: string,
+  eventKey: EventKey,
   storage: StorageLike = localStorage,
 ): void {
   const all = readNotifs(storage);
@@ -190,7 +192,7 @@ export function clearNotifications(profileId: string, storage: StorageLike = loc
 
 export function hasSeenEvent(
   profileId: string,
-  eventKey: string,
+  eventKey: EventKey,
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readSeen(storage);

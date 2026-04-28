@@ -62,6 +62,7 @@ export const hi: Record<string, string> = {
   'notif.generationDone': '{type} पूर्ण',
   'notif.generationFailed': '{type} विफल',
   'notif.generationCancelled': '{type} रद्द',
+  'notif.crossTabSyncInactive': 'टैबों के बीच सिंक निष्क्रिय',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',

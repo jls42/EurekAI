@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { createSession } from './session.js';
 import type { AppContext } from './app-context.js';
 import type { PendingTrackerEntry } from '../../types.js';
+import type { EventKey } from '../../helpers/event-bus.js';
 import { appendNotification, hasSeenEvent, listProfileNotifications } from './notifications.js';
 
 function makeCtx(overrides: Partial<AppContext> = {}): AppContext {
@@ -12,7 +13,7 @@ function makeCtx(overrides: Partial<AppContext> = {}): AppContext {
     pendingById: {},
     toasts: [],
     toastCounter: 0,
-    shownToastEventKeys: new Set<string>(),
+    shownToastEventKeys: new Set<EventKey>(),
     confirmCallback: null,
     confirmTrigger: null,
     ...overrides,
@@ -67,7 +68,7 @@ describe('resetSession', () => {
   });
 
   it('vide toasts + reset toastCounter + reset shownToastEventKeys', () => {
-    const set = new Set(['generation:gid-1:completed']);
+    const set = new Set(['generation:gid-1:completed' as EventKey]);
     const ctx = makeCtx({
       toasts: [{ id: 1, message: 'hello', type: 'info' }] as any,
       toastCounter: 42,
@@ -124,14 +125,14 @@ describe('resetSession — invariants persistés (négatif)', () => {
     appendNotification(
       'profile-A',
       {
-        eventKey: 'generation:gid-X:completed',
+        eventKey: 'generation:gid-X:completed' as EventKey,
         message: 'Test',
         type: 'success',
       },
       storage,
     );
     const before = storage.snapshot();
-    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed', storage)).toBe(true);
+    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed' as EventKey, storage)).toBe(true);
 
     const ctx = makeCtx();
     sessionMixin.resetSession.call(ctx);
@@ -139,7 +140,7 @@ describe('resetSession — invariants persistés (négatif)', () => {
     // Le storage n'a pas été touché par resetSession (resetSession ne reçoit
     // pas le storage en argument et n'a aucun chemin légitime vers lui).
     expect(storage.snapshot()).toEqual(before);
-    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed', storage)).toBe(true);
+    expect(hasSeenEvent('profile-A', 'generation:gid-X:completed' as EventKey, storage)).toBe(true);
   });
 
   it('PRÉSERVE les notifications persistées par profil', () => {
@@ -147,7 +148,7 @@ describe('resetSession — invariants persistés (négatif)', () => {
     appendNotification(
       'profile-A',
       {
-        eventKey: 'generation:gid-Y:completed',
+        eventKey: 'generation:gid-Y:completed' as EventKey,
         message: 'Visible notif',
         type: 'success',
       },
@@ -167,7 +168,7 @@ describe('resetSession — invariants persistés (négatif)', () => {
     appendNotification(
       'profile-A',
       {
-        eventKey: 'generation:gid-Z:completed',
+        eventKey: 'generation:gid-Z:completed' as EventKey,
         message: 'First',
         type: 'success',
       },
@@ -182,7 +183,7 @@ describe('resetSession — invariants persistés (négatif)', () => {
     const created = appendNotification(
       'profile-A',
       {
-        eventKey: 'generation:gid-Z:completed',
+        eventKey: 'generation:gid-Z:completed' as EventKey,
         message: 'Duplicate would create here if ledger was wiped',
         type: 'success',
       },

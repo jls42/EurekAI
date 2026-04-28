@@ -4,6 +4,7 @@ import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import type { AppContext } from './app-context';
 import type { Generation, Source } from '../../types';
+import type { EventKey } from '../../helpers/event-bus';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
@@ -11,6 +12,7 @@ const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
+const asEventKey = (value: string): EventKey => value as EventKey;
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -203,7 +205,7 @@ export async function runAutoStep(
       'success',
       null,
       { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
-      `generation:${gen.id}:completed`,
+      asEventKey(`generation:${gen.id}:completed`),
     );
     return 'success';
   } catch (e: unknown) {
@@ -297,7 +299,7 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
     'success',
     null,
     { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
-    `generation:${gen.id}:completed`,
+    asEventKey(`generation:${gen.id}:completed`),
     { messageKey: NOTIF_GENERATION_DONE, paramKeys: { type: I18N_GEN_PREFIX + type } },
   );
 }

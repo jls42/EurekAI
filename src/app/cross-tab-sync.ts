@@ -4,10 +4,15 @@
 // les deux cas. Un 5+ tabs ouverts → 4+ events par écriture, charge négligeable.
 
 const NOTIFS_STORAGE_SLOT = 'sf-profile-notifications';
+export const CROSS_TAB_SYNC_BROKEN_EVENT = 'cross-tab-sync-broken';
 
 type AlpineRoot = HTMLElement & {
-  _x_dataStack?: Array<{ notificationsVersion?: number }>;
+  _x_dataStack?: Array<{ notificationsVersion?: number; crossTabSyncBroken?: boolean }>;
 };
+
+function notifyCrossTabSyncBroken(doc: Document): void {
+  doc.defaultView?.dispatchEvent(new Event(CROSS_TAB_SYNC_BROKEN_EVENT));
+}
 
 export function handleCrossTabStorageEvent(
   event: { key: string | null },
@@ -21,6 +26,10 @@ export function handleCrossTabStorageEvent(
     stack.notificationsVersion++;
     return 'bumped';
   }
+  if (stack && typeof stack.crossTabSyncBroken === 'boolean') {
+    stack.crossTabSyncBroken = true;
+  }
+  notifyCrossTabSyncBroken(doc);
   if (!warned.value) {
     // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
     // chemin silencieusement. Warn une fois par session si la structure

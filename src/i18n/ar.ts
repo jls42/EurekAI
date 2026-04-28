@@ -65,6 +65,7 @@ export const ar: Record<string, string> = {
   'notif.generationDone': 'اكتمل {type}',
   'notif.generationFailed': 'فشل {type}',
   'notif.generationCancelled': 'تم إلغاء {type}',
+  'notif.crossTabSyncInactive': 'مزامنة التبويبات غير نشطة',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',

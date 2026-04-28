@@ -1,15 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { handleCrossTabStorageEvent, installCrossTabSync } from './cross-tab-sync.js';
+import {
+  CROSS_TAB_SYNC_BROKEN_EVENT,
+  handleCrossTabStorageEvent,
+  installCrossTabSync,
+} from './cross-tab-sync.js';
 
-function makeStack(version = 0): { notificationsVersion?: number } {
-  return { notificationsVersion: version };
+function makeStack(version = 0): { notificationsVersion?: number; crossTabSyncBroken?: boolean } {
+  return { notificationsVersion: version, crossTabSyncBroken: false };
 }
 
-function makeDoc(stack: { notificationsVersion?: number } | null): Document {
+function makeDoc(
+  stack: { notificationsVersion?: number; crossTabSyncBroken?: boolean } | null,
+  dispatchEvent = vi.fn(),
+): Document {
   return {
     querySelector: vi.fn(() =>
       stack === null ? null : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
     ),
+    defaultView: { dispatchEvent },
   } as unknown as Document;
 }
 
@@ -57,19 +65,26 @@ describe('handleCrossTabStorageEvent', () => {
   });
 
   it('warns once when alpine root is missing (Alpine drift)', () => {
+    const dispatchEvent = vi.fn();
     const result = handleCrossTabStorageEvent(
       { key: 'sf-profile-notifications' },
-      makeDoc(null),
+      makeDoc(null, dispatchEvent),
       warned,
     );
 
     expect(result).toBe('drift');
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warned.value).toBe(true);
+    expect(dispatchEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: CROSS_TAB_SYNC_BROKEN_EVENT }),
+    );
   });
 
   it('warns once when notificationsVersion is missing (field drift)', () => {
-    const stack = {} as { notificationsVersion?: number };
+    const stack = { crossTabSyncBroken: false } as {
+      notificationsVersion?: number;
+      crossTabSyncBroken?: boolean;
+    };
     const result = handleCrossTabStorageEvent(
       { key: 'sf-profile-notifications' },
       makeDoc(stack),
@@ -78,6 +93,7 @@ describe('handleCrossTabStorageEvent', () => {
 
     expect(result).toBe('drift');
     expect(warnSpy).toHaveBeenCalledTimes(1);
+    expect(stack.crossTabSyncBroken).toBe(true);
   });
 
   it('does not warn twice on consecutive drifts (one warning per session)', () => {

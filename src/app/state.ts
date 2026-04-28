@@ -9,6 +9,7 @@ import type {
   ChatMessage,
   PendingTrackerEntry,
 } from '../../types';
+import type { EventKey } from '../../helpers/event-bus';
 import type { Toast } from './toast';
 
 const PROFILE_AVATARS = Array.from({ length: 20 }, (_, i) => String(i));
@@ -188,7 +189,12 @@ export function createState() {
     // appendNotification (dédup persistée localStorage), garantit qu'un même
     // eventKey produit max 1 toast UI par onglet ET max 1 notif persistée
     // cross-tabs (cf. notifications.ts).
-    shownToastEventKeys: new Set<string>(),
+    shownToastEventKeys: new Set<EventKey>(),
+
+    // Flag UI public si le bridge cross-tab basé sur l'API privée Alpine
+    // `_x_dataStack` casse après upgrade. Posé via event DOM, pas via cette
+    // même API privée.
+    crossTabSyncBroken: false,
 
     // Compteur incrémenté à chaque appendNotification réussi pour déclencher
     // la reactivity Alpine sur la cloche header (badge unread + liste).

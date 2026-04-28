@@ -48,6 +48,14 @@
       </div>
     </header>
 
+    <p
+      x-show="crossTabSyncBroken"
+      class="px-3 py-1.5 border-b border-warning/20 bg-warning/10 text-[11px] text-warning"
+      x-text="t('notif.crossTabSyncInactive')"
+    >
+      Sync cross-onglets inactive
+    </p>
+
     <ul class="flex-1 overflow-y-auto" x-show="profileNotifications().length > 0">
       <template x-for="notif in profileNotifications().slice().reverse()" :key="notif.eventKey">
         <li

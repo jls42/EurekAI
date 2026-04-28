@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHelpers } from './helpers';
+import type { EventKey } from '../../helpers/event-bus.js';
 
 const helpers = createHelpers();
 
@@ -1839,6 +1840,27 @@ describe('applyGenerationEvent', () => {
     );
 
     expect(ctx.pendingById['g6']).toBeUndefined();
+  });
+});
+
+describe('clearProfileNotifications', () => {
+  it('clears per-tab shownToastEventKeys along with visible notifications', () => {
+    const eventKey = 'generation:g1:completed' as EventKey;
+    (globalThis as any).localStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+    const ctx = {
+      currentProfile: { id: 'profile-A' },
+      shownToastEventKeys: new Set<EventKey>([eventKey]),
+      notificationsVersion: 0,
+      clearProfileNotifications: helpers.clearProfileNotifications,
+    };
+
+    ctx.clearProfileNotifications.call(ctx as any);
+
+    expect(ctx.shownToastEventKeys.size).toBe(0);
+    expect(ctx.notificationsVersion).toBe(1);
   });
 });
 
