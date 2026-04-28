@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   appendNotification,
   listProfileNotifications,
@@ -180,6 +180,25 @@ describe('storage corrompu', () => {
       '[notifications] corrupted slot',
       'sf-profile-notifications',
       expect.any(SyntaxError),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('absorbe un setItem qui throw (quota dépassé) sans casser la pipeline', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const failingStorage: StorageLike = {
+      getItem: () => null,
+      setItem: () => {
+        throw new Error('QuotaExceededError');
+      },
+    };
+
+    expect(() =>
+      appendNotification('p1', N({ eventKey: 'k-quota' }), failingStorage),
+    ).not.toThrow();
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[notifications] storage write failed (likely quota)',
+      expect.objectContaining({ key: expect.any(String), err: expect.any(Error) }),
     );
     errorSpy.mockRestore();
   });

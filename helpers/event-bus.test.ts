@@ -70,6 +70,29 @@ describe('event-bus', () => {
     u2();
   });
 
+  it("absorbe un throw d'un handler client (filet anti-uncaughtException)", () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const goodHandler = vi.fn();
+    const badHandler = vi.fn(() => {
+      throw new Error('handler crash');
+    });
+    const u1 = subscribeGeneration('project-1', badHandler);
+    const u2 = subscribeGeneration('project-1', goodHandler);
+
+    expect(() => emitGenerationEvent(makeEvent())).not.toThrow();
+
+    expect(badHandler).toHaveBeenCalledTimes(1);
+    expect(goodHandler).toHaveBeenCalledTimes(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[event-bus] handler threw for pid=',
+      'project-1',
+      expect.any(Error),
+    );
+    u1();
+    u2();
+    errorSpy.mockRestore();
+  });
+
   it('buildEventKey produit une clé stable et idempotente', () => {
     expect(buildEventKey('abc', 'completed')).toBe('generation:abc:completed');
     expect(buildEventKey('abc', 'cancelled')).toBe('generation:abc:cancelled');

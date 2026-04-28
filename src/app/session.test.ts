@@ -42,6 +42,15 @@ describe('resetSession', () => {
     expect(ctx.abortControllersByGid).toEqual({});
   });
 
+  it('appelle stopPendingsStream si la méthode est présente', () => {
+    const stopPendingsStream = vi.fn();
+    const ctx = makeCtx({ stopPendingsStream } as Partial<AppContext>);
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(stopPendingsStream).toHaveBeenCalledOnce();
+  });
+
   it('vide loading mais conserve la structure (pose tous les flags à false)', () => {
     const ctx = makeCtx({
       loading: { auto: true, voice: true, websearch: false } as Record<string, boolean>,

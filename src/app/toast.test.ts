@@ -229,6 +229,21 @@ describe('createToast', () => {
       expect(ctx.toasts).toHaveLength(1);
     });
 
+    it('persists messageKey + paramKeys when notifSpec is provided (i18n-aware)', () => {
+      showToast('Legacy ignoré', 'success', null, null, 'generation:gid-3:completed', {
+        messageKey: 'notif.generationDone',
+        paramKeys: { type: 'gen.summary' },
+      });
+
+      const persisted = JSON.parse(storage['sf-profile-notifications']);
+      expect(persisted['profile-1'][0]).toMatchObject({
+        eventKey: 'generation:gid-3:completed',
+        messageKey: 'notif.generationDone',
+        paramKeys: { type: 'gen.summary' },
+      });
+      expect(persisted['profile-1'][0].message).toBeUndefined();
+    });
+
     it('passes projectId through to appendNotification', () => {
       ctx.currentProjectId = 'proj-xyz';
       showToast('Done', 'success', null, null, 'generation:gid-2:completed');
