@@ -54,8 +54,18 @@ const readJson = <T>(storage: StorageLike, key: string, fallback: T): T => {
   }
 };
 
+// Wrappe storage.setItem pour absorber les exceptions QuotaExceededError
+// (LS pleine, ~5MB selon navigateur). Sans ce try/catch, un throw bubble
+// jusqu'à appendNotification → showToast → mutation Alpine → casse la
+// pipeline toast en plein vol et laisse l'app dans un état incohérent.
+// Best-effort : si on ne peut pas persister la notif, on log et on continue
+// (le toast reste affiché côté UI, juste pas archivé dans la cloche).
 const writeJson = (storage: StorageLike, key: string, value: unknown): void => {
-  storage.setItem(key, JSON.stringify(value));
+  try {
+    storage.setItem(key, JSON.stringify(value));
+  } catch (err) {
+    console.error('[notifications] storage write failed (likely quota)', { key, err });
+  }
 };
 
 // --- Notifs visibles ---

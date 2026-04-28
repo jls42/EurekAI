@@ -3,6 +3,7 @@ import { extractSourceNums } from './source-markers';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
+  FailedStepCode,
   Generation,
   GenerationStatus,
   PendingTrackerEntry,
@@ -29,13 +30,16 @@ const COLOR_ACCENT = 'var(--color-accent)';
 
 // Event SSE poussé par le serveur sur GET /api/projects/:pid/events.
 // Schéma aligné sur helpers/event-bus.ts (côté serveur). Pas d'import direct
-// car ce module sert au frontend (Vite) et le shape reste stable côté backend.
+// du shape complet (le runtime côté Alpine ne l'a pas), mais on importe
+// `FailedStepCode` en `type` (effacé par Vite) pour garder l'union fermée
+// côté client : ajouter un code serveur cassera à compile-time les
+// consommateurs SSE qui font du narrowing dessus.
 export interface GenerationEvent {
   pid: string;
   gid: string;
   type: PendingTrackerEntry['type'];
   status: GenerationStatus;
-  failureCode?: string;
+  failureCode?: FailedStepCode;
   generation?: Generation;
   at: string;
   eventKey: string;
@@ -671,8 +675,12 @@ export function createHelpers() {
         // même surfacé au prochain reconnect/reload (pas masqué par lastSeenAt).
         setProjectLastSeen(profileId, projectId, reconcileStartedAt);
         this.notificationsVersion++;
-      } catch {
-        /* silent: réseau down, on retentera au reconnect SSE */
+      } catch (err) {
+        // Offline = acceptable (SSE rejouera au reconnect), MAIS un parse
+        // JSON failed / quota LS / exception applicative ferait silencieusement
+        // sauter le watermark et provoquerait un re-backfill perpétuel à chaque
+        // reload. Log pour rendre ces cas visibles en dev / Sentry.
+        console.error('[reconcile] failed for project', projectId, err);
       }
     },
 

@@ -275,7 +275,12 @@ interface HandleGenerationOptions {
   trackedType?: TrackedGenerationType;
 }
 
-const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+// UUID v4 strict : version nibble = '4', variant nibble dans [89ab].
+// Aligné sur la regex client (src/app/confirm.ts GID_UUID_V4) — assure que le
+// gid produit par crypto.randomUUID() côté client (RFC 4122 v4) traverse
+// inchangé et que toute autre valeur (UUID v1/v3/v5, hex shape valide non-v4)
+// retombe sur randomUUID() au lieu de propager un gid non conforme.
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
 // randomUUID. Le client génère son propre gid avant le fetch pour avoir
@@ -1037,9 +1042,16 @@ export function generateRoutes(
       logger.info('auto', `${step.agent} OK`);
       return { ok: true, gen: promoteResult.generation };
     }
-    // Race cancel/fail : signaler dans le résultat du plan agrégé
+    // Race cancel/fail / OU bug observabilité (kind === 'missing' = entry retirée
+    // sous nos pieds entre addPendingEntry et promoteToGeneration). On distingue
+    // 'missing' de 'cancelled' explicitement : 'missing' = symptôme d'un cleanup
+    // imprévu (tracker corrompu, race avec deleteProject), donc 'internal_error'
+    // pour ne pas masquer un bug en code utilisateur 'cancelled' attendu.
     logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
-    const code: FailedStepCode = promoteResult.kind === 'failed' ? promoteResult.code : 'cancelled';
+    let code: FailedStepCode;
+    if (promoteResult.kind === 'failed') code = promoteResult.code;
+    else if (promoteResult.kind === 'cancelled') code = 'cancelled';
+    else code = 'internal_error';
     return { ok: false, agent: step.agent, code };
   }
 

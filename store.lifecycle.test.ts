@@ -3,7 +3,12 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from './store.js';
-import type { Generation, PendingTrackerEntry } from './types.js';
+import type {
+  FailedStepCode,
+  Generation,
+  PendingTrackerEntry,
+  TrackedGenerationType,
+} from './types.js';
 
 let store: ProjectStore;
 let tempDir: string;
@@ -19,17 +24,36 @@ afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
 });
 
-const makeEntry = (
-  id: string,
-  overrides: Partial<PendingTrackerEntry> = {},
-): PendingTrackerEntry => ({
+// Helper de construction de PendingTrackerEntry pour les tests. Le discriminated
+// union exige que les arms terminales (failed/cancelled) portent failureCode +
+// completedAt, donc on résout l'override en arm approprié.
+type EntryOverrides = {
+  type?: TrackedGenerationType;
+  status?: 'pending' | 'failed' | 'cancelled';
+  startedAt?: string;
+  sourceIds?: string[];
+  failureCode?: FailedStepCode;
+  completedAt?: string;
+};
+
+const buildEntryBase = (id: string, o: EntryOverrides) => ({
   id,
-  type: 'summary',
-  status: 'pending',
-  startedAt: new Date().toISOString(),
-  sourceIds: [],
-  ...overrides,
+  type: o.type ?? ('summary' as TrackedGenerationType),
+  startedAt: o.startedAt ?? new Date().toISOString(),
+  sourceIds: o.sourceIds ?? [],
 });
+
+const makeEntry = (id: string, overrides: EntryOverrides = {}): PendingTrackerEntry => {
+  const base = buildEntryBase(id, overrides);
+  const status = overrides.status ?? 'pending';
+  if (status === 'pending') return { ...base, status };
+  return {
+    ...base,
+    status,
+    failureCode: overrides.failureCode ?? 'internal_error',
+    completedAt: overrides.completedAt ?? new Date().toISOString(),
+  };
+};
 
 const makeGen = (id: string): Generation =>
   ({
@@ -103,12 +127,22 @@ describe('promoteToGeneration', () => {
   });
 });
 
+// Narrowing helper : remonte le PendingTrackerEntry au sous-type Terminal
+// pour les assertions sur failureCode / completedAt qui n'existent que sur
+// l'arm non-pending.
+function expectTerminal(e: PendingTrackerEntry) {
+  if (e.status === 'pending') {
+    throw new Error(`expected terminal entry, got status=pending for ${e.id}`);
+  }
+  return e;
+}
+
 describe('markPendingFailed / markPendingCancelled', () => {
   it('markPendingFailed flippe le status, set failureCode et completedAt', () => {
     store.addPendingEntry(projectId, makeEntry('gid-1'));
     expect(store.markPendingFailed(projectId, 'gid-1', 'upstream_unavailable')).toBe(true);
     const data = store.getProject(projectId)!;
-    const entry = data.results.pendingTracker![0];
+    const entry = expectTerminal(data.results.pendingTracker![0]);
     expect(entry.status).toBe('failed');
     expect(entry.failureCode).toBe('upstream_unavailable');
     expect(entry.completedAt).toBeTruthy();
@@ -118,8 +152,9 @@ describe('markPendingFailed / markPendingCancelled', () => {
     store.addPendingEntry(projectId, makeEntry('gid-1'));
     expect(store.markPendingCancelled(projectId, 'gid-1')).toBe(true);
     const data = store.getProject(projectId)!;
-    expect(data.results.pendingTracker![0].status).toBe('cancelled');
-    expect(data.results.pendingTracker![0].failureCode).toBe('cancelled');
+    const entry = expectTerminal(data.results.pendingTracker![0]);
+    expect(entry.status).toBe('cancelled');
+    expect(entry.failureCode).toBe('cancelled');
   });
 
   it('markPendingFailed est no-op (false) si déjà cancelled', () => {
@@ -161,9 +196,29 @@ describe('cancelAllPendingsAtBoot', () => {
     expect(count).toBe(1);
 
     const data = store.getProject(projectId)!;
-    const failed = data.results.pendingTracker!.find((e) => e.id === 'gid-failed')!;
+    const failed = expectTerminal(data.results.pendingTracker!.find((e) => e.id === 'gid-failed')!);
     expect(failed.status).toBe('failed');
     expect(failed.failureCode).toBe('internal_error');
+  });
+
+  // Test #13 — invariant boot : un nouveau process qui hérite de pendings sur
+  // disque (process précédent crashé pendant une génération) DOIT les passer
+  // tous en cancelled au démarrage. Simule la séquence en créant une 2e
+  // ProjectStore sur le même tempDir après avoir persisté un pending.
+  it('un nouveau ProjectStore re-monté sur le même dir cancelle les pendings persistés', () => {
+    store.addPendingEntry(projectId, makeEntry('gid-survivor', { type: 'podcast' }));
+    expect(store.getProject(projectId)!.results.pendingTracker![0].status).toBe('pending');
+
+    // Simule le redémarrage : nouvelle instance qui lit project.json hérité.
+    const rebooted = new ProjectStore(tempDir);
+    const cancelled = rebooted.cancelAllPendingsAtBoot();
+    expect(cancelled).toBe(1);
+
+    const data = rebooted.getProject(projectId)!;
+    const entry = expectTerminal(data.results.pendingTracker![0]);
+    expect(entry.status).toBe('cancelled');
+    expect(entry.failureCode).toBe('cancelled');
+    expect(entry.completedAt).toBeTruthy();
   });
 
   it("retourne 0 si aucun pending n'existe", () => {

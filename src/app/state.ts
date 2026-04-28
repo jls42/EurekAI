@@ -21,15 +21,40 @@ const CATEGORIES_DEFAULT: ReadonlyArray<{
   icon: string;
   color: string;
 }> = [
-  { key: 'dashboard', labelKey: 'nav.dashboard', icon: 'layout-grid', color: 'var(--color-primary)' },
+  {
+    key: 'dashboard',
+    labelKey: 'nav.dashboard',
+    icon: 'layout-grid',
+    color: 'var(--color-primary)',
+  },
   { key: 'sources', labelKey: 'nav.sources', icon: 'upload-cloud', color: 'var(--color-accent)' },
   { key: 'chat', labelKey: 'nav.chat', icon: 'message-circle', color: 'var(--color-primary)' },
   { key: 'summary', labelKey: 'nav.summary', icon: 'file-text', color: 'var(--color-gen-summary)' },
-  { key: 'flashcards', labelKey: 'nav.flashcards', icon: 'layers', color: 'var(--color-gen-flashcards)' },
+  {
+    key: 'flashcards',
+    labelKey: 'nav.flashcards',
+    icon: 'layers',
+    color: 'var(--color-gen-flashcards)',
+  },
   { key: 'quiz', labelKey: 'nav.quiz', icon: 'brain', color: 'var(--color-gen-quiz)' },
-  { key: 'quiz-vocal', labelKey: 'nav.quiz-vocal', icon: 'mic', color: 'var(--color-gen-quizvocal)' },
-  { key: 'podcast', labelKey: 'nav.podcast', icon: 'headphones', color: 'var(--color-gen-podcast)' },
-  { key: 'fill-blank', labelKey: 'nav.fill-blank', icon: 'pencil-line', color: 'var(--color-gen-fillblank)' },
+  {
+    key: 'quiz-vocal',
+    labelKey: 'nav.quiz-vocal',
+    icon: 'mic',
+    color: 'var(--color-gen-quizvocal)',
+  },
+  {
+    key: 'podcast',
+    labelKey: 'nav.podcast',
+    icon: 'headphones',
+    color: 'var(--color-gen-podcast)',
+  },
+  {
+    key: 'fill-blank',
+    labelKey: 'nav.fill-blank',
+    icon: 'pencil-line',
+    color: 'var(--color-gen-fillblank)',
+  },
   { key: 'image', labelKey: 'nav.image', icon: 'image', color: 'var(--color-gen-image)' },
 ];
 

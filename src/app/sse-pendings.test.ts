@@ -20,7 +20,8 @@ class FakeEventSource {
 
   dispatch(name: string, data: unknown): void {
     const fns = this.listeners[name] ?? [];
-    for (const fn of fns) fn({ data: typeof data === 'string' ? data : JSON.stringify(data) } as any);
+    for (const fn of fns)
+      fn({ data: typeof data === 'string' ? data : JSON.stringify(data) } as any);
   }
 
   triggerError(): void {

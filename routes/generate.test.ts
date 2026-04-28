@@ -712,6 +712,81 @@ describe('generateRoutes', () => {
       expect(failedEntry).toBeDefined();
       expect((failedEntry as any).failureCode).toBe('internal_error');
     });
+
+    // Test #11 — invariant absolu (cf. CLAUDE.md "Pending generations") :
+    // refresh ≠ cancel. Le serveur ne DOIT PAS brancher req.on('close') pour
+    // annuler une génération. Une fermeture de socket pendant que Mistral
+    // travaille = la génération continue, persiste son résultat normalement.
+    // Si un futur ajout ajoute req.on('close', ctrl.abort()), ce test casse
+    // immédiatement.
+    it('refresh ≠ cancel : req.on("close") mid-flight ne flippe PAS le pending', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      // Retient la génération en suspens : le générateur ne résoudra pas avant
+      // qu'on ait simulé le close serveur. Permet d'observer l'état du tracker
+      // pendant la fenêtre où le client a déjà raccroché.
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Refresh test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const closeHandlers: Array<() => void> = [];
+      const req = mockReq({
+        params: { pid },
+        body: { gid: '11111111-1111-4111-8111-111111111111' },
+      });
+      // Simule un EventEmitter req minimal : enregistre le handler 'close' que
+      // Express attache automatiquement, et permet de le déclencher manuellement.
+      (req as any).on = (event: string, fn: () => void) => {
+        if (event === 'close') closeHandlers.push(fn);
+      };
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+
+      // Laisse le handler s'exécuter jusqu'au addPendingEntry (synchrone) puis
+      // entrer dans le await du générateur retenu.
+      await new Promise((r) => setTimeout(r, 10));
+
+      const trackerMidFlight = store.getProject(pid)!.results.pendingTracker ?? [];
+      expect(trackerMidFlight).toHaveLength(1);
+      expect(trackerMidFlight[0].status).toBe('pending');
+
+      // Simule la fermeture du socket client (refresh / switch profil / network drop)
+      for (const h of closeHandlers) h();
+
+      // Vérifier IMMÉDIATEMENT (avant que le générateur résolve) que le close
+      // n'a pas muté le status. Ne PAS flip vers cancelled.
+      const trackerAfterClose = store.getProject(pid)!.results.pendingTracker ?? [];
+      expect(trackerAfterClose).toHaveLength(1);
+      expect(trackerAfterClose[0].status).toBe('pending');
+
+      // Maintenant que le client est parti, on laisse Mistral renvoyer son
+      // résultat — la génération doit se terminer normalement (promotion vers
+      // generations[]). Le payload res.json sera émis dans le vide, c'est OK.
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      const finalProject = store.getProject(pid)!;
+      // Tracker vide (entrée promotée), generation persistée, JAMAIS cancelled.
+      expect(finalProject.results.pendingTracker ?? []).toHaveLength(0);
+      expect(finalProject.results.generations).toHaveLength(1);
+      expect(finalProject.results.generations[0].id).toBe('11111111-1111-4111-8111-111111111111');
+    });
   });
 
   // --- Route-level tests ---
@@ -1186,6 +1261,68 @@ describe('generateRoutes', () => {
 
       const gen = res.json.mock.calls[0][0];
       expect(gen.title).toContain('Review');
+    });
+
+    // Tests #12 — verrou : aucune branche d'early-4xx ne doit laisser un
+    // pending tracker entry orphelin (cf. CLAUDE.md "Validations early
+    // extraites des generators"). Si un handler ajoute addPendingEntry AVANT
+    // une validation, ce test casse → on doit déplacer la validation en
+    // pre-handler.
+    it('early 4xx ne laisse jamais de pending tracker orphelin', async () => {
+      const project = store.createProject('Test orphan');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.addGeneration(pid, {
+        id: 'gen-summary',
+        title: 'Summary',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'summary',
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      store.addGeneration(pid, {
+        id: 'gen-quiz-orphan',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['ghost-src'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b'], correct: 0, explanation: 'E' }],
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const cases: Array<{ name: string; body: Record<string, unknown> }> = [
+        { name: 'generationId requis', body: { weakQuestions: [{}] } },
+        { name: 'weakQuestions requis', body: { generationId: 'gen-quiz-orphan' } },
+        {
+          name: 'weakQuestions doit être array',
+          body: { generationId: 'gen-quiz-orphan', weakQuestions: 'not-array' },
+        },
+        {
+          name: 'original quiz introuvable',
+          body: { generationId: 'unknown-id', weakQuestions: [{}] },
+        },
+        {
+          name: 'gen pas un quiz',
+          body: { generationId: 'gen-summary', weakQuestions: [{}] },
+        },
+        {
+          name: 'no_sources (sourceIds orphelins)',
+          body: { generationId: 'gen-quiz-orphan', weakQuestions: [{}], lang: 'fr' },
+        },
+      ];
+
+      for (const c of cases) {
+        const req = mockReq({ params: { pid }, body: c.body });
+        const res = mockRes();
+        await handler(req, res);
+        const tracker = store.getProject(pid)!.results.pendingTracker ?? [];
+        expect(tracker, `cas "${c.name}" laisse un pending orphelin`).toHaveLength(0);
+      }
     });
   });
 

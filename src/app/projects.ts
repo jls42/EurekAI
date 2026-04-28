@@ -169,8 +169,11 @@ export function createProjects() {
         // re-fetche le projet (réconciliation des notifs ratées) puis ouvre
         // l'EventSource. Stoppé par resetSession au switch projet/profil.
         if (typeof this.startPendingsStream === 'function') {
-          this.startPendingsStream(id).catch(() => {
-            /* silent: SSE optionnel, le snapshot ci-dessus suffit pour l'UI */
+          this.startPendingsStream(id).catch((err: unknown) => {
+            // SSE optionnel (snapshot suffit pour l'UI), mais on log l'erreur :
+            // un échec persistant ici masque les notifications temps réel et
+            // doit être visible en dev — pas de catch totalement silencieux.
+            console.error('[sse] startPendingsStream failed', err);
           });
         }
       } catch {
@@ -179,7 +182,22 @@ export function createProjects() {
     },
 
     async deleteProject(this: AppContext, id: string) {
-      await fetch('/api/projects/' + id, { method: 'DELETE' });
+      // Vérifier res.ok AVANT mutation state.projects : sinon en cas de 404/500
+      // (projet locked, FS error), l'UI affiche succès mais le projet réapparaît
+      // au reload — incohérence opaque côté utilisateur.
+      let res: Response;
+      try {
+        res = await fetch('/api/projects/' + id, { method: 'DELETE' });
+      } catch (err) {
+        console.error('[deleteProject] network failure', err);
+        this.showToast(this.t('toast.projectDeleteError'), 'error', () => this.deleteProject(id));
+        return;
+      }
+      if (!res.ok) {
+        console.error('[deleteProject] non-ok', { id, status: res.status });
+        this.showToast(this.t('toast.projectDeleteError'), 'error', () => this.deleteProject(id));
+        return;
+      }
       this.projects = this.projects.filter((p) => p.id !== id);
       if (this.currentProjectId === id) {
         this.currentProjectId = null;

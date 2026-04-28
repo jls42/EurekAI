@@ -12,9 +12,20 @@ const SSE_HEARTBEAT_MS = 25_000;
 // La ligne `event: generation` est obligatoire pour matcher
 // addEventListener('generation', ...) côté client. Sans elle, l'event serait
 // dispatché comme 'message' (générique).
+//
+// Garde-fou writableEnded + try/catch : entre le `bus.emit` et le `res.write`,
+// le socket peut s'être fermé (req.on('close') pas encore exécuté → unsubscribe
+// pas encore appelé). Sans cette garde, res.write throw ERR_STREAM_WRITE_AFTER_END
+// et l'EventEmitter propage l'erreur au listener (Node default = uncaught dans le
+// callback → process crash). Pas besoin de logger en succès — c'est attendu.
 function writeGenerationEvent(res: Response, event: GenerationEvent): void {
-  res.write(`event: generation\n`);
-  res.write(`data: ${JSON.stringify(event)}\n\n`);
+  if (res.writableEnded) return;
+  try {
+    res.write(`event: generation\n`);
+    res.write(`data: ${JSON.stringify(event)}\n\n`);
+  } catch (err) {
+    logger.warn('sse', `write after close, dropping event: ${String(err)}`);
+  }
 }
 
 export function projectRoutes(store: ProjectStore): Router {
@@ -69,6 +80,14 @@ export function projectRoutes(store: ProjectStore): Router {
   // couvre ce cas pour les events ratés (refresh, coupure réseau).
   router.get('/:pid/events', (req, res) => {
     const pid = req.params.pid;
+    // 404 explicite si le projet n'existe pas — sinon on laisserait un listener
+    // EventEmitter attaché à vie sur un pid bidon (cap 50 → MaxListenersWarning
+    // au bout de quelques typos client) et le stream pousserait des heartbeats
+    // dans le vide jusqu'à TCP keepalive. Code stable pour mapping i18n côté UI.
+    if (!store.getProject(pid)) {
+      res.status(404).json({ error: 'project_not_found' });
+      return;
+    }
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');
@@ -84,14 +103,23 @@ export function projectRoutes(store: ProjectStore): Router {
     // commentaires SSE (`: ...`) sont ignorés par le client mais maintiennent
     // la connexion vivante.
     const heartbeat = setInterval(() => {
-      res.write(`: keep-alive\n\n`);
+      if (res.writableEnded) return;
+      try {
+        res.write(`: keep-alive\n\n`);
+      } catch {
+        /* socket fermé entre tick et write — req.on('close') va cleaner */
+      }
     }, SSE_HEARTBEAT_MS);
 
-    req.on('close', () => {
+    const cleanup = (reason: string) => {
       clearInterval(heartbeat);
       unsubscribe();
-      logger.info('sse', `client disconnected from project ${pid}`);
-    });
+      logger.info('sse', `client ${reason} from project ${pid}`);
+    };
+    req.on('close', () => cleanup('disconnected'));
+    // Listener err sur res : si le serveur tente d'écrire après reset TCP brutal,
+    // Node émet 'error' sur res. Sans listener, ça remonte uncaught et crash.
+    res.on('error', (err) => cleanup(`error: ${String(err)}`));
   });
 
   return router;

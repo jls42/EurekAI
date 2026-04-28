@@ -356,7 +356,8 @@ export function generationCrudRoutes(
   router.post('/:pid/generations/:gid/cancel', (req, res) => {
     const ok = store.markPendingCancelled(req.params.pid, req.params.gid);
     if (!ok) {
-      res.status(404).json({ error: 'Pending introuvable ou déjà terminé' });
+      // Code stable pour mapping i18n côté UI (cf. CLAUDE.md "Codes d'erreur API").
+      res.status(404).json({ error: 'pending_not_found' });
       return;
     }
     res.json({ ok: true, status: 'cancelled' });

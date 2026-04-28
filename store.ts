@@ -30,8 +30,10 @@ export type PromoteResult =
   | { kind: 'missing' };
 
 // Defaults pour le pruning du tracker (failed/cancelled accumulent sinon).
-// maxKeep et maxAgeMs s'appliquent en union : on garde une entrée si elle satisfait
-// LES DEUX critères. Les pendings actifs (status === 'pending') sont toujours préservés.
+// maxKeep et maxAgeMs s'appliquent en intersection (AND) : une entrée terminale est
+// gardée seulement si elle satisfait À LA FOIS la fenêtre temporelle ET le quota
+// maxKeep (les plus récentes au-dessus de la limite sont prunées). Les pendings
+// actifs (status === 'pending') sont toujours préservés indépendamment.
 const DEFAULT_PRUNE_MAX_KEEP = 50;
 const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -330,14 +332,24 @@ export class ProjectStore {
       if (!data) continue;
       const tracker = data.results.pendingTracker ?? [];
       const cancelled: PendingTrackerEntry[] = [];
-      for (const entry of tracker) {
-        if (entry.status === 'pending') {
-          entry.status = 'cancelled';
-          entry.failureCode = 'cancelled';
-          entry.completedAt = new Date().toISOString();
-          cancelled.push(entry);
-          total++;
-        }
+      for (let i = 0; i < tracker.length; i++) {
+        const entry = tracker[i];
+        if (entry.status !== 'pending') continue;
+        // Construit une nouvelle entrée terminale (le discriminated union
+        // empêche la mutation in-place : flipper status sans poser failureCode
+        // + completedAt produirait un état impossible).
+        const terminal: PendingTrackerEntry = {
+          id: entry.id,
+          type: entry.type,
+          startedAt: entry.startedAt,
+          sourceIds: entry.sourceIds,
+          status: 'cancelled',
+          failureCode: 'cancelled',
+          completedAt: new Date().toISOString(),
+        };
+        tracker[i] = terminal;
+        cancelled.push(terminal);
+        total++;
       }
       if (cancelled.length > 0) {
         this.pruneTrackerIfNeeded(data);
@@ -369,14 +381,25 @@ export class ProjectStore {
     const data = this.getProject(projectId);
     if (!data) return false;
     const tracker = data.results.pendingTracker ?? [];
-    const entry = tracker.find((e) => e.id === generationId);
-    if (entry?.status !== 'pending') return false;
-    entry.status = nextStatus;
-    entry.failureCode = code;
-    entry.completedAt = new Date().toISOString();
+    const idx = tracker.findIndex((e) => e.id === generationId);
+    if (idx === -1) return false;
+    const entry = tracker[idx];
+    if (entry.status !== 'pending') return false;
+    // Remplace l'entrée par une terminale fraîche (le discriminated union
+    // interdit la mutation status-only sans poser failureCode + completedAt).
+    const terminal: PendingTrackerEntry = {
+      id: entry.id,
+      type: entry.type,
+      startedAt: entry.startedAt,
+      sourceIds: entry.sourceIds,
+      status: nextStatus,
+      failureCode: code,
+      completedAt: new Date().toISOString(),
+    };
+    tracker[idx] = terminal;
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
-    this.emitTrackerEvent(projectId, entry, nextStatus);
+    this.emitTrackerEvent(projectId, terminal, nextStatus);
     return true;
   }
 
@@ -389,14 +412,20 @@ export class ProjectStore {
     status: GenerationStatus,
     generation?: Generation,
   ): void {
+    // Narrowing par status pour récupérer les champs du terminal arm. Sur
+    // pending ou completed (passé à la promotion), failureCode/completedAt
+    // n'existent pas et on retombe sur startedAt + Date.now.
+    const isTerminal = entry.status === 'failed' || entry.status === 'cancelled';
+    const failureCode = isTerminal ? entry.failureCode : undefined;
+    const completedAt = isTerminal ? entry.completedAt : undefined;
     emitGenerationEvent({
       pid,
       gid: entry.id,
       type: entry.type,
       status,
-      failureCode: entry.failureCode,
+      failureCode,
       generation,
-      at: entry.completedAt ?? entry.startedAt ?? new Date().toISOString(),
+      at: completedAt ?? entry.startedAt ?? new Date().toISOString(),
       eventKey: buildEventKey(entry.id, status),
     });
   }

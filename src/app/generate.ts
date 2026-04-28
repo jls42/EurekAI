@@ -8,6 +8,7 @@ import type { Generation, Source } from '../../types';
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
+const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -70,7 +71,7 @@ export async function aggregateGenerateResults(
 
 export function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
-    state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
+    state.showToast(state.t(TOAST_PARTIAL_GENERATED, { count: total - failures }), 'warning');
   } else if (failures >= total) {
     state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
@@ -146,7 +147,7 @@ export function populateAutoPlan(
   }
 }
 
-type StepResult = 'success' | 'aborted' | 'failed';
+type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: string };
 
 // Parse le body d'une réponse !ok pour extraire un code d'erreur lisible.
 // Si JSON valide → utilise body.error. Si non-JSON (HTML 502 proxy / timeout) →
@@ -172,19 +173,22 @@ export async function runAutoStep(
   controller: AbortController,
   allowedUrls: Set<string>,
 ): Promise<StepResult> {
-  if (!AUTO_AGENTS_SET.has(type)) return 'failed';
+  if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
   // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
   const url = '/api/projects/' + projectId + '/generate/' + type;
   // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
   // immédiatement avant `fetch(url, ...)` dans la même fonction.
-  if (!allowedUrls.has(url)) return 'failed';
+  if (!allowedUrls.has(url)) return { kind: 'failed', code: 'internal_error' };
   try {
     const res = await fetch(url, postJson(body, controller.signal));
     if (state.currentProjectId !== projectId) return 'aborted';
     if (!res.ok) {
       const detail = await parseStepErrorDetail(res, res.statusText);
       console.error(`auto: ${type} failed (${res.status}):`, detail);
-      return 'failed';
+      // Threader le code parsé permet à showAutoResult de dispatcher un toast
+      // actionnable (auth_required → settings, quota_exceeded → wait, etc.)
+      // au lieu d'un générique 'partialGenerated'.
+      return { kind: 'failed', code: detail };
     }
     const gen = await res.json();
     registerGeneration(state, gen);
@@ -204,7 +208,7 @@ export async function runAutoStep(
     if (e instanceof Error && e.name === 'AbortError') return 'aborted';
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`auto: ${type} error:`, msg);
-    return 'failed';
+    return { kind: 'failed', code: 'internal_error' };
   } finally {
     state.loading[type] = false;
     delete state.abortControllers[type];
@@ -218,25 +222,46 @@ export async function runAutoSteps(
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-): Promise<number> {
+): Promise<{ failures: number; codes: string[] }> {
   const allowedUrls = new Set(
     AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
   );
   let failures = 0;
+  const codes: string[] = [];
   const promises = plannedTypes.map(async (type) => {
     const result = await runAutoStep(state, type, projectId, body, controller, allowedUrls);
-    if (result === 'failed') failures++;
+    if (typeof result === 'object' && result.kind === 'failed') {
+      failures++;
+      codes.push(result.code);
+    }
   });
   await Promise.all(promises);
-  return failures;
+  return { failures, codes };
 }
 
-export function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
+// Sélection priorisée du toast partial-fail : un code actionnable utilisateur
+// (auth_required > quota_exceeded) prime sur 'partial' générique. Évite de
+// noyer un user "clé API absente" dans un toast warning sans piste d'action.
+const pickAutoFailToast = (codes: string[]): { key: string; type: 'error' | 'warning' } => {
+  const set = new Set(codes);
+  if (set.has('auth_required')) return { key: 'toast.audioAuthRequired', type: 'error' };
+  if (set.has('quota_exceeded')) return { key: 'toast.audioQuotaExceeded', type: 'warning' };
+  return { key: TOAST_PARTIAL_GENERATED, type: 'warning' };
+};
+
+export function showAutoResult(
+  state: AppContext,
+  failures: number,
+  plannedCount: number,
+  codes: string[] = [],
+): void {
   if (failures > 0 && failures < plannedCount) {
-    state.showToast(
-      state.t('toast.partialGenerated', { count: plannedCount - failures }),
-      'warning',
-    );
+    const { key, type } = pickAutoFailToast(codes);
+    if (key === TOAST_PARTIAL_GENERATED) {
+      state.showToast(state.t(key, { count: plannedCount - failures }), type);
+    } else {
+      state.showToast(state.t(key), type);
+    }
   } else if (failures >= plannedCount) {
     state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
@@ -493,9 +518,15 @@ export function createGenerate() {
         if (!route) return;
         if (this.currentProjectId !== projectId) return;
         populateAutoPlan(this, route.plan, plannedTypes, controller);
-        const failures = await runAutoSteps(this, plannedTypes, projectId, body, controller);
+        const { failures, codes } = await runAutoSteps(
+          this,
+          plannedTypes,
+          projectId,
+          body,
+          controller,
+        );
         if (this.currentProjectId !== projectId) return;
-        showAutoResult(this, failures, plannedTypes.length);
+        showAutoResult(this, failures, plannedTypes.length, codes);
       } catch (e: unknown) {
         if (e instanceof Error && e.name === 'AbortError') return;
         console.error('[generate:auto]', e);

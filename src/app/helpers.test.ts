@@ -1704,14 +1704,17 @@ describe('applyGenerationEvent', () => {
 
   it('hydrates pendingById on pending event', () => {
     const ctx = makeCtx();
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g1',
-      type: 'summary',
-      status: 'pending',
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g1:pending',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g1',
+        type: 'summary',
+        status: 'pending',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g1:pending',
+      } as any,
+    );
 
     expect(ctx.pendingById['g1']).toBeDefined();
     expect(ctx.pendingById['g1'].type).toBe('summary');
@@ -1721,15 +1724,18 @@ describe('applyGenerationEvent', () => {
     const ctx = makeCtx();
     ctx.pendingById = { g2: { id: 'g2', type: 'quiz', status: 'pending' } };
     const gen = { id: 'g2', type: 'quiz', data: {} };
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g2',
-      type: 'quiz',
-      status: 'completed',
-      generation: gen,
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g2:completed',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g2',
+        type: 'quiz',
+        status: 'completed',
+        generation: gen,
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g2:completed',
+      } as any,
+    );
 
     expect(ctx.pendingById['g2']).toBeUndefined();
     expect(ctx.generations).toContainEqual(gen);
@@ -1746,14 +1752,17 @@ describe('applyGenerationEvent', () => {
   it('cancelled event: removes pending + info toast (no upsert)', () => {
     const ctx = makeCtx();
     ctx.pendingById = { g3: { id: 'g3', type: 'podcast', status: 'pending' } };
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g3',
-      type: 'podcast',
-      status: 'cancelled',
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g3:cancelled',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g3',
+        type: 'podcast',
+        status: 'cancelled',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g3:cancelled',
+      } as any,
+    );
 
     expect(ctx.pendingById['g3']).toBeUndefined();
     expect(ctx.generations).toEqual([]);
@@ -1769,15 +1778,18 @@ describe('applyGenerationEvent', () => {
   it('failed event: removes pending + error toast', () => {
     const ctx = makeCtx();
     ctx.pendingById = { g4: { id: 'g4', type: 'image', status: 'pending' } };
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g4',
-      type: 'image',
-      status: 'failed',
-      failureCode: 'quota_exceeded',
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g4:failed',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g4',
+        type: 'image',
+        status: 'failed',
+        failureCode: 'quota_exceeded',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g4:failed',
+      } as any,
+    );
 
     expect(ctx.pendingById['g4']).toBeUndefined();
     expect(ctx.showToast).toHaveBeenCalledWith(
@@ -1792,14 +1804,17 @@ describe('applyGenerationEvent', () => {
   it('completed event without generation payload: removes pending but no upsert', () => {
     const ctx = makeCtx();
     ctx.pendingById = { g5: { id: 'g5', type: 'flashcards', status: 'pending' } };
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g5',
-      type: 'flashcards',
-      status: 'completed',
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g5:completed',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g5',
+        type: 'flashcards',
+        status: 'completed',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g5:completed',
+      } as any,
+    );
 
     expect(ctx.pendingById['g5']).toBeUndefined();
     expect(ctx.generations).toEqual([]);
@@ -1808,14 +1823,17 @@ describe('applyGenerationEvent', () => {
   it('skips entirely when currentProfile is null', () => {
     const ctx = makeCtx();
     ctx.currentProfile = null;
-    ctx.applyGenerationEvent.call(ctx as any, {
-      pid: 'pid-1',
-      gid: 'g6',
-      type: 'summary',
-      status: 'pending',
-      at: '2026-04-26T10:00:00Z',
-      eventKey: 'generation:g6:pending',
-    } as any);
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g6',
+        type: 'summary',
+        status: 'pending',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g6:pending',
+      } as any,
+    );
 
     expect(ctx.pendingById['g6']).toBeUndefined();
   });
@@ -1937,6 +1955,25 @@ describe('reconcilePendings', () => {
     await expect(
       ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z'),
     ).resolves.toBeUndefined();
+  });
+
+  // Test #18 — verrou : le watermark lastSeenAt DOIT être set avec
+  // reconcileStartedAt (timestamp PRÉ-fetch), pas Date.now() post-backfill.
+  // Sinon un event arrivé entre le snapshot et l'ouverture SSE serait masqué
+  // par un lastSeenAt trop tardif et perdu silencieusement.
+  it('persiste lastSeenAt = reconcileStartedAt exact (pas Date.now post-backfill)', async () => {
+    const ctx = makeCtx();
+    mockProjectFetch({
+      results: {
+        pendingTracker: [],
+        generations: [],
+      },
+    });
+    const reconcileStartedAt = '2026-04-26T11:00:00.000Z';
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', reconcileStartedAt);
+
+    const stored = JSON.parse(storage['sf-profile-projects-seen'] || '{}');
+    expect(stored['profile-A']?.['pid-1']).toBe(reconcileStartedAt);
   });
 });
 

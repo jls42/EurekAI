@@ -283,19 +283,34 @@ export type TrackedGenerationType =
   | 'image'
   | 'fill-blank';
 
-export interface PendingTrackerEntry {
+// Champs communs aux entrées actives et terminales du tracker.
+interface PendingTrackerEntryBase {
   // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour /generate/auto).
   // Identique au `id` de la `Generation` finale après promotion.
   id: string;
   type: TrackedGenerationType;
-  // Le tracker ne stocke jamais 'completed' : à la promotion, l'entrée est retirée
-  // du tracker et la Generation est ajoutée à `generations[]`.
-  status: 'pending' | 'failed' | 'cancelled';
   startedAt: string;
-  completedAt?: string;
-  failureCode?: FailedStepCode;
   sourceIds: string[];
 }
+
+// Discriminated union sur `status` : verrouille à compile-time que les champs
+// terminaux (failureCode, completedAt) sont OBLIGATOIRES dès qu'on flippe le
+// status, et ABSENTS sur l'arm pending. Évite l'état impossible
+// `{status:'pending', failureCode:'cancelled'}` qui était type-valide avant ce
+// refactor (cf. PR #29 review fix #16).
+export interface PendingTrackerEntryActive extends PendingTrackerEntryBase {
+  status: 'pending';
+}
+
+export interface PendingTrackerEntryTerminal extends PendingTrackerEntryBase {
+  status: 'failed' | 'cancelled';
+  failureCode: FailedStepCode;
+  completedAt: string;
+}
+
+// Le tracker ne stocke jamais 'completed' : à la promotion, l'entrée est retirée
+// du tracker et la Generation est ajoutée à `generations[]`.
+export type PendingTrackerEntry = PendingTrackerEntryActive | PendingTrackerEntryTerminal;
 
 export interface CostEntry {
   timestamp: string;

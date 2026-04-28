@@ -3,8 +3,7 @@ import type { AppContext } from './app-context';
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
 // readClientGid). Validation pré-fetch pour Codacy `rule-node-ssrf` : la regex
 // borne le set de caractères injectables dans l'URL avant la concaténation.
-const GID_UUID_V4 =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GID_UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 // pid est un slug court généré côté serveur (cf. store.createProject) ; on
 // borne aux caractères safe pour URL avant fetch — défense en profondeur.
@@ -16,22 +15,31 @@ const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 //   if (whitelist.includes(url)) { fetch(url, ...) }
 // Defense in depth : regex PID_SAFE + GID_UUID_V4 + encodeURIComponent
 // sur chaque segment AVANT construction de l'URL.
-async function postCancel(pid: string, gid: string, allowedUrls: string[]): Promise<void> {
-  if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid)) return;
+//
+// Retourne `true` si le serveur a confirmé le cancel (200) ou est déjà sans
+// pending (404 = race avec un completion ; même résultat fonctionnel pour
+// l'UI). Retourne `false` UNIQUEMENT en cas de réseau down / 5xx — l'UI
+// rollbacke alors le pending pour ne pas mentir à l'utilisateur.
+async function postCancel(pid: string, gid: string, allowedUrls: string[]): Promise<boolean> {
+  if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid)) return false;
   const safePid = encodeURIComponent(pid);
   const safeGid = encodeURIComponent(gid);
   const url = '/api/projects/' + safePid + '/generations/' + safeGid + '/cancel';
   // Shape exact recommandé par Codacy `rule-node-ssrf` (OWASP) :
   // `if (whitelist.includes(url)) { fetch(url, ...) }`.
-  if (allowedUrls.includes(url)) {
-    try {
-      const res = await fetch(url, { method: 'POST' });
-      if (!res.ok) {
-        console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
-      }
-    } catch (err) {
-      console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
-    }
+  if (!allowedUrls.includes(url)) return false;
+  try {
+    const res = await fetch(url, { method: 'POST' });
+    if (res.ok) return true;
+    // 404 pending_not_found = race avec un completion/cancel précédent : pour
+    // l'UX on accepte (le pending est de toute façon parti). 4xx/5xx autres =
+    // bug serveur, on rollback.
+    if (res.status === 404) return true;
+    console.warn('[cancel] POST /cancel non-ok', { pid, gid, status: res.status });
+    return false;
+  } catch (err) {
+    console.warn('[cancel] POST /cancel failed', { pid, gid, err: String(err) });
+    return false;
   }
 }
 
@@ -47,9 +55,11 @@ function buildCancelWhitelist(pid: string, gids: string[]): string[] {
 }
 
 // Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
-// Best-effort sur la POST mais on log les erreurs (4xx/5xx/réseau) pour ne pas
-// masquer un bug serveur ou un desync client/serveur. UI optimiste : retire de
-// pendingById immédiatement, l'event SSE 'cancelled' confirmera bientôt.
+// UI optimiste avec rollback sur erreur HTTP : retire de pendingById
+// immédiatement (feedback instantané), puis si le POST /cancel échoue (réseau
+// down / 5xx serveur), restaure l'entrée pending + toast erreur. Sans rollback,
+// l'utilisateur croirait que c'est annulé alors que le backend continue, et
+// recevrait plus tard un event SSE 'completed' pour un gid disparu côté UI.
 function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
   const controller = state.abortControllersByGid[gid];
   const hadLocalController = Boolean(controller);
@@ -61,11 +71,7 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     }
     delete state.abortControllersByGid[gid];
   }
-  const pid = state.currentProjectId;
-  if (pid) {
-    const allowedUrls = buildCancelWhitelist(pid, Object.keys(state.pendingById));
-    void postCancel(pid, gid, allowedUrls);
-  }
+  const snapshot = state.pendingById[gid];
   delete state.pendingById[gid];
   // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
   // state.generate) : aucun controller local n'a été aborté donc le finally
@@ -77,6 +83,26 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   }
   const label = state.t('gen.' + type) || type;
   state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
+
+  const pid = state.currentProjectId;
+  if (!pid) return;
+  const allowedUrls = buildCancelWhitelist(pid, [gid, ...Object.keys(state.pendingById)]);
+  postCancel(pid, gid, allowedUrls)
+    .then((ok) => {
+      if (ok) return;
+      // Rollback : si le pending est revenu côté SSE entre-temps (race), ne pas
+      // l'écraser. Sinon restaure le snapshot + toast erreur actionnable.
+      if (snapshot && !state.pendingById[gid]) {
+        state.pendingById[gid] = snapshot;
+      }
+      state.showToast(state.t('toast.cancelFailed', { type: label }), 'error');
+    })
+    .catch((err: unknown) => {
+      // postCancel ne reject jamais (tous les chemins return un boolean), mais
+      // un .catch est nécessaire pour satisfaire le contrat "no floating promise"
+      // sans recourir au `void` operator interdit par sonarjs/void-use.
+      console.error('[cancel] unexpected postCancel error', err);
+    });
 }
 
 export function createConfirm() {

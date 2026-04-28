@@ -55,8 +55,11 @@ export function createPendingsStream() {
         try {
           const event = JSON.parse(msg.data);
           this.applyGenerationEvent(event);
-        } catch {
-          /* malformed event, ignore */
+        } catch (err) {
+          // Malformed event = bug serveur (BigInt non-serializable, cycle JSON,
+          // ...). Sans log, la cloche reste stale sans signal debug. Pas de
+          // re-throw : on absorbe pour ne pas tuer l'EventSource.
+          console.warn('[sse] malformed generation event', err, msg.data);
         }
         backoff = RECONNECT_INITIAL_MS;
       });

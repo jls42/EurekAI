@@ -8,9 +8,7 @@ function makeStack(version = 0): { notificationsVersion?: number } {
 function makeDoc(stack: { notificationsVersion?: number } | null): Document {
   return {
     querySelector: vi.fn(() =>
-      stack === null
-        ? null
-        : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
+      stack === null ? null : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
     ),
   } as unknown as Document;
 }
