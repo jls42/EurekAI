@@ -105,7 +105,7 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
 
 export function createConfirm() {
   return {
-    confirmDelete(this: AppContext, target: string, callback: () => void) {
+    confirmDelete(this: AppContext, target: string, callback: () => void | Promise<void>) {
       const confirmLabels: Record<string, string> = {
         projet: 'confirm.project',
         source: 'confirm.source',
@@ -120,8 +120,18 @@ export function createConfirm() {
     executeConfirm(this: AppContext) {
       (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
       if (this.confirmCallback) {
-        this.confirmCallback();
-        this.confirmCallback = null;
+        const cb = this.confirmCallback;
+        try {
+          Promise.resolve(cb()).catch((err: unknown) => {
+            console.warn('[confirm]', err);
+          });
+        } catch (err) {
+          console.warn('[confirm]', err);
+        } finally {
+          if (this.confirmCallback === cb) {
+            this.confirmCallback = null;
+          }
+        }
       }
       if (this.confirmTrigger) {
         this.$nextTick(() => {

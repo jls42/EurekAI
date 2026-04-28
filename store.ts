@@ -165,7 +165,10 @@ export class ProjectStore {
 
   addGeneration(projectId: string, generation: Generation): void {
     const data = this.getProject(projectId);
-    if (!data) return;
+    if (!data) {
+      console.warn('[store] addGeneration: project missing', projectId);
+      return;
+    }
     data.results.generations.push(generation);
     this.saveProject(projectId, data);
   }

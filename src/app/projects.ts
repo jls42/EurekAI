@@ -176,8 +176,8 @@ export function createProjects() {
             console.error('[sse] startPendingsStream failed', err);
           });
         }
-      } catch {
-        /* silent: offline project select, state reset deja fait */
+      } catch (err) {
+        console.warn('[selectProject] failed', err);
       }
     },
 

@@ -73,7 +73,8 @@ const readJson = <T>(storage: StorageLike, key: string, fallback: T): T => {
   if (!raw) return fallback;
   try {
     return JSON.parse(raw) as T;
-  } catch {
+  } catch (err) {
+    console.error('[notifications] corrupted slot', key, err);
     return fallback;
   }
 };

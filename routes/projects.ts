@@ -114,6 +114,10 @@ export function projectRoutes(store: ProjectStore): Router {
       cleanedUp = true;
       clearInterval(heartbeat);
       unsubscribe();
+      if (reason.startsWith('error:')) {
+        logger.warn('sse', `client ${reason} from project ${pid}`);
+        return;
+      }
       logger.info('sse', `client ${reason} from project ${pid}`);
     };
     const heartbeat = setInterval(() => {

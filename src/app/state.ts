@@ -249,7 +249,7 @@ export function createState() {
     toastCounter: 0,
 
     // Confirm dialog
-    confirmCallback: null as (() => void) | null,
+    confirmCallback: null as (() => void | Promise<void>) | null,
     confirmTarget: '',
     confirmTrigger: null as HTMLElement | null,
 

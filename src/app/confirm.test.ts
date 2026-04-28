@@ -9,7 +9,7 @@ import { createConfirm } from './confirm';
 function makeContext(overrides: any = {}) {
   return {
     confirmTarget: '',
-    confirmCallback: null as (() => void) | null,
+    confirmCallback: null as (() => void | Promise<void>) | null,
     confirmTrigger: null as any,
     abortControllers: {} as Record<string, AbortController>,
     abortControllersByGid: {} as Record<string, AbortController>,
@@ -105,6 +105,19 @@ describe('createConfirm', () => {
       ctx.confirmCallback = null;
       confirm.executeConfirm.call(ctx);
       expect(ctx.$refs.confirmDialog.close).toHaveBeenCalled();
+    });
+
+    it('logs async callback rejection without leaving callback armed', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const error = new Error('delete failed');
+      ctx.confirmCallback = vi.fn().mockRejectedValue(error);
+
+      confirm.executeConfirm.call(ctx);
+      await Promise.resolve();
+
+      expect(warnSpy).toHaveBeenCalledWith('[confirm]', error);
+      expect(ctx.confirmCallback).toBeNull();
+      warnSpy.mockRestore();
     });
   });
 

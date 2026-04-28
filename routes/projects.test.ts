@@ -595,6 +595,27 @@ describe('GET /:pid/events (SSE)', () => {
     req._trigger('close');
   });
 
+  it('res error cleanup log en warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const project = store.createProject('SSE res error');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+    const errorHandler = res.on.mock.calls.find((call: unknown[]) => call[0] === 'error')?.[1] as
+      | ((err: Error) => void)
+      | undefined;
+    errorHandler?.(new Error('ECONNRESET'));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [sse]'),
+      expect.stringContaining('ECONNRESET'),
+    );
+    warnSpy.mockRestore();
+  });
+
   // Test #18 — verrou : heartbeat 25s exact (sans lui, les proxies idle
   // coupent la connexion → notifications stale jusqu'au reconnect EventSource).
   it('écrit un keep-alive heartbeat toutes les 25s', () => {

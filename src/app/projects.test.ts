@@ -263,6 +263,17 @@ describe('selectProject', () => {
     expect(ctx.currentProjectId).toBe('p1');
     expect(ctx.sources).toEqual([]);
   });
+
+  it('logs fetch exceptions for observability', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('offline'));
+    const ctx = makeContext();
+
+    await proj.selectProject.call(ctx, 'p1');
+
+    expect(warnSpy).toHaveBeenCalledWith('[selectProject] failed', expect.any(Error));
+    warnSpy.mockRestore();
+  });
 });
 
 // --- deleteProject ---

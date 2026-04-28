@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -118,6 +118,28 @@ describe('addGeneration / deleteGeneration', () => {
     const found = store.getProject(p.meta.id);
     expect(found!.results.generations).toHaveLength(1);
     expect(found!.results.generations[0].id).toBe('g1');
+  });
+
+  it('log warn si le projet est introuvable', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const gen: Generation = {
+      id: 'g-missing',
+      title: 'Fiche',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: {
+        title: 'Test',
+        summary: 'Resume',
+        key_points: [],
+        vocabulary: [],
+      },
+    };
+
+    store.addGeneration('pid-missing', gen);
+
+    expect(warnSpy).toHaveBeenCalledWith('[store] addGeneration: project missing', 'pid-missing');
+    warnSpy.mockRestore();
   });
 
   it('supprime une generation', () => {
