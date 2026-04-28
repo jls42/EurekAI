@@ -14,7 +14,6 @@ import type {
   CostEntry,
   ModerationResult,
   PendingTrackerEntry,
-  PendingTrackerEntryTerminal,
   FailedStepCode,
   GenerationStatus,
 } from './types.js';
@@ -273,15 +272,9 @@ export class ProjectStore {
 
   // --- Pending tracker lifecycle ---
   //
-  // Modèle : pending tracker séparé de generations[]. Permet d'avoir un cycle de
-  // vie (pending → completed/failed/cancelled) sans contaminer le typage strict
-  // de Generation.data partout dans le code. À la promotion, l'entrée est retirée
-  // du tracker et une Generation complète est ajoutée à generations[].
-  //
-  // Les races (réponse Mistral arrive juste après cancel HTTP) sont absorbées par
-  // les checks d'idempotence : promoteToGeneration retourne {kind: 'cancelled'} si
-  // l'entrée a été retirée du tracker entre-temps, et le handler HTTP renvoie 409
-  // au lieu de 200 fantôme.
+  // Modèle détaillé et invariants : voir CLAUDE.md "Pending generations &
+  // notifications". Ici, le store applique seulement les transitions atomiques
+  // tracker → generations[] et tracker pending → terminal.
 
   addPendingEntry(projectId: string, entry: PendingTrackerEntry): boolean {
     const data = this.getProject(projectId);
@@ -457,7 +450,7 @@ export class ProjectStore {
     emitGenerationEvent({
       ...base,
       status,
-      failureCode: (entry as PendingTrackerEntryTerminal).failureCode,
+      failureCode: entry.failureCode,
     });
   }
 
