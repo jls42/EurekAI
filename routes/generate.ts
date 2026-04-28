@@ -362,6 +362,11 @@ async function runGeneratorAndPersist(
       res.json(promoteResult.generation);
       return;
     }
+    if (promoteResult.kind === 'missing') {
+      // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
+      // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
+      logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
+    }
     // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
     // 200 fantôme — le client refresh le projet pour voir l'état réel.
     res.status(409).json({ error: promoteResult.kind, gid });
@@ -1047,11 +1052,18 @@ export function generateRoutes(
     // 'missing' de 'cancelled' explicitement : 'missing' = symptôme d'un cleanup
     // imprévu (tracker corrompu, race avec deleteProject), donc 'internal_error'
     // pour ne pas masquer un bug en code utilisateur 'cancelled' attendu.
-    logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
     let code: FailedStepCode;
     if (promoteResult.kind === 'failed') code = promoteResult.code;
     else if (promoteResult.kind === 'cancelled') code = 'cancelled';
     else code = 'internal_error';
+    if (promoteResult.kind === 'missing') {
+      // Signal observabilité : tracker entry retirée entre addPendingEntry et
+      // promoteToGeneration (race deleteProject ou corruption). logger.error
+      // pour remonter en Sentry, jamais un cancel user-initié.
+      logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
+    } else {
+      logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
+    }
     return { ok: false, agent: step.agent, code };
   }
 

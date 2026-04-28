@@ -37,6 +37,13 @@ const bus = new EventEmitter();
 // 50 indiquerait une fuite (handlers non désinscrits) plutôt qu'une vraie charge.
 bus.setMaxListeners(50);
 
+// Filet anti-uncaughtException : sans listener 'error', un throw d'un listener
+// `generation` (ex: JSON.stringify circulaire, write-after-end non capturé)
+// remonte en uncaughtException et tue le process. On absorbe ici en log error.
+bus.on('error', (err) => {
+  console.error('[event-bus] listener error:', err);
+});
+
 const EVENT_NAME = 'generation';
 
 export function emitGenerationEvent(event: GenerationEvent): void {
@@ -45,12 +52,19 @@ export function emitGenerationEvent(event: GenerationEvent): void {
 
 // Souscription filtrée par projectId. Retourne un unsubscribe à appeler dans
 // le `req.on('close')` du handler SSE pour éviter les fuites de listeners.
+// Le wrapped catch tout throw du handler client (writeGenerationEvent) pour
+// éviter qu'une seule connexion SSE buggée ne crashe les N autres listeners.
 export function subscribeGeneration(
   pid: string,
   handler: (event: GenerationEvent) => void,
 ): () => void {
   const wrapped = (event: GenerationEvent) => {
-    if (event.pid === pid) handler(event);
+    if (event.pid !== pid) return;
+    try {
+      handler(event);
+    } catch (err) {
+      console.error('[event-bus] handler threw for pid=', pid, err);
+    }
   };
   bus.on(EVENT_NAME, wrapped);
   return () => {

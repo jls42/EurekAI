@@ -329,7 +329,13 @@ export class ProjectStore {
     let total = 0;
     for (const meta of this.readIndex()) {
       const data = this.getProject(meta.id);
-      if (!data) continue;
+      if (!data) {
+        // getProject swallow déjà l'erreur JSON parse en console.error mais le
+        // boot sweep doit signaler explicitement les pendings ghost laissés en
+        // place : un project.json corrompu = aucun pending purgé pour ce projet.
+        console.warn(`[store] boot sweep skipped unreadable project ${meta.id}`);
+        continue;
+      }
       const tracker = data.results.pendingTracker ?? [];
       const cancelled: PendingTrackerEntry[] = [];
       for (let i = 0; i < tracker.length; i++) {
