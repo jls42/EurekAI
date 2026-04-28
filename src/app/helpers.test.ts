@@ -1845,14 +1845,13 @@ describe('applyGenerationEvent', () => {
 
 describe('clearProfileNotifications', () => {
   it('clears per-tab shownToastEventKeys along with visible notifications', () => {
-    const eventKey = 'generation:g1:completed' as EventKey;
     (globalThis as any).localStorage = {
       getItem: vi.fn(() => null),
       setItem: vi.fn(),
     };
     const ctx = {
       currentProfile: { id: 'profile-A' },
-      shownToastEventKeys: new Set<EventKey>([eventKey]),
+      shownToastEventKeys: new Set<EventKey>(['generation:g1:completed' as EventKey]),
       notificationsVersion: 0,
       clearProfileNotifications: helpers.clearProfileNotifications,
     };
