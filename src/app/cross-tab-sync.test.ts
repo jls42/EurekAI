@@ -1,7 +1,11 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call -- Codacy résout
+/* eslint-disable @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unused-vars -- Codacy résout
    describe/it/beforeEach/afterEach (importés depuis vitest) en type `error`
    car son tsconfig racine exclut src/. Localement les types sont OK via
-   projectService → cette directive est inactive (cf. linterOptions). */
+   projectService → ces directives sont inactives (cf. linterOptions).
+   no-unused-vars : Codacy ignore notre `argsIgnorePattern: '^_'` et flag
+   les rest params nommés dans les types (ex: `_args` dans la signature
+   `(..._args: unknown[]) => R`). */
 import { describe, it, beforeEach, afterEach } from 'vitest';
 import { strict as assert } from 'node:assert';
 import {
