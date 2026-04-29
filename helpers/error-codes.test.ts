@@ -18,7 +18,7 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
 
 describe('FailedStepCode registry', () => {
   it('liste exhaustivement les 8 codes contractuels (garde compile-time + runtime)', () => {
-    expect(Object.keys(_KNOWN_CODES).sort()).toEqual([
+    expect(Object.keys(_KNOWN_CODES).sort((a, b) => a.localeCompare(b))).toEqual([
       'auth_required',
       'cancelled',
       'context_length_exceeded',

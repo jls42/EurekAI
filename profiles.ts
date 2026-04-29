@@ -428,7 +428,7 @@ export class ProfileStore {
       // Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
       if (Array.isArray(updates.mistralVoices)) {
         logger.warn('profiles', 'update: rejected array mistralVoices payload');
-      } else if (updates.mistralVoices === null || typeof updates.mistralVoices === 'object') {
+      } else if (typeof updates.mistralVoices === 'object') {
         profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
       } else {
         logger.warn(

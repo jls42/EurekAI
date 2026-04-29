@@ -471,7 +471,6 @@ export function createProfiles() {
       this.showToast(this.t('toast.profileReset'), 'success');
     },
 
-    /** @deprecated Use autoSaveProfile — kept for test compat */
     async saveEditProfile(this: AppContext) {
       this.autoSaveProfile(true);
       this.editingProfile = null;

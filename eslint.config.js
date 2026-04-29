@@ -17,6 +17,9 @@ export default [
       'public/**',
       '**/*.config.js',
       '**/*.config.ts',
+      // .mjs scripts utilisent leur propre runtime (Node sans tsconfig) —
+      // hors du scope du typed-linting, projectService ne les résout pas.
+      'scripts/**/*.mjs',
     ],
   },
   js.configs.recommended,
@@ -26,6 +29,15 @@ export default [
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
+      // projectService: tseslint v8 auto-détecte le tsconfig le plus proche
+      // pour chaque fichier (racine pour server/, src/tsconfig.json pour
+      // src/). Sans ça, le typed-linting de Codacy résout les types des
+      // src/**/*.test.ts via le tsconfig racine qui exclut src/ → vi/spyOn
+      // typés `error/any` → règles @typescript-eslint/no-unsafe-* en cascade.
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
       globals: {
         console: 'readonly',
         process: 'readonly',

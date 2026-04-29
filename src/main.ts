@@ -47,6 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
 // Cross-tab synchronization de la cloche notifications. Logique extraite
 // dans cross-tab-sync.ts pour permettre les tests unitaires (handler appelé
 // avec un Document mocké). Guard pour ne pas péter en environnement Node.
-if (globalThis.window !== undefined) {
+if (typeof window !== 'undefined') {
   installCrossTabSync(globalThis, document);
 }

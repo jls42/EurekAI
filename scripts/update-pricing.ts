@@ -20,8 +20,9 @@ const PRICE_PATTERNS: readonly RegExp[] = [
 export function extractPrices(html: string): string[] {
   const prices: string[] = [];
   for (const pattern of PRICE_PATTERNS) {
-    const found = html.match(pattern);
-    if (found) prices.push(...found);
+    for (const match of html.matchAll(pattern)) {
+      prices.push(match[0]);
+    }
   }
   if (!prices.length && html.includes('$0')) prices.push('$0 (free)');
   return prices;

@@ -1049,7 +1049,9 @@ describe('activeGenerations', () => {
     };
     const result = callWith<any[]>(helpers.activeGenerations, ctx);
     expect(result).toHaveLength(2);
-    expect(result.map((r: any) => r.key).sort()).toEqual(['gid-1', 'gid-2']);
+    expect(
+      result.map((r: any) => r.key).sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual(['gid-1', 'gid-2']);
     expect(result.every((r: any) => r.label === 'gen.summary')).toBe(true);
   });
 
@@ -1619,7 +1621,7 @@ describe('metaPopoverStyle', () => {
     const result = callWith<string>(helpers.metaPopoverStyle, ctx);
     expect(result).toContain('bottom:404px');
     expect(result).toContain('left:50px');
-    if (origInnerHeight !== undefined) globalThis.window = { innerHeight: origInnerHeight } as any;
+    globalThis.window = { innerHeight: origInnerHeight } as any;
   });
 });
 
@@ -1637,8 +1639,8 @@ describe('podcastSpeaker* helpers', () => {
     });
 
     it('returns empty string when speakers absent (legacy gen)', () => {
-      expect(helpers.podcastSpeakerName(makeGen(undefined), hostLine)).toBe('');
-      expect(helpers.podcastSpeakerName(makeGen(undefined), guestLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen(), hostLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen(), guestLine)).toBe('');
     });
 
     it('returns empty string when speaker field is empty or whitespace', () => {
@@ -1655,8 +1657,8 @@ describe('podcastSpeaker* helpers', () => {
     });
 
     it('falls back to role initial (H/G) when name is empty', () => {
-      expect(helpers.podcastSpeakerInitial(makeGen(undefined), hostLine)).toBe('H');
-      expect(helpers.podcastSpeakerInitial(makeGen(undefined), guestLine)).toBe('G');
+      expect(helpers.podcastSpeakerInitial(makeGen(), hostLine)).toBe('H');
+      expect(helpers.podcastSpeakerInitial(makeGen(), guestLine)).toBe('G');
       expect(helpers.podcastSpeakerInitial(makeGen({ host: '' }), hostLine)).toBe('H');
     });
   });
@@ -1671,12 +1673,12 @@ describe('podcastSpeaker* helpers', () => {
 
     it('falls back to i18n keys when name is missing', () => {
       const ctx = { t: (k: string) => (k === 'podcast.speakerHost' ? 'Animateur' : 'Invité') };
-      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), hostLine)).toBe(
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(), hostLine)).toBe(
         'Animateur',
       );
-      expect(
-        callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), guestLine),
-      ).toBe('Invité');
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(), guestLine)).toBe(
+        'Invité',
+      );
     });
   });
 });
@@ -2026,7 +2028,9 @@ describe('mergeReconciledGenerations', () => {
     ctx.mergeReconciledGenerations.call(ctx, gens, cutoff);
 
     expect(ctx.generations).toHaveLength(2);
-    expect(ctx.generations.map((g: any) => g.id).sort()).toEqual(['g1', 'g2']);
+    expect(
+      ctx.generations.map((g: any) => g.id).sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual(['g1', 'g2']);
   });
 
   it('skips gens without completedAt (still pending)', () => {

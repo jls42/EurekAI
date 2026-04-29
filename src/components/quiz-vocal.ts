@@ -127,7 +127,7 @@ export function quizVocalComponent(gen: QuizVocalGeneration) {
 
     isCurrentAnswered(this: QuizVocalContext): boolean {
       const idx = this.currentIndex();
-      return idx !== undefined && this.storedFeedback[idx] !== undefined;
+      return idx !== undefined && idx in this.storedFeedback;
     },
 
     async submitVocalAnswer(this: QuizVocalContext, blob: Blob) {
