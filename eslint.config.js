@@ -29,13 +29,15 @@ export default [
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
-      // projectService: tseslint v8 auto-détecte le tsconfig le plus proche
-      // pour chaque fichier (racine pour server/, src/tsconfig.json pour
-      // src/). Sans ça, le typed-linting de Codacy résout les types des
-      // src/**/*.test.ts via le tsconfig racine qui exclut src/ → vi/spyOn
-      // typés `error/any` → règles @typescript-eslint/no-unsafe-* en cascade.
+      // tsconfig.eslint.json : config dédiée au linting qui inclut TOUT le
+      // code TS (racine + src/) avec lib DOM + types vitest. Sans ça, le
+      // tsconfig racine qui exclut src/ ferait résoudre vi/spyOn en `error`
+      // côté typed-linting → cascade @typescript-eslint/no-unsafe-*.
+      // Ce tsconfig est utilisé UNIQUEMENT par ESLint (et par les outils qui
+      // respectent parserOptions.project comme Codacy) ; tsc --noEmit utilise
+      // toujours tsconfig.json racine.
       parserOptions: {
-        projectService: true,
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
       },
       globals: {
