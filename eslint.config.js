@@ -81,6 +81,13 @@ export default [
     // contexte de tests : mocks de fonctions, chemins /tmp contrôlés par le test,
     // URLs http:// dans des fixtures non exposées.
     files: ['**/*.test.ts'],
+    // reportUnusedDisableDirectives off : nos tests peuvent contenir des
+    // /* eslint-disable @typescript-eslint/no-unsafe-* */ pour Codacy (qui
+    // résout vi/describe/it en `error`). Localement avec projectService la
+    // règle est inactive donc le directive est "unused" sans cette option.
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',

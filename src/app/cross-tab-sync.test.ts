@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call -- Codacy résout
+   describe/it/beforeEach/afterEach (importés depuis vitest) en type `error`
+   car son tsconfig racine exclut src/. Localement les types sont OK via
+   projectService → cette directive est inactive (cf. linterOptions). */
 import { describe, it, beforeEach, afterEach } from 'vitest';
 import { strict as assert } from 'node:assert';
 import {
@@ -11,7 +15,11 @@ import {
 // Le projet utilise quand même vitest pour describe/it ; les helpers ci-dessous
 // reproduisent juste ce dont on a besoin pour stubs/spies sans toucher à `vi`.
 type StubCalls = unknown[][];
-function makeStub<R>(impl?: () => R): { fn: (...args: unknown[]) => R; calls: StubCalls } {
+interface Stub<R> {
+  fn: (..._args: unknown[]) => R;
+  calls: StubCalls;
+}
+function makeStub<R>(impl?: () => R): Stub<R> {
   const calls: StubCalls = [];
   const fn = (...args: unknown[]): R => {
     calls.push(args);
@@ -32,7 +40,7 @@ interface MockDocResult {
 function makeDoc(
   stack: { notificationsVersion?: number; crossTabSyncBroken?: boolean } | null,
 ): MockDocResult {
-  const dispatch = makeStub<void>();
+  const dispatch = makeStub();
   const querySelector = makeStub(() =>
     stack === null ? null : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
   );

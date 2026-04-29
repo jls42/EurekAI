@@ -6,7 +6,10 @@
 const NOTIFS_STORAGE_SLOT = 'sf-profile-notifications';
 export const CROSS_TAB_SYNC_BROKEN_EVENT = 'cross-tab-sync-broken';
 
-type AlpineDataStackEntry = { notificationsVersion?: number; crossTabSyncBroken?: boolean };
+interface AlpineDataStackEntry {
+  notificationsVersion?: number;
+  crossTabSyncBroken?: boolean;
+}
 
 function getAlpineStackEntry(root: Element | null): AlpineDataStackEntry | undefined {
   if (root === null || !('_x_dataStack' in root)) return undefined;
