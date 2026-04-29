@@ -7,9 +7,14 @@ const NOTIFS_STORAGE_SLOT = 'sf-profile-notifications';
 export const CROSS_TAB_SYNC_BROKEN_EVENT = 'cross-tab-sync-broken';
 
 type AlpineDataStackEntry = { notificationsVersion?: number; crossTabSyncBroken?: boolean };
-type AlpineRoot = HTMLElement & {
-  _x_dataStack?: AlpineDataStackEntry[];
-};
+
+function getAlpineStackEntry(root: Element | null): AlpineDataStackEntry | undefined {
+  if (root === null || !('_x_dataStack' in root)) return undefined;
+  const dataStack = root._x_dataStack;
+  if (!Array.isArray(dataStack)) return undefined;
+  const stack: unknown = dataStack[0];
+  return typeof stack === 'object' && stack !== null ? stack : undefined;
+}
 
 function notifyCrossTabSyncBroken(doc: Document): void {
   doc.defaultView?.dispatchEvent(new Event(CROSS_TAB_SYNC_BROKEN_EVENT));
@@ -21,8 +26,8 @@ export function handleCrossTabStorageEvent(
   warned: { value: boolean },
 ): 'bumped' | 'wrong-key' | 'drift' {
   if (event.key !== NOTIFS_STORAGE_SLOT) return 'wrong-key';
-  const root = doc.querySelector<AlpineRoot>('[x-data="app()"]');
-  const stack = root?._x_dataStack?.[0];
+  const root = doc.querySelector('[x-data="app()"]');
+  const stack = getAlpineStackEntry(root);
   if (stack && typeof stack.notificationsVersion === 'number') {
     stack.notificationsVersion++;
     return 'bumped';
