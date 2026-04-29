@@ -1,11 +1,18 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call,
-                  @typescript-eslint/no-unused-vars -- Codacy résout
-   describe/it/beforeEach/afterEach (importés depuis vitest) en type `error`
-   car son tsconfig racine exclut src/. Localement les types sont OK via
-   projectService → ces directives sont inactives (cf. linterOptions).
-   no-unused-vars : Codacy ignore notre `argsIgnorePattern: '^_'` et flag
-   les rest params nommés dans les types (ex: `_args` dans la signature
-   `(..._args: unknown[]) => R`). */
+                  @typescript-eslint/no-unused-vars,
+                  no-unused-vars,
+                  @typescript-eslint/unbound-method -- Codacy applique
+   tseslint.recommendedTypeChecked sur ce fichier. Notre tsconfig racine
+   exclut src/, donc les types de vitest (describe/it/beforeEach/afterEach)
+   sont résolus en `error` → cascade unsafe-call. Localement les types sont
+   OK via projectService.
+   - no-unused-vars (et variant @ts-eslint) : Codacy flag les rest params
+     nommés dans les signatures de type (`(...args: ...)`) sans tolérer
+     argsIgnorePattern.
+   - unbound-method : Codacy flag `console.warn` lu sans .bind(), bien que
+     ce soit utilisé pour stub/restore (assignment, pas appel détaché).
+   linterOptions.reportUnusedDisableDirectives off côté tests pour ne pas
+   warn local quand projectService a déjà résolu les types correctement. */
 import { describe, it, beforeEach, afterEach } from 'vitest';
 import { strict as assert } from 'node:assert';
 import {
