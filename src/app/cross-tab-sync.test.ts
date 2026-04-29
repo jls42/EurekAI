@@ -1,83 +1,105 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, beforeEach, afterEach } from 'vitest';
+import { strict as assert } from 'node:assert';
 import {
   CROSS_TAB_SYNC_BROKEN_EVENT,
   handleCrossTabStorageEvent,
   installCrossTabSync,
 } from './cross-tab-sync.js';
 
+// Stubs vanilla pour éviter le typed-linting cassé sur vi.* côté Codacy
+// (tsconfig racine exclut src/ → vi/spyOn typés `error` → cascade unsafe-*).
+// Le projet utilise quand même vitest pour describe/it ; les helpers ci-dessous
+// reproduisent juste ce dont on a besoin pour stubs/spies sans toucher à `vi`.
+type StubCalls = unknown[][];
+function makeStub<R>(impl?: () => R): { fn: (...args: unknown[]) => R; calls: StubCalls } {
+  const calls: StubCalls = [];
+  const fn = (...args: unknown[]): R => {
+    calls.push(args);
+    return impl ? impl() : (undefined as R);
+  };
+  return { fn, calls };
+}
+
 function makeStack(version = 0): { notificationsVersion?: number; crossTabSyncBroken?: boolean } {
   return { notificationsVersion: version, crossTabSyncBroken: false };
 }
 
+interface MockDocResult {
+  doc: Document;
+  dispatchCalls: StubCalls;
+}
+
 function makeDoc(
   stack: { notificationsVersion?: number; crossTabSyncBroken?: boolean } | null,
-  dispatchEvent = vi.fn(),
-): Document {
-  return {
-    querySelector: vi.fn(() =>
-      stack === null ? null : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
-    ),
-    defaultView: { dispatchEvent },
+): MockDocResult {
+  const dispatch = makeStub<void>();
+  const querySelector = makeStub(() =>
+    stack === null ? null : ({ _x_dataStack: [stack] } as unknown as HTMLElement),
+  );
+  const doc = {
+    querySelector: querySelector.fn,
+    defaultView: { dispatchEvent: dispatch.fn },
   } as unknown as Document;
+  return { doc, dispatchCalls: dispatch.calls };
 }
 
 describe('handleCrossTabStorageEvent', () => {
   let warned: { value: boolean };
-  let warnSpy: ReturnType<typeof vi.spyOn>;
+  let warnCalls: StubCalls;
+  let originalWarn: typeof console.warn;
 
   beforeEach(() => {
     warned = { value: false };
-    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    warnCalls = [];
+    originalWarn = console.warn;
+    console.warn = ((...args: unknown[]) => {
+      warnCalls.push(args);
+    }) as typeof console.warn;
   });
 
   afterEach(() => {
-    warnSpy.mockRestore();
+    console.warn = originalWarn;
   });
 
   it('returns "wrong-key" and no-op when storage event key is not the notif slot', () => {
     const stack = makeStack(5);
-    const result = handleCrossTabStorageEvent({ key: 'sf-other-key' }, makeDoc(stack), warned);
+    const { doc } = makeDoc(stack);
+    const result = handleCrossTabStorageEvent({ key: 'sf-other-key' }, doc, warned);
 
-    expect(result).toBe('wrong-key');
-    expect(stack.notificationsVersion).toBe(5);
-    expect(warnSpy).not.toHaveBeenCalled();
+    assert.equal(result, 'wrong-key');
+    assert.equal(stack.notificationsVersion, 5);
+    assert.equal(warnCalls.length, 0);
   });
 
   it('returns "wrong-key" when storage event key is null (whole storage cleared)', () => {
     const stack = makeStack(2);
-    const result = handleCrossTabStorageEvent({ key: null }, makeDoc(stack), warned);
+    const { doc } = makeDoc(stack);
+    const result = handleCrossTabStorageEvent({ key: null }, doc, warned);
 
-    expect(result).toBe('wrong-key');
-    expect(stack.notificationsVersion).toBe(2);
+    assert.equal(result, 'wrong-key');
+    assert.equal(stack.notificationsVersion, 2);
   });
 
   it('bumps notificationsVersion when alpine stack is present and field is a number', () => {
     const stack = makeStack(3);
-    const result = handleCrossTabStorageEvent(
-      { key: 'sf-profile-notifications' },
-      makeDoc(stack),
-      warned,
-    );
+    const { doc } = makeDoc(stack);
+    const result = handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, doc, warned);
 
-    expect(result).toBe('bumped');
-    expect(stack.notificationsVersion).toBe(4);
-    expect(warnSpy).not.toHaveBeenCalled();
+    assert.equal(result, 'bumped');
+    assert.equal(stack.notificationsVersion, 4);
+    assert.equal(warnCalls.length, 0);
   });
 
   it('warns once when alpine root is missing (Alpine drift)', () => {
-    const dispatchEvent = vi.fn();
-    const result = handleCrossTabStorageEvent(
-      { key: 'sf-profile-notifications' },
-      makeDoc(null, dispatchEvent),
-      warned,
-    );
+    const { doc, dispatchCalls } = makeDoc(null);
+    const result = handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, doc, warned);
 
-    expect(result).toBe('drift');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warned.value).toBe(true);
-    expect(dispatchEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ type: CROSS_TAB_SYNC_BROKEN_EVENT }),
-    );
+    assert.equal(result, 'drift');
+    assert.equal(warnCalls.length, 1);
+    assert.equal(warned.value, true);
+    assert.equal(dispatchCalls.length, 1);
+    const event = dispatchCalls[0][0] as Event;
+    assert.equal(event.type, CROSS_TAB_SYNC_BROKEN_EVENT);
   });
 
   it('warns once when notificationsVersion is missing (field drift)', () => {
@@ -85,43 +107,39 @@ describe('handleCrossTabStorageEvent', () => {
       notificationsVersion?: number;
       crossTabSyncBroken?: boolean;
     };
-    const result = handleCrossTabStorageEvent(
-      { key: 'sf-profile-notifications' },
-      makeDoc(stack),
-      warned,
-    );
+    const { doc } = makeDoc(stack);
+    const result = handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, doc, warned);
 
-    expect(result).toBe('drift');
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(stack.crossTabSyncBroken).toBe(true);
+    assert.equal(result, 'drift');
+    assert.equal(warnCalls.length, 1);
+    assert.equal(stack.crossTabSyncBroken, true);
   });
 
   it('does not warn twice on consecutive drifts (one warning per session)', () => {
-    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null), warned);
-    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null), warned);
-    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null), warned);
+    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null).doc, warned);
+    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null).doc, warned);
+    handleCrossTabStorageEvent({ key: 'sf-profile-notifications' }, makeDoc(null).doc, warned);
 
-    expect(warnSpy).toHaveBeenCalledTimes(1);
+    assert.equal(warnCalls.length, 1);
   });
 });
 
 describe('installCrossTabSync', () => {
   it('attaches a storage listener that bumps version when fired', () => {
     const stack = makeStack(0);
-    const doc = makeDoc(stack);
+    const { doc } = makeDoc(stack);
     const listeners = new Map<string, EventListener>();
-    const target = {
-      addEventListener: vi.fn((name: string, fn: EventListener) => {
-        listeners.set(name, fn);
-      }),
-    } as unknown as EventTarget;
+    const addEventListener = (name: string, fn: EventListener) => {
+      listeners.set(name, fn);
+    };
+    const target = { addEventListener } as unknown as EventTarget;
 
     installCrossTabSync(target, doc);
 
-    expect(target.addEventListener).toHaveBeenCalledWith('storage', expect.any(Function));
+    assert.equal(listeners.has('storage'), true);
     const handler = listeners.get('storage');
-    handler?.({ key: 'sf-profile-notifications' } as any);
+    handler?.({ key: 'sf-profile-notifications' } as unknown as StorageEvent);
 
-    expect(stack.notificationsVersion).toBe(1);
+    assert.equal(stack.notificationsVersion, 1);
   });
 });
