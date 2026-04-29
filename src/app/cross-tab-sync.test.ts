@@ -20,7 +20,7 @@ import {
 // reproduisent juste ce dont on a besoin pour stubs/spies sans toucher à `vi`.
 type StubCalls = unknown[][];
 interface Stub<R> {
-  fn: (..._args: unknown[]) => R;
+  fn(...inputs: unknown[]): R;
   calls: StubCalls;
 }
 function makeStub<R>(impl?: () => R): Stub<R> {
