@@ -21,7 +21,7 @@ export function handleCrossTabStorageEvent(
   warned: { value: boolean },
 ): 'bumped' | 'wrong-key' | 'drift' {
   if (event.key !== NOTIFS_STORAGE_SLOT) return 'wrong-key';
-  const root: AlpineRoot | null = doc.querySelector('[x-data="app()"]');
+  const root = doc.querySelector<AlpineRoot>('[x-data="app()"]');
   const stack = root?._x_dataStack?.[0];
   if (stack && typeof stack.notificationsVersion === 'number') {
     stack.notificationsVersion++;
