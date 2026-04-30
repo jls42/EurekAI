@@ -809,7 +809,7 @@ export function createHelpers() {
     async navigateToNotification(this: AppContext, notif: PersistedNotification): Promise<void> {
       this.markNotificationRead(notif.eventKey);
       const parsed = parseGenerationEventKey(notif.eventKey);
-      if (!parsed || parsed.status !== 'completed') return;
+      if (parsed?.status !== 'completed') return;
       if (notif.projectId && notif.projectId !== this.currentProjectId) {
         await this.selectProject(notif.projectId);
       }
