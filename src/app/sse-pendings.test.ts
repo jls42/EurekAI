@@ -6,11 +6,14 @@ import { createPendingsStream } from './sse-pendings.js';
 // (tsconfig racine exclut src/ → vi/expect typés `error` → unsafe-*).
 // Localement projectService résout vitest correctement.
 type StubCalls = unknown[][];
-// Underscore prefix sur les params en TYPE signatures : Codacy ignore
-// `argsIgnorePattern: '^_'` mais accepte `_args`/`_impl` comme intentionnels.
+// Type signatures : params nommés requis par TS syntax sans body pour les
+// référencer. Codacy native `no-unused-vars` n'honore pas `argsIgnorePattern:
+// '^_'` (cf. e396616 — la règle native est indépendante du variant @ts-eslint).
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
 type StubImpl = (..._args: unknown[]) => unknown;
 type SpyFn = StubImpl & {
   calls: StubCalls;
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
   setImpl(_impl: StubImpl): void;
 };
 
@@ -31,6 +34,7 @@ function makeSpy(): SpyFn {
 // Stub de l'API DOM EventSource. `Map` plutôt que `Record` pour le bucket
 // listeners : indexer par `name: string` arbitraire signale `Generic Object
 // Injection Sink` côté eslint-plugin-security même si l'input vient de tests.
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
 type GenerationListener = (_msg: MessageEvent) => void;
 
 class FakeEventSource {
@@ -39,6 +43,7 @@ class FakeEventSource {
   // EventSource['onerror'] standard DOM utilise `(ev: Event) => unknown` —
   // pas besoin de la binding `this: EventSource` (jamais référencé), simplifie
   // aussi triggerError() qui n'a plus à invoquer .call(this, ...).
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
   onerror: ((_ev: Event) => void) | null = null;
   private readonly listeners = new Map<string, GenerationListener[]>();
   closed = false;
@@ -73,6 +78,7 @@ class FakeEventSource {
 }
 
 // Patch typé de globalThis.EventSource — évite `(globalThis as any).EventSource`.
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
 type EventSourceCtor = new (_url: string) => EventSource;
 function installEventSourceStub(stub: EventSourceCtor): void {
   (globalThis as { EventSource: EventSourceCtor }).EventSource = stub;
@@ -85,6 +91,7 @@ interface FakeContext {
   // sse-pendings.ts L102 fait `this.startPendingsStream(projectId)` pour le
   // retry dans setTimeout — le ctx doit donc exposer la méthode. Arrow wrapper
   // (vs. assignment direct) évite `@typescript-eslint/unbound-method`.
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
   startPendingsStream(_pid: string): Promise<void>;
 }
 
@@ -124,8 +131,11 @@ const advanceTimers = async (ms: number): Promise<void> => {
 // Wrappers describe/it/beforeEach/afterEach pour confiner la même cascade
 // typed-error que vi.* à 4 helpers, plutôt qu'un inline disable sur chaque
 // appel ou un disable file-level qui masquerait des bugs réels.
+// eslint-disable-next-line no-unused-vars -- type-sig params required by TS
 type DescribeFn = (_name: string, _fn: () => void) => void;
+// eslint-disable-next-line no-unused-vars -- type-sig params required by TS
 type ItFn = (_name: string, _fn: () => Promise<void> | void) => void;
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
 type HookFn = (_fn: () => Promise<void> | void) => void;
 /* eslint-disable @typescript-eslint/no-unsafe-call --
    describe/it/beforeEach/afterEach typés `error` côté Codacy. Local OK. */
@@ -156,7 +166,11 @@ $describe('createPendingsStream', () => {
     // Arrow forwarder typé : retry dans setTimeout (sse-pendings.ts L102)
     // appelle `this.startPendingsStream(pid)`. Sans bind explicite, Codacy
     // signalerait `unbound-method` sur une assignment de référence directe.
-    ctx.startPendingsStream = (pid) => stream.startPendingsStream.call(ctx as never, pid);
+    ctx.startPendingsStream = async (pid) => {
+      // `await` explicite + `Promise<void>` inféré → évite Codacy
+      // `no-unsafe-return` (call().return = any quand `this` est cast en never).
+      await stream.startPendingsStream.call(ctx as never, pid);
+    };
   });
 
   $afterEach(() => {
