@@ -6,10 +6,12 @@ import { createPendingsStream } from './sse-pendings.js';
 // (tsconfig racine exclut src/ → vi/expect typés `error` → unsafe-*).
 // Localement projectService résout vitest correctement.
 type StubCalls = unknown[][];
-type StubImpl = (...args: unknown[]) => unknown;
+// Underscore prefix sur les params en TYPE signatures : Codacy ignore
+// `argsIgnorePattern: '^_'` mais accepte `_args`/`_impl` comme intentionnels.
+type StubImpl = (..._args: unknown[]) => unknown;
 type SpyFn = StubImpl & {
   calls: StubCalls;
-  setImpl(impl: StubImpl): void;
+  setImpl(_impl: StubImpl): void;
 };
 
 function makeSpy(): SpyFn {
@@ -29,7 +31,7 @@ function makeSpy(): SpyFn {
 // Stub de l'API DOM EventSource. `Map` plutôt que `Record` pour le bucket
 // listeners : indexer par `name: string` arbitraire signale `Generic Object
 // Injection Sink` côté eslint-plugin-security même si l'input vient de tests.
-type GenerationListener = (msg: MessageEvent) => void;
+type GenerationListener = (_msg: MessageEvent) => void;
 
 class FakeEventSource {
   static readonly instances: FakeEventSource[] = [];
@@ -37,7 +39,7 @@ class FakeEventSource {
   // EventSource['onerror'] standard DOM utilise `(ev: Event) => unknown` —
   // pas besoin de la binding `this: EventSource` (jamais référencé), simplifie
   // aussi triggerError() qui n'a plus à invoquer .call(this, ...).
-  onerror: ((ev: Event) => void) | null = null;
+  onerror: ((_ev: Event) => void) | null = null;
   private readonly listeners = new Map<string, GenerationListener[]>();
   closed = false;
 
@@ -71,7 +73,7 @@ class FakeEventSource {
 }
 
 // Patch typé de globalThis.EventSource — évite `(globalThis as any).EventSource`.
-type EventSourceCtor = new (url: string) => EventSource;
+type EventSourceCtor = new (_url: string) => EventSource;
 function installEventSourceStub(stub: EventSourceCtor): void {
   (globalThis as { EventSource: EventSourceCtor }).EventSource = stub;
 }
@@ -80,8 +82,10 @@ interface FakeContext {
   currentProjectId: string | null;
   reconcilePendings: SpyFn;
   applyGenerationEvent: SpyFn;
-  startPendingsStream: ReturnType<typeof createPendingsStream>['startPendingsStream'] | null;
-  stopPendingsStream: ReturnType<typeof createPendingsStream>['stopPendingsStream'] | null;
+  // sse-pendings.ts L102 fait `this.startPendingsStream(projectId)` pour le
+  // retry dans setTimeout — le ctx doit donc exposer la méthode. Arrow wrapper
+  // (vs. assignment direct) évite `@typescript-eslint/unbound-method`.
+  startPendingsStream(_pid: string): Promise<void>;
 }
 
 function makeContext(): FakeContext {
@@ -92,8 +96,8 @@ function makeContext(): FakeContext {
     currentProjectId: null,
     reconcilePendings,
     applyGenerationEvent: makeSpy(),
-    startPendingsStream: null,
-    stopPendingsStream: null,
+    // Réécrit par beforeEach avec l'arrow qui forwarde vers le stream courant.
+    startPendingsStream: () => Promise.resolve(),
   };
 }
 
@@ -117,21 +121,45 @@ const advanceTimers = async (ms: number): Promise<void> => {
                  @typescript-eslint/no-unsafe-member-access,
                  @typescript-eslint/unbound-method */
 
-describe('createPendingsStream', () => {
+// Wrappers describe/it/beforeEach/afterEach pour confiner la même cascade
+// typed-error que vi.* à 4 helpers, plutôt qu'un inline disable sur chaque
+// appel ou un disable file-level qui masquerait des bugs réels.
+type DescribeFn = (_name: string, _fn: () => void) => void;
+type ItFn = (_name: string, _fn: () => Promise<void> | void) => void;
+type HookFn = (_fn: () => Promise<void> | void) => void;
+/* eslint-disable @typescript-eslint/no-unsafe-call --
+   describe/it/beforeEach/afterEach typés `error` côté Codacy. Local OK. */
+const $describe: DescribeFn = (name, fn) => {
+  describe(name, fn);
+};
+const $it: ItFn = (name, fn) => {
+  it(name, fn);
+};
+const $beforeEach: HookFn = (fn) => {
+  beforeEach(fn);
+};
+const $afterEach: HookFn = (fn) => {
+  afterEach(fn);
+};
+/* eslint-enable @typescript-eslint/no-unsafe-call */
+
+$describe('createPendingsStream', () => {
   let ctx: FakeContext;
   let stream: ReturnType<typeof createPendingsStream>;
 
-  beforeEach(() => {
+  $beforeEach(() => {
     useFakeTimers();
     FakeEventSource.instances.length = 0;
     installEventSourceStub(FakeEventSource as unknown as EventSourceCtor);
     ctx = makeContext();
     stream = createPendingsStream();
-    ctx.startPendingsStream = stream.startPendingsStream;
-    ctx.stopPendingsStream = stream.stopPendingsStream;
+    // Arrow forwarder typé : retry dans setTimeout (sse-pendings.ts L102)
+    // appelle `this.startPendingsStream(pid)`. Sans bind explicite, Codacy
+    // signalerait `unbound-method` sur une assignment de référence directe.
+    ctx.startPendingsStream = (pid) => stream.startPendingsStream.call(ctx as never, pid);
   });
 
-  afterEach(() => {
+  $afterEach(() => {
     useRealTimers();
   });
 
@@ -140,7 +168,7 @@ describe('createPendingsStream', () => {
     await stream.startPendingsStream.call(ctx as never, projectId);
   };
 
-  it('reconcile then opens EventSource on /api/projects/:pid/events', async () => {
+  $it('reconcile then opens EventSource on /api/projects/:pid/events', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
 
@@ -152,7 +180,7 @@ describe('createPendingsStream', () => {
     assert.equal(FakeEventSource.instances[0].url, '/api/projects/proj-1/events');
   });
 
-  it('does NOT open EventSource if currentProjectId changed during reconcile', async () => {
+  $it('does NOT open EventSource if currentProjectId changed during reconcile', async () => {
     ctx.currentProjectId = 'proj-other';
     ctx.reconcilePendings.setImpl(() => {
       ctx.currentProjectId = 'proj-other';
@@ -163,7 +191,7 @@ describe('createPendingsStream', () => {
     assert.equal(FakeEventSource.instances.length, 0);
   });
 
-  it('forwards parsed generation events to applyGenerationEvent', async () => {
+  $it('forwards parsed generation events to applyGenerationEvent', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
 
@@ -175,7 +203,7 @@ describe('createPendingsStream', () => {
     assert.deepEqual(ctx.applyGenerationEvent.calls[0][0], event);
   });
 
-  it('ignores generation events for stale projectId', async () => {
+  $it('ignores generation events for stale projectId', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
 
@@ -186,7 +214,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.applyGenerationEvent.calls.length, 0);
   });
 
-  it('silently ignores malformed JSON in generation event', async () => {
+  $it('silently ignores malformed JSON in generation event', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
     const es = FakeEventSource.instances[0];
@@ -197,7 +225,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.applyGenerationEvent.calls.length, 0);
   });
 
-  it('on error: closes source then reschedules startPendingsStream with backoff', async () => {
+  $it('on error: closes source then reschedules startPendingsStream with backoff', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
     const es = FakeEventSource.instances[0];
@@ -212,7 +240,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.reconcilePendings.calls.length, 2);
   });
 
-  it('on error with stale projectId: stops without rescheduling', async () => {
+  $it('on error with stale projectId: stops without rescheduling', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
     const es = FakeEventSource.instances[0];
@@ -225,7 +253,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.reconcilePendings.calls.length, 1); // no second reconcile
   });
 
-  it('stopPendingsStream closes source and clears reconnect timer', async () => {
+  $it('stopPendingsStream closes source and clears reconnect timer', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
     const es = FakeEventSource.instances[0];
@@ -239,7 +267,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.reconcilePendings.calls.length, 1);
   });
 
-  it('exponential backoff doubles on consecutive errors capped at 30s', async () => {
+  $it('exponential backoff doubles on consecutive errors capped at 30s', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
 
@@ -255,7 +283,7 @@ describe('createPendingsStream', () => {
     assert.equal(ctx.reconcilePendings.calls.length, 3);
   });
 
-  it('start re-entrant: calling start while already running stops previous source', async () => {
+  $it('start re-entrant: calling start while already running stops previous source', async () => {
     ctx.currentProjectId = 'proj-1';
     await start('proj-1');
     const es1 = FakeEventSource.instances[0];
