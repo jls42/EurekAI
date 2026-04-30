@@ -157,7 +157,7 @@ const parseGenerationEventKey = (eventKey: string): { gid: string; status: strin
 // la navigation est skippée plutôt que de router vers une vue invalide.
 const extractNotifGenType = (paramKeys: Record<string, string> | undefined): string | null => {
   const typeParam = paramKeys?.type;
-  if (!typeParam || !typeParam.startsWith(I18N_GEN_PREFIX)) return null;
+  if (!typeParam?.startsWith(I18N_GEN_PREFIX)) return null;
   return typeParam.slice(I18N_GEN_PREFIX.length);
 };
 
