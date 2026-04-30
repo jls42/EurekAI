@@ -61,7 +61,7 @@
         <li
           class="px-3 py-2 border-b border-text-secondary/10 last:border-b-0 hover:bg-primary/5 transition-colors cursor-pointer"
           :class="!notif.read && 'bg-primary/5 font-medium'"
-          @click="markNotificationRead(notif.eventKey)"
+          @click="navigateToNotification(notif); notifOpen = false"
         >
           <p class="text-body-sm" x-text="notificationMessage(notif)"></p>
           <p

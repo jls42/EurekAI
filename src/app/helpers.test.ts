@@ -2070,3 +2070,146 @@ describe('mergeReconciledGenerations', () => {
     expect(ctx.generations[0].stale).toBe(false);
   });
 });
+
+// --- navigateToNotification: bell click → goToView + selectProject + openGens ---
+describe('navigateToNotification', () => {
+  function makeCtx(currentProjectId: string | null = 'pid-1') {
+    return {
+      currentProfile: { id: 'profile-A' } as { id: string } | null,
+      currentProjectId,
+      openGens: {} as Record<string, boolean>,
+      notificationsVersion: 0,
+      goToView: vi.fn(),
+      selectProject: vi.fn(async function (this: any, id: string) {
+        this.currentProjectId = id;
+      }),
+      markNotificationRead: helpers.markNotificationRead,
+      navigateToNotification: helpers.navigateToNotification,
+    };
+  }
+
+  // Stub localStorage pour markRead (consultation du ledger sf-profile-notifications).
+  beforeEach(() => {
+    (globalThis as any).localStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+  });
+
+  it('completed: goToView + openGens + markRead (même projet)', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-1:completed' as EventKey,
+      messageKey: 'notif.generationDone',
+      paramKeys: { type: 'gen.summary' },
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).toHaveBeenCalledWith('summary');
+    expect(ctx.openGens['gid-1']).toBe(true);
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('cross-project completed: selectProject AVANT goToView + openGens', async () => {
+    const ctx = makeCtx('pid-current');
+    const callOrder: string[] = [];
+    ctx.selectProject = vi.fn(async function (this: any, id: string) {
+      callOrder.push('selectProject:' + id);
+      this.currentProjectId = id;
+    });
+    ctx.goToView = vi.fn(() => {
+      callOrder.push('goToView');
+    });
+    const notif = {
+      eventKey: 'generation:gid-2:completed' as EventKey,
+      paramKeys: { type: 'gen.quiz-vocal' },
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-other',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).toHaveBeenCalledWith('pid-other');
+    expect(ctx.goToView).toHaveBeenCalledWith('quiz-vocal');
+    expect(callOrder).toEqual(['selectProject:pid-other', 'goToView']);
+    expect(ctx.openGens['gid-2']).toBe(true);
+  });
+
+  it('failed: markRead seul, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-3:failed' as EventKey,
+      paramKeys: { type: 'gen.image' },
+      type: 'error' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-3']).toBeUndefined();
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('cancelled: markRead seul, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-4:cancelled' as EventKey,
+      paramKeys: { type: 'gen.podcast' },
+      type: 'info' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-4']).toBeUndefined();
+  });
+
+  it('eventKey legacy / corrompu: markRead silencieux, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'something-else' as EventKey,
+      type: 'info' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('completed sans paramKeys.type: openGens posé mais pas de goToView', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-5:completed' as EventKey,
+      message: 'Legacy already-translated message',
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-5']).toBe(true);
+  });
+});

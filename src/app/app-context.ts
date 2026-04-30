@@ -10,6 +10,7 @@ import type {
   StudyFiche,
 } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
+import type { PersistedNotification } from './notifications';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -208,12 +209,13 @@ export interface AppContext extends AppState {
   canStartGenerate(type: string): boolean;
   upsertGenerationById(gen: Generation): void;
   resetSession(): void;
-  profileNotifications(): import('./notifications').PersistedNotification[];
+  profileNotifications(): PersistedNotification[];
   unreadNotificationsCount(): number;
   markAllNotificationsRead(): void;
   markNotificationRead(eventKey: EventKey): void;
+  navigateToNotification(notif: PersistedNotification): Promise<void>;
   clearProfileNotifications(): void;
-  notificationMessage(notif: import('./notifications').PersistedNotification): string;
+  notificationMessage(notif: PersistedNotification): string;
   formatRelativeTime(iso: string): string;
   applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;

@@ -141,6 +141,26 @@ function resolvePodcastSpeaker(
   return { name: (raw ?? '').trim(), role };
 }
 
+// Parse un eventKey 'generation:${gid}:${status}' en (gid, status). Retourne
+// null si le format ne matche pas — défensif pour les notifs legacy ou un
+// eventKey corrompu (on évite d'inventer un gid). Arrow plutôt que `function`
+// pour ne pas être agglomérée par le parseur TS de Lizard avec les `function`
+// top-level voisines (cf. CLAUDE.md piège connu).
+const parseGenerationEventKey = (eventKey: string): { gid: string; status: string } | null => {
+  const parts = eventKey.split(':');
+  if (parts.length !== 3 || parts[0] !== 'generation') return null;
+  return { gid: parts[1], status: parts[2] };
+};
+
+// Extrait le type de génération depuis paramKeys.type (format 'gen.<type>').
+// Renvoie null si paramKeys absent (notif legacy pré-i18n) ou format inattendu —
+// la navigation est skippée plutôt que de router vers une vue invalide.
+const extractNotifGenType = (paramKeys: Record<string, string> | undefined): string | null => {
+  const typeParam = paramKeys?.type;
+  if (!typeParam || !typeParam.startsWith(I18N_GEN_PREFIX)) return null;
+  return typeParam.slice(I18N_GEN_PREFIX.length);
+};
+
 /** Ensures summary data arrays are initialized (citations, vocabulary, key_points). */
 export function normalizeSummaryData(gen: Generation): void {
   if (gen.type !== 'summary' || !gen.data) return;
@@ -778,6 +798,26 @@ export function createHelpers() {
       if (!this.currentProfile) return;
       markRead(this.currentProfile.id, eventKey);
       this.notificationsVersion++;
+    },
+
+    // Navigation depuis le panneau cloche : amène l'utilisateur sur la
+    // génération concernée. Pour 'completed' uniquement → switch projet si
+    // besoin, navigation vers la vue du type, déploiement de la carte gen.
+    // Pour 'failed'/'cancelled' → markRead seul (rien à ouvrir, le toast
+    // associé a déjà expliqué l'échec). Statut inconnu / eventKey legacy →
+    // markRead silencieux (no-op de navigation).
+    async navigateToNotification(this: AppContext, notif: PersistedNotification): Promise<void> {
+      this.markNotificationRead(notif.eventKey);
+      const parsed = parseGenerationEventKey(notif.eventKey);
+      if (!parsed || parsed.status !== 'completed') return;
+      if (notif.projectId && notif.projectId !== this.currentProjectId) {
+        await this.selectProject(notif.projectId);
+      }
+      const type = extractNotifGenType(notif.paramKeys);
+      if (type) this.goToView(type);
+      // openGens posé APRÈS selectProject : sinon resetState (déclenché par
+      // selectProject) le wipe avant que la transition de vue n'arrive.
+      this.openGens[parsed.gid] = true;
     },
 
     clearProfileNotifications(this: AppContext): void {
