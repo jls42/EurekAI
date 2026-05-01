@@ -1,3 +1,19 @@
+/* eslint-disable
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/consistent-type-definitions
+   --
+   Codacy applique tseslint.recommendedTypeChecked avec son propre tsconfig
+   qui exclut les test files → vitest globals (`vi`, `expect`, `describe`,
+   `it`...) sont typés `error`, cascadant en 50+ unsafe-* + non-null
+   assertions sur les fixtures. Localement `eslint.config.js`
+   (projectService: true) résout les types correctement et
+   `npm run lint:ci --max-warnings 0` couvre ce fichier. SonarCloud /
+   SonarQube / CodeQL résolvent aussi les types proprement. Cf.
+   sse-pendings.test.ts qui applique le pattern wrappers vanilla
+   équivalent (plus lourd à dupliquer ici). */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
