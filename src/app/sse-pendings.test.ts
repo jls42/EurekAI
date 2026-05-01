@@ -317,22 +317,25 @@ $describe('createPendingsStream', () => {
     await start('proj-1');
 
     // Backoff doubling : 1s, 2s, 4s, 8s, 16s, 30s (cap), 30s, 30s.
+    // `for..of entries()` (vs index access) évite les warnings Codacy
+    // "Generic Object Injection Sink" — pas de bracket-style read.
     const backoffsMs = [1000, 2000, 4000, 8000, 16_000, 30_000, 30_000];
-    for (let i = 0; i < backoffsMs.length; i++) {
+    for (const [i, ms] of backoffsMs.entries()) {
       assert.equal(
         FakeEventSource.instances.length,
         i + 1,
         `expected ${i + 1} EventSource instances after ${i} retries`,
       );
-      FakeEventSource.instances[i].triggerError();
-      await advanceTimers(backoffsMs[i]);
+      const current = FakeEventSource.instances.at(i);
+      current?.triggerError();
+      await advanceTimers(ms);
     }
 
-    // 8e erreur (sur la 8e instance, 0-indexed = 7) : on doit S'ARRÊTER.
+    // 8e erreur (sur la 8e instance) : on doit S'ARRÊTER.
     // Aucune nouvelle EventSource ne doit être créée, aucun reconcile non plus.
     assert.equal(FakeEventSource.instances.length, 8);
     const reconcileCallsBeforeFinalError = ctx.reconcilePendings.calls.length;
-    FakeEventSource.instances[7].triggerError();
+    FakeEventSource.instances.at(-1)?.triggerError();
     await advanceTimers(60_000); // bien au-delà du cap 30s
 
     assert.equal(

@@ -67,7 +67,22 @@ export class ProjectStore {
     writeFileSync(this.indexPath, JSON.stringify(index, null, 2));
   }
 
+  // Sanitization defense-in-depth contre js/path-injection : tout id qui sert
+  // à construire un path doit matcher cette regex stricte (UUID v4-like + chars
+  // safe pour migrations legacy). Un id non conforme provient nécessairement
+  // d'un client malicieux (req.params.pid manipulé) — on throw plutôt que de
+  // construire un path joint avec '../'. Utilisé par tous les helpers fs-bound
+  // ci-dessous pour neutraliser le taint flow vu par CodeQL js/path-injection.
+  private static readonly SAFE_PROJECT_ID = /^[a-zA-Z0-9_-]{1,64}$/;
+
+  private assertSafeProjectId(id: string): void {
+    if (typeof id !== 'string' || !ProjectStore.SAFE_PROJECT_ID.test(id)) {
+      throw new Error('invalid_project_id');
+    }
+  }
+
   private projectDir(id: string): string {
+    this.assertSafeProjectId(id);
     return join(this.projectsDir, id);
   }
 
