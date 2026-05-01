@@ -83,11 +83,10 @@ describe('event-bus', () => {
 
     expect(badHandler).toHaveBeenCalledTimes(1);
     expect(goodHandler).toHaveBeenCalledTimes(1);
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[event-bus] handler threw for pid=',
-      'project-1',
-      expect.any(Error),
-    );
+    // Le wrapper re-emit l'erreur sur le canal 'error' du bus → le filet
+    // bus.on('error', ...) la log via console.error. Single point of failure
+    // observability au lieu d'un log dispersé dans chaque wrapper.
+    expect(errorSpy).toHaveBeenCalledWith('[event-bus] listener error:', expect.any(Error));
     u1();
     u2();
     errorSpy.mockRestore();

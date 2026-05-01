@@ -14,10 +14,12 @@ import type {
   CostEntry,
   ModerationResult,
   PendingTrackerEntry,
+  PendingTrackerEntryTerminal,
   FailedStepCode,
   GenerationStatus,
 } from './types.js';
 import { emitGenerationEvent, buildEventKey } from './helpers/event-bus.js';
+import { logger } from './helpers/logger.js';
 
 // Résultat d'une tentative de promotion d'un pending vers une Generation finale.
 // Permet au handler HTTP de répondre 200 (promoted) ou 409 (cancelled/failed/missing)
@@ -165,7 +167,7 @@ export class ProjectStore {
   addGeneration(projectId: string, generation: Generation): void {
     const data = this.getProject(projectId);
     if (!data) {
-      console.warn('[store] addGeneration: project missing', projectId);
+      logger.warn('store', 'addGeneration: project missing', projectId);
       return;
     }
     data.results.generations.push(generation);
@@ -283,7 +285,13 @@ export class ProjectStore {
     if (tracker.some((e) => e.id === entry.id)) return false;
     tracker.push(entry);
     this.saveProject(projectId, data);
-    this.emitTrackerEvent(projectId, entry, entry.status);
+    // Une entrée fraîchement ajoutée est par construction `pending` (la create
+    // path n'utilise jamais le tracker pour persister un terminal initial).
+    if (entry.status === 'pending') {
+      this.emitPendingEvent(projectId, entry);
+    } else {
+      this.emitTerminalEvent(projectId, entry);
+    }
     return true;
   }
 
@@ -300,14 +308,17 @@ export class ProjectStore {
     const entry = tracker[idx];
     if (entry.status === 'cancelled') return { kind: 'cancelled' };
     if (entry.status === 'failed') {
-      return { kind: 'failed', code: entry.failureCode ?? 'internal_error' };
+      // failureCode est obligatoire sur l'arm terminale (cf. types.ts
+      // PendingTrackerEntryTerminal). Pas de fallback `??` : surfacer une vraie
+      // drift (entrée terminale sans failureCode = bug type) plutôt que masquer.
+      return { kind: 'failed', code: entry.failureCode };
     }
     tracker.splice(idx, 1);
     const finalGen = { ...generation, completedAt: new Date().toISOString() } as Generation;
     data.results.generations.push(finalGen);
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
-    this.emitTrackerEvent(projectId, entry, 'completed', finalGen);
+    this.emitCompletedEvent(projectId, entry, finalGen);
     return { kind: 'promoted', generation: finalGen };
   }
 
@@ -330,18 +341,21 @@ export class ProjectStore {
         // getProject swallow déjà l'erreur JSON parse en console.error mais le
         // boot sweep doit signaler explicitement les pendings ghost laissés en
         // place : un project.json corrompu = aucun pending purgé pour ce projet.
-        console.warn(`[store] boot sweep skipped unreadable project ${meta.id}`);
+        // Niveau error (pas warn) parce qu'un project.json corrompu = bug
+        // observabilité critique (l'user verra une bannière "génération en cours"
+        // stuck à vie pour ce projet tant que le fichier n'est pas réparé).
+        logger.error('store', `boot sweep skipped unreadable project ${meta.id}`);
         continue;
       }
       const tracker = data.results.pendingTracker ?? [];
-      const cancelled: PendingTrackerEntry[] = [];
+      const cancelled: PendingTrackerEntryTerminal[] = [];
       for (let i = 0; i < tracker.length; i++) {
         const entry = tracker[i];
         if (entry.status !== 'pending') continue;
         // Construit une nouvelle entrée terminale (le discriminated union
         // empêche la mutation in-place : flipper status sans poser failureCode
         // + completedAt produirait un état impossible).
-        const terminal: PendingTrackerEntry = {
+        const terminal: PendingTrackerEntryTerminal = {
           id: entry.id,
           type: entry.type,
           startedAt: entry.startedAt,
@@ -358,7 +372,7 @@ export class ProjectStore {
         this.pruneTrackerIfNeeded(data);
         this.saveProject(meta.id, data);
         for (const entry of cancelled) {
-          this.emitTrackerEvent(meta.id, entry, 'cancelled');
+          this.emitTerminalEvent(meta.id, entry);
         }
       }
     }
@@ -390,7 +404,7 @@ export class ProjectStore {
     if (entry.status !== 'pending') return false;
     // Remplace l'entrée par une terminale fraîche (le discriminated union
     // interdit la mutation status-only sans poser failureCode + completedAt).
-    const terminal: PendingTrackerEntry = {
+    const terminal: PendingTrackerEntryTerminal = {
       id: entry.id,
       type: entry.type,
       startedAt: entry.startedAt,
@@ -402,54 +416,55 @@ export class ProjectStore {
     tracker[idx] = terminal;
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
-    this.emitTrackerEvent(projectId, terminal, nextStatus);
+    this.emitTerminalEvent(projectId, terminal);
     return true;
   }
 
-  // Construit et émet un GenerationEvent à partir d'une entrée de tracker.
-  // Centralisé pour que tous les helpers (add/promote/fail/cancel/boot sweep)
-  // émettent au même format avec la même clé eventKey stable. Le switch sur
-  // status construit la bonne arm de la discriminated union (cf. types.ts) —
-  // generation présent uniquement sur 'completed', failureCode uniquement sur
-  // 'failed'/'cancelled'.
-  private emitTrackerEvent(
+  // Construit la base commune à tous les events (pid, gid, type, at, eventKey).
+  // Centralisé pour garantir que tous les emit*** en sortie portent la même
+  // clé stable. `status` paramètre est utilisé pour le buildEventKey ; les
+  // helpers spécialisés ci-dessous le repassent en `as const`.
+  private buildEventBase(
     pid: string,
     entry: PendingTrackerEntry,
     status: GenerationStatus,
-    generation?: Generation,
-  ): void {
+  ): { pid: string; gid: string; type: PendingTrackerEntry['type']; at: string; eventKey: string } {
     const isTerminal = entry.status === 'failed' || entry.status === 'cancelled';
     const completedAt = isTerminal ? entry.completedAt : undefined;
-    const base = {
+    return {
       pid,
       gid: entry.id,
       type: entry.type,
       at: completedAt ?? entry.startedAt ?? new Date().toISOString(),
       eventKey: buildEventKey(entry.id, status),
     };
-    if (status === 'completed') {
-      if (!generation) {
-        // Bug appelant : promoteToGeneration émet 'completed' avec generation
-        // garantie. Si on arrive ici sans generation, on log et on skip plutôt
-        // que de pousser un event invalide qui casserait la discriminated union.
-        console.error(`[store] emitTrackerEvent: 'completed' without generation`);
-        return;
-      }
-      emitGenerationEvent({ ...base, status: 'completed', generation });
-      return;
-    }
-    if (status === 'pending') {
-      emitGenerationEvent({ ...base, status: 'pending' });
-      return;
-    }
-    // Terminal : failed | cancelled — failureCode obligatoire.
-    if (!isTerminal) {
-      console.error(`[store] emitTrackerEvent: terminal status ${status} from non-terminal entry`);
-      return;
-    }
+  }
+
+  // 3 helpers d'émission, un par arm de la discriminated union. Chacun impose
+  // ses paramètres requis à compile-time : impossible d'émettre 'completed'
+  // sans generation, ou 'failed'/'cancelled' sans failureCode. Remplace
+  // l'ancien `emitTrackerEvent` qui devait runtime-checker chaque combinaison.
+
+  private emitPendingEvent(pid: string, entry: PendingTrackerEntry): void {
+    emitGenerationEvent({ ...this.buildEventBase(pid, entry, 'pending'), status: 'pending' });
+  }
+
+  private emitCompletedEvent(
+    pid: string,
+    entry: PendingTrackerEntry,
+    generation: Generation,
+  ): void {
     emitGenerationEvent({
-      ...base,
-      status,
+      ...this.buildEventBase(pid, entry, 'completed'),
+      status: 'completed',
+      generation,
+    });
+  }
+
+  private emitTerminalEvent(pid: string, entry: PendingTrackerEntryTerminal): void {
+    emitGenerationEvent({
+      ...this.buildEventBase(pid, entry, entry.status),
+      status: entry.status,
       failureCode: entry.failureCode,
     });
   }

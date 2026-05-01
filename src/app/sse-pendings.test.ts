@@ -307,4 +307,43 @@ $describe('createPendingsStream', () => {
     assert.equal(es1.closed, true);
     assert.equal(FakeEventSource.instances.length, 2);
   });
+
+  $it('gives up after RECONNECT_MAX_RETRIES (8) consecutive errors', async () => {
+    // Régression-lock : sans ce cap, un projet supprimé dans un autre tab
+    // (404 répété) ou un réseau down durable ferait marteler la reconnexion
+    // ad vitam. Au-delà de 8 erreurs successives, on stop l'EventSource sans
+    // replanifier de retry.
+    ctx.currentProjectId = 'proj-1';
+    await start('proj-1');
+
+    // Backoff doubling : 1s, 2s, 4s, 8s, 16s, 30s (cap), 30s, 30s.
+    const backoffsMs = [1000, 2000, 4000, 8000, 16_000, 30_000, 30_000];
+    for (let i = 0; i < backoffsMs.length; i++) {
+      assert.equal(
+        FakeEventSource.instances.length,
+        i + 1,
+        `expected ${i + 1} EventSource instances after ${i} retries`,
+      );
+      FakeEventSource.instances[i].triggerError();
+      await advanceTimers(backoffsMs[i]);
+    }
+
+    // 8e erreur (sur la 8e instance, 0-indexed = 7) : on doit S'ARRÊTER.
+    // Aucune nouvelle EventSource ne doit être créée, aucun reconcile non plus.
+    assert.equal(FakeEventSource.instances.length, 8);
+    const reconcileCallsBeforeFinalError = ctx.reconcilePendings.calls.length;
+    FakeEventSource.instances[7].triggerError();
+    await advanceTimers(60_000); // bien au-delà du cap 30s
+
+    assert.equal(
+      FakeEventSource.instances.length,
+      8,
+      'no 9th EventSource should be created after RECONNECT_MAX_RETRIES',
+    );
+    assert.equal(
+      ctx.reconcilePendings.calls.length,
+      reconcileCallsBeforeFinalError,
+      'no reconcile should fire after giving up',
+    );
+  });
 });

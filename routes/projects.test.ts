@@ -637,4 +637,52 @@ describe('GET /:pid/events (SSE)', () => {
     req._trigger('close');
     vi.useRealTimers();
   });
+
+  // Régression-lock : si req.on('close') ne fire jamais (bug Node socket
+  // half-open observé en prod), le compteur de throws consécutifs sur l'interval
+  // du heartbeat doit forcer un cleanup au bout de HEARTBEAT_MAX_CONSECUTIVE_THROWS
+  // (=3). Sans ça, l'interval tourne ad vitam et accumule les throws qui peuvent
+  // saturer Sentry et fuiter le listener event-bus.
+  it('force cleanup après 3 throws consécutifs du heartbeat', () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const project = store.createProject('SSE heartbeat stuck');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    // Stub : tout `res.write` qui ressemble à un heartbeat throw, le reste
+    // (event SSE) reste opérationnel. Compteur séparé pour l'assertion finale.
+    let heartbeatThrowCount = 0;
+    res.write = vi.fn((chunk: string) => {
+      if (chunk.startsWith(': ')) {
+        heartbeatThrowCount++;
+        throw new Error('write half-open');
+      }
+      res.writes.push(chunk);
+      return true;
+    });
+
+    handler(req, res);
+
+    // 3 ticks heartbeat = 3 throws → cleanup forcé sur le 3e.
+    vi.advanceTimersByTime(25_000 * 3);
+    expect(heartbeatThrowCount).toBe(3);
+
+    // Une fois cleanup fait, l'interval est cleared : aucun nouvel essai ne
+    // doit incrémenter le compteur, même après plusieurs cycles 25s.
+    vi.advanceTimersByTime(25_000 * 5);
+    expect(heartbeatThrowCount).toBe(3);
+
+    // Logger.warn doit signaler "heartbeat write throwing repeatedly" pour la
+    // visibilité ops + cleanup `heartbeat-stuck`.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [sse]'),
+      expect.stringContaining('heartbeat write throwing'),
+    );
+
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
 });

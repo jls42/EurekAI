@@ -411,6 +411,7 @@ export const de: Record<string, string> = {
   'toast.cancelledGeneration': 'Generierung abgebrochen',
   'toast.cancelledOne': '{type} abgebrochen',
   'toast.cancelFailed': 'Abbruch von {type} fehlgeschlagen',
+  'toast.confirmActionFailed': 'Aktion fehlgeschlagen — Details siehe Konsole.',
   'toast.scoreSaved': 'Punkte gespeichert!',
   'toast.scoreError': 'Fehler beim Speichern der Punkte',
   'toast.reviewGenerated': 'Wiederholungs-Quiz generiert!',

@@ -680,11 +680,26 @@ export function createHelpers() {
     ): Promise<void> {
       if (!this.currentProfile) return;
       const profileId = this.currentProfile.id;
+      // 1. Fetch + parse snapshot — offline / 5xx / non-JSON = acceptable, SSE
+      //    rejouera au reconnect. Pas de watermark posé : on retentera au
+      //    prochain selectProject avec un état frais.
+      let project: ProjectData;
       try {
         const res = await fetch('/api/projects/' + projectId);
         if (!res.ok) return;
-        const project = (await res.json()) as ProjectData;
-        if (this.currentProjectId !== projectId) return;
+        project = (await res.json()) as ProjectData;
+      } catch (err) {
+        console.warn('[reconcile] snapshot fetch failed for project', projectId, err);
+        return;
+      }
+      if (this.currentProjectId !== projectId) return;
+
+      // 2. Application locale (hydratation + merge + backfill notifs).
+      //    Si une de ces étapes throw (quota LS, parse interne, mutation Alpine
+      //    foireuse), on log mais on POSE QUAND MÊME le watermark : sans ça,
+      //    chaque reload re-rentre dans le backfill cassé et spamme l'user à
+      //    chaque retour sur le projet.
+      try {
         this.hydratePendingByIdFromTracker(project.results.pendingTracker ?? []);
         const cutoff = computeReconcileCutoff(profileId, projectId, reconcileStartedAt);
         // Merge des générations apparues dans le snapshot post-cutoff (events SSE
@@ -698,17 +713,16 @@ export function createHelpers() {
           profileId,
           projectId,
         );
+      } catch (err) {
+        console.error('[reconcile] backfill threw for project', projectId, err);
+      } finally {
         // Watermark écrit avec le timestamp PRÉ-fetch : si une génération se
         // termine entre le snapshot et l'ouverture SSE, son event sera quand
         // même surfacé au prochain reconnect/reload (pas masqué par lastSeenAt).
+        // Posé même en cas d'exception ci-dessus pour ne pas piéger l'user dans
+        // une boucle de re-backfill perpétuel.
         setProjectLastSeen(profileId, projectId, reconcileStartedAt);
         this.notificationsVersion++;
-      } catch (err) {
-        // Offline = acceptable (SSE rejouera au reconnect), MAIS un parse
-        // JSON failed / quota LS / exception applicative ferait silencieusement
-        // sauter le watermark et provoquerait un re-backfill perpétuel à chaque
-        // reload. Log pour rendre ces cas visibles en dev / Sentry.
-        console.error('[reconcile] failed for project', projectId, err);
       }
     },
 
@@ -774,9 +788,11 @@ export function createHelpers() {
 
     // --- Notifications cloche header ---
     profileNotifications(this: AppContext): PersistedNotification[] {
-      // notificationsVersion référencé pour Alpine reactivity (re-render quand
-      // appendNotification ou storage event bumpe le compteur). Le && évite
-      // le `void` operator que sonarjs interdit, sans changer la sémantique.
+      // Lire notificationsVersion via un `if` impossible-en-pratique (compteur
+      // toujours ≥ 0 par construction) déclare la dépendance pour Alpine
+      // reactivity sans utiliser le `void` operator que sonarjs interdit.
+      // Re-render déclenché quand appendNotification / le storage listener
+      // bumpe le compteur.
       if (this.notificationsVersion < 0) return [];
       if (!this.currentProfile) return [];
       return listProfileNotifications(this.currentProfile.id);
@@ -817,7 +833,14 @@ export function createHelpers() {
       if (type) this.goToView(type);
       // openGens posé APRÈS selectProject : sinon resetState (déclenché par
       // selectProject) le wipe avant que la transition de vue n'arrive.
-      this.openGens[parsed.gid] = true;
+      // Guard : sans projectId (notif legacy pré-refactor i18n), on ignore —
+      // sinon le gid d'une gen inconnue d'un autre projet pollue openGens du
+      // projet courant à vie. Quand projectId est posé, le selectProject
+      // ci-dessus a aligné currentProjectId, donc le gid pointe vers une gen
+      // du projet courant (ou disparue, mais alors c'est juste un no-op visuel).
+      if (notif.projectId) {
+        this.openGens[parsed.gid] = true;
+      }
     },
 
     clearProfileNotifications(this: AppContext): void {

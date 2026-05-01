@@ -3,7 +3,7 @@ import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import type { AppContext } from './app-context';
-import type { Generation, Source } from '../../types';
+import type { FailedStepCode, Generation, Source } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
@@ -151,22 +151,48 @@ export function populateAutoPlan(
   }
 }
 
-type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: string };
+type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: FailedStepCode };
 
-// Parse le body d'une réponse !ok pour extraire un code d'erreur lisible.
-// Si JSON valide → utilise body.error. Si non-JSON (HTML 502 proxy / timeout) →
-// retourne un snippet du raw text (max 200 chars) pour ne pas perdre le
-// diagnostic FailedStepCode silencieusement (cf. CLAUDE.md error codes API).
-// Arrow function pour éviter agglomération Lizard TS sur runAutoStep voisine.
-const parseStepErrorDetail = async (res: Response, fallback: string): Promise<string> => {
+// Le serveur garantit que les codes renvoyés (FailedStepCode) sont stables
+// (cf. types.ts). Source de vérité côté client pour normaliser les valeurs
+// inattendues vers 'internal_error' avant qu'elles ne polluent les codes[]
+// que pickAutoFailToast inspecte.
+const KNOWN_FAILED_STEP_CODES: ReadonlySet<FailedStepCode> = new Set<FailedStepCode>([
+  'llm_invalid_json',
+  'quota_exceeded',
+  'upstream_unavailable',
+  'auth_required',
+  'tts_upstream_error',
+  'context_length_exceeded',
+  'internal_error',
+  'cancelled',
+]);
+
+const normalizeFailedStepCode = (raw: unknown): FailedStepCode => {
+  if (typeof raw !== 'string') return 'internal_error';
+  return KNOWN_FAILED_STEP_CODES.has(raw as FailedStepCode)
+    ? (raw as FailedStepCode)
+    : 'internal_error';
+};
+
+// Parse le body d'une réponse !ok pour extraire un code FailedStepCode normalisé
+// + un détail brut séparé. Le code reste typé (utilisable par pickAutoFailToast),
+// le détail est uniquement loggé en console pour diagnostic — sans polluer le
+// flux UI avec des blobs HTML 502 proxy.
+const parseStepErrorDetail = async (
+  res: Response,
+  fallback: string,
+): Promise<{ code: FailedStepCode; detail: string }> => {
   const raw = await res.text().catch(() => '');
   try {
     const errorCode = JSON.parse(raw)?.error;
-    if (errorCode) return errorCode;
+    if (typeof errorCode === 'string' && errorCode.length > 0) {
+      return { code: normalizeFailedStepCode(errorCode), detail: errorCode };
+    }
   } catch {
     /* non-JSON body, fallback raw snippet */
   }
-  return raw.slice(0, 200) || fallback;
+  return { code: 'internal_error', detail: raw.slice(0, 200) || fallback };
 };
 
 export async function runAutoStep(
@@ -187,12 +213,13 @@ export async function runAutoStep(
     const res = await fetch(url, postJson(body, controller.signal));
     if (state.currentProjectId !== projectId) return 'aborted';
     if (!res.ok) {
-      const detail = await parseStepErrorDetail(res, res.statusText);
+      const { code, detail } = await parseStepErrorDetail(res, res.statusText);
       console.error(`auto: ${type} failed (${res.status}):`, detail);
-      // Threader le code parsé permet à showAutoResult de dispatcher un toast
-      // actionnable (auth_required → settings, quota_exceeded → wait, etc.)
-      // au lieu d'un générique 'partialGenerated'.
-      return { kind: 'failed', code: detail };
+      // Threader le code FailedStepCode normalisé permet à showAutoResult de
+      // dispatcher un toast actionnable (auth_required → settings,
+      // quota_exceeded → wait, etc.) au lieu d'un générique 'partialGenerated'.
+      // Le détail brut reste dans console.error pour diagnostic.
+      return { kind: 'failed', code };
     }
     const gen = await res.json();
     registerGeneration(state, gen);
@@ -226,12 +253,12 @@ export async function runAutoSteps(
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-): Promise<{ failures: number; codes: string[] }> {
+): Promise<{ failures: number; codes: FailedStepCode[] }> {
   const allowedUrls = new Set(
     AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
   );
   let failures = 0;
-  const codes: string[] = [];
+  const codes: FailedStepCode[] = [];
   const promises = plannedTypes.map(async (type) => {
     const result = await runAutoStep(state, type, projectId, body, controller, allowedUrls);
     if (typeof result === 'object' && result.kind === 'failed') {
@@ -246,7 +273,7 @@ export async function runAutoSteps(
 // Sélection priorisée du toast partial-fail : un code actionnable utilisateur
 // (auth_required > quota_exceeded) prime sur 'partial' générique. Évite de
 // noyer un user "clé API absente" dans un toast warning sans piste d'action.
-const pickAutoFailToast = (codes: string[]): { key: string; type: 'error' | 'warning' } => {
+const pickAutoFailToast = (codes: FailedStepCode[]): { key: string; type: 'error' | 'warning' } => {
   const set = new Set(codes);
   if (set.has('auth_required')) return { key: 'toast.audioAuthRequired', type: 'error' };
   if (set.has('quota_exceeded')) return { key: 'toast.audioQuotaExceeded', type: 'warning' };
@@ -257,7 +284,7 @@ export function showAutoResult(
   state: AppContext,
   failures: number,
   plannedCount: number,
-  codes: string[] = [],
+  codes: FailedStepCode[] = [],
 ): void {
   if (failures > 0 && failures < plannedCount) {
     const { key, type } = pickAutoFailToast(codes);

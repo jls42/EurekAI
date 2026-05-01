@@ -405,6 +405,7 @@ export const it: Record<string, string> = {
   'toast.cancelledGeneration': 'Generazione annullata',
   'toast.cancelledOne': '{type} annullato',
   'toast.cancelFailed': 'Annullamento di {type} non riuscito',
+  'toast.confirmActionFailed': "L'azione non è riuscita — controlla la console per i dettagli.",
   'toast.scoreSaved': 'Punteggio salvato!',
   'toast.scoreError': 'Errore nel salvataggio del punteggio',
   'toast.reviewGenerated': 'Quiz di ripasso generato!',

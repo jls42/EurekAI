@@ -412,6 +412,7 @@ export const pt: Record<string, string> = {
   'toast.cancelledGeneration': 'Gera\u00e7\u00e3o cancelada',
   'toast.cancelledOne': '{type} cancelado',
   'toast.cancelFailed': 'Falha ao cancelar {type}',
+  'toast.confirmActionFailed': 'A ação falhou — verifique a consola para detalhes.',
   'toast.scoreSaved': 'Pontua\u00e7\u00e3o salva!',
   'toast.scoreError': 'Erro ao salvar pontua\u00e7\u00e3o',
   'toast.reviewGenerated': 'Quiz de revis\u00e3o gerado!',

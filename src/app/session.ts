@@ -24,20 +24,14 @@ export function createSession() {
       if (typeof this.stopPendingsStream === 'function') {
         this.stopPendingsStream();
       }
+      // AbortController.abort() est idempotent par spec et ne throw jamais —
+      // pas de try/catch défensif (cf. CLAUDE.md "no empty catch").
       for (const controller of Object.values(this.abortControllers)) {
-        try {
-          controller.abort();
-        } catch {
-          /* déjà aborté */
-        }
+        controller.abort();
       }
       this.abortControllers = {};
       for (const controller of Object.values(this.abortControllersByGid)) {
-        try {
-          controller.abort();
-        } catch {
-          /* déjà aborté */
-        }
+        controller.abort();
       }
       this.abortControllersByGid = {};
       for (const key of Object.keys(this.loading)) {
@@ -47,6 +41,9 @@ export function createSession() {
       this.toasts = [];
       this.toastCounter = 0;
       this.shownToastEventKeys = new Set<EventKey>();
+      // chatLoading vit hors de loading{} (flag dédié) — un chat envoyé sur
+      // profil A puis switch vers profil B garderait l'input désactivé sinon.
+      this.chatLoading = false;
       // Reset confirm dialog en vol pour éviter qu'un callback orphelin
       // s'exécute sur le nouveau contexte (le user vient de switcher).
       this.confirmCallback = null;

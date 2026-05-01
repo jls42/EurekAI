@@ -95,32 +95,56 @@ export function projectRoutes(store: ProjectStore): Router {
     res.setHeader('X-Accel-Buffering', 'no');
     res.flushHeaders?.();
 
-    const unsubscribe = subscribeGeneration(pid, (event) => {
-      writeGenerationEvent(res, event);
-    });
-
-    // Heartbeat pour empêcher les proxies de couper la connexion idle. Les
-    // commentaires SSE (`: ...`) sont ignorés par le client mais maintiennent
-    // la connexion vivante. Compteur de throws consécutifs : si req.on('close')
-    // ne fire jamais (bug Node socket half-open observé en prod), on stoppe
-    // l'interval après 3 échecs au lieu de tourner ad vitam.
+    // Init-order : déclarer heartbeat + unsubscribe AVANT subscribeGeneration
+    // et avant les listeners close/error. Si le client ferme la connexion
+    // entre `subscribeGeneration` et la fin du handler (TCP RST sur boot
+    // serveur lent par exemple), `cleanup` peut être invoqué via close-listener
+    // alors que `heartbeat` n'a pas encore été assigné — d'où les guards
+    // `clearInterval(heartbeat)` conditionnel et `unsubscribe?.()`.
     const HEARTBEAT_MAX_CONSECUTIVE_THROWS = 3;
     let heartbeatThrows = 0;
     let cleanedUp = false;
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    let unsubscribe: (() => void) | null = null;
     const cleanup = (reason: string) => {
       // Idempotent : req.on('close') ET res.on('error') peuvent firer ensemble
       // sur reset TCP brutal — on ne veut pas double-log + double-unsubscribe.
       if (cleanedUp) return;
       cleanedUp = true;
-      clearInterval(heartbeat);
-      unsubscribe();
+      if (heartbeat) clearInterval(heartbeat);
+      unsubscribe?.();
       if (reason.startsWith('error:')) {
         logger.warn('sse', `client ${reason} from project ${pid}`);
         return;
       }
       logger.info('sse', `client ${reason} from project ${pid}`);
     };
-    const heartbeat = setInterval(() => {
+
+    // Listeners close/error attachés AVANT toute attribution longue-vie : si
+    // une de ces opérations throw entre les attributions, le close fire et
+    // appelle cleanup() qui voit `heartbeat`/`unsubscribe` éventuellement nulls.
+    req.on('close', () => cleanup('disconnected'));
+    // Listener err sur res : si le serveur tente d'écrire après reset TCP brutal,
+    // Node émet 'error' sur res. Sans listener, ça remonte uncaught et crash.
+    res.on('error', (err) => cleanup(`error: ${String(err)}`));
+
+    unsubscribe = subscribeGeneration(pid, (event) => {
+      writeGenerationEvent(res, event);
+    });
+    // Si close a fire pendant l'await/attribution ci-dessus, cleanup() a tourné
+    // sur unsubscribe=null. On rattrape l'unsubscribe qu'on vient d'obtenir.
+    if (cleanedUp) {
+      unsubscribe();
+      unsubscribe = null;
+      return;
+    }
+
+    // Heartbeat pour empêcher les proxies de couper la connexion idle. Les
+    // commentaires SSE (`: ...`) sont ignorés par le client mais maintiennent
+    // la connexion vivante. Compteur de throws consécutifs : si req.on('close')
+    // ne fire jamais (bug Node socket half-open observé en prod), on stoppe
+    // l'interval après 3 échecs au lieu de tourner ad vitam.
+    heartbeat = setInterval(() => {
       if (res.writableEnded) return;
       try {
         res.write(`: keep-alive\n\n`);
@@ -137,11 +161,13 @@ export function projectRoutes(store: ProjectStore): Router {
         }
       }
     }, SSE_HEARTBEAT_MS);
-
-    req.on('close', () => cleanup('disconnected'));
-    // Listener err sur res : si le serveur tente d'écrire après reset TCP brutal,
-    // Node émet 'error' sur res. Sans listener, ça remonte uncaught et crash.
-    res.on('error', (err) => cleanup(`error: ${String(err)}`));
+    // Symétrique : cleanup peut avoir tourné sur heartbeat=null si close a fire
+    // entre subscribe et setInterval. Récupère l'interval pour ne pas le laisser
+    // tourner à vie sans personne pour clearInterval.
+    if (cleanedUp) {
+      clearInterval(heartbeat);
+      heartbeat = null;
+    }
   });
 
   return router;

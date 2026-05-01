@@ -406,6 +406,7 @@ export const nl: Record<string, string> = {
   'toast.cancelledGeneration': 'Generatie geannuleerd',
   'toast.cancelledOne': '{type} geannuleerd',
   'toast.cancelFailed': 'Annuleren van {type} mislukt',
+  'toast.confirmActionFailed': 'Actie mislukt — zie de console voor details.',
   'toast.scoreSaved': 'Score opgeslagen!',
   'toast.scoreError': 'Fout bij opslaan van score',
   'toast.reviewGenerated': 'Herhalingsquiz gegenereerd!',

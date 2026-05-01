@@ -2001,6 +2001,54 @@ describe('reconcilePendings', () => {
     const stored = JSON.parse(storage['sf-profile-projects-seen'] || '{}');
     expect(stored['profile-A']?.['pid-1']).toBe(reconcileStartedAt);
   });
+
+  // Régression-lock : zero-backfill au 1er load post-migration. Quand
+  // lastSeenAt est absent, le cutoff est computeReconcileCutoff(... ?? reconcileStartedAt) =
+  // reconcileStartedAt → toutes les gens dont completedAt < reconcileStartedAt
+  // sont AU-DESSOUS du cutoff et ne génèrent PAS de notif. Sinon un user qui
+  // ouvre EurekAI pour la 1re fois après le déploiement verrait spammer 200+
+  // notifs historiques d'un coup.
+  it('aucun backfill historique au 1er load (lastSeenAt absent → cutoff = reconcileStartedAt)', async () => {
+    const ctx = makeCtx();
+    // 5 gens complétées AVANT reconcileStartedAt — toutes doivent être ignorées.
+    const oldGens = Array.from({ length: 5 }, (_, i) => ({
+      id: `g-${i}`,
+      type: 'summary',
+      data: {},
+      completedAt: '2026-04-26T09:00:00Z',
+    }));
+    mockProjectFetch({
+      results: {
+        pendingTracker: [
+          // Aussi un terminal failed/cancelled antérieur — backfill terminal idem.
+          {
+            id: 't-old',
+            type: 'quiz',
+            status: 'failed',
+            failureCode: 'internal_error',
+            startedAt: '2026-04-26T09:00:00Z',
+            completedAt: '2026-04-26T09:30:00Z',
+          },
+        ],
+        generations: oldGens,
+      },
+    });
+    const reconcileStartedAt = '2026-04-26T11:00:00.000Z';
+
+    // sf-profile-projects-seen absent → 1er load post-migration.
+    expect(storage['sf-profile-projects-seen']).toBeUndefined();
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', reconcileStartedAt);
+
+    // Watermark a été posé pour les prochains loads.
+    const seen = JSON.parse(storage['sf-profile-projects-seen']);
+    expect(seen['profile-A']['pid-1']).toBe(reconcileStartedAt);
+
+    // ZÉRO notification créée — toutes les gens et terminaux historiques sont
+    // sous le cutoff. Sans ce verrou, l'user serait spammé au 1er load.
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}');
+    expect(notifs['profile-A'] ?? []).toEqual([]);
+  });
 });
 
 // --- mergeReconciledGenerations: merge completed gens missed by SSE drop ---

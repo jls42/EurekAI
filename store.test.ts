@@ -138,7 +138,13 @@ describe('addGeneration / deleteGeneration', () => {
 
     store.addGeneration('pid-missing', gen);
 
-    expect(warnSpy).toHaveBeenCalledWith('[store] addGeneration: project missing', 'pid-missing');
+    // logger.warn ajoute un préfixe `<HH:mm:ss.SSS> WARN [store]` — on assert
+    // sur le format final (substring) pour rester insensible au timestamp.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [store]'),
+      'addGeneration: project missing',
+      'pid-missing',
+    );
     warnSpy.mockRestore();
   });
 

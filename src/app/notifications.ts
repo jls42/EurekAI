@@ -22,6 +22,12 @@ const MAX_SEEN_EVENTS_PER_PROFILE = 1000;
 
 export type NotificationType = 'info' | 'success' | 'warning' | 'error';
 
+// Le shape PERSISTÉ reste tolérant aux deux mondes (i18n + legacy) pour rester
+// rétrocompatible avec les notifs déjà sur disque chez les users : un refresh
+// de l'onglet doit pouvoir lire les anciens objets (messageKey absent OU
+// message absent) sans crasher. Le verrou EITHER-OR est appliqué uniquement à
+// l'INPUT de appendNotification (cf. AppendNotifPayload ci-dessous), qui force
+// les nouveaux call sites à choisir l'un des deux modes au compile time.
 export interface PersistedNotification {
   // Identifiant stable cross-onglets pour la déduplication idempotente.
   // Format : 'generation:${gid}:${status}'.
@@ -42,6 +48,29 @@ export interface PersistedNotification {
   read: boolean;
   projectId?: string;
 }
+
+// Discriminated union appliquée à l'append : un nouveau call site DOIT choisir
+// entre i18n (messageKey requis) et legacy (message requis). Empêche au
+// compile time un appendNotification({ ... }) qui oublierait les deux. Le
+// shape persisté reste l'union large ci-dessus pour rester rétrocompatible.
+type AppendNotifBase = {
+  eventKey: EventKey;
+  type: NotificationType;
+  projectId?: string;
+};
+export type AppendNotifPayload =
+  | (AppendNotifBase & {
+      messageKey: string;
+      params?: Record<string, string | number>;
+      paramKeys?: Record<string, string>;
+      message?: never;
+    })
+  | (AppendNotifBase & {
+      message: string;
+      messageKey?: never;
+      params?: never;
+      paramKeys?: never;
+    });
 
 // Résout messageKey + paramKeys → texte traduit dans la langue UI courante.
 // Fallback sur `message` legacy si pas de messageKey. Vide si rien des deux.
@@ -85,13 +114,16 @@ const readJson = <T>(storage: StorageLike, key: string, fallback: T): T => {
 // (LS pleine, ~5MB selon navigateur). Sans ce try/catch, un throw bubble
 // jusqu'à appendNotification → showToast → mutation Alpine → casse la
 // pipeline toast en plein vol et laisse l'app dans un état incohérent.
-// Best-effort : si on ne peut pas persister la notif, on log et on continue
-// (le toast reste affiché côté UI, juste pas archivé dans la cloche).
-const writeJson = (storage: StorageLike, key: string, value: unknown): void => {
+// Retourne `false` si l'écriture a échoué — appendNotification s'en sert pour
+// éviter de désynchroniser le ledger seenEventKeys quand la map des notifs
+// elle-même n'a pas pu être persistée.
+const writeJson = (storage: StorageLike, key: string, value: unknown): boolean => {
   try {
     storage.setItem(key, JSON.stringify(value));
+    return true;
   } catch (err) {
     console.error('[notifications] storage write failed (likely quota)', { key, err });
+    return false;
   }
 };
 
@@ -101,8 +133,8 @@ function readNotifs(storage: StorageLike): NotifMap {
   return readJson<NotifMap>(storage, NOTIFS_STORAGE_SLOT, {});
 }
 
-function writeNotifs(storage: StorageLike, all: NotifMap): void {
-  writeJson(storage, NOTIFS_STORAGE_SLOT, all);
+function writeNotifs(storage: StorageLike, all: NotifMap): boolean {
+  return writeJson(storage, NOTIFS_STORAGE_SLOT, all);
 }
 
 function pruneExpiredAndCap(items: PersistedNotification[]): PersistedNotification[] {
@@ -116,8 +148,8 @@ function readSeen(storage: StorageLike): SeenMap {
   return readJson<SeenMap>(storage, SEEN_EVENTS_SLOT, {});
 }
 
-function writeSeen(storage: StorageLike, all: SeenMap): void {
-  writeJson(storage, SEEN_EVENTS_SLOT, all);
+function writeSeen(storage: StorageLike, all: SeenMap): boolean {
+  return writeJson(storage, SEEN_EVENTS_SLOT, all);
 }
 
 function recordSeen(storage: StorageLike, profileId: string, eventKey: EventKey): void {
@@ -143,9 +175,12 @@ export function listProfileNotifications(
 // Idempotent par eventKey via le ledger seenEventKeys.
 // - Si eventKey déjà vu → no-op et retour false.
 // - Sinon → push notif + add eventKey dans le ledger, retour true.
+// - Si writeNotifs échoue (quota LS) → on N'ENREGISTRE PAS l'eventKey dans le
+//   ledger : sinon prochaine reconcile verrait l'event "déjà vu" alors que la
+//   notif elle-même n'est pas en LS, et l'user n'aurait jamais l'alerte.
 export function appendNotification(
   profileId: string,
-  notif: Omit<PersistedNotification, 'createdAt' | 'read'>,
+  notif: AppendNotifPayload,
   storage: StorageLike = localStorage,
 ): boolean {
   if (hasSeenEvent(profileId, notif.eventKey, storage)) return false;
@@ -153,7 +188,7 @@ export function appendNotification(
   const list = all[profileId] ?? [];
   list.push({ ...notif, createdAt: new Date().toISOString(), read: false });
   all[profileId] = pruneExpiredAndCap(list);
-  writeNotifs(storage, all);
+  if (!writeNotifs(storage, all)) return false;
   recordSeen(storage, profileId, notif.eventKey);
   return true;
 }

@@ -407,6 +407,7 @@ export const en: Record<string, string> = {
   'toast.cancelledGeneration': 'Generation cancelled',
   'toast.cancelledOne': '{type} cancelled',
   'toast.cancelFailed': 'Failed to cancel {type}',
+  'toast.confirmActionFailed': 'Action failed — see console for details.',
   'toast.scoreSaved': 'Score saved!',
   'toast.scoreError': 'Score save error',
   'toast.reviewGenerated': 'Review quiz generated!',

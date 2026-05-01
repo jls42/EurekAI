@@ -22,6 +22,10 @@ const RECONNECT_MAX_MS = 30_000;
 // projet/refresh pour relancer.
 const RECONNECT_MAX_RETRIES = 8;
 
+const logReconnectError = (err: unknown): void => {
+  console.error('[sse] reconnect failed', err);
+};
+
 export function createPendingsStream() {
   let source: EventSource | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -29,14 +33,10 @@ export function createPendingsStream() {
   let consecutiveErrors = 0;
 
   const stop = () => {
-    if (source) {
-      try {
-        source.close();
-      } catch {
-        /* déjà fermé */
-      }
-      source = null;
-    }
+    // EventSource.close() est idempotent par spec et ne throw jamais —
+    // pas de try/catch défensif (cf. CLAUDE.md "no empty catch").
+    source?.close();
+    source = null;
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -83,11 +83,7 @@ export function createPendingsStream() {
         console.warn(
           `[sse] connection error (attempt ${consecutiveErrors}/${RECONNECT_MAX_RETRIES})`,
         );
-        try {
-          source?.close();
-        } catch {
-          /* ignore */
-        }
+        source?.close();
         source = null;
         if (consecutiveErrors >= RECONNECT_MAX_RETRIES) {
           // Probable 404 (projet supprimé) ou réseau down durable. On stop
@@ -98,9 +94,14 @@ export function createPendingsStream() {
           );
           return;
         }
-        reconnectTimer = setTimeout(() => {
-          this.startPendingsStream(projectId);
-        }, backoff);
+        // Recursive call retournant Promise — on .catch explicitement plutôt
+        // que `void`-ifier pour éviter qu'une rejection (reconcile throw) ne
+        // remonte en unhandled promise rejection. Extrait en const pour rester
+        // sous la limite sonarjs/no-nested-functions (≤ 4 niveaux).
+        const fireReconnect = (): void => {
+          this.startPendingsStream(projectId).catch(logReconnectError);
+        };
+        reconnectTimer = setTimeout(fireReconnect, backoff);
         backoff = Math.min(backoff * 2, RECONNECT_MAX_MS);
       };
     },

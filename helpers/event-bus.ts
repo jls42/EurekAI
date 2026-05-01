@@ -23,9 +23,11 @@ const bus = new EventEmitter();
 // 50 indiquerait une fuite (handlers non désinscrits) plutôt qu'une vraie charge.
 bus.setMaxListeners(50);
 
-// Filet anti-uncaughtException : sans listener 'error', un throw d'un listener
-// `generation` (ex: JSON.stringify circulaire, write-after-end non capturé)
-// remonte en uncaughtException et tue le process. On absorbe ici en log error.
+// Filet anti-uncaughtException : par défaut Node throw "Unhandled error event"
+// si quelqu'un appelle `bus.emit('error', ...)` sans listener attaché — ce qui
+// est exactement notre chemin de propagation depuis `subscribeGeneration` quand
+// un handler client throw. Le listener garantit que ces erreurs ne tuent pas
+// le process et restent observables (console.error → captures Sentry).
 bus.on('error', (err) => {
   console.error('[event-bus] listener error:', err);
 });
@@ -36,10 +38,13 @@ export function emitGenerationEvent(event: GenerationEvent): void {
   bus.emit(EVENT_NAME, event);
 }
 
-// Souscription filtrée par projectId. Retourne un unsubscribe à appeler dans
-// le `req.on('close')` du handler SSE pour éviter les fuites de listeners.
-// Le wrapped catch tout throw du handler client (writeGenerationEvent) pour
-// éviter qu'une seule connexion SSE buggée ne crashe les N autres listeners.
+// Souscription filtrée par projectId. Retourne un unsubscribe à appeler à la
+// fermeture du stream SSE (close listener, error listener, ou heartbeat-stuck
+// cleanup) pour éviter les fuites de listeners.
+// Le wrapper attrape tout throw du handler client et re-emit sur le canal
+// 'error' du bus — pour qu'une seule connexion SSE buggée ne crashe pas les N
+// autres listeners ET que le filet `bus.on('error', ...)` ci-dessus soit le
+// point unique de log/observabilité (pas de console.error in-line dispersés).
 export function subscribeGeneration(
   pid: string,
   handler: (event: GenerationEvent) => void,
@@ -49,7 +54,7 @@ export function subscribeGeneration(
     try {
       handler(event);
     } catch (err) {
-      console.error('[event-bus] handler threw for pid=', pid, err);
+      bus.emit('error', err instanceof Error ? err : new Error(String(err)));
     }
   };
   bus.on(EVENT_NAME, wrapped);

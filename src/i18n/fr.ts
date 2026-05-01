@@ -433,6 +433,7 @@ export const fr: Record<string, string> = {
   'toast.cancelledGeneration': 'Génération annulée',
   'toast.cancelledOne': '{type} annulé(e)',
   'toast.cancelFailed': "Échec de l'annulation de {type}",
+  'toast.confirmActionFailed': "L'action a échoué — vérifiez la console pour le détail.",
   'toast.scoreSaved': 'Score enregistré !',
   'toast.scoreError': 'Erreur enregistrement du score',
   'toast.reviewGenerated': 'Quiz de révision généré !',

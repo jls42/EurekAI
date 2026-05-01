@@ -107,21 +107,22 @@ describe('createConfirm', () => {
       expect(ctx.$refs.confirmDialog.close).toHaveBeenCalled();
     });
 
-    it('logs async callback rejection without leaving callback armed', async () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('logs async callback rejection + surfaces toast user-visible', async () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const error = new Error('delete failed');
       ctx.confirmCallback = vi.fn().mockRejectedValue(error);
 
       confirm.executeConfirm.call(ctx);
       await Promise.resolve();
 
-      expect(warnSpy).toHaveBeenCalledWith('[confirm]', error);
+      expect(errSpy).toHaveBeenCalledWith('[confirm] action failed', error);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.confirmActionFailed', 'error');
       expect(ctx.confirmCallback).toBeNull();
-      warnSpy.mockRestore();
+      errSpy.mockRestore();
     });
 
-    it('absorbe un throw synchrone du callback (try/catch sync)', () => {
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    it('absorbe un throw synchrone du callback + toast (try/catch sync)', () => {
+      const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
       const syncError = new Error('sync boom');
       ctx.confirmCallback = vi.fn(() => {
         throw syncError;
@@ -129,9 +130,10 @@ describe('createConfirm', () => {
 
       expect(() => confirm.executeConfirm.call(ctx)).not.toThrow();
 
-      expect(warnSpy).toHaveBeenCalledWith('[confirm]', syncError);
+      expect(errSpy).toHaveBeenCalledWith('[confirm] action failed', syncError);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.confirmActionFailed', 'error');
       expect(ctx.confirmCallback).toBeNull();
-      warnSpy.mockRestore();
+      errSpy.mockRestore();
     });
   });
 

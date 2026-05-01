@@ -62,11 +62,9 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   const controller = state.abortControllersByGid[gid];
   const hadLocalController = Boolean(controller);
   if (controller) {
-    try {
-      controller.abort();
-    } catch {
-      /* déjà aborté */
-    }
+    // AbortController.abort() est idempotent par spec et ne throw jamais — pas
+    // de try/catch défensif (cf. CLAUDE.md "no empty catch").
+    controller.abort();
     delete state.abortControllersByGid[gid];
   }
   const snapshot = state.pendingById[gid];
@@ -121,12 +119,18 @@ export function createConfirm() {
       (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
       if (this.confirmCallback) {
         const cb = this.confirmCallback;
+        const onFailure = (err: unknown): void => {
+          // Action confirmée par l'utilisateur (delete projet/source/generation)
+          // qui throw côté implémentation : on log en error (pour Sentry / console
+          // dev) ET on surface un toast user-visible. Sinon le dialog se ferme
+          // comme si l'action avait réussi alors qu'elle a silencieusement échoué.
+          console.error('[confirm] action failed', err);
+          this.showToast(this.t('toast.confirmActionFailed'), 'error');
+        };
         try {
-          Promise.resolve(cb()).catch((err: unknown) => {
-            console.warn('[confirm]', err);
-          });
+          Promise.resolve(cb()).catch(onFailure);
         } catch (err) {
-          console.warn('[confirm]', err);
+          onFailure(err);
         } finally {
           if (this.confirmCallback === cb) {
             this.confirmCallback = null;
@@ -170,8 +174,13 @@ export function createConfirm() {
         cancelPendingByGid(this, key, pending.type);
         return;
       }
-      // Fallback legacy : cancel par type (transients ou auto qui mute loading{})
+      // Fallback legacy : cancel par type (transients ou auto qui mute loading{}).
+      // On ne notifie l'utilisateur que si quelque chose a réellement été annulé —
+      // sinon clic sur une chip stale produirait un faux toast "annulé(e)" alors
+      // que rien ne tournait.
       const controller = this.abortControllers[key];
+      const wasLoading = this.loading[key] === true;
+      if (!controller && !wasLoading) return;
       if (controller) {
         controller.abort();
         delete this.abortControllers[key];
