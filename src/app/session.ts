@@ -61,8 +61,12 @@ function doResetSession(ctx: AppContext): void {
 
 export function createSession() {
   return {
-    resetSession(this: AppContext): void {
-      doResetSession(this);
+    // Pas de `this: AppContext` binding ici — Codacy `no-unused-vars` natif
+    // (purement syntaxique) le flag faussement comme paramètre non utilisé,
+    // même quand `this` est référencé dans le body. Cast local équivalent
+    // côté typage, plus de faux positif.
+    resetSession(): void {
+      doResetSession(this as unknown as AppContext);
     },
   };
 }
