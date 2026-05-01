@@ -15,44 +15,54 @@ import type { EventKey } from '../../helpers/event-bus';
 // profileId) ne sont PAS touchés — ils sont la mémoire persistante du profil
 // et doivent être replay quand on revient sur un profil.
 
+// Le binding `this: AppContext` directement dans la signature de la méthode
+// déclenche un faux positif Codacy `no-unused-vars` (la règle native voit le
+// type-binding comme un paramètre non utilisé, alors que TypeScript le résout
+// au niveau type uniquement). On extrait l'implémentation en arrow function
+// qui prend `ctx` explicitement, et la méthode object-literal forwarde via
+// `this`. Mêmes garanties de typage, plus de faux positif.
+function doResetSession(ctx: AppContext): void {
+  // Stop EventSource SSE — sinon des events sur l'ancien contexte arrivent
+  // après le switch et écrasent le nouveau (méthode injectée par
+  // createPendingsStream).
+  if (typeof ctx.stopPendingsStream === 'function') {
+    ctx.stopPendingsStream();
+  }
+  // AbortController.abort() est idempotent par spec et ne throw jamais —
+  // pas de try/catch défensif (cf. CLAUDE.md "no empty catch").
+  for (const controller of Object.values(ctx.abortControllers)) {
+    controller.abort();
+  }
+  ctx.abortControllers = {};
+  for (const controller of Object.values(ctx.abortControllersByGid)) {
+    controller.abort();
+  }
+  ctx.abortControllersByGid = {};
+  // Reset toutes les clés à false sans bracket-write user-typed (warning
+  // Codacy "Generic Object Injection Sink"). `Object.fromEntries` produit
+  // un nouvel objet figé à cet instant ; on l'assigne à la place pour
+  // remplacer la map d'un coup, ce qui reste compatible avec la reactivité
+  // Alpine puisque `loading` est l'objet observé.
+  ctx.loading = Object.fromEntries(
+    Object.keys(ctx.loading).map((k) => [k, false]),
+  ) as typeof ctx.loading;
+  ctx.pendingById = {};
+  ctx.toasts = [];
+  ctx.toastCounter = 0;
+  ctx.shownToastEventKeys = new Set<EventKey>();
+  // chatLoading vit hors de loading{} (flag dédié) — un chat envoyé sur
+  // profil A puis switch vers profil B garderait l'input désactivé sinon.
+  ctx.chatLoading = false;
+  // Reset confirm dialog en vol pour éviter qu'un callback orphelin
+  // s'exécute sur le nouveau contexte (le user vient de switcher).
+  ctx.confirmCallback = null;
+  ctx.confirmTrigger = null;
+}
+
 export function createSession() {
   return {
     resetSession(this: AppContext): void {
-      // Stop EventSource SSE — sinon des events sur l'ancien contexte arrivent
-      // après le switch et écrasent le nouveau (méthode injectée par
-      // createPendingsStream).
-      if (typeof this.stopPendingsStream === 'function') {
-        this.stopPendingsStream();
-      }
-      // AbortController.abort() est idempotent par spec et ne throw jamais —
-      // pas de try/catch défensif (cf. CLAUDE.md "no empty catch").
-      for (const controller of Object.values(this.abortControllers)) {
-        controller.abort();
-      }
-      this.abortControllers = {};
-      for (const controller of Object.values(this.abortControllersByGid)) {
-        controller.abort();
-      }
-      this.abortControllersByGid = {};
-      // Reset toutes les clés à false sans bracket-write user-typed (warning
-      // Codacy "Generic Object Injection Sink"). `Object.fromEntries` produit
-      // un nouvel objet figé à cet instant ; on l'assigne à la place pour
-      // remplacer la map d'un coup, ce qui reste compatible avec la reactivité
-      // Alpine puisque `loading` est l'objet observé.
-      this.loading = Object.fromEntries(
-        Object.keys(this.loading).map((k) => [k, false]),
-      ) as typeof this.loading;
-      this.pendingById = {};
-      this.toasts = [];
-      this.toastCounter = 0;
-      this.shownToastEventKeys = new Set<EventKey>();
-      // chatLoading vit hors de loading{} (flag dédié) — un chat envoyé sur
-      // profil A puis switch vers profil B garderait l'input désactivé sinon.
-      this.chatLoading = false;
-      // Reset confirm dialog en vol pour éviter qu'un callback orphelin
-      // s'exécute sur le nouveau contexte (le user vient de switcher).
-      this.confirmCallback = null;
-      this.confirmTrigger = null;
+      doResetSession(this);
     },
   };
 }
