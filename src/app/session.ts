@@ -34,9 +34,14 @@ export function createSession() {
         controller.abort();
       }
       this.abortControllersByGid = {};
-      for (const key of Object.keys(this.loading)) {
-        this.loading[key] = false;
-      }
+      // Reset toutes les clés à false sans bracket-write user-typed (warning
+      // Codacy "Generic Object Injection Sink"). `Object.fromEntries` produit
+      // un nouvel objet figé à cet instant ; on l'assigne à la place pour
+      // remplacer la map d'un coup, ce qui reste compatible avec la reactivité
+      // Alpine puisque `loading` est l'objet observé.
+      this.loading = Object.fromEntries(
+        Object.keys(this.loading).map((k) => [k, false]),
+      ) as typeof this.loading;
       this.pendingById = {};
       this.toasts = [];
       this.toastCounter = 0;

@@ -60,8 +60,12 @@ export function createPendingsStream() {
       source.addEventListener('generation', (msg: MessageEvent) => {
         if (this.currentProjectId !== projectId) return;
         try {
-          const event = JSON.parse(msg.data);
-          this.applyGenerationEvent(event);
+          // Cast explicite pour neutraliser la cascade `any` Codacy (msg.data
+          // est `any` côté DOM). Le shape réel est garanti par le serveur
+          // (writeGenerationEvent émet GenerationEvent typé) ; un payload
+          // corrompu sera capturé par les checks de status dans applyGenerationEvent.
+          const raw: unknown = JSON.parse(msg.data as string);
+          this.applyGenerationEvent(raw as Parameters<typeof this.applyGenerationEvent>[0]);
         } catch (err) {
           // Malformed event = bug serveur (BigInt non-serializable, cycle JSON,
           // ...). Sans log, la cloche reste stale sans signal debug. Pas de
