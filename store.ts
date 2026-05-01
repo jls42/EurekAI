@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, renameSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import type {
   ProjectMeta,
   ProjectData,
@@ -67,23 +67,30 @@ export class ProjectStore {
     writeFileSync(this.indexPath, JSON.stringify(index, null, 2));
   }
 
-  // Sanitization defense-in-depth contre js/path-injection : tout id qui sert
-  // à construire un path doit matcher cette regex stricte (UUID v4-like + chars
-  // safe pour migrations legacy). Un id non conforme provient nécessairement
-  // d'un client malicieux (req.params.pid manipulé) — on throw plutôt que de
-  // construire un path joint avec '../'. Utilisé par tous les helpers fs-bound
-  // ci-dessous pour neutraliser le taint flow vu par CodeQL js/path-injection.
+  // Sanitization defense-in-depth contre js/path-injection (CodeQL).
+  // Trois neutralisations cumulées :
+  //   1. `basename(id)` strip tout segment parent ; si le résultat diffère de
+  //      `id`, l'entrée contenait un séparateur ('/', '\\') ou '..' → reject.
+  //      `basename` est explicitement reconnu par CodeQL comme path sanitizer.
+  //   2. Regex stricte sur le segment safe (chars URL/fs-safe).
+  //   3. Le résultat est toujours `join(projectsDir, safeId)` — confiné sous
+  //      le baseDir contrôlé par la classe.
+  // Un id non conforme provient nécessairement d'un client malicieux
+  // (req.params.pid manipulé) — on throw plutôt que de construire un path joint
+  // avec '../'. Le try/catch existant dans getProject convertit en null return.
   private static readonly SAFE_PROJECT_ID = /^[a-zA-Z0-9_-]{1,64}$/;
 
-  private assertSafeProjectId(id: string): void {
-    if (typeof id !== 'string' || !ProjectStore.SAFE_PROJECT_ID.test(id)) {
+  private safeProjectSegment(id: string): string {
+    if (typeof id !== 'string') throw new Error('invalid_project_id');
+    const safe = basename(id);
+    if (safe !== id || !ProjectStore.SAFE_PROJECT_ID.test(safe)) {
       throw new Error('invalid_project_id');
     }
+    return safe;
   }
 
   private projectDir(id: string): string {
-    this.assertSafeProjectId(id);
-    return join(this.projectsDir, id);
+    return join(this.projectsDir, this.safeProjectSegment(id));
   }
 
   private projectFilePath(id: string): string {
@@ -138,7 +145,11 @@ export class ProjectStore {
       this.migrateModerationFormat(data);
       return data;
     } catch (e) {
-      console.error(`Failed to read project ${id} at ${path}:`, e);
+      // Pass tainted values as separate args (not as template literal) so the
+      // format string remains a static literal — neutralizes CodeQL
+      // js/tainted-format-string. The `id` here is the same value that
+      // safeProjectSegment validated above; logging is best-effort.
+      logger.error('store', 'Failed to read project', id, 'at', path, e);
       return null;
     }
   }

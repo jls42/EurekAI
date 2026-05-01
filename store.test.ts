@@ -697,8 +697,14 @@ describe('readIndex / getProject corruption resilience', () => {
     writeFileSync(projectPath, '{corrupted!!!');
 
     expect(store.getProject(p.meta.id)).toBeNull();
+    // logger.error passe args séparés (pas de template literal) pour éviter
+    // CodeQL js/tainted-format-string — assert sur la séquence d'arguments.
     expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining(`Failed to read project ${p.meta.id}`),
+      expect.stringContaining('ERROR [store]'),
+      'Failed to read project',
+      p.meta.id,
+      'at',
+      expect.stringContaining(p.meta.id),
       expect.any(Error),
     );
     errorSpy.mockRestore();
