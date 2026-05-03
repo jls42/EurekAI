@@ -2,7 +2,7 @@ import type { GenerationUsage } from './helpers/pricing.js';
 import type { VoiceId } from './helpers/voice-types.js';
 import type { EventKey } from './helpers/event-key.js';
 
-export type { EventKey };
+export type { EventKey } from './helpers/event-key.js';
 
 // --- Profiles ---
 
