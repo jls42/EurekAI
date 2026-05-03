@@ -368,7 +368,7 @@ describe('createConfirm', () => {
 
       confirm.cancelGeneration.call(ctx);
 
-      // Le helper cancelPendingByGid POST /cancel pour ce gid (couvre L186-188)
+      // cancelPendingByGid POSTe /cancel pour le gid courant.
       expect(fetchMock).toHaveBeenCalledWith(
         `/api/projects/pid-1/generations/${VALID_GID}/cancel`,
         { method: 'POST' },

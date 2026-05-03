@@ -1983,7 +1983,7 @@ describe('reconcilePendings', () => {
     ).resolves.toBeUndefined();
   });
 
-  // Test #18 — verrou : le watermark lastSeenAt DOIT être set avec
+  // Régression-lock : le watermark lastSeenAt DOIT être set avec
   // reconcileStartedAt (timestamp PRÉ-fetch), pas Date.now() post-backfill.
   // Sinon un event arrivé entre le snapshot et l'ouverture SSE serait masqué
   // par un lastSeenAt trop tardif et perdu silencieusement.
@@ -2048,6 +2048,113 @@ describe('reconcilePendings', () => {
     // sous le cutoff. Sans ce verrou, l'user serait spammé au 1er load.
     const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}');
     expect(notifs['profile-A'] ?? []).toEqual([]);
+  });
+});
+
+// Unit-tests directs sur les helpers de backfill (sans passer par
+// reconcilePendings). Verrouillent : (1) la sémantique du cutoff `<= cutoff`
+// (off-by-one : un completedAt exactement égal au cutoff est SKIPPED, pas
+// notifié) et (2) le mapping cancelled→info / failed→error sur les terminaux.
+describe('backfillCompletedNotifs / backfillTerminalNotifs (direct)', () => {
+  let storage: Record<string, string>;
+  beforeEach(() => {
+    storage = {};
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => storage[k] ?? null,
+      setItem: (k: string, v: string) => {
+        storage[k] = v;
+      },
+      removeItem: (k: string) => {
+        delete storage[k];
+      },
+    };
+  });
+
+  function makeCtx() {
+    return {
+      currentProfile: { id: 'profile-B' } as { id: string },
+      backfillCompletedNotifs: helpers.backfillCompletedNotifs,
+      backfillTerminalNotifs: helpers.backfillTerminalNotifs,
+    };
+  }
+
+  it('backfillCompletedNotifs : cutoff exclut <= et inclut >', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens: any[] = [
+      // <= cutoff : skipped
+      { id: 'g-old', type: 'summary', completedAt: '2026-04-26T09:00:00Z' },
+      // == cutoff : skipped (sémantique <=)
+      { id: 'g-edge', type: 'flashcards', completedAt: '2026-04-26T10:00:00Z' },
+      // > cutoff : notifié
+      { id: 'g-new', type: 'quiz', completedAt: '2026-04-26T11:00:00Z' },
+      // sans completedAt : skipped (legacy/pré-pending-lifecycle)
+      { id: 'g-legacy', type: 'image' },
+    ];
+
+    ctx.backfillCompletedNotifs.call(ctx as any, gens, cutoff, 'profile-B', 'pid-X');
+
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}')['profile-B'] ?? [];
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].eventKey).toBe('generation:g-new:completed');
+    expect(notifs[0].messageKey).toBe('notif.generationDone');
+    expect(notifs[0].type).toBe('success');
+    expect(notifs[0].projectId).toBe('pid-X');
+    expect(notifs[0].paramKeys.type).toBe('gen.quiz');
+  });
+
+  it('backfillTerminalNotifs : cancelled→info, failed→error, cutoff respecté', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const tracker: any[] = [
+      // <= cutoff : skipped
+      {
+        id: 't-old',
+        type: 'summary',
+        status: 'failed',
+        failureCode: 'internal_error',
+        startedAt: '2026-04-26T08:00:00Z',
+        completedAt: '2026-04-26T09:00:00Z',
+      },
+      // > cutoff, failed → error
+      {
+        id: 't-failed',
+        type: 'quiz',
+        status: 'failed',
+        failureCode: 'quota_exceeded',
+        startedAt: '2026-04-26T10:30:00Z',
+        completedAt: '2026-04-26T11:00:00Z',
+      },
+      // > cutoff, cancelled → info
+      {
+        id: 't-cancelled',
+        type: 'podcast',
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        startedAt: '2026-04-26T10:30:00Z',
+        completedAt: '2026-04-26T11:30:00Z',
+      },
+      // status pending : skipped (pas de notif backfill pour les actifs)
+      {
+        id: 't-pending',
+        type: 'image',
+        status: 'pending',
+        startedAt: '2026-04-26T11:00:00Z',
+      },
+    ];
+
+    ctx.backfillTerminalNotifs.call(ctx as any, tracker, cutoff, 'profile-B', 'pid-Y');
+
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}')['profile-B'] ?? [];
+    expect(notifs).toHaveLength(2);
+    const failed = notifs.find((n: any) => n.eventKey === 'generation:t-failed:failed');
+    const cancelled = notifs.find((n: any) => n.eventKey === 'generation:t-cancelled:cancelled');
+    expect(failed.messageKey).toBe('notif.generationFailed');
+    expect(failed.type).toBe('error');
+    expect(failed.paramKeys.type).toBe('gen.quiz');
+    expect(cancelled.messageKey).toBe('notif.generationCancelled');
+    expect(cancelled.type).toBe('info');
+    expect(cancelled.paramKeys.type).toBe('gen.podcast');
   });
 });
 

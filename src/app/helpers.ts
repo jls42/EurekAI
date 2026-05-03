@@ -11,7 +11,8 @@ import type {
   ProjectData,
   Source,
 } from '../../types';
-import type { EventKey } from '../../helpers/event-bus';
+import type { EventKey } from '../../helpers/event-key';
+import { buildEventKey } from '../../helpers/event-key';
 
 export type { GenerationEvent } from '../../types';
 import {
@@ -32,7 +33,6 @@ const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE_LABEL = 'notif.generationDone';
-const asEventKey = (value: string): EventKey => value as EventKey;
 
 // `GenerationEvent` est désormais une discriminated union sur `status` exportée
 // depuis types.ts (source unique partagée serveur ↔ client). `generation`
@@ -610,7 +610,7 @@ export function createHelpers() {
     applyGenerationEvent(this: AppContext, event: GenerationEvent): void {
       if (!this.currentProfile) return;
       const { gid, type, status } = event;
-      const eventKey = asEventKey(event.eventKey);
+      const eventKey = event.eventKey;
       if (status === 'pending') {
         // Hydrate / refresh le pending optimiste (peut écraser un déjà existant
         // côté client avec les vrais startedAt/sourceIds backend).
@@ -756,7 +756,7 @@ export function createHelpers() {
         if (!gen.completedAt) continue;
         if (Date.parse(gen.completedAt) <= cutoff) continue;
         appendNotification(profileId, {
-          eventKey: asEventKey(`generation:${gen.id}:completed`),
+          eventKey: buildEventKey(gen.id, 'completed'),
           messageKey: NOTIF_GENERATION_DONE_LABEL,
           paramKeys: { type: 'gen.' + gen.type },
           type: 'success',
@@ -777,7 +777,7 @@ export function createHelpers() {
         if (!t.completedAt || Date.parse(t.completedAt) <= cutoff) continue;
         const cancelled = t.status === 'cancelled';
         appendNotification(profileId, {
-          eventKey: asEventKey(`generation:${t.id}:${t.status}`),
+          eventKey: buildEventKey(t.id, t.status),
           messageKey: cancelled ? 'notif.generationCancelled' : 'notif.generationFailed',
           paramKeys: { type: 'gen.' + t.type },
           type: cancelled ? 'info' : 'error',

@@ -14,11 +14,13 @@ import type {
   CostEntry,
   ModerationResult,
   PendingTrackerEntry,
+  PendingTrackerEntryBase,
   PendingTrackerEntryTerminal,
   FailedStepCode,
   GenerationStatus,
 } from './types.js';
-import { emitGenerationEvent, buildEventKey } from './helpers/event-bus.js';
+import { emitGenerationEvent } from './helpers/event-bus.js';
+import { buildEventKey, type EventKey } from './helpers/event-key.js';
 import { logger } from './helpers/logger.js';
 
 // Résultat d'une tentative de promotion d'un pending vers une Generation finale.
@@ -36,16 +38,14 @@ export type PromoteResult =
 // gardée seulement si elle satisfait À LA FOIS la fenêtre temporelle ET le quota
 // maxKeep (les plus récentes au-dessus de la limite sont prunées). Les pendings
 // actifs (status === 'pending') sont toujours préservés indépendamment.
-const DEFAULT_PRUNE_MAX_KEEP = 50;
-const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+export const DEFAULT_PRUNE_MAX_KEEP = 50;
+export const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
 export class ProjectStore {
-  private readonly baseDir: string;
   private readonly indexPath: string;
   private readonly projectsDir: string;
 
   constructor(outputDir: string) {
-    this.baseDir = outputDir;
     this.indexPath = join(outputDir, 'projects.json');
     this.projectsDir = join(outputDir, 'projects');
     mkdirSync(this.projectsDir, { recursive: true });
@@ -161,10 +161,35 @@ export class ProjectStore {
   }
 
   deleteProject(id: string) {
+    // Avant rmSync : émettre des events 'cancelled' pour les pendings actifs.
+    // Sinon les onglets ouverts gardent leurs chips orphelins jusqu'à ce que
+    // RECONNECT_MAX_RETRIES (8) soit atteint sur le prochain reconnect SSE
+    // (le serveur répond 404 sur /events). Cohérent avec cancelAllPendingsAtBoot
+    // qui purge les pendings ghost laissés par un process mort.
+    const data = this.getProject(id);
+    const pendingTerminals: PendingTrackerEntryTerminal[] = [];
+    if (data) {
+      const tracker = data.results.pendingTracker ?? [];
+      for (const entry of tracker) {
+        if (entry.status !== 'pending') continue;
+        pendingTerminals.push({
+          id: entry.id,
+          type: entry.type,
+          startedAt: entry.startedAt,
+          sourceIds: entry.sourceIds,
+          status: 'cancelled',
+          failureCode: 'cancelled',
+          completedAt: new Date().toISOString(),
+        });
+      }
+    }
     const dir = this.projectDir(id);
     if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
     const index = this.readIndex().filter((p) => p.id !== id);
     this.writeIndex(index);
+    for (const entry of pendingTerminals) {
+      this.emitTerminalEvent(id, entry);
+    }
   }
 
   renameProject(id: string, name: string) {
@@ -348,12 +373,26 @@ export class ProjectStore {
     return { kind: 'promoted', generation: finalGen };
   }
 
-  markPendingFailed(projectId: string, generationId: string, code: FailedStepCode): boolean {
-    return this.terminatePending(projectId, generationId, 'failed', code);
+  markPendingFailed(
+    projectId: string,
+    generationId: string,
+    code: Exclude<FailedStepCode, 'cancelled'>,
+  ): boolean {
+    return this.replacePendingWithTerminal(projectId, generationId, (base) => ({
+      ...base,
+      status: 'failed',
+      failureCode: code,
+      completedAt: new Date().toISOString(),
+    }));
   }
 
   markPendingCancelled(projectId: string, generationId: string): boolean {
-    return this.terminatePending(projectId, generationId, 'cancelled', 'cancelled');
+    return this.replacePendingWithTerminal(projectId, generationId, (base) => ({
+      ...base,
+      status: 'cancelled',
+      failureCode: 'cancelled',
+      completedAt: new Date().toISOString(),
+    }));
   }
 
   // Cas boot : process précédent mort, tous les pendings sur disque sont par
@@ -362,47 +401,59 @@ export class ProjectStore {
   cancelAllPendingsAtBoot(): number {
     let total = 0;
     for (const meta of this.readIndex()) {
-      const data = this.getProject(meta.id);
-      if (!data) {
-        // getProject swallow déjà l'erreur JSON parse en console.error mais le
-        // boot sweep doit signaler explicitement les pendings ghost laissés en
-        // place : un project.json corrompu = aucun pending purgé pour ce projet.
-        // Niveau error (pas warn) parce qu'un project.json corrompu = bug
-        // observabilité critique (l'user verra une bannière "génération en cours"
-        // stuck à vie pour ce projet tant que le fichier n'est pas réparé).
-        logger.error('store', `boot sweep skipped unreadable project ${meta.id}`);
-        continue;
-      }
-      const tracker = data.results.pendingTracker ?? [];
-      const cancelled: PendingTrackerEntryTerminal[] = [];
-      for (let i = 0; i < tracker.length; i++) {
-        const entry = tracker[i];
-        if (entry.status !== 'pending') continue;
-        // Construit une nouvelle entrée terminale (le discriminated union
-        // empêche la mutation in-place : flipper status sans poser failureCode
-        // + completedAt produirait un état impossible).
-        const terminal: PendingTrackerEntryTerminal = {
-          id: entry.id,
-          type: entry.type,
-          startedAt: entry.startedAt,
-          sourceIds: entry.sourceIds,
-          status: 'cancelled',
-          failureCode: 'cancelled',
-          completedAt: new Date().toISOString(),
-        };
-        tracker[i] = terminal;
-        cancelled.push(terminal);
-        total++;
-      }
-      if (cancelled.length > 0) {
-        this.pruneTrackerIfNeeded(data);
-        this.saveProject(meta.id, data);
-        for (const entry of cancelled) {
-          this.emitTerminalEvent(meta.id, entry);
-        }
+      // Try/catch par projet : un saveProject qui throw (EACCES, disk full,
+      // EROFS) sur un projet ne doit pas tuer le boot — les autres projets
+      // doivent quand même être balayés. Sinon une seule corruption disque
+      // laisserait tous les pendings ghost en place sans signal.
+      try {
+        total += this.sweepPendingsForProject(meta.id);
+      } catch (e) {
+        logger.error('store', `boot sweep failed for project ${meta.id}`, e);
       }
     }
     return total;
+  }
+
+  private sweepPendingsForProject(projectId: string): number {
+    const data = this.getProject(projectId);
+    if (!data) {
+      // getProject swallow déjà l'erreur JSON parse en console.error mais le
+      // boot sweep doit signaler explicitement les pendings ghost laissés en
+      // place : un project.json corrompu = aucun pending purgé pour ce projet.
+      // Niveau error (pas warn) parce qu'un project.json corrompu = bug
+      // observabilité critique (l'user verra une bannière "génération en cours"
+      // stuck à vie pour ce projet tant que le fichier n'est pas réparé).
+      logger.error('store', `boot sweep skipped unreadable project ${projectId}`);
+      return 0;
+    }
+    const tracker = data.results.pendingTracker ?? [];
+    const cancelled: PendingTrackerEntryTerminal[] = [];
+    for (let i = 0; i < tracker.length; i++) {
+      const entry = tracker[i];
+      if (entry.status !== 'pending') continue;
+      // Construit une nouvelle entrée terminale (le discriminated union
+      // empêche la mutation in-place : flipper status sans poser failureCode
+      // + completedAt produirait un état impossible).
+      const terminal: PendingTrackerEntryTerminal = {
+        id: entry.id,
+        type: entry.type,
+        startedAt: entry.startedAt,
+        sourceIds: entry.sourceIds,
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        completedAt: new Date().toISOString(),
+      };
+      tracker[i] = terminal;
+      cancelled.push(terminal);
+    }
+    if (cancelled.length > 0) {
+      this.pruneTrackerIfNeeded(data);
+      this.saveProject(projectId, data);
+      for (const entry of cancelled) {
+        this.emitTerminalEvent(projectId, entry);
+      }
+    }
+    return cancelled.length;
   }
 
   prunePendingTracker(projectId: string, opts?: { maxKeep?: number; maxAgeMs?: number }): number {
@@ -415,11 +466,16 @@ export class ProjectStore {
     return before - after;
   }
 
-  private terminatePending(
+  // Remplace une entrée pending par une terminale fraîche (le discriminated
+  // union interdit la mutation status-only sans poser failureCode +
+  // completedAt). Le builder reçoit la base commune (id/type/startedAt/sourceIds)
+  // et produit l'arm spécialisée — chaque appelant locke ainsi son literal
+  // ('failed' avec failureCode ≠ 'cancelled', 'cancelled' avec failureCode
+  // strictement 'cancelled').
+  private replacePendingWithTerminal(
     projectId: string,
     generationId: string,
-    nextStatus: 'failed' | 'cancelled',
-    code: FailedStepCode,
+    builder: (base: PendingTrackerEntryBase) => PendingTrackerEntryTerminal,
   ): boolean {
     const data = this.getProject(projectId);
     if (!data) return false;
@@ -428,17 +484,12 @@ export class ProjectStore {
     if (idx === -1) return false;
     const entry = tracker[idx];
     if (entry.status !== 'pending') return false;
-    // Remplace l'entrée par une terminale fraîche (le discriminated union
-    // interdit la mutation status-only sans poser failureCode + completedAt).
-    const terminal: PendingTrackerEntryTerminal = {
+    const terminal = builder({
       id: entry.id,
       type: entry.type,
       startedAt: entry.startedAt,
       sourceIds: entry.sourceIds,
-      status: nextStatus,
-      failureCode: code,
-      completedAt: new Date().toISOString(),
-    };
+    });
     tracker[idx] = terminal;
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
@@ -454,7 +505,13 @@ export class ProjectStore {
     pid: string,
     entry: PendingTrackerEntry,
     status: GenerationStatus,
-  ): { pid: string; gid: string; type: PendingTrackerEntry['type']; at: string; eventKey: string } {
+  ): {
+    pid: string;
+    gid: string;
+    type: PendingTrackerEntry['type'];
+    at: string;
+    eventKey: EventKey;
+  } {
     const isTerminal = entry.status === 'failed' || entry.status === 'cancelled';
     const completedAt = isTerminal ? entry.completedAt : undefined;
     return {

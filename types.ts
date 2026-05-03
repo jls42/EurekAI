@@ -1,5 +1,8 @@
 import type { GenerationUsage } from './helpers/pricing.js';
 import type { VoiceId } from './helpers/voice-types.js';
+import type { EventKey } from './helpers/event-key.js';
+
+export type { EventKey };
 
 // --- Profiles ---
 
@@ -284,7 +287,7 @@ export type TrackedGenerationType =
   | 'fill-blank';
 
 // Champs communs aux entrées actives et terminales du tracker.
-interface PendingTrackerEntryBase {
+export interface PendingTrackerEntryBase {
   // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour /generate/auto).
   // Identique au `id` de la `Generation` finale après promotion.
   id: string;
@@ -297,15 +300,30 @@ interface PendingTrackerEntryBase {
 // terminaux (failureCode, completedAt) sont OBLIGATOIRES dès qu'on flippe le
 // status, et ABSENTS sur l'arm pending. Empêche l'état impossible
 // `{status:'pending', failureCode:'cancelled'}` qui contournerait la sémantique.
+//
+// L'arm 'cancelled' verrouille `failureCode: 'cancelled'` au niveau du literal
+// (cf. CLAUDE.md "'cancelled' posé explicitement par markPendingCancelled /
+// cancelAllPendingsAtBoot, jamais dérivé via extractErrorCode"). Symétriquement
+// l'arm 'failed' exclut le literal 'cancelled' — un vrai bug (extractErrorCode
+// produisant 'cancelled' par erreur) compilerait silencieusement sans cette
+// restriction.
 export interface PendingTrackerEntryActive extends PendingTrackerEntryBase {
   status: 'pending';
 }
 
-export interface PendingTrackerEntryTerminal extends PendingTrackerEntryBase {
-  status: 'failed' | 'cancelled';
-  failureCode: FailedStepCode;
+export interface PendingTrackerEntryFailed extends PendingTrackerEntryBase {
+  status: 'failed';
+  failureCode: Exclude<FailedStepCode, 'cancelled'>;
   completedAt: string;
 }
+
+export interface PendingTrackerEntryCancelled extends PendingTrackerEntryBase {
+  status: 'cancelled';
+  failureCode: 'cancelled';
+  completedAt: string;
+}
+
+export type PendingTrackerEntryTerminal = PendingTrackerEntryFailed | PendingTrackerEntryCancelled;
 
 // Le tracker ne stocke jamais 'completed' : à la promotion, l'entrée est retirée
 // du tracker et la Generation est ajoutée à `generations[]`.
@@ -314,8 +332,11 @@ export type PendingTrackerEntry = PendingTrackerEntryActive | PendingTrackerEntr
 // Réponse HTTP 409 quand la promotion échoue (route /generate/:type avec
 // trackedType, /generate/auto par step). Découple le contrat HTTP du
 // discriminant interne `PromoteResult.kind` — sinon renommer le discriminant
-// store casserait le client sans warning compile.
-export type PromoteErrorOutcome = 'cancelled' | 'failed' | 'missing';
+// store casserait le client sans warning compile. Le `'missing'` interne du
+// store est volontairement absent : c'est un signal observabilité (tracker
+// entry retirée sous nos pieds) qui doit être remappé côté serveur en
+// 'failed' avant d'atteindre le wire — pas un code stable client.
+export type PromoteErrorOutcome = 'cancelled' | 'failed';
 export interface PromoteErrorResponse {
   error: PromoteErrorOutcome;
   gid: string;
@@ -334,8 +355,10 @@ interface GenerationEventBase {
   type: TrackedGenerationType;
   at: string;
   // Identifiant stable cross-onglets pour la déduplication idempotente.
-  // Format : 'generation:${gid}:${status}'.
-  eventKey: string;
+  // Format : 'generation:${gid}:${status}'. Toujours minté via buildEventKey
+  // (helpers/event-key.ts) — le brand empêche les call sites d'inventer la
+  // chaîne et de drift le format.
+  eventKey: EventKey;
 }
 
 export interface GenerationEventPending extends GenerationEventBase {

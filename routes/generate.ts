@@ -321,8 +321,6 @@ function buildFinalGeneration(
   const final = { ...gen, id: gid } as Generation;
   if (persisted) {
     final.usage = persisted.usage;
-    // PersistResult expose `cost` (cf. helpers/cost-persist.ts), pas `estimatedCost`.
-    // Le contrat client attend `estimatedCost` sur la Generation décorée.
     final.estimatedCost = persisted.cost;
     final.costBreakdown = persisted.costBreakdown;
   }
@@ -372,8 +370,10 @@ async function runGeneratorAndPersist(
     // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
     // 200 fantôme — le client refresh le projet pour voir l'état réel.
     // Le typage PromoteErrorResponse découple le contrat HTTP du discriminant
-    // store : renommer kind n'aurait plus d'impact sur le client.
-    const errorOutcome: PromoteErrorOutcome = promoteResult.kind;
+    // store : 'missing' est un signal observabilité serveur, pas un code stable
+    // client → remap en 'failed' avant le wire.
+    const errorOutcome: PromoteErrorOutcome =
+      promoteResult.kind === 'cancelled' ? 'cancelled' : 'failed';
     const body: PromoteErrorResponse = { error: errorOutcome, gid };
     res.status(409).json(body);
     return;

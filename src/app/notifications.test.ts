@@ -30,6 +30,9 @@ beforeEach(() => {
   storage = makeStorage();
 });
 
+// Échappatoire test : les fixtures utilisent des strings arbitraires ('k1',
+// 'evk-0') qui ne respectent pas le format canonique 'generation:gid:status'.
+// En production, tous les eventKey passent par buildEventKey (helpers/event-key).
 const E = (value: string): EventKey => value as EventKey;
 
 type NotificationOverrides = Omit<

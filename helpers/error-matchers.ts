@@ -15,27 +15,31 @@ export interface ErrContext {
   agent: string | undefined;
 }
 
-export type Matcher = (ctx: ErrContext) => FailedStepCode | null;
+// Les matchers ne produisent jamais 'cancelled' : ce literal est posé
+// explicitement par les paths store (markPendingCancelled,
+// cancelAllPendingsAtBoot), jamais dérivé d'une exception upstream.
+// Le retour étroit le verrouille au compile time.
+export type Matcher = (ctx: ErrContext) => Exclude<FailedStepCode, 'cancelled'> | null;
 
-export function matchStatus(ctx: ErrContext): FailedStepCode | null {
+export function matchStatus(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
   if (typeof ctx.status !== 'number') return null;
   const status = ctx.status;
   const matched = STATUS_RULES.find((r) => r.status === status);
   return matched ? matched.code : null;
 }
 
-export function matchStructuredCode(ctx: ErrContext): FailedStepCode | null {
+export function matchStructuredCode(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
   const code = typeof ctx.code === 'string' ? ctx.code : '';
   const matched = STRUCTURED_CODE_RULES.find((r) => r.pattern.test(code));
   return matched ? matched.code : null;
 }
 
-export function matchMessage(ctx: ErrContext): FailedStepCode | null {
+export function matchMessage(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
   const matched = MESSAGE_RULES.find((r) => r.pattern.test(ctx.message));
   return matched ? matched.code : null;
 }
 
-export function matchAudio(ctx: ErrContext): FailedStepCode | null {
+export function matchAudio(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
   if (!ctx.agent) return null;
   if (!TTS_AGENTS.has(ctx.agent)) return null;
   if (ctx.stage === 'tts') return 'tts_upstream_error';

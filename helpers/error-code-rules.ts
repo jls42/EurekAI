@@ -2,12 +2,12 @@ import type { FailedStepCode } from '../types.js';
 
 export type Rule = Readonly<{
   pattern: RegExp;
-  code: FailedStepCode;
+  code: Exclude<FailedStepCode, 'cancelled'>;
 }>;
 
 export type StatusRule = Readonly<{
   status: number;
-  code: FailedStepCode;
+  code: Exclude<FailedStepCode, 'cancelled'>;
 }>;
 
 // Mapping status HTTP → code d'erreur stable. Co-localisé avec MESSAGE_RULES /

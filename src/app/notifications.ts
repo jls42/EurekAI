@@ -152,14 +152,14 @@ function writeSeen(storage: StorageLike, all: SeenMap): boolean {
   return writeJson(storage, SEEN_EVENTS_SLOT, all);
 }
 
-function recordSeen(storage: StorageLike, profileId: string, eventKey: EventKey): void {
+function recordSeen(storage: StorageLike, profileId: string, eventKey: EventKey): boolean {
   const all = readSeen(storage);
   const list = all[profileId] ?? [];
-  if (list.includes(eventKey)) return;
+  if (list.includes(eventKey)) return true;
   list.push(eventKey);
   // LRU cap : garde les MAX_SEEN_EVENTS_PER_PROFILE plus récents
   all[profileId] = list.slice(-MAX_SEEN_EVENTS_PER_PROFILE);
-  writeSeen(storage, all);
+  return writeSeen(storage, all);
 }
 
 // --- API publique ---
@@ -178,6 +178,8 @@ export function listProfileNotifications(
 // - Si writeNotifs échoue (quota LS) → on N'ENREGISTRE PAS l'eventKey dans le
 //   ledger : sinon prochaine reconcile verrait l'event "déjà vu" alors que la
 //   notif elle-même n'est pas en LS, et l'user n'aurait jamais l'alerte.
+// - Si recordSeen échoue (ledger seul plein) → console.warn dédié : la notif
+//   est posée mais le ledger drift, prochaine reconcile re-créera la même notif.
 export function appendNotification(
   profileId: string,
   notif: AppendNotifPayload,
@@ -189,7 +191,12 @@ export function appendNotification(
   list.push({ ...notif, createdAt: new Date().toISOString(), read: false });
   all[profileId] = pruneExpiredAndCap(list);
   if (!writeNotifs(storage, all)) return false;
-  recordSeen(storage, profileId, notif.eventKey);
+  if (!recordSeen(storage, profileId, notif.eventKey)) {
+    console.warn('[notifications] ledger persist failed; reconcile may re-create notif', {
+      profileId,
+      eventKey: notif.eventKey,
+    });
+  }
   return true;
 }
 
@@ -198,7 +205,9 @@ export function markAllRead(profileId: string, storage: StorageLike = localStora
   const list = all[profileId];
   if (!list || list.length === 0) return;
   all[profileId] = list.map((n) => ({ ...n, read: true }));
-  writeNotifs(storage, all);
+  if (!writeNotifs(storage, all)) {
+    console.warn('[notifications] markAllRead persist failed', { profileId });
+  }
 }
 
 export function markRead(
@@ -212,7 +221,9 @@ export function markRead(
   const idx = list.findIndex((n) => n.eventKey === eventKey);
   if (idx === -1) return;
   list[idx] = { ...list[idx], read: true };
-  writeNotifs(storage, all);
+  if (!writeNotifs(storage, all)) {
+    console.warn('[notifications] markRead persist failed', { profileId, eventKey });
+  }
 }
 
 // "Vider" — supprime les notifs visibles SEULEMENT. Le ledger seenEventKeys
@@ -222,7 +233,9 @@ export function clearNotifications(profileId: string, storage: StorageLike = loc
   const all = readNotifs(storage);
   if (!(profileId in all)) return;
   delete all[profileId];
-  writeNotifs(storage, all);
+  if (!writeNotifs(storage, all)) {
+    console.warn('[notifications] clearNotifications persist failed', { profileId });
+  }
 }
 
 export function hasSeenEvent(

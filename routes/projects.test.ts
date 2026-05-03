@@ -395,9 +395,8 @@ describe('GET /:pid/events (SSE)', () => {
       res.writes.push(chunk);
       return true;
     });
-    // Stub minimal — le code réel attache un listener 'error' pour cleanup sur
-    // reset TCP brutal (cf. Fix #2 SSE write protection). Pas besoin de simuler
-    // l'émission, juste accepter l'enregistrement.
+    // Stub : le code réel attache un listener 'error' pour cleanup sur reset
+    // TCP brutal. Pas besoin d'émettre, juste accepter l'enregistrement.
     res.on = vi.fn();
     return res;
   }
@@ -504,8 +503,8 @@ describe('GET /:pid/events (SSE)', () => {
     expect(res.writes.length).toBe(writesBeforeAdd);
   });
 
-  // Fix #1 — verrou : pid inconnu = 404, jamais d'EventEmitter listener leaké
-  // (cap 50 → MaxListenersWarning au bout de quelques typos client). Code stable.
+  // Régression-lock : pid inconnu = 404, jamais d'EventEmitter listener leaké
+  // (cap 50 → MaxListenersWarning au bout de quelques typos client).
   it('retourne 404 project_not_found pour pid inexistant + ne souscrit pas', () => {
     const handler = getHandler(router, 'get', '/:pid/events');
     const req = mockSseReq('pid-inconnu');
@@ -616,8 +615,8 @@ describe('GET /:pid/events (SSE)', () => {
     warnSpy.mockRestore();
   });
 
-  // Test #18 — verrou : heartbeat 25s exact (sans lui, les proxies idle
-  // coupent la connexion → notifications stale jusqu'au reconnect EventSource).
+  // Régression-lock : heartbeat 25s exact. Sans lui, les proxies idle coupent
+  // la connexion → notifications stale jusqu'au reconnect EventSource.
   it('écrit un keep-alive heartbeat toutes les 25s', () => {
     vi.useFakeTimers();
     const project = store.createProject('SSE heartbeat');

@@ -18,7 +18,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { ProjectStore } from './store.js';
+import { ProjectStore, DEFAULT_PRUNE_MAX_AGE_MS } from './store.js';
 import type {
   FailedStepCode,
   Generation,
@@ -59,16 +59,21 @@ const buildEntryBase = (id: string, o: EntryOverrides) => ({
   sourceIds: o.sourceIds ?? [],
 });
 
+// Résout l'arm failed avec le constraint Exclude<FailedStepCode, 'cancelled'>.
+const resolveFailedCode = (
+  raw: FailedStepCode | undefined,
+): Exclude<FailedStepCode, 'cancelled'> => {
+  const code = raw ?? 'internal_error';
+  return code === 'cancelled' ? 'internal_error' : code;
+};
+
 const makeEntry = (id: string, overrides: EntryOverrides = {}): PendingTrackerEntry => {
   const base = buildEntryBase(id, overrides);
   const status = overrides.status ?? 'pending';
+  const completedAt = overrides.completedAt ?? new Date().toISOString();
   if (status === 'pending') return { ...base, status };
-  return {
-    ...base,
-    status,
-    failureCode: overrides.failureCode ?? 'internal_error',
-    completedAt: overrides.completedAt ?? new Date().toISOString(),
-  };
+  if (status === 'cancelled') return { ...base, status, failureCode: 'cancelled', completedAt };
+  return { ...base, status, failureCode: resolveFailedCode(overrides.failureCode), completedAt };
 };
 
 const makeGen = (id: string): Generation =>
@@ -240,6 +245,32 @@ describe('cancelAllPendingsAtBoot', () => {
   it("retourne 0 si aucun pending n'existe", () => {
     expect(store.cancelAllPendingsAtBoot()).toBe(0);
   });
+
+  // Régression-lock : un project.json corrompu ne doit pas tuer le boot. Le
+  // sweep doit logger et continuer pour que les autres projets soient quand
+  // même balayés (sinon une seule corruption laisse tous les pendings ghost).
+  it('continue les autres projets quand un project.json est corrompu', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+
+    // Projet 1 (corrompu) : pending posé puis project.json overwrite avec JSON invalide.
+    store.addPendingEntry(projectId, makeEntry('gid-corrupt'));
+    const corruptPath = path.join(tempDir, 'projects', projectId, 'project.json');
+    fs.writeFileSync(corruptPath, '{not valid json');
+
+    // Projet 2 (sain) : pending posé normalement.
+    const healthyId = store.createProject('Healthy').meta.id;
+    store.addPendingEntry(healthyId, makeEntry('gid-healthy'));
+
+    // Sweep : doit cancel le pending sain (1) et skipper le corrompu sans throw.
+    const count = store.cancelAllPendingsAtBoot();
+    expect(count).toBe(1);
+
+    // Le projet sain doit être balayé proprement.
+    const healthyData = store.getProject(healthyId)!;
+    const healthyEntry = expectTerminal(healthyData.results.pendingTracker![0]);
+    expect(healthyEntry.status).toBe('cancelled');
+  });
 });
 
 describe('prunePendingTracker', () => {
@@ -281,7 +312,8 @@ describe('prunePendingTracker', () => {
   });
 
   it('prune les terminals trop anciens (maxAgeMs)', () => {
-    const oldTimestamp = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    // Crée une entrée plus vieille que la fenêtre par défaut, l'autre fraîche.
+    const oldTimestamp = new Date(Date.now() - DEFAULT_PRUNE_MAX_AGE_MS - 1000).toISOString();
     const recent = makeEntry('gid-recent', {
       status: 'failed',
       failureCode: 'internal_error',
@@ -296,7 +328,7 @@ describe('prunePendingTracker', () => {
     store.addPendingEntry(projectId, recent);
     store.addPendingEntry(projectId, old);
 
-    store.prunePendingTracker(projectId, { maxAgeMs: 7 * 24 * 60 * 60 * 1000 });
+    store.prunePendingTracker(projectId, { maxAgeMs: DEFAULT_PRUNE_MAX_AGE_MS });
     const data = store.getProject(projectId)!;
     expect(data.results.pendingTracker!.map((e) => e.id)).toEqual(['gid-recent']);
   });

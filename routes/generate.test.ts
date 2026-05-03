@@ -635,12 +635,8 @@ describe('generateRoutes', () => {
     it('decorates generation with estimatedCost from PersistResult.cost (regression)', async () => {
       const { generateSummary } = await import('../generators/summary.js');
       const { recordUsage } = await import('../helpers/usage-context.js');
-      // Régression vue à la review : le commit 2ea2854 avait introduit
-      // `final.estimatedCost = persisted.estimatedCost` alors que PersistResult
-      // expose `cost` (cf. helpers/cost-persist.ts). Conséquence : toutes les
-      // générations renvoyées au client avaient `estimatedCost = undefined`.
-      // Ce test pin l'invariant : un generator qui enregistre un usage facturable
-      // doit produire une Generation décorée avec estimatedCost numérique > 0.
+      // Invariant : un generator qui enregistre un usage facturable doit
+      // produire une Generation décorée avec estimatedCost numérique > 0.
       (generateSummary as any).mockImplementationOnce(async () => {
         recordUsage({
           model: 'mistral-large-2512',
@@ -713,12 +709,9 @@ describe('generateRoutes', () => {
       expect((failedEntry as any).failureCode).toBe('internal_error');
     });
 
-    // Test #11 — invariant absolu (cf. CLAUDE.md "Pending generations") :
-    // refresh ≠ cancel. Le serveur ne DOIT PAS brancher req.on('close') pour
-    // annuler une génération. Une fermeture de socket pendant que Mistral
-    // travaille = la génération continue, persiste son résultat normalement.
-    // Si un futur ajout ajoute req.on('close', ctrl.abort()), ce test casse
-    // immédiatement.
+    // Régression-lock CLAUDE.md "Pending generations" : refresh ≠ cancel. Le
+    // serveur ne DOIT PAS brancher req.on('close') pour annuler une génération.
+    // Si un futur ajout introduit req.on('close', ctrl.abort()), ce test casse.
     it('refresh ≠ cancel : req.on("close") mid-flight ne flippe PAS le pending', async () => {
       const { generateSummary } = await import('../generators/summary.js');
       let resolveGen: (value: unknown) => void = () => {};
@@ -955,6 +948,56 @@ describe('generateRoutes', () => {
 
       const finalProject = store.getProject(pid)!;
       expect(finalProject.results.generations[0].id).toBe(VALID_GID);
+    });
+
+    // Régression-lock : 2 POST simultanés avec le même body.gid → le 2e doit
+    // retourner 409 duplicate_gid, pas se croiser avec le 1er pending. Sans ce
+    // verrou côté addPendingEntry, le 2e POST observerait kind:'cancelled' à
+    // la promotion (le 1er ayant déjà claimé/promu l'entrée) et leak un
+    // 'cancelled' alors qu'aucun cancel n'a eu lieu.
+    it('addPendingEntry : 2e POST avec même body.gid mid-flight → 409 duplicate_gid', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('DupGid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const SHARED_GID = '22222222-2222-4222-8222-222222222222';
+
+      const req1 = mockReq({ params: { pid }, body: { gid: SHARED_GID } });
+      (req1 as any).on = () => {};
+      const res1 = mockRes();
+      const handler1Promise = handler(req1, res1);
+
+      // Laisse le handler 1 atteindre addPendingEntry puis entrer dans l'await.
+      await new Promise((r) => setTimeout(r, 10));
+
+      const req2 = mockReq({ params: { pid }, body: { gid: SHARED_GID } });
+      (req2 as any).on = () => {};
+      const res2 = mockRes();
+      await handler(req2, res2);
+
+      expect(res2.status).toHaveBeenCalledWith(409);
+      expect(res2.json).toHaveBeenCalledWith({ error: 'duplicate_gid', gid: SHARED_GID });
+
+      // Laisse le handler 1 finir proprement (cleanup).
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handler1Promise;
     });
   });
 
@@ -1659,6 +1702,35 @@ describe('generateRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
+
+    // Régression-lock CLAUDE.md "Pour /generate/auto (batch), la route NE LIT PAS
+    // body.gid". Si un futur refactor branche readClientGid sur /auto, les N
+    // steps partageraient le même gid → addPendingEntry retournerait false sur
+    // step 2+ → silent skips invisibles côté UI.
+    it('/auto IGNORE body.gid : chaque step reçoit un gid serveur distinct', async () => {
+      const project = store.createProject('AutoIgnoreGid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const CLIENT_GID = '33333333-3333-4333-8333-333333333333';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const updated = store.getProject(pid)!;
+      expect(updated.results.generations.length).toBeGreaterThanOrEqual(2);
+      const ids = updated.results.generations.map((g) => g.id);
+      // Aucun step ne doit avoir réutilisé le body.gid client.
+      expect(ids).not.toContain(CLIENT_GID);
+      // Tous les ids doivent être distincts (pas de collision serveur).
+      expect(new Set(ids).size).toBe(ids.length);
     });
 
     it('executes routed plan and returns multiple generations', async () => {
