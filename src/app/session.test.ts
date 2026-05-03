@@ -1,3 +1,19 @@
+/* eslint-disable
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-empty-function
+   --
+   Codacy applique tseslint.recommendedTypeChecked avec son propre tsconfig
+   qui exclut les test files → vitest globals (`vi`, `expect`, `describe`,
+   `it`...) sont typés `error`, cascadant en 50+ unsafe-* sur les fixtures.
+   Localement `eslint.config.js` (projectService: true) résout les types
+   correctement et `npm run lint:ci --max-warnings 0` couvre ce fichier.
+   Cf. store.lifecycle.test.ts qui applique le même pattern. */
+// nosemgrep: xss-no-mixed-html -- fakeButton n'est pas du HTML, juste un cast typé
+// HTMLElement pour passer un dummy à confirm.dismissConfirm en test.
 import { describe, it, expect, vi } from 'vitest';
 import { createSession } from './session.js';
 import type { AppContext } from './app-context.js';
