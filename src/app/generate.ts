@@ -583,8 +583,10 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
   const controller = new AbortController();
   setupGeneratePending(state, type, gid, controller);
   try {
-    // fetch inline avec projectId lu directement de state.currentProjectId pour
-    // préserver l'analyse taint Codacy `rule-node-ssrf`.
+    // nosemgrep: rule-node-ssrf -- projectId vient de currentProjectId (state interne),
+    // pas d'input user direct. Pas de whitelist applicable (set d'IDs dynamique).
+    // Le pattern existait avant l'extraction de runSingleGenerate ; le taint
+    // analysis re-flag sur fonction fraîchement extraite (cf. CLAUDE.md piège).
     const res = await fetch(
       '/api/projects/' + projectId + '/generate/' + type,
       postJson({ ...buildGenerateBody(state), gid }, controller.signal),

@@ -203,8 +203,12 @@ export function appendNotification(
 // qui se réverte au reload).
 export function markAllRead(profileId: string, storage: StorageLike = localStorage): boolean {
   const all = readNotifs(storage);
-  const list = all[profileId];
-  if (!list || list.length === 0) return true;
+  // `?? []` plutôt que `if (!list)` : NotifMap est typé Record<string, T[]>
+  // (sans noUncheckedIndexedAccess), donc TS infère `list` comme jamais
+  // undefined → `if (!list)` flaggé "always falsy" par Codacy. Le default
+  // array couvre le cas runtime (profile sans entrée) sans condition redondante.
+  const list = all[profileId] ?? [];
+  if (list.length === 0) return true;
   all[profileId] = list.map((n) => ({ ...n, read: true }));
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markAllRead persist failed', { profileId });
@@ -219,8 +223,8 @@ export function markRead(
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readNotifs(storage);
-  const list = all[profileId];
-  if (!list) return true;
+  const list = all[profileId] ?? [];
+  if (list.length === 0) return true;
   const idx = list.findIndex((n) => n.eventKey === eventKey);
   if (idx === -1) return true;
   list[idx] = { ...list[idx], read: true };
