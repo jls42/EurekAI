@@ -67,7 +67,14 @@ export function projectRoutes(store: ProjectStore): Router {
   });
 
   router.delete('/:pid', (req, res) => {
-    store.deleteProject(req.params.pid);
+    // deleteProject retourne false si rmSync/writeIndex throw (EACCES, EBUSY,
+    // ENOSPC, EROFS) — sinon l'UI verrait "supprimé" puis le projet ressuscite
+    // au reload. Code stable pour mapping i18n.
+    const ok = store.deleteProject(req.params.pid);
+    if (!ok) {
+      res.status(500).json({ error: 'project_delete_failed' });
+      return;
+    }
     res.json({ ok: true });
   });
 

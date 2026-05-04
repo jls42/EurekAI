@@ -372,6 +372,7 @@ export const nl: Record<string, string> = {
   'toast.courseCreateError': 'Fout bij het aanmaken van de cursus',
   'toast.projectDeleted': 'Project verwijderd',
   'toast.projectDeleteError': 'Fout bij het verwijderen van het project',
+  'toast.projectLoadError': 'Fout bij het laden van het project',
   'toast.micError': 'Kan microfoon niet openen: {error}',
   'toast.voiceTranscribed': 'Stem getranscribeerd!',
   'toast.transcriptionError': 'Transcriptiefout: {error}',

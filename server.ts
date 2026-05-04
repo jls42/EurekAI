@@ -90,7 +90,7 @@ app.put('/api/config', (req, res) => {
   try {
     res.json(saveConfig(req.body));
   } catch (e) {
-    console.error('Config save error:', e);
+    logger.error('config', 'Config save error', e);
     res.status(500).json({ error: 'Failed to save configuration' });
   }
 });
@@ -99,7 +99,7 @@ app.post('/api/config/reset', (_req, res) => {
   try {
     res.json(resetConfig());
   } catch (e) {
-    console.error('Config reset error:', e);
+    logger.error('config', 'Config reset error', e);
     res.status(500).json({ error: 'Failed to reset configuration' });
   }
 });
@@ -110,7 +110,7 @@ app.get('/api/config/voices', async (req, res) => {
     if (!lang) setVoiceCache(voices);
     res.json(voices);
   } catch (e) {
-    console.error('List voices error:', e);
+    logger.error('config', 'List voices error', e);
     res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
   }
 });

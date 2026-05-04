@@ -337,3 +337,54 @@ describe('prunePendingTracker', () => {
     expect(store.prunePendingTracker(projectId)).toBe(0);
   });
 });
+
+// Régressions ajoutées suite au /pr-review (Phase 7) — verrouillent des invariants
+// CLAUDE.md non couverts ailleurs. Cf. CLAUDE.md "Pending generations & notifications".
+
+describe('addPendingEntry / cancelAllPendingsAtBoot / promote interleaving', () => {
+  it('cancelAllPendingsAtBoot après addPendingEntry : promote retourne cancelled (multi-process safety)', () => {
+    // Scénario : process A pose un pending sur disque, un process B se lance
+    // en parallèle (PM2 cluster, deploy rolling) et balaie tous les pendings.
+    // Quand process A finit son work et appelle promote, l'entrée est terminale
+    // → 409 cancelled au client. Doc CLAUDE.md affirme "single-process only" ;
+    // ce test verrouille la contention actuelle pour qu'une régression silencieuse
+    // (ex: passage en multi-instance sans flag) soit visible.
+    expect(store.addPendingEntry(projectId, makeEntry('gid-race'))).toBe(true);
+    expect(store.cancelAllPendingsAtBoot()).toBe(1);
+
+    const result = store.promoteToGeneration(projectId, 'gid-race', makeGen('gid-race'));
+    expect(result.kind).toBe('cancelled');
+    // Le pending est resté en terminal (pas re-promu fantôme).
+    const data = store.getProject(projectId)!;
+    expect(data.results.generations).toHaveLength(0);
+    expect(data.results.pendingTracker![0].status).toBe('cancelled');
+  });
+});
+
+describe('addPendingEntry duplicate gid (non-mutation)', () => {
+  it('rejette un duplicate gid sans muter le startedAt/status de la première entry', () => {
+    const firstStartedAt = '2026-01-01T00:00:00.000Z';
+    expect(
+      store.addPendingEntry(
+        projectId,
+        makeEntry('gid-dup', { startedAt: firstStartedAt, sourceIds: ['src-1'] }),
+      ),
+    ).toBe(true);
+
+    // Tentative de re-addition avec un payload différent : doit être rejetée
+    // sans modifier l'entry existante.
+    expect(
+      store.addPendingEntry(
+        projectId,
+        makeEntry('gid-dup', { startedAt: '2099-01-01T00:00:00.000Z', sourceIds: ['src-other'] }),
+      ),
+    ).toBe(false);
+
+    const data = store.getProject(projectId)!;
+    expect(data.results.pendingTracker).toHaveLength(1);
+    const entry = data.results.pendingTracker![0];
+    expect(entry.startedAt).toBe(firstStartedAt);
+    expect(entry.sourceIds).toEqual(['src-1']);
+    expect(entry.status).toBe('pending');
+  });
+});

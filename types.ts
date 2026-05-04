@@ -274,17 +274,12 @@ export interface ProjectResults {
 // - 'cancelled' : annulée explicitement (POST /cancel) ou au boot (process précédent mort)
 export type GenerationStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
 
-// Limité aux 7 agents avec persistance Generation. PAS voice/websearch/read-aloud
-// (flows séparés non couverts par le pending lifecycle). Doit rester en sync avec
-// `Generation['type']`.
-export type TrackedGenerationType =
-  | 'summary'
-  | 'flashcards'
-  | 'quiz'
-  | 'podcast'
-  | 'quiz-vocal'
-  | 'image'
-  | 'fill-blank';
+// Source unique de vérité = `Generation['type']`. Lié au compile-time pour
+// qu'un nouveau Generation arm soit automatiquement trackable (ou nécessite
+// une exclusion explicite si non-trackable). Évite la dérive de la liste
+// dupliquée constatée précédemment (voice/websearch/read-aloud ne sont déjà
+// pas dans `Generation['type']` — flows séparés sans persistance Generation).
+export type TrackedGenerationType = Generation['type'];
 
 // Champs communs aux entrées actives et terminales du tracker.
 export interface PendingTrackerEntryBase {

@@ -86,8 +86,12 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   postCancel(pid, gid, allowedUrls)
     .then((ok) => {
       if (ok) return;
-      // Rollback : si le pending est revenu côté SSE entre-temps (race), ne pas
-      // l'écraser. Sinon restaure le snapshot + toast erreur actionnable.
+      // Race possible entre POST cancel échoué et SSE `completed` : si la gen
+      // est arrivée en `state.generations` entre-temps, ne pas restaurer le
+      // pending (toast trompeur "annulation échouée" alors que la gen a bel
+      // et bien complété). Vérifier d'abord generations[], puis pendingById.
+      const completedSinceCancel = state.generations.some((g) => g.id === gid);
+      if (completedSinceCancel) return;
       if (snapshot && !state.pendingById[gid]) {
         state.pendingById[gid] = snapshot;
       }
@@ -101,111 +105,128 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Méthodes extraites de createConfirm pour ne pas agglomérer leur CCN dans la
+// factory. `const = function` (pas `function`) car les `function name(this: T)`
+// consécutifs sont agglomérés par Lizard TS (cf. CLAUDE.md piège connu).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CONFIRM_LABELS: Record<string, string> = {
+  projet: 'confirm.project',
+  source: 'confirm.source',
+  generation: 'confirm.generation',
+};
+
+const confirmDelete = function (
+  this: AppContext,
+  target: string,
+  callback: () => void | Promise<void>,
+) {
+  this.confirmTarget = CONFIRM_LABELS[target] ? this.t(CONFIRM_LABELS[target]) : target;
+  this.confirmCallback = callback;
+  this.confirmTrigger = document.activeElement as HTMLElement;
+  (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.showModal();
+};
+
+// Restaure le focus sur le déclencheur après fermeture du dialog (a11y).
+// Try/catch silencieux : focus() peut throw si l'élément a été démonté entre
+// l'ouverture et la fermeture du dialog (ex: liste rerendered).
+const restoreConfirmTriggerFocus = function (state: AppContext): void {
+  if (!state.confirmTrigger) return;
+  state.$nextTick(() => {
+    try {
+      state.confirmTrigger?.focus();
+    } catch {
+      /* silent: focus restore peut throw si element demonte */
+    }
+    state.confirmTrigger = null;
+  });
+};
+
+const runConfirmCallback = function (state: AppContext, cb: () => void | Promise<void>): void {
+  const onFailure = (err: unknown): void => {
+    // Action confirmée par l'utilisateur (delete projet/source/generation)
+    // qui throw côté implémentation : on log en error (pour Sentry / console
+    // dev) ET on surface un toast user-visible. Sinon le dialog se ferme
+    // comme si l'action avait réussi alors qu'elle a silencieusement échoué.
+    console.error('[confirm] action failed', err);
+    state.showToast(state.t('toast.confirmActionFailed'), 'error');
+  };
+  try {
+    Promise.resolve(cb()).catch(onFailure);
+  } catch (err) {
+    onFailure(err);
+  } finally {
+    if (state.confirmCallback === cb) {
+      state.confirmCallback = null;
+    }
+  }
+};
+
+const executeConfirm = function (this: AppContext) {
+  (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
+  if (this.confirmCallback) {
+    runConfirmCallback(this, this.confirmCallback);
+  }
+  restoreConfirmTriggerFocus(this);
+};
+
+const closeConfirmDialog = function (this: AppContext) {
+  (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
+  this.confirmCallback = null;
+  restoreConfirmTriggerFocus(this);
+};
+
+// Le `key` accepte soit un type (transient : auto/voice/websearch/...),
+// soit un gid (UUID v4) pour cibler un pending Generation spécifique.
+// Détection : un gid trouvé dans pendingById prime sur le type pour
+// permettre le cancel précis en multi-onglets / auto parallel.
+const cancelOne = function (this: AppContext, key: string) {
+  const pending = this.pendingById[key];
+  if (pending) {
+    cancelPendingByGid(this, key, pending.type);
+    return;
+  }
+  // Fallback legacy : cancel par type (transients ou auto qui mute loading{}).
+  // On ne notifie l'utilisateur que si quelque chose a réellement été annulé —
+  // sinon clic sur une chip stale produirait un faux toast "annulé(e)" alors
+  // que rien ne tournait.
+  const controller = this.abortControllers[key];
+  const wasLoading = this.loading[key] === true;
+  if (!controller && !wasLoading) return;
+  if (controller) {
+    controller.abort();
+    delete this.abortControllers[key];
+  }
+  this.loading[key] = false;
+  const label = this.t('gen.' + key) || key;
+  this.showToast(this.t('toast.cancelledOne', { type: label }), 'info');
+};
+
+const cancelGeneration = function (this: AppContext) {
+  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque)
+  for (const gid of Object.keys(this.pendingById)) {
+    const entry = this.pendingById[gid];
+    cancelPendingByGid(this, gid, entry.type);
+  }
+  // 2. Cancel les transients résiduels (auto/voice/websearch via abort
+  //    controller par type seulement)
+  for (const controller of Object.values(this.abortControllers)) {
+    controller.abort();
+  }
+  this.abortControllers = {};
+  for (const key of Object.keys(this.loading)) {
+    this.loading[key] = false;
+  }
+  this.showToast(this.t('toast.cancelledGeneration'), 'info');
+};
+
 export function createConfirm() {
   return {
-    confirmDelete(this: AppContext, target: string, callback: () => void | Promise<void>) {
-      const confirmLabels: Record<string, string> = {
-        projet: 'confirm.project',
-        source: 'confirm.source',
-        generation: 'confirm.generation',
-      };
-      this.confirmTarget = confirmLabels[target] ? this.t(confirmLabels[target]) : target;
-      this.confirmCallback = callback;
-      this.confirmTrigger = document.activeElement as HTMLElement;
-      (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.showModal();
-    },
-
-    executeConfirm(this: AppContext) {
-      (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
-      if (this.confirmCallback) {
-        const cb = this.confirmCallback;
-        const onFailure = (err: unknown): void => {
-          // Action confirmée par l'utilisateur (delete projet/source/generation)
-          // qui throw côté implémentation : on log en error (pour Sentry / console
-          // dev) ET on surface un toast user-visible. Sinon le dialog se ferme
-          // comme si l'action avait réussi alors qu'elle a silencieusement échoué.
-          console.error('[confirm] action failed', err);
-          this.showToast(this.t('toast.confirmActionFailed'), 'error');
-        };
-        try {
-          Promise.resolve(cb()).catch(onFailure);
-        } catch (err) {
-          onFailure(err);
-        } finally {
-          if (this.confirmCallback === cb) {
-            this.confirmCallback = null;
-          }
-        }
-      }
-      if (this.confirmTrigger) {
-        this.$nextTick(() => {
-          try {
-            this.confirmTrigger?.focus();
-          } catch {
-            /* silent: focus restore peut throw si element demonte */
-          }
-          this.confirmTrigger = null;
-        });
-      }
-    },
-
-    closeConfirmDialog(this: AppContext) {
-      (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.close();
-      this.confirmCallback = null;
-      if (this.confirmTrigger) {
-        this.$nextTick(() => {
-          try {
-            this.confirmTrigger?.focus();
-          } catch {
-            /* silent: focus restore peut throw si element demonte */
-          }
-          this.confirmTrigger = null;
-        });
-      }
-    },
-
-    // Le `key` accepte soit un type (transient : auto/voice/websearch/...),
-    // soit un gid (UUID v4) pour cibler un pending Generation spécifique.
-    // Détection : un gid trouvé dans pendingById prime sur le type pour
-    // permettre le cancel précis en multi-onglets / auto parallel.
-    cancelOne(this: AppContext, key: string) {
-      const pending = this.pendingById[key];
-      if (pending) {
-        cancelPendingByGid(this, key, pending.type);
-        return;
-      }
-      // Fallback legacy : cancel par type (transients ou auto qui mute loading{}).
-      // On ne notifie l'utilisateur que si quelque chose a réellement été annulé —
-      // sinon clic sur une chip stale produirait un faux toast "annulé(e)" alors
-      // que rien ne tournait.
-      const controller = this.abortControllers[key];
-      const wasLoading = this.loading[key] === true;
-      if (!controller && !wasLoading) return;
-      if (controller) {
-        controller.abort();
-        delete this.abortControllers[key];
-      }
-      this.loading[key] = false;
-      const label = this.t('gen.' + key) || key;
-      this.showToast(this.t('toast.cancelledOne', { type: label }), 'info');
-    },
-
-    cancelGeneration(this: AppContext) {
-      // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque)
-      for (const gid of Object.keys(this.pendingById)) {
-        const entry = this.pendingById[gid];
-        cancelPendingByGid(this, gid, entry.type);
-      }
-      // 2. Cancel les transients résiduels (auto/voice/websearch via abort
-      //    controller par type seulement)
-      for (const controller of Object.values(this.abortControllers)) {
-        controller.abort();
-      }
-      this.abortControllers = {};
-      for (const key of Object.keys(this.loading)) {
-        this.loading[key] = false;
-      }
-      this.showToast(this.t('toast.cancelledGeneration'), 'info');
-    },
+    confirmDelete,
+    executeConfirm,
+    closeConfirmDialog,
+    cancelOne,
+    cancelGeneration,
   };
 }

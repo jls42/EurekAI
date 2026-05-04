@@ -371,6 +371,7 @@ export const it: Record<string, string> = {
   'toast.courseCreateError': 'Errore nella creazione del corso',
   'toast.projectDeleted': 'Progetto eliminato',
   'toast.projectDeleteError': "Errore nell'eliminazione del progetto",
+  'toast.projectLoadError': 'Errore nel caricamento del progetto',
   'toast.micError': 'Impossibile accedere al microfono: {error}',
   'toast.voiceTranscribed': 'Voce trascritta!',
   'toast.transcriptionError': 'Errore di trascrizione: {error}',

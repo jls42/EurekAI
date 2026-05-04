@@ -15,12 +15,12 @@ import type { EventKey } from '../../helpers/event-bus';
 // profileId) ne sont PAS touchés — ils sont la mémoire persistante du profil
 // et doivent être replay quand on revient sur un profil.
 
-// Le binding `this: AppContext` directement dans la signature de la méthode
-// déclenche un faux positif Codacy `no-unused-vars` (la règle native voit le
-// type-binding comme un paramètre non utilisé, alors que TypeScript le résout
-// au niveau type uniquement). On extrait l'implémentation en arrow function
-// qui prend `ctx` explicitement, et la méthode object-literal forwarde via
-// `this`. Mêmes garanties de typage, plus de faux positif.
+// Codacy `no-unused-vars` natif flagge le `this: AppContext` binding comme
+// paramètre non utilisé (la règle ignore que TypeScript résout le binding au
+// niveau type). Extraction en arrow function `doResetSession(ctx)` privée +
+// méthode object-literal qui forwarde via `this`. Workaround documenté ici une
+// seule fois pour les deux sites concernés (`doResetSession` ci-dessous et
+// `resetSession` dans le createSession factory).
 function doResetSession(ctx: AppContext): void {
   // Stop EventSource SSE — sinon des events sur l'ancien contexte arrivent
   // après le switch et écrasent le nouveau (méthode injectée par
@@ -61,10 +61,6 @@ function doResetSession(ctx: AppContext): void {
 
 export function createSession() {
   return {
-    // Pas de `this: AppContext` binding ici — Codacy `no-unused-vars` natif
-    // (purement syntaxique) le flag faussement comme paramètre non utilisé,
-    // même quand `this` est référencé dans le body. Cast local équivalent
-    // côté typage, plus de faux positif.
     resetSession(): void {
       doResetSession(this as unknown as AppContext);
     },

@@ -63,7 +63,9 @@ export function verifyPin(pin: string, hash: string): boolean {
   return timingSafeEqual(candidate, expected);
 }
 
-export function profileToPublic(profile: Profile): Omit<Profile, 'pinHash'> & { hasPin: boolean } {
+export type PublicProfile = Omit<Profile, 'pinHash'> & { hasPin: boolean };
+
+export function profileToPublic(profile: Profile): PublicProfile {
   const { pinHash, ...rest } = profile;
   return { ...rest, hasPin: !!pinHash };
 }
@@ -172,6 +174,30 @@ const describeEntryShape = (value: unknown): string => {
   return typeof value;
 };
 
+// Boucle inversée plutôt que `for…of [...valid]` : permet `splice(i, 1)` safe sans
+// cloner le tableau (Sonar L260) tout en évitant le skip d'entrée que produirait un
+// `for…of` direct + splice en avant. migrateProfile peut throw sur des shapes hostiles
+// qui passent le typeof object (ex: champ obligatoire manquant → cascade TypeError) —
+// on drop l'entrée IN-MEMORY mais on N'EFFACE PAS la donnée du disque (caller-side).
+// Helper top-level (pas une méthode privée) : Lizard agglomère le CCN des méthodes de
+// classe consécutives et faisait remonter ce simple petit helper à CCN 31 dans le
+// rapport (faux positif). En top-level fonction nommée, le CCN réel ~5 est mesuré.
+function migrateInPlace(valid: Profile[]): { migrated: boolean; droppedByMigration: boolean } {
+  let migrated = false;
+  let droppedByMigration = false;
+  for (let i = valid.length - 1; i >= 0; i--) {
+    const p = valid[i];
+    try {
+      if (migrateProfile(p)) migrated = true;
+    } catch (e) {
+      logger.warn('profiles', 'dropped entry (migration failed) id=', p.id ?? '<no-id>', e);
+      valid.splice(i, 1);
+      droppedByMigration = true;
+    }
+  }
+  return { migrated, droppedByMigration };
+}
+
 export class ProfileStore {
   private readonly filePath: string;
   // Mirror du pattern `lastLoadFailed` de config.ts — évite un overwrite silencieux
@@ -245,37 +271,11 @@ export class ProfileStore {
     return valid;
   }
 
-  // Boucle inversée plutôt que `for…of [...valid]` : permet `splice(i, 1)` safe sans
-  // cloner le tableau (Sonar L260) tout en évitant le skip d'entrée que produirait un
-  // `for…of` direct + splice en avant. migrateProfile peut throw sur des shapes hostiles
-  // qui passent le typeof object (ex: champ obligatoire manquant → cascade TypeError) —
-  // on drop l'entrée IN-MEMORY mais on N'EFFACE PAS la donnée du disque (caller-side).
-  // `readonly` sur l'arrow field : Sonar L255 + intention immutable. Arrow plutôt que
-  // `private method()` : casse l'agglomération du parseur TS Lizard avec migrateAndPersist
-  // (cf. CLAUDE.md "Pièges connus").
-  private readonly migrateInPlace = (
-    valid: Profile[],
-  ): { migrated: boolean; droppedByMigration: boolean } => {
-    let migrated = false;
-    let droppedByMigration = false;
-    for (let i = valid.length - 1; i >= 0; i--) {
-      const p = valid[i];
-      try {
-        if (migrateProfile(p)) migrated = true;
-      } catch (e) {
-        logger.warn('profiles', 'dropped entry (migration failed) id=', p.id ?? '<no-id>', e);
-        valid.splice(i, 1);
-        droppedByMigration = true;
-      }
-    }
-    return { migrated, droppedByMigration };
-  };
-
   private migrateAndPersist(profiles: Profile[]): Profile[] {
     const before = profiles.length;
     const valid = this.filterValidEntries(profiles);
     const filterDropped = valid.length !== profiles.length;
-    const { migrated: migratedFromLoop, droppedByMigration } = this.migrateInPlace(valid);
+    const { migrated: migratedFromLoop, droppedByMigration } = migrateInPlace(valid);
     this.lastDroppedCount = before - valid.length;
     this.lastLoadFailed = false;
     // Backup AVANT le early return droppedByMigration : si filterDropped et migration

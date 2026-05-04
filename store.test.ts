@@ -683,10 +683,12 @@ describe('readIndex / getProject corruption resilience', () => {
     const newStore = new ProjectStore(tempDir);
 
     expect(newStore.listProjects()).toEqual([]);
-    expect(errorSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Failed to read project index'),
-      expect.any(Error),
-    );
+    // logger.error sort un préfixe `HH:mm:ss.SSS ERROR [store]` + les args.
+    // On vérifie la présence du message via une recherche dans tous les calls.
+    const calls = errorSpy.mock.calls.flat();
+    expect(
+      calls.some((arg) => typeof arg === 'string' && arg.includes('Failed to read project index')),
+    ).toBe(true);
     errorSpy.mockRestore();
   });
 
@@ -753,10 +755,13 @@ describe('migrateModerationFormat unknown format', () => {
     const loaded = store.getProject(p.meta.id);
 
     expect(loaded!.sources[0].moderation).toEqual({ status: 'error', categories: {} });
-    expect(warnSpy).toHaveBeenCalledWith(
-      'Unknown moderation format during migration:',
-      expect.any(String),
-    );
+    const calls = warnSpy.mock.calls.flat();
+    expect(
+      calls.some(
+        (arg) =>
+          typeof arg === 'string' && arg.includes('Unknown moderation format during migration'),
+      ),
+    ).toBe(true);
     warnSpy.mockRestore();
   });
 });

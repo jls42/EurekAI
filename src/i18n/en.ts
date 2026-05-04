@@ -374,6 +374,7 @@ export const en: Record<string, string> = {
   'toast.courseCreateError': 'Error creating course',
   'toast.projectDeleted': 'Project deleted',
   'toast.projectDeleteError': 'Failed to delete project',
+  'toast.projectLoadError': 'Failed to load project',
   'toast.micError': 'Cannot access microphone: {error}',
   'toast.voiceTranscribed': 'Voice transcribed!',
   'toast.transcriptionError': 'Transcription error: {error}',

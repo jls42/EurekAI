@@ -14,6 +14,7 @@ function makeContext(overrides: any = {}) {
     abortControllers: {} as Record<string, AbortController>,
     abortControllersByGid: {} as Record<string, AbortController>,
     pendingById: {} as Record<string, any>,
+    generations: [] as any[],
     currentProjectId: 'pid-1',
     loading: {
       summary: false,

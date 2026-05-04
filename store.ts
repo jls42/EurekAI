@@ -160,36 +160,48 @@ export class ProjectStore {
     this.touchIndex(id, data.meta);
   }
 
-  deleteProject(id: string) {
-    // Avant rmSync : émettre des events 'cancelled' pour les pendings actifs.
-    // Sinon les onglets ouverts gardent leurs chips orphelins jusqu'à ce que
-    // RECONNECT_MAX_RETRIES (8) soit atteint sur le prochain reconnect SSE
-    // (le serveur répond 404 sur /events). Cohérent avec cancelAllPendingsAtBoot
-    // qui purge les pendings ghost laissés par un process mort.
+  // Sous-helper extrait : capture l'état pending → terminal pour émission
+  // post-rmSync (sinon les chips orphelins persistent jusqu'à
+  // RECONNECT_MAX_RETRIES sur le prochain reconnect SSE).
+  private capturePendingTerminalsForDelete(id: string): PendingTrackerEntryTerminal[] {
     const data = this.getProject(id);
-    const pendingTerminals: PendingTrackerEntryTerminal[] = [];
-    if (data) {
-      const tracker = data.results.pendingTracker ?? [];
-      for (const entry of tracker) {
-        if (entry.status !== 'pending') continue;
-        pendingTerminals.push({
-          id: entry.id,
-          type: entry.type,
-          startedAt: entry.startedAt,
-          sourceIds: entry.sourceIds,
-          status: 'cancelled',
-          failureCode: 'cancelled',
-          completedAt: new Date().toISOString(),
-        });
-      }
+    if (!data) return [];
+    const terminals: PendingTrackerEntryTerminal[] = [];
+    const tracker = data.results.pendingTracker ?? [];
+    for (const entry of tracker) {
+      if (entry.status !== 'pending') continue;
+      terminals.push({
+        id: entry.id,
+        type: entry.type,
+        startedAt: entry.startedAt,
+        sourceIds: entry.sourceIds,
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        completedAt: new Date().toISOString(),
+      });
     }
-    const dir = this.projectDir(id);
-    if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
-    const index = this.readIndex().filter((p) => p.id !== id);
-    this.writeIndex(index);
+    return terminals;
+  }
+
+  deleteProject(id: string): boolean {
+    // Retourne false UNIQUEMENT si l'opération filesystem échoue (rmSync /
+    // writeIndex throw : EACCES, EBUSY, ENOSPC, EROFS). Project absent =
+    // no-op succès (true) — le caller voulait juste s'assurer qu'il n'y est
+    // plus, et c'est le cas. Cf. routes/projects.ts qui mappe false → 500.
+    const pendingTerminals = this.capturePendingTerminalsForDelete(id);
+    try {
+      const dir = this.projectDir(id);
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      const index = this.readIndex().filter((p) => p.id !== id);
+      this.writeIndex(index);
+    } catch (err) {
+      logger.error('deleteProject: filesystem failure', id, err);
+      return false;
+    }
     for (const entry of pendingTerminals) {
       this.emitTerminalEvent(id, entry);
     }
+    return true;
   }
 
   renameProject(id: string, name: string) {
@@ -296,11 +308,17 @@ export class ProjectStore {
     return source;
   }
 
-  deleteGeneration(projectId: string, generationId: string): void {
+  deleteGeneration(projectId: string, generationId: string): boolean {
+    // Retourne true uniquement si la generation a effectivement été retirée :
+    // route delete renvoie 404 sinon (cf. CLAUDE.md : double-delete entre 2
+    // onglets ne doit pas masquer un toast "supprimé" trompeur).
     const data = this.getProject(projectId);
-    if (!data) return;
+    if (!data) return false;
+    const before = data.results.generations.length;
     data.results.generations = data.results.generations.filter((g) => g.id !== generationId);
+    if (data.results.generations.length === before) return false;
     this.saveProject(projectId, data);
+    return true;
   }
 
   updateGeneration(

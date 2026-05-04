@@ -512,14 +512,15 @@ describe('DELETE /:pid/generations/:gid', () => {
     expect(gen).toBeNull();
   });
 
-  it('ne plante pas si la generation n existe pas', () => {
+  it('retourne 404 generation_not_found quand la gid n existe pas (evite double-delete trompeur)', () => {
     const handler = getHandler(router, 'delete', '/:pid/generations/:gid');
     const req = mockReq({ params: { pid, gid: 'nonexistent' } });
     const res = mockRes();
 
     handler(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 });
 

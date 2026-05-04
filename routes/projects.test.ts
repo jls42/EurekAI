@@ -519,6 +519,23 @@ describe('GET /:pid/events (SSE)', () => {
     expect(res.flushHeaders).not.toHaveBeenCalled();
   });
 
+  // Régression-lock T2 : 60 GET successifs sur pid inconnu n'attachent jamais
+  // de listener bus (cap 50 → MaxListenersWarning sinon). Vérifie que le 404
+  // pre-flushHeaders bloque effectivement subscribeGeneration.
+  it('60 GET sur pid inexistant : 0 listener bus attache (pas de leak listener)', async () => {
+    const { generationListenerCount } = await import('../helpers/event-bus.js');
+    const before = generationListenerCount();
+    const handler = getHandler(router, 'get', '/:pid/events');
+    for (let i = 0; i < 60; i++) {
+      const req = mockSseReq(`bidon-${i}`);
+      const res = mockSseRes();
+      res.status = vi.fn(() => res);
+      res.json = vi.fn(() => res);
+      handler(req, res);
+    }
+    expect(generationListenerCount()).toBe(before);
+  });
+
   // Régression-lock : writeGenerationEvent doit guarder writableEnded AVANT
   // d'écrire. Sans ce guard, un event émis après que le socket s'est fermé
   // (race entre bus.emit et req.on('close')) déclenche ERR_STREAM_WRITE_AFTER_END,

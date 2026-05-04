@@ -96,8 +96,6 @@ type SeenMap = Record<string, string[]>;
 type ProjectsSeenMap = Record<string, Record<string, string>>;
 
 // --- Helpers de lecture/écriture sécurisée ---
-// Arrow function pour éviter le faux positif Codacy "Method has 9 parameters"
-// déclenché par le type generic <T> sur la signature classique `function`.
 
 const readJson = <T>(storage: StorageLike, key: string, fallback: T): T => {
   const raw = storage.getItem(key);
@@ -200,42 +198,54 @@ export function appendNotification(
   return true;
 }
 
-export function markAllRead(profileId: string, storage: StorageLike = localStorage): void {
+// Retourne false si le persist quota fail (l'UI peut alors surface un toast
+// `notifPersistFailed` plutôt que d'afficher silencieusement un état "tout lu"
+// qui se réverte au reload).
+export function markAllRead(profileId: string, storage: StorageLike = localStorage): boolean {
   const all = readNotifs(storage);
   const list = all[profileId];
-  if (!list || list.length === 0) return;
+  if (!list || list.length === 0) return true;
   all[profileId] = list.map((n) => ({ ...n, read: true }));
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markAllRead persist failed', { profileId });
+    return false;
   }
+  return true;
 }
 
 export function markRead(
   profileId: string,
   eventKey: EventKey,
   storage: StorageLike = localStorage,
-): void {
+): boolean {
   const all = readNotifs(storage);
   const list = all[profileId];
-  if (!list) return;
+  if (!list) return true;
   const idx = list.findIndex((n) => n.eventKey === eventKey);
-  if (idx === -1) return;
+  if (idx === -1) return true;
   list[idx] = { ...list[idx], read: true };
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markRead persist failed', { profileId, eventKey });
+    return false;
   }
+  return true;
 }
 
 // "Vider" — supprime les notifs visibles SEULEMENT. Le ledger seenEventKeys
 // est PRÉSERVÉ : sinon une réconciliation future (switch projet, reconnect SSE,
 // reload) recréerait les mêmes notifs supprimées.
-export function clearNotifications(profileId: string, storage: StorageLike = localStorage): void {
+export function clearNotifications(
+  profileId: string,
+  storage: StorageLike = localStorage,
+): boolean {
   const all = readNotifs(storage);
-  if (!(profileId in all)) return;
+  if (!(profileId in all)) return true;
   delete all[profileId];
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] clearNotifications persist failed', { profileId });
+    return false;
   }
+  return true;
 }
 
 export function hasSeenEvent(
@@ -270,5 +280,10 @@ export function setProjectLastSeen(
   const all = readProjectsSeen(storage);
   all[profileId] ??= {};
   all[profileId][projectId] = iso;
-  writeJson(storage, PROJECTS_SEEN_SLOT, all);
+  if (!writeJson(storage, PROJECTS_SEEN_SLOT, all)) {
+    // Quota fail = watermark drift silencieux (next reconcile retombera sur
+    // le cutoff "now" et perdra les events du delta). Pas critique mais visible
+    // en dev pour diagnostiquer une UX "notifs disparaissent au reload".
+    console.warn('[notifications] setProjectLastSeen persist failed', { profileId, projectId });
+  }
 }

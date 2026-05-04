@@ -5,7 +5,9 @@ import { logger } from '../helpers/logger.js';
 import { summarySystem, summaryUser } from '../prompts.js';
 import type { StudyFiche, AgeGroup } from '../types.js';
 
-function isValidSummary(data: unknown): data is StudyFiche {
+// `const = function` plutôt que `function` pour empêcher Lizard d'agglomérer le CCN
+// avec unwrapAndMerge / extractSummary qui suivent (cf. CLAUDE.md piège connu).
+const isValidSummary = function (data: unknown): data is StudyFiche {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
   return (
@@ -16,12 +18,12 @@ function isValidSummary(data: unknown): data is StudyFiche {
     Array.isArray(d.key_points) &&
     d.key_points.length > 0
   );
-}
+};
 
 type FicheFragment = Partial<StudyFiche>;
 
 /** When the model wraps multiple fiches in {"fiches": [...]}, merge them into one. */
-function unwrapAndMerge(data: Record<string, unknown>): StudyFiche | null {
+const unwrapAndMerge = function (data: Record<string, unknown>): StudyFiche | null {
   const fiches = data.fiches || data.fiche || data.results || data.summary_fiches;
   if (!Array.isArray(fiches) || fiches.length === 0) return null;
   const typed = fiches as FicheFragment[];
@@ -54,7 +56,7 @@ function unwrapAndMerge(data: Record<string, unknown>): StudyFiche | null {
   });
 
   return merged;
-}
+};
 
 function extractSummary(raw: string): StudyFiche {
   const data = safeParseJson<Record<string, unknown>>(raw);

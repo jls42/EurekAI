@@ -30,6 +30,14 @@ export function emitGenerationEvent(event: GenerationEvent): void {
   bus.emit(EVENT_NAME, event);
 }
 
+// Helper test-only : nombre de listeners actuellement attachés sur le canal
+// 'generation'. Permet de verrouiller "404 sur pid inconnu ne fuit aucun
+// listener" sans exposer le bus brut. Pas de dépendance ergonomique côté
+// production code (les call sites passent par subscribeGeneration uniquement).
+export function generationListenerCount(): number {
+  return bus.listenerCount(EVENT_NAME);
+}
+
 // Souscription filtrée par projectId. Retourne un unsubscribe à appeler à la
 // fermeture du stream SSE (close listener, error listener, ou heartbeat-stuck
 // cleanup) pour éviter les fuites de listeners.

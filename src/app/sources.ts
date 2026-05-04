@@ -177,6 +177,79 @@ export function _maybeCleanupSession(this: AppContext, sessionId: string) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers extraits de createSources.addText pour rester sous CCN 8 (Lizard).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const startAddTextSession = function (state: AppContext, projectId: string): UploadSession | null {
+  const sessionId = crypto.randomUUID();
+  state.uploadSessions.push({
+    id: sessionId,
+    projectId,
+    cleanupScheduled: false,
+    files: [
+      {
+        id: crypto.randomUUID(),
+        name: 'text',
+        file: null,
+        status: 'uploading' as const,
+        errorMsg: null,
+      },
+    ],
+  });
+  return state.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
+};
+
+const handleAddTextResponse = async function (
+  state: AppContext,
+  session: UploadSession,
+  res: Response,
+): Promise<void> {
+  if (!_isSessionActive(state, session)) return;
+  if (!res.ok) {
+    const err = await res.json();
+    if (!_isSessionActive(state, session)) return;
+    state.showToast(
+      state.t(TOAST_ERROR, { error: state.resolveError(err.error || res.statusText) }),
+      'error',
+    );
+    return;
+  }
+  const source = await res.json();
+  if (!_isSessionActive(state, session)) return;
+  state.sources.push(source);
+  state.selectedIds.push(source.id);
+  state.textInput = '';
+  state.showTextInput = false;
+  state.showToast(state.t('toast.textAdded'), 'success');
+  state.$nextTick(() => state.refreshIcons());
+  setTimeout(() => {
+    if (_isSessionActive(state, session)) state.refreshModeration();
+  }, 2000);
+};
+
+const runAddText = async function (state: AppContext): Promise<void> {
+  const text = state.textInput.trim();
+  const projectId = state.currentProjectId;
+  if (!text || !projectId) return;
+  const session = startAddTextSession(state, projectId);
+  if (!session) return;
+  try {
+    const res = await fetch(state.apiBase() + '/sources/text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, lang: state.locale }),
+    });
+    await handleAddTextResponse(state, session, res);
+  } catch (e: unknown) {
+    if (!_isSessionActive(state, session)) return;
+    const msg = e instanceof Error ? e.message : String(e);
+    state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error', () => state.addText());
+  } finally {
+    state.uploadSessions = state.uploadSessions.filter((s: UploadSession) => s.id !== session.id);
+  }
+};
+
 export function createSources() {
   return {
     handleDrop(this: AppContext, e: DragEvent) {
@@ -224,62 +297,7 @@ export function createSources() {
     },
 
     async addText(this: AppContext) {
-      const text = this.textInput.trim();
-      const projectId = this.currentProjectId;
-      if (!text || !projectId) return;
-
-      const sessionId = crypto.randomUUID();
-      this.uploadSessions.push({
-        id: sessionId,
-        projectId,
-        cleanupScheduled: false,
-        files: [
-          {
-            id: crypto.randomUUID(),
-            name: 'text',
-            file: null,
-            status: 'uploading' as const,
-            errorMsg: null,
-          },
-        ],
-      });
-      const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
-      if (!session) return;
-
-      try {
-        const res = await fetch(this.apiBase() + '/sources/text', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, lang: this.locale }),
-        });
-        if (!_isSessionActive(this, session)) return;
-        if (!res.ok) {
-          const err = await res.json();
-          if (!_isSessionActive(this, session)) return;
-          this.showToast(
-            this.t(TOAST_ERROR, { error: this.resolveError(err.error || res.statusText) }),
-            'error',
-          );
-          return;
-        }
-        const source = await res.json();
-        if (!_isSessionActive(this, session)) return;
-        this.sources.push(source);
-        this.selectedIds.push(source.id);
-        this.textInput = '';
-        this.showTextInput = false;
-        this.showToast(this.t('toast.textAdded'), 'success');
-        this.$nextTick(() => this.refreshIcons());
-        setTimeout(() => {
-          if (_isSessionActive(this, session)) this.refreshModeration();
-        }, 2000);
-      } catch (e: unknown) {
-        if (!_isSessionActive(this, session)) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error', () => this.addText());
-      } finally {
-        this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
-      }
+      await runAddText(this);
     },
 
     async deleteSource(this: AppContext, id: string) {
@@ -360,26 +378,32 @@ export function createSources() {
     },
 
     async refreshModeration(this: AppContext, retries = 3) {
-      if (!this.currentProjectId) return;
-      try {
-        const res = await fetch('/api/projects/' + this.currentProjectId);
-        if (res.ok) {
-          const project = await res.json();
-          for (const src of project.sources as Source[]) {
-            if (src.moderation) {
-              const local = this.sources.find((s: Source) => s.id === src.id);
-              if (local) local.moderation = src.moderation;
-            }
-          }
-          this.$nextTick(() => this.refreshIcons());
-          const hasPending = this.sources.some((s: Source) => s.moderation?.status === 'pending');
-          if (hasPending && retries > 0) {
-            setTimeout(() => this.refreshModeration(retries - 1), 3000);
-          }
-        }
-      } catch (e) {
-        console.error('[sources] refreshModeration failed:', e);
-      }
+      await runRefreshModeration(this, retries);
     },
   };
 }
+
+const mergeServerModeration = function (state: AppContext, serverSources: Source[]): void {
+  for (const src of serverSources) {
+    if (!src.moderation) continue;
+    const local = state.sources.find((s: Source) => s.id === src.id);
+    if (local) local.moderation = src.moderation;
+  }
+};
+
+const runRefreshModeration = async function (state: AppContext, retries: number): Promise<void> {
+  if (!state.currentProjectId) return;
+  try {
+    const res = await fetch('/api/projects/' + state.currentProjectId);
+    if (!res.ok) return;
+    const project = await res.json();
+    mergeServerModeration(state, project.sources as Source[]);
+    state.$nextTick(() => state.refreshIcons());
+    const hasPending = state.sources.some((s: Source) => s.moderation?.status === 'pending');
+    if (hasPending && retries > 0) {
+      setTimeout(() => state.refreshModeration(retries - 1), 3000);
+    }
+  } catch (e) {
+    console.error('[sources] refreshModeration failed:', e);
+  }
+};

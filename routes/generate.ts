@@ -37,6 +37,31 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
+import type { PromoteResult } from '../store.js';
+
+const assertNever = (x: never): never => {
+  throw new Error('exhaustive check failed: ' + JSON.stringify(x));
+};
+
+// Centralise le remap PromoteResult (interne store) → PromoteErrorOutcome (wire).
+// Source unique pour éviter la dérive entre les 2 dispatch sites (handleGeneration
+// + runStep auto). Le switch sur `kind` force exhaustivité au compile-time : un
+// nouveau arm de PromoteResult casse la build au lieu de tomber dans le default.
+function classifyPromoteFailure(result: Exclude<PromoteResult, { kind: 'promoted' }>): {
+  outcome: PromoteErrorOutcome;
+  isMissing: boolean;
+} {
+  switch (result.kind) {
+    case 'cancelled':
+      return { outcome: 'cancelled', isMissing: false };
+    case 'failed':
+      return { outcome: 'failed', isMissing: false };
+    case 'missing':
+      return { outcome: 'failed', isMissing: true };
+    default:
+      return assertNever(result);
+  }
+}
 
 const QUIZ_VOCAL = 'quiz-vocal' as const;
 const FILL_BLANK = 'fill-blank' as const;
@@ -362,19 +387,15 @@ async function runGeneratorAndPersist(
       res.json(promoteResult.generation);
       return;
     }
-    if (promoteResult.kind === 'missing') {
+    // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
+    // 200 fantôme — le client refresh le projet pour voir l'état réel.
+    const { outcome, isMissing } = classifyPromoteFailure(promoteResult);
+    if (isMissing) {
       // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
       // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
       logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
     }
-    // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
-    // 200 fantôme — le client refresh le projet pour voir l'état réel.
-    // Le typage PromoteErrorResponse découple le contrat HTTP du discriminant
-    // store : 'missing' est un signal observabilité serveur, pas un code stable
-    // client → remap en 'failed' avant le wire.
-    const errorOutcome: PromoteErrorOutcome =
-      promoteResult.kind === 'cancelled' ? 'cancelled' : 'failed';
-    const body: PromoteErrorResponse = { error: errorOutcome, gid };
+    const body: PromoteErrorResponse = { error: outcome, gid };
     res.status(409).json(body);
     return;
   }
@@ -946,30 +967,40 @@ export function generateRoutes(
     },
   };
 
+  // Sous-helper extrait : valide les inputs route + prépare le markdown
+  // (consigne + context limit). Retourne null après envoi 4xx si invalide.
+  function prepareRouteRequest(
+    req: Request,
+    res: Response,
+  ): { markdown: string; lang: string; ageGroup: AgeGroup } | null {
+    const project = store.getProject(String(req.params.pid));
+    if (!project) {
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+      return null;
+    }
+    const lang = req.body.lang || 'fr';
+    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
+    const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
+    if (rawMarkdown === null) {
+      res.status(400).json({ error: 'no_sources' });
+      return null;
+    }
+    const useConsigneRoute = req.body.useConsigne !== false;
+    const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+    const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
+    if (ctxError) {
+      res.status(400).json({ error: ctxError });
+      return null;
+    }
+    return { markdown, lang, ageGroup };
+  }
+
   // --- Route analysis only (for 2-phase auto) ---
   router.post('/:pid/generate/route', async (req, res) => {
     try {
-      const project = store.getProject(req.params.pid);
-      if (!project) {
-        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-        return;
-      }
-      const lang = req.body.lang || 'fr';
-      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
-      if (rawMarkdown === null) {
-        res.status(400).json({ error: 'no_sources' });
-        return;
-      }
-      const useConsigneRoute = req.body.useConsigne !== false;
-      const markdown = useConsigneRoute
-        ? applyConsigne(rawMarkdown, project.consigne)
-        : rawMarkdown;
-      const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
-      if (ctxError) {
-        res.status(400).json({ error: ctxError });
-        return;
-      }
+      const prepared = prepareRouteRequest(req, res);
+      if (!prepared) return;
+      const { markdown, lang, ageGroup } = prepared;
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
         routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
@@ -1057,20 +1088,30 @@ export function generateRoutes(
     // sous nos pieds entre addPendingEntry et promoteToGeneration). On distingue
     // 'missing' de 'cancelled' explicitement : 'missing' = symptôme d'un cleanup
     // imprévu (tracker corrompu, race avec deleteProject), donc 'internal_error'
-    // pour ne pas masquer un bug en code utilisateur 'cancelled' attendu.
-    let code: FailedStepCode;
-    if (promoteResult.kind === 'failed') code = promoteResult.code;
-    else if (promoteResult.kind === 'cancelled') code = 'cancelled';
-    else code = 'internal_error';
+    // côté client pour ne pas masquer un bug en code utilisateur 'cancelled'.
+    // Switch exhaustif (assertNever) verrouille le passage de tout futur arm.
+    const code = pickAutoStepFailureCode(promoteResult);
     if (promoteResult.kind === 'missing') {
-      // Signal observabilité : tracker entry retirée entre addPendingEntry et
-      // promoteToGeneration (race deleteProject ou corruption). logger.error
-      // pour remonter en Sentry, jamais un cancel user-initié.
       logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
     } else {
       logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
     }
     return { ok: false, agent: step.agent, code };
+  }
+
+  function pickAutoStepFailureCode(
+    result: Exclude<PromoteResult, { kind: 'promoted' }>,
+  ): FailedStepCode {
+    switch (result.kind) {
+      case 'failed':
+        return result.code;
+      case 'cancelled':
+        return 'cancelled';
+      case 'missing':
+        return 'internal_error';
+      default:
+        return assertNever(result);
+    }
   }
 
   function runStepCatch(
@@ -1114,6 +1155,18 @@ export function generateRoutes(
         // runStep catche déjà tout. Ce cas ne devrait pas arriver, mais on le capte
         // quand même pour ne jamais perdre un step du plan.
         logger.error('auto', `${step.agent} unexpected rejection:`, outcome.reason);
+        // Si l'erreur porte un apiUsage (cas où l'exception a fui tracked-client
+        // sans passer par runStepCatch), persister quand même pour ne pas
+        // perdre le coût Mistral déjà facturé. Mirror du pattern runStepCatch.
+        const failedUsage = (outcome.reason as { apiUsage?: ApiUsage[] })?.apiUsage;
+        if (failedUsage?.length) {
+          persistUsage(
+            st,
+            pid,
+            `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+            failedUsage,
+          );
+        }
         failedSteps.push({ agent: step.agent, code: extractErrorCode(outcome.reason, step.agent) });
         return;
       }

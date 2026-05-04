@@ -377,6 +377,7 @@ export const de: Record<string, string> = {
   'toast.courseCreateError': 'Fehler beim Erstellen des Kurses',
   'toast.projectDeleted': 'Projekt gel\u00f6scht',
   'toast.projectDeleteError': 'Fehler beim L\u00f6schen des Projekts',
+  'toast.projectLoadError': 'Fehler beim Laden des Projekts',
   'toast.micError': 'Zugriff auf Mikrofon nicht m\u00f6glich: {error}',
   'toast.voiceTranscribed': 'Sprache transkribiert!',
   'toast.transcriptionError': 'Transkriptionsfehler: {error}',
