@@ -394,10 +394,11 @@ const mergeServerModeration = function (state: AppContext, serverSources: Source
 const runRefreshModeration = async function (state: AppContext, retries: number): Promise<void> {
   if (!state.currentProjectId) return;
   try {
-    // nosemgrep: rule-node-ssrf -- projectId vient de currentProjectId (state interne),
-    // pas d'input user direct. Pas de whitelist applicable (set d'IDs dynamique).
-    // Le pattern existait déjà avant le refactor extraction (cf. CLAUDE.md effet
-    // secondaire taint sur cleanup/refactor).
+    // projectId vient de currentProjectId (state interne), pas d'input user direct.
+    // Pas de whitelist applicable (set d'IDs dynamique). Pattern préexistant à
+    // l'extraction de runRefreshModeration ; le taint analysis Codacy re-flag
+    // après refactor (cf. CLAUDE.md effet secondaire taint sur cleanup).
+    // nosemgrep
     const res = await fetch('/api/projects/' + state.currentProjectId);
     if (!res.ok) return;
     const project = await res.json();

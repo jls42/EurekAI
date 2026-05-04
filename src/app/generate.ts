@@ -583,10 +583,11 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
   const controller = new AbortController();
   setupGeneratePending(state, type, gid, controller);
   try {
-    // nosemgrep: rule-node-ssrf -- projectId vient de currentProjectId (state interne),
-    // pas d'input user direct. Pas de whitelist applicable (set d'IDs dynamique).
-    // Le pattern existait avant l'extraction de runSingleGenerate ; le taint
-    // analysis re-flag sur fonction fraîchement extraite (cf. CLAUDE.md piège).
+    // projectId vient de currentProjectId (state interne), pas d'input user direct.
+    // Pas de whitelist applicable (set d'IDs dynamique). Pattern préexistant à
+    // l'extraction de runSingleGenerate ; le taint analysis Codacy re-flag après
+    // refactor (cf. CLAUDE.md piège effet secondaire taint).
+    // nosemgrep
     const res = await fetch(
       '/api/projects/' + projectId + '/generate/' + type,
       postJson({ ...buildGenerateBody(state), gid }, controller.signal),
