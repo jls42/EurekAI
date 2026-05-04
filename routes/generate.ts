@@ -15,7 +15,7 @@ import type {
   PromoteErrorOutcome,
   PromoteErrorResponse,
 } from '../types.js';
-import type { ProjectStore } from '../store.js';
+import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../config.js';
@@ -37,7 +37,6 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
-import type { PromoteResult } from '../store.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));

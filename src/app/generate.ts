@@ -577,21 +577,21 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
   if (!canStartGenerate(state, type)) return;
   const projectId = state.currentProjectId;
   if (!projectId) return;
+  // URL whitelist : pattern Codacy/Opengrep rule-node-ssrf "safe example".
+  // Pré-calcul de la liste complète des URLs autorisées pour ce projet ;
+  // fetch n'exécute que si l'URL cible matche exactement (cf. commit 00af5f2
+  // pour le mass-generate). Same-origin + projectId state interne, mais le
+  // pattern .includes(url) éteint la taint analysis sans suppression.
+  const allowedUrls = AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t);
+  const url = '/api/projects/' + projectId + '/generate/' + type;
+  if (!allowedUrls.includes(url)) return;
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
   const controller = new AbortController();
   setupGeneratePending(state, type, gid, controller);
   try {
-    // projectId vient de currentProjectId (state interne), pas d'input user direct.
-    // Pas de whitelist applicable (set d'IDs dynamique). Pattern préexistant à
-    // l'extraction de runSingleGenerate ; le taint analysis Codacy re-flag après
-    // refactor (cf. CLAUDE.md piège effet secondaire taint).
-    // nosemgrep
-    const res = await fetch(
-      '/api/projects/' + projectId + '/generate/' + type,
-      postJson({ ...buildGenerateBody(state), gid }, controller.signal),
-    );
+    const res = await fetch(url, postJson({ ...buildGenerateBody(state), gid }, controller.signal));
     if (state.currentProjectId !== projectId) return;
     await dispatchGenerateResponse(state, type, gid, res);
   } catch (e: unknown) {

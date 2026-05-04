@@ -33,6 +33,21 @@ const FILL_BLANK = 'fill-blank';
 
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
 
+// Phase 1B.1 — figer lang + ageGroup sur la génération (cf. décisions produit #4, #7).
+// - lang : best-effort partiel via req.body.lang pour les quiz legacy (cf. #9).
+//   Limite : si la locale UI a changé depuis la génération, le fallback sera incorrect.
+// - ageGroup : pas de fallback body (le frontend ne l'envoie pas). Régression assumée
+//   vers 'enfant' pour les quiz legacy (cf. #9).
+function resolveVocalAnswerLocale(
+  quizGen: QuizVocalGeneration,
+  req: Request,
+): { lang: string; ageGroup: AgeGroup } {
+  return {
+    lang: quizGen.lang ?? req.body.lang ?? 'fr',
+    ageGroup: quizGen.ageGroup ?? 'enfant',
+  };
+}
+
 const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
   stats[qi] ??= { correct: 0, wrong: 0 };
   if (correct) stats[qi].correct++;
@@ -396,21 +411,6 @@ export function generationCrudRoutes(
       return null;
     }
     return { quizGen, question };
-  }
-
-  // Phase 1B.1 — figer lang + ageGroup sur la génération (cf. décisions produit #4, #7).
-  // - lang : best-effort partiel via req.body.lang pour les quiz legacy (cf. #9).
-  //   Limite : si la locale UI a changé depuis la génération, le fallback sera incorrect.
-  // - ageGroup : pas de fallback body (le frontend ne l'envoie pas). Régression assumée
-  //   vers 'enfant' pour les quiz legacy (cf. #9).
-  function resolveVocalAnswerLocale(
-    quizGen: QuizVocalGeneration,
-    req: Request,
-  ): { lang: string; ageGroup: AgeGroup } {
-    return {
-      lang: quizGen.lang ?? req.body.lang ?? 'fr',
-      ageGroup: quizGen.ageGroup ?? 'enfant',
-    };
   }
 
   // --- Quiz vocal: verify spoken answer ---

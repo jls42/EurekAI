@@ -1,3 +1,11 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-member-access -- Codacy applique
+   tseslint.recommendedTypeChecked sur ce fichier. Notre tsconfig racine
+   exclut src/, donc les types de vitest (describe/it/expect/beforeEach/vi)
+   sont résolus en `error` → cascade unsafe-call / unsafe-member-access sur
+   chaque expect(...).toBe(...). Localement les types sont OK via projectService.
+   linterOptions.reportUnusedDisableDirectives off côté tests pour ne pas
+   warn local quand projectService a déjà résolu les types correctement. */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   appendNotification,

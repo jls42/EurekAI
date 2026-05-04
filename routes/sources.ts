@@ -27,6 +27,17 @@ function pendingModeration(): Source['moderation'] {
 // cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
+// Sous-helper : valide le query input pour /sources/websearch. Retourne null si
+// invalide (et envoie déjà la réponse HTTP) — caller juste `return` après.
+function validateWebsearchQuery(req: Request, res: Response): string | null {
+  const { query } = req.body;
+  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    res.status(400).json({ error: 'query requis' });
+    return null;
+  }
+  return query;
+}
+
 const runConsigneDetection = async (
   store: ProjectStore,
   client: Mistral,
@@ -594,17 +605,6 @@ export function sourceRoutes(
   }
 
   // Web search / URL scrape source
-  // Sous-helper : valide le query input. Retourne null si invalide (et envoie
-  // déjà la réponse HTTP) — caller juste `return` après.
-  function validateWebsearchQuery(req: Request, res: Response): string | null {
-    const { query } = req.body;
-    if (!query || typeof query !== 'string' || query.trim().length === 0) {
-      res.status(400).json({ error: 'query requis' });
-      return null;
-    }
-    return query;
-  }
-
   // Sous-helper : si modération activée, vérifie que la query passe la
   // modération. Retourne true si OK pour continuer, false si bloquée (réponse
   // déjà envoyée).
