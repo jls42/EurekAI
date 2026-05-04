@@ -1,10 +1,5 @@
-import {
-  describe as _describe,
-  it as _it,
-  expect as _expect,
-  beforeEach as _beforeEach,
-  vi,
-} from 'vitest';
+import { describe, it, beforeEach, vi } from 'vitest';
+import { strict as assert } from 'node:assert';
 import {
   appendNotification,
   listProfileNotifications,
@@ -20,43 +15,31 @@ import {
 } from './notifications.js';
 import type { EventKey } from '../../helpers/event-bus.js';
 
-// Aliases typés pour vitest globals — Codacy applique tseslint.recommendedTypeChecked
+// Wrappers typés pour vitest globals — Codacy applique tseslint.recommendedTypeChecked
 // et notre tsconfig racine exclut src/, donc les types vitest sont résolus en
-// `error` → cascade @typescript-eslint/no-unsafe-call sur describe/it/expect.
-// Le pattern eslint-disable file-level n'est pas honoré par Codacy ; on type-wrap
-// les imports en aliases explicites (cf. sse-pendings.test.ts pour le même
-// contournement). Local OK via projectService.
+// `error` → cascade @typescript-eslint/no-unsafe-call. Ni le block-comment
+// /* eslint-disable */ file-level, ni les casts `as DescribeFn` ne sont honorés
+// par Codacy. Pattern robuste (cf. sse-pendings.test.ts) : wrappers explicitement
+// typés + assert au lieu de expect, plus aucun unsafe-call dans les call sites.
 // eslint-disable-next-line no-unused-vars -- type-sig params required by TS
 type DescribeFn = (_name: string, _fn: () => void) => void;
 // eslint-disable-next-line no-unused-vars -- type-sig params required by TS
 type ItFn = (_name: string, _fn: () => Promise<void> | void) => void;
 // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
 type HookFn = (_fn: () => Promise<void> | void) => void;
-type Matcher = {
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  toBe: (_v: unknown) => void;
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  toEqual: (_v: unknown) => void;
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  toHaveLength: (_n: number) => void;
-  toBeNull: () => void;
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  toHaveBeenCalledWith: (..._args: unknown[]) => void;
-  not: { toThrow: () => void };
-};
-type ExpectMatchers = Matcher & {
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  any: (_constructor: unknown) => unknown;
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  objectContaining: (_obj: Record<string, unknown>) => unknown;
-};
-// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-type ExpectFn = ((_val: unknown) => Matcher) & ExpectMatchers;
 
-const describe = _describe as DescribeFn;
-const it = _it as ItFn;
-const beforeEach = _beforeEach as HookFn;
-const expect = _expect as unknown as ExpectFn;
+/* eslint-disable @typescript-eslint/no-unsafe-call --
+   describe/it/beforeEach typés `error` côté Codacy. Local OK via projectService. */
+const $describe: DescribeFn = (name, fn) => {
+  describe(name, fn);
+};
+const $it: ItFn = (name, fn) => {
+  it(name, fn);
+};
+const $beforeEach: HookFn = (fn) => {
+  beforeEach(fn);
+};
+/* eslint-enable @typescript-eslint/no-unsafe-call */
 
 function makeStorage(): StorageLike {
   const data = new Map<string, string>();
@@ -70,7 +53,7 @@ function makeStorage(): StorageLike {
 
 let storage: StorageLike;
 
-beforeEach(() => {
+$beforeEach(() => {
   storage = makeStorage();
 });
 
@@ -97,141 +80,156 @@ const N = (overrides: NotificationOverrides = {}) => {
   };
 };
 
-describe('appendNotification', () => {
-  it('ajoute une notification visible et marque l event vu', () => {
-    expect(appendNotification('p1', N(), storage)).toBe(true);
+$describe('appendNotification', () => {
+  $it('ajoute une notification visible et marque l event vu', () => {
+    assert.equal(appendNotification('p1', N(), storage), true);
     const list = listProfileNotifications('p1', storage);
-    expect(list).toHaveLength(1);
-    expect(list[0].eventKey).toBe('generation:gid-1:completed');
-    expect(list[0].read).toBe(false);
-    expect(hasSeenEvent('p1', E('generation:gid-1:completed'), storage)).toBe(true);
+    assert.equal(list.length, 1);
+    assert.equal(list[0].eventKey, 'generation:gid-1:completed');
+    assert.equal(list[0].read, false);
+    assert.equal(hasSeenEvent('p1', E('generation:gid-1:completed'), storage), true);
   });
 
-  it('est idempotent par eventKey (no-op si déjà vu)', () => {
-    expect(appendNotification('p1', N(), storage)).toBe(true);
-    expect(appendNotification('p1', N({ message: 'Ignored' }), storage)).toBe(false);
-    expect(listProfileNotifications('p1', storage)).toHaveLength(1);
+  $it('est idempotent par eventKey (no-op si déjà vu)', () => {
+    assert.equal(appendNotification('p1', N(), storage), true);
+    assert.equal(appendNotification('p1', N({ message: 'Ignored' }), storage), false);
+    assert.equal(listProfileNotifications('p1', storage).length, 1);
   });
 
-  it('isole les notifs par profileId', () => {
+  $it('isole les notifs par profileId', () => {
     appendNotification('pA', N({ eventKey: 'generation:a:completed' }), storage);
     appendNotification('pB', N({ eventKey: 'generation:b:completed' }), storage);
-    expect(listProfileNotifications('pA', storage)).toHaveLength(1);
-    expect(listProfileNotifications('pB', storage)).toHaveLength(1);
-    expect(hasSeenEvent('pA', E('generation:b:completed'), storage)).toBe(false);
+    assert.equal(listProfileNotifications('pA', storage).length, 1);
+    assert.equal(listProfileNotifications('pB', storage).length, 1);
+    assert.equal(hasSeenEvent('pA', E('generation:b:completed'), storage), false);
   });
 
-  it('cap à MAX_PER_PROFILE (50) avec FIFO drop', () => {
+  $it('cap à MAX_PER_PROFILE (50) avec FIFO drop', () => {
     for (let i = 0; i < 60; i++) {
       appendNotification('p1', N({ eventKey: `gen:${i}:completed` }), storage);
     }
     const list = listProfileNotifications('p1', storage);
-    expect(list).toHaveLength(50);
+    assert.equal(list.length, 50);
     // Les plus anciens (0-9) sont droppés, on garde 10-59
-    expect(list[0].eventKey).toBe('gen:10:completed');
-    expect(list[49].eventKey).toBe('gen:59:completed');
+    assert.equal(list[0].eventKey, 'gen:10:completed');
+    assert.equal(list[49].eventKey, 'gen:59:completed');
   });
 
   // Régression-lock CLAUDE.md "ledger LRU cap 1000/profil" : le ledger
   // seenEventKeys (qui sert à l'idempotence) ne doit pas grossir indéfiniment.
   // Si la slice est supprimée par erreur, après ~1001 events un même eventKey
   // ré-émis ne serait plus dédupliqué et recréerait la notif.
-  it('ledger seenEventKeys : LRU cap 1000 — le 1001e event évince le 1er', () => {
+  $it('ledger seenEventKeys : LRU cap 1000 — le 1001e event évince le 1er', () => {
     // Pousse 1001 events ; les events 0..49 doivent rester visibles dans la
     // notif list (cap 50) mais le ledger doit cap à 1000.
     for (let i = 0; i < 1001; i++) {
       appendNotification('p1', N({ eventKey: `evk-${i}` }), storage);
     }
     // Le 1er event (evk-0) doit avoir été évincé du ledger LRU.
-    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(false);
+    assert.equal(hasSeenEvent('p1', E('evk-0'), storage), false);
     // Les 1000 derniers (evk-1 → evk-1000 inclus, mais on a poussé 0..1000)
     // doivent toujours être présents dans le ledger.
-    expect(hasSeenEvent('p1', E('evk-1000'), storage)).toBe(true);
-    expect(hasSeenEvent('p1', E('evk-500'), storage)).toBe(true);
+    assert.equal(hasSeenEvent('p1', E('evk-1000'), storage), true);
+    assert.equal(hasSeenEvent('p1', E('evk-500'), storage), true);
   });
 
-  it('ledger LRU : un eventKey évincé peut être ré-ajouté (pas de blacklist permanente)', () => {
+  $it('ledger LRU : un eventKey évincé peut être ré-ajouté (pas de blacklist permanente)', () => {
     for (let i = 0; i < 1001; i++) {
       appendNotification('p1', N({ eventKey: `evk-${i}` }), storage);
     }
     // evk-0 a été évincé ; le ré-appender doit créer une nouvelle notif
     // (le ledger LRU n'est pas une blacklist permanente, juste une fenêtre).
-    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(false);
-    expect(appendNotification('p1', N({ eventKey: 'evk-0' }), storage)).toBe(true);
-    expect(hasSeenEvent('p1', E('evk-0'), storage)).toBe(true);
+    assert.equal(hasSeenEvent('p1', E('evk-0'), storage), false);
+    assert.equal(appendNotification('p1', N({ eventKey: 'evk-0' }), storage), true);
+    assert.equal(hasSeenEvent('p1', E('evk-0'), storage), true);
   });
 });
 
-describe('markAllRead / markRead', () => {
-  it('markAllRead flippe read=true pour toutes les notifs du profil', () => {
+$describe('markAllRead / markRead', () => {
+  $it('markAllRead flippe read=true pour toutes les notifs du profil', () => {
     appendNotification('p1', N({ eventKey: 'a' }), storage);
     appendNotification('p1', N({ eventKey: 'b' }), storage);
     markAllRead('p1', storage);
     const list = listProfileNotifications('p1', storage);
-    expect(list.every((n) => n.read)).toBe(true);
+    assert.equal(
+      list.every((n) => n.read),
+      true,
+    );
   });
 
-  it('markRead cible une notif par eventKey', () => {
+  $it('markRead cible une notif par eventKey', () => {
     appendNotification('p1', N({ eventKey: 'a' }), storage);
     appendNotification('p1', N({ eventKey: 'b' }), storage);
     markRead('p1', E('a'), storage);
     const list = listProfileNotifications('p1', storage);
-    expect(list.find((n) => n.eventKey === 'a')!.read).toBe(true);
-    expect(list.find((n) => n.eventKey === 'b')!.read).toBe(false);
+    const a = list.find((n) => n.eventKey === 'a');
+    const b = list.find((n) => n.eventKey === 'b');
+    assert.ok(a);
+    assert.ok(b);
+    assert.equal(a.read, true);
+    assert.equal(b.read, false);
   });
 });
 
-describe('clearNotifications', () => {
-  it('supprime les notifs visibles MAIS PRÉSERVE le ledger seenEventKeys', () => {
+$describe('clearNotifications', () => {
+  $it('supprime les notifs visibles MAIS PRÉSERVE le ledger seenEventKeys', () => {
     appendNotification('p1', N({ eventKey: 'persisted-key' }), storage);
-    expect(listProfileNotifications('p1', storage)).toHaveLength(1);
+    assert.equal(listProfileNotifications('p1', storage).length, 1);
 
     clearNotifications('p1', storage);
-    expect(listProfileNotifications('p1', storage)).toHaveLength(0);
+    assert.equal(listProfileNotifications('p1', storage).length, 0);
 
     // Le ledger reste : un appendNotification avec le même eventKey est rejeté
-    expect(hasSeenEvent('p1', E('persisted-key'), storage)).toBe(true);
-    expect(appendNotification('p1', N({ eventKey: 'persisted-key' }), storage)).toBe(false);
-    expect(listProfileNotifications('p1', storage)).toHaveLength(0);
+    assert.equal(hasSeenEvent('p1', E('persisted-key'), storage), true);
+    assert.equal(appendNotification('p1', N({ eventKey: 'persisted-key' }), storage), false);
+    assert.equal(listProfileNotifications('p1', storage).length, 0);
   });
 });
 
-describe('lastSeenAt par projet (watermark réconciliation)', () => {
-  it('getProjectLastSeen retourne null si jamais set', () => {
-    expect(getProjectLastSeen('p1', 'proj-a', storage)).toBeNull();
+$describe('lastSeenAt par projet (watermark réconciliation)', () => {
+  $it('getProjectLastSeen retourne null si jamais set', () => {
+    assert.equal(getProjectLastSeen('p1', 'proj-a', storage), null);
   });
 
-  it('setProjectLastSeen / getProjectLastSeen round-trip', () => {
+  $it('setProjectLastSeen / getProjectLastSeen round-trip', () => {
     const iso = '2026-04-26T10:00:00.000Z';
     setProjectLastSeen('p1', 'proj-a', iso, storage);
-    expect(getProjectLastSeen('p1', 'proj-a', storage)).toBe(iso);
+    assert.equal(getProjectLastSeen('p1', 'proj-a', storage), iso);
   });
 
-  it('isole par profileId et projectId', () => {
+  $it('isole par profileId et projectId', () => {
     setProjectLastSeen('pA', 'proj-1', '2026-01-01T00:00:00Z', storage);
     setProjectLastSeen('pA', 'proj-2', '2026-02-01T00:00:00Z', storage);
     setProjectLastSeen('pB', 'proj-1', '2026-03-01T00:00:00Z', storage);
 
-    expect(getProjectLastSeen('pA', 'proj-1', storage)).toBe('2026-01-01T00:00:00Z');
-    expect(getProjectLastSeen('pA', 'proj-2', storage)).toBe('2026-02-01T00:00:00Z');
-    expect(getProjectLastSeen('pB', 'proj-1', storage)).toBe('2026-03-01T00:00:00Z');
+    assert.equal(getProjectLastSeen('pA', 'proj-1', storage), '2026-01-01T00:00:00Z');
+    assert.equal(getProjectLastSeen('pA', 'proj-2', storage), '2026-02-01T00:00:00Z');
+    assert.equal(getProjectLastSeen('pB', 'proj-1', storage), '2026-03-01T00:00:00Z');
   });
 });
 
-describe('storage corrompu', () => {
-  it('retourne fallback vide si JSON invalide', () => {
+$describe('storage corrompu', () => {
+  $it('retourne fallback vide si JSON invalide', () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-call,
+                      @typescript-eslint/no-unsafe-member-access --
+       vi.spyOn typé `error` côté Codacy. Local OK via projectService. */
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     storage.setItem('sf-profile-notifications', 'not-json');
-    expect(listProfileNotifications('p1', storage)).toEqual([]);
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[notifications] corrupted slot',
-      'sf-profile-notifications',
-      expect.any(SyntaxError),
-    );
+    assert.deepEqual(listProfileNotifications('p1', storage), []);
+    assert.equal(errorSpy.mock.calls.length, 1);
+    const call = errorSpy.mock.calls[0];
+    assert.equal(call[0], '[notifications] corrupted slot');
+    assert.equal(call[1], 'sf-profile-notifications');
+    assert.ok(call[2] instanceof SyntaxError);
     errorSpy.mockRestore();
+    /* eslint-enable @typescript-eslint/no-unsafe-call,
+                     @typescript-eslint/no-unsafe-member-access */
   });
 
-  it('absorbe un setItem qui throw (quota dépassé) sans casser la pipeline', () => {
+  $it('absorbe un setItem qui throw (quota dépassé) sans casser la pipeline', () => {
+    /* eslint-disable @typescript-eslint/no-unsafe-call,
+                      @typescript-eslint/no-unsafe-member-access --
+       vi.spyOn typé `error` côté Codacy. Local OK via projectService. */
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const failingStorage: StorageLike = {
       getItem: () => null,
@@ -240,18 +238,22 @@ describe('storage corrompu', () => {
       },
     };
 
-    expect(() =>
-      appendNotification('p1', N({ eventKey: 'k-quota' }), failingStorage),
-    ).not.toThrow();
-    expect(errorSpy).toHaveBeenCalledWith(
-      '[notifications] storage write failed (likely quota)',
-      expect.objectContaining({ key: expect.any(String), err: expect.any(Error) }),
-    );
+    assert.doesNotThrow(() => {
+      appendNotification('p1', N({ eventKey: 'k-quota' }), failingStorage);
+    });
+    assert.equal(errorSpy.mock.calls.length, 1);
+    const call = errorSpy.mock.calls[0];
+    assert.equal(call[0], '[notifications] storage write failed (likely quota)');
+    const payload = call[1] as { key: unknown; err: unknown };
+    assert.equal(typeof payload.key, 'string');
+    assert.ok(payload.err instanceof Error);
     errorSpy.mockRestore();
+    /* eslint-enable @typescript-eslint/no-unsafe-call,
+                     @typescript-eslint/no-unsafe-member-access */
   });
 });
 
-describe('renderNotificationMessage (i18n-aware)', () => {
+$describe('renderNotificationMessage (i18n-aware)', () => {
   // Faux t() qui simule un dictionnaire minimaliste avec interpolation.
   const dict: Record<string, string> = {
     'notif.generationDone': '{type} terminé',
@@ -269,7 +271,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
     return text;
   };
 
-  it('résout messageKey + paramKeys au render dans la langue courante', () => {
+  $it('résout messageKey + paramKeys au render dans la langue courante', () => {
     const notif: PersistedNotification = {
       eventKey: E('k1'),
       messageKey: 'notif.generationDone',
@@ -278,10 +280,10 @@ describe('renderNotificationMessage (i18n-aware)', () => {
       createdAt: '2026-04-28T10:00:00Z',
       read: false,
     };
-    expect(renderNotificationMessage(notif, t)).toBe('Fiche terminé');
+    assert.equal(renderNotificationMessage(notif, t), 'Fiche terminé');
   });
 
-  it('combine params scalaires et paramKeys (paramKeys traduit, params direct)', () => {
+  $it('combine params scalaires et paramKeys (paramKeys traduit, params direct)', () => {
     const notif: PersistedNotification = {
       eventKey: E('k2'),
       messageKey: 'notif.errorWithCount',
@@ -290,10 +292,10 @@ describe('renderNotificationMessage (i18n-aware)', () => {
       createdAt: '2026-04-28T10:00:00Z',
       read: false,
     };
-    expect(renderNotificationMessage(notif, t)).toBe('3 erreurs');
+    assert.equal(renderNotificationMessage(notif, t), '3 erreurs');
   });
 
-  it('fallback sur message legacy si messageKey absent (notifs pré-refactor)', () => {
+  $it('fallback sur message legacy si messageKey absent (notifs pré-refactor)', () => {
     const legacy: PersistedNotification = {
       eventKey: E('k3'),
       message: 'Message figé en français',
@@ -301,20 +303,20 @@ describe('renderNotificationMessage (i18n-aware)', () => {
       createdAt: '2026-04-28T10:00:00Z',
       read: false,
     };
-    expect(renderNotificationMessage(legacy, t)).toBe('Message figé en français');
+    assert.equal(renderNotificationMessage(legacy, t), 'Message figé en français');
   });
 
-  it('chaîne vide si ni messageKey ni message', () => {
+  $it('chaîne vide si ni messageKey ni message', () => {
     const empty: PersistedNotification = {
       eventKey: E('k4'),
       type: 'info',
       createdAt: '2026-04-28T10:00:00Z',
       read: false,
     };
-    expect(renderNotificationMessage(empty, t)).toBe('');
+    assert.equal(renderNotificationMessage(empty, t), '');
   });
 
-  it('change de langue au render : la même notif persistée donne 2 sorties différentes', () => {
+  $it('change de langue au render : la même notif persistée donne 2 sorties différentes', () => {
     const notif: PersistedNotification = {
       eventKey: E('k5'),
       messageKey: 'notif.generationDone',
@@ -324,7 +326,7 @@ describe('renderNotificationMessage (i18n-aware)', () => {
       read: false,
     };
     // FR
-    expect(renderNotificationMessage(notif, t)).toBe('Quiz terminé');
+    assert.equal(renderNotificationMessage(notif, t), 'Quiz terminé');
     // EN simulé (autre dictionnaire)
     const tEn = (key: string, params?: Record<string, string | number>) => {
       const enDict: Record<string, string> = {
@@ -339,6 +341,6 @@ describe('renderNotificationMessage (i18n-aware)', () => {
       }
       return text;
     };
-    expect(renderNotificationMessage(notif, tEn)).toBe('Quiz complete');
+    assert.equal(renderNotificationMessage(notif, tEn), 'Quiz complete');
   });
 });

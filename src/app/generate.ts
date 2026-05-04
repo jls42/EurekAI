@@ -581,16 +581,16 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
   const controller = new AbortController();
-  // Whitelist canonique (cf. runAutoStep ligne 245, commit 00af5f2) : Set.has(url)
-  // littéral inline juste avant fetch(url) — pattern reconnu par la taint analysis
-  // Codacy/Opengrep rule-node-ssrf. .includes() sur Array ne suffit pas.
   const allowedUrls = new Set(
     AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
   );
-  const url = '/api/projects/' + projectId + '/generate/' + type;
-  if (!allowedUrls.has(url)) return;
   setupGeneratePending(state, type, gid, controller);
   try {
+    // Whitelist canonique (cf. runAutoStep ligne 245, commit 00af5f2) : Set.has(url)
+    // littéral inline JUSTE avant fetch(url), zéro opération entre les deux —
+    // pattern reconnu par la taint analysis Codacy/Opengrep rule-node-ssrf.
+    const url = '/api/projects/' + projectId + '/generate/' + type;
+    if (!allowedUrls.has(url)) return;
     const res = await fetch(url, postJson({ ...buildGenerateBody(state), gid }, controller.signal));
     if (state.currentProjectId !== projectId) return;
     await dispatchGenerateResponse(state, type, gid, res);
