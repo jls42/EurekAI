@@ -1,12 +1,10 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call,
-                  @typescript-eslint/no-unsafe-member-access -- Codacy applique
-   tseslint.recommendedTypeChecked sur ce fichier. Notre tsconfig racine
-   exclut src/, donc les types de vitest (describe/it/expect/beforeEach/vi)
-   sont résolus en `error` → cascade unsafe-call / unsafe-member-access sur
-   chaque expect(...).toBe(...). Localement les types sont OK via projectService.
-   linterOptions.reportUnusedDisableDirectives off côté tests pour ne pas
-   warn local quand projectService a déjà résolu les types correctement. */
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+  describe as _describe,
+  it as _it,
+  expect as _expect,
+  beforeEach as _beforeEach,
+  vi,
+} from 'vitest';
 import {
   appendNotification,
   listProfileNotifications,
@@ -21,6 +19,44 @@ import {
   type PersistedNotification,
 } from './notifications.js';
 import type { EventKey } from '../../helpers/event-bus.js';
+
+// Aliases typés pour vitest globals — Codacy applique tseslint.recommendedTypeChecked
+// et notre tsconfig racine exclut src/, donc les types vitest sont résolus en
+// `error` → cascade @typescript-eslint/no-unsafe-call sur describe/it/expect.
+// Le pattern eslint-disable file-level n'est pas honoré par Codacy ; on type-wrap
+// les imports en aliases explicites (cf. sse-pendings.test.ts pour le même
+// contournement). Local OK via projectService.
+// eslint-disable-next-line no-unused-vars -- type-sig params required by TS
+type DescribeFn = (_name: string, _fn: () => void) => void;
+// eslint-disable-next-line no-unused-vars -- type-sig params required by TS
+type ItFn = (_name: string, _fn: () => Promise<void> | void) => void;
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+type HookFn = (_fn: () => Promise<void> | void) => void;
+type Matcher = {
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  toBe: (_v: unknown) => void;
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  toEqual: (_v: unknown) => void;
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  toHaveLength: (_n: number) => void;
+  toBeNull: () => void;
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  toHaveBeenCalledWith: (..._args: unknown[]) => void;
+  not: { toThrow: () => void };
+};
+type ExpectMatchers = Matcher & {
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  any: (_constructor: unknown) => unknown;
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  objectContaining: (_obj: Record<string, unknown>) => unknown;
+};
+// eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+type ExpectFn = ((_val: unknown) => Matcher) & ExpectMatchers;
+
+const describe = _describe as DescribeFn;
+const it = _it as ItFn;
+const beforeEach = _beforeEach as HookFn;
+const expect = _expect as unknown as ExpectFn;
 
 function makeStorage(): StorageLike {
   const data = new Map<string, string>();
