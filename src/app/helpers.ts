@@ -507,17 +507,28 @@ const collectRefNums = (refs: string[] | undefined, nums: Set<number>): void => 
   }
 };
 
-const collectFromSummary = (data: unknown, nums: Set<number>): void => {
-  const summaryData = (data ?? {}) as {
-    citations?: Array<{ sourceRef?: string }>;
-    summary?: string;
-    key_points?: string[];
-  };
+type SummaryRefShape = {
+  citations?: Array<{ sourceRef?: string }>;
+  summary?: string;
+  key_points?: string[];
+};
+
+const collectSummaryCitationRefs = (summaryData: SummaryRefShape, nums: Set<number>): void => {
   for (const cit of summaryData.citations ?? []) {
     if (cit.sourceRef) collectRefNums([cit.sourceRef], nums);
   }
-  const text = (summaryData.summary ?? '') + ' ' + (summaryData.key_points ?? []).join(' ');
-  for (const n of extractSourceNums(text)) nums.add(n);
+};
+
+const collectSummaryFreeText = (summaryData: SummaryRefShape, nums: Set<number>): void => {
+  const summary = summaryData.summary ?? '';
+  const points = (summaryData.key_points ?? []).join(' ');
+  for (const n of extractSourceNums(summary + ' ' + points)) nums.add(n);
+};
+
+const collectFromSummary = (data: unknown, nums: Set<number>): void => {
+  const summaryData = (data ?? {}) as SummaryRefShape;
+  collectSummaryCitationRefs(summaryData, nums);
+  collectSummaryFreeText(summaryData, nums);
 };
 
 const referencedSourceNums = function (gen: Generation) {
@@ -983,84 +994,119 @@ const defaultModerationCategories = function (this: AppContext, ageGroup: string
   return [...(this.moderationDefaults?.[ageGroup] || [])];
 };
 
+// Groupes thématiques de méthodes : permettent de garder createHelpers à NLOC
+// minimal (Codacy limit 50). Chaque groupe est une `const` data declaration —
+// pas une fonction — donc Lizard ne compte pas son contenu dans createHelpers.
+const VIEW_HELPERS = {
+  generationsByType,
+  toggleGen,
+  apiBase,
+  currentFlag,
+  langLabel,
+  langFlag,
+  iconChipClass,
+  genIcon,
+  genColor,
+  recentGenerations,
+  dashboardStats,
+  projectColor,
+};
+
+const SOURCE_HELPERS = {
+  genSources,
+  inferSourceType,
+  isOcrSource,
+  getOriginalFileUrl,
+  isImageFile,
+  isPdfFile,
+  sourceTypeIcon,
+  sourceTypeBadge,
+  sourceTypeBadgeColor,
+  consigneStatus,
+  resolveSourceRef,
+  itemSources,
+  questionSources,
+  flashcardSource,
+  referencedSourceNums,
+  isSourceReferenced,
+};
+
+const OCR_MODERATION_HELPERS = {
+  ocrConfidenceTier,
+  ocrConfidenceColor,
+  ocrConfidencePercent,
+  ocrConfidenceIcon,
+  ocrConfidenceToneClass,
+  moderationStatus,
+  moderationBadgeColor,
+  moderationBadgeIcon,
+  moderationBadgeIconClass,
+  moderationBadgeTitle,
+  moderationToneClass,
+  flaggedCategories,
+  flaggedCategoryLabels,
+  defaultModerationCategories,
+};
+
+const POPOVER_HELPERS = {
+  showMetaPopover,
+  hideMetaPopover,
+  metaPopoverStyle,
+  showCostPopover,
+  showOcrPopover,
+  showModerationPopover,
+};
+
+const PODCAST_HELPERS = {
+  podcastSpeakerName,
+  podcastSpeakerInitial,
+  podcastSpeakerTitle,
+};
+
+const GENERATION_STATE_HELPERS = {
+  hasPendingOfType,
+  isLoading,
+  canStartGenerate,
+  upsertGenerationById,
+  applyGenerationEvent,
+  reconcilePendings,
+  hydratePendingByIdFromTracker,
+  mergeReconciledGenerations,
+  backfillCompletedNotifs,
+  backfillTerminalNotifs,
+  isGenerating,
+  activeGenerations,
+};
+
+const NOTIFICATION_HELPERS = {
+  profileNotifications,
+  unreadNotificationsCount,
+  markAllNotificationsRead,
+  markNotificationRead,
+  navigateToNotification,
+  clearProfileNotifications,
+  notificationMessage,
+  formatRelativeTime,
+};
+
+const MISC_HELPERS = {
+  getQuizScores,
+  resolveError,
+  refreshIcons,
+  formatDuration,
+  avatarStyle,
+  initGenProps,
+};
+
 export function createHelpers() {
   return {
-    generationsByType,
-    toggleGen,
-    apiBase,
-    currentFlag,
-    langLabel,
-    langFlag,
-    iconChipClass,
-    genIcon,
-    genSources,
-    inferSourceType,
-    isOcrSource,
-    getOriginalFileUrl,
-    isImageFile,
-    isPdfFile,
-    sourceTypeIcon,
-    sourceTypeBadge,
-    sourceTypeBadgeColor,
-    consigneStatus,
-    ocrConfidenceTier,
-    ocrConfidenceColor,
-    ocrConfidencePercent,
-    ocrConfidenceIcon,
-    ocrConfidenceToneClass,
-    moderationStatus,
-    podcastSpeakerName,
-    podcastSpeakerInitial,
-    podcastSpeakerTitle,
-    moderationBadgeColor,
-    moderationBadgeIcon,
-    moderationBadgeIconClass,
-    moderationBadgeTitle,
-    moderationToneClass,
-    showMetaPopover,
-    hideMetaPopover,
-    metaPopoverStyle,
-    showCostPopover,
-    showOcrPopover,
-    showModerationPopover,
-    resolveSourceRef,
-    itemSources,
-    questionSources,
-    flashcardSource,
-    referencedSourceNums,
-    isSourceReferenced,
-    genColor,
-    recentGenerations,
-    dashboardStats,
-    projectColor,
-    hasPendingOfType,
-    isLoading,
-    canStartGenerate,
-    upsertGenerationById,
-    applyGenerationEvent,
-    reconcilePendings,
-    hydratePendingByIdFromTracker,
-    mergeReconciledGenerations,
-    backfillCompletedNotifs,
-    backfillTerminalNotifs,
-    profileNotifications,
-    unreadNotificationsCount,
-    markAllNotificationsRead,
-    markNotificationRead,
-    navigateToNotification,
-    clearProfileNotifications,
-    notificationMessage,
-    formatRelativeTime,
-    isGenerating,
-    activeGenerations,
-    getQuizScores,
-    resolveError,
-    refreshIcons,
-    formatDuration,
-    avatarStyle,
-    initGenProps,
-    flaggedCategories,
-    flaggedCategoryLabels,
-    defaultModerationCategories,
+    ...VIEW_HELPERS,
+    ...SOURCE_HELPERS,
+    ...OCR_MODERATION_HELPERS,
+    ...POPOVER_HELPERS,
+    ...PODCAST_HELPERS,
+    ...GENERATION_STATE_HELPERS,
+    ...NOTIFICATION_HELPERS,
+    ...MISC_HELPERS,
   };
 }

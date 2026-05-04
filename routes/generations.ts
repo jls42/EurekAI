@@ -469,23 +469,34 @@ export function generationCrudRoutes(
     return { gen, section };
   }
 
+  // Contexte commun aux 3 pipelines read-aloud (batch summary / flashcards /
+  // section unique). Bundle les 7 valeurs résolues en amont (resolveReadAloud
+  // Context + identifiants gén/projet) en un seul argument structuré pour
+  // rester sous la limite Codacy "max 8 paramètres" par helper.
+  type ReadAloudCtx = {
+    pid: string;
+    gid: string;
+    gen: NonNullable<ReturnType<typeof store.getGeneration>>;
+    voiceId: VoiceId;
+    voices: { host: VoiceId; guest: VoiceId };
+    ttsOpts: TtsOptions;
+    projectDir: string;
+    baseId: string;
+  };
+
   // Sous-helper : pipeline batch summary all-sections.
   async function runBatchSummaryReadAloud(
-    pid: string,
-    gid: string,
+    ctx: ReadAloudCtx,
     summaryGen: SummaryGeneration,
-    voiceId: VoiceId,
-    ttsOpts: TtsOptions,
-    projectDir: string,
     res: Response,
   ): Promise<void> {
     const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(() =>
-      generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
+      generateBatchAudio(summaryGen, ctx.voiceId, ctx.ttsOpts, ctx.projectDir, ctx.pid),
     );
     const batchCost = persistUsage(
       store,
-      pid,
-      `POST /api/projects/${pid}/read-aloud/batch`,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/batch`,
       batchUsage,
     );
     handleBatchSummaryResult({
@@ -493,59 +504,60 @@ export function generationCrudRoutes(
       failedSections: batchResult.failedSections,
       summaryGen,
       store,
-      pid,
-      gid,
+      pid: ctx.pid,
+      gid: ctx.gid,
       res,
       costDelta: batchCost?.cost,
     });
   }
 
   // Sous-helper : pipeline dual-voice flashcards.
-  async function runFlashcardsReadAloud(
-    pid: string,
-    gen: NonNullable<ReturnType<typeof store.getGeneration>>,
-    voices: { host: VoiceId; guest: VoiceId },
-    ttsOpts: TtsOptions,
-    projectDir: string,
-    baseId: string,
-    res: Response,
-  ): Promise<void> {
-    const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
+  async function runFlashcardsReadAloud(ctx: ReadAloudCtx, res: Response): Promise<void> {
+    const cards = ctx.gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
     const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
-      generateFlashcardsAudio(cards, voices, ttsOpts),
+      generateFlashcardsAudio(cards, ctx.voices, ctx.ttsOpts),
     );
     const fcCost = persistUsage(
       store,
-      pid,
-      `POST /api/projects/${pid}/read-aloud/flashcards`,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/flashcards`,
       fcUsage,
     );
-    const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-all`);
+    const audioUrl = saveAudioFile(
+      audioBuffer,
+      ctx.projectDir,
+      ctx.pid,
+      `read-aloud-${ctx.baseId}-all`,
+    );
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
   }
 
   // Sous-helper : pipeline section unique.
   async function runSingleSectionReadAloud(
-    pid: string,
-    gid: string,
-    gen: NonNullable<ReturnType<typeof store.getGeneration>>,
+    ctx: ReadAloudCtx,
     section: string,
-    voiceId: VoiceId,
-    ttsOpts: TtsOptions,
-    projectDir: string,
-    baseId: string,
     res: Response,
   ): Promise<void> {
     const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(() =>
       generateSectionAudio(
-        { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid },
+        {
+          gen: ctx.gen,
+          section,
+          voiceId: ctx.voiceId,
+          ttsOpts: ctx.ttsOpts,
+          projectDir: ctx.projectDir,
+          pid: ctx.pid,
+          baseId: ctx.baseId,
+          store,
+          gid: ctx.gid,
+        },
         res,
       ),
     );
     const secCost = persistUsage(
       store,
-      pid,
-      `POST /api/projects/${pid}/read-aloud/${section}`,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/${section}`,
       secUsage,
     );
     if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
@@ -567,34 +579,17 @@ export function generationCrudRoutes(
         req.body.lang,
       );
       const baseId = gen.id.slice(0, 8);
+      const ctx: ReadAloudCtx = { pid, gid, gen, voiceId, voices, ttsOpts, projectDir, baseId };
 
       if (section === 'all' && gen.type === 'summary') {
-        await runBatchSummaryReadAloud(
-          pid,
-          gid,
-          gen as SummaryGeneration, // NOSONAR(S4325) — narrow after gen.type === 'summary'
-          voiceId,
-          ttsOpts,
-          projectDir,
-          res,
-        );
+        await runBatchSummaryReadAloud(ctx, gen as SummaryGeneration, res); // NOSONAR(S4325) — narrow after gen.type === 'summary'
         return;
       }
       if (gen.type === 'flashcards') {
-        await runFlashcardsReadAloud(pid, gen, voices, ttsOpts, projectDir, baseId, res);
+        await runFlashcardsReadAloud(ctx, res);
         return;
       }
-      await runSingleSectionReadAloud(
-        pid,
-        gid,
-        gen,
-        section,
-        voiceId,
-        ttsOpts,
-        projectDir,
-        baseId,
-        res,
-      );
+      await runSingleSectionReadAloud(ctx, section, res);
     } catch (e) {
       const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
