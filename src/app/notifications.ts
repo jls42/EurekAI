@@ -201,13 +201,17 @@ export function appendNotification(
 // Retourne false si le persist quota fail (l'UI peut alors surface un toast
 // `notifPersistFailed` plutôt que d'afficher silencieusement un état "tout lu"
 // qui se réverte au reload).
+//
+// `Object.hasOwn` plutôt que `if (!list)` ou `?? []` : NotifMap est typé
+// `Record<string, T[]>` sans noUncheckedIndexedAccess → TS infère all[profileId]
+// comme jamais undefined → `if (!list)` ET `?? []` flaggés "always falsy /
+// never-reached" par Codacy. hasOwn est un check runtime (pas typé) qui bypass
+// le faux positif tout en gardant la safety nécessaire (LS peut renvoyer un map
+// sans entrée pour ce profil au 1er appel).
 export function markAllRead(profileId: string, storage: StorageLike = localStorage): boolean {
   const all = readNotifs(storage);
-  // Pas d'early-return sur liste vide : NotifMap est typé Record<string, T[]>
-  // sans noUncheckedIndexedAccess → `if (!list)` flaggé "always falsy" par
-  // Codacy. Sur liste absente / vide, `?? []` produit [], `.map(...)` retourne
-  // [], writeNotifs persiste un no-op. Coût négligeable.
-  const list = all[profileId] ?? [];
+  if (!Object.hasOwn(all, profileId)) return true;
+  const list = all[profileId];
   all[profileId] = list.map((n) => ({ ...n, read: true }));
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markAllRead persist failed', { profileId });
@@ -222,7 +226,8 @@ export function markRead(
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readNotifs(storage);
-  const list = all[profileId] ?? [];
+  if (!Object.hasOwn(all, profileId)) return true;
+  const list = all[profileId];
   const idx = list.findIndex((n) => n.eventKey === eventKey);
   if (idx === -1) return true;
   list[idx] = { ...list[idx], read: true };
