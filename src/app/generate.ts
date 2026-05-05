@@ -12,6 +12,7 @@ const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
+const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -481,6 +482,30 @@ const cleanupGenerateState = function (
   state.$nextTick(() => state.refreshIcons());
 };
 
+const fetchSingleGenerate = async function (
+  projectId: string,
+  type: string,
+  body: AutoBody,
+  gid: string,
+  signal: AbortSignal,
+): Promise<Response | null> {
+  const safeProjectId = encodeURIComponent(projectId);
+  const allowedUrls = AUTO_AGENT_TYPES.map(
+    (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
+  );
+  const url = '/api/projects/' + safeProjectId + '/generate/' + type;
+  // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
+  // par Codacy `rule-node-ssrf` (même pattern que confirm.ts).
+  if (allowedUrls.includes(url)) {
+    return await fetch(url, postJson({ ...body, gid }, signal));
+  }
+  return null;
+};
+
+const isSingleGenerateTargetSafe = function (projectId: string, type: string): boolean {
+  return PROJECT_ID_SAFE.test(projectId) && AUTO_AGENTS_SET.has(type);
+};
+
 const GENERATE_ALL_TYPES = ['summary', 'flashcards', 'quiz'] as const;
 
 const setupGenerateAllPending = function (state: AppContext, controller: AbortController): void {
@@ -577,21 +602,21 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
   if (!canStartGenerate(state, type)) return;
   const projectId = state.currentProjectId;
   if (!projectId) return;
+  if (!isSingleGenerateTargetSafe(projectId, type)) return;
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
   const controller = new AbortController();
-  const allowedUrls = new Set(
-    AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
-  );
   setupGeneratePending(state, type, gid, controller);
   try {
-    // Whitelist canonique (cf. runAutoStep ligne 245, commit 00af5f2) : Set.has(url)
-    // littéral inline JUSTE avant fetch(url), zéro opération entre les deux —
-    // pattern reconnu par la taint analysis Codacy/Opengrep rule-node-ssrf.
-    const url = '/api/projects/' + projectId + '/generate/' + type;
-    if (!allowedUrls.has(url)) return;
-    const res = await fetch(url, postJson({ ...buildGenerateBody(state), gid }, controller.signal));
+    const res = await fetchSingleGenerate(
+      projectId,
+      type,
+      buildGenerateBody(state),
+      gid,
+      controller.signal,
+    );
+    if (!res) return;
     if (state.currentProjectId !== projectId) return;
     await dispatchGenerateResponse(state, type, gid, res);
   } catch (e: unknown) {
