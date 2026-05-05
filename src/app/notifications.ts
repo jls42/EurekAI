@@ -53,11 +53,11 @@ export interface PersistedNotification {
 // entre i18n (messageKey requis) et legacy (message requis). Empêche au
 // compile time un appendNotification({ ... }) qui oublierait les deux. Le
 // shape persisté reste l'union large ci-dessus pour rester rétrocompatible.
-type AppendNotifBase = {
+interface AppendNotifBase {
   eventKey: EventKey;
   type: NotificationType;
   projectId?: string;
-};
+}
 export type AppendNotifPayload =
   | (AppendNotifBase & {
       messageKey: string;
