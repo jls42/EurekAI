@@ -267,9 +267,8 @@ describe('storage corrompu', () => {
       eq(errorSpy.calls.length, 1);
       const call = errorSpy.calls[0];
       eq(call[0], '[notifications] storage write failed (likely quota)');
-      const payload = call[1] as { key: unknown; err: unknown };
-      eq(typeof payload.key, 'string');
-      ok(payload.err instanceof Error);
+      eq(call[1], 'sf-profile-notifications');
+      ok(String(call[2]).includes('QuotaExceededError'));
     } finally {
       errorSpy.restore();
     }

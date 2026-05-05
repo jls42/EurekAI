@@ -49,6 +49,9 @@ export interface PersistedNotification {
   projectId?: string;
 }
 
+type TranslateParams = Record<string, string | number>;
+type TranslateFn = (_key: string, _params?: TranslateParams) => string;
+
 // Discriminated union appliquée à l'append : un nouveau call site DOIT choisir
 // entre i18n (messageKey requis) et legacy (message requis). Empêche au
 // compile time un appendNotification({ ... }) qui oublierait les deux. Le
@@ -74,26 +77,28 @@ export type AppendNotifPayload =
 
 // Résout messageKey + paramKeys → texte traduit dans la langue UI courante.
 // Fallback sur `message` legacy si pas de messageKey. Vide si rien des deux.
-export function renderNotificationMessage(
-  notif: PersistedNotification,
-  t: (key: string, params?: Record<string, string | number>) => string,
-): string {
+export function renderNotificationMessage(notif: PersistedNotification, t: TranslateFn): string {
   if (!notif.messageKey) return notif.message ?? '';
-  const resolved: Record<string, string | number> = { ...notif.params };
-  for (const [paramName, key] of Object.entries(notif.paramKeys ?? {})) {
-    resolved[paramName] = t(key);
-  }
+  const resolved = Object.fromEntries([
+    ...Object.entries(notif.params ?? {}),
+    ...Object.entries(notif.paramKeys ?? {}).map(
+      ([paramName, key]) => [paramName, t(key)] as const,
+    ),
+  ]) as TranslateParams;
   return t(notif.messageKey, resolved);
 }
 
 export interface StorageLike {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
+  getItem(_key: string): string | null;
+  setItem(_key: string, _value: string): void;
 }
 
-type NotifMap = Record<string, PersistedNotification[]>;
-type SeenMap = Record<string, string[]>;
-type ProjectsSeenMap = Record<string, Record<string, string>>;
+type RawNotifMap = Record<string, PersistedNotification[]>;
+type RawSeenMap = Record<string, string[]>;
+type RawProjectsSeenMap = Record<string, Record<string, string>>;
+type NotifMap = Map<string, PersistedNotification[]>;
+type SeenMap = Map<string, string[]>;
+type ProjectsSeenMap = Map<string, Map<string, string>>;
 
 // --- Helpers de lecture/écriture sécurisée ---
 
@@ -120,7 +125,7 @@ const writeJson = (storage: StorageLike, key: string, value: unknown): boolean =
     storage.setItem(key, JSON.stringify(value));
     return true;
   } catch (err) {
-    console.error('[notifications] storage write failed (likely quota)', { key, err });
+    console.error('[notifications] storage write failed (likely quota)', key, String(err));
     return false;
   }
 };
@@ -128,11 +133,11 @@ const writeJson = (storage: StorageLike, key: string, value: unknown): boolean =
 // --- Notifs visibles ---
 
 function readNotifs(storage: StorageLike): NotifMap {
-  return readJson<NotifMap>(storage, NOTIFS_STORAGE_SLOT, {});
+  return new Map(Object.entries(readJson<RawNotifMap>(storage, NOTIFS_STORAGE_SLOT, {})));
 }
 
 function writeNotifs(storage: StorageLike, all: NotifMap): boolean {
-  return writeJson(storage, NOTIFS_STORAGE_SLOT, all);
+  return writeJson(storage, NOTIFS_STORAGE_SLOT, Object.fromEntries(all));
 }
 
 function pruneExpiredAndCap(items: PersistedNotification[]): PersistedNotification[] {
@@ -143,20 +148,20 @@ function pruneExpiredAndCap(items: PersistedNotification[]): PersistedNotificati
 // --- Ledger seenEventKeys ---
 
 function readSeen(storage: StorageLike): SeenMap {
-  return readJson<SeenMap>(storage, SEEN_EVENTS_SLOT, {});
+  return new Map(Object.entries(readJson<RawSeenMap>(storage, SEEN_EVENTS_SLOT, {})));
 }
 
 function writeSeen(storage: StorageLike, all: SeenMap): boolean {
-  return writeJson(storage, SEEN_EVENTS_SLOT, all);
+  return writeJson(storage, SEEN_EVENTS_SLOT, Object.fromEntries(all));
 }
 
 function recordSeen(storage: StorageLike, profileId: string, eventKey: EventKey): boolean {
   const all = readSeen(storage);
-  const list = all[profileId] ?? [];
+  const list = all.get(profileId) ?? [];
   if (list.includes(eventKey)) return true;
   list.push(eventKey);
   // LRU cap : garde les MAX_SEEN_EVENTS_PER_PROFILE plus récents
-  all[profileId] = list.slice(-MAX_SEEN_EVENTS_PER_PROFILE);
+  all.set(profileId, list.slice(-MAX_SEEN_EVENTS_PER_PROFILE));
   return writeSeen(storage, all);
 }
 
@@ -167,7 +172,7 @@ export function listProfileNotifications(
   storage: StorageLike = localStorage,
 ): PersistedNotification[] {
   const all = readNotifs(storage);
-  return all[profileId] ?? [];
+  return all.get(profileId) ?? [];
 }
 
 // Idempotent par eventKey via le ledger seenEventKeys.
@@ -185,9 +190,9 @@ export function appendNotification(
 ): boolean {
   if (hasSeenEvent(profileId, notif.eventKey, storage)) return false;
   const all = readNotifs(storage);
-  const list = all[profileId] ?? [];
+  const list = all.get(profileId) ?? [];
   list.push({ ...notif, createdAt: new Date().toISOString(), read: false });
-  all[profileId] = pruneExpiredAndCap(list);
+  all.set(profileId, pruneExpiredAndCap(list));
   if (!writeNotifs(storage, all)) return false;
   if (!recordSeen(storage, profileId, notif.eventKey)) {
     console.warn('[notifications] ledger persist failed; reconcile may re-create notif', {
@@ -202,17 +207,14 @@ export function appendNotification(
 // `notifPersistFailed` plutôt que d'afficher silencieusement un état "tout lu"
 // qui se réverte au reload).
 //
-// `Object.hasOwn` plutôt que `if (!list)` ou `?? []` : NotifMap est typé
-// `Record<string, T[]>` sans noUncheckedIndexedAccess → TS infère all[profileId]
-// comme jamais undefined → `if (!list)` ET `?? []` flaggés "always falsy /
-// never-reached" par Codacy. hasOwn est un check runtime (pas typé) qui bypass
-// le faux positif tout en gardant la safety nécessaire (LS peut renvoyer un map
-// sans entrée pour ce profil au 1er appel).
 export function markAllRead(profileId: string, storage: StorageLike = localStorage): boolean {
   const all = readNotifs(storage);
-  if (!Object.hasOwn(all, profileId)) return true;
-  const list = all[profileId];
-  all[profileId] = list.map((n) => ({ ...n, read: true }));
+  const list = all.get(profileId);
+  if (!list) return true;
+  all.set(
+    profileId,
+    list.map((n) => ({ ...n, read: true })),
+  );
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markAllRead persist failed', { profileId });
     return false;
@@ -226,11 +228,13 @@ export function markRead(
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readNotifs(storage);
-  if (!Object.hasOwn(all, profileId)) return true;
-  const list = all[profileId];
-  const idx = list.findIndex((n) => n.eventKey === eventKey);
-  if (idx === -1) return true;
-  list[idx] = { ...list[idx], read: true };
+  const list = all.get(profileId);
+  if (!list) return true;
+  if (!list.some((n) => n.eventKey === eventKey)) return true;
+  all.set(
+    profileId,
+    list.map((n) => (n.eventKey === eventKey ? { ...n, read: true } : n)),
+  );
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] markRead persist failed', { profileId, eventKey });
     return false;
@@ -246,8 +250,7 @@ export function clearNotifications(
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readNotifs(storage);
-  if (!(profileId in all)) return true;
-  delete all[profileId];
+  if (!all.delete(profileId)) return true;
   if (!writeNotifs(storage, all)) {
     console.warn('[notifications] clearNotifications persist failed', { profileId });
     return false;
@@ -261,13 +264,29 @@ export function hasSeenEvent(
   storage: StorageLike = localStorage,
 ): boolean {
   const all = readSeen(storage);
-  return (all[profileId] ?? []).includes(eventKey);
+  return all.get(profileId)?.includes(eventKey) ?? false;
 }
 
 // --- Watermark lastSeenAt par projet ---
 
 function readProjectsSeen(storage: StorageLike): ProjectsSeenMap {
-  return readJson<ProjectsSeenMap>(storage, PROJECTS_SEEN_SLOT, {});
+  const raw = readJson<RawProjectsSeenMap>(storage, PROJECTS_SEEN_SLOT, {});
+  return new Map(
+    Object.entries(raw).map(([profileId, projects]) => [
+      profileId,
+      new Map(Object.entries(projects)),
+    ]),
+  );
+}
+
+function writeProjectsSeen(storage: StorageLike, all: ProjectsSeenMap): boolean {
+  return writeJson(
+    storage,
+    PROJECTS_SEEN_SLOT,
+    Object.fromEntries(
+      Array.from(all, ([profileId, projects]) => [profileId, Object.fromEntries(projects)]),
+    ),
+  );
 }
 
 export function getProjectLastSeen(
@@ -275,7 +294,7 @@ export function getProjectLastSeen(
   projectId: string,
   storage: StorageLike = localStorage,
 ): string | null {
-  return readProjectsSeen(storage)[profileId]?.[projectId] ?? null;
+  return readProjectsSeen(storage).get(profileId)?.get(projectId) ?? null;
 }
 
 export function setProjectLastSeen(
@@ -285,9 +304,10 @@ export function setProjectLastSeen(
   storage: StorageLike = localStorage,
 ): void {
   const all = readProjectsSeen(storage);
-  all[profileId] ??= {};
-  all[profileId][projectId] = iso;
-  if (!writeJson(storage, PROJECTS_SEEN_SLOT, all)) {
+  const projects = all.get(profileId) ?? new Map<string, string>();
+  projects.set(projectId, iso);
+  all.set(profileId, projects);
+  if (!writeProjectsSeen(storage, all)) {
     // Quota fail = watermark drift silencieux (next reconcile retombera sur
     // le cutoff "now" et perdra les events du delta). Pas critique mais visible
     // en dev pour diagnostiquer une UX "notifs disparaissent au reload".
