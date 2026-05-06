@@ -563,6 +563,23 @@ export function generationCrudRoutes(
     if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
   }
 
+  // Sous-helper extrait : dispatche entre les 3 pipelines selon (gen.type, section).
+  async function runReadAloudPipeline(
+    ctx: ReadAloudCtx,
+    section: string,
+    res: Response,
+  ): Promise<void> {
+    if (section === 'all' && ctx.gen.type === 'summary') {
+      await runBatchSummaryReadAloud(ctx, ctx.gen as SummaryGeneration, res); // NOSONAR(S4325) — narrow after gen.type === 'summary'
+      return;
+    }
+    if (ctx.gen.type === 'flashcards') {
+      await runFlashcardsReadAloud(ctx, res);
+      return;
+    }
+    await runSingleSectionReadAloud(ctx, section, res);
+  }
+
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
     const pid = String(req.params.pid);
@@ -580,16 +597,7 @@ export function generationCrudRoutes(
       );
       const baseId = gen.id.slice(0, 8);
       const ctx: ReadAloudCtx = { pid, gid, gen, voiceId, voices, ttsOpts, projectDir, baseId };
-
-      if (section === 'all' && gen.type === 'summary') {
-        await runBatchSummaryReadAloud(ctx, gen as SummaryGeneration, res); // NOSONAR(S4325) — narrow after gen.type === 'summary'
-        return;
-      }
-      if (gen.type === 'flashcards') {
-        await runFlashcardsReadAloud(ctx, res);
-        return;
-      }
-      await runSingleSectionReadAloud(ctx, section, res);
+      await runReadAloudPipeline(ctx, section, res);
     } catch (e) {
       const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
