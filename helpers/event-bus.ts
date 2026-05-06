@@ -48,7 +48,8 @@ export function generationListenerCount(): number {
 // point unique de log/observabilité (pas de console.error in-line dispersés).
 export function subscribeGeneration(
   pid: string,
-  handler: (event: GenerationEvent) => void,
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
+  handler: (_event: GenerationEvent) => void,
 ): () => void {
   const wrapped = (event: GenerationEvent) => {
     if (event.pid !== pid) return;

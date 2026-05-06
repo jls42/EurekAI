@@ -26,6 +26,15 @@ export default [
   ...tseslint.configs.recommended,
   sonarjs.configs.recommended,
   {
+    // reportUnusedDisableDirectives off global : on garde des
+    // /* eslint-disable */ ciblés Codacy (qui ne respecte pas certains
+    // argsIgnorePattern, ou qui résout des types en `error` côté son
+    // typed-linting). Localement ces directives apparaissent "unused"
+    // car ESLint trouve déjà la rule inactive — sans cette option,
+    // `lint:ci --max-warnings 0` échouerait.
+    linterOptions: {
+      reportUnusedDisableDirectives: 'off',
+    },
     languageOptions: {
       ecmaVersion: 2024,
       sourceType: 'module',
@@ -81,13 +90,6 @@ export default [
     // contexte de tests : mocks de fonctions, chemins /tmp contrôlés par le test,
     // URLs http:// dans des fixtures non exposées.
     files: ['**/*.test.ts'],
-    // reportUnusedDisableDirectives off : nos tests peuvent contenir des
-    // /* eslint-disable @typescript-eslint/no-unsafe-* */ pour Codacy (qui
-    // résout vi/describe/it en `error`). Localement avec projectService la
-    // règle est inactive donc le directive est "unused" sans cette option.
-    linterOptions: {
-      reportUnusedDisableDirectives: 'off',
-    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',

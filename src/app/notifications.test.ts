@@ -49,10 +49,10 @@ function doesNotThrow(fn: () => void): void {
   fn();
 }
 
-type ConsoleSpy = {
+interface ConsoleSpy {
   calls: unknown[][];
   restore(): void;
-};
+}
 
 function spyConsoleError(): ConsoleSpy {
   const calls: unknown[][] = [];
@@ -277,14 +277,14 @@ describe('storage corrompu', () => {
 
 describe('renderNotificationMessage (i18n-aware)', () => {
   // Faux t() qui simule un dictionnaire minimaliste avec interpolation.
-  const dict: Record<string, string> = {
-    'notif.generationDone': '{type} terminé',
-    'gen.summary': 'Fiche',
-    'gen.quiz': 'Quiz',
-    'notif.errorWithCount': '{count} erreurs',
-  };
+  const dict = new Map<string, string>([
+    ['notif.generationDone', '{type} terminé'],
+    ['gen.summary', 'Fiche'],
+    ['gen.quiz', 'Quiz'],
+    ['notif.errorWithCount', '{count} erreurs'],
+  ]);
   const t = (key: string, params?: Record<string, string | number>) => {
-    let text = dict[key] ?? key;
+    let text = dict.get(key) ?? key;
     if (params) {
       for (const [k, v] of Object.entries(params)) {
         text = text.replaceAll(`{${k}}`, String(v));
@@ -351,11 +351,11 @@ describe('renderNotificationMessage (i18n-aware)', () => {
     eq(renderNotificationMessage(notif, t), 'Quiz terminé');
     // EN simulé (autre dictionnaire)
     const tEn = (key: string, params?: Record<string, string | number>) => {
-      const enDict: Record<string, string> = {
-        'notif.generationDone': '{type} complete',
-        'gen.quiz': 'Quiz',
-      };
-      let text = enDict[key] ?? key;
+      const enDict = new Map<string, string>([
+        ['notif.generationDone', '{type} complete'],
+        ['gen.quiz', 'Quiz'],
+      ]);
+      let text = enDict.get(key) ?? key;
       if (params) {
         for (const [k, v] of Object.entries(params)) {
           text = text.replaceAll(`{${k}}`, String(v));

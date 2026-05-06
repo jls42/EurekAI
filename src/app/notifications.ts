@@ -50,6 +50,7 @@ export interface PersistedNotification {
 }
 
 type TranslateParams = Record<string, string | number>;
+// eslint-disable-next-line no-unused-vars -- type-sig params required by TS
 type TranslateFn = (_key: string, _params?: TranslateParams) => string;
 
 // Discriminated union appliquée à l'append : un nouveau call site DOIT choisir
@@ -89,7 +90,9 @@ export function renderNotificationMessage(notif: PersistedNotification, t: Trans
 }
 
 export interface StorageLike {
+  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
   getItem(_key: string): string | null;
+  // eslint-disable-next-line no-unused-vars -- type-sig params required by TS
   setItem(_key: string, _value: string): void;
 }
 
