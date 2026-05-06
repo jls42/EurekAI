@@ -55,14 +55,19 @@ async function downloadAndSaveImage(
   return `/output/projects/${pid}/${imageFilename}`;
 }
 
-export async function generateImage(
+// Arrow function (pas `function` declaration) pour contourner un crash du
+// plugin Codacy `eslint-plugin-security-node` (rule `detect-unhandled-async-errors`)
+// qui hooke sur les FunctionDeclaration et plante en lisant `node.body.body[0].type`
+// quand la signature combine 6 params + defaults TS + return type Promise<{...}>.
+// Le hook ne s'applique pas aux ArrowFunctionExpression → pas de crash.
+export const generateImage = async (
   client: Mistral,
   markdown: string,
   projectDir: string,
   pid: string,
   lang: string = 'fr',
   ageGroup: AgeGroup = 'enfant',
-): Promise<{ imageUrl: string; prompt: string }> {
+): Promise<{ imageUrl: string; prompt: string }> => {
   const agent = await client.beta.agents.create({
     model: 'mistral-large-latest',
     name: 'Illustrator',
@@ -91,4 +96,4 @@ export async function generateImage(
       .delete({ agentId: agent.id })
       .catch((e) => logger.warn('image', 'agent delete failed', e));
   }
-}
+};

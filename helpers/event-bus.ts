@@ -15,16 +15,17 @@ const bus = new EventEmitter();
 // 50 indiquerait une fuite (handlers non désinscrits) plutôt qu'une vraie charge.
 bus.setMaxListeners(50);
 
+const EVENT_NAME = 'generation';
+const ERROR_EVENT = 'error';
+
 // Filet anti-uncaughtException : par défaut Node throw "Unhandled error event"
-// si quelqu'un appelle `bus.emit('error', ...)` sans listener attaché — ce qui
-// est exactement notre chemin de propagation depuis `subscribeGeneration` quand
-// un handler client throw. Le listener garantit que ces erreurs ne tuent pas
-// le process et restent observables (console.error → captures Sentry).
-bus.on('error', (err) => {
+// si quelqu'un appelle `bus.emit(ERROR_EVENT, ...)` sans listener attaché — ce
+// qui est exactement notre chemin de propagation depuis `subscribeGeneration`
+// quand un handler client throw. Le listener garantit que ces erreurs ne tuent
+// pas le process et restent observables (console.error → captures Sentry).
+bus.on(ERROR_EVENT, (err) => {
   console.error('[event-bus] listener error:', err);
 });
-
-const EVENT_NAME = 'generation';
 
 export function emitGenerationEvent(event: GenerationEvent): void {
   bus.emit(EVENT_NAME, event);
@@ -54,7 +55,8 @@ export function subscribeGeneration(
     try {
       handler(event);
     } catch (err) {
-      bus.emit('error', err instanceof Error ? err : new Error(String(err)));
+      const wrappedErr = err instanceof Error ? err : new Error(String(err));
+      bus.emit(ERROR_EVENT, wrappedErr);
     }
   };
   bus.on(EVENT_NAME, wrapped);
