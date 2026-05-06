@@ -3,6 +3,8 @@ import { createI18n } from './i18n';
 import { createHelpers } from './helpers';
 import { createNavigation } from './navigation';
 import { createToast } from './toast';
+import { createSession } from './session';
+import { createPendingsStream } from './sse-pendings';
 import { createConfirm } from './confirm';
 import { createProfiles } from './profiles';
 import { createProjects } from './projects';
@@ -24,6 +26,8 @@ export function app() {
     ...createHelpers(),
     ...createNavigation(),
     ...createToast(),
+    ...createSession(),
+    ...createPendingsStream(),
     ...createConfirm(),
     ...createProfiles(),
     ...createProjects(),

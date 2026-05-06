@@ -631,6 +631,374 @@ describe('generateRoutes', () => {
       const gen = res.json.mock.calls[0][0];
       expect(gen.sourceIds).toEqual(['src-2']);
     });
+
+    it('decorates generation with estimatedCost from PersistResult.cost (regression)', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      const { recordUsage } = await import('../helpers/usage-context.js');
+      // Invariant : un generator qui enregistre un usage facturable doit
+      // produire une Generation décorée avec estimatedCost numérique > 0.
+      (generateSummary as any).mockImplementationOnce(async () => {
+        recordUsage({
+          model: 'mistral-large-2512',
+          promptTokens: 1_000_000,
+          completionTokens: 0,
+          totalTokens: 1_000_000,
+        });
+        return {
+          title: 'Test',
+          summary: 'r',
+          key_points: [],
+          vocabulary: [],
+          fun_fact: '',
+        };
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'X',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const gen = res.json.mock.calls[0][0];
+      // mistral-large @ 0.5 $/M input → 1M tokens = 0.5
+      expect(typeof gen.estimatedCost).toBe('number');
+      expect(gen.estimatedCost).toBeGreaterThan(0);
+      expect(gen.estimatedCost).toBeCloseTo(0.5, 5);
+      expect(Array.isArray(gen.costBreakdown)).toBe(true);
+    });
+
+    it('returns 500 internal_error and marks pending failed when generator returns null', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      // Defense en profondeur (cf. routes/generate.ts runGeneratorAndPersist) :
+      // si un generator retourne null après les validations early, on doit
+      // répondre 500 (sinon la connexion HTTP reste pendante côté client) ET
+      // marquer le pending tracker entry failed avec code internal_error.
+      (generateSummary as any).mockResolvedValueOnce(null);
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Some content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: {} });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+      const project2 = store.getProject(pid);
+      const failedEntry = project2?.results.pendingTracker?.find(
+        (e: any) => e.type === 'summary' && e.status === 'failed',
+      );
+      expect(failedEntry).toBeDefined();
+      expect((failedEntry as any).failureCode).toBe('internal_error');
+    });
+
+    // Régression-lock CLAUDE.md "Pending generations" : refresh ≠ cancel. Le
+    // serveur ne DOIT PAS brancher req.on('close') pour annuler une génération.
+    // Si un futur ajout introduit req.on('close', ctrl.abort()), ce test casse.
+    it('refresh ≠ cancel : req.on("close") mid-flight ne flippe PAS le pending', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      // Retient la génération en suspens : le générateur ne résoudra pas avant
+      // qu'on ait simulé le close serveur. Permet d'observer l'état du tracker
+      // pendant la fenêtre où le client a déjà raccroché.
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Refresh test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const closeHandlers: Array<() => void> = [];
+      const req = mockReq({
+        params: { pid },
+        body: { gid: '11111111-1111-4111-8111-111111111111' },
+      });
+      // Simule un EventEmitter req minimal : enregistre le handler 'close' que
+      // Express attache automatiquement, et permet de le déclencher manuellement.
+      (req as any).on = (event: string, fn: () => void) => {
+        if (event === 'close') closeHandlers.push(fn);
+      };
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+
+      // Laisse le handler s'exécuter jusqu'au addPendingEntry (synchrone) puis
+      // entrer dans le await du générateur retenu.
+      await new Promise((r) => setTimeout(r, 10));
+
+      const trackerMidFlight = store.getProject(pid)!.results.pendingTracker ?? [];
+      expect(trackerMidFlight).toHaveLength(1);
+      expect(trackerMidFlight[0].status).toBe('pending');
+
+      // Simule la fermeture du socket client (refresh / switch profil / network drop)
+      for (const h of closeHandlers) h();
+
+      // Vérifier IMMÉDIATEMENT (avant que le générateur résolve) que le close
+      // n'a pas muté le status. Ne PAS flip vers cancelled.
+      const trackerAfterClose = store.getProject(pid)!.results.pendingTracker ?? [];
+      expect(trackerAfterClose).toHaveLength(1);
+      expect(trackerAfterClose[0].status).toBe('pending');
+
+      // Maintenant que le client est parti, on laisse Mistral renvoyer son
+      // résultat — la génération doit se terminer normalement (promotion vers
+      // generations[]). Le payload res.json sera émis dans le vide, c'est OK.
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      const finalProject = store.getProject(pid)!;
+      // Tracker vide (entrée promotée), generation persistée, JAMAIS cancelled.
+      expect(finalProject.results.pendingTracker ?? []).toHaveLength(0);
+      expect(finalProject.results.generations).toHaveLength(1);
+      expect(finalProject.results.generations[0].id).toBe('11111111-1111-4111-8111-111111111111');
+    });
+
+    // Régression-lock : readClientGid valide UUID v4 strict ou retombe sur
+    // randomUUID(). Sans ce verrou, un client malveillant peut injecter un
+    // gid arbitraire (v1, hex non-v4, payload SSRF-like) dans pendingTracker[].id.
+    it('readClientGid : gid client invalide (non-UUID-v4) → fallback randomUUID serveur', async () => {
+      const project = store.createProject('GidValidation');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      // Tente d'injecter un gid bidon (pas un UUID v4 — ici une chaîne lambda).
+      const HOSTILE_GID = 'not-a-real-uuid-but-could-be-anything';
+      const req = mockReq({ params: { pid }, body: { gid: HOSTILE_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      expect(res.json).toHaveBeenCalled();
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations).toHaveLength(1);
+      // Le gid effectif n'est PAS celui du client : randomUUID() v4 serveur a
+      // pris le relais. Vérification format strict.
+      const effectiveGid = finalProject.results.generations[0].id;
+      expect(effectiveGid).not.toBe(HOSTILE_GID);
+      expect(effectiveGid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    it('readClientGid : UUID v1 (variant non-v4) → fallback randomUUID serveur', async () => {
+      const project = store.createProject('GidV1');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      // UUID v1 timestamp-based : version nibble = 1 (pas 4) → REJETÉ par regex.
+      const V1_GID = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
+      const req = mockReq({ params: { pid }, body: { gid: V1_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const finalProject = store.getProject(pid)!;
+      const effectiveGid = finalProject.results.generations[0].id;
+      expect(effectiveGid).not.toBe(V1_GID);
+      // Doit être un v4 (nibble version = 4 et variant = [89ab])
+      expect(effectiveGid).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+      );
+    });
+
+    // Régression-lock : si markPendingCancelled gagne la course pendant que
+    // Mistral travaille, promoteToGeneration retourne kind='cancelled' et le
+    // handler DOIT répondre 409 avec {error: 'cancelled', gid} — pas 200 avec
+    // les data fantômes. Une régression qui flip le dispatch vers 200 stale
+    // serait silencieuse côté tests store-only ; ce test l'attrape route-level.
+    it('promote cancelled→409 dispatch : markPendingCancelled mid-flight → 409 cancelled', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Cancel race');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const CLIENT_GID = '22222222-2222-4222-8222-222222222222';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+
+      // Laisse le handler s'exécuter jusqu'au addPendingEntry
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Cancel arrive PENDANT que generateSummary est en attente
+      const cancelled = store.markPendingCancelled(pid, CLIENT_GID);
+      expect(cancelled).toBe(true);
+
+      // Maintenant Mistral renvoie son résultat — promoteToGeneration doit
+      // retourner kind='cancelled', le handler doit répondre 409.
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'cancelled', gid: CLIENT_GID });
+      // La generation NE DOIT PAS être ajoutée à generations[] (le cancel a gagné).
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations).toHaveLength(0);
+    });
+
+    it('promote failed→409 dispatch : markPendingFailed mid-flight → 409 failed', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('Fail race');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const CLIENT_GID = '33333333-3333-4333-8333-333333333333';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+
+      const handlerPromise = handler(req, res);
+      await new Promise((r) => setTimeout(r, 10));
+
+      // Force un échec côté store pendant l'attente Mistral
+      store.markPendingFailed(pid, CLIENT_GID, 'quota_exceeded');
+
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handlerPromise;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'failed', gid: CLIENT_GID });
+    });
+
+    it('readClientGid : UUID v4 valide → conservé tel quel', async () => {
+      const project = store.createProject('GidValid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const VALID_GID = '8a3e1d2c-9fb7-4d5a-91e6-7f8c3b2a4d56';
+      const req = mockReq({ params: { pid }, body: { gid: VALID_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const finalProject = store.getProject(pid)!;
+      expect(finalProject.results.generations[0].id).toBe(VALID_GID);
+    });
+
+    // Régression-lock : 2 POST simultanés avec le même body.gid → le 2e doit
+    // retourner 409 duplicate_gid, pas se croiser avec le 1er pending. Sans ce
+    // verrou côté addPendingEntry, le 2e POST observerait kind:'cancelled' à
+    // la promotion (le 1er ayant déjà claimé/promu l'entrée) et leak un
+    // 'cancelled' alors qu'aucun cancel n'a eu lieu.
+    it('addPendingEntry : 2e POST avec même body.gid mid-flight → 409 duplicate_gid', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let resolveGen: (value: unknown) => void = () => {};
+      (generateSummary as any).mockImplementationOnce(
+        () => new Promise((r) => (resolveGen = r as typeof resolveGen)),
+      );
+
+      const project = store.createProject('DupGid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const SHARED_GID = '22222222-2222-4222-8222-222222222222';
+
+      const req1 = mockReq({ params: { pid }, body: { gid: SHARED_GID } });
+      (req1 as any).on = () => {};
+      const res1 = mockRes();
+      const handler1Promise = handler(req1, res1);
+
+      // Laisse le handler 1 atteindre addPendingEntry puis entrer dans l'await.
+      await new Promise((r) => setTimeout(r, 10));
+
+      const req2 = mockReq({ params: { pid }, body: { gid: SHARED_GID } });
+      (req2 as any).on = () => {};
+      const res2 = mockRes();
+      await handler(req2, res2);
+
+      expect(res2.status).toHaveBeenCalledWith(409);
+      expect(res2.json).toHaveBeenCalledWith({ error: 'duplicate_gid', gid: SHARED_GID });
+
+      // Laisse le handler 1 finir proprement (cleanup).
+      resolveGen({
+        type: 'summary',
+        title: 'T',
+        sourceIds: ['src-1'],
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      await handler1Promise;
+    });
   });
 
   // --- Route-level tests ---
@@ -1106,6 +1474,68 @@ describe('generateRoutes', () => {
       const gen = res.json.mock.calls[0][0];
       expect(gen.title).toContain('Review');
     });
+
+    // Tests #12 — verrou : aucune branche d'early-4xx ne doit laisser un
+    // pending tracker entry orphelin (cf. CLAUDE.md "Validations early
+    // extraites des generators"). Si un handler ajoute addPendingEntry AVANT
+    // une validation, ce test casse → on doit déplacer la validation en
+    // pre-handler.
+    it('early 4xx ne laisse jamais de pending tracker orphelin', async () => {
+      const project = store.createProject('Test orphan');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.addGeneration(pid, {
+        id: 'gen-summary',
+        title: 'Summary',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'summary',
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+      store.addGeneration(pid, {
+        id: 'gen-quiz-orphan',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['ghost-src'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b'], correct: 0, explanation: 'E' }],
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const cases: Array<{ name: string; body: Record<string, unknown> }> = [
+        { name: 'generationId requis', body: { weakQuestions: [{}] } },
+        { name: 'weakQuestions requis', body: { generationId: 'gen-quiz-orphan' } },
+        {
+          name: 'weakQuestions doit être array',
+          body: { generationId: 'gen-quiz-orphan', weakQuestions: 'not-array' },
+        },
+        {
+          name: 'original quiz introuvable',
+          body: { generationId: 'unknown-id', weakQuestions: [{}] },
+        },
+        {
+          name: 'gen pas un quiz',
+          body: { generationId: 'gen-summary', weakQuestions: [{}] },
+        },
+        {
+          name: 'no_sources (sourceIds orphelins)',
+          body: { generationId: 'gen-quiz-orphan', weakQuestions: [{}], lang: 'fr' },
+        },
+      ];
+
+      for (const c of cases) {
+        const req = mockReq({ params: { pid }, body: c.body });
+        const res = mockRes();
+        await handler(req, res);
+        const tracker = store.getProject(pid)!.results.pendingTracker ?? [];
+        expect(tracker, `cas "${c.name}" laisse un pending orphelin`).toHaveLength(0);
+      }
+    });
   });
 
   // --- Route analysis endpoint ---
@@ -1272,6 +1702,35 @@ describe('generateRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
+
+    // Régression-lock CLAUDE.md "Pour /generate/auto (batch), la route NE LIT PAS
+    // body.gid". Si un futur refactor branche readClientGid sur /auto, les N
+    // steps partageraient le même gid → addPendingEntry retournerait false sur
+    // step 2+ → silent skips invisibles côté UI.
+    it('/auto IGNORE body.gid : chaque step reçoit un gid serveur distinct', async () => {
+      const project = store.createProject('AutoIgnoreGid');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const CLIENT_GID = '33333333-3333-4333-8333-333333333333';
+      const req = mockReq({ params: { pid }, body: { gid: CLIENT_GID } });
+      const res = mockRes();
+      await handler(req, res);
+
+      const updated = store.getProject(pid)!;
+      expect(updated.results.generations.length).toBeGreaterThanOrEqual(2);
+      const ids = updated.results.generations.map((g) => g.id);
+      // Aucun step ne doit avoir réutilisé le body.gid client.
+      expect(ids).not.toContain(CLIENT_GID);
+      // Tous les ids doivent être distincts (pas de collision serveur).
+      expect(new Set(ids).size).toBe(ids.length);
     });
 
     it('executes routed plan and returns multiple generations', async () => {

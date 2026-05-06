@@ -72,13 +72,25 @@ initConfig(outputDir);
 // Migration from legacy sources.json
 store.migrateFromLegacy(join(outputDir, 'sources.json'));
 
+// Au boot, tout pendingTracker entry restant en status 'pending' est par
+// construction d'un process précédent mort (le current process n'en a écrit
+// aucun encore). Marque-les tous comme 'cancelled' pour ne pas laisser de
+// bannière "génération en cours" coincée à l'infini après un crash serveur.
+const cancelledAtBoot = store.cancelAllPendingsAtBoot();
+if (cancelledAtBoot > 0) {
+  logger.info(
+    'store',
+    `boot: cancelled ${cancelledAtBoot} pendings inherited from previous process`,
+  );
+}
+
 // --- Config API ---
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => {
   try {
     res.json(saveConfig(req.body));
   } catch (e) {
-    console.error('Config save error:', e);
+    logger.error('config', 'Config save error', e);
     res.status(500).json({ error: 'Failed to save configuration' });
   }
 });
@@ -87,7 +99,7 @@ app.post('/api/config/reset', (_req, res) => {
   try {
     res.json(resetConfig());
   } catch (e) {
-    console.error('Config reset error:', e);
+    logger.error('config', 'Config reset error', e);
     res.status(500).json({ error: 'Failed to reset configuration' });
   }
 });
@@ -98,7 +110,7 @@ app.get('/api/config/voices', async (req, res) => {
     if (!lang) setVoiceCache(voices);
     res.json(voices);
   } catch (e) {
-    console.error('List voices error:', e);
+    logger.error('config', 'List voices error', e);
     res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
   }
 });

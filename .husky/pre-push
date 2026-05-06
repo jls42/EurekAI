@@ -1,3 +1,4 @@
+#!/usr/bin/env sh
 # Bloque le push sur les vulns critiques transitives (detectees AVANT que Dependabot
 # ouvre une PR). --audit-level=critical : moderate/high ne bloquent pas (souvent non
 # actionnable au moment du push, bruit trop important). ~1s avec reseau, ~instant

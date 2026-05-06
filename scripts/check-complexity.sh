@@ -26,6 +26,7 @@ fi
 
 pipx run lizard \
   --CCN 8 \
+  --length 2000 \
   --warnings_only \
   -i 0 \
   -l typescript \

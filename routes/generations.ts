@@ -1,7 +1,8 @@
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';
 import type {
+  AgeGroup,
   Generation,
   QuizGeneration,
   QuizAttempt,
@@ -31,6 +32,21 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const FILL_BLANK = 'fill-blank';
 
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
+
+// Phase 1B.1 — figer lang + ageGroup sur la génération (cf. décisions produit #4, #7).
+// - lang : best-effort partiel via req.body.lang pour les quiz legacy (cf. #9).
+//   Limite : si la locale UI a changé depuis la génération, le fallback sera incorrect.
+// - ageGroup : pas de fallback body (le frontend ne l'envoie pas). Régression assumée
+//   vers 'enfant' pour les quiz legacy (cf. #9).
+function resolveVocalAnswerLocale(
+  quizGen: QuizVocalGeneration,
+  req: Request,
+): { lang: string; ageGroup: AgeGroup } {
+  return {
+    lang: quizGen.lang ?? req.body.lang ?? 'fr',
+    ageGroup: quizGen.ageGroup ?? 'enfant',
+  };
+}
 
 const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
   stats[qi] ??= { correct: 0, wrong: 0 };
@@ -283,7 +299,7 @@ export function generationCrudRoutes(
       } as Partial<QuizGeneration>);
       res.json({ attempt, stats });
     } catch (e) {
-      logger.error('quiz', 'attempt error:', e);
+      logger.error('quiz', 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
       res.status(500).json({ error: extractErrorCode(e, 'quiz') });
     }
   });
@@ -318,7 +334,7 @@ export function generationCrudRoutes(
       } as Partial<FillBlankGeneration>);
       res.json({ attempt, stats, results });
     } catch (e) {
-      logger.error(FILL_BLANK, 'attempt error:', e);
+      logger.error(FILL_BLANK, 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
       res.status(500).json({ error: extractErrorCode(e, FILL_BLANK) });
     }
   });
@@ -342,40 +358,68 @@ export function generationCrudRoutes(
 
   // --- Delete generation ---
   router.delete('/:pid/generations/:gid', (req, res) => {
-    store.deleteGeneration(req.params.pid, req.params.gid);
+    // 404 si aucune génération n'a effectivement été retirée (project missing
+    // OU gid inconnu). Sinon double-delete (race entre 2 onglets) renvoie 200
+    // sur la 2e tentative et le user voit un toast "supprimé" trompeur.
+    const ok = store.deleteGeneration(req.params.pid, req.params.gid);
+    if (!ok) {
+      res.status(404).json({ error: 'generation_not_found' });
+      return;
+    }
     res.json({ ok: true });
   });
+
+  // --- Cancel pending generation ---
+  // Marque le pending tracker entry comme 'cancelled'. Émet un event SSE pour
+  // que les clients connectés mettent à jour leur UI. Limite acceptée : la
+  // requête Mistral en cours côté serveur n'est PAS interruptible (SDK ne le
+  // permet pas), donc la facturation peut continuer. Le cancel signifie "on
+  // ignore la réponse quand elle arrive" — promoteToGeneration retournera
+  // {kind: 'cancelled'} et le handler initial répondra 409 (sans 200 fantôme).
+  router.post('/:pid/generations/:gid/cancel', (req, res) => {
+    const ok = store.markPendingCancelled(req.params.pid, req.params.gid);
+    if (!ok) {
+      // Code stable pour mapping i18n côté UI (cf. CLAUDE.md "Codes d'erreur API").
+      res.status(404).json({ error: 'pending_not_found' });
+      return;
+    }
+    res.json({ ok: true, status: 'cancelled' });
+  });
+
+  // Sous-helper : valide la cible vocal-answer (gen quiz-vocal + question +
+  // file). Retourne le triplet validé, ou null après envoi de la réponse 4xx.
+  function validateVocalAnswerTarget(
+    req: Request,
+    res: Response,
+  ): { quizGen: QuizVocalGeneration; question: QuizVocalGeneration['data'][number] } | null {
+    const pid = String(req.params.pid);
+    const gid = String(req.params.gid);
+    const gen = store.getGeneration(pid, gid);
+    if (gen?.type !== 'quiz-vocal') {
+      res.status(404).json({ error: 'Quiz vocal introuvable' });
+      return null;
+    }
+    const quizGen = gen as QuizVocalGeneration; // NOSONAR(S4325) — type narrowing
+    const questionIndex = Number(req.body.questionIndex ?? 0);
+    const question = quizGen.data[questionIndex];
+    if (!question) {
+      res.status(400).json({ error: 'Index de question invalide' });
+      return null;
+    }
+    if (!req.file) {
+      res.status(400).json({ error: 'Fichier audio requis' });
+      return null;
+    }
+    return { quizGen, question };
+  }
 
   // --- Quiz vocal: verify spoken answer ---
   router.post('/:pid/generations/:gid/vocal-answer', upload.single('audio'), async (req, res) => {
     try {
-      const pid = String(req.params.pid);
-      const gid = String(req.params.gid);
-      const gen = store.getGeneration(pid, gid);
-      if (gen?.type !== 'quiz-vocal') {
-        res.status(404).json({ error: 'Quiz vocal introuvable' });
-        return;
-      }
-      const questionIndex = Number(req.body.questionIndex ?? 0);
-      const quizGen = gen as QuizVocalGeneration; // NOSONAR(S4325) — type narrowing after gen?.type === 'quiz-vocal' guard
-      const question = quizGen.data[questionIndex];
-      if (!question) {
-        res.status(400).json({ error: 'Index de question invalide' });
-        return;
-      }
-
-      if (!req.file) {
-        res.status(400).json({ error: 'Fichier audio requis' });
-        return;
-      }
-
-      // Phase 1B.1 — figer lang + ageGroup sur la génération (cf. décisions produit #4, #7).
-      // - lang : best-effort partiel via req.body.lang pour les quiz legacy (cf. #9).
-      //   Limite : si la locale UI a changé depuis la génération, le fallback sera incorrect.
-      // - ageGroup : pas de fallback body (le frontend ne l'envoie pas). Régression assumée
-      //   vers 'enfant' pour les quiz legacy (cf. #9).
-      const lang = quizGen.lang ?? req.body.lang ?? 'fr';
-      const ageGroup = quizGen.ageGroup ?? 'enfant';
+      const target = validateVocalAnswerTarget(req, res);
+      if (!target) return;
+      const { quizGen, question } = target;
+      const { lang, ageGroup } = resolveVocalAnswerLocale(quizGen, req);
       const config = getConfig();
       const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
       const result = await verifyAnswer(
@@ -396,24 +440,154 @@ export function generationCrudRoutes(
     }
   });
 
+  const VALID_READ_ALOUD_SECTIONS = new Set([
+    'intro',
+    'key_points',
+    'fun_fact',
+    'vocabulary',
+    'all',
+  ]);
+
+  // Sous-helper extrait : valide la cible read-aloud (gen + section). Retourne
+  // null après envoi d'une réponse 4xx si invalide.
+  function validateReadAloudTarget(
+    pid: string,
+    req: Request,
+    res: Response,
+  ): { gen: NonNullable<ReturnType<typeof store.getGeneration>>; section: string } | null {
+    const gid = String(req.params.gid);
+    const gen = store.getGeneration(pid, gid);
+    if (!gen) {
+      res.status(404).json({ error: 'Generation introuvable' });
+      return null;
+    }
+    const section = req.body.section || 'all';
+    if (!VALID_READ_ALOUD_SECTIONS.has(section)) {
+      res.status(400).json({ error: 'Section invalide' });
+      return null;
+    }
+    return { gen, section };
+  }
+
+  // Contexte commun aux 3 pipelines read-aloud (batch summary / flashcards /
+  // section unique). Bundle les 7 valeurs résolues en amont (resolveReadAloud
+  // Context + identifiants gén/projet) en un seul argument structuré pour
+  // rester sous la limite Codacy "max 8 paramètres" par helper.
+  type ReadAloudCtx = {
+    pid: string;
+    gid: string;
+    gen: NonNullable<ReturnType<typeof store.getGeneration>>;
+    voiceId: VoiceId;
+    voices: { host: VoiceId; guest: VoiceId };
+    ttsOpts: TtsOptions;
+    projectDir: string;
+    baseId: string;
+  };
+
+  // Sous-helper : pipeline batch summary all-sections.
+  async function runBatchSummaryReadAloud(
+    ctx: ReadAloudCtx,
+    summaryGen: SummaryGeneration,
+    res: Response,
+  ): Promise<void> {
+    const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(() =>
+      generateBatchAudio(summaryGen, ctx.voiceId, ctx.ttsOpts, ctx.projectDir, ctx.pid),
+    );
+    const batchCost = persistUsage(
+      store,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/batch`,
+      batchUsage,
+    );
+    handleBatchSummaryResult({
+      audioUrls: batchResult.audioUrls,
+      failedSections: batchResult.failedSections,
+      summaryGen,
+      store,
+      pid: ctx.pid,
+      gid: ctx.gid,
+      res,
+      costDelta: batchCost?.cost,
+    });
+  }
+
+  // Sous-helper : pipeline dual-voice flashcards.
+  async function runFlashcardsReadAloud(ctx: ReadAloudCtx, res: Response): Promise<void> {
+    const cards = ctx.gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
+    const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
+      generateFlashcardsAudio(cards, ctx.voices, ctx.ttsOpts),
+    );
+    const fcCost = persistUsage(
+      store,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/flashcards`,
+      fcUsage,
+    );
+    const audioUrl = saveAudioFile(
+      audioBuffer,
+      ctx.projectDir,
+      ctx.pid,
+      `read-aloud-${ctx.baseId}-all`,
+    );
+    res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
+  }
+
+  // Sous-helper : pipeline section unique.
+  async function runSingleSectionReadAloud(
+    ctx: ReadAloudCtx,
+    section: string,
+    res: Response,
+  ): Promise<void> {
+    const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(() =>
+      generateSectionAudio(
+        {
+          gen: ctx.gen,
+          section,
+          voiceId: ctx.voiceId,
+          ttsOpts: ctx.ttsOpts,
+          projectDir: ctx.projectDir,
+          pid: ctx.pid,
+          baseId: ctx.baseId,
+          store,
+          gid: ctx.gid,
+        },
+        res,
+      ),
+    );
+    const secCost = persistUsage(
+      store,
+      ctx.pid,
+      `POST /api/projects/${ctx.pid}/read-aloud/${section}`,
+      secUsage,
+    );
+    if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
+  }
+
+  // Sous-helper extrait : dispatche entre les 3 pipelines selon (gen.type, section).
+  async function runReadAloudPipeline(
+    ctx: ReadAloudCtx,
+    section: string,
+    res: Response,
+  ): Promise<void> {
+    if (section === 'all' && ctx.gen.type === 'summary') {
+      await runBatchSummaryReadAloud(ctx, ctx.gen as SummaryGeneration, res); // NOSONAR(S4325) — narrow after gen.type === 'summary'
+      return;
+    }
+    if (ctx.gen.type === 'flashcards') {
+      await runFlashcardsReadAloud(ctx, res);
+      return;
+    }
+    await runSingleSectionReadAloud(ctx, section, res);
+  }
+
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
     const pid = String(req.params.pid);
     try {
+      const validated = validateReadAloudTarget(pid, req, res);
+      if (!validated) return;
+      const { gen, section } = validated;
       const gid = String(req.params.gid);
-      const gen = store.getGeneration(pid, gid);
-      if (!gen) {
-        res.status(404).json({ error: 'Generation introuvable' });
-        return;
-      }
-
-      const section = req.body.section || 'all';
-      const VALID_SECTIONS = new Set(['intro', 'key_points', 'fun_fact', 'vocabulary', 'all']);
-      if (!VALID_SECTIONS.has(section)) {
-        res.status(400).json({ error: 'Section invalide' });
-        return;
-      }
-
       const { voiceId, voices, ttsOpts, projectDir } = resolveReadAloudContext(
         store,
         profileStore,
@@ -422,69 +596,14 @@ export function generationCrudRoutes(
         req.body.lang,
       );
       const baseId = gen.id.slice(0, 8);
-
-      // Batch mode: generate all sections individually for summaries
-      if (section === 'all' && gen.type === 'summary') {
-        const summaryGen = gen as SummaryGeneration; // NOSONAR(S4325) — narrow once for batch block
-        const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(() =>
-          generateBatchAudio(summaryGen, voiceId, ttsOpts, projectDir, pid),
-        );
-        const batchCost = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/read-aloud/batch`,
-          batchUsage,
-        );
-        handleBatchSummaryResult({
-          audioUrls: batchResult.audioUrls,
-          failedSections: batchResult.failedSections,
-          summaryGen,
-          store,
-          pid,
-          gid,
-          res,
-          costDelta: batchCost?.cost,
-        });
-        return;
-      }
-
-      // Dual-voice flashcards: host=questions, guest=answers, silence between cards
-      if (gen.type === 'flashcards') {
-        const cards = gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing after gen.type check
-        const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
-          generateFlashcardsAudio(cards, voices, ttsOpts),
-        );
-        const fcCost = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/read-aloud/flashcards`,
-          fcUsage,
-        );
-        const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-all`);
-        res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
-        return;
-      }
-
-      // Single section (summary)
-      const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(() =>
-        generateSectionAudio(
-          { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid },
-          res,
-        ),
-      );
-      const secCost = persistUsage(
-        store,
-        pid,
-        `POST /api/projects/${pid}/read-aloud/${section}`,
-        secUsage,
-      );
-      if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
+      const ctx: ReadAloudCtx = { pid, gid, gen, voiceId, voices, ttsOpts, projectDir, baseId };
+      await runReadAloudPipeline(ctx, section, res);
     } catch (e) {
       const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
       if (failedUsage?.length) {
         persistUsage(store, pid, `POST /api/projects/${pid}/read-aloud/failed`, failedUsage);
       }
-      logger.error('tts', 'read-aloud error:', e);
+      logger.error('tts', 'read-aloud error', { pid: req.params.pid, gid: req.params.gid }, e);
       res.status(500).json({ error: extractErrorCode(e, 'tts') });
     }
   });

@@ -14,17 +14,9 @@ const MIN_CONTENT_LENGTH = 200;
 export type ScrapeMode = 'auto' | 'readability' | 'lightpanda';
 export type ScrapeEngine = 'readability' | 'lightpanda';
 
-/** Fetch a URL and extract its main text content. */
-export async function fetchPageContent(
-  url: string,
-  mode: ScrapeMode = 'auto',
-): Promise<{ text: string; engine: ScrapeEngine }> {
-  if (mode === 'lightpanda') {
-    const text = await fetchWithLightpanda(url);
-    return { text, engine: 'lightpanda' };
-  }
-
-  // Readability path (mode 'readability' or 'auto')
+// Sous-helper extrait : pipeline Readability (fetch + parse HTML + extract).
+// Sépare le fetch lourd du dispatcher mode dans fetchPageContent.
+async function fetchWithReadability(url: string): Promise<string> {
   const res = await fetch(url, {
     headers: {
       'User-Agent':
@@ -34,25 +26,43 @@ export async function fetchPageContent(
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const html = await res.text();
-
   const { document } = parseHTML(html);
   const reader = new Readability(document);
   const article = reader.parse();
-  const text = article?.textContent?.trim() || '';
+  return article?.textContent?.trim() || '';
+}
 
-  if (mode === 'readability' || text.length >= MIN_CONTENT_LENGTH) {
-    if (text.length > 0) return { text, engine: 'readability' };
-    throw new Error('Readability could not extract content');
-  }
-
-  // Auto mode: fallback to Lightpanda if content too short
+// Sous-helper : Auto mode fallback vers Lightpanda quand le contenu Readability
+// est trop court. Retourne le résultat Lightpanda si succès, sinon le fallback
+// Readability tronqué (s'il y avait au moins quelque chose), sinon throw.
+async function autoFallbackToLightpanda(
+  url: string,
+  readabilityText: string,
+): Promise<{ text: string; engine: ScrapeEngine }> {
   try {
     const lpText = await fetchWithLightpanda(url);
     return { text: lpText, engine: 'lightpanda' };
   } catch {
-    if (text.length > 0) return { text, engine: 'readability' };
+    if (readabilityText.length > 0) return { text: readabilityText, engine: 'readability' };
     throw new Error('Could not extract content from page');
   }
+}
+
+/** Fetch a URL and extract its main text content. */
+export async function fetchPageContent(
+  url: string,
+  mode: ScrapeMode = 'auto',
+): Promise<{ text: string; engine: ScrapeEngine }> {
+  if (mode === 'lightpanda') {
+    const text = await fetchWithLightpanda(url);
+    return { text, engine: 'lightpanda' };
+  }
+  const text = await fetchWithReadability(url);
+  if (mode === 'readability' || text.length >= MIN_CONTENT_LENGTH) {
+    if (text.length > 0) return { text, engine: 'readability' };
+    throw new Error('Readability could not extract content');
+  }
+  return autoFallbackToLightpanda(url, text);
 }
 
 /** Fallback: use Lightpanda headless browser for JS-rendered content. */

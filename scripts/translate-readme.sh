@@ -49,7 +49,7 @@ for lang in $LANGS; do
     --force &
 
   # Limit parallel jobs
-  while [ $(jobs -r | wc -l) -ge $MAX_JOBS ]; do
+  while [ "$(jobs -r | wc -l)" -ge "$MAX_JOBS" ]; do
     sleep 1
   done
 done

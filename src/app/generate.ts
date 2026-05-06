@@ -3,11 +3,16 @@ import { normalizeSummaryData } from './helpers';
 import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import type { AppContext } from './app-context';
-import type { Generation, Source } from '../../types';
+import type { FailedStepCode, Generation, Source } from '../../types';
+import { buildEventKey } from '../../helpers/event-key';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
+const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
+const I18N_GEN_PREFIX = 'gen.';
+const NOTIF_GENERATION_DONE = 'toast.generationDone';
+const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -39,8 +44,12 @@ export function postJson(body: unknown, signal: AbortSignal): RequestInit {
 export function registerGeneration(state: AppContext, gen: Generation): void {
   normalizeSummaryData(gen);
   state.initGenProps(gen);
-  state.generations.push(gen);
+  // openGens AVANT upsert : invariant doc dans helpers.ts applyGenerationEvent
+  // (transition undefined→true ferait auto-play du quiz vocal). Idempotent par
+  // gid via upsertGenerationById (payload 200 fallback + SSE 'completed' dans
+  // le même onglet absorbés sans doublon).
   state.openGens[gen.id] = true;
+  state.upsertGenerationById(gen);
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
@@ -63,7 +72,7 @@ export async function aggregateGenerateResults(
 
 export function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
-    state.showToast(state.t('toast.partialGenerated', { count: total - failures }), 'warning');
+    state.showToast(state.t(TOAST_PARTIAL_GENERATED, { count: total - failures }), 'warning');
   } else if (failures >= total) {
     state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
@@ -139,7 +148,87 @@ export function populateAutoPlan(
   }
 }
 
-type StepResult = 'success' | 'aborted' | 'failed';
+type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: FailedStepCode };
+
+// Le serveur garantit que les codes renvoyés (FailedStepCode) sont stables
+// (cf. types.ts). Source de vérité côté client pour normaliser les valeurs
+// inattendues vers 'internal_error' avant qu'elles ne polluent les codes[]
+// que pickAutoFailToast inspecte.
+const KNOWN_FAILED_STEP_CODES: ReadonlySet<FailedStepCode> = new Set<FailedStepCode>([
+  'llm_invalid_json',
+  'quota_exceeded',
+  'upstream_unavailable',
+  'auth_required',
+  'tts_upstream_error',
+  'context_length_exceeded',
+  'internal_error',
+  'cancelled',
+]);
+
+const normalizeFailedStepCode = (raw: unknown): FailedStepCode => {
+  if (typeof raw !== 'string') return 'internal_error';
+  if (KNOWN_FAILED_STEP_CODES.has(raw as FailedStepCode)) return raw as FailedStepCode;
+  // Drift visible : un code non-vide non-listé = backend a déployé un nouveau
+  // FailedStepCode avant qu'il ne soit ajouté ici. Le user verra "internal_error"
+  // (toast générique) au lieu d'un toast actionnable. Logger en dev pour
+  // signaler aux opérateurs qu'il faut sync KNOWN_FAILED_STEP_CODES + types.ts.
+  if (raw.length > 0) {
+    console.warn('[generate] unknown FailedStepCode coerced to internal_error', raw);
+  }
+  return 'internal_error';
+};
+
+// Parse le body d'une réponse !ok pour extraire un code FailedStepCode normalisé
+// + un détail brut séparé. Le code reste typé (utilisable par pickAutoFailToast),
+// le détail est uniquement loggé en console pour diagnostic — sans polluer le
+// flux UI avec des blobs HTML 502 proxy.
+const parseStepErrorDetail = async (
+  res: Response,
+  fallback: string,
+): Promise<{ code: FailedStepCode; detail: string }> => {
+  const raw = await res.text().catch(() => '');
+  try {
+    const errorCode = JSON.parse(raw)?.error;
+    if (typeof errorCode === 'string' && errorCode.length > 0) {
+      return { code: normalizeFailedStepCode(errorCode), detail: errorCode };
+    }
+  } catch {
+    /* non-JSON body, fallback raw snippet */
+  }
+  return { code: 'internal_error', detail: raw.slice(0, 200) || fallback };
+};
+
+// Sous-helper extrait : si res.ok, register + toast success + return 'success'.
+// Sinon parse le code d'erreur normalisé. Sépare la branche succès/échec du
+// runAutoStep orchestrateur pour rester sous CCN 8.
+const handleAutoStepResponse = async function (
+  state: AppContext,
+  type: string,
+  res: Response,
+): Promise<StepResult> {
+  if (!res.ok) {
+    const { code, detail } = await parseStepErrorDetail(res, res.statusText);
+    console.error(`auto: ${type} failed (${res.status}):`, detail);
+    // Threader le code FailedStepCode normalisé permet à showAutoResult de
+    // dispatcher un toast actionnable (auth_required → settings,
+    // quota_exceeded → wait, etc.) au lieu d'un générique 'partialGenerated'.
+    return { kind: 'failed', code };
+  }
+  const gen = await res.json();
+  registerGeneration(state, gen);
+  // eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts
+  // applyGenerationEvent) : dédup tab-locale du toast UI + persistance
+  // notif via showToast → appendNotification (toast.ts). Le HTTP
+  // devient un chemin de persistance complet quand SSE est down.
+  state.showToast(
+    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
+    'success',
+    null,
+    { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+    buildEventKey(gen.id, 'completed'),
+  );
+  return 'success';
+};
 
 export async function runAutoStep(
   state: AppContext,
@@ -149,33 +238,21 @@ export async function runAutoStep(
   controller: AbortController,
   allowedUrls: Set<string>,
 ): Promise<StepResult> {
-  if (!AUTO_AGENTS_SET.has(type)) return 'failed';
+  if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
   // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
   const url = '/api/projects/' + projectId + '/generate/' + type;
   // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
   // immédiatement avant `fetch(url, ...)` dans la même fonction.
-  if (!allowedUrls.has(url)) return 'failed';
+  if (!allowedUrls.has(url)) return { kind: 'failed', code: 'internal_error' };
   try {
     const res = await fetch(url, postJson(body, controller.signal));
     if (state.currentProjectId !== projectId) return 'aborted';
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      console.error(`auto: ${type} failed (${res.status}):`, err.error || res.statusText);
-      return 'failed';
-    }
-    registerGeneration(state, await res.json());
-    state.showToast(
-      state.t('toast.generationDone', { type: state.t('gen.' + type) }),
-      'success',
-      null,
-      { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
-    );
-    return 'success';
+    return await handleAutoStepResponse(state, type, res);
   } catch (e: unknown) {
     if (e instanceof Error && e.name === 'AbortError') return 'aborted';
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`auto: ${type} error:`, msg);
-    return 'failed';
+    return { kind: 'failed', code: 'internal_error' };
   } finally {
     state.loading[type] = false;
     delete state.abortControllers[type];
@@ -189,25 +266,46 @@ export async function runAutoSteps(
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-): Promise<number> {
+): Promise<{ failures: number; codes: FailedStepCode[] }> {
   const allowedUrls = new Set(
     AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
   );
   let failures = 0;
+  const codes: FailedStepCode[] = [];
   const promises = plannedTypes.map(async (type) => {
     const result = await runAutoStep(state, type, projectId, body, controller, allowedUrls);
-    if (result === 'failed') failures++;
+    if (typeof result === 'object' && result.kind === 'failed') {
+      failures++;
+      codes.push(result.code);
+    }
   });
   await Promise.all(promises);
-  return failures;
+  return { failures, codes };
 }
 
-export function showAutoResult(state: AppContext, failures: number, plannedCount: number): void {
+// Sélection priorisée du toast partial-fail : un code actionnable utilisateur
+// (auth_required > quota_exceeded) prime sur 'partial' générique. Évite de
+// noyer un user "clé API absente" dans un toast warning sans piste d'action.
+const pickAutoFailToast = (codes: FailedStepCode[]): { key: string; type: 'error' | 'warning' } => {
+  const set = new Set(codes);
+  if (set.has('auth_required')) return { key: 'toast.audioAuthRequired', type: 'error' };
+  if (set.has('quota_exceeded')) return { key: 'toast.audioQuotaExceeded', type: 'warning' };
+  return { key: TOAST_PARTIAL_GENERATED, type: 'warning' };
+};
+
+export function showAutoResult(
+  state: AppContext,
+  failures: number,
+  plannedCount: number,
+  codes: FailedStepCode[] = [],
+): void {
   if (failures > 0 && failures < plannedCount) {
-    state.showToast(
-      state.t('toast.partialGenerated', { count: plannedCount - failures }),
-      'warning',
-    );
+    const { key, type } = pickAutoFailToast(codes);
+    if (key === TOAST_PARTIAL_GENERATED) {
+      state.showToast(state.t(key, { count: plannedCount - failures }), type);
+    } else {
+      state.showToast(state.t(key), type);
+    }
   } else if (failures >= plannedCount) {
     state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
   } else {
@@ -233,11 +331,16 @@ export function handleGenerateHttpError(
 
 export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
   registerGeneration(state, gen);
+  // showToast avec eventKey idempotent : si l'event SSE 'completed' arrive en
+  // premier (peu probable mais possible), le toast UI ne sera pas dupliqué et
+  // la notif persistée n'aura qu'une seule entrée pour ce gid.
   state.showToast(
-    state.t('toast.generationDone', { type: state.t('gen.' + type) }),
+    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
     'success',
     null,
     { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+    buildEventKey(gen.id, 'completed'),
+    { messageKey: NOTIF_GENERATION_DONE, paramKeys: { type: I18N_GEN_PREFIX + type } },
   );
 }
 
@@ -310,6 +413,221 @@ export function applyVoiceResult(
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers extraits des méthodes async generate*/runSingleGenerate de la
+// factory createGenerate, pour rester sous CCN 8 par fonction (Lizard strict).
+// ─────────────────────────────────────────────────────────────────────────────
+
+type TrackedType =
+  | 'summary'
+  | 'flashcards'
+  | 'quiz'
+  | 'podcast'
+  | 'quiz-vocal'
+  | 'image'
+  | 'fill-blank';
+
+const setupGeneratePending = function (
+  state: AppContext,
+  type: string,
+  gid: string,
+  controller: AbortController,
+): void {
+  state.loading[type] = true;
+  state.abortControllers[type] = controller;
+  state.abortControllersByGid[gid] = controller;
+  state.pendingById[gid] = {
+    id: gid,
+    type: type as TrackedType,
+    status: 'pending',
+    startedAt: new Date().toISOString(),
+    sourceIds: [...state.selectedIds],
+  };
+};
+
+const dispatchGenerateResponse = async function (
+  state: AppContext,
+  type: string,
+  gid: string,
+  res: Response,
+): Promise<void> {
+  if (!res.ok) {
+    // Validation early serveur (no_sources, context_too_large, moderation,
+    // duplicate_gid, race cancel/fail = 409). Aucun event SSE ne nettoiera
+    // le pending optimiste — cleanup local ici.
+    delete state.pendingById[gid];
+    handleGenerateHttpError(state, type, res, await res.json().catch(() => ({})));
+    return;
+  }
+  // Payload 200 fallback IDEMPOTENT avec SSE : si SSE down au moment du
+  // retour, cette branche garantit le feedback. SSE rejouera mais
+  // upsertGenerationById + showToast(eventKey) sont idempotents.
+  delete state.pendingById[gid];
+  handleGenerateSuccess(state, type, await res.json());
+};
+
+const cleanupGenerateState = function (
+  state: AppContext,
+  type: string,
+  gid: string,
+  projectId: string,
+): void {
+  // Guard projectId au cleanup pour ne pas effacer un nouveau pending si
+  // l'utilisateur a switché de projet entre temps.
+  if (state.currentProjectId === projectId) {
+    state.loading[type] = false;
+    delete state.abortControllers[type];
+    delete state.abortControllersByGid[gid];
+  }
+  state.$nextTick(() => state.refreshIcons());
+};
+
+const fetchSingleGenerate = async function (
+  projectId: string,
+  type: string,
+  body: AutoBody,
+  gid: string,
+  signal: AbortSignal,
+): Promise<Response | null> {
+  const safeProjectId = encodeURIComponent(projectId);
+  const allowedUrls = AUTO_AGENT_TYPES.map(
+    (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
+  );
+  const url = '/api/projects/' + safeProjectId + '/generate/' + type;
+  // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
+  // par Codacy `rule-node-ssrf` (même pattern que confirm.ts).
+  if (allowedUrls.includes(url)) {
+    return await fetch(url, postJson({ ...body, gid }, signal));
+  }
+  return null;
+};
+
+const isSingleGenerateTargetSafe = function (projectId: string, type: string): boolean {
+  return PROJECT_ID_SAFE.test(projectId) && AUTO_AGENTS_SET.has(type);
+};
+
+const GENERATE_ALL_TYPES = ['summary', 'flashcards', 'quiz'] as const;
+
+const setupGenerateAllPending = function (state: AppContext, controller: AbortController): void {
+  for (const type of GENERATE_ALL_TYPES) {
+    state.loading[type] = true;
+    state.abortControllers[type] = controller;
+  }
+};
+
+const cleanupGenerateAllPending = function (state: AppContext): void {
+  for (const type of GENERATE_ALL_TYPES) {
+    state.loading[type] = false;
+    delete state.abortControllers[type];
+  }
+  state.$nextTick(() => state.refreshIcons());
+};
+
+const runGenerateAll = async function (state: AppContext): Promise<void> {
+  if (!canStartGenerate(state)) return;
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
+  const controller = new AbortController();
+  setupGenerateAllPending(state, controller);
+  try {
+    const body = buildGenerateBody(state);
+    const base = '/api/projects/' + projectId;
+    const responses = await Promise.all([
+      fetch(base + '/generate/summary', postJson(body, controller.signal)),
+      fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
+      fetch(base + '/generate/quiz', postJson(body, controller.signal)),
+    ]);
+    if (state.currentProjectId !== projectId) return;
+    const failures = await aggregateGenerateResults(responses, state);
+    showGenerateAllResult(failures, responses.length, state);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') return;
+    console.error('[generate:all]', e);
+    state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generateAll());
+  } finally {
+    cleanupGenerateAllPending(state);
+  }
+};
+
+const cleanupGenerateAutoPending = function (state: AppContext, plannedTypes: string[]): void {
+  state.loading.auto = false;
+  delete state.abortControllers.auto;
+  // Les types individuels se nettoient dans leurs propres finally ; ceci
+  // attrape les cas d'abort précoce avant que les promises démarrent.
+  for (const type of plannedTypes) {
+    state.loading[type] = false;
+    delete state.abortControllers[type];
+  }
+  state.$nextTick(() => state.refreshIcons());
+};
+
+// Sous-helper d'orchestration : route → plan → steps. Sépare la logique métier
+// du try/catch/finally de runGenerateAuto pour rester sous CCN 8.
+const orchestrateAutoSteps = async function (
+  state: AppContext,
+  projectId: string,
+  controller: AbortController,
+  plannedTypes: string[],
+): Promise<void> {
+  const body = buildGenerateBody(state);
+  const route = await runAutoRoute(state, projectId, body, controller);
+  if (!route) return;
+  if (state.currentProjectId !== projectId) return;
+  populateAutoPlan(state, route.plan, plannedTypes, controller);
+  const { failures, codes } = await runAutoSteps(state, plannedTypes, projectId, body, controller);
+  if (state.currentProjectId !== projectId) return;
+  showAutoResult(state, failures, plannedTypes.length, codes);
+};
+
+const runGenerateAuto = async function (state: AppContext): Promise<void> {
+  if (!canStartGenerate(state)) return;
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
+  state.loading.auto = true;
+  const controller = new AbortController();
+  state.abortControllers.auto = controller;
+  const plannedTypes: string[] = [];
+  try {
+    await orchestrateAutoSteps(state, projectId, controller, plannedTypes);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') return;
+    console.error('[generate:auto]', e);
+    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
+  } finally {
+    cleanupGenerateAutoPending(state, plannedTypes);
+  }
+};
+
+const runSingleGenerate = async function (state: AppContext, type: string): Promise<void> {
+  if (!canStartGenerate(state, type)) return;
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
+  if (!isSingleGenerateTargetSafe(projectId, type)) return;
+  // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
+  // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
+  const gid = crypto.randomUUID();
+  const controller = new AbortController();
+  setupGeneratePending(state, type, gid, controller);
+  try {
+    const res = await fetchSingleGenerate(
+      projectId,
+      type,
+      buildGenerateBody(state),
+      gid,
+      controller.signal,
+    );
+    if (!res) return;
+    if (state.currentProjectId !== projectId) return;
+    await dispatchGenerateResponse(state, type, gid, res);
+  } catch (e: unknown) {
+    if (state.currentProjectId !== projectId) return;
+    delete state.pendingById[gid];
+    handleGenerateError(state, type, e);
+  } finally {
+    cleanupGenerateState(state, type, gid, projectId);
+  }
+};
+
 export function createGenerate() {
   return {
     blockedModerationSource(this: AppContext) {
@@ -333,115 +651,15 @@ export function createGenerate() {
     },
 
     async generate(this: AppContext, type: string) {
-      if (!canStartGenerate(this, type)) return;
-      const projectId = this.currentProjectId;
-      if (!projectId) return;
-      this.loading[type] = true;
-      const controller = new AbortController();
-      this.abortControllers[type] = controller;
-      try {
-        // fetch inline avec projectId lu directement de this.currentProjectId pour
-        // préserver l'analyse taint Codacy `rule-node-ssrf` — cf. CLAUDE.md section Sécurité.
-        const res = await fetch(
-          '/api/projects/' + projectId + '/generate/' + type,
-          postJson(buildGenerateBody(this), controller.signal),
-        );
-        if (!res.ok) {
-          handleGenerateHttpError(this, type, res, await res.json().catch(() => ({})));
-          return;
-        }
-        if (this.currentProjectId !== projectId) return;
-        handleGenerateSuccess(this, type, await res.json());
-      } catch (e: unknown) {
-        handleGenerateError(this, type, e);
-      } finally {
-        this.loading[type] = false;
-        delete this.abortControllers[type];
-        this.$nextTick(() => this.refreshIcons());
-      }
+      await runSingleGenerate(this, type);
     },
 
     async generateAll(this: AppContext) {
-      if (!this.currentProjectId) return;
-      const moderationStatus = this.blockedModerationStatus();
-      if (this.currentProfile?.useModeration && moderationStatus) {
-        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
-        return;
-      }
-      const projectId = this.currentProjectId;
-      const allTypes = ['summary', 'flashcards', 'quiz'];
-      const controller = new AbortController();
-      for (const type of allTypes) {
-        this.loading[type] = true;
-        this.abortControllers[type] = controller;
-      }
-
-      const body = {
-        sourceIds: this.selectedIds.length > 0 ? this.selectedIds : undefined,
-        lang: getLocale(),
-        ageGroup: this.currentProfile?.ageGroup || 'enfant',
-        useConsigne: this.useConsigne,
-      };
-      try {
-        const base = '/api/projects/' + projectId;
-        const [summaryRes, flashcardsRes, quizRes] = await Promise.all([
-          fetch(base + '/generate/summary', postJson(body, controller.signal)),
-          fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
-          fetch(base + '/generate/quiz', postJson(body, controller.signal)),
-        ]);
-        if (this.currentProjectId !== projectId) return;
-        const responses = [summaryRes, flashcardsRes, quizRes];
-        const failures = await aggregateGenerateResults(responses, this);
-        showGenerateAllResult(failures, responses.length, this);
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return;
-        console.error('[generate:all]', e);
-        this.showToast(this.t(TOAST_GENERATION_ERROR), 'error', () => this.generateAll());
-      } finally {
-        for (const type of allTypes) {
-          this.loading[type] = false;
-          delete this.abortControllers[type];
-        }
-        this.$nextTick(() => this.refreshIcons());
-      }
+      await runGenerateAll(this);
     },
 
     async generateAuto(this: AppContext) {
-      if (!this.currentProjectId) return;
-      const moderationStatus = this.blockedModerationStatus();
-      if (this.currentProfile?.useModeration && moderationStatus) {
-        this.showToast(this.moderationBlockedMessage(moderationStatus), 'error');
-        return;
-      }
-      const projectId = this.currentProjectId;
-      this.loading.auto = true;
-      const controller = new AbortController();
-      this.abortControllers.auto = controller;
-      const plannedTypes: string[] = [];
-      try {
-        const body = buildGenerateBody(this);
-        const route = await runAutoRoute(this, projectId, body, controller);
-        if (!route) return;
-        if (this.currentProjectId !== projectId) return;
-        populateAutoPlan(this, route.plan, plannedTypes, controller);
-        const failures = await runAutoSteps(this, plannedTypes, projectId, body, controller);
-        if (this.currentProjectId !== projectId) return;
-        showAutoResult(this, failures, plannedTypes.length);
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return;
-        console.error('[generate:auto]', e);
-        this.showToast(this.t('toast.autoError'), 'error', () => this.generateAuto());
-      } finally {
-        this.loading.auto = false;
-        delete this.abortControllers.auto;
-        // Les types individuels se nettoient dans leurs propres finally ; ceci
-        // attrape les cas d'abort précoce avant que les promises démarrent.
-        for (const type of plannedTypes) {
-          this.loading[type] = false;
-          delete this.abortControllers[type];
-        }
-        this.$nextTick(() => this.refreshIcons());
-      }
+      await runGenerateAuto(this);
     },
 
     _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],

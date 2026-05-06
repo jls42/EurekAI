@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createHelpers } from './helpers';
+import type { EventKey } from '../../helpers/event-bus.js';
 
 const helpers = createHelpers();
 
@@ -1035,6 +1036,62 @@ describe('activeGenerations', () => {
     expect(result).toHaveLength(2);
     expect(result.map((r: any) => r.key)).toEqual(['voice', 'websearch']);
   });
+
+  it('returns one chip per gid for tracked pendings', () => {
+    const ctx = {
+      categories,
+      loading: {},
+      pendingById: {
+        'gid-1': { id: 'gid-1', type: 'summary', status: 'pending' },
+        'gid-2': { id: 'gid-2', type: 'summary', status: 'pending' },
+      },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(2);
+    expect(
+      result.map((r: any) => r.key).sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual(['gid-1', 'gid-2']);
+    expect(result.every((r: any) => r.label === 'gen.summary')).toBe(true);
+  });
+
+  it('prefers gid over type when both loading and pending exist', () => {
+    const ctx = {
+      categories,
+      loading: { summary: true },
+      pendingById: { 'gid-X': { id: 'gid-X', type: 'summary', status: 'pending' } },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('gid-X');
+  });
+
+  it('falls back to type when loading without pending tracker', () => {
+    const ctx = {
+      categories,
+      loading: { summary: true },
+      pendingById: {},
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toHaveLength(1);
+    expect(result[0].key).toBe('summary');
+  });
+
+  it('ignores cancelled or completed pendings', () => {
+    const ctx = {
+      categories,
+      loading: {},
+      pendingById: {
+        'gid-1': { id: 'gid-1', type: 'summary', status: 'cancelled' },
+        'gid-2': { id: 'gid-2', type: 'quiz', status: 'completed' },
+      },
+      t: (k: string) => k,
+    };
+    const result = callWith<any[]>(helpers.activeGenerations, ctx);
+    expect(result).toEqual([]);
+  });
 });
 
 // --- Moderation helpers ---
@@ -1564,7 +1621,7 @@ describe('metaPopoverStyle', () => {
     const result = callWith<string>(helpers.metaPopoverStyle, ctx);
     expect(result).toContain('bottom:404px');
     expect(result).toContain('left:50px');
-    if (origInnerHeight !== undefined) globalThis.window = { innerHeight: origInnerHeight } as any;
+    globalThis.window = { innerHeight: origInnerHeight } as any;
   });
 });
 
@@ -1582,8 +1639,8 @@ describe('podcastSpeaker* helpers', () => {
     });
 
     it('returns empty string when speakers absent (legacy gen)', () => {
-      expect(helpers.podcastSpeakerName(makeGen(undefined), hostLine)).toBe('');
-      expect(helpers.podcastSpeakerName(makeGen(undefined), guestLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen(), hostLine)).toBe('');
+      expect(helpers.podcastSpeakerName(makeGen(), guestLine)).toBe('');
     });
 
     it('returns empty string when speaker field is empty or whitespace', () => {
@@ -1600,8 +1657,8 @@ describe('podcastSpeaker* helpers', () => {
     });
 
     it('falls back to role initial (H/G) when name is empty', () => {
-      expect(helpers.podcastSpeakerInitial(makeGen(undefined), hostLine)).toBe('H');
-      expect(helpers.podcastSpeakerInitial(makeGen(undefined), guestLine)).toBe('G');
+      expect(helpers.podcastSpeakerInitial(makeGen(), hostLine)).toBe('H');
+      expect(helpers.podcastSpeakerInitial(makeGen(), guestLine)).toBe('G');
       expect(helpers.podcastSpeakerInitial(makeGen({ host: '' }), hostLine)).toBe('H');
     });
   });
@@ -1616,12 +1673,698 @@ describe('podcastSpeaker* helpers', () => {
 
     it('falls back to i18n keys when name is missing', () => {
       const ctx = { t: (k: string) => (k === 'podcast.speakerHost' ? 'Animateur' : 'Invité') };
-      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), hostLine)).toBe(
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(), hostLine)).toBe(
         'Animateur',
       );
-      expect(
-        callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(undefined), guestLine),
-      ).toBe('Invité');
+      expect(callWith<string>(helpers.podcastSpeakerTitle, ctx, makeGen(), guestLine)).toBe(
+        'Invité',
+      );
     });
+  });
+});
+
+// --- applyGenerationEvent: SSE event application ---
+describe('applyGenerationEvent', () => {
+  function makeCtx() {
+    return {
+      currentProfile: { id: 'p1' } as { id: string } | null,
+      currentProjectId: 'pid-1',
+      pendingById: {} as Record<string, any>,
+      generations: [] as any[],
+      openGens: {} as Record<string, boolean>,
+      shownToastEventKeys: new Set<string>(),
+      notificationsVersion: 0,
+      showToast: vi.fn(),
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      t: (k: string) => k,
+      applyGenerationEvent: helpers.applyGenerationEvent,
+    };
+  }
+
+  it('hydrates pendingById on pending event', () => {
+    const ctx = makeCtx();
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g1',
+        type: 'summary',
+        status: 'pending',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g1:pending',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g1']).toBeDefined();
+    expect(ctx.pendingById['g1'].type).toBe('summary');
+  });
+
+  it('completed event: openGens before upsert + push gen + toast with eventKey', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g2: { id: 'g2', type: 'quiz', status: 'pending' } };
+    const gen = { id: 'g2', type: 'quiz', data: {} };
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g2',
+        type: 'quiz',
+        status: 'completed',
+        generation: gen,
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g2:completed',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g2']).toBeUndefined();
+    expect(ctx.generations).toContainEqual(gen);
+    expect(ctx.openGens['g2']).toBe(true);
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationDone',
+      'success',
+      null,
+      null,
+      'generation:g2:completed',
+      { messageKey: 'notif.generationDone', paramKeys: { type: 'gen.quiz' } },
+    );
+  });
+
+  it('cancelled event: removes pending + info toast (no upsert)', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g3: { id: 'g3', type: 'podcast', status: 'pending' } };
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g3',
+        type: 'podcast',
+        status: 'cancelled',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g3:cancelled',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g3']).toBeUndefined();
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationCancelled',
+      'info',
+      null,
+      null,
+      'generation:g3:cancelled',
+      { messageKey: 'notif.generationCancelled', paramKeys: { type: 'gen.podcast' } },
+    );
+  });
+
+  it('failed event: removes pending + error toast', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g4: { id: 'g4', type: 'image', status: 'pending' } };
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g4',
+        type: 'image',
+        status: 'failed',
+        failureCode: 'quota_exceeded',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g4:failed',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g4']).toBeUndefined();
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'notif.generationFailed',
+      'error',
+      null,
+      null,
+      'generation:g4:failed',
+      { messageKey: 'notif.generationFailed', paramKeys: { type: 'gen.image' } },
+    );
+  });
+
+  it('completed event without generation payload: removes pending but no upsert', () => {
+    const ctx = makeCtx();
+    ctx.pendingById = { g5: { id: 'g5', type: 'flashcards', status: 'pending' } };
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g5',
+        type: 'flashcards',
+        status: 'completed',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g5:completed',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g5']).toBeUndefined();
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('skips entirely when currentProfile is null', () => {
+    const ctx = makeCtx();
+    ctx.currentProfile = null;
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g6',
+        type: 'summary',
+        status: 'pending',
+        at: '2026-04-26T10:00:00Z',
+        eventKey: 'generation:g6:pending',
+      } as any,
+    );
+
+    expect(ctx.pendingById['g6']).toBeUndefined();
+  });
+});
+
+describe('clearProfileNotifications', () => {
+  it('clears per-tab shownToastEventKeys along with visible notifications', () => {
+    (globalThis as any).localStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+    const ctx = {
+      currentProfile: { id: 'profile-A' },
+      shownToastEventKeys: new Set<EventKey>(['generation:g1:completed' as EventKey]),
+      notificationsVersion: 0,
+      clearProfileNotifications: helpers.clearProfileNotifications,
+    };
+
+    ctx.clearProfileNotifications.call(ctx as any);
+
+    expect(ctx.shownToastEventKeys.size).toBe(0);
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+});
+
+// --- reconcilePendings: snapshot-driven reconciliation ---
+describe('reconcilePendings', () => {
+  let storage: Record<string, string>;
+  beforeEach(() => {
+    storage = {};
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => storage[k] ?? null,
+      setItem: (k: string, v: string) => {
+        storage[k] = v;
+      },
+    };
+  });
+
+  function makeCtx(currentProjectId: string | null = 'pid-1') {
+    return {
+      currentProfile: { id: 'profile-A' } as { id: string } | null,
+      currentProjectId,
+      pendingById: {} as Record<string, any>,
+      generations: [] as any[],
+      notificationsVersion: 0,
+      hydratePendingByIdFromTracker: helpers.hydratePendingByIdFromTracker,
+      mergeReconciledGenerations: helpers.mergeReconciledGenerations,
+      backfillCompletedNotifs: helpers.backfillCompletedNotifs,
+      backfillTerminalNotifs: helpers.backfillTerminalNotifs,
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      t: (k: string) => k,
+      reconcilePendings: helpers.reconcilePendings,
+    };
+  }
+
+  function mockProjectFetch(project: any): void {
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => project,
+    });
+  }
+
+  it('hydrates pendingById + merges new completed gens + bumps notificationsVersion', async () => {
+    const ctx = makeCtx();
+    mockProjectFetch({
+      results: {
+        pendingTracker: [
+          { id: 'p1', type: 'summary', status: 'pending', startedAt: '2026-04-26T10:00:00Z' },
+        ],
+        generations: [
+          {
+            id: 'g-completed',
+            type: 'quiz',
+            data: {},
+            completedAt: '2026-04-26T11:30:00Z',
+          },
+        ],
+      },
+    });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById['p1']).toBeDefined();
+    expect(ctx.generations).toHaveLength(1);
+    expect(ctx.generations[0].id).toBe('g-completed');
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('aborts silently when fetch returns non-ok', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({ ok: false, json: async () => ({}) });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.notificationsVersion).toBe(0);
+  });
+
+  it('aborts when currentProjectId changed during await fetch (race)', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => {
+        ctx.currentProjectId = 'pid-other';
+        return {
+          results: {
+            pendingTracker: [{ id: 'p1', type: 'summary', status: 'pending' }],
+            generations: [],
+          },
+        };
+      },
+    });
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(ctx.pendingById).toEqual({});
+  });
+
+  it('skips when currentProfile is null', async () => {
+    const ctx = makeCtx();
+    ctx.currentProfile = null;
+    const fetchMock = vi.fn();
+    (globalThis as any).fetch = fetchMock;
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('catches network error silently (silent: réseau down)', async () => {
+    const ctx = makeCtx();
+    (globalThis as any).fetch = vi.fn().mockRejectedValue(new Error('network down'));
+
+    await expect(
+      ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z'),
+    ).resolves.toBeUndefined();
+  });
+
+  // Régression-lock : le watermark lastSeenAt DOIT être set avec
+  // reconcileStartedAt (timestamp PRÉ-fetch), pas Date.now() post-backfill.
+  // Sinon un event arrivé entre le snapshot et l'ouverture SSE serait masqué
+  // par un lastSeenAt trop tardif et perdu silencieusement.
+  it('persiste lastSeenAt = reconcileStartedAt exact (pas Date.now post-backfill)', async () => {
+    const ctx = makeCtx();
+    mockProjectFetch({
+      results: {
+        pendingTracker: [],
+        generations: [],
+      },
+    });
+    const reconcileStartedAt = '2026-04-26T11:00:00.000Z';
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', reconcileStartedAt);
+
+    const stored = JSON.parse(storage['sf-profile-projects-seen'] || '{}');
+    expect(stored['profile-A']?.['pid-1']).toBe(reconcileStartedAt);
+  });
+
+  // Régression-lock : zero-backfill au 1er load post-migration. Quand
+  // lastSeenAt est absent, le cutoff est computeReconcileCutoff(... ?? reconcileStartedAt) =
+  // reconcileStartedAt → toutes les gens dont completedAt < reconcileStartedAt
+  // sont AU-DESSOUS du cutoff et ne génèrent PAS de notif. Sinon un user qui
+  // ouvre EurekAI pour la 1re fois après le déploiement verrait spammer 200+
+  // notifs historiques d'un coup.
+  it('aucun backfill historique au 1er load (lastSeenAt absent → cutoff = reconcileStartedAt)', async () => {
+    const ctx = makeCtx();
+    // 5 gens complétées AVANT reconcileStartedAt — toutes doivent être ignorées.
+    const oldGens = Array.from({ length: 5 }, (_, i) => ({
+      id: `g-${i}`,
+      type: 'summary',
+      data: {},
+      completedAt: '2026-04-26T09:00:00Z',
+    }));
+    mockProjectFetch({
+      results: {
+        pendingTracker: [
+          // Aussi un terminal failed/cancelled antérieur — backfill terminal idem.
+          {
+            id: 't-old',
+            type: 'quiz',
+            status: 'failed',
+            failureCode: 'internal_error',
+            startedAt: '2026-04-26T09:00:00Z',
+            completedAt: '2026-04-26T09:30:00Z',
+          },
+        ],
+        generations: oldGens,
+      },
+    });
+    const reconcileStartedAt = '2026-04-26T11:00:00.000Z';
+
+    // sf-profile-projects-seen absent → 1er load post-migration.
+    expect(storage['sf-profile-projects-seen']).toBeUndefined();
+
+    await ctx.reconcilePendings.call(ctx as any, 'pid-1', reconcileStartedAt);
+
+    // Watermark a été posé pour les prochains loads.
+    const seen = JSON.parse(storage['sf-profile-projects-seen']);
+    expect(seen['profile-A']['pid-1']).toBe(reconcileStartedAt);
+
+    // ZÉRO notification créée — toutes les gens et terminaux historiques sont
+    // sous le cutoff. Sans ce verrou, l'user serait spammé au 1er load.
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}');
+    expect(notifs['profile-A'] ?? []).toEqual([]);
+  });
+});
+
+// Unit-tests directs sur les helpers de backfill (sans passer par
+// reconcilePendings). Verrouillent : (1) la sémantique du cutoff `<= cutoff`
+// (off-by-one : un completedAt exactement égal au cutoff est SKIPPED, pas
+// notifié) et (2) le mapping cancelled→info / failed→error sur les terminaux.
+describe('backfillCompletedNotifs / backfillTerminalNotifs (direct)', () => {
+  let storage: Record<string, string>;
+  beforeEach(() => {
+    storage = {};
+    (globalThis as any).localStorage = {
+      getItem: (k: string) => storage[k] ?? null,
+      setItem: (k: string, v: string) => {
+        storage[k] = v;
+      },
+      removeItem: (k: string) => {
+        delete storage[k];
+      },
+    };
+  });
+
+  function makeCtx() {
+    return {
+      currentProfile: { id: 'profile-B' } as { id: string },
+      backfillCompletedNotifs: helpers.backfillCompletedNotifs,
+      backfillTerminalNotifs: helpers.backfillTerminalNotifs,
+    };
+  }
+
+  it('backfillCompletedNotifs : cutoff exclut <= et inclut >', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens: any[] = [
+      // <= cutoff : skipped
+      { id: 'g-old', type: 'summary', completedAt: '2026-04-26T09:00:00Z' },
+      // == cutoff : skipped (sémantique <=)
+      { id: 'g-edge', type: 'flashcards', completedAt: '2026-04-26T10:00:00Z' },
+      // > cutoff : notifié
+      { id: 'g-new', type: 'quiz', completedAt: '2026-04-26T11:00:00Z' },
+      // sans completedAt : skipped (legacy/pré-pending-lifecycle)
+      { id: 'g-legacy', type: 'image' },
+    ];
+
+    ctx.backfillCompletedNotifs.call(ctx as any, gens, cutoff, 'profile-B', 'pid-X');
+
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}')['profile-B'] ?? [];
+    expect(notifs).toHaveLength(1);
+    expect(notifs[0].eventKey).toBe('generation:g-new:completed');
+    expect(notifs[0].messageKey).toBe('notif.generationDone');
+    expect(notifs[0].type).toBe('success');
+    expect(notifs[0].projectId).toBe('pid-X');
+    expect(notifs[0].paramKeys.type).toBe('gen.quiz');
+  });
+
+  it('backfillTerminalNotifs : cancelled→info, failed→error, cutoff respecté', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const tracker: any[] = [
+      // <= cutoff : skipped
+      {
+        id: 't-old',
+        type: 'summary',
+        status: 'failed',
+        failureCode: 'internal_error',
+        startedAt: '2026-04-26T08:00:00Z',
+        completedAt: '2026-04-26T09:00:00Z',
+      },
+      // > cutoff, failed → error
+      {
+        id: 't-failed',
+        type: 'quiz',
+        status: 'failed',
+        failureCode: 'quota_exceeded',
+        startedAt: '2026-04-26T10:30:00Z',
+        completedAt: '2026-04-26T11:00:00Z',
+      },
+      // > cutoff, cancelled → info
+      {
+        id: 't-cancelled',
+        type: 'podcast',
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        startedAt: '2026-04-26T10:30:00Z',
+        completedAt: '2026-04-26T11:30:00Z',
+      },
+      // status pending : skipped (pas de notif backfill pour les actifs)
+      {
+        id: 't-pending',
+        type: 'image',
+        status: 'pending',
+        startedAt: '2026-04-26T11:00:00Z',
+      },
+    ];
+
+    ctx.backfillTerminalNotifs.call(ctx as any, tracker, cutoff, 'profile-B', 'pid-Y');
+
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}')['profile-B'] ?? [];
+    expect(notifs).toHaveLength(2);
+    const failed = notifs.find((n: any) => n.eventKey === 'generation:t-failed:failed');
+    const cancelled = notifs.find((n: any) => n.eventKey === 'generation:t-cancelled:cancelled');
+    expect(failed.messageKey).toBe('notif.generationFailed');
+    expect(failed.type).toBe('error');
+    expect(failed.paramKeys.type).toBe('gen.quiz');
+    expect(cancelled.messageKey).toBe('notif.generationCancelled');
+    expect(cancelled.type).toBe('info');
+    expect(cancelled.paramKeys.type).toBe('gen.podcast');
+  });
+});
+
+// --- mergeReconciledGenerations: merge completed gens missed by SSE drop ---
+describe('mergeReconciledGenerations', () => {
+  function makeCtx() {
+    return {
+      generations: [] as any[],
+      upsertGenerationById(this: any, gen: any) {
+        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
+        if (idx === -1) this.generations.push(gen);
+        else this.generations[idx] = gen;
+      },
+      mergeReconciledGenerations: helpers.mergeReconciledGenerations,
+    };
+  }
+
+  it('upserts completed gens with completedAt > cutoff', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z' },
+      { id: 'g2', type: 'quiz', completedAt: '2026-04-26T10:10:00Z' },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, cutoff);
+
+    expect(ctx.generations).toHaveLength(2);
+    expect(
+      ctx.generations.map((g: any) => g.id).sort((a: string, b: string) => a.localeCompare(b)),
+    ).toEqual(['g1', 'g2']);
+  });
+
+  it('skips gens without completedAt (still pending)', () => {
+    const ctx = makeCtx();
+    const gens = [{ id: 'g1', type: 'summary' }] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, 0);
+
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('skips gens completed before or at cutoff (lastSeenAt watermark)', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const gens = [
+      { id: 'old', type: 'quiz', completedAt: '2026-04-26T09:00:00Z' },
+      { id: 'edge', type: 'summary', completedAt: '2026-04-26T10:00:00Z' },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, cutoff);
+
+    expect(ctx.generations).toEqual([]);
+  });
+
+  it('idempotent: existing gen by id is replaced not duplicated', () => {
+    const ctx = makeCtx();
+    ctx.generations = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z', stale: true },
+    ];
+    const gens = [
+      { id: 'g1', type: 'summary', completedAt: '2026-04-26T10:05:00Z', stale: false },
+    ] as any[];
+
+    ctx.mergeReconciledGenerations.call(ctx, gens, 0);
+
+    expect(ctx.generations).toHaveLength(1);
+    expect(ctx.generations[0].stale).toBe(false);
+  });
+});
+
+// --- navigateToNotification: bell click → goToView + selectProject + openGens ---
+describe('navigateToNotification', () => {
+  function makeCtx(currentProjectId: string | null = 'pid-1') {
+    return {
+      currentProfile: { id: 'profile-A' } as { id: string } | null,
+      currentProjectId,
+      openGens: {} as Record<string, boolean>,
+      notificationsVersion: 0,
+      goToView: vi.fn(),
+      selectProject: vi.fn(async function (this: any, id: string) {
+        this.currentProjectId = id;
+      }),
+      markNotificationRead: helpers.markNotificationRead,
+      navigateToNotification: helpers.navigateToNotification,
+    };
+  }
+
+  // Stub localStorage pour markRead (consultation du ledger sf-profile-notifications).
+  beforeEach(() => {
+    (globalThis as any).localStorage = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+    };
+  });
+
+  it('completed: goToView + openGens + markRead (même projet)', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-1:completed' as EventKey,
+      messageKey: 'notif.generationDone',
+      paramKeys: { type: 'gen.summary' },
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).toHaveBeenCalledWith('summary');
+    expect(ctx.openGens['gid-1']).toBe(true);
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('cross-project completed: selectProject AVANT goToView + openGens', async () => {
+    const ctx = makeCtx('pid-current');
+    const callOrder: string[] = [];
+    ctx.selectProject = vi.fn(async function (this: any, id: string) {
+      callOrder.push('selectProject:' + id);
+      this.currentProjectId = id;
+    });
+    ctx.goToView = vi.fn(() => {
+      callOrder.push('goToView');
+    });
+    const notif = {
+      eventKey: 'generation:gid-2:completed' as EventKey,
+      paramKeys: { type: 'gen.quiz-vocal' },
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-other',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).toHaveBeenCalledWith('pid-other');
+    expect(ctx.goToView).toHaveBeenCalledWith('quiz-vocal');
+    expect(callOrder).toEqual(['selectProject:pid-other', 'goToView']);
+    expect(ctx.openGens['gid-2']).toBe(true);
+  });
+
+  it('failed: markRead seul, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-3:failed' as EventKey,
+      paramKeys: { type: 'gen.image' },
+      type: 'error' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-3']).toBeUndefined();
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('cancelled: markRead seul, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-4:cancelled' as EventKey,
+      paramKeys: { type: 'gen.podcast' },
+      type: 'info' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-4']).toBeUndefined();
+  });
+
+  it('eventKey legacy / corrompu: markRead silencieux, pas de navigation', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'something-else' as EventKey,
+      type: 'info' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.selectProject).not.toHaveBeenCalled();
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.notificationsVersion).toBe(1);
+  });
+
+  it('completed sans paramKeys.type: openGens posé mais pas de goToView', async () => {
+    const ctx = makeCtx('pid-1');
+    const notif = {
+      eventKey: 'generation:gid-5:completed' as EventKey,
+      message: 'Legacy already-translated message',
+      type: 'success' as const,
+      createdAt: '2026-04-26T10:00:00Z',
+      read: false,
+      projectId: 'pid-1',
+    };
+
+    await ctx.navigateToNotification.call(ctx as any, notif);
+
+    expect(ctx.goToView).not.toHaveBeenCalled();
+    expect(ctx.openGens['gid-5']).toBe(true);
   });
 });

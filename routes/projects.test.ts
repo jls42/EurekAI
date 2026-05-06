@@ -378,3 +378,327 @@ describe('DELETE /:pid', () => {
     expect(res.json).toHaveBeenCalledWith({ ok: true });
   });
 });
+
+describe('GET /:pid/events (SSE)', () => {
+  function mockSseRes() {
+    const res: any = {
+      writes: [] as string[],
+      headers: {} as Record<string, string>,
+      writableEnded: false,
+    };
+    res.setHeader = vi.fn((k: string, v: string) => {
+      res.headers[k] = v;
+      return res;
+    });
+    res.flushHeaders = vi.fn();
+    res.write = vi.fn((chunk: string) => {
+      res.writes.push(chunk);
+      return true;
+    });
+    // Stub : le code réel attache un listener 'error' pour cleanup sur reset
+    // TCP brutal. Pas besoin d'émettre, juste accepter l'enregistrement.
+    res.on = vi.fn();
+    return res;
+  }
+
+  function mockSseReq(pid: string) {
+    const handlers: Record<string, () => void> = {};
+    return {
+      params: { pid },
+      on: vi.fn((event: string, fn: () => void) => {
+        handlers[event] = fn;
+      }),
+      _trigger: (event: string) => handlers[event]?.(),
+    } as any;
+  }
+
+  it('positionne les headers SSE et flush', () => {
+    const project = store.createProject('SSE test');
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(project.meta.id);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    expect(res.headers['Content-Type']).toBe('text/event-stream');
+    expect(res.headers['Cache-Control']).toBe('no-cache');
+    expect(res.headers['Connection']).toBe('keep-alive');
+    expect(res.headers['X-Accel-Buffering']).toBe('no');
+    expect(res.flushHeaders).toHaveBeenCalled();
+
+    // Cleanup pour ne pas laisser de listener du store en fuite
+    req._trigger('close');
+  });
+
+  it('écrit un event au format event: generation\\ndata: {...}\\n\\n quand le store émet', () => {
+    const project = store.createProject('SSE emit');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Trigger un event via le store (addPendingEntry émet automatiquement)
+    store.addPendingEntry(pid, {
+      id: 'gid-sse',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+
+    const generationWrites = res.writes.filter((w: string) => w.startsWith('event: generation'));
+    expect(generationWrites).toHaveLength(1);
+    expect(res.writes.join('')).toContain('event: generation\n');
+    expect(res.writes.join('')).toContain('"gid":"gid-sse"');
+    expect(res.writes.join('')).toContain('"status":"pending"');
+
+    req._trigger('close');
+  });
+
+  it('filtre les events des autres projets', () => {
+    const project = store.createProject('SSE filter');
+    const otherProject = store.createProject('Other');
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(project.meta.id);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Event sur l'autre projet : ne doit PAS arriver dans cette response
+    store.addPendingEntry(otherProject.meta.id, {
+      id: 'gid-other',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+
+    const generationWrites = res.writes.filter((w: string) => w.startsWith('event: generation'));
+    expect(generationWrites).toHaveLength(0);
+
+    req._trigger('close');
+  });
+
+  it('cleanup unsubscribe + clearInterval sur req close', () => {
+    const project = store.createProject('SSE cleanup');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+    req._trigger('close');
+
+    // Après close, un nouvel event ne doit plus déclencher d'écriture
+    const writesBeforeAdd = res.writes.length;
+    store.addPendingEntry(pid, {
+      id: 'gid-after-close',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    expect(res.writes.length).toBe(writesBeforeAdd);
+  });
+
+  // Régression-lock : pid inconnu = 404, jamais d'EventEmitter listener leaké
+  // (cap 50 → MaxListenersWarning au bout de quelques typos client).
+  it('retourne 404 project_not_found pour pid inexistant + ne souscrit pas', () => {
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq('pid-inconnu');
+    const res = mockSseRes();
+    res.status = vi.fn(() => res);
+    res.json = vi.fn(() => res);
+
+    handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
+    expect(res.flushHeaders).not.toHaveBeenCalled();
+  });
+
+  // Régression-lock T2 : 60 GET successifs sur pid inconnu n'attachent jamais
+  // de listener bus (cap 50 → MaxListenersWarning sinon). Vérifie que le 404
+  // pre-flushHeaders bloque effectivement subscribeGeneration.
+  it('60 GET sur pid inexistant : 0 listener bus attache (pas de leak listener)', async () => {
+    const { generationListenerCount } = await import('../helpers/event-bus.js');
+    const before = generationListenerCount();
+    const handler = getHandler(router, 'get', '/:pid/events');
+    for (let i = 0; i < 60; i++) {
+      const req = mockSseReq(`bidon-${i}`);
+      const res = mockSseRes();
+      res.status = vi.fn(() => res);
+      res.json = vi.fn(() => res);
+      handler(req, res);
+    }
+    expect(generationListenerCount()).toBe(before);
+  });
+
+  // Régression-lock : writeGenerationEvent doit guarder writableEnded AVANT
+  // d'écrire. Sans ce guard, un event émis après que le socket s'est fermé
+  // (race entre bus.emit et req.on('close')) déclenche ERR_STREAM_WRITE_AFTER_END,
+  // l'EventEmitter propage l'erreur au listener et le process peut crasher.
+  it('writableEnded guard : skip write quand le socket est terminé', () => {
+    const project = store.createProject('SSE writable guard');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Premier event : socket OK → écrit
+    store.addPendingEntry(pid, {
+      id: 'gid-before-end',
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    const writesBefore = res.writes.length;
+    expect(writesBefore).toBeGreaterThan(0);
+
+    // Simule la fermeture du flux côté Node : writableEnded=true.
+    // (req.on('close') n'est PAS encore déclenché → unsubscribe pas appelé,
+    // donc le listener bus est encore là — c'est la fenêtre de race).
+    res.writableEnded = true;
+
+    // Deuxième event : doit être skippé par le guard, pas de throw
+    // ERR_STREAM_WRITE_AFTER_END qui crasherait le process.
+    expect(() => {
+      store.addPendingEntry(pid, {
+        id: 'gid-after-end',
+        type: 'summary',
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+        sourceIds: [],
+      });
+    }).not.toThrow();
+    expect(res.writes.length).toBe(writesBefore);
+
+    req._trigger('close');
+  });
+
+  // Régression-lock : si res.write throw (bug Node, race rare), le catch dans
+  // writeGenerationEvent évite que l'erreur remonte à l'EventEmitter (= crash).
+  it('write throw : log warn mais ne crash pas le listener bus', () => {
+    const project = store.createProject('SSE write throw');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+
+    // Force res.write à throw — simule ERR_STREAM_WRITE_AFTER_END échappant
+    // au guard writableEnded (race extrêmement étroite mais documentée).
+    res.write = vi.fn(() => {
+      throw new Error('ERR_STREAM_WRITE_AFTER_END');
+    });
+
+    expect(() => {
+      store.addPendingEntry(pid, {
+        id: 'gid-write-throw',
+        type: 'summary',
+        status: 'pending',
+        startedAt: new Date().toISOString(),
+        sourceIds: [],
+      });
+    }).not.toThrow();
+
+    req._trigger('close');
+  });
+
+  it('res error cleanup log en warn', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const project = store.createProject('SSE res error');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+    const errorHandler = res.on.mock.calls.find((call: unknown[]) => call[0] === 'error')?.[1] as
+      | ((err: Error) => void)
+      | undefined;
+    errorHandler?.(new Error('ECONNRESET'));
+
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [sse]'),
+      expect.stringContaining('ECONNRESET'),
+    );
+    warnSpy.mockRestore();
+  });
+
+  // Régression-lock : heartbeat 25s exact. Sans lui, les proxies idle coupent
+  // la connexion → notifications stale jusqu'au reconnect EventSource.
+  it('écrit un keep-alive heartbeat toutes les 25s', () => {
+    vi.useFakeTimers();
+    const project = store.createProject('SSE heartbeat');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    handler(req, res);
+    const writesBefore = res.writes.length;
+
+    vi.advanceTimersByTime(25_000);
+    const heartbeats = res.writes.filter((w: string) => w.startsWith(': '));
+    expect(heartbeats.length).toBeGreaterThanOrEqual(1);
+    expect(res.writes.length).toBeGreaterThan(writesBefore);
+
+    req._trigger('close');
+    vi.useRealTimers();
+  });
+
+  // Régression-lock : si req.on('close') ne fire jamais (bug Node socket
+  // half-open observé en prod), le compteur de throws consécutifs sur l'interval
+  // du heartbeat doit forcer un cleanup au bout de HEARTBEAT_MAX_CONSECUTIVE_THROWS
+  // (=3). Sans ça, l'interval tourne ad vitam et accumule les throws qui peuvent
+  // saturer Sentry et fuiter le listener event-bus.
+  it('force cleanup après 3 throws consécutifs du heartbeat', () => {
+    vi.useFakeTimers();
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const project = store.createProject('SSE heartbeat stuck');
+    const pid = project.meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+
+    // Stub : tout `res.write` qui ressemble à un heartbeat throw, le reste
+    // (event SSE) reste opérationnel. Compteur séparé pour l'assertion finale.
+    let heartbeatThrowCount = 0;
+    res.write = vi.fn((chunk: string) => {
+      if (chunk.startsWith(': ')) {
+        heartbeatThrowCount++;
+        throw new Error('write half-open');
+      }
+      res.writes.push(chunk);
+      return true;
+    });
+
+    handler(req, res);
+
+    // 3 ticks heartbeat = 3 throws → cleanup forcé sur le 3e.
+    vi.advanceTimersByTime(25_000 * 3);
+    expect(heartbeatThrowCount).toBe(3);
+
+    // Une fois cleanup fait, l'interval est cleared : aucun nouvel essai ne
+    // doit incrémenter le compteur, même après plusieurs cycles 25s.
+    vi.advanceTimersByTime(25_000 * 5);
+    expect(heartbeatThrowCount).toBe(3);
+
+    // Logger.warn doit signaler "heartbeat write throwing repeatedly" pour la
+    // visibilité ops + cleanup `heartbeat-stuck`.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [sse]'),
+      expect.stringContaining('heartbeat write throwing'),
+    );
+
+    warnSpy.mockRestore();
+    vi.useRealTimers();
+  });
+});

@@ -1,5 +1,8 @@
 import type { GenerationUsage } from './helpers/pricing.js';
 import type { VoiceId } from './helpers/voice-types.js';
+import type { EventKey } from './helpers/event-key.js';
+
+export type { EventKey } from './helpers/event-key.js';
 
 // --- Profiles ---
 
@@ -100,6 +103,10 @@ export interface GenerationMeta {
   usage?: GenerationUsage;
   estimatedCost?: number;
   costBreakdown?: string[];
+  // Posé par store.promoteToGeneration uniquement. Absent sur les générations
+  // pré-pending-lifecycle → ignorées par la réconciliation client (évite le
+  // spam de notifications historiques au 1er load après migration).
+  completedAt?: string;
 }
 
 export interface SummaryGeneration extends GenerationMeta {
@@ -205,7 +212,10 @@ export type FailedStepCode =
   | 'auth_required'
   | 'tts_upstream_error'
   | 'context_length_exceeded'
-  | 'internal_error';
+  | 'internal_error'
+  // Posé explicitement par store.markPendingCancelled / cancelAllPendingsAtBoot.
+  // Jamais dérivé d'une exception via extractErrorCode (pas de mapping dans error-matchers).
+  | 'cancelled';
 
 export interface FailedStep {
   // Toujours un agent exécutable par /generate/auto (cf. AUTO_AGENTS_SET) :
@@ -250,7 +260,122 @@ export interface ProjectMeta {
 
 export interface ProjectResults {
   generations: Generation[];
+  // Cycle de vie des générations en cours / échouées / annulées. Séparé de
+  // `generations[]` pour ne pas contaminer les call sites qui lisent `g.data`
+  // sans guard : le tracker contient uniquement les métadonnées de cycle de vie
+  // (pas de payload data).
+  pendingTracker?: PendingTrackerEntry[];
 }
+
+// Statut du cycle de vie d'une génération suivie par le tracker.
+// - 'pending' : génération en cours côté serveur (pas encore complétée)
+// - 'completed' : déplacée vers `generations[]` via promoteToGeneration (entrée retirée du tracker)
+// - 'failed' : erreur durant la génération, conserve `failureCode`
+// - 'cancelled' : annulée explicitement (POST /cancel) ou au boot (process précédent mort)
+export type GenerationStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
+
+// Source unique de vérité = `Generation['type']`. Lié au compile-time pour
+// qu'un nouveau Generation arm soit automatiquement trackable (ou nécessite
+// une exclusion explicite si non-trackable). Évite la dérive de la liste
+// dupliquée constatée précédemment (voice/websearch/read-aloud ne sont déjà
+// pas dans `Generation['type']` — flows séparés sans persistance Generation).
+export type TrackedGenerationType = Generation['type'];
+
+// Champs communs aux entrées actives et terminales du tracker.
+export interface PendingTrackerEntryBase {
+  // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour /generate/auto).
+  // Identique au `id` de la `Generation` finale après promotion.
+  id: string;
+  type: TrackedGenerationType;
+  startedAt: string;
+  sourceIds: string[];
+}
+
+// Discriminated union sur `status` : verrouille à compile-time que les champs
+// terminaux (failureCode, completedAt) sont OBLIGATOIRES dès qu'on flippe le
+// status, et ABSENTS sur l'arm pending. Empêche l'état impossible
+// `{status:'pending', failureCode:'cancelled'}` qui contournerait la sémantique.
+//
+// L'arm 'cancelled' verrouille `failureCode: 'cancelled'` au niveau du literal
+// (cf. CLAUDE.md "'cancelled' posé explicitement par markPendingCancelled /
+// cancelAllPendingsAtBoot, jamais dérivé via extractErrorCode"). Symétriquement
+// l'arm 'failed' exclut le literal 'cancelled' — un vrai bug (extractErrorCode
+// produisant 'cancelled' par erreur) compilerait silencieusement sans cette
+// restriction.
+export interface PendingTrackerEntryActive extends PendingTrackerEntryBase {
+  status: 'pending';
+}
+
+export interface PendingTrackerEntryFailed extends PendingTrackerEntryBase {
+  status: 'failed';
+  failureCode: Exclude<FailedStepCode, 'cancelled'>;
+  completedAt: string;
+}
+
+export interface PendingTrackerEntryCancelled extends PendingTrackerEntryBase {
+  status: 'cancelled';
+  failureCode: 'cancelled';
+  completedAt: string;
+}
+
+export type PendingTrackerEntryTerminal = PendingTrackerEntryFailed | PendingTrackerEntryCancelled;
+
+// Le tracker ne stocke jamais 'completed' : à la promotion, l'entrée est retirée
+// du tracker et la Generation est ajoutée à `generations[]`.
+export type PendingTrackerEntry = PendingTrackerEntryActive | PendingTrackerEntryTerminal;
+
+// Réponse HTTP 409 quand la promotion échoue (route /generate/:type avec
+// trackedType, /generate/auto par step). Découple le contrat HTTP du
+// discriminant interne `PromoteResult.kind` — sinon renommer le discriminant
+// store casserait le client sans warning compile. Le `'missing'` interne du
+// store est volontairement absent : c'est un signal observabilité (tracker
+// entry retirée sous nos pieds) qui doit être remappé côté serveur en
+// 'failed' avant d'atteindre le wire — pas un code stable client.
+export type PromoteErrorOutcome = 'cancelled' | 'failed';
+export interface PromoteErrorResponse {
+  error: PromoteErrorOutcome;
+  gid: string;
+}
+
+// Event SSE poussé sur GET /api/projects/:pid/events. Discriminated union sur
+// `status` : `generation` est présent UNIQUEMENT sur l'arm 'completed' — sans
+// ce verrou, le call site applyGenerationEvent doit checker `status === 'completed'
+// && generation` à chaque fois et un bug serveur (status='failed' avec generation
+// renseigné par erreur) compilerait silencieusement. Source unique de vérité
+// partagée serveur (helpers/event-bus.ts) ↔ client (src/app/helpers.ts) via
+// `import type` cross-frontière (pas de coût runtime — Vite efface).
+interface GenerationEventBase {
+  pid: string;
+  gid: string;
+  type: TrackedGenerationType;
+  at: string;
+  // Identifiant stable cross-onglets pour la déduplication idempotente.
+  // Format : 'generation:${gid}:${status}'. Toujours minté via buildEventKey
+  // (helpers/event-key.ts) — le brand empêche les call sites d'inventer la
+  // chaîne et de drift le format.
+  eventKey: EventKey;
+}
+
+export interface GenerationEventPending extends GenerationEventBase {
+  status: 'pending';
+}
+
+export interface GenerationEventCompleted extends GenerationEventBase {
+  status: 'completed';
+  // Le tracker n'a pas le payload data ; on l'attache à l'event pour permettre
+  // au client de mettre à jour state.generations sans refetch.
+  generation: Generation;
+}
+
+export interface GenerationEventTerminal extends GenerationEventBase {
+  status: 'failed' | 'cancelled';
+  failureCode: FailedStepCode;
+}
+
+export type GenerationEvent =
+  | GenerationEventPending
+  | GenerationEventCompleted
+  | GenerationEventTerminal;
 
 export interface CostEntry {
   timestamp: string;

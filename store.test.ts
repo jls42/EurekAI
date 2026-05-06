@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
@@ -118,6 +118,34 @@ describe('addGeneration / deleteGeneration', () => {
     const found = store.getProject(p.meta.id);
     expect(found!.results.generations).toHaveLength(1);
     expect(found!.results.generations[0].id).toBe('g1');
+  });
+
+  it('log warn si le projet est introuvable', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const gen: Generation = {
+      id: 'g-missing',
+      title: 'Fiche',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: {
+        title: 'Test',
+        summary: 'Resume',
+        key_points: [],
+        vocabulary: [],
+      },
+    };
+
+    store.addGeneration('pid-missing', gen);
+
+    // logger.warn ajoute un préfixe `<HH:mm:ss.SSS> WARN [store]` — on assert
+    // sur le format final (substring) pour rester insensible au timestamp.
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('WARN [store]'),
+      'addGeneration: project missing',
+      'pid-missing',
+    );
+    warnSpy.mockRestore();
   });
 
   it('supprime une generation', () => {
@@ -642,5 +670,134 @@ describe('legacy migration edge cases', () => {
 
     store.migrateFromLegacy(legacyPath);
     expect(store.listProjects()).toEqual([]);
+  });
+});
+
+describe('readIndex / getProject corruption resilience', () => {
+  it('readIndex retourne [] et log error si projects.json est corrompu', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const indexPath = join(tempDir, 'projects.json');
+    writeFileSync(indexPath, '{corrupted index!!!');
+
+    // Re-instanciation pour forcer un readIndex fresh
+    const newStore = new ProjectStore(tempDir);
+
+    expect(newStore.listProjects()).toEqual([]);
+    // logger.error sort un préfixe `HH:mm:ss.SSS ERROR [store]` + les args.
+    // On vérifie la présence du message via une recherche dans tous les calls.
+    const calls = errorSpy.mock.calls.flat();
+    expect(
+      calls.some((arg) => typeof arg === 'string' && arg.includes('Failed to read project index')),
+    ).toBe(true);
+    errorSpy.mockRestore();
+  });
+
+  it('getProject retourne null et log error si project.json est corrompu', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const p = store.createProject('Corruption');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+    writeFileSync(projectPath, '{corrupted!!!');
+
+    expect(store.getProject(p.meta.id)).toBeNull();
+    // logger.error passe args séparés (pas de template literal) pour éviter
+    // CodeQL js/tainted-format-string — assert sur la séquence d'arguments.
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('ERROR [store]'),
+      'Failed to read project',
+      p.meta.id,
+      'at',
+      expect.stringContaining(p.meta.id),
+      expect.any(Error),
+    );
+    errorSpy.mockRestore();
+  });
+});
+
+describe('appendChatMessage cap', () => {
+  it('cap les messages au-delà de maxMessages (slice tail)', () => {
+    const p = store.createProject('Chat cap');
+    for (let i = 0; i < 5; i++) {
+      store.appendChatMessage(
+        p.meta.id,
+        { role: 'user', content: `msg-${i}`, timestamp: new Date().toISOString() },
+        3, // maxMessages = 3
+      );
+    }
+
+    const found = store.getProject(p.meta.id);
+    expect(found!.chat?.messages).toHaveLength(3);
+    // Les 3 derniers : msg-2, msg-3, msg-4
+    expect(found!.chat?.messages.map((m) => m.content)).toEqual(['msg-2', 'msg-3', 'msg-4']);
+  });
+});
+
+describe('migrateModerationFormat unknown format', () => {
+  it('warn + retourne {status: error, categories: {}} si format inconnu', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const p = store.createProject('Mod unknown');
+    const projectPath = join(tempDir, 'projects', p.meta.id, 'project.json');
+    const data = {
+      meta: p.meta,
+      sources: [
+        {
+          id: 'src-bad-mod',
+          filename: 'x.txt',
+          markdown: '',
+          uploadedAt: new Date().toISOString(),
+          // Format ni legacy (no `safe` boolean) ni new (no `status` string)
+          moderation: { unexpectedField: 42 },
+        },
+      ],
+      results: { generations: [] },
+    };
+    writeFileSync(projectPath, JSON.stringify(data));
+
+    const loaded = store.getProject(p.meta.id);
+
+    expect(loaded!.sources[0].moderation).toEqual({ status: 'error', categories: {} });
+    const calls = warnSpy.mock.calls.flat();
+    expect(
+      calls.some(
+        (arg) =>
+          typeof arg === 'string' && arg.includes('Unknown moderation format during migration'),
+      ),
+    ).toBe(true);
+    warnSpy.mockRestore();
+  });
+});
+
+describe('pruneTracker cap (50 entries)', () => {
+  it('pruneTrackerIfNeeded prune le tracker quand il dépasse DEFAULT_PRUNE_MAX_KEEP au terminate', () => {
+    const p = store.createProject('Prune');
+    const oldDate = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    // Pré-charge 51 entrées terminales vieilles directement dans le tracker via getProject
+    const data = store.getProject(p.meta.id)!;
+    data.results.pendingTracker = [];
+    for (let i = 0; i < 51; i++) {
+      data.results.pendingTracker.push({
+        id: `${i.toString().padStart(8, '0')}-1111-4111-8111-111111111111`,
+        type: 'summary',
+        status: 'cancelled',
+        startedAt: oldDate,
+        completedAt: oldDate,
+        failureCode: 'cancelled',
+        sourceIds: [],
+      });
+    }
+    store.saveProject(p.meta.id, data);
+
+    // Trigger : ajoute un nouveau pending puis terminate → déclenche pruneTrackerIfNeeded
+    const triggerGid = '99999999-1111-4111-8111-111111111111';
+    store.addPendingEntry(p.meta.id, {
+      id: triggerGid,
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    store.markPendingCancelled(p.meta.id, triggerGid);
+
+    const found = store.getProject(p.meta.id);
+    expect(found!.results.pendingTracker!.length).toBeLessThanOrEqual(50);
   });
 });

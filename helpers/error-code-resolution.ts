@@ -22,10 +22,17 @@ function buildContext(err: unknown, agent: string | undefined): ErrContext {
   };
 }
 
+// Le retour exclut 'cancelled' : ce literal n'est jamais dérivé d'une exception
+// upstream, il est posé explicitement par store.markPendingCancelled /
+// cancelAllPendingsAtBoot (cf. CLAUDE.md "FailedStepCode" + types.ts comment
+// "Posé explicitement…"). Le retour étroit permet de passer le résultat à
+// markPendingFailed sans cast ni guard runtime.
+export type ExtractedErrorCode = Exclude<FailedStepCode, 'cancelled'>;
+
 export function extractErrorCode(
   err: unknown,
   agent: string | undefined = undefined,
-): FailedStepCode {
+): ExtractedErrorCode {
   if (err instanceof SyntaxError) return 'llm_invalid_json';
   const ctx = buildContext(err, agent);
   for (const matcher of MATCHERS) {

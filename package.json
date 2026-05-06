@@ -1,6 +1,6 @@
 {
   "name": "eurekai",
-  "version": "1.4.3",
+  "version": "1.5.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -n srv,web -c blue,green \"tsx watch server.ts\" \"vite\"",
@@ -23,6 +23,10 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,js,html,css,json}": "prettier --write",
+    "*.{ts,js}": "eslint --fix --max-warnings 0 --no-warn-ignored"
   },
   "dependencies": {
     "@lightpanda/browser": "^1.2.0",
@@ -55,6 +59,7 @@
     "eslint-plugin-sonarjs": "^4.0.3",
     "husky": "^9.1.7",
     "knip": "^6.4.1",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.8.1",
     "tailwindcss": "^4.2.1",
     "tsx": "^4.19.0",

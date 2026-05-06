@@ -5,12 +5,17 @@ import type {
   Source,
   Generation,
   QuizQuestion,
+  QuizGeneration,
   AgeGroup,
   FailedStep,
   FailedStepCode,
   Consigne,
+  TrackedGenerationType,
+  PendingTrackerEntry,
+  PromoteErrorOutcome,
+  PromoteErrorResponse,
 } from '../types.js';
-import type { ProjectStore } from '../store.js';
+import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../config.js';
@@ -33,9 +38,34 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 
-const QUIZ_VOCAL = 'quiz-vocal';
-const FILL_BLANK = 'fill-blank';
+const assertNever = (x: never): never => {
+  throw new Error('exhaustive check failed: ' + JSON.stringify(x));
+};
+
+// Centralise le remap PromoteResult (interne store) → PromoteErrorOutcome (wire).
+// Source unique pour éviter la dérive entre les 2 dispatch sites (handleGeneration
+// + runStep auto). Le switch sur `kind` force exhaustivité au compile-time : un
+// nouveau arm de PromoteResult casse la build au lieu de tomber dans le default.
+function classifyPromoteFailure(result: Exclude<PromoteResult, { kind: 'promoted' }>): {
+  outcome: PromoteErrorOutcome;
+  isMissing: boolean;
+} {
+  switch (result.kind) {
+    case 'cancelled':
+      return { outcome: 'cancelled', isMissing: false };
+    case 'failed':
+      return { outcome: 'failed', isMissing: false };
+    case 'missing':
+      return { outcome: 'failed', isMissing: true };
+    default:
+      return assertNever(result);
+  }
+}
+
+const QUIZ_VOCAL = 'quiz-vocal' as const;
+const FILL_BLANK = 'fill-blank' as const;
 const ROUTER_MODEL = 'mistral-small-latest';
+const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
 // Variante non-throw : retourne null quand aucune source ne matche, pour permettre aux
 // call sites internes (`buildGenContext`, `quiz-review`, `route` analysis) de répondre
@@ -168,7 +198,7 @@ function buildGenContext(
   | { ok: true; ctx: Omit<GenContext, 'req' | 'res'> }
   | { ok: false; error: string; status: number } {
   const project = store.getProject(pid);
-  if (!project) return { ok: false, error: 'Projet introuvable', status: 404 };
+  if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
 
   const unsafeSource = checkModeration(store, profileStore, pid, body.sourceIds);
   if (unsafeSource) return { ok: false, error: 'moderation.blocked', status: 400 };
@@ -208,46 +238,225 @@ function buildGenContext(
   };
 }
 
+// Pré-validation des inputs de quiz-review. Sortie en amont de handleGeneration
+// pour éviter qu'un pending tracker entry (ajouté au commit pending lifecycle)
+// ne reste orphelin quand une validation échoue. Toutes les erreurs de cette
+// validation produisent un 400/404 sans avoir touché le tracker.
+interface QuizReviewValidated {
+  originalGen: QuizGeneration;
+  weakQuestions: QuizQuestion[];
+  markdown: string;
+  reviewLabel: string;
+}
+
+type ValidationResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
+
+const reviewLabelForLang = (lang: string): string => (lang === 'en' ? 'Review' : 'Revision');
+
+function validateQuizReviewInputs(
+  store: ProjectStore,
+  pid: string,
+  body: { generationId?: string; weakQuestions?: unknown; lang?: string },
+): ValidationResult<QuizReviewValidated> {
+  if (!body.generationId || !Array.isArray(body.weakQuestions)) {
+    return { ok: false, status: 400, error: 'generationId et weakQuestions requis' };
+  }
+  const originalGen = store.getGeneration(pid, body.generationId);
+  if (originalGen?.type !== 'quiz') {
+    return { ok: false, status: 404, error: 'Quiz original introuvable' };
+  }
+  const project = store.getProject(pid);
+  if (!project) {
+    return { ok: false, status: 404, error: ERR_PROJECT_NOT_FOUND };
+  }
+  const markdown = getMarkdownOrNull(project.sources, originalGen.sourceIds);
+  if (markdown === null) {
+    return { ok: false, status: 400, error: 'no_sources' };
+  }
+  const ctxError = checkContextLimit(markdown, getConfig().models.quiz);
+  if (ctxError) {
+    return { ok: false, status: 400, error: ctxError };
+  }
+  return {
+    ok: true,
+    data: {
+      // type-narrowed via `originalGen?.type !== 'quiz'` early-return ci-dessus
+      originalGen,
+      weakQuestions: body.weakQuestions as QuizQuestion[],
+      markdown,
+      reviewLabel: reviewLabelForLang(body.lang || 'fr'),
+    },
+  };
+}
+
+interface HandleGenerationOptions {
+  skipContextCheck?: boolean;
+  checkRawMarkdown?: boolean;
+  agentName?: string;
+  // Si défini, active le pending lifecycle :
+  // 1. addPendingEntry au début (409 duplicate_gid si gid déjà pris)
+  // 2. promoteToGeneration au succès (PromoteResult dispatch ou 409 si race cancel/fail)
+  // 3. markPendingFailed au catch
+  // Si absent, fallback comportement legacy (addGeneration direct).
+  trackedType?: TrackedGenerationType;
+}
+
+// UUID v4 strict : version nibble = '4', variant nibble dans [89ab].
+// Aligné sur la regex client (src/app/confirm.ts GID_UUID_V4) — assure que le
+// gid produit par crypto.randomUUID() côté client (RFC 4122 v4) traverse
+// inchangé et que toute autre valeur (UUID v1/v3/v5, hex shape valide non-v4)
+// retombe sur randomUUID() au lieu de propager un gid non conforme.
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+// Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
+// randomUUID. Le client génère son propre gid avant le fetch pour avoir
+// abortControllersByGid[gid] immédiatement opérationnel + identifiant stable
+// utilisable au moment du payload 200 fallback ou de l'event SSE.
+function readClientGid(req: Request): string {
+  const candidate = (req.body as { gid?: unknown })?.gid;
+  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate) ? candidate : randomUUID();
+}
+
+function makeTrackerEntry(
+  type: TrackedGenerationType,
+  gid: string,
+  sourceIds: string[],
+): PendingTrackerEntry {
+  return {
+    id: gid,
+    type,
+    status: 'pending',
+    startedAt: new Date().toISOString(),
+    sourceIds,
+  };
+}
+
+interface PersistedCostFields {
+  usage?: Generation['usage'];
+  cost?: number;
+  costBreakdown?: string[];
+}
+
+function buildFinalGeneration(
+  gid: string,
+  gen: Generation,
+  persisted: PersistedCostFields | null,
+): Generation {
+  const final = { ...gen, id: gid } as Generation;
+  if (persisted) {
+    final.usage = persisted.usage;
+    final.estimatedCost = persisted.cost;
+    final.costBreakdown = persisted.costBreakdown;
+  }
+  return final;
+}
+
+async function runGeneratorAndPersist(
+  store: ProjectStore,
+  generatorFn: (ctx: GenContext) => Promise<Generation | null>,
+  ctx: GenContext,
+  pid: string,
+  gid: string,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): Promise<void> {
+  const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
+  if (!gen) {
+    // Defense en profondeur : aucune closure ne devrait return null après le commit
+    // d'extraction des validations early. Logger UNCONDITIONAL pour Sentry (la
+    // surface de bug doit être visible même si trackedType absent).
+    logger.error(
+      'generate',
+      `generator returned null: type=${options?.trackedType ?? 'unknown'} pid=${pid} gid=${gid}`,
+    );
+    if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
+    res.status(500).json({ error: 'internal_error' });
+    return;
+  }
+  const persisted = persistUsage(
+    store,
+    pid,
+    `POST /api/projects/${pid}/generate/${gen.type}`,
+    usage,
+  );
+  const finalGen = buildFinalGeneration(gid, gen, persisted);
+  if (options?.trackedType) {
+    const promoteResult = store.promoteToGeneration(pid, gid, finalGen);
+    if (promoteResult.kind === 'promoted') {
+      res.json(promoteResult.generation);
+      return;
+    }
+    // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
+    // 200 fantôme — le client refresh le projet pour voir l'état réel.
+    const { outcome, isMissing } = classifyPromoteFailure(promoteResult);
+    if (isMissing) {
+      // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
+      // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
+      logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
+    }
+    const body: PromoteErrorResponse = { error: outcome, gid };
+    res.status(409).json(body);
+    return;
+  }
+  store.addGeneration(pid, finalGen);
+  res.json(finalGen);
+}
+
+function handleGenerationFailure(
+  store: ProjectStore,
+  pid: string,
+  gid: string,
+  e: unknown,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): void {
+  const code = extractErrorCode(e, options?.agentName);
+  if (options?.trackedType) store.markPendingFailed(pid, gid, code);
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
+  }
+  logger.error('generate', 'error:', e);
+  res.status(500).json({ error: code });
+}
+
 function handleGeneration(
   store: ProjectStore,
   profileStore: ProfileStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
   modelId?: string,
-  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean; agentName?: string },
+  options?: HandleGenerationOptions,
 ) {
   return async (req: Request, res: Response) => {
     const pid = req.params.pid as string;
-    try {
-      const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
-      if (!result.ok) {
-        res.status(result.status).json({ error: result.error });
+    const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
+    if (!result.ok) {
+      res.status(result.status).json({ error: result.error });
+      return;
+    }
+    const gid = readClientGid(req);
+    if (options?.trackedType) {
+      const added = store.addPendingEntry(
+        pid,
+        makeTrackerEntry(options.trackedType, gid, result.ctx.sourceIds),
+      );
+      if (!added) {
+        res.status(409).json({ error: 'duplicate_gid', gid });
         return;
       }
-      const { result: gen, usage } = await runWithUsageTracking(() =>
-        generatorFn({ ...result.ctx, req, res }),
+    }
+    try {
+      await runGeneratorAndPersist(
+        store,
+        generatorFn,
+        { ...result.ctx, req, res },
+        pid,
+        gid,
+        options,
+        res,
       );
-      if (gen) {
-        const persisted = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/generate/${gen.type}`,
-          usage,
-        );
-        if (persisted) {
-          gen.usage = persisted.usage;
-          gen.estimatedCost = persisted.cost;
-          gen.costBreakdown = persisted.costBreakdown;
-        }
-        store.addGeneration(pid, gen);
-        res.json(gen);
-      }
     } catch (e) {
-      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
-      }
-      logger.error('generate', 'error:', e);
-      res.status(500).json({ error: extractErrorCode(e, options?.agentName) });
+      handleGenerationFailure(store, pid, gid, e, options, res);
     }
   };
 }
@@ -293,7 +502,7 @@ export function generateRoutes(
         };
       },
       undefined,
-      { agentName: 'summary' },
+      { agentName: 'summary', trackedType: 'summary' },
     ),
   );
 
@@ -323,7 +532,7 @@ export function generateRoutes(
         };
       },
       'flashcards',
-      { agentName: 'flashcards' },
+      { agentName: 'flashcards', trackedType: 'flashcards' },
     ),
   );
 
@@ -353,7 +562,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { agentName: 'quiz' },
+      { agentName: 'quiz', trackedType: 'quiz' },
     ),
   );
 
@@ -412,45 +621,34 @@ export function generateRoutes(
         });
       },
       'podcast',
-      { agentName: 'podcast' },
+      { agentName: 'podcast', trackedType: 'podcast' },
     ),
   );
 
-  router.post(
-    '/:pid/generate/quiz-review',
-    handleGeneration(
+  // Quiz-review : validations early en pre-handler. La closure passée à
+  // handleGeneration n'a plus aucun `return null` ni `ctx.res.status` — tout
+  // ce qui pourrait échouer côté input est déjà validé. Permet au commit
+  // pending lifecycle d'ajouter un tracker entry sans risquer de pendings
+  // orphelins quand un input est rejeté.
+  router.post('/:pid/generate/quiz-review', async (req, res) => {
+    const validation = validateQuizReviewInputs(store, req.params.pid, req.body);
+    if (!validation.ok) {
+      res.status(validation.status).json({ error: validation.error });
+      return;
+    }
+    const { originalGen, weakQuestions, markdown, reviewLabel } = validation.data;
+    await handleGeneration(
       store,
       profileStore,
       async (ctx) => {
-        const { generationId, weakQuestions } = ctx.req.body;
-        if (!generationId || !weakQuestions || !Array.isArray(weakQuestions)) {
-          ctx.res.status(400).json({ error: 'generationId et weakQuestions requis' });
-          return null;
-        }
-        const originalGen = store.getGeneration(ctx.pid, generationId);
-        if (originalGen?.type !== 'quiz') {
-          ctx.res.status(404).json({ error: 'Quiz original introuvable' });
-          return null;
-        }
-        const markdown = getMarkdownOrNull(ctx.project.sources, originalGen.sourceIds);
-        if (markdown === null) {
-          ctx.res.status(400).json({ error: 'no_sources' });
-          return null;
-        }
-        const ctxError = checkContextLimit(markdown, ctx.config.models.quiz);
-        if (ctxError) {
-          ctx.res.status(400).json({ error: ctxError });
-          return null;
-        }
         const data = await generateQuizReview(
           client,
           markdown,
-          weakQuestions as QuizQuestion[],
+          weakQuestions,
           ctx.config.models.quiz,
           ctx.lang,
           ctx.ageGroup,
         );
-        const reviewLabel = ctx.lang === 'en' ? 'Review' : 'Revision';
         return {
           id: randomUUID(),
           title: `${reviewLabel} — ${originalGen.title}`,
@@ -461,9 +659,9 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { skipContextCheck: true, agentName: 'quiz-review' },
-    ),
-  );
+      { skipContextCheck: true, agentName: 'quiz-review', trackedType: 'quiz' },
+    )(req, res);
+  });
 
   router.post(
     '/:pid/generate/quiz-vocal',
@@ -521,7 +719,7 @@ export function generateRoutes(
         });
       },
       'quiz',
-      { agentName: QUIZ_VOCAL },
+      { agentName: QUIZ_VOCAL, trackedType: QUIZ_VOCAL },
     ),
   );
 
@@ -556,7 +754,7 @@ export function generateRoutes(
         };
       },
       'mistral-large-latest',
-      { checkRawMarkdown: true, agentName: 'image' },
+      { checkRawMarkdown: true, agentName: 'image', trackedType: 'image' },
     ),
   );
 
@@ -591,7 +789,7 @@ export function generateRoutes(
         };
       },
       'quiz',
-      { agentName: FILL_BLANK },
+      { agentName: FILL_BLANK, trackedType: FILL_BLANK },
     ),
   );
 
@@ -768,30 +966,40 @@ export function generateRoutes(
     },
   };
 
+  // Sous-helper extrait : valide les inputs route + prépare le markdown
+  // (consigne + context limit). Retourne null après envoi 4xx si invalide.
+  function prepareRouteRequest(
+    req: Request,
+    res: Response,
+  ): { markdown: string; lang: string; ageGroup: AgeGroup } | null {
+    const project = store.getProject(String(req.params.pid));
+    if (!project) {
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+      return null;
+    }
+    const lang = req.body.lang || 'fr';
+    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
+    const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
+    if (rawMarkdown === null) {
+      res.status(400).json({ error: 'no_sources' });
+      return null;
+    }
+    const useConsigneRoute = req.body.useConsigne !== false;
+    const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+    const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
+    if (ctxError) {
+      res.status(400).json({ error: ctxError });
+      return null;
+    }
+    return { markdown, lang, ageGroup };
+  }
+
   // --- Route analysis only (for 2-phase auto) ---
   router.post('/:pid/generate/route', async (req, res) => {
     try {
-      const project = store.getProject(req.params.pid);
-      if (!project) {
-        res.status(404).json({ error: 'Projet introuvable' });
-        return;
-      }
-      const lang = req.body.lang || 'fr';
-      const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-      const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
-      if (rawMarkdown === null) {
-        res.status(400).json({ error: 'no_sources' });
-        return;
-      }
-      const useConsigneRoute = req.body.useConsigne !== false;
-      const markdown = useConsigneRoute
-        ? applyConsigne(rawMarkdown, project.consigne)
-        : rawMarkdown;
-      const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
-      if (ctxError) {
-        res.status(400).json({ error: ctxError });
-        return;
-      }
+      const prepared = prepareRouteRequest(req, res);
+      if (!prepared) return;
+      const { markdown, lang, ageGroup } = prepared;
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
         routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
@@ -819,54 +1027,112 @@ export function generateRoutes(
     }
   });
 
-  // Exécute un step en parallèle : retourne soit la génération, soit l'erreur encapsulée.
-  // Les mutations du store (persistUsage, addGeneration) restent séquentielles au niveau JS
-  // (event-loop single-thread), mais l'agrégation dans generations[]/failedSteps[] est
-  // remontée par l'appelant pour contrôler l'ordre de sortie (= ordre du plan).
+  type StepOutcome =
+    | { ok: true; gen: Generation }
+    | { ok: false; agent: AutoAgentType; code: FailedStepCode };
+
+  // Le UI ne passe pas par /generate/auto (il fait runAutoSteps avec N
+  // /generate/<type>), mais cette route reste utilisable pour appels batch.
+  // Chaque step a son propre gid serveur (le body.gid global serait incohérent
+  // avec N générations en parallèle). Le pending lifecycle suit les mêmes
+  // invariants que handleGeneration : pas de req.on('close') cancel.
   async function runStep(
     step: { agent: AutoAgentType },
     autoCtx: AutoCtx,
     st: ProjectStore,
     pid: string,
-  ): Promise<
-    { ok: true; gen: Generation } | { ok: false; agent: AutoAgentType; code: FailedStepCode }
-  > {
+  ): Promise<StepOutcome> {
     const executor = AUTO_EXECUTORS[step.agent];
     if (!executor) {
       // Cas impossible : executablePlan est déjà filtré via splitByAutoExecutable.
-      // Filet de sécurité en cas de dérive future du typage.
       logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
       return { ok: false, agent: step.agent, code: 'internal_error' };
     }
+    const gid = randomUUID();
+    const added = st.addPendingEntry(pid, makeTrackerEntry(step.agent, gid, autoCtx.sourceIds));
+    if (!added) {
+      // Improbable : gid serveur fresh à chaque step (UUID v4 unique).
+      logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
+      return { ok: false, agent: step.agent, code: 'internal_error' };
+    }
     try {
-      const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
-      const persisted = persistUsage(
+      return await runStepBody(step, executor, autoCtx, st, pid, gid);
+    } catch (err) {
+      return runStepCatch(err, step, st, pid, gid);
+    }
+  }
+
+  async function runStepBody(
+    step: { agent: AutoAgentType },
+    executor: (ctx: AutoCtx) => Promise<Generation>,
+    autoCtx: AutoCtx,
+    st: ProjectStore,
+    pid: string,
+    gid: string,
+  ): Promise<StepOutcome> {
+    const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+    const persisted = persistUsage(
+      st,
+      pid,
+      `POST /api/projects/${pid}/generate/auto/${step.agent}`,
+      usage,
+    );
+    const finalGen = buildFinalGeneration(gid, gen, persisted);
+    const promoteResult = st.promoteToGeneration(pid, gid, finalGen);
+    if (promoteResult.kind === 'promoted') {
+      logger.info('auto', `${step.agent} OK`);
+      return { ok: true, gen: promoteResult.generation };
+    }
+    // Race cancel/fail / OU bug observabilité (kind === 'missing' = entry retirée
+    // sous nos pieds entre addPendingEntry et promoteToGeneration). On distingue
+    // 'missing' de 'cancelled' explicitement : 'missing' = symptôme d'un cleanup
+    // imprévu (tracker corrompu, race avec deleteProject), donc 'internal_error'
+    // côté client pour ne pas masquer un bug en code utilisateur 'cancelled'.
+    // Switch exhaustif (assertNever) verrouille le passage de tout futur arm.
+    const code = pickAutoStepFailureCode(promoteResult);
+    if (promoteResult.kind === 'missing') {
+      logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
+    } else {
+      logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
+    }
+    return { ok: false, agent: step.agent, code };
+  }
+
+  function pickAutoStepFailureCode(
+    result: Exclude<PromoteResult, { kind: 'promoted' }>,
+  ): FailedStepCode {
+    switch (result.kind) {
+      case 'failed':
+        return result.code;
+      case 'cancelled':
+        return 'cancelled';
+      case 'missing':
+        return 'internal_error';
+      default:
+        return assertNever(result);
+    }
+  }
+
+  function runStepCatch(
+    err: unknown,
+    step: { agent: AutoAgentType },
+    st: ProjectStore,
+    pid: string,
+    gid: string,
+  ): StepOutcome {
+    const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(
         st,
         pid,
-        `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-        usage,
+        `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+        failedUsage,
       );
-      if (persisted) {
-        gen.usage = persisted.usage;
-        gen.estimatedCost = persisted.cost;
-        gen.costBreakdown = persisted.costBreakdown;
-      }
-      st.addGeneration(pid, gen);
-      logger.info('auto', `${step.agent} OK`);
-      return { ok: true, gen };
-    } catch (err) {
-      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(
-          st,
-          pid,
-          `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-          failedUsage,
-        );
-      }
-      logger.error('auto', `${step.agent} FAILED:`, err);
-      return { ok: false, agent: step.agent, code: extractErrorCode(err, step.agent) };
     }
+    const code = extractErrorCode(err, step.agent);
+    st.markPendingFailed(pid, gid, code);
+    logger.error('auto', `${step.agent} FAILED:`, err);
+    return { ok: false, agent: step.agent, code };
   }
 
   // Parallélisation alignée sur le comportement UI (cf. src/app/generate.ts:260).
@@ -888,6 +1154,18 @@ export function generateRoutes(
         // runStep catche déjà tout. Ce cas ne devrait pas arriver, mais on le capte
         // quand même pour ne jamais perdre un step du plan.
         logger.error('auto', `${step.agent} unexpected rejection:`, outcome.reason);
+        // Si l'erreur porte un apiUsage (cas où l'exception a fui tracked-client
+        // sans passer par runStepCatch), persister quand même pour ne pas
+        // perdre le coût Mistral déjà facturé. Mirror du pattern runStepCatch.
+        const failedUsage = (outcome.reason as { apiUsage?: ApiUsage[] })?.apiUsage;
+        if (failedUsage?.length) {
+          persistUsage(
+            st,
+            pid,
+            `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+            failedUsage,
+          );
+        }
         failedSteps.push({ agent: step.agent, code: extractErrorCode(outcome.reason, step.agent) });
         return;
       }

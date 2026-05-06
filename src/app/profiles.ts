@@ -167,368 +167,412 @@ export function buildProfileUpdates(editingProfile: EditingProfile): Record<stri
   return updates;
 }
 
+// Surface les drops silencieux (rows malformées ou migration failed côté serveur) —
+// sans ce signal, l'user voit un picker partiel et invente un profil au-dessus
+// de ses anciennes données. Toast warning, pas erreur : le picker est utilisable.
+const surfaceProfilesDropHeader = (state: AppContext, res: Response): void => {
+  const droppedRaw = res.headers.get('X-Profiles-Dropped');
+  const dropped = droppedRaw ? Number.parseInt(droppedRaw, 10) : 0;
+  if (Number.isFinite(dropped) && dropped > 0) {
+    state.showToast(state.t('toast.profilesPartial', { count: dropped }), 'warning');
+  }
+};
+
+const reportFetchProfilesError = async (state: AppContext, res: Response): Promise<void> => {
+  const err = await res.json().catch(() => ({}));
+  console.error('Failed to load profiles:', res.status, err);
+  state.showToast(
+    state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
+    'error',
+  );
+};
+
 // Sépare le fetch + handling erreur du flow de sélection de profil pour rester sous
 // CCN 8 dans loadProfiles. Surface les erreurs serveur (500 sur ENOSPC/EACCES côté
 // ProfileStore) via toast — sinon l'user voit un picker vide et invente un nouveau
 // profil au-dessus de ses données existantes.
-async function fetchProfilesInto(state: AppContext): Promise<void> {
+const fetchProfilesInto = async function (state: AppContext): Promise<void> {
   try {
     const res = await fetch('/api/profiles');
     if (res.ok) {
       state.profiles = await res.json();
-      // Surface les drops silencieux (rows malformées ou migration failed côté serveur) —
-      // sans ce signal, l'user voit un picker partiel et invente un profil au-dessus
-      // de ses anciennes données. Toast warning, pas erreur : le picker est utilisable.
-      const droppedRaw = res.headers.get('X-Profiles-Dropped');
-      const dropped = droppedRaw ? Number.parseInt(droppedRaw, 10) : 0;
-      if (Number.isFinite(dropped) && dropped > 0) {
-        state.showToast(state.t('toast.profilesPartial', { count: dropped }), 'warning');
-      }
+      surfaceProfilesDropHeader(state, res);
       return;
     }
-    const err = await res.json().catch(() => ({}));
-    console.error('Failed to load profiles:', res.status, err);
-    state.showToast(
-      state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
-      'error',
-    );
+    await reportFetchProfilesError(state, res);
   } catch (e: unknown) {
     console.error('Failed to load profiles:', e);
     const msg = e instanceof Error ? e.message : String(e);
     state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
   }
-}
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Méthodes extraites de createProfiles : éviter l'agglomération Lizard CCN.
+// `const x = function(this: AppContext, ...) {...}` plutôt que `function x(...)`
+// car le parseur TS Lizard agglomère les `function name(this: T, ...)` consécutifs.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const loadProfiles = async function (this: AppContext) {
+  await fetchProfilesInto(this);
+  // Restore last selected profile
+  const saved = localStorage.getItem(LS_PROFILE_ID);
+  if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
+    this.selectProfile(saved);
+  } else if (this.profiles.length > 0) {
+    this.selectProfile(this.profiles[0].id);
+  } else {
+    this.showProfilePicker = true;
+  }
+};
+
+const applyProfileTheme = function (state: AppContext, profile: Profile): void {
+  if (profile.theme) {
+    state.theme = profile.theme;
+    document.documentElement.dataset.theme = profile.theme;
+    return;
+  }
+  const stored = localStorage.getItem('sf-theme');
+  const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  state.theme = stored || system;
+  document.documentElement.dataset.theme = state.theme;
+};
+
+const selectProfile = function (this: AppContext, id: string) {
+  const profile = this.profiles.find((p: Profile) => p.id === id);
+  if (!profile) return;
+  this.currentProfile = profile;
+  this.showProfilePicker = false;
+  localStorage.setItem(LS_PROFILE_ID, id);
+  this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
+  applyProfileTheme(this, profile);
+  // Reset project state and reload projects for this profile.
+  // resetSession() abort les fetches en vol et vide loading/toasts/pendings :
+  // empêche un toast `generationDone` du profil précédent d'apparaître ici.
+  this.currentProjectId = null;
+  this.currentProject = null;
+  this.resetSession();
+  this.resetState();
+  this.loadProjects();
+};
+
+const createProfile = async function (this: AppContext) {
+  const { result, name, age } = validateNewProfileForm(this);
+  if (result === 'pin_mismatch') {
+    this.showToast(this.t('profile.pinMismatch'), 'error');
+    return;
+  }
+  if (result !== 'ok') return;
+  try {
+    const res = await fetch('/api/profiles', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(buildCreateProfileBody(this, name, age)),
+    });
+    if (res.ok) {
+      applyCreateProfileSuccess(this, await res.json());
+    } else {
+      const err = await res.json().catch(() => ({}));
+      this.showToast(
+        this.t(TOAST_ERROR, { error: mapServerErrorCode(this, err.error) || res.statusText }),
+        'error',
+      );
+    }
+  } catch (e: unknown) {
+    console.error('Failed to create profile:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
+  }
+};
+
+const deleteProfile = async function (this: AppContext, id: string) {
+  const profile = this.profiles.find((p: Profile) => p.id === id);
+  if (!profile) return;
+  const target = deleteConfirmMessage(this, id);
+  if (profile.hasPin) {
+    this.requirePin(async (pin: string) => {
+      this.confirmDelete(target, () => executeDeleteProfile(this, id, pin));
+    });
+    return;
+  }
+  this.confirmDelete(target, () => executeDeleteProfile(this, id));
+};
+
+const applyProfileUpdate = function (this: AppContext, id: string, updated: Profile) {
+  const idx = this.profiles.findIndex((p: Profile) => p.id === id);
+  if (idx !== -1) this.profiles[idx] = updated;
+  if (this.currentProfile?.id === id) this.currentProfile = updated;
+  if (this.editingProfile?.id === id) {
+    if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
+    if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
+  }
+  if (updated.locale) setProfileLocale(id, updated.locale);
+};
+
+// Sous-helper extrait d'updateProfile pour le branchement sur res.ok / abort.
+const handleUpdateProfileResponse = async (
+  state: AppContext,
+  id: string,
+  res: Response,
+  signal?: AbortSignal,
+): Promise<void> => {
+  if (signal?.aborted) return;
+  if (res.ok) {
+    state.applyProfileUpdate(id, await res.json());
+    return;
+  }
+  const err = await res.json().catch(() => ({}));
+  // Toujours surfacer un toast — sans ce fallback un 5xx avec body HTML, un 413
+  // payload-too-large, ou un parse fail produirait silence total côté UI alors
+  // que l'état serveur diverge.
+  console.error('Failed to update profile:', res.status, err);
+  state.showToast(
+    state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
+    'error',
+  );
+};
+
+const updateProfile = async function (
+  this: AppContext,
+  id: string,
+  updates: Record<string, unknown>,
+  signal?: AbortSignal,
+) {
+  try {
+    // SSRF: literal `/api/profiles/` inline pour préserver l'analyse taint Codacy
+    // (cf. executeDeleteProfile + CLAUDE.md section Sécurité).
+    const res = await fetch('/api/profiles/' + id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updates),
+      signal,
+    });
+    await handleUpdateProfileResponse(this, id, res, signal);
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') return;
+    console.error('Failed to update profile:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
+  }
+};
+
+const startEditProfile = function (this: AppContext, id: string) {
+  const profile = this.profiles.find((p: Profile) => p.id === id);
+  if (!profile) return;
+  this.editingProfile = {
+    ...profile,
+    locale: profile.locale || 'fr',
+    mistralVoices: {
+      host: profile.mistralVoices?.host ?? '',
+      guest: profile.mistralVoices?.guest ?? '',
+    },
+    theme: profile.theme,
+  };
+  this.showProfilePicker = true;
+  this.showProfileForm = false;
+  // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
+  // a publié de nouvelles voix depuis le chargement initial. Non bloquant —
+  // loadMistralVoices avale ses propres erreurs.
+  this.loadMistralVoices?.()?.catch((e: unknown) => {
+    console.error('voice catalog refresh failed:', e);
+  });
+};
+
+const requireParentalAccess = function (this: AppContext, callback: () => void) {
+  if (!this.editingProfile?.hasPin) {
+    callback();
+    return;
+  }
+  if (this.editingProfile._verifiedPin) {
+    callback();
+    return;
+  }
+  const editing = this.editingProfile;
+  if (!editing) return;
+  this.requirePin(async (pin: string) => {
+    try {
+      // SSRF: literal `/api/profiles/` inline (cf. executeDeleteProfile).
+      const res = await fetch('/api/profiles/' + editing.id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      if (!res.ok) {
+        this.showToast(this.t('profile.pinWrong'), 'error');
+        return;
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
+      return;
+    }
+    editing._verifiedPin = pin;
+    callback();
+  });
+};
+
+const autoSaveProfile = function (this: AppContext, immediate?: boolean) {
+  if (!this.editingProfile) return;
+  if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
+  const doSave = async () => {
+    const editing = this.editingProfile;
+    if (!isProfileFormValid(editing) || !editing) return;
+    const { id, locale } = editing;
+    const updates = buildProfileUpdates(editing);
+    if (this._saveController) this._saveController.abort();
+    this._saveController = new AbortController();
+    await this.updateProfile(id, updates, this._saveController.signal);
+    if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
+  };
+  if (immediate) {
+    doSave();
+    return;
+  }
+  this._autoSaveTimer = setTimeout(doSave, 500);
+};
+
+const toggleModerationCategory = function (this: AppContext, cat: string) {
+  this.requireParentalAccess(() => {
+    const editing = this.editingProfile;
+    if (!editing) return;
+    const cats = (editing.moderationCategories ??= []);
+    const idx = cats.indexOf(cat);
+    if (idx >= 0) cats.splice(idx, 1);
+    else cats.push(cat);
+    this.autoSaveParental();
+  });
+};
+
+const autoSaveParental = async function (this: AppContext) {
+  if (!this.editingProfile) return;
+  const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } =
+    this.editingProfile;
+  const updates: Record<string, unknown> = {
+    useModeration,
+    moderationCategories,
+    chatEnabled,
+    _updatedAt: updatedAt,
+  };
+  if (_verifiedPin) updates.pin = _verifiedPin;
+  if (this._saveController) this._saveController.abort();
+  this._saveController = new AbortController();
+  await this.updateProfile(id, updates, this._saveController.signal);
+};
+
+const applyThemeLive = function (this: AppContext) {
+  const theme = this.editingProfile?.theme;
+  if (theme) {
+    this.theme = theme;
+    document.documentElement.dataset.theme = theme;
+  } else {
+    const stored = localStorage.getItem('sf-theme');
+    const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    this.theme = stored || system;
+    document.documentElement.dataset.theme = this.theme;
+  }
+  this.autoSaveProfile(true);
+};
+
+const closeEditProfile = function (this: AppContext) {
+  this.autoSaveProfile(true);
+  this.editingProfile = null;
+};
+
+const resetProfileDefaults = function (this: AppContext) {
+  if (!this.editingProfile) return;
+  this.editingProfile.mistralVoices = { host: '', guest: '' };
+  this.editingProfile.theme = undefined;
+  this.applyThemeLive();
+  this.showToast(this.t('toast.profileReset'), 'success');
+};
+
+const saveEditProfile = async function (this: AppContext) {
+  this.autoSaveProfile(true);
+  this.editingProfile = null;
+};
+
+const _toggleProfileProp = async function (this: AppContext, id: string, prop: string) {
+  const profile = this.profiles.find((p: Profile) => p.id === id);
+  if (!profile) return;
+  const doToggle = async (pin?: string) => {
+    const updates: Record<string, unknown> = {
+      [prop]: !(profile as unknown as Record<string, unknown>)[prop],
+    };
+    if (pin) updates.pin = pin;
+    await this.updateProfile(id, updates);
+  };
+  if (profile.hasPin) {
+    this.requirePin(async (pin: string) => {
+      await doToggle(pin);
+    });
+    return;
+  }
+  await doToggle();
+};
+
+const toggleModeration = async function (this: AppContext, id: string) {
+  await this._toggleProfileProp(id, 'useModeration');
+};
+
+const toggleChat = async function (this: AppContext, id: string) {
+  await this._toggleProfileProp(id, 'chatEnabled');
+};
+
+const openProfilePicker = function (this: AppContext) {
+  this.showProfilePicker = true;
+};
+
+// PIN dialog helpers
+const requirePin = function (this: AppContext, callback: (pin: string) => void) {
+  this.pinVerifyInput = '';
+  this.pinVerifyCallback = callback;
+  this.showPinDialog = true;
+  this.$nextTick(() => {
+    (this.$refs.pinDialog as HTMLDialogElement | undefined)?.showModal();
+    this.refreshIcons();
+  });
+};
+
+const submitPinVerify = function (this: AppContext) {
+  if (!/^\d{4}$/.test(this.pinVerifyInput)) return;
+  const cb = this.pinVerifyCallback;
+  const pin = this.pinVerifyInput;
+  this.closePinDialog();
+  if (cb) cb(pin);
+};
+
+const closePinDialog = function (this: AppContext) {
+  this.showPinDialog = false;
+  this.pinVerifyInput = '';
+  this.pinVerifyCallback = null;
+  (this.$refs.pinDialog as HTMLDialogElement | undefined)?.close();
+};
 
 export function createProfiles() {
   return {
-    async loadProfiles(this: AppContext) {
-      await fetchProfilesInto(this);
-      // Restore last selected profile
-      const saved = localStorage.getItem(LS_PROFILE_ID);
-      if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
-        this.selectProfile(saved);
-      } else if (this.profiles.length > 0) {
-        this.selectProfile(this.profiles[0].id);
-      } else {
-        this.showProfilePicker = true;
-      }
-    },
-
-    selectProfile(this: AppContext, id: string) {
-      const profile = this.profiles.find((p: Profile) => p.id === id);
-      if (!profile) return;
-      this.currentProfile = profile;
-      this.showProfilePicker = false;
-      localStorage.setItem(LS_PROFILE_ID, id);
-      this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
-      // Apply profile theme or fallback to localStorage/system default
-      if (profile.theme) {
-        this.theme = profile.theme;
-        document.documentElement.dataset.theme = profile.theme;
-      } else {
-        const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-        this.theme = stored || system;
-        document.documentElement.dataset.theme = this.theme;
-      }
-      // Reset project state and reload projects for this profile
-      this.currentProjectId = null;
-      this.currentProject = null;
-      this.resetState();
-      this.loadProjects();
-    },
-
-    async createProfile(this: AppContext) {
-      const { result, name, age } = validateNewProfileForm(this);
-      if (result === 'pin_mismatch') {
-        this.showToast(this.t('profile.pinMismatch'), 'error');
-        return;
-      }
-      if (result !== 'ok') return;
-      try {
-        const res = await fetch('/api/profiles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildCreateProfileBody(this, name, age)),
-        });
-        if (res.ok) {
-          applyCreateProfileSuccess(this, await res.json());
-        } else {
-          const err = await res.json().catch(() => ({}));
-          this.showToast(
-            this.t(TOAST_ERROR, { error: mapServerErrorCode(this, err.error) || res.statusText }),
-            'error',
-          );
-        }
-      } catch (e: unknown) {
-        console.error('Failed to create profile:', e);
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
-      }
-    },
-
-    async deleteProfile(this: AppContext, id: string) {
-      const profile = this.profiles.find((p: Profile) => p.id === id);
-      if (!profile) return;
-      const target = deleteConfirmMessage(this, id);
-      if (profile.hasPin) {
-        this.requirePin(async (pin: string) => {
-          this.confirmDelete(target, () => executeDeleteProfile(this, id, pin));
-        });
-        return;
-      }
-      this.confirmDelete(target, () => executeDeleteProfile(this, id));
-    },
-
+    loadProfiles,
+    selectProfile,
+    createProfile,
+    deleteProfile,
     _saveController: null as AbortController | null,
-
-    applyProfileUpdate(this: AppContext, id: string, updated: Profile) {
-      const idx = this.profiles.findIndex((p: Profile) => p.id === id);
-      if (idx !== -1) this.profiles[idx] = updated;
-      if (this.currentProfile?.id === id) this.currentProfile = updated;
-      if (this.editingProfile?.id === id) {
-        if (updated.updatedAt) this.editingProfile.updatedAt = updated.updatedAt;
-        if (updated.ageGroup) this.editingProfile.ageGroup = updated.ageGroup;
-      }
-      if (updated.locale) setProfileLocale(id, updated.locale);
-    },
-
-    async updateProfile(
-      this: AppContext,
-      id: string,
-      updates: Record<string, unknown>,
-      signal?: AbortSignal,
-    ) {
-      try {
-        // SSRF: literal `/api/profiles/` inline pour préserver l'analyse taint Codacy
-        // (cf. executeDeleteProfile + CLAUDE.md section Sécurité).
-        const res = await fetch('/api/profiles/' + id, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updates),
-          signal,
-        });
-        if (signal?.aborted) return;
-        if (res.ok) {
-          this.applyProfileUpdate(id, await res.json());
-        } else {
-          const err = await res.json().catch(() => ({}));
-          // Toujours surfacer un toast — sans ce fallback un 5xx avec body HTML, un 413
-          // payload-too-large, ou un parse fail produirait silence total côté UI alors
-          // que l'état serveur diverge.
-          console.error('Failed to update profile:', res.status, err);
-          this.showToast(
-            this.t(TOAST_ERROR, { error: mapServerErrorCode(this, err.error) || res.statusText }),
-            'error',
-          );
-        }
-      } catch (e: unknown) {
-        if (e instanceof Error && e.name === 'AbortError') return;
-        console.error('Failed to update profile:', e);
-        const msg = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
-      }
-    },
-
-    startEditProfile(this: AppContext, id: string) {
-      const profile = this.profiles.find((p: Profile) => p.id === id);
-      if (!profile) return;
-      this.editingProfile = {
-        ...profile,
-        locale: profile.locale || 'fr',
-        mistralVoices: {
-          host: profile.mistralVoices?.host ?? '',
-          guest: profile.mistralVoices?.guest ?? '',
-        },
-        theme: profile.theme,
-      };
-      this.showProfilePicker = true;
-      this.showProfileForm = false;
-      // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
-      // a publié de nouvelles voix depuis le chargement initial. Non bloquant —
-      // loadMistralVoices avale ses propres erreurs (try/catch + console.error
-      // dans src/app/config.ts). `.catch()` défensif si le contrat interne change un
-      // jour — UnhandledPromiseRejection silencieuse n'aide pas au diagnostic.
-      this.loadMistralVoices?.()?.catch((e: unknown) => {
-        console.error('voice catalog refresh failed:', e);
-      });
-    },
-
-    requireParentalAccess(this: AppContext, callback: () => void) {
-      if (!this.editingProfile?.hasPin) {
-        callback();
-        return;
-      }
-      if (this.editingProfile._verifiedPin) {
-        callback();
-        return;
-      }
-      const editing = this.editingProfile;
-      if (!editing) return;
-      this.requirePin(async (pin: string) => {
-        try {
-          // SSRF: literal `/api/profiles/` inline (cf. executeDeleteProfile).
-          const res = await fetch('/api/profiles/' + editing.id, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ pin }),
-          });
-          if (!res.ok) {
-            this.showToast(this.t('profile.pinWrong'), 'error');
-            return;
-          }
-        } catch (e: unknown) {
-          const msg = e instanceof Error ? e.message : String(e);
-          this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
-          return;
-        }
-        editing._verifiedPin = pin;
-        callback();
-      });
-    },
-
+    applyProfileUpdate,
+    updateProfile,
+    startEditProfile,
+    requireParentalAccess,
     _autoSaveTimer: null as ReturnType<typeof setTimeout> | null,
-
-    autoSaveProfile(this: AppContext, immediate?: boolean) {
-      if (!this.editingProfile) return;
-      if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
-      const doSave = async () => {
-        const editing = this.editingProfile;
-        if (!isProfileFormValid(editing) || !editing) return;
-        const { id, locale } = editing;
-        const updates = buildProfileUpdates(editing);
-        if (this._saveController) this._saveController.abort();
-        this._saveController = new AbortController();
-        await this.updateProfile(id, updates, this._saveController.signal);
-        if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
-      };
-      if (immediate) {
-        doSave();
-        return;
-      }
-      this._autoSaveTimer = setTimeout(doSave, 500);
-    },
-
-    toggleModerationCategory(this: AppContext, cat: string) {
-      this.requireParentalAccess(() => {
-        const editing = this.editingProfile;
-        if (!editing) return;
-        const cats = (editing.moderationCategories ??= []);
-        const idx = cats.indexOf(cat);
-        if (idx >= 0) cats.splice(idx, 1);
-        else cats.push(cat);
-        this.autoSaveParental();
-      });
-    },
-
-    async autoSaveParental(this: AppContext) {
-      if (!this.editingProfile) return;
-      const { id, useModeration, moderationCategories, chatEnabled, _verifiedPin, updatedAt } =
-        this.editingProfile;
-      const updates: Record<string, unknown> = {
-        useModeration,
-        moderationCategories,
-        chatEnabled,
-        _updatedAt: updatedAt,
-      };
-      if (_verifiedPin) updates.pin = _verifiedPin;
-      if (this._saveController) this._saveController.abort();
-      this._saveController = new AbortController();
-      await this.updateProfile(id, updates, this._saveController.signal);
-    },
-
-    applyThemeLive(this: AppContext) {
-      const theme = this.editingProfile?.theme;
-      if (theme) {
-        this.theme = theme;
-        document.documentElement.dataset.theme = theme;
-      } else {
-        const stored = localStorage.getItem('sf-theme');
-        const system = globalThis.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-        this.theme = stored || system;
-        document.documentElement.dataset.theme = this.theme;
-      }
-      this.autoSaveProfile(true);
-    },
-
-    closeEditProfile(this: AppContext) {
-      this.autoSaveProfile(true);
-      this.editingProfile = null;
-    },
-
-    resetProfileDefaults(this: AppContext) {
-      if (!this.editingProfile) return;
-      this.editingProfile.mistralVoices = { host: '', guest: '' };
-      this.editingProfile.theme = undefined;
-      this.applyThemeLive();
-      this.showToast(this.t('toast.profileReset'), 'success');
-    },
-
-    /** @deprecated Use autoSaveProfile — kept for test compat */
-    async saveEditProfile(this: AppContext) {
-      this.autoSaveProfile(true);
-      this.editingProfile = null;
-    },
-
-    async _toggleProfileProp(this: AppContext, id: string, prop: string) {
-      const profile = this.profiles.find((p: Profile) => p.id === id);
-      if (!profile) return;
-      const doToggle = async (pin?: string) => {
-        const updates: Record<string, unknown> = {
-          [prop]: !(profile as unknown as Record<string, unknown>)[prop],
-        };
-        if (pin) updates.pin = pin;
-        await this.updateProfile(id, updates);
-      };
-      if (profile.hasPin) {
-        this.requirePin(async (pin: string) => {
-          await doToggle(pin);
-        });
-        return;
-      }
-      await doToggle();
-    },
-
-    async toggleModeration(this: AppContext, id: string) {
-      await this._toggleProfileProp(id, 'useModeration');
-    },
-
-    async toggleChat(this: AppContext, id: string) {
-      await this._toggleProfileProp(id, 'chatEnabled');
-    },
-
-    openProfilePicker(this: AppContext) {
-      this.showProfilePicker = true;
-    },
-
-    // PIN dialog helpers
-    requirePin(this: AppContext, callback: (pin: string) => void) {
-      this.pinVerifyInput = '';
-      this.pinVerifyCallback = callback;
-      this.showPinDialog = true;
-      this.$nextTick(() => {
-        (this.$refs.pinDialog as HTMLDialogElement | undefined)?.showModal();
-        this.refreshIcons();
-      });
-    },
-
-    submitPinVerify(this: AppContext) {
-      if (!/^\d{4}$/.test(this.pinVerifyInput)) return;
-      const cb = this.pinVerifyCallback;
-      const pin = this.pinVerifyInput;
-      this.closePinDialog();
-      if (cb) cb(pin);
-    },
-
-    closePinDialog(this: AppContext) {
-      this.showPinDialog = false;
-      this.pinVerifyInput = '';
-      this.pinVerifyCallback = null;
-      (this.$refs.pinDialog as HTMLDialogElement | undefined)?.close();
-    },
+    autoSaveProfile,
+    toggleModerationCategory,
+    autoSaveParental,
+    applyThemeLive,
+    closeEditProfile,
+    resetProfileDefaults,
+    saveEditProfile,
+    _toggleProfileProp,
+    toggleModeration,
+    toggleChat,
+    openProfilePicker,
+    requirePin,
+    submitPinVerify,
+    closePinDialog,
   };
 }

@@ -2,11 +2,15 @@ import type { createState } from './state';
 import type {
   Consigne,
   Generation,
+  PendingTrackerEntry,
   PodcastGeneration,
   PodcastLine,
   Profile,
   Source,
+  StudyFiche,
 } from '../../types';
+import type { EventKey } from '../../helpers/event-bus';
+import type { PersistedNotification } from './notifications';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -33,6 +37,11 @@ export interface ItemWithRefs {
 }
 
 type ToastAction = { label: string; fn: () => void };
+type NotifSpec = {
+  messageKey: string;
+  params?: Record<string, string | number>;
+  paramKeys?: Record<string, string>;
+};
 
 export interface AppContext extends AppState {
   $nextTick(cb?: () => void): Promise<void>;
@@ -45,6 +54,8 @@ export interface AppContext extends AppState {
     type?: string,
     retryFn?: (() => void) | null,
     action?: ToastAction | null,
+    eventKey?: EventKey,
+    notifSpec?: NotifSpec,
   ): void;
   dismissToast(id: number): void;
 
@@ -59,7 +70,7 @@ export interface AppContext extends AppState {
   selectProfile(id: string): void;
   loadMistralVoices?(): Promise<void>;
   requirePin(callback: (pin: string) => void): void;
-  confirmDelete(message: string, callback: () => void): void;
+  confirmDelete(message: string, callback: () => void | Promise<void>): void;
   setLocale(lang: string, skipProfileSync?: boolean): void;
   resetState(): void;
   loadProjects(): Promise<void>;
@@ -95,7 +106,7 @@ export interface AppContext extends AppState {
 
   renderMarkdown(content: string): string;
   renderWithSources(content: string, gen: Generation): string;
-  summaryData(gen: Generation): import('../../types').StudyFiche;
+  summaryData(gen: Generation): StudyFiche;
 
   sendChatMessage(): Promise<void>;
   loadChatHistory(): Promise<void>;
@@ -193,6 +204,37 @@ export interface AppContext extends AppState {
   projectColor(index: number): string;
   isGenerating(): boolean;
   activeGenerations(): Array<{ key: string; label: string; color: string; icon: string }>;
+  hasPendingOfType(type: string): boolean;
+  isLoading(type: string): boolean;
+  canStartGenerate(type: string): boolean;
+  upsertGenerationById(gen: Generation): void;
+  resetSession(): void;
+  profileNotifications(): PersistedNotification[];
+  unreadNotificationsCount(): number;
+  markAllNotificationsRead(): void;
+  markNotificationRead(eventKey: EventKey): void;
+  navigateToNotification(notif: PersistedNotification): Promise<void>;
+  clearProfileNotifications(): void;
+  notificationMessage(notif: PersistedNotification): string;
+  formatRelativeTime(iso: string): string;
+  applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
+  reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
+  hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;
+  mergeReconciledGenerations(generations: Generation[], cutoff: number): void;
+  backfillCompletedNotifs(
+    generations: Generation[],
+    cutoff: number,
+    profileId: string,
+    projectId: string,
+  ): void;
+  backfillTerminalNotifs(
+    tracker: PendingTrackerEntry[],
+    cutoff: number,
+    profileId: string,
+    projectId: string,
+  ): void;
+  startPendingsStream(projectId: string): Promise<void>;
+  stopPendingsStream(): void;
   getQuizScores(): Array<{
     gen: Generation;
     lastScore: number;

@@ -85,7 +85,7 @@ describe('moderateContent', () => {
   it('treats any flagged category as unsafe when no category filter is provided', async () => {
     const { client } = createClient([{ self_harm: true, violence_and_threats: false }]);
 
-    const result = await moderateContent(client, 'texte', undefined);
+    const result = await moderateContent(client, 'texte');
 
     expect(result).toEqual({
       status: 'unsafe',

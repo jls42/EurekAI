@@ -1,4 +1,4 @@
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
@@ -26,6 +26,17 @@ function pendingModeration(): Source['moderation'] {
 
 // cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
+
+// Sous-helper : valide le query input pour /sources/websearch. Retourne null si
+// invalide (et envoie déjà la réponse HTTP) — caller juste `return` après.
+function validateWebsearchQuery(req: Request, res: Response): string | null {
+  const { query } = req.body;
+  if (!query || typeof query !== 'string' || query.trim().length === 0) {
+    res.status(400).json({ error: 'query requis' });
+    return null;
+  }
+  return query;
+}
 
 const runConsigneDetection = async (
   store: ProjectStore,
@@ -330,15 +341,82 @@ export function sourceRoutes(
     res.json(source);
   });
 
+  // Sous-helper extrait du handler /sources/voice : construit la Source à partir
+  // du résultat STT + persistance usage. Sépare la logique métier du try/catch
+  // du handler pour rester sous CCN 8.
+  function buildVoiceSource(
+    text: string,
+    persisted: ReturnType<typeof persistUsage>,
+    modCats: string[] | null,
+  ): Source {
+    return {
+      id: randomUUID(),
+      filename: 'Enregistrement vocal',
+      markdown: text.trim(),
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'voice',
+      moderation: modCats ? pendingModeration() : undefined,
+      ...(persisted && {
+        usage: persisted.usage,
+        estimatedCost: persisted.cost,
+        costBreakdown: persisted.costBreakdown,
+      }),
+    };
+  }
+
+  function persistFailedUsage(pid: string, e: unknown): void {
+    const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
+    }
+  }
+
   // Voice input (Voxtral STT)
+  // Sous-helper extrait : pipeline STT (transcribe + persist usage + validate
+  // text). Retourne null + envoie déjà la réponse 400 si transcription vide.
+  async function runSttPipeline(
+    pid: string,
+    file: Express.Multer.File,
+    lang: string,
+    res: Response,
+  ): Promise<{ text: string; elapsed: number; persisted: ReturnType<typeof persistUsage> } | null> {
+    const { result: sttResult, usage } = await runWithUsageTracking(() =>
+      transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
+    );
+    // Persist IMMEDIATELY — before business validation (empty transcription still costs)
+    const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
+    const { text, elapsed } = sttResult;
+    if (!text || text.trim().length === 0) {
+      res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
+      return null;
+    }
+    return { text, elapsed, persisted };
+  }
+
+  function persistAndDispatchVoiceSource(
+    pid: string,
+    text: string,
+    elapsed: number,
+    persisted: ReturnType<typeof persistUsage>,
+    lang: string,
+  ): Source {
+    const modCats = getModerationCategories(store, profileStore, pid);
+    const source = buildVoiceSource(text, persisted, modCats);
+    store.addSource(pid, source);
+    logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
+    triggerConsigneDetection(store, client, pid, lang);
+    if (modCats) {
+      void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+    }
+    return source;
+  }
+
   router.post('/:pid/sources/voice', memoryUpload.single('audio'), async (req, res) => {
     const pid = String(req.params.pid);
-    const project = store.getProject(pid);
-    if (!project) {
+    if (!store.getProject(pid)) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
-
     const file = req.file;
     if (!file) {
       res.status(400).json({ error: 'Fichier audio requis' });
@@ -347,43 +425,12 @@ export function sourceRoutes(
 
     try {
       const lang = req.body.lang || 'fr';
-      const { result: sttResult, usage } = await runWithUsageTracking(() =>
-        transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
-      );
-      // Persist IMMEDIATELY — before business validation (empty transcription still costs)
-      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
-
-      const { text, elapsed } = sttResult;
-      if (!text || text.trim().length === 0) {
-        res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
-        return;
-      }
-      const modCats = getModerationCategories(store, profileStore, pid);
-      const source: Source = {
-        id: randomUUID(),
-        filename: 'Enregistrement vocal',
-        markdown: text.trim(),
-        uploadedAt: new Date().toISOString(),
-        sourceType: 'voice',
-        moderation: modCats ? pendingModeration() : undefined,
-        ...(persisted && {
-          usage: persisted.usage,
-          estimatedCost: persisted.cost,
-          costBreakdown: persisted.costBreakdown,
-        }),
-      };
-      store.addSource(pid, source);
-      logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-      triggerConsigneDetection(store, client, pid, lang);
-      if (modCats) {
-        void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
-      }
+      const stt = await runSttPipeline(pid, file, lang, res);
+      if (!stt) return;
+      const source = persistAndDispatchVoiceSource(pid, stt.text, stt.elapsed, stt.persisted, lang);
       res.json(source);
     } catch (e) {
-      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
-      }
+      persistFailedUsage(pid, e);
       logger.error('sources', 'STT error:', e);
       res.status(500).json({ error: extractErrorCode(e, 'stt') });
     }
@@ -558,6 +605,51 @@ export function sourceRoutes(
   }
 
   // Web search / URL scrape source
+  // Sous-helper : si modération activée, vérifie que la query passe la
+  // modération. Retourne true si OK pour continuer, false si bloquée (réponse
+  // déjà envoyée).
+  async function checkWebsearchModeration(
+    res: Response,
+    query: string,
+    modCats: string[] | null,
+  ): Promise<boolean> {
+    if (!modCats) return true;
+    const modResult = await moderateContent(client, query.trim(), modCats);
+    if (modResult.status !== 'safe') {
+      res.status(400).json({ error: 'moderation.blocked' });
+      return false;
+    }
+    return true;
+  }
+
+  // Sous-helper : envoie la réponse partial vs full success.
+  function respondWebsearchSources(res: Response, sources: Source[], failures: unknown[]): void {
+    // Partial success : wrapper {sources, failures} (miroir du contrat
+    // UploadFailure de /sources/upload). Full success : array nu pour
+    // backwards compat.
+    if (failures.length > 0) {
+      res.json({ sources, failures });
+    } else {
+      res.json(sources);
+    }
+  }
+
+  // Sous-helper extrait : persiste les sources scrapées dans le store + trigger
+  // consigne detection + moderation async par source. Sépare la logique métier
+  // du try/catch du handler /sources/websearch pour rester sous CCN 8.
+  function persistWebsearchSources(
+    pid: string,
+    sources: Source[],
+    modCats: string[] | null,
+    lang: string,
+  ): void {
+    for (const s of sources) store.addSource(pid, s);
+    triggerConsigneDetection(store, client, pid, lang);
+    for (const s of sources) {
+      if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
+    }
+  }
+
   router.post('/:pid/sources/websearch', async (req, res) => {
     const pid = String(req.params.pid);
     if (!store.getProject(pid)) {
@@ -565,20 +657,11 @@ export function sourceRoutes(
       return;
     }
 
-    const { query } = req.body;
-    if (!query || typeof query !== 'string' || query.trim().length === 0) {
-      res.status(400).json({ error: 'query requis' });
-      return;
-    }
+    const query = validateWebsearchQuery(req, res);
+    if (query === null) return;
 
     const modCats = getModerationCategories(store, profileStore, pid);
-    if (modCats) {
-      const modResult = await moderateContent(client, query.trim(), modCats);
-      if (modResult.status !== 'safe') {
-        res.status(400).json({ error: 'moderation.blocked' });
-        return;
-      }
-    }
+    if (!(await checkWebsearchModeration(res, query, modCats))) return;
 
     try {
       const { sources, failures } = await collectWebSources(pid, req, modCats);
@@ -588,20 +671,8 @@ export function sourceRoutes(
         res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
-      for (const s of sources) store.addSource(pid, s);
-      const lang = req.body.lang || 'fr';
-      triggerConsigneDetection(store, client, pid, lang);
-      for (const s of sources) {
-        if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
-      }
-      // Partial success : wrapper {sources, failures} (miroir du contrat
-      // UploadFailure de /sources/upload). Full success : array nu pour
-      // backwards compat.
-      if (failures.length > 0) {
-        res.json({ sources, failures });
-      } else {
-        res.json(sources);
-      }
+      persistWebsearchSources(pid, sources, modCats, req.body.lang || 'fr');
+      respondWebsearchSources(res, sources, failures);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
       res.status(500).json({ error: extractErrorCode(e) });

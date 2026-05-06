@@ -48,6 +48,24 @@ export const ar: Record<string, string> = {
   'gen.contextTooLarge': 'المحتوى كبير جدا ({pct}% من سعة النموذج). اختر مصادر أقل.',
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
+  'errorCode.cancelled': 'تم إلغاء التوليد',
+
+  // Notifications center
+  'notif.openBell': 'فتح مركز الإشعارات',
+  'notif.title': 'الإشعارات',
+  'notif.empty': 'لا توجد إشعارات',
+  'notif.markAllRead': 'تعليم الكل كمقروء',
+  'notif.clear': 'مسح',
+  'notif.timeAgo': 'منذ {time}',
+  'notif.justNow': 'الآن',
+  'notif.minutesAgo': '{count} د',
+  'notif.hoursAgo': '{count} س',
+  'notif.daysAgo': '{count} ي',
+  'notif.unreadBadge': '{count} غير مقروء',
+  'notif.generationDone': 'اكتمل {type}',
+  'notif.generationFailed': 'فشل {type}',
+  'notif.generationCancelled': 'تم إلغاء {type}',
+  'notif.crossTabSyncInactive': 'مزامنة التبويبات غير نشطة',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
@@ -57,8 +75,7 @@ export const ar: Record<string, string> = {
   'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
   'errorCode.upload_failed': 'فشل التحميل',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
-  'errorCode.profile_delete_partial':
-    'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
+  'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',
@@ -467,6 +484,10 @@ export const ar: Record<string, string> = {
     '\u062e\u0637\u0623 \u0641\u064a \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u062f\u0631\u0633',
   'toast.projectDeleted':
     '\u062a\u0645\u0651 \u062d\u0630\u0641 \u0627\u0644\u0645\u0634\u0631\u0648\u0639',
+  'toast.projectDeleteError':
+    '\u062e\u0637\u0623 \u0641\u064a \u062d\u0630\u0641 \u0627\u0644\u0645\u0634\u0631\u0648\u0639',
+  'toast.projectLoadError':
+    '\u062e\u0637\u0623 \u0641\u064a \u062a\u062d\u0645\u064a\u0644 \u0627\u0644\u0645\u0634\u0631\u0648\u0639',
   'toast.micError':
     '\u062a\u0639\u0630\u0651\u0631 \u0627\u0644\u0648\u0635\u0648\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u064a\u0643\u0631\u0648\u0641\u0648\u0646: {error}',
   'toast.voiceTranscribed': '\u062a\u0645\u0651 \u0646\u0633\u062e \u0627\u0644\u0635\u0648\u062a!',
@@ -525,6 +546,9 @@ export const ar: Record<string, string> = {
   'toast.cancelledGeneration':
     '\u062a\u0645\u0651 \u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u062a\u0648\u0644\u064a\u062f',
   'toast.cancelledOne': '\u062a\u0645\u0651 \u0625\u0644\u063a\u0627\u0621 {type}',
+  'toast.cancelFailed': '\u0641\u0634\u0644 \u0625\u0644\u063a\u0627\u0621 {type}',
+  'toast.confirmActionFailed':
+    '\u0641\u0634\u0644\u062a \u0627\u0644\u0639\u0645\u0644\u064a\u0629 \u2014 \u0631\u0627\u062c\u0639 \u0648\u062d\u062f\u0629 \u0627\u0644\u062a\u062d\u0643\u0651\u0645 \u0644\u0644\u062a\u0641\u0627\u0635\u064a\u0644.',
   'toast.scoreSaved':
     '\u062a\u0645\u0651 \u062d\u0641\u0638 \u0627\u0644\u0646\u062a\u064a\u062c\u0629!',
   'toast.scoreError':

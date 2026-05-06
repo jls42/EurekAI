@@ -52,6 +52,7 @@ function makeContext(overrides: any = {}) {
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: {},
     initGenProps: vi.fn(),
+    resetSession: vi.fn(),
     resetState: proj.resetState,
     selectProject: proj.selectProject,
     sortedProjects: proj.sortedProjects,
@@ -163,6 +164,46 @@ describe('loadProjects', () => {
     await proj.loadProjects.call(ctx);
     expect(ctx.currentProjectId).toBeNull();
   });
+
+  // T3 — Régression-lock : la migration legacy 'sf-lastProjectId' est idempotente.
+  // Si la map namespacée existe déjà avec une entrée pour le profil courant, la
+  // legacy key est juste effacée (pas d'override). Si la legacy reste sur disque
+  // entre 2 boots (ne devrait pas arriver, mais robustesse), pas de resurrection.
+  it('migration sf-lastProjectId : idempotente quand la map namespacée a déjà une entrée pour le profil', async () => {
+    mockFetchOk([{ id: 'p-current', name: 'Project current' }]);
+    // La map namespacée existe déjà : profil p1 → p-current
+    localStorageMock['sf-profile-last-project'] = JSON.stringify({ p1: 'p-current' });
+    // Une legacy key résiduelle pointe vers un autre projet
+    localStorageMock['sf-lastProjectId'] = 'p-legacy';
+
+    // Mock pour le selectProject('p-current') qui suivra
+    mockFetchOk({ id: 'p-current', sources: [], results: { generations: [] } });
+
+    const ctx = makeContext();
+    await proj.loadProjects.call(ctx);
+
+    // La legacy key a été effacée même si elle n'a pas écrasé la map
+    expect(localStorage.removeItem).toHaveBeenCalledWith('sf-lastProjectId');
+    // La map namespacée n'a PAS été écrasée par la legacy
+    const map = JSON.parse(localStorageMock['sf-profile-last-project']);
+    expect(map.p1).toBe('p-current');
+    // Le projet courant restauré est bien celui de la map (pas de la legacy)
+    expect(ctx.currentProjectId).toBe('p-current');
+  });
+
+  it('migration sf-lastProjectId : appel répété est no-op (legacy key déjà supprimée)', async () => {
+    // Reset l'historique des calls localStorage hérité des tests précédents
+    // (le mock global n'est pas reset entre tests, seul localStorageMock l'est).
+    vi.mocked(localStorage.removeItem).mockClear();
+    mockFetchOk([{ id: 'p1', name: 'Project 1' }]);
+    // Premier load : pas de legacy key, map vide → migration no-op
+    expect(localStorageMock['sf-lastProjectId']).toBeUndefined();
+
+    const ctx = makeContext();
+    await proj.loadProjects.call(ctx);
+    // Pas d'appel à removeItem('sf-lastProjectId') puisque la legacy n'existait pas
+    expect(localStorage.removeItem).not.toHaveBeenCalledWith('sf-lastProjectId');
+  });
 });
 
 // --- createProject ---
@@ -240,7 +281,12 @@ describe('selectProject', () => {
     expect(ctx.openGens['g2']).toBe(true);
     expect(ctx.openGens['g3']).toBe(true);
     expect(ctx.activeView).toBe('dashboard');
-    expect(localStorage.setItem).toHaveBeenCalledWith('sf-lastProjectId', 'p1');
+    // Namespacé par profil : la map `sf-profile-last-project` reçoit { 'p1': 'p1' }
+    // (où le 1er 'p1' est le profileId mock et le 2nd 'p1' est le projectId).
+    expect(localStorage.setItem).toHaveBeenCalledWith(
+      'sf-profile-last-project',
+      expect.stringContaining('"p1":"p1"'),
+    );
   });
 
   it('sets activeView to sources when no sources', async () => {
@@ -250,12 +296,36 @@ describe('selectProject', () => {
     expect(ctx.activeView).toBe('sources');
   });
 
-  it('handles fetch failure gracefully', async () => {
+  it('reset currentProjectId + toast actionnable sur fetch !ok (UI dead-state)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     mockFetchFail(404);
     const ctx = makeContext();
     await proj.selectProject.call(ctx, 'p1');
-    expect(ctx.currentProjectId).toBe('p1');
+    expect(ctx.currentProjectId).toBeNull();
     expect(ctx.sources).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectLoadError',
+      'error',
+      expect.any(Function),
+    );
+    warnSpy.mockRestore();
+  });
+
+  it('logs fetch exceptions et reset currentProjectId pour eviter le freeze UI', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('offline'));
+    const ctx = makeContext();
+
+    await proj.selectProject.call(ctx, 'p1');
+
+    expect(warnSpy).toHaveBeenCalledWith('[selectProject] failed', expect.any(Error));
+    expect(ctx.currentProjectId).toBeNull();
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectLoadError',
+      'error',
+      expect.any(Function),
+    );
+    warnSpy.mockRestore();
   });
 });
 
@@ -279,6 +349,8 @@ describe('deleteProject', () => {
 
   it('resets state if current project deleted', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+    // Pre-condition : la map namespacée a une entrée pour le profil courant
+    localStorageMock['sf-profile-last-project'] = JSON.stringify({ p1: 'p1' });
     const ctx = makeContext({
       currentProjectId: 'p1',
       projects: [{ id: 'p1' }],
@@ -286,9 +358,65 @@ describe('deleteProject', () => {
     await proj.deleteProject.call(ctx, 'p1');
     expect(ctx.currentProjectId).toBeNull();
     expect(ctx.currentProject).toBeNull();
-    expect(localStorage.removeItem).toHaveBeenCalledWith('sf-lastProjectId');
+    // Le projet est retiré de la map namespacée du profil courant
+    const map = JSON.parse(localStorageMock['sf-profile-last-project'] ?? '{}');
+    expect(map.p1).toBeUndefined();
     expect(ctx.sources).toEqual([]);
     expect(ctx.generations).toEqual([]);
+  });
+
+  it('rollback + toast erreur si fetch DELETE throw (network down)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('ECONNREFUSED'));
+    const ctx = makeContext({ projects: [{ id: 'p1' }, { id: 'p2' }] });
+
+    await proj.deleteProject.call(ctx, 'p1');
+
+    // Pas de mutation : projects intact + toast erreur affiché
+    expect(ctx.projects).toHaveLength(2);
+    expect(errorSpy).toHaveBeenCalledWith('[deleteProject] network failure', expect.any(Error));
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectDeleteError',
+      'error',
+      expect.any(Function),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it('rollback + toast erreur si fetch DELETE renvoie non-ok (5xx)', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: false, status: 500 } as any);
+    const ctx = makeContext({ projects: [{ id: 'p1' }] });
+
+    await proj.deleteProject.call(ctx, 'p1');
+
+    expect(ctx.projects).toHaveLength(1);
+    expect(errorSpy).toHaveBeenCalledWith(
+      '[deleteProject] non-ok',
+      expect.objectContaining({ id: 'p1', status: 500 }),
+    );
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.projectDeleteError',
+      'error',
+      expect.any(Function),
+    );
+    errorSpy.mockRestore();
+  });
+});
+
+describe('openLightbox', () => {
+  it('set lightboxUrl et appelle showModal sur la dialog ref', () => {
+    const showModal = vi.fn();
+    const ctx = makeContext({
+      $refs: { imageLightbox: { showModal } },
+      lightboxUrl: '',
+      openLightbox: proj.openLightbox,
+    });
+
+    ctx.openLightbox.call(ctx, '/image/foo.png');
+
+    expect(ctx.lightboxUrl).toBe('/image/foo.png');
+    expect(showModal).toHaveBeenCalledOnce();
   });
 });
 

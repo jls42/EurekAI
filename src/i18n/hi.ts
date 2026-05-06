@@ -45,6 +45,24 @@ export const hi: Record<string, string> = {
   'gen.contextTooLarge': 'सामग्री बहुत लंबी है ({pct}% मॉडल क्षमता). कम स्रोत चुनें।',
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
+  'errorCode.cancelled': 'जनरेशन रद्द कर दी गई',
+
+  // Notifications center
+  'notif.openBell': 'सूचना केंद्र खोलें',
+  'notif.title': 'सूचनाएँ',
+  'notif.empty': 'कोई सूचना नहीं',
+  'notif.markAllRead': 'सभी को पढ़ा हुआ चिह्नित करें',
+  'notif.clear': 'साफ़ करें',
+  'notif.timeAgo': '{time} पहले',
+  'notif.justNow': 'अभी',
+  'notif.minutesAgo': '{count} मिनट',
+  'notif.hoursAgo': '{count} घंटे',
+  'notif.daysAgo': '{count} दिन',
+  'notif.unreadBadge': '{count} अनपढ़ी',
+  'notif.generationDone': '{type} पूर्ण',
+  'notif.generationFailed': '{type} विफल',
+  'notif.generationCancelled': '{type} रद्द',
+  'notif.crossTabSyncInactive': 'टैबों के बीच सिंक निष्क्रिय',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
@@ -54,8 +72,7 @@ export const hi: Record<string, string> = {
   'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
   'errorCode.upload_failed': 'अपलोड विफल',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
-  'errorCode.profile_delete_partial':
-    'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
+  'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
@@ -477,6 +494,10 @@ export const hi: Record<string, string> = {
     '\u092A\u093E\u0920\u094D\u092F\u0915\u094D\u0930\u092E \u092C\u0928\u093E\u0928\u0947 \u092E\u0947\u0902 \u0924\u094D\u0930\u0941\u091F\u093F',
   'toast.projectDeleted':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u0939\u091F\u093E\u092F\u093E \u0917\u092F\u093E',
+  'toast.projectDeleteError':
+    '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u0939\u091F\u093E\u0928\u0947 \u092E\u0947\u0902 \u0924\u094D\u0930\u0941\u091F\u093F',
+  'toast.projectLoadError':
+    '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u0932\u094B\u0921 \u0915\u0930\u0928\u0947 \u092E\u0947\u0902 \u0924\u094D\u0930\u0941\u091F\u093F',
   'toast.micError':
     '\u092E\u093E\u0907\u0915\u094D\u0930\u094B\u092B\u093C\u094B\u0928 \u0909\u092A\u0932\u092C\u094D\u0927 \u0928\u0939\u0940\u0902: {error}',
   'toast.voiceTranscribed':
@@ -533,6 +554,10 @@ export const hi: Record<string, string> = {
     '\u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0930\u0926\u094D\u0926 \u0915\u093F\u092F\u093E \u0917\u092F\u093E',
   'toast.cancelledOne':
     '{type} \u0930\u0926\u094D\u0926 \u0915\u093F\u092F\u093E \u0917\u092F\u093E',
+  'toast.cancelFailed':
+    '{type} \u0930\u0926\u094D\u0926 \u0915\u0930\u0928\u0947 \u092E\u0947\u0902 \u0935\u093F\u092B\u0932',
+  'toast.confirmActionFailed':
+    '\u0915\u093E\u0930\u094D\u0930\u0935\u093E\u0908 \u0935\u093F\u092B\u0932 \u2014 \u0935\u093F\u0935\u0930\u0923 \u0915\u0947 \u0932\u093F\u090F \u0915\u0902\u0938\u094B\u0932 \u0926\u0947\u0916\u0947\u0902\u0964',
   'toast.scoreSaved': '\u0905\u0902\u0915 \u0938\u0939\u0947\u091C\u093E \u0917\u092F\u093E!',
   'toast.scoreError':
     '\u0905\u0902\u0915 \u0938\u0939\u0947\u091C\u0928\u0947 \u092E\u0947\u0902 \u0924\u094D\u0930\u0941\u091F\u093F',
