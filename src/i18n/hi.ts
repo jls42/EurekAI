@@ -39,6 +39,8 @@ export const hi: Record<string, string> = {
   'gen.all': '\u0938\u092C \u092C\u0928\u093E\u090F\u0901',
   'gen.voice': '\u091C\u094B\u0930 \u0938\u0947 \u092A\u0922\u093C\u0947\u0902',
   'gen.websearch': '\u0935\u0947\u092C \u0916\u094B\u091C',
+  'a11y.viewCategory': '{category} \u0926\u0947\u0916\u0947\u0902',
+  'a11y.generateCategory': '{category} \u092C\u0928\u093E\u090F\u0902',
   'gen.questionCount': '\u0938\u0902\u0916\u094D\u092F\u093E:',
   'gen.needsTts':
     'Voxtral TTS \u0938\u0915\u094D\u0937\u092E \u0915\u0930\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F MISTRAL_API_KEY \u0906\u0935\u0936\u094D\u092F\u0915 \u0939\u0948',

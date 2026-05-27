@@ -35,6 +35,8 @@ export const en: Record<string, string> = {
   'gen.all': 'Generate all',
   'gen.voice': 'Read aloud',
   'gen.websearch': 'Web search',
+  'a11y.viewCategory': 'View {category}',
+  'a11y.generateCategory': 'Generate {category}',
   'gen.questionCount': 'Count:',
   'gen.needsTts': 'Requires MISTRAL_API_KEY to enable Voxtral TTS',
   'gen.contextTooLarge': 'Content too large ({pct}% of model capacity). Select fewer sources.',

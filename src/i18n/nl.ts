@@ -35,6 +35,8 @@ export const nl: Record<string, string> = {
   'gen.all': 'Alles genereren',
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
+  'a11y.viewCategory': '{category} bekijken',
+  'a11y.generateCategory': '{category} genereren',
   'gen.questionCount': 'Aantal:',
   'gen.needsTts': 'Vereist MISTRAL_API_KEY om Voxtral TTS in te schakelen',
   'gen.contextTooLarge':

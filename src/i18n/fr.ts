@@ -38,6 +38,8 @@ export const fr: Record<string, string> = {
   'gen.all': 'Tout générer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',
+  'a11y.viewCategory': 'Voir les {category}',
+  'a11y.generateCategory': 'Générer des {category}',
   'gen.questionCount': 'Nombre :',
   'gen.needsTts': 'Nécessite MISTRAL_API_KEY pour activer le TTS Voxtral',
   'gen.contextTooLarge':

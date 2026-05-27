@@ -42,6 +42,8 @@ export const ar: Record<string, string> = {
   'gen.voice':
     '\u0627\u0644\u0642\u0631\u0627\u0621\u0629 \u0628\u0635\u0648\u062a \u0639\u0627\u0644\u064d',
   'gen.websearch': '\u0628\u062d\u062b \u0639\u0644\u0649 \u0627\u0644\u0648\u064a\u0628',
+  'a11y.viewCategory': '\u0639\u0631\u0636 {category}',
+  'a11y.generateCategory': '\u0625\u0646\u0634\u0627\u0621 {category}',
   'gen.questionCount': '\u0627\u0644\u0639\u062f\u062f:',
   'gen.needsTts':
     '\u064a\u062a\u0637\u0644\u0651\u0628 MISTRAL_API_KEY \u0644\u062a\u0641\u0639\u064a\u0644 Voxtral TTS',
