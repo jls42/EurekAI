@@ -3,6 +3,7 @@ import { ProfileStore, verifyPin, profileToPublic } from '../profiles.js';
 import { ProjectStore } from '../store.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
+import { authLimiter } from '../helpers/rate-limit.js';
 import type { Profile } from '../types.js';
 
 const ERR_PROFILE_NOT_FOUND = 'Profil introuvable';
@@ -211,6 +212,8 @@ const cascadeDeleteProjects = (
 export function profileRoutes(outputDir: string, projectStore: ProjectStore): Router {
   const store = new ProfileStore(outputDir);
   const router = Router();
+
+  router.use(authLimiter);
 
   // Wrap les handlers pour catcher les erreurs de persistence (ENOSPC, EACCES, EIO).
   // Sans ça, Express renvoie sa réponse par défaut — en dev, la stacktrace HTML peut

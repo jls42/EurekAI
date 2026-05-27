@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { promises as dns } from 'node:dns';
 import {
   stripJsonMarkdown,
   safeParseJson,
@@ -7,7 +8,14 @@ import {
   timer,
   parseWebInput,
   fetchPageContent,
+  assertSafeFetchUrl,
 } from './index.js';
+
+// IPs fixtures pour mock DNS — pas de vrai trafic.
+/* eslint-disable sonarjs/no-hardcoded-ip */
+const PUBLIC_IPV4 = '93.184.215.14'; // example.com (RFC2606 doc)
+const PRIVATE_IPV4 = '10.0.0.5'; // RFC1918
+/* eslint-enable sonarjs/no-hardcoded-ip */
 
 describe('stripJsonMarkdown', () => {
   it('retire les blocs ```json ```', () => {
@@ -131,6 +139,15 @@ describe('parseWebInput', () => {
 });
 
 describe('fetchPageContent', () => {
+  beforeEach(() => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PUBLIC_IPV4, family: 4 },
+    ] as unknown as never);
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('extracts text from HTML using Readability', async () => {
     const html = `<html><head><title>Test</title></head><body>
       <nav>Menu</nav>
@@ -201,6 +218,63 @@ describe('fetchPageContent', () => {
     expect(result.engine).toBe('readability');
     expect(result.text).toContain('Short');
     vi.unstubAllGlobals();
+  });
+});
+
+describe('assertSafeFetchUrl', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('rejette les URL invalides', async () => {
+    await expect(assertSafeFetchUrl('pas une url')).rejects.toThrow('URL invalide');
+  });
+
+  it('rejette les protocoles non http(s)', async () => {
+    await expect(assertSafeFetchUrl('file:///etc/passwd')).rejects.toThrow('Protocole');
+    await expect(assertSafeFetchUrl('ftp://example.com')).rejects.toThrow('Protocole');
+    await expect(assertSafeFetchUrl('gopher://example.com')).rejects.toThrow('Protocole');
+  });
+
+  it('rejette localhost et IPs de loopback', async () => {
+    await expect(assertSafeFetchUrl('http://localhost/x')).rejects.toThrow();
+    await expect(assertSafeFetchUrl('http://127.0.0.1/x')).rejects.toThrow('IP privee');
+    await expect(assertSafeFetchUrl('http://[::1]/x')).rejects.toThrow('IP privee');
+  });
+
+  it('rejette les IPs privees RFC 1918', async () => {
+    await expect(assertSafeFetchUrl('http://10.0.0.1/x')).rejects.toThrow('IP privee');
+    await expect(assertSafeFetchUrl('http://192.168.1.1/x')).rejects.toThrow('IP privee');
+    await expect(assertSafeFetchUrl('http://172.16.0.1/x')).rejects.toThrow('IP privee');
+  });
+
+  it('rejette les endpoints metadata cloud', async () => {
+    await expect(assertSafeFetchUrl('http://169.254.169.254/latest/meta-data/')).rejects.toThrow();
+    await expect(assertSafeFetchUrl('http://metadata.google.internal/')).rejects.toThrow();
+  });
+
+  it('rejette les TLD internes', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PUBLIC_IPV4, family: 4 },
+    ] as unknown as never);
+    await expect(assertSafeFetchUrl('http://server.local/x')).rejects.toThrow('Hostname interdit');
+    await expect(assertSafeFetchUrl('http://api.internal/x')).rejects.toThrow('Hostname interdit');
+  });
+
+  it('rejette un hostname qui resout vers une IP privee', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PRIVATE_IPV4, family: 4 },
+    ] as unknown as never);
+    await expect(assertSafeFetchUrl('http://evil.example.com/x')).rejects.toThrow('IP privee');
+  });
+
+  it('accepte une URL https publique', async () => {
+    // eslint-disable-next-line sonarjs/no-hardcoded-ip -- example.com public IP (test fixture)
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PUBLIC_IPV4, family: 4 },
+    ] as unknown as never);
+    const url = await assertSafeFetchUrl('https://example.com/path?q=1');
+    expect(url.hostname).toBe('example.com');
   });
 });
 
