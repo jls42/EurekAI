@@ -8,7 +8,14 @@ coverage/
 *.mp4
 *.aac
 *.wav
-.claude/
+# .claude/ : on track les conventions et skills versionnes, mais pas les
+# fichiers locaux ou ephemeres (settings perso, locks, drafts).
+.claude/*.local.json
+.claude/*.local.md
+.claude/*.lock
+.claude/refactor-quality-debt.md
+.claude/todo-tooling.md
+.claude/scheduled_tasks*
 *.swp
 GRAND_CONSEIL.md
 IDEAS.md
