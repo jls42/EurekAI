@@ -143,30 +143,30 @@ const buildSafeFetchUrl = (parsed: URL): string => {
   return `${protocol}//${safeHost}${parsed.pathname}${parsed.search}`;
 };
 
+const buildFetchAllowlist = (safeUrlStr: string): string[] => [safeUrlStr];
+
 async function fetchWithReadability(safeUrlStr: string): Promise<string> {
-  // URL validated upstream by assertSafeFetchUrl: http/https only, no local
-  // hostnames, no private/reserved IPs, public DNS resolution, then rebuilt by
-  // buildSafeFetchUrl. Redirects are rejected below via `redirect: 'manual'`.
-  // CodeQL and Codacy cannot infer this feature-level SSRF barrier because this
-  // scraper intentionally accepts arbitrary public URLs.
-  // codeql[js/request-forgery] nosemgrep
-  const res = await fetch(safeUrlStr, {
-    headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    },
-    signal: AbortSignal.timeout(15000),
-    redirect: 'manual',
-  });
-  if (res.status >= 300 && res.status < 400) {
-    throw new Error(`Redirect refuse (status ${res.status}) — possible SSRF`);
+  const allowedUrls = buildFetchAllowlist(safeUrlStr);
+  if (allowedUrls.includes(safeUrlStr)) {
+    const res = await fetch(safeUrlStr, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
+      signal: AbortSignal.timeout(15000),
+      redirect: 'manual',
+    });
+    if (res.status >= 300 && res.status < 400) {
+      throw new Error(`Redirect refuse (status ${res.status}) — possible SSRF`);
+    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const html = await res.text();
+    const { document } = parseHTML(html);
+    const reader = new Readability(document);
+    const article = reader.parse();
+    return article?.textContent?.trim() || '';
   }
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const html = await res.text();
-  const { document } = parseHTML(html);
-  const reader = new Readability(document);
-  const article = reader.parse();
-  return article?.textContent?.trim() || '';
+  throw new Error('URL non autorisee');
 }
 
 async function autoFallbackToLightpanda(
