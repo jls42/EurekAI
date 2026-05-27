@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import helmet, { type HelmetOptions } from 'helmet';
+import helmet from 'helmet';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -28,6 +28,7 @@ import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore, ALL_MODERATION_CATEGORIES, MODERATION_CATEGORIES } from './profiles.js';
 import { aiLimiter, generalLimiter } from './helpers/rate-limit.js';
+import { createHelmetOptions } from './helpers/security-headers.js';
 
 dotenv.config({ override: true, quiet: true });
 
@@ -64,38 +65,7 @@ const PORT = Number(process.env.PORT) || 3000;
 // Cross-origin embedder policy desactivee pour permettre l'integration iframe en
 // dev outils Vite et l'embed de blobs audio/image generes.
 const isProduction = process.env.NODE_ENV === 'production';
-type ContentSecurityPolicyConfig = Exclude<
-  NonNullable<HelmetOptions['contentSecurityPolicy']>,
-  boolean
->;
-const cspSelf = "'self'";
-const cspUnsafeInline = "'unsafe-inline'";
-const cspUnsafeEval = "'unsafe-eval'";
-const viteDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
-const viteDevWsOrigins = ['ws://localhost:5173', 'ws://127.0.0.1:5173'];
-const cspDevDirectives: NonNullable<ContentSecurityPolicyConfig['directives']> = isProduction
-  ? {}
-  : {
-      'connect-src': [cspSelf, ...viteDevOrigins, ...viteDevWsOrigins],
-      'script-src': [cspSelf, cspUnsafeInline, cspUnsafeEval, ...viteDevOrigins],
-      'style-src': [cspSelf, cspUnsafeInline, ...viteDevOrigins],
-      'upgrade-insecure-requests': null,
-    };
-const cspConfig: ContentSecurityPolicyConfig = {
-  directives: {
-    ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-    // Alpine.js evalue les expressions x-data/x-text/x-on dynamiquement ;
-    // unsafe-eval + unsafe-inline sont requis. Audit du DOM regulier
-    // recommande pour detecter une injection.
-    'script-src': [cspSelf, cspUnsafeInline, cspUnsafeEval],
-    'style-src': [cspSelf, cspUnsafeInline],
-    // Audio TTS et images generees servies en data:/blob:.
-    'img-src': [cspSelf, 'data:', 'blob:'],
-    'media-src': [cspSelf, 'blob:'],
-    ...cspDevDirectives,
-  },
-};
-app.use(helmet({ contentSecurityPolicy: cspConfig, crossOriginEmbedderPolicy: false }));
+app.use(helmet(createHelmetOptions(isProduction)));
 
 app.use(express.json({ limit: '5mb' }));
 

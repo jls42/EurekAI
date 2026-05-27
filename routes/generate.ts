@@ -166,14 +166,14 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
-const VALID_AGE_GROUPS: readonly AgeGroup[] = ['enfant', 'ado', 'etudiant', 'adulte'];
+const VALID_AGE_GROUPS: ReadonlySet<AgeGroup> = new Set(['enfant', 'ado', 'etudiant', 'adulte']);
 
 // Predicates individuels (arrow) — evitent le piege Lizard d'agglomeration des
 // `function foo()` top-level consecutives, et gardent chaque check sous CCN 8.
 const isNonEmptyString = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
 const isOptionalNonEmptyString = (v: unknown): boolean => v === undefined || isNonEmptyString(v);
 const isOptionalAgeGroup = (v: unknown): boolean =>
-  v === undefined || VALID_AGE_GROUPS.includes(v as AgeGroup);
+  v === undefined || VALID_AGE_GROUPS.has(v as AgeGroup);
 const isOptionalNullableString = (v: unknown): boolean =>
   v === undefined || v === null || typeof v === 'string';
 const isOptionalBoolean = (v: unknown): boolean => v === undefined || typeof v === 'boolean';

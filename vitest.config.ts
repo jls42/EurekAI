@@ -21,7 +21,6 @@ export default defineConfig({
         'vite-env.d.ts',
         'src/env.d.ts',
         'types.ts',
-        'server.ts',
         'src/components/fill-blank-validate.ts',
       ],
     },

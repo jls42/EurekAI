@@ -1,0 +1,225 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const state = vi.hoisted(() => {
+  const app = {
+    disable: vi.fn(),
+    get: vi.fn(),
+    listen: vi.fn((_port: number, cb?: () => void) => {
+      cb?.();
+      return { close: vi.fn() };
+    }),
+    post: vi.fn(),
+    put: vi.fn(),
+    use: vi.fn(),
+  };
+
+  const makeMiddleware = () => vi.fn((_req: unknown, _res: unknown, next?: () => void) => next?.());
+  const helmetMiddleware = makeMiddleware();
+  const jsonMiddleware = makeMiddleware();
+  const staticMiddleware = makeMiddleware();
+  const routeMiddleware = makeMiddleware();
+
+  const helmet = Object.assign(
+    vi.fn(() => helmetMiddleware),
+    {
+      contentSecurityPolicy: {
+        getDefaultDirectives: vi.fn(() => ({
+          'default-src': ["'self'"],
+          'upgrade-insecure-requests': [],
+        })),
+      },
+    },
+  );
+
+  return {
+    app,
+    aiLimiter: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+    dotenvConfig: vi.fn(),
+    expressJson: vi.fn(() => jsonMiddleware),
+    expressStatic: vi.fn(() => staticMiddleware),
+    generalLimiter: makeMiddleware(),
+    helmet,
+    initConfig: vi.fn(),
+    listVoices: vi.fn(() => Promise.resolve([])),
+    logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
+    mkdirSync: vi.fn(),
+    modelList: vi.fn(),
+    projectStoreInstances: [] as Array<{
+      cancelAllPendingsAtBoot: ReturnType<typeof vi.fn>;
+      listProjects: ReturnType<typeof vi.fn>;
+      migrateFromLegacy: ReturnType<typeof vi.fn>;
+    }>,
+    routeFactory: vi.fn(() => routeMiddleware),
+    setModelLimits: vi.fn(),
+    setVoiceCache: vi.fn(),
+    trackClient: vi.fn(),
+  };
+});
+
+vi.mock('dotenv', () => ({ default: { config: state.dotenvConfig } }));
+vi.mock('node:fs', () => ({ mkdirSync: state.mkdirSync }));
+vi.mock('express', () => ({
+  default: Object.assign(
+    vi.fn(() => state.app),
+    {
+      json: state.expressJson,
+      static: state.expressStatic,
+    },
+  ),
+}));
+vi.mock('helmet', () => ({ default: state.helmet }));
+vi.mock('@mistralai/mistralai', () => ({
+  Mistral: class MockMistral {
+    models = { list: state.modelList };
+  },
+}));
+vi.mock('./helpers/tracked-client.js', () => ({ trackClient: state.trackClient }));
+vi.mock('./helpers/logger.js', () => ({ logger: state.logger }));
+vi.mock('./helpers/usage-context.js', () => ({ recordUsage: vi.fn() }));
+vi.mock('./helpers/rate-limit.js', () => ({
+  aiLimiter: state.aiLimiter,
+  generalLimiter: state.generalLimiter,
+}));
+vi.mock('./config.js', () => ({
+  getApiStatus: vi.fn(() => ({ mistral: true, ttsAvailable: false })),
+  getConfig: vi.fn(() => ({})),
+  initConfig: state.initConfig,
+  resetConfig: vi.fn(() => ({})),
+  saveConfig: vi.fn(() => ({})),
+  setModelLimits: state.setModelLimits,
+  setVoiceCache: state.setVoiceCache,
+}));
+vi.mock('./generators/tts-provider.js', () => ({ listVoices: state.listVoices }));
+vi.mock('./store.js', () => ({
+  ProjectStore: class MockProjectStore {
+    cancelAllPendingsAtBoot = vi.fn(() => 0);
+    listProjects = vi.fn(() => []);
+    migrateFromLegacy = vi.fn();
+
+    constructor() {
+      state.projectStoreInstances.push(this);
+    }
+  },
+}));
+vi.mock('./profiles.js', () => ({
+  ALL_MODERATION_CATEGORIES: [],
+  MODERATION_CATEGORIES: {},
+  ProfileStore: class MockProfileStore {},
+}));
+vi.mock('./routes/projects.js', () => ({ projectRoutes: state.routeFactory }));
+vi.mock('./routes/sources.js', () => ({ sourceRoutes: state.routeFactory }));
+vi.mock('./routes/generate.js', () => ({ generateRoutes: state.routeFactory }));
+vi.mock('./routes/generations.js', () => ({ generationCrudRoutes: state.routeFactory }));
+vi.mock('./routes/chat.js', () => ({ chatRoutes: state.routeFactory }));
+vi.mock('./routes/profiles.js', () => ({ profileRoutes: state.routeFactory }));
+
+function responseMock() {
+  const res = { json: vi.fn(), status: vi.fn() };
+  res.status.mockReturnValue(res);
+  return res;
+}
+
+describe('server bootstrap', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    state.projectStoreInstances.length = 0;
+    state.listVoices.mockResolvedValue([]);
+    state.modelList.mockResolvedValue({
+      data: [
+        { id: 'model-a', maxContextLength: 32_000, aliases: ['model-alias'] },
+        { id: 'model-without-limit' },
+      ],
+    });
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.spyOn(console, 'log').mockImplementation(() => undefined);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it('monte Helmet avec CSP active et les guards Express', async () => {
+    await import('./server.js');
+
+    const helmetCalls = state.helmet.mock.calls as unknown as Array<[unknown]>;
+    const helmetOptions = helmetCalls[0]?.[0] as {
+      contentSecurityPolicy: { directives: Record<string, unknown> };
+      crossOriginEmbedderPolicy: boolean;
+    };
+    expect(helmetOptions.contentSecurityPolicy).not.toBe(false);
+    expect(helmetOptions.crossOriginEmbedderPolicy).toBe(false);
+    expect(helmetOptions.contentSecurityPolicy.directives['connect-src']).toEqual([
+      "'self'",
+      'http://localhost:5173',
+      'http://127.0.0.1:5173',
+      'ws://localhost:5173',
+      'ws://127.0.0.1:5173',
+    ]);
+    await vi.waitFor(() =>
+      expect(state.setModelLimits).toHaveBeenCalledWith({
+        'model-a': 32_000,
+        'model-alias': 32_000,
+      }),
+    );
+
+    const getCalls = state.app.get.mock.calls as unknown as Array<[string, Function]>;
+    const moderationHandler = getCalls.find(([path]) => path === '/api/moderation-categories')?.[1];
+    const moderationRes = responseMock();
+    moderationHandler?.({}, moderationRes);
+    expect(moderationRes.json).toHaveBeenCalledWith({ all: [], defaults: {} });
+
+    const errorHandler = state.app.use.mock.calls
+      .map(([middleware]) => middleware)
+      .find((middleware) => typeof middleware === 'function' && middleware.length === 4) as (
+      err: unknown,
+      req: unknown,
+      res: ReturnType<typeof responseMock>,
+      next: (err?: unknown) => void,
+    ) => void;
+    const syntaxError = Object.assign(new SyntaxError('bad json'), { body: '{}' });
+    const badJsonRes = responseMock();
+    errorHandler(syntaxError, {}, badJsonRes, vi.fn());
+    expect(badJsonRes.status).toHaveBeenCalledWith(400);
+    expect(badJsonRes.json).toHaveBeenCalledWith({ error: 'invalid_json' });
+
+    const nextError = vi.fn();
+    const otherError = new Error('other');
+    errorHandler(otherError, {}, responseMock(), nextError);
+    expect(nextError).toHaveBeenCalledWith(otherError);
+
+    const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
+    const aiMiddleware = state.app.use.mock.calls[generalLimiterIndex + 1]?.[0] as (
+      req: { path: string },
+      res: unknown,
+      next: () => void,
+    ) => void;
+
+    aiMiddleware({ path: '/api/projects/p1/generate' }, {}, vi.fn());
+    expect(state.aiLimiter).toHaveBeenCalled();
+
+    const next = vi.fn();
+    aiMiddleware({ path: '/api/projects/p1/events' }, {}, next);
+    expect(next).toHaveBeenCalled();
+  });
+
+  it('journalise les echecs de warmup non bloquants', async () => {
+    state.listVoices.mockRejectedValueOnce(new Error('voice down'));
+    state.modelList.mockRejectedValueOnce(new Error('models down'));
+
+    await import('./server.js');
+
+    await vi.waitFor(() => {
+      expect(state.logger.warn).toHaveBeenCalledWith(
+        'voice-cache',
+        expect.stringContaining('voice down'),
+      );
+      expect(state.logger.warn).toHaveBeenCalledWith(
+        'models',
+        expect.stringContaining('models down'),
+      );
+    });
+  });
+});
