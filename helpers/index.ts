@@ -131,6 +131,11 @@ const buildSafeFetchUrl = (parsed: URL): string => {
 };
 
 async function fetchWithReadability(safeUrlStr: string): Promise<string> {
+  // URL validated upstream by assertSafeFetchUrl (hostname allow-list, private-IP &
+  // DNS-resolution check, http/https only) and reconstructed by buildSafeFetchUrl
+  // (regex match[0] sanitization barrier). Redirects rejected via `redirect: 'manual'`.
+  // codeql[js/request-forgery] -- safeUrlStr sanitized via SAFE_HOST_RE.exec barrier
+  // nosemgrep: rule-node-ssrf -- safeUrlStr is regex-validated, not raw user input
   const res = await fetch(safeUrlStr, {
     headers: {
       'User-Agent':

@@ -1,7 +1,7 @@
-import rateLimit, { type RateLimitRequestHandler } from 'express-rate-limit';
+import rateLimit, { type Options, type RateLimitRequestHandler } from 'express-rate-limit';
 
-const COMMON_OPTS = {
-  standardHeaders: 'draft-7' as const,
+const COMMON_OPTS: Partial<Options> = {
+  standardHeaders: 'draft-7',
   legacyHeaders: false,
 };
 
