@@ -57,8 +57,8 @@ const PORT = Number(process.env.PORT) || 3000;
 //
 // CSP : active en prod avec defaults Helmet + override 'unsafe-inline'/'unsafe-eval'
 // requis par Alpine.js (x-data, x-text, x-on directives inline). En dev, CSP off
-// pour ne pas casser le proxy Vite (HMR via WebSocket sur ws://). Un reverse-proxy
-// prod (nginx/caddy) peut imposer un CSP plus strict en surcouche.
+// pour ne pas casser le proxy Vite (HMR WebSocket non chiffre en local). Un
+// reverse-proxy prod (nginx/caddy) peut imposer un CSP plus strict en surcouche.
 //
 // Cross-origin embedder policy desactivee pour permettre l'integration iframe en
 // dev outils Vite et l'embed de blobs audio/image generes.
