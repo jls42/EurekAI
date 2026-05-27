@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
-import helmet from 'helmet';
+import helmet, { type HelmetOptions } from 'helmet';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -55,31 +55,46 @@ const PORT = Number(process.env.PORT) || 3000;
 
 // Headers de securite : X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.
 //
-// CSP : active en prod avec defaults Helmet + override 'unsafe-inline'/'unsafe-eval'
-// requis par Alpine.js (x-data, x-text, x-on directives inline). En dev, CSP off
-// pour ne pas casser le proxy Vite (HMR WebSocket non chiffre en local). Un
-// reverse-proxy prod (nginx/caddy) peut imposer un CSP plus strict en surcouche.
+// CSP : active avec defaults Helmet + override 'unsafe-inline'/'unsafe-eval'
+// requis par Alpine.js (x-data, x-text, x-on directives inline). En dev, on
+// garde CSP actif avec exceptions localhost pour Vite HMR/WS et sans
+// upgrade-insecure-requests, qui peut casser http://localhost. Un reverse-proxy
+// prod (nginx/caddy) peut imposer un CSP plus strict en surcouche.
 //
 // Cross-origin embedder policy desactivee pour permettre l'integration iframe en
 // dev outils Vite et l'embed de blobs audio/image generes.
 const isProduction = process.env.NODE_ENV === 'production';
-const cspConfig = isProduction
-  ? {
-      directives: {
-        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
-        // Alpine.js evalue les expressions x-data/x-text/x-on dynamiquement ;
-        // unsafe-eval + unsafe-inline sont requis. Audit du DOM regulier
-        // recommande pour detecter une injection.
-        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
-        'style-src': ["'self'", "'unsafe-inline'"],
-        // Audio TTS et images generees servies en data:/blob:.
-        'img-src': ["'self'", 'data:', 'blob:'],
-        'media-src': ["'self'", 'blob:'],
-      },
-    }
-  : false;
-// codeql[js/insecure-helmet-configuration] -- CSP off en dev (Vite HMR/WS), actif en prod ; cf. cspConfig ci-dessus
-// eslint-disable-next-line sonarjs/content-security-policy -- CSP conditionnel dev/prod (cf. commentaire ci-dessus)
+type ContentSecurityPolicyConfig = Exclude<
+  NonNullable<HelmetOptions['contentSecurityPolicy']>,
+  boolean
+>;
+const cspSelf = "'self'";
+const cspUnsafeInline = "'unsafe-inline'";
+const cspUnsafeEval = "'unsafe-eval'";
+const viteDevOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173'];
+const viteDevWsOrigins = ['ws://localhost:5173', 'ws://127.0.0.1:5173'];
+const cspDevDirectives: NonNullable<ContentSecurityPolicyConfig['directives']> = isProduction
+  ? {}
+  : {
+      'connect-src': [cspSelf, ...viteDevOrigins, ...viteDevWsOrigins],
+      'script-src': [cspSelf, cspUnsafeInline, cspUnsafeEval, ...viteDevOrigins],
+      'style-src': [cspSelf, cspUnsafeInline, ...viteDevOrigins],
+      'upgrade-insecure-requests': null,
+    };
+const cspConfig: ContentSecurityPolicyConfig = {
+  directives: {
+    ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+    // Alpine.js evalue les expressions x-data/x-text/x-on dynamiquement ;
+    // unsafe-eval + unsafe-inline sont requis. Audit du DOM regulier
+    // recommande pour detecter une injection.
+    'script-src': [cspSelf, cspUnsafeInline, cspUnsafeEval],
+    'style-src': [cspSelf, cspUnsafeInline],
+    // Audio TTS et images generees servies en data:/blob:.
+    'img-src': [cspSelf, 'data:', 'blob:'],
+    'media-src': [cspSelf, 'blob:'],
+    ...cspDevDirectives,
+  },
+};
 app.use(helmet({ contentSecurityPolicy: cspConfig, crossOriginEmbedderPolicy: false }));
 
 app.use(express.json({ limit: '5mb' }));
