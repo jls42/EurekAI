@@ -54,13 +54,33 @@ app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;
 
 // Headers de securite : X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.
-// CSP desactive volontairement : l'app est servie en dev par Vite (proxy) avec HMR/WS,
-// et en prod sert du HTML + bundle Alpine.js ; ajouter un CSP custom necessite un audit
-// complet des directives inline d'Alpine (x-data, x-text, x-on). Le reverse-proxy prod
-// (nginx/caddy) impose le CSP final adapte au deployment. Cross-origin embedder policy
-// desactivee pour permettre l'integration iframe en dev outils Vite.
-// eslint-disable-next-line sonarjs/content-security-policy -- CSP delegue au reverse-proxy prod (cf. commentaire ci-dessus)
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+//
+// CSP : active en prod avec defaults Helmet + override 'unsafe-inline'/'unsafe-eval'
+// requis par Alpine.js (x-data, x-text, x-on directives inline). En dev, CSP off
+// pour ne pas casser le proxy Vite (HMR via WebSocket sur ws://). Un reverse-proxy
+// prod (nginx/caddy) peut imposer un CSP plus strict en surcouche.
+//
+// Cross-origin embedder policy desactivee pour permettre l'integration iframe en
+// dev outils Vite et l'embed de blobs audio/image generes.
+const isProduction = process.env.NODE_ENV === 'production';
+const cspConfig = isProduction
+  ? {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        // Alpine.js evalue les expressions x-data/x-text/x-on dynamiquement ;
+        // unsafe-eval + unsafe-inline sont requis. Audit du DOM regulier
+        // recommande pour detecter une injection.
+        'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+        'style-src': ["'self'", "'unsafe-inline'"],
+        // Audio TTS et images generees servies en data:/blob:.
+        'img-src': ["'self'", 'data:', 'blob:'],
+        'media-src': ["'self'", 'blob:'],
+      },
+    }
+  : false;
+// codeql[js/insecure-helmet-configuration] -- CSP off en dev (Vite HMR/WS), actif en prod ; cf. cspConfig ci-dessus
+// eslint-disable-next-line sonarjs/content-security-policy -- CSP conditionnel dev/prod (cf. commentaire ci-dessus)
+app.use(helmet({ contentSecurityPolicy: cspConfig, crossOriginEmbedderPolicy: false }));
 
 app.use(express.json({ limit: '5mb' }));
 
