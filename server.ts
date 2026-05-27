@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
-import express from 'express';
+import express, { type NextFunction, type Request, type Response } from 'express';
+import helmet from 'helmet';
 import { mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,7 @@ import { generationCrudRoutes } from './routes/generations.js';
 import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore, ALL_MODERATION_CATEGORIES, MODERATION_CATEGORIES } from './profiles.js';
+import { aiLimiter, generalLimiter } from './helpers/rate-limit.js';
 
 dotenv.config({ override: true, quiet: true });
 
@@ -51,7 +53,28 @@ const app = express();
 app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;
 
+// Headers de securite : X-Frame-Options, X-Content-Type-Options, HSTS, Referrer-Policy, etc.
+// CSP desactive volontairement : l'app est servie en dev par Vite (proxy) avec HMR/WS,
+// et en prod sert du HTML + bundle Alpine.js ; ajouter un CSP custom necessite un audit
+// complet des directives inline d'Alpine (x-data, x-text, x-on). Le reverse-proxy prod
+// (nginx/caddy) impose le CSP final adapte au deployment. Cross-origin embedder policy
+// desactivee pour permettre l'integration iframe en dev outils Vite.
+// eslint-disable-next-line sonarjs/content-security-policy -- CSP delegue au reverse-proxy prod (cf. commentaire ci-dessus)
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
 app.use(express.json({ limit: '5mb' }));
+
+// body-parser SyntaxError handler : sans ce middleware, un payload JSON malforme
+// expose la stack trace Node (paths absolus, versions deps) via le default handler
+// Express. cf. CLAUDE.md "Codes d'erreur API (FailedStep)" — jamais err.message brut
+// dans une reponse HTTP.
+app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    res.status(400).json({ error: 'invalid_json' });
+    return;
+  }
+  next(err);
+});
 
 // Dev: Vite serves the frontend (proxy), Express = API only
 // Prod: Express serves the built frontend from dist/
@@ -123,6 +146,23 @@ app.get('/api/moderation-categories', (_req, res) =>
 // --- Routes ---
 const API_PROJECTS = '/api/projects';
 const NON_CONFIGURE = 'NON CONFIGURE';
+
+// Rate-limit general anti-flood sur toutes les routes /api. authLimiter
+// (sur /profiles) et aiLimiter (sur paths cher) s'empilent par-dessus.
+app.use('/api', generalLimiter);
+
+// aiLimiter sur les paths qui declenchent un appel LLM/TTS/OCR (generate,
+// sources scrape/upload, chat). Empile sur generalLimiter ci-dessus. Le
+// regex match les sous-paths sous /api/projects/:pid/{generate|sources|chat}.
+// /events (SSE) n'est pas dans ces prefix donc reste non-affecte.
+const AI_PATH_RE = /^\/api\/projects\/[^/]+\/(generate|sources|chat)(\/|$)/;
+app.use((req, res, next) => {
+  if (AI_PATH_RE.test(req.path)) {
+    aiLimiter(req, res, next);
+    return;
+  }
+  next();
+});
 
 app.use('/api/profiles', profileRoutes(outputDir, store));
 app.use(API_PROJECTS, projectRoutes(store));
