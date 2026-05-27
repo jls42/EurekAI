@@ -72,18 +72,18 @@ function stripUntilStable(input: string, patterns: RegExp[]): string {
 
 export function sanitizeRenderedHtml(html: string): string {
   let safe = stripUntilStable(html, [BLOCKED_TAG_RE, EVENT_HANDLER_RE, STYLE_ATTR_RE]);
-  let prev = '';
-  while (prev !== safe) {
-    prev = safe;
-    safe = safe.replaceAll(
-      URL_ATTR_RE,
-      (_match, attr: string, dq?: string, sq?: string, bare?: string) => {
-        const raw = dq ?? sq ?? bare ?? '';
-        if (!isSafeUrl(raw)) return '';
-        return ` ${attr}="${escapeHtmlAttribute(raw)}"`;
-      },
-    );
-  }
+  // Une seule passe sur URL_ATTR_RE : la transformation escape les `&` en `&amp;`,
+  // donc reboucler relancerait l'escape (&amp; → &amp;amp;) sans jamais converger.
+  // Les patterns multi-char dangereux (script, on*=) sont déjà neutralisés par
+  // stripUntilStable au-dessus, qui ne pose pas ce problème (suppression vs transform).
+  safe = safe.replaceAll(
+    URL_ATTR_RE,
+    (_match, attr: string, dq?: string, sq?: string, bare?: string) => {
+      const raw = dq ?? sq ?? bare ?? '';
+      if (!isSafeUrl(raw)) return '';
+      return ` ${attr}="${escapeHtmlAttribute(raw)}"`;
+    },
+  );
   safe = safe.replaceAll(/<a\b(?![^>]*\brel=)([^>]*)>/gi, '<a$1 rel="noopener noreferrer">');
   return safe;
 }
