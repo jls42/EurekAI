@@ -240,6 +240,7 @@ describe('assertSafeFetchUrl', () => {
     await expect(assertSafeFetchUrl('http://localhost/x')).rejects.toThrow();
     await expect(assertSafeFetchUrl('http://127.0.0.1/x')).rejects.toThrow('IP privee');
     await expect(assertSafeFetchUrl('http://[::1]/x')).rejects.toThrow('IP privee');
+    await expect(assertSafeFetchUrl('http://[::ffff:127.0.0.1]/x')).rejects.toThrow('IP privee');
   });
 
   it('rejette les IPs privees RFC 1918', async () => {
@@ -251,6 +252,10 @@ describe('assertSafeFetchUrl', () => {
   it('rejette les endpoints metadata cloud', async () => {
     await expect(assertSafeFetchUrl('http://169.254.169.254/latest/meta-data/')).rejects.toThrow();
     await expect(assertSafeFetchUrl('http://metadata.google.internal/')).rejects.toThrow();
+  });
+
+  it('rejette les IPs reservees benchmark', async () => {
+    await expect(assertSafeFetchUrl('http://198.18.0.1/x')).rejects.toThrow('IP privee');
   });
 
   it('rejette les TLD internes', async () => {

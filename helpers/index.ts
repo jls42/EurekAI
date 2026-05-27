@@ -26,10 +26,11 @@ const PRIVATE_IPV4_RANGES: ReadonlyArray<readonly [number, number | null, number
   [192, 88, 88],
   [192, 168, 168],
   [100, 64, 127],
+  [198, 18, 19],
 ];
 
 const parseIPv4Octets = (ip: string): [number, number] | null => {
-  const parts = ip.split('.').map((s) => Number(s));
+  const parts = ip.split('.').map(Number);
   if (parts.length !== 4 || parts.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return null;
   return [parts[0], parts[1]];
 };
@@ -51,6 +52,15 @@ const isPrivateIPv4 = (ip: string): boolean => {
 
 const PRIVATE_IPV6_PREFIXES = ['fc', 'fd', 'fe80', 'fe9', 'fea', 'feb', 'ff'];
 
+const parseMappedIPv4Hex = (ip: string): string | null => {
+  const words = ip.split(':').map((part) => Number.parseInt(part, 16));
+  if (words.length !== 2 || words.some((n) => Number.isNaN(n) || n < 0 || n > 0xffff)) {
+    return null;
+  }
+  const [hi, lo] = words;
+  return `${hi >> 8}.${hi & 0xff}.${lo >> 8}.${lo & 0xff}`;
+};
+
 const isPrivateIPv6 = (ip: string): boolean => {
   const lower = ip.toLowerCase().replace(/^\[|\]$/g, '');
   if (lower === '::1' || lower === '::') return true;
@@ -58,6 +68,9 @@ const isPrivateIPv6 = (ip: string): boolean => {
   if (lower.startsWith('::ffff:')) {
     const v4 = lower.slice(7);
     if (isIPv4(v4)) return isPrivateIPv4(v4);
+    const mapped = parseMappedIPv4Hex(v4);
+    if (mapped) return isPrivateIPv4(mapped);
+    return true;
   }
   return false;
 };
@@ -131,11 +144,12 @@ const buildSafeFetchUrl = (parsed: URL): string => {
 };
 
 async function fetchWithReadability(safeUrlStr: string): Promise<string> {
-  // URL validated upstream by assertSafeFetchUrl (hostname allow-list, private-IP &
-  // DNS-resolution check, http/https only) and reconstructed by buildSafeFetchUrl
-  // (regex match[0] sanitization barrier). Redirects rejected via `redirect: 'manual'`.
-  // lgtm[js/request-forgery]
-  // nosemgrep: rule-node-ssrf
+  // URL validated upstream by assertSafeFetchUrl: http/https only, no local
+  // hostnames, no private/reserved IPs, public DNS resolution, then rebuilt by
+  // buildSafeFetchUrl. Redirects are rejected below via `redirect: 'manual'`.
+  // CodeQL and Codacy cannot infer this feature-level SSRF barrier because this
+  // scraper intentionally accepts arbitrary public URLs.
+  // codeql[js/request-forgery] nosemgrep
   const res = await fetch(safeUrlStr, {
     headers: {
       'User-Agent':
