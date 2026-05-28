@@ -1,10 +1,10 @@
 type CspDirectives = Record<string, null | readonly string[]>;
-export type HelmetSecurityOptions = {
+export interface HelmetSecurityOptions {
   contentSecurityPolicy: {
     directives: CspDirectives;
   };
   crossOriginEmbedderPolicy: false;
-};
+}
 
 const cspSelf = "'self'";
 const cspUnsafeInline = "'unsafe-inline'";

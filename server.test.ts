@@ -52,11 +52,11 @@ const state = vi.hoisted(() => {
     logger: { error: vi.fn(), info: vi.fn(), warn: vi.fn() },
     mkdirSync: vi.fn(),
     modelList: vi.fn(),
-    projectStoreInstances: [] as Array<{
+    projectStoreInstances: [] as {
       cancelAllPendingsAtBoot: ReturnType<typeof vi.fn>;
       listProjects: ReturnType<typeof vi.fn>;
       migrateFromLegacy: ReturnType<typeof vi.fn>;
-    }>,
+    }[],
     routeFactory: vi.fn(() => routeMiddleware),
     setModelLimits: vi.fn(),
     setVoiceCache: vi.fn(),
@@ -112,7 +112,13 @@ vi.mock('./store.js', () => ({
 vi.mock('./profiles.js', () => ({
   ALL_MODERATION_CATEGORIES: [],
   MODERATION_CATEGORIES: {},
-  ProfileStore: class MockProfileStore {},
+  ProfileStore: class MockProfileStore {
+    readonly outputDir: string | undefined;
+
+    constructor(outputDir?: string) {
+      this.outputDir = outputDir;
+    }
+  },
 }));
 vi.mock('./routes/projects.js', () => ({ projectRoutes: state.routeFactory }));
 vi.mock('./routes/sources.js', () => ({ sourceRoutes: state.routeFactory }));
@@ -127,12 +133,12 @@ function responseMock() {
   return res;
 }
 
-async function importServer() {
-  await import('./server.js');
+function importServer(): Promise<typeof import('./server.js')> {
+  return import('./server.js');
 }
 
 function getHelmetOptions() {
-  const helmetCalls = state.helmet.mock.calls as unknown as Array<[unknown]>;
+  const helmetCalls = state.helmet.mock.calls as unknown as [unknown][];
   return helmetCalls[0]?.[0] as {
     contentSecurityPolicy: { directives: Record<string, unknown> };
     crossOriginEmbedderPolicy: boolean;
@@ -140,9 +146,7 @@ function getHelmetOptions() {
 }
 
 function getRouteHandler(path: string) {
-  const getCalls = state.app.get.mock.calls as unknown as Array<
-    [string, (...args: unknown[]) => void]
-  >;
+  const getCalls = state.app.get.mock.calls as unknown as [string, (..._args: unknown[]) => void][];
   return getCalls.find(([routePath]) => routePath === path)?.[1];
 }
 
@@ -150,19 +154,19 @@ function getJsonErrorHandler() {
   return state.app.use.mock.calls
     .map(([middleware]) => middleware)
     .find((middleware) => typeof middleware === 'function' && middleware.length === 4) as (
-    err: unknown,
-    req: unknown,
-    res: ReturnType<typeof responseMock>,
-    next: (err?: unknown) => void,
+    _err: unknown,
+    _req: unknown,
+    _res: ReturnType<typeof responseMock>,
+    _next: (err?: unknown) => void,
   ) => void;
 }
 
 function getAiMiddleware() {
   const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
   return state.app.use.mock.calls[generalLimiterIndex + 1]?.[0] as (
-    req: { path: string },
-    res: unknown,
-    next: () => void,
+    _req: { path: string },
+    _res: unknown,
+    _next: () => void,
   ) => void;
 }
 
