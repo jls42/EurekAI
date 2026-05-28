@@ -139,10 +139,17 @@ vi.mock('./routes/generations.js', () => ({ generationCrudRoutes: state.routeFac
 vi.mock('./routes/chat.js', () => ({ chatRoutes: state.routeFactory }));
 vi.mock('./routes/profiles.js', () => ({ profileRoutes: state.routeFactory }));
 
-function responseMock(): Response {
-  const res = { json: vi.fn(), status: vi.fn() };
-  res.status.mockReturnValue(res);
-  return res as unknown as Response;
+type TestResponse = Response & {
+  jsonMock: ReturnType<typeof vi.fn>;
+  statusMock: ReturnType<typeof vi.fn>;
+};
+
+function responseMock(): TestResponse {
+  const jsonMock = vi.fn();
+  const statusMock = vi.fn();
+  const res = { json: jsonMock, jsonMock, status: statusMock, statusMock };
+  statusMock.mockReturnValue(res);
+  return res as unknown as TestResponse;
 }
 
 function importServer(): Promise<typeof import('./server.js')> {
@@ -228,7 +235,7 @@ describe('server bootstrap', () => {
     const moderationHandler = getRouteHandler('/api/moderation-categories');
     const moderationRes = responseMock();
     moderationHandler({} as Request, moderationRes, vi.fn());
-    expect(moderationRes.json).toHaveBeenCalledWith({ all: [], defaults: {} });
+    expect(moderationRes.jsonMock).toHaveBeenCalledWith({ all: [], defaults: {} });
   });
 
   it('masque les details des payloads JSON invalides', async () => {
@@ -238,8 +245,8 @@ describe('server bootstrap', () => {
     const syntaxError = Object.assign(new SyntaxError('bad json'), { body: '{}' });
     const badJsonRes = responseMock();
     errorHandler(syntaxError, {} as Request, badJsonRes, vi.fn() as NextFunction);
-    expect(badJsonRes.status).toHaveBeenCalledWith(400);
-    expect(badJsonRes.json).toHaveBeenCalledWith({ error: 'invalid_json' });
+    expect(badJsonRes.statusMock).toHaveBeenCalledWith(400);
+    expect(badJsonRes.jsonMock).toHaveBeenCalledWith({ error: 'invalid_json' });
 
     const nextError = vi.fn();
     const otherError = new Error('other');
