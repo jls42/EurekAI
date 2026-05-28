@@ -4,6 +4,13 @@
                   @typescript-eslint/no-unsafe-return,
                   @typescript-eslint/no-unsafe-argument --
    Codacy typed lint resolves Vitest mocks as error typed in this bootstrap test. */
+import {
+  type ErrorRequestHandler,
+  type NextFunction,
+  type Request,
+  type RequestHandler,
+  type Response,
+} from 'express';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => {
@@ -19,7 +26,11 @@ const state = vi.hoisted(() => {
     use: vi.fn(),
   };
 
-  const makeMiddleware = () => vi.fn((_req: unknown, _res: unknown, next?: () => void) => next?.());
+  const makeMiddleware = () =>
+    vi.fn((...args: unknown[]) => {
+      const next = args[2];
+      if (typeof next === 'function') next();
+    });
   const helmetMiddleware = makeMiddleware();
   const jsonMiddleware = makeMiddleware();
   const staticMiddleware = makeMiddleware();
@@ -39,8 +50,9 @@ const state = vi.hoisted(() => {
 
   return {
     app,
-    aiLimiter: vi.fn((_req: unknown, _res: unknown, next: () => void) => {
-      next();
+    aiLimiter: vi.fn((...args: unknown[]) => {
+      const next = args[2];
+      if (typeof next === 'function') next();
     }),
     dotenvConfig: vi.fn(),
     expressJson: vi.fn(() => jsonMiddleware),
@@ -127,10 +139,10 @@ vi.mock('./routes/generations.js', () => ({ generationCrudRoutes: state.routeFac
 vi.mock('./routes/chat.js', () => ({ chatRoutes: state.routeFactory }));
 vi.mock('./routes/profiles.js', () => ({ profileRoutes: state.routeFactory }));
 
-function responseMock() {
+function responseMock(): Response {
   const res = { json: vi.fn(), status: vi.fn() };
   res.status.mockReturnValue(res);
-  return res;
+  return res as unknown as Response;
 }
 
 function importServer(): Promise<typeof import('./server.js')> {
@@ -146,28 +158,29 @@ function getHelmetOptions() {
 }
 
 function getRouteHandler(path: string) {
-  const getCalls = state.app.get.mock.calls as unknown as [string, (..._args: unknown[]) => void][];
-  return getCalls.find(([routePath]) => routePath === path)?.[1];
+  const getCalls = state.app.get.mock.calls as unknown as [string, RequestHandler][];
+  const handler = getCalls.find(([routePath]) => routePath === path)?.[1];
+  if (!handler) throw new TypeError(`Missing route handler for ${path}`);
+  return handler;
 }
 
 function getJsonErrorHandler() {
-  return state.app.use.mock.calls
+  const handler = state.app.use.mock.calls
     .map(([middleware]) => middleware)
-    .find((middleware) => typeof middleware === 'function' && middleware.length === 4) as (
-    _err: unknown,
-    _req: unknown,
-    _res: ReturnType<typeof responseMock>,
-    _next: (err?: unknown) => void,
-  ) => void;
+    .find((middleware) => typeof middleware === 'function' && middleware.length === 4);
+  if (!handler) throw new TypeError('Missing JSON error handler');
+  return handler as ErrorRequestHandler;
 }
 
 function getAiMiddleware() {
   const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
-  return state.app.use.mock.calls[generalLimiterIndex + 1]?.[0] as (
-    _req: { path: string },
-    _res: unknown,
-    _next: () => void,
-  ) => void;
+  const handler = state.app.use.mock.calls[generalLimiterIndex + 1]?.[0];
+  if (typeof handler !== 'function') throw new TypeError('Missing AI rate-limit middleware');
+  return handler as RequestHandler;
+}
+
+function requestForPath(path: string): Request {
+  return { path } as Request;
 }
 
 describe('server bootstrap', () => {
@@ -214,7 +227,7 @@ describe('server bootstrap', () => {
 
     const moderationHandler = getRouteHandler('/api/moderation-categories');
     const moderationRes = responseMock();
-    moderationHandler?.({}, moderationRes);
+    moderationHandler({} as Request, moderationRes, vi.fn());
     expect(moderationRes.json).toHaveBeenCalledWith({ all: [], defaults: {} });
   });
 
@@ -224,13 +237,13 @@ describe('server bootstrap', () => {
     const errorHandler = getJsonErrorHandler();
     const syntaxError = Object.assign(new SyntaxError('bad json'), { body: '{}' });
     const badJsonRes = responseMock();
-    errorHandler(syntaxError, {}, badJsonRes, vi.fn());
+    errorHandler(syntaxError, {} as Request, badJsonRes, vi.fn() as NextFunction);
     expect(badJsonRes.status).toHaveBeenCalledWith(400);
     expect(badJsonRes.json).toHaveBeenCalledWith({ error: 'invalid_json' });
 
     const nextError = vi.fn();
     const otherError = new Error('other');
-    errorHandler(otherError, {}, responseMock(), nextError);
+    errorHandler(otherError, {} as Request, responseMock(), nextError as NextFunction);
     expect(nextError).toHaveBeenCalledWith(otherError);
   });
 
@@ -238,11 +251,11 @@ describe('server bootstrap', () => {
     await importServer();
 
     const aiMiddleware = getAiMiddleware();
-    aiMiddleware({ path: '/api/projects/p1/generate' }, {}, vi.fn());
+    aiMiddleware(requestForPath('/api/projects/p1/generate'), responseMock(), vi.fn());
     expect(state.aiLimiter).toHaveBeenCalled();
 
     const next = vi.fn();
-    aiMiddleware({ path: '/api/projects/p1/events' }, {}, next);
+    aiMiddleware(requestForPath('/api/projects/p1/events'), responseMock(), next);
     expect(next).toHaveBeenCalled();
   });
 
