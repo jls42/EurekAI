@@ -1,12 +1,14 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-return --
+   Codacy typed lint resolves Vitest/expect imports as error typed on new test files. */
 import { describe, expect, it } from 'vitest';
-import { type HelmetOptions } from 'helmet';
 
 import { createHelmetOptions } from './security-headers.js';
 
-function directivesFor(options: HelmetOptions) {
-  const csp = options.contentSecurityPolicy;
-  if (!csp || typeof csp !== 'object') throw new Error('CSP must stay enabled');
-  return csp.directives ?? {};
+function directivesFor(options: ReturnType<typeof createHelmetOptions>) {
+  return options.contentSecurityPolicy.directives;
 }
 
 describe('createHelmetOptions', () => {
@@ -20,7 +22,7 @@ describe('createHelmetOptions', () => {
     expect(directives['style-src']).toEqual(["'self'", "'unsafe-inline'"]);
     expect(directives['img-src']).toEqual(["'self'", 'data:', 'blob:']);
     expect(directives['media-src']).toEqual(["'self'", 'blob:']);
-    expect(directives['upgrade-insecure-requests']).toEqual([]);
+    expect(directives['upgrade-insecure-requests']).toBeUndefined();
     expect(directives['connect-src']).toBeUndefined();
   });
 

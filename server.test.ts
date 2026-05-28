@@ -1,3 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment,
+                  @typescript-eslint/no-unsafe-call,
+                  @typescript-eslint/no-unsafe-member-access,
+                  @typescript-eslint/no-unsafe-return,
+                  @typescript-eslint/no-unsafe-argument --
+   Codacy typed lint resolves Vitest mocks as error typed in this bootstrap test. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const state = vi.hoisted(() => {
@@ -33,7 +39,9 @@ const state = vi.hoisted(() => {
 
   return {
     app,
-    aiLimiter: vi.fn((_req: unknown, _res: unknown, next: () => void) => next()),
+    aiLimiter: vi.fn((_req: unknown, _res: unknown, next: () => void) => {
+      next();
+    }),
     dotenvConfig: vi.fn(),
     expressJson: vi.fn(() => jsonMiddleware),
     expressStatic: vi.fn(() => staticMiddleware),
@@ -119,6 +127,45 @@ function responseMock() {
   return res;
 }
 
+async function importServer() {
+  await import('./server.js');
+}
+
+function getHelmetOptions() {
+  const helmetCalls = state.helmet.mock.calls as unknown as Array<[unknown]>;
+  return helmetCalls[0]?.[0] as {
+    contentSecurityPolicy: { directives: Record<string, unknown> };
+    crossOriginEmbedderPolicy: boolean;
+  };
+}
+
+function getRouteHandler(path: string) {
+  const getCalls = state.app.get.mock.calls as unknown as Array<
+    [string, (...args: unknown[]) => void]
+  >;
+  return getCalls.find(([routePath]) => routePath === path)?.[1];
+}
+
+function getJsonErrorHandler() {
+  return state.app.use.mock.calls
+    .map(([middleware]) => middleware)
+    .find((middleware) => typeof middleware === 'function' && middleware.length === 4) as (
+    err: unknown,
+    req: unknown,
+    res: ReturnType<typeof responseMock>,
+    next: (err?: unknown) => void,
+  ) => void;
+}
+
+function getAiMiddleware() {
+  const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
+  return state.app.use.mock.calls[generalLimiterIndex + 1]?.[0] as (
+    req: { path: string },
+    res: unknown,
+    next: () => void,
+  ) => void;
+}
+
 describe('server bootstrap', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -141,14 +188,10 @@ describe('server bootstrap', () => {
     vi.restoreAllMocks();
   });
 
-  it('monte Helmet avec CSP active et les guards Express', async () => {
-    await import('./server.js');
+  it('monte Helmet avec CSP active et les routes de boot', async () => {
+    await importServer();
 
-    const helmetCalls = state.helmet.mock.calls as unknown as Array<[unknown]>;
-    const helmetOptions = helmetCalls[0]?.[0] as {
-      contentSecurityPolicy: { directives: Record<string, unknown> };
-      crossOriginEmbedderPolicy: boolean;
-    };
+    const helmetOptions = getHelmetOptions();
     expect(helmetOptions.contentSecurityPolicy).not.toBe(false);
     expect(helmetOptions.crossOriginEmbedderPolicy).toBe(false);
     expect(helmetOptions.contentSecurityPolicy.directives['connect-src']).toEqual([
@@ -165,20 +208,16 @@ describe('server bootstrap', () => {
       }),
     );
 
-    const getCalls = state.app.get.mock.calls as unknown as Array<[string, Function]>;
-    const moderationHandler = getCalls.find(([path]) => path === '/api/moderation-categories')?.[1];
+    const moderationHandler = getRouteHandler('/api/moderation-categories');
     const moderationRes = responseMock();
     moderationHandler?.({}, moderationRes);
     expect(moderationRes.json).toHaveBeenCalledWith({ all: [], defaults: {} });
+  });
 
-    const errorHandler = state.app.use.mock.calls
-      .map(([middleware]) => middleware)
-      .find((middleware) => typeof middleware === 'function' && middleware.length === 4) as (
-      err: unknown,
-      req: unknown,
-      res: ReturnType<typeof responseMock>,
-      next: (err?: unknown) => void,
-    ) => void;
+  it('masque les details des payloads JSON invalides', async () => {
+    await importServer();
+
+    const errorHandler = getJsonErrorHandler();
     const syntaxError = Object.assign(new SyntaxError('bad json'), { body: '{}' });
     const badJsonRes = responseMock();
     errorHandler(syntaxError, {}, badJsonRes, vi.fn());
@@ -189,14 +228,12 @@ describe('server bootstrap', () => {
     const otherError = new Error('other');
     errorHandler(otherError, {}, responseMock(), nextError);
     expect(nextError).toHaveBeenCalledWith(otherError);
+  });
 
-    const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
-    const aiMiddleware = state.app.use.mock.calls[generalLimiterIndex + 1]?.[0] as (
-      req: { path: string },
-      res: unknown,
-      next: () => void,
-    ) => void;
+  it('limite les routes API couteuses uniquement', async () => {
+    await importServer();
 
+    const aiMiddleware = getAiMiddleware();
     aiMiddleware({ path: '/api/projects/p1/generate' }, {}, vi.fn());
     expect(state.aiLimiter).toHaveBeenCalled();
 
@@ -209,7 +246,7 @@ describe('server bootstrap', () => {
     state.listVoices.mockRejectedValueOnce(new Error('voice down'));
     state.modelList.mockRejectedValueOnce(new Error('models down'));
 
-    await import('./server.js');
+    await importServer();
 
     await vi.waitFor(() => {
       expect(state.logger.warn).toHaveBeenCalledWith(
