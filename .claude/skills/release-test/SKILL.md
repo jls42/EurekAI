@@ -51,18 +51,23 @@ L'objectif est de couvrir **tous les generateurs declares dynamiquement** dans `
 
 ```javascript
 // Via mcp__claude-in-chrome__javascript_tool sur l'onglet ouvert :
-Array.from(document.querySelectorAll('button[aria-label^="Generer"]')).map(b => ({
-  label: b.getAttribute('aria-label'),
-  disabled: b.disabled,
-  rect: b.getBoundingClientRect(),
-})).filter(b => b.rect.width > 0)
+Array.from(document.querySelectorAll('button[aria-label^="Générer"]'))
+  .filter(b => b.offsetParent !== null && b.getBoundingClientRect().width > 0)
+  .map(b => ({
+    label: b.getAttribute('aria-label'),
+    disabled: b.disabled,
+    x: Math.round(b.getBoundingClientRect().x),
+    y: Math.round(b.getBoundingClientRect().y),
+  }))
 ```
 
-Les boutons de generation portent l'`aria-label` `"Generer des X"` (ajoute pour disambiguer category-chip vs CTA). Les boutons de navigation portent `"Voir les X"`.
+Les boutons de generation portent l'`aria-label` `"Générer des X"` **avec accent aigu** (i18n FR — verifie dans `src/i18n/fr.ts` cle `actions.generate`). Les locales autres mettent autre chose (`"Generate X"` en EN). Pour rester robuste cross-langue, soit (a) forcer la langue FR via `localStorage.setItem('sf-locale', 'fr')` + reload avant le scan, soit (b) selectionner par autre voie (par exemple `button[aria-label*="ner"]` + verification du texte du bouton). Les boutons de navigation portent `"Voir les X"`.
+
+**Note importante** : ces chips ne sont visibles que sur la vue **Sources** (rangee de boutons par-source) — pas sur le **Tableau de bord** (qui n'a que le CTA `Auto — Magie !`). Pour lancer une generation typee depuis le tableau de bord, soit naviguer vers la vue catégorie (`+ Nouvelle fiche` etc.), soit aller sur la vue Sources d'abord.
 
 ### Pour chaque generateur
 
-Pour chaque bouton visible avec aria-label commencant par `"Generer"` :
+Pour chaque bouton visible avec aria-label commencant par `"Générer"` :
 1. Cliquer dessus (`computer.left_click` aux coords retournees par `find` ou la query JS).
 2. Surveiller le reseau : un `POST /api/projects/<pid>/generate/<type>` doit partir en `pending`.
 3. Attendre la complétion (poll `read_network_requests` jusqu'a status 200 ou >30s timeout).
@@ -207,7 +212,7 @@ Pour que ce skill reste valable dans le temps :
 
 Quand l'app change et que le skill commence a echouer :
 
-- **Nouveau generateur ajoute** : le skill le decouvrira automatiquement via `categories[]`. Verifier juste qu'il a un bouton avec `aria-label="Generer ..."`.
+- **Nouveau generateur ajoute** : le skill le decouvrira automatiquement via `categories[]`. Verifier juste qu'il a un bouton avec `aria-label="Générer ..."` (FR avec accent — voir cle i18n `actions.generate`).
 - **Refactor des endpoints** : si `/generate/auto/route` devient `/generate/orchestrate` par exemple, mettre a jour la phase 3.
 - **Nouveau code d'erreur** : ajouter dans `security-tests.sh` la regex d'assertion correspondante.
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
