@@ -320,6 +320,7 @@ export const nl: Record<string, string> = {
   'fillBlank.retryWrong': 'Mijn fouten verbeteren',
   'fillBlank.restart': 'Opnieuw beginnen',
   'fillBlank.correctAnswer': 'Antwoord: {answer}',
+  'fillBlank.spellingAlert': 'Let op de spelling: het is « {answer} ».',
 
   'step.questionOf': 'Oefening {current}/{total}',
   'step.check': 'Controleren',

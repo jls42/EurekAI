@@ -416,6 +416,8 @@ export const hi: Record<string, string> = {
   'fillBlank.restart':
     '\u0936\u0941\u0930\u0942 \u0938\u0947 \u0936\u0941\u0930\u0942 \u0915\u0930\u0947\u0902',
   'fillBlank.correctAnswer': '\u0909\u0924\u094D\u0924\u0930: {answer}',
+  'fillBlank.spellingAlert':
+    '\u0935\u0930\u094D\u0924\u0928\u0940 \u0915\u093E \u0927\u094D\u092F\u093E\u0928 \u0926\u0947\u0902: \u0938\u0939\u0940 \u0935\u0930\u094D\u0924\u0928\u0940 \u00AB {answer} \u00BB \u0939\u0948\u0964',
 
   'step.questionOf': '\u0905\u092D\u094D\u092F\u093E\u0938 {current}/{total}',
   'step.check': '\u091C\u093E\u0901\u091A\u0947\u0902',

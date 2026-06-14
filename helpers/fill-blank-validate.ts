@@ -54,3 +54,26 @@ export function validateFillBlankAnswer(
 
   return { match: distance <= threshold, distance };
 }
+
+// Comparaison qui CONSERVE les accents (contrairement a normalizeAnswer qui les
+// supprime), mais ignore casse + article. NFC canonise les deux operandes : sans
+// lui, "é" precompose (U+00E9) et "e"+accent combinant (U+0065 U+0301) comparent
+// faux alors qu'ils sont visuellement identiques.
+function normalizeKeepingAccents(text: string): string {
+  return stripArticles(
+    text
+      .toLowerCase()
+      .normalize('NFC')
+      .trim()
+      .replaceAll(/\s+/g, ' ')
+      // eslint-disable-next-line sonarjs/slow-regex -- bounded char-class, anchored, no backtracking risk (voir NOSONAR S5852)
+      .replaceAll(/^[.,;:!?'"()-]+|[.,;:!?'"()-]+$/g, ''),
+  );
+}
+
+// Vrai quand la saisie correspond a l'orthographe canonique (accents inclus),
+// en ignorant casse et article. Utilise pour decider s'il faut alerter l'enfant
+// sur une faute d'orthographe alors meme que sa reponse est acceptee comme juste.
+export function isExactSpelling(childAnswer: string, correctAnswer: string): boolean {
+  return normalizeKeepingAccents(childAnswer) === normalizeKeepingAccents(correctAnswer);
+}

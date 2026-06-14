@@ -341,6 +341,7 @@ export const fr: Record<string, string> = {
   'fillBlank.retryWrong': 'Corriger mes erreurs',
   'fillBlank.restart': 'Recommencer',
   'fillBlank.correctAnswer': 'Réponse : {answer}',
+  'fillBlank.spellingAlert': "Attention à l'orthographe : on écrit « {answer} ».",
 
   // Step-by-step (shared)
   'step.questionOf': 'Exercice {current}/{total}',

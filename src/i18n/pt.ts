@@ -323,6 +323,7 @@ export const pt: Record<string, string> = {
   'fillBlank.retryWrong': 'Corrigir meus erros',
   'fillBlank.restart': 'Recome\u00e7ar',
   'fillBlank.correctAnswer': 'Resposta: {answer}',
+  'fillBlank.spellingAlert': 'Atenção à ortografia: escreve-se « {answer} ».',
 
   'step.questionOf': 'Exerc\u00edcio {current}/{total}',
   'step.check': 'Verificar',

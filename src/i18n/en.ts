@@ -320,6 +320,7 @@ export const en: Record<string, string> = {
   'fillBlank.retryWrong': 'Fix my mistakes',
   'fillBlank.restart': 'Start over',
   'fillBlank.correctAnswer': 'Answer: {answer}',
+  'fillBlank.spellingAlert': 'Mind your spelling: it should be « {answer} ».',
 
   // Step-by-step (shared)
   'step.questionOf': 'Exercise {current}/{total}',

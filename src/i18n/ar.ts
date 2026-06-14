@@ -408,6 +408,8 @@ export const ar: Record<string, string> = {
   'fillBlank.retryWrong': '\u062a\u0635\u062d\u064a\u062d \u0623\u062e\u0637\u0627\u0626\u064a',
   'fillBlank.restart': '\u0627\u0644\u0628\u062f\u0621 \u0645\u0646 \u062c\u062f\u064a\u062f',
   'fillBlank.correctAnswer': '\u0627\u0644\u0625\u062c\u0627\u0628\u0629: {answer}',
+  'fillBlank.spellingAlert':
+    '\u0627\u0646\u062a\u0628\u0647 \u0625\u0644\u0649 \u0627\u0644\u0625\u0645\u0644\u0627\u0621: \u062a\u064f\u0643\u062a\u0628 \u00ab {answer} \u00bb.',
 
   'step.questionOf': '\u0627\u0644\u062a\u0645\u0631\u064a\u0646 {current}/{total}',
   'step.check': '\u062a\u062d\u0642\u0651\u0642',
