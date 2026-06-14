@@ -50,6 +50,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@fontsource/manrope": "^5.2.8",
+    "@fontsource/sora": "^5.2.8",
     "@google/genai": "^1.47.0",
     "@tailwindcss/vite": "^4.2.1",
     "@types/express": "^5.0.0",
