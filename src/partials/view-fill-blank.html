@@ -109,6 +109,7 @@
                               type="text"
                               x-ref="blankInput"
                               x-model="answer"
+                              :aria-label="t('a11y.fillBlankAnswer')"
                               :disabled="!!feedback"
                               @keydown="handleKey($event)"
                               x-effect="if (!feedback) $nextTick(() => $refs.blankInput?.focus())"

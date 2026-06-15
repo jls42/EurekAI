@@ -37,6 +37,8 @@ export const es: Record<string, string> = {
   'gen.websearch': 'B\u00fasqueda web',
   'a11y.viewCategory': 'Ver {category}',
   'a11y.generateCategory': 'Generar {category}',
+  'a11y.fillBlankAnswer': 'Respuesta para completar',
+  'a11y.selectSource': 'Seleccionar esta fuente',
   'gen.questionCount': 'Cantidad:',
   'gen.needsTts': 'Requiere MISTRAL_API_KEY para habilitar TTS Voxtral',
   'gen.contextTooLarge':
