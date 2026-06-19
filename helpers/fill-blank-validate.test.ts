@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeAnswer, validateFillBlankAnswer } from './fill-blank-validate.js';
+import {
+  normalizeAnswer,
+  validateFillBlankAnswer,
+  isExactSpelling,
+} from './fill-blank-validate.js';
 
 describe('normalizeAnswer', () => {
   it('met en minuscules', () => {
@@ -114,5 +118,35 @@ describe('validateFillBlankAnswer', () => {
   it('reponse completement differente = no match', () => {
     const result = validateFillBlankAnswer('Londres', 'Paris');
     expect(result.match).toBe(false);
+  });
+});
+
+describe('isExactSpelling', () => {
+  it('orthographe identique = exact', () => {
+    expect(isExactSpelling('électricité', 'électricité')).toBe(true);
+  });
+
+  it('difference de casse seule = exact (casse ignoree)', () => {
+    expect(isExactSpelling('paris', 'Paris')).toBe(true);
+  });
+
+  it('article manquant seul = exact (article ignore)', () => {
+    expect(isExactSpelling('alternateur', 'un alternateur')).toBe(true);
+  });
+
+  it('formes Unicode NFD/NFC equivalentes = exact', () => {
+    // Memes lettres mais formes Unicode differentes : la normalisation NFC interne
+    // doit les faire converger (sinon fausse alerte sur un mot pourtant identique).
+    const nfc = 'électricité'.normalize('NFC');
+    const nfd = 'électricité'.normalize('NFD');
+    expect(isExactSpelling(nfd, nfc)).toBe(true);
+  });
+
+  it('accents manquants = PAS exact (a signaler)', () => {
+    expect(isExactSpelling('electricite', 'électricité')).toBe(false);
+  });
+
+  it('faute de frappe = PAS exact (a signaler)', () => {
+    expect(isExactSpelling('Pari', 'Paris')).toBe(false);
   });
 });

@@ -35,6 +35,10 @@ export const es: Record<string, string> = {
   'gen.all': 'Generar todo',
   'gen.voice': 'Leer en voz alta',
   'gen.websearch': 'B\u00fasqueda web',
+  'a11y.viewCategory': 'Ver {category}',
+  'a11y.generateCategory': 'Generar {category}',
+  'a11y.fillBlankAnswer': 'Respuesta para completar',
+  'a11y.selectSource': 'Seleccionar esta fuente',
   'gen.questionCount': 'Cantidad:',
   'gen.needsTts': 'Requiere MISTRAL_API_KEY para habilitar TTS Voxtral',
   'gen.contextTooLarge':
@@ -317,6 +321,7 @@ export const es: Record<string, string> = {
   'fillBlank.retryWrong': 'Corregir mis errores',
   'fillBlank.restart': 'Empezar de nuevo',
   'fillBlank.correctAnswer': 'Respuesta: {answer}',
+  'fillBlank.spellingAlert': 'Cuidado con la ortografía: se escribe « {answer} ».',
 
   'step.questionOf': 'Ejercicio {current}/{total}',
   'step.check': 'Verificar',

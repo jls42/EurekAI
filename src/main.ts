@@ -1,5 +1,15 @@
 import Alpine from 'alpinejs';
 import { createIcons, icons } from 'lucide';
+// Polices auto-hebergees (Manrope/Sora) via @fontsource : aucune requete tierce,
+// fonctionne hors-ligne, aucune exception CSP (servies depuis 'self' apres build Vite).
+import '@fontsource/manrope/400.css';
+import '@fontsource/manrope/500.css';
+import '@fontsource/manrope/600.css';
+import '@fontsource/manrope/700.css';
+import '@fontsource/manrope/800.css';
+import '@fontsource/sora/600.css';
+import '@fontsource/sora/700.css';
+import '@fontsource/sora/800.css';
 import './styles/main.css';
 import { registerLocale } from './i18n/index';
 import { fr } from './i18n/fr';

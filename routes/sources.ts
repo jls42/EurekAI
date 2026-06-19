@@ -436,6 +436,27 @@ export function sourceRoutes(
     }
   });
 
+  // Discrimine les erreurs SSRF des erreurs reseau/parse pour decider du fallback LLM.
+  // Sans ce check, une URL bloquee par assertSafeFetchUrl (IP privee, loopback,
+  // metadata cloud, RFC 2544, IPv4-mapped IPv6 hex) etait fallback sur webSearchEnrich
+  // qui passe l'URL au LLM Mistral -> consommation quota + DoS amplification possible.
+  // Les messages d'erreur viennent de assertSafeFetchUrl dans helpers/index.ts.
+  const SSRF_ERROR_MARKERS = [
+    'URL invalide',
+    'Protocole non autorise',
+    'Hostname interdit',
+    'IP privee interdite',
+    'Resolution DNS impossible',
+    'Hostname resout vers IP privee',
+    'URL sans hostname',
+    'Host format invalide',
+    'Redirect refuse',
+  ];
+  const isSsrfError = (err: unknown): boolean => {
+    if (!(err instanceof Error)) return false;
+    return SSRF_ERROR_MARKERS.some((marker) => err.message.includes(marker));
+  };
+
   async function scrapeUrl(
     url: string,
     scrapeMode: string,
@@ -473,6 +494,14 @@ export function sourceRoutes(
       // pour les URLs mortes saisies par un enfant, elles doivent fallback sur la web search.
       if (scrapeError instanceof SyntaxError) {
         logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
+        throw scrapeError;
+      }
+      // SSRF guard : pas de fallback LLM sur URL bloquee (cf. isSsrfError ci-dessus).
+      if (isSsrfError(scrapeError)) {
+        logger.warn(
+          'sources',
+          `URL rejected (SSRF guard): "${url}" — ${(scrapeError as Error).message}`,
+        );
         throw scrapeError;
       }
       logger.warn(

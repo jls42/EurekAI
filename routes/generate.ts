@@ -166,15 +166,56 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
+const VALID_AGE_GROUPS: ReadonlySet<AgeGroup> = new Set(['enfant', 'ado', 'etudiant', 'adulte']);
+
+// Predicates individuels (arrow) — evitent le piege Lizard d'agglomeration des
+// `function foo()` top-level consecutives, et gardent chaque check sous CCN 8.
+const isNonEmptyString = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
+const isOptionalNonEmptyString = (v: unknown): boolean => v === undefined || isNonEmptyString(v);
+const isOptionalAgeGroup = (v: unknown): boolean =>
+  v === undefined || VALID_AGE_GROUPS.has(v as AgeGroup);
+const isOptionalNullableString = (v: unknown): boolean =>
+  v === undefined || v === null || typeof v === 'string';
+const isOptionalBoolean = (v: unknown): boolean => v === undefined || typeof v === 'boolean';
+const isOptionalStringArray = (v: unknown): boolean =>
+  v === undefined || (Array.isArray(v) && v.every((s) => typeof s === 'string'));
+const isOptionalFiniteNumberish = (v: unknown): boolean =>
+  v === undefined || v === null || Number.isFinite(Number(v));
+
+type ValidateResult = { ok: true } | { ok: false; error: string };
+
+const INVALID: ValidateResult = { ok: false, error: 'invalid_input' };
+const OK: ValidateResult = { ok: true };
+
+// Validation primitive des inputs de /generate/*. Sans ce check, un payload
+// avec types incorrects (lang: 12345, ageGroup: [], profileId: null) etait
+// silencieusement accepte et fallback sur les defaults — consommation Mistral
+// sans validation, et impossible de distinguer un bug client d'une vraie demande.
+// Appele EN AMONT de buildGenContext / addPendingEntry pour rejet 400 propre
+// (cf. CLAUDE.md "Validations early extraites des generators").
+const allChecksPass = (b: Record<string, unknown>): boolean =>
+  isOptionalNonEmptyString(b.lang) &&
+  isOptionalAgeGroup(b.ageGroup) &&
+  isOptionalNullableString(b.profileId) &&
+  isOptionalBoolean(b.useConsigne) &&
+  isOptionalStringArray(b.sourceIds) &&
+  isOptionalFiniteNumberish(b.count) &&
+  (b.gid === undefined || typeof b.gid === 'string');
+
+const validateGenRequestBody = (body: unknown): ValidateResult => {
+  if (!body || typeof body !== 'object') return INVALID;
+  return allChecksPass(body as Record<string, unknown>) ? OK : INVALID;
+};
+
 const AUTO_EXECUTABLE = AUTO_AGENTS_SET;
 
 // Narrow `agent: string` vers `AutoAgentType` côté executable après le check runtime
 // sur AUTO_EXECUTABLE.has — permet à FailedStep.agent de rester typé sans cast ailleurs.
 type WithAgent<T, A> = Omit<T, 'agent'> & { agent: A };
 
-function splitByAutoExecutable<T extends { agent: string }>(
+const splitByAutoExecutable = <T extends { agent: string }>(
   plan: T[],
-): { executable: Array<WithAgent<T, AutoAgentType>>; skipped: T[] } {
+): { executable: Array<WithAgent<T, AutoAgentType>>; skipped: T[] } => {
   const executable: Array<WithAgent<T, AutoAgentType>> = [];
   const skipped: T[] = [];
   for (const step of plan) {
@@ -185,7 +226,7 @@ function splitByAutoExecutable<T extends { agent: string }>(
     }
   }
   return { executable, skipped };
-}
+};
 
 function buildGenContext(
   store: ProjectStore,
@@ -197,6 +238,9 @@ function buildGenContext(
 ):
   | { ok: true; ctx: Omit<GenContext, 'req' | 'res'> }
   | { ok: false; error: string; status: number } {
+  const validation = validateGenRequestBody(body);
+  if (!validation.ok) return { ok: false, error: validation.error, status: 400 };
+
   const project = store.getProject(pid);
   if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
 

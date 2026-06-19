@@ -5,9 +5,12 @@ vi.mock('./fill-blank-validate', () => ({
   validateAnswer: vi.fn((userAnswer: string, correctAnswer: string) => {
     return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
   }),
+  isExactSpelling: vi.fn((userAnswer: string, correctAnswer: string) => {
+    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+  }),
 }));
 
-import { validateAnswer } from './fill-blank-validate';
+import { validateAnswer, isExactSpelling } from './fill-blank-validate';
 
 function createFillBlank(exercises: any[]) {
   const gen = {
@@ -101,7 +104,7 @@ describe('fillBlankComponent', () => {
       expect(comp.score).toBe(1);
       expect(comp.results[0]).toBe(true);
       expect(comp.answers[0]).toBe('ciel');
-      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel' });
+      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel', misspelled: false });
     });
 
     it('mauvaise reponse ne incremente pas le score', () => {
@@ -111,7 +114,7 @@ describe('fillBlankComponent', () => {
       expect(comp.score).toBe(0);
       expect(comp.results[0]).toBe(false);
       expect(comp.answers[0]).toBe('mer');
-      expect(comp.feedback).toEqual({ correct: false, correctAnswer: 'ciel' });
+      expect(comp.feedback).toEqual({ correct: false, correctAnswer: 'ciel', misspelled: false });
     });
 
     it('appelle validateAnswer avec la bonne reponse', () => {
@@ -128,6 +131,17 @@ describe('fillBlankComponent', () => {
       comp.checkAnswer();
       expect(comp.answers[2]).toBe('soleil');
       expect(comp.results[2]).toBe(true);
+    });
+
+    it('correct mais mal orthographie => feedback.misspelled true', () => {
+      const comp = createFillBlank(sampleExercises);
+      vi.mocked(validateAnswer).mockReturnValueOnce(true);
+      vi.mocked(isExactSpelling).mockReturnValueOnce(false);
+      comp.answer = 'siel';
+      comp.checkAnswer();
+      expect(comp.results[0]).toBe(true);
+      expect(comp.score).toBe(1);
+      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel', misspelled: true });
     });
   });
 
@@ -318,7 +332,7 @@ describe('fillBlankComponent', () => {
       comp.results[0] = true;
       comp.restoreState();
       expect(comp.answer).toBe('ciel');
-      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel' });
+      expect(comp.feedback).toEqual({ correct: true, correctAnswer: 'ciel', misspelled: false });
       expect(comp.showHint).toBe(false);
     });
 

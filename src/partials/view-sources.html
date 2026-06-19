@@ -43,6 +43,7 @@
           @click="generate(cat.key)"
           :disabled="isLoading(cat.key) || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
           :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
+          :aria-label="t('a11y.generateCategory', { category: t('gen.' + cat.key) })"
           class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
           :style="'color:' + cat.color"
         >
@@ -144,6 +145,7 @@
         class="w-full input-modern p-3 text-body-sm resize-none"
         rows="4"
         :placeholder="t('sources.textPlaceholder')"
+        :aria-label="t('sources.textPlaceholder')"
       ></textarea>
       <div class="flex justify-end gap-2 mt-2">
         <button
@@ -170,6 +172,7 @@
           @keydown.enter="searchWeb()"
           class="flex-1 input-modern px-3 py-2 text-body-sm"
           :placeholder="t('sources.webPlaceholder')"
+          :aria-label="t('sources.webPlaceholder')"
         />
         <button
           @click="searchWeb()"
@@ -387,6 +390,7 @@
           type="checkbox"
           :value="src.id"
           x-model="selectedIds"
+          :aria-label="t('a11y.selectSource')"
           class="w-5 h-5 rounded text-primary focus-ring shrink-0"
         />
         <i :data-lucide="sourceTypeIcon(src)" class="w-5 h-5 text-text-secondary shrink-0"></i>

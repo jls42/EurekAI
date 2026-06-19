@@ -143,9 +143,25 @@ function writeNotifs(storage: StorageLike, all: NotifMap): boolean {
   return writeJson(storage, NOTIFS_STORAGE_SLOT, Object.fromEntries(all));
 }
 
+// Dedup defense en profondeur : un onglet B peut avoir append une notif
+// (writeNotifs cross-tab) entre le `hasSeenEvent` et le `readNotifs` de
+// l'onglet A. Le ledger seenEventKeys empeche le 2e push dans le MEME onglet,
+// mais pas la race write-write entre 2 onglets sur localStorage. Filtre les
+// doublons par eventKey en gardant le 1er occurrence (ordre chronologique
+// preserve, plus ancien gagne pour stabilite UI).
+const dedupByEventKey = (items: PersistedNotification[]): PersistedNotification[] => {
+  const seen = new Set<string>();
+  return items.filter((n) => {
+    if (seen.has(n.eventKey)) return false;
+    seen.add(n.eventKey);
+    return true;
+  });
+};
+
 function pruneExpiredAndCap(items: PersistedNotification[]): PersistedNotification[] {
   const cutoff = Date.now() - TTL_MS;
-  return items.filter((n) => Date.parse(n.createdAt) > cutoff).slice(-MAX_PER_PROFILE);
+  const filtered = items.filter((n) => Date.parse(n.createdAt) > cutoff);
+  return dedupByEventKey(filtered).slice(-MAX_PER_PROFILE);
 }
 
 // --- Ledger seenEventKeys ---
@@ -194,6 +210,11 @@ export function appendNotification(
   if (hasSeenEvent(profileId, notif.eventKey, storage)) return false;
   const all = readNotifs(storage);
   const list = all.get(profileId) ?? [];
+  // Re-check sur la list elle-meme : un onglet B peut avoir push une notif avec
+  // ce eventKey entre notre `hasSeenEvent` et ce `readNotifs` (race cross-tab
+  // sur localStorage). pruneExpiredAndCap dedupe en aval mais ce re-check evite
+  // le push inutile + l'incoherence ephemere de la liste retournee.
+  if (list.some((n) => n.eventKey === notif.eventKey)) return false;
   list.push({ ...notif, createdAt: new Date().toISOString(), read: false });
   all.set(profileId, pruneExpiredAndCap(list));
   if (!writeNotifs(storage, all)) return false;

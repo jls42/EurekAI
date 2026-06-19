@@ -1,1 +1,1 @@
-export { validateAnswer } from '@helpers/fill-blank-validate';
+export { validateAnswer, isExactSpelling } from '@helpers/fill-blank-validate';

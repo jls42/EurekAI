@@ -201,6 +201,10 @@ const onFinish = function () {
 
 const resetVocalQuiz = function (this: QuizVocalContext) {
   this.stopQuestion();
+  // resetAll() ne connaît que les champs du mixin step-by-step : il faut vider
+  // storedFeedback explicitement, sinon isCurrentAnswered() reste true au 2e tour
+  // et le bouton micro (x-if="!feedback && !isCurrentAnswered()") ne réapparaît pas.
+  this.storedFeedback = {};
   this.resetAll();
   this.$nextTick(() => this.playQuestion());
 };

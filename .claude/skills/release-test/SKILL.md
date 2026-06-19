@@ -1,0 +1,220 @@
+---
+name: release-test
+description: Suite de tests E2E pre-release pour EurekAI. Lance le dev server si necessaire, joue le golden path via Chrome (tous les generateurs depuis des sources reelles), audit securite (SSRF, rate-limit, validation, headers, JSON malformed), et compile un rapport de findings. A utiliser avant chaque release/merge sur main, ou quand l'user demande "lance les tests de release", "verifie avant release", "/release-test".
+allowed-tools: Bash, Read, Grep, Glob
+---
+
+# Release Test Suite — EurekAI
+
+Pre-release validation : golden path E2E + audit securite. Generique par construction (lit `categories[]` dynamique cote app, decouvre projet/profil via API, pas de coords HTML hardcodees) — robuste aux refactors UI et ajouts de generateurs.
+
+## Pre-requis utilisateur (a annoncer au debut)
+
+Le skill **ne reset pas les donnees** automatiquement (preservation des sources de l'user). Demander une fois au debut :
+
+> "Je vais lancer les tests E2E + securite. Tu veux que je :
+>   (a) **tester sur l'etat actuel** (sources existantes, profil actuel) — le plus rapide, mais skip les checks d'import
+>   (b) attendre que tu **resets** (`sudo rm -rf output/*`) et importes des sources fraiches — couverture complete
+>
+> Je peux aussi reproduire automatiquement les conditions de test : profil enfant FR + au moins 1 source. Dis-moi."
+
+## Phase 0 — Boot
+
+1. Verifier si `npm run dev` tourne :
+   ```bash
+   curl -s --max-time 2 http://localhost:3000/api/config/status >/dev/null && echo "up" || echo "down"
+   ```
+2. Si down : `npm run dev` en background via `Bash` avec `run_in_background: true`. Attendre que le boot log contienne `API Mistral: OK`.
+3. Verifier que le frontend Vite repond sur `http://localhost:5173/`.
+4. Charger les outils Chrome via `ToolSearch` :
+   ```
+   select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__browser_batch,mcp__claude-in-chrome__find,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_network_requests,mcp__claude-in-chrome__read_console_messages
+   ```
+
+## Phase 1 — Decouverte de l'etat
+
+Decouvrir projet et profil **dynamiquement** (jamais hardcoder un UUID) :
+
+```bash
+PROJECT_ID=$(curl -s http://localhost:3000/api/projects | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["id"] if d else "")')
+PROFILE_ID=$(curl -s http://localhost:3000/api/profiles | python3 -c 'import json,sys; d=json.load(sys.stdin); print(d[0]["id"] if d else "")')
+SOURCES_COUNT=$(curl -s http://localhost:3000/api/projects/$PROJECT_ID 2>/dev/null | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len(d.get("sources",[])))')
+```
+
+Si `PROJECT_ID` vide ou `SOURCES_COUNT < 1` : **stopper et demander a l'user** de creer un projet + importer au moins 1 source via l'UI Chrome (ou lui proposer de le faire via Chrome). Ne JAMAIS appeler les generateurs sans source : ils echoueront en `no_sources` et fausseront le rapport.
+
+## Phase 2 — Golden path E2E (Chrome)
+
+L'objectif est de couvrir **tous les generateurs declares dynamiquement** dans `state.ts:categories[]` (source unique de verite). Ne jamais hardcoder la liste.
+
+### Lire la liste reelle des generateurs
+
+```javascript
+// Via mcp__claude-in-chrome__javascript_tool sur l'onglet ouvert :
+Array.from(document.querySelectorAll('button[aria-label^="Générer"]'))
+  .filter(b => b.offsetParent !== null && b.getBoundingClientRect().width > 0)
+  .map(b => ({
+    label: b.getAttribute('aria-label'),
+    disabled: b.disabled,
+    x: Math.round(b.getBoundingClientRect().x),
+    y: Math.round(b.getBoundingClientRect().y),
+  }))
+```
+
+Les boutons de generation portent l'`aria-label` `"Générer des X"` **avec accent aigu** (i18n FR — verifie dans `src/i18n/fr.ts` cle `actions.generate`). Les locales autres mettent autre chose (`"Generate X"` en EN). Pour rester robuste cross-langue, soit (a) forcer la langue FR via `localStorage.setItem('sf-locale', 'fr')` + reload avant le scan, soit (b) selectionner par autre voie (par exemple `button[aria-label*="ner"]` + verification du texte du bouton). Les boutons de navigation portent `"Voir les X"`.
+
+**Note importante** : ces chips ne sont visibles que sur la vue **Sources** (rangee de boutons par-source) — pas sur le **Tableau de bord** (qui n'a que le CTA `Auto — Magie !`). Pour lancer une generation typee depuis le tableau de bord, soit naviguer vers la vue catégorie (`+ Nouvelle fiche` etc.), soit aller sur la vue Sources d'abord.
+
+### Pour chaque generateur
+
+Pour chaque bouton visible avec aria-label commencant par `"Générer"` :
+1. Cliquer dessus (`computer.left_click` aux coords retournees par `find` ou la query JS).
+2. Surveiller le reseau : un `POST /api/projects/<pid>/generate/<type>` doit partir en `pending`.
+3. Attendre la complétion (poll `read_network_requests` jusqu'a status 200 ou >30s timeout).
+4. Naviguer vers la vue dediee (`Voir les X`) et capturer un screenshot pour valider le rendu.
+5. Pour les generateurs audio (podcast, quiz-vocal) : verifier la presence d'un element `<audio>` avec `duration > 0`.
+6. Pour `image` : verifier qu'une `<img>` charge un blob (pas d'erreur 404).
+7. Pour les exercices (quiz, fill-blank, flashcards) : cliquer une reponse / retourner une carte et verifier que le feedback s'affiche (Score change, message "Correct"/"Incorrect" visible).
+
+### Test du router auto
+
+Cliquer le bouton **"Auto"** (gradient bleu/violet, texte contient "magique" ou equivalent — chercher par texte: `find` "bouton genere tous les contenus / Auto / magique"). Attendre la complétion :
+- `POST /generate/route` retourne 200 (router LLM)
+- N appels `/generate/<agent>` parallels (typiquement tous les agents AUTO_AGENTS_SET)
+- Verifier via API serveur que `pendingTracker.length === 0` et que `generations.length` a augmente du nombre d'agents lances.
+
+### Test cancel
+
+1. Cliquer un generateur lent (podcast ou quiz-vocal).
+2. Pendant le pending (badge visible en haut), cliquer le ✕ du badge.
+3. Verifier :
+   - `POST /generations/<gid>/cancel` retourne 200
+   - Un toast de confirmation apparait (texte i18n "annule(e)" / "cancelled")
+   - Cote API : entry dans `pendingTracker` avec `status: 'cancelled', failureCode: 'cancelled'`
+   - **Aucune** nouvelle generation creee dans `generations[]` apres le cancel (verif post-30s pour laisser Mistral repondre dans le vide)
+
+### Test SSE cross-tab (optionnel, si chrome supporte plusieurs onglets)
+
+1. Ouvrir un 2e onglet sur `http://localhost:5173/` (`tabs_create_mcp` + `navigate`).
+2. Lancer une generation rapide depuis l'onglet 1 (ex: flashcards count=5).
+3. Verifier dans l'onglet 2 :
+   - Le compteur cloche notifications s'incremente
+   - La nouvelle generation apparait dans le dashboard sans refresh manuel
+4. Inspecter le ledger via JS :
+   ```javascript
+   const notifs = JSON.parse(localStorage.getItem('sf-profile-notifications') || '{}');
+   const seen = JSON.parse(localStorage.getItem('sf-profile-seen-events') || '{}');
+   Object.entries(notifs).map(([pid, list]) => ({
+     pid: pid.slice(0,8),
+     notifsCount: list.length,
+     seenKeysCount: (seen[pid] || []).length,
+     ratio: list.length / Math.max(1, (seen[pid] || []).length)
+   }))
+   ```
+   `notifsCount` doit etre `<=` `seenKeysCount` (egal ideal). Un ratio > 1 = bug dedup.
+
+### Cas a verifier sur les ages restraints
+
+Le bouton "Chat" est desactive pour les profils enfant (`Chat desactive pour ce profil` tooltip). Verifier que :
+- Le bouton est `disabled` (attribut HTML)
+- Le clic ne declenche pas de POST `/chat`
+- Le tooltip s'affiche au hover
+
+## Phase 3 — Audit securite
+
+Lancer le script securite dedie :
+
+```bash
+PROJECT_ID=$PROJECT_ID PROFILE_ID=$PROFILE_ID bash ${CLAUDE_PLUGIN_ROOT:-$(dirname $0)/..}/scripts/security-tests.sh
+```
+
+Note : si `CLAUDE_PLUGIN_ROOT` n'est pas defini (skill en project mode), fallback sur `.claude/skills/release-test/scripts/security-tests.sh` depuis la racine du repo.
+
+Le script teste (cf. son entete) :
+- **JSON malformed** : `POST` avec body invalide → doit retourner `{"error":"invalid_json"}` 400 (pas de stack trace, pas de path serveur dans la reponse)
+- **Helmet headers** : `curl -I /api/projects` → doit contenir `X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`
+- **Validation types** : `POST /generate/summary` avec `{lang:12345, ageGroup:[], profileId:null}` → doit retourner `{"error":"invalid_input"}` 400 sans creer de generation
+- **SSRF** : `POST /sources/websearch` avec URL `127.0.0.1`, `169.254.169.254`, `[::ffff:7f00:0001]`, `198.18.0.1` → doit retourner `failures[]` SANS creer de source ni appeler Mistral (verif cote `costLog`)
+- **Rate-limit general** : burst 350 GET `/api/projects` → doit voir des 429 apparaitre au-dela de 300/min
+- **Rate-limit AI** : burst 70 POST `/generate/route` → doit voir des 429 apparaitre au-dela de 60/min
+- **Pas de fuite secrets** : grep des reponses d'erreur pour `MISTRAL_API_KEY|sk-|api_key|password|/mnt/|/home/` → doit etre vide
+
+Lire la sortie du script. Tout `[FAIL]` est un finding bloquant. Tout `[WARN]` est a discuter.
+
+## Phase 4 — Verification cost tracking
+
+Le tracking de cout est une exigence stricte (cf. CLAUDE.md). Apres les generations de la phase 2, verifier :
+
+```bash
+curl -s http://localhost:3000/api/projects/$PROJECT_ID | python3 -c '
+import json,sys
+d = json.load(sys.stdin)
+gens = d.get("results", {}).get("generations", [])
+total = d.get("totalCost", 0)
+missing = [g.get("type") for g in gens if isinstance(g, dict) and not g.get("estimatedCost")]
+breakdowns_missing = [g.get("type") for g in gens if isinstance(g, dict) and not g.get("costBreakdown")]
+print(f"totalCost={total:.4f}, gens={len(gens)}, missing_cost={missing}, missing_breakdown={breakdowns_missing}")
+'
+```
+
+Tout `missing_cost` ou `missing_breakdown` non vide = bug du wrapping `tracked-client` (un appel Mistral a echappe au tracking).
+
+## Phase 5 — Rapport final
+
+Compiler dans la reponse a l'user :
+
+```
+## Release Test Report — <timestamp>
+
+### Golden path E2E
+| Generateur | Status | Cout | Notes |
+|------------|--------|------|-------|
+| summary    | ✓/✗    | $0.X | ...   |
+...
+
+### Securite (output script)
+- JSON malformed : ✓/✗
+- Helmet headers : ✓/✗
+- Validation types : ✓/✗
+- SSRF (4 vecteurs) : ✓/✗
+- Rate-limit general : ✓/✗
+- Rate-limit AI : ✓/✗
+- Fuite secrets : ✓/✗
+
+### Cost tracking
+- totalCost session : $X.XXXX
+- Generations sans estimatedCost : N
+- Generations sans costBreakdown : N
+
+### Findings (par severite)
+- 🔴 HIGH : ...
+- 🟡 MEDIUM : ...
+- ⚪ LOW : ...
+
+### Cout total Mistral consomme : $X.XX
+```
+
+Si aucun finding HIGH/MEDIUM : **GO release**. Sinon : lister les fix recommandes (sans les appliquer — laisser l'user decider).
+
+## Conventions de robustesse
+
+Pour que ce skill reste valable dans le temps :
+
+1. **Jamais de UUID hardcode** — toujours decouvrir via `/api/projects` et `/api/profiles`.
+2. **Jamais de coordonnees Chrome hardcodees** — utiliser `find` natural language, ou query JS sur les `aria-label` (qui sont stables car i18n-aware).
+3. **Lire les listes dynamiques** (`categories[]`, `AUTO_AGENTS_SET`) depuis le code/DOM, jamais redupliquer ici. Ce skill **ne doit pas connaitre la liste exhaustive des generateurs** — il l'observe.
+4. **Tests securite : noms des cles d'erreur stables** (`invalid_json`, `invalid_input`, `upstream_unavailable`, `internal_error`) — cf. `types.ts:FailedStepCode`. Si ces codes changent, mettre a jour ce skill ET `helpers/error-code-resolution.ts`.
+5. **Budgets de timeout** : podcast/quiz-vocal peuvent prendre 60-90s. Ne pas timeout < 120s.
+6. **Cost-conscious** : tester 1× chaque generateur par run (pas en boucle). Le script securite ne fait QUE des requetes qui doivent etre rejetees en amont (pas d'appel Mistral). Budget run complet ≈ $0.15-0.25.
+7. **Pas de destructive** : ne JAMAIS faire `rm -rf output/`, `DELETE /api/projects/*`, ou modifier `config.json` sans confirmation explicite. Seul le mode "reset" requiert l'action de l'user (commande affichee, mais executee par lui).
+
+## En cas d'evolution du projet
+
+Quand l'app change et que le skill commence a echouer :
+
+- **Nouveau generateur ajoute** : le skill le decouvrira automatiquement via `categories[]`. Verifier juste qu'il a un bouton avec `aria-label="Générer ..."` (FR avec accent — voir cle i18n `actions.generate`).
+- **Refactor des endpoints** : si `/generate/auto/route` devient `/generate/orchestrate` par exemple, mettre a jour la phase 3.
+- **Nouveau code d'erreur** : ajouter dans `security-tests.sh` la regex d'assertion correspondante.
+- **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
+
+Ouvrir une PR `chore(release-test): update for <changement>` quand cette maintenance est faite.

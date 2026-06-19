@@ -109,6 +109,7 @@
                               type="text"
                               x-ref="blankInput"
                               x-model="answer"
+                              :aria-label="t('a11y.fillBlankAnswer')"
                               :disabled="!!feedback"
                               @keydown="handleKey($event)"
                               x-effect="if (!feedback) $nextTick(() => $refs.blankInput?.focus())"
@@ -180,6 +181,13 @@
                       class="text-body-sm mt-1 text-danger-dark"
                       x-text="t('fillBlank.correctAnswer', { answer: feedback?.correctAnswer || '' })"
                     ></p>
+                    <p
+                      x-show="feedback && feedback.correct && feedback.misspelled"
+                      class="text-body-sm mt-1 text-warning-dark"
+                      x-text="t('fillBlank.spellingAlert', { answer: feedback?.correctAnswer || '' })"
+                    >
+                      Attention à l'orthographe
+                    </p>
                     <!-- Source refs for this exercise -->
                     <div
                       x-show="questionSources(gen, currentExercise()).length > 0"

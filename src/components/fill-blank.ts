@@ -1,9 +1,9 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
-import { validateAnswer } from './fill-blank-validate';
+import { validateAnswer, isExactSpelling } from './fill-blank-validate';
 import type { AppContext } from '../app/app-context';
 import type { FillBlankGeneration, FillBlankItem, FillBlankStats, Generation } from '../../types';
 
-type FillBlankFeedback = { correct: boolean; correctAnswer?: string };
+type FillBlankFeedback = { correct: boolean; correctAnswer?: string; misspelled: boolean };
 
 interface FillBlankContext extends Omit<StepByStepBase<FillBlankItem>, 'feedback'>, AppContext {
   answer: string;
@@ -44,10 +44,11 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       const ex = this.currentExercise();
       if (idx === undefined || !ex) return;
       const correct = validateAnswer(this.answer, ex.answer);
+      const misspelled = correct && !isExactSpelling(this.answer, ex.answer);
       this.answers[idx] = this.answer;
       this.results[idx] = correct;
       if (correct) this.score++;
-      this.feedback = { correct, correctAnswer: ex.answer };
+      this.feedback = { correct, correctAnswer: ex.answer, misspelled };
     },
 
     onNextReady(this: FillBlankContext) {
@@ -64,7 +65,9 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       if (idx !== undefined && idx in this.answers) {
         this.answer = this.answers[idx];
         const ex = this.items()[idx];
-        this.feedback = { correct: this.results[idx], correctAnswer: ex?.answer };
+        const correct = this.results[idx];
+        const misspelled = correct && !isExactSpelling(this.answers[idx], ex?.answer ?? '');
+        this.feedback = { correct, correctAnswer: ex?.answer, misspelled };
       } else {
         this.answer = '';
         this.feedback = null;

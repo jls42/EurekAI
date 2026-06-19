@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { quizVocalComponent } from './quiz-vocal';
+import type { QuizVocalGeneration } from '../../types';
 
 // Mock document.documentElement.lang used in submitVocalAnswer
 (globalThis as any).document = {
@@ -9,8 +10,12 @@ import { quizVocalComponent } from './quiz-vocal';
 globalThis.fetch = vi.fn();
 
 function createVocalQuiz(questions: any[], audioUrls: string[] = []) {
-  const gen = {
+  const gen: QuizVocalGeneration = {
     id: 'gen-vocal-1',
+    type: 'quiz-vocal',
+    title: 'Quiz vocal test',
+    createdAt: '2026-01-01T00:00:00.000Z',
+    sourceIds: [],
     data: questions,
     audioUrls,
   };
@@ -173,6 +178,24 @@ describe('quizVocalComponent', () => {
       expect(comp.finished).toBe(false);
       expect(comp.$refs.questionAudio.play).toHaveBeenCalled();
     });
+
+    it('clears storedFeedback so the mic button reappears on restart', () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      comp.storedFeedback = {
+        0: { correct: true },
+        1: { correct: false },
+        2: { correct: true },
+      };
+      comp.currentQ = 2;
+      comp.finished = true;
+
+      comp.resetVocalQuiz();
+
+      expect(comp.storedFeedback).toEqual({});
+      // Invariant réel d'affichage du bouton micro : sans ce reset, isCurrentAnswered()
+      // resterait true à Q0 et le bouton (x-if="!feedback && !isCurrentAnswered()") disparaîtrait.
+      expect(comp.isCurrentAnswered()).toBe(false);
+    });
   });
 
   describe('submitVocalAnswer', () => {
@@ -241,7 +264,9 @@ describe('quizVocalComponent', () => {
     let mockStart: ReturnType<typeof vi.fn>;
     let mockStop: ReturnType<typeof vi.fn>;
     let onDataAvailable: ((e: any) => void) | null = null;
-    let onStop: (() => void) | null = null;
+    // Le handler réel (quiz-vocal.ts) est `async () => {...}` → peut renvoyer une Promise ;
+    // le typer ainsi rend le `await onStop!()` du test significatif.
+    let onStop: (() => void | Promise<void>) | null = null;
     let mockTrackStop: ReturnType<typeof vi.fn>;
     let mockStream: { getTracks: () => { stop: ReturnType<typeof vi.fn> }[] };
 

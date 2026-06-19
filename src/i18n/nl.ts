@@ -35,6 +35,10 @@ export const nl: Record<string, string> = {
   'gen.all': 'Alles genereren',
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
+  'a11y.viewCategory': '{category} bekijken',
+  'a11y.generateCategory': '{category} genereren',
+  'a11y.fillBlankAnswer': 'Antwoord invullen',
+  'a11y.selectSource': 'Deze bron selecteren',
   'gen.questionCount': 'Aantal:',
   'gen.needsTts': 'Vereist MISTRAL_API_KEY om Voxtral TTS in te schakelen',
   'gen.contextTooLarge':
@@ -318,6 +322,7 @@ export const nl: Record<string, string> = {
   'fillBlank.retryWrong': 'Mijn fouten verbeteren',
   'fillBlank.restart': 'Opnieuw beginnen',
   'fillBlank.correctAnswer': 'Antwoord: {answer}',
+  'fillBlank.spellingAlert': 'Let op de spelling: het is « {answer} ».',
 
   'step.questionOf': 'Oefening {current}/{total}',
   'step.check': 'Controleren',

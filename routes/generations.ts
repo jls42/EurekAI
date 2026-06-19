@@ -26,6 +26,7 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
+import { aiLimiter } from '../helpers/rate-limit.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -269,6 +270,8 @@ export function generationCrudRoutes(
   profileStore: ProfileStore,
 ): Router {
   const router = Router();
+
+  router.use(aiLimiter);
 
   // --- Quiz attempt (save score) ---
   router.post('/:pid/generations/:gid/quiz-attempt', async (req, res) => {

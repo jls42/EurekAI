@@ -55,10 +55,27 @@ function isSafeUrl(value: string): boolean {
   return /^(?:https?:|mailto:|tel:)/i.test(normalized);
 }
 
+// Applique les remplaceurs en boucle jusqu'à point fixe : empêche qu'un pattern
+// multi-caractères (ex. "<script", " onerror=...") réapparaisse après un seul passage
+// quand l'input est conçu pour le faire (ex. "<scri<scriptpt>" -> "<script>").
+function stripUntilStable(input: string, patterns: RegExp[]): string {
+  let prev = '';
+  let safe = input;
+  while (prev !== safe) {
+    prev = safe;
+    for (const re of patterns) {
+      safe = safe.replaceAll(re, '');
+    }
+  }
+  return safe;
+}
+
 export function sanitizeRenderedHtml(html: string): string {
-  let safe = html.replaceAll(BLOCKED_TAG_RE, '');
-  safe = safe.replaceAll(EVENT_HANDLER_RE, '');
-  safe = safe.replaceAll(STYLE_ATTR_RE, '');
+  let safe = stripUntilStable(html, [BLOCKED_TAG_RE, EVENT_HANDLER_RE, STYLE_ATTR_RE]);
+  // Une seule passe sur URL_ATTR_RE : la transformation escape les `&` en `&amp;`,
+  // donc reboucler relancerait l'escape (&amp; → &amp;amp;) sans jamais converger.
+  // Les patterns multi-char dangereux (script, on*=) sont déjà neutralisés par
+  // stripUntilStable au-dessus, qui ne pose pas ce problème (suppression vs transform).
   safe = safe.replaceAll(
     URL_ATTR_RE,
     (_match, attr: string, dq?: string, sq?: string, bare?: string) => {
