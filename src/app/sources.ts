@@ -121,7 +121,7 @@ export function _createUploadSession(
   const files = Array.from(fileList).map((f) => ({
     id: crypto.randomUUID(),
     name: f.name,
-    file: f as File | null,
+    file: f,
     status: 'pending' as const,
     errorMsg: null as string | null,
   }));

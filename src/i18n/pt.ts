@@ -39,6 +39,7 @@ export const pt: Record<string, string> = {
   'a11y.generateCategory': 'Gerar {category}',
   'a11y.fillBlankAnswer': 'Resposta a preencher',
   'a11y.selectSource': 'Selecionar esta fonte',
+  'a11y.editTitle': 'Editar o título',
   'gen.questionCount': 'Quantidade:',
   'gen.needsTts': 'Requer MISTRAL_API_KEY para habilitar TTS Voxtral',
   'gen.contextTooLarge':

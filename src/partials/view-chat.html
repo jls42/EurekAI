@@ -133,6 +133,7 @@
             <div class="bg-white rounded-card shadow-card p-3 flex gap-2">
               <input
                 x-model="chatInput"
+                :aria-label="t('chat.placeholder')"
                 @keydown.enter="sendChatMessage()"
                 class="flex-1 input-modern px-3 py-2 text-body-sm"
                 :placeholder="t('chat.placeholder')"

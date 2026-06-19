@@ -25,7 +25,7 @@ export async function webSearchEnrich(
       inputs: websearchInput(query, lang),
     });
 
-    const text = extractAllText(response.outputs as unknown[]);
+    const text = extractAllText(response.outputs);
     const elapsed = stop();
 
     const noResult = lang === 'en' ? 'No results found.' : 'Aucun resultat trouve.';

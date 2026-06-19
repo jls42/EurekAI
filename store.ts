@@ -622,9 +622,7 @@ export class ProjectStore {
 
   private migrateModerationFormat(data: ProjectData): void {
     for (const source of data.sources) {
-      source.moderation = this.normalizeModeration(
-        source.moderation as Parameters<typeof this.normalizeModeration>[0],
-      );
+      source.moderation = this.normalizeModeration(source.moderation);
     }
   }
 

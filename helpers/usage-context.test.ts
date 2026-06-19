@@ -66,9 +66,11 @@ describe('usage-context', () => {
     expect(err.apiUsage).toEqual([]);
   });
 
-  it('silently discards usage when no context is active', () => {
-    recordUsage({ promptTokens: 100, model: 'mistral-large-latest' });
-    // No throw = success; verify no lingering state by running a clean tracking context
-    expect(true).toBe(true);
+  it('silently discards usage when no context is active', async () => {
+    // recordUsage hors de tout contexte de tracking doit être un no-op silencieux (pas de throw)
+    expect(() => recordUsage({ promptTokens: 100, model: 'mistral-large-latest' })).not.toThrow();
+    // et ne doit pas fuiter dans un contexte de tracking ultérieur
+    const { usage } = await runWithUsageTracking(async () => 'ok');
+    expect(usage).toEqual([]);
   });
 });

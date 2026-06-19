@@ -386,7 +386,7 @@ function buildFinalGeneration(
   gen: Generation,
   persisted: PersistedCostFields | null,
 ): Generation {
-  const final = { ...gen, id: gid } as Generation;
+  const final: Generation = { ...gen, id: gid };
   if (persisted) {
     final.usage = persisted.usage;
     final.estimatedCost = persisted.cost;

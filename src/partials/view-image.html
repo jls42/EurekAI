@@ -70,6 +70,7 @@
               <template x-if="editingTitle === gen.id">
                 <input
                   x-model="editTitleValue"
+                  :aria-label="t('a11y.editTitle')"
                   @click.stop
                   @keydown.enter="saveTitle(gen)"
                   @keydown.escape="editingTitle = null"

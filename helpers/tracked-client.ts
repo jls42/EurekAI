@@ -60,7 +60,8 @@ function wrapChatComplete(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.chat.complete.bind(client.chat);
   client.chat.complete = async (request, options) => {
     const response = await callWithRetry('chat', () => orig(request, options));
-    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel));
+    // cast requis : SDK usage.promptAudioSeconds est number|null, tsc refuse l'assignation directe au type local number (faux positif S4325, moteur TS Sonar plus permissif que tsc)
+    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel)); // NOSONAR(S4325)
     return response;
   };
 }
@@ -69,7 +70,8 @@ function wrapStt(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.audio.transcriptions.complete.bind(client.audio.transcriptions);
   client.audio.transcriptions.complete = async (request, options) => {
     const response = await callWithRetry('stt', () => orig(request, options));
-    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel));
+    // cast requis : SDK usage.promptAudioSeconds est number|null, tsc refuse l'assignation directe au type local number (faux positif S4325, moteur TS Sonar plus permissif que tsc)
+    onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel)); // NOSONAR(S4325)
     return response;
   };
 }

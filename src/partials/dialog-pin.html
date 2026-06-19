@@ -18,6 +18,7 @@
       inputmode="numeric"
       maxlength="4"
       x-model="pinVerifyInput"
+      :aria-label="t('profile.pinLabel')"
       @keydown.enter="submitPinVerify()"
       class="input-modern w-full px-3 py-2 mb-4 text-center text-lg tracking-[0.5em] font-mono"
       :placeholder="t('profile.pinPlaceholder')"

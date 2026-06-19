@@ -622,10 +622,8 @@ export function sourceRoutes(
     }
 
     if (searchQuery) {
-      const outcome = await trackWebSource(
-        pid,
-        `Keyword search: ${searchQuery}`,
-        () => searchByKeywords(searchQuery, lang, ageGroup, modCats, now) as Promise<Source | null>,
+      const outcome = await trackWebSource(pid, `Keyword search: ${searchQuery}`, () =>
+        searchByKeywords(searchQuery, lang, ageGroup, modCats, now),
       );
       pushOutcome(outcome, sources, failures);
     }

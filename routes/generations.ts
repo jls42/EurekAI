@@ -161,7 +161,7 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
     const d = summaryGen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, ...audioUrls } },
-    } as Partial<SummaryGeneration>);
+    });
   }
   if (failedSections.length > 0 && Object.keys(audioUrls).length === 0) {
     // All-fail: use the last captured error as the terminal batch failure code.
@@ -226,7 +226,7 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promis
     const d = gen.data;
     store.updateGeneration(pid, gid, {
       data: { ...d, audioUrls: { ...d.audioUrls, [section]: audioUrl } },
-    } as Partial<SummaryGeneration>);
+    });
   }
   return audioUrl;
 }
@@ -299,7 +299,7 @@ export function generationCrudRoutes(
 
       store.updateGeneration(req.params.pid, req.params.gid, {
         stats,
-      } as Partial<QuizGeneration>);
+      });
       res.json({ attempt, stats });
     } catch (e) {
       logger.error('quiz', 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
@@ -334,7 +334,7 @@ export function generationCrudRoutes(
 
       store.updateGeneration(req.params.pid, req.params.gid, {
         stats,
-      } as Partial<FillBlankGeneration>);
+      });
       res.json({ attempt, stats, results });
     } catch (e) {
       logger.error(FILL_BLANK, 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
@@ -351,7 +351,7 @@ export function generationCrudRoutes(
     }
     const updated = store.updateGeneration(req.params.pid, req.params.gid, {
       title,
-    } as Partial<Generation>);
+    });
     if (!updated) {
       res.status(404).json({ error: 'Generation introuvable' });
       return;
