@@ -639,7 +639,7 @@ const applyPendingEvent = (
     status: 'pending',
     startedAt: event.at,
     sourceIds: prev?.sourceIds ?? [],
-  } as PendingTrackerEntry;
+  };
 };
 
 const applyCompletedEvent = (

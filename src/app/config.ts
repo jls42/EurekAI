@@ -60,7 +60,7 @@ export function createConfig() {
           const config = (await configRes.json()) as AppConfig;
           const draft = structuredClone(config) as ConfigDraft;
           draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
-          this.configDraft = draft as unknown as typeof this.configDraft;
+          this.configDraft = draft;
         }
       } catch (e) {
         console.error('Failed to load config:', e);
@@ -87,7 +87,7 @@ export function createConfig() {
             langFull,
           };
         });
-        this.mistralVoicesList = enriched as unknown as typeof this.mistralVoicesList;
+        this.mistralVoicesList = enriched;
       } catch (e) {
         console.error('Failed to load Mistral voices:', e);
       }
@@ -164,7 +164,7 @@ export function createConfig() {
           const saved = (await res.json()) as AppConfig;
           const updated = structuredClone(saved) as ConfigDraft;
           updated._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
-          this.configDraft = updated as unknown as typeof this.configDraft;
+          this.configDraft = updated;
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
           await this.loadMistralVoices?.();
@@ -186,7 +186,7 @@ export function createConfig() {
           const saved = (await res.json()) as AppConfig;
           const reset = structuredClone(saved) as ConfigDraft;
           reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
-          this.configDraft = reset as unknown as typeof this.configDraft;
+          this.configDraft = reset;
           await this.loadMistralVoices?.();
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {

@@ -25,6 +25,7 @@
       <div class="flex gap-2">
         <input
           x-model="newProjectName"
+          :aria-label="t('sidebar.courseNamePlaceholder')"
           x-effect="if (showNewProject && !sidebarCollapsed) $nextTick(() => $el.focus())"
           @keydown.enter="createProject()"
           @keydown.escape="showNewProject = false"

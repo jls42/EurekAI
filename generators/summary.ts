@@ -61,7 +61,7 @@ const unwrapAndMerge = function (data: Record<string, unknown>): StudyFiche | nu
 function extractSummary(raw: string): StudyFiche {
   const data = safeParseJson<Record<string, unknown>>(raw);
 
-  if (isValidSummary(data)) return data as unknown as StudyFiche;
+  if (isValidSummary(data)) return data;
 
   const merged = unwrapAndMerge(data);
   if (merged && isValidSummary(merged)) {
