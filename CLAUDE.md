@@ -151,6 +151,17 @@ Cycle de vie des générations en cours :
 - **HTML** : NOSONAR ne fonctionne PAS en HTML. Ajouter un texte fallback statique dans les elements `x-text` pour satisfaire les règles d'accessibilité (ex: `<span x-text="title">Chargement…</span>`).
 - Faux positifs fréquents : `S1192` (string duplication) — souvent préférable d'extraire une constante plutôt qu'ignorer. `S3776` / `S6324` (complexity) — croiser avec `npm run lint:complexity` (Lizard CCN 8) avant de supprimer.
 
+## Codacy
+
+- **Codacy lance son PROPRE ESLint** — il ne lit PAS notre `eslint.config.js` (flat config ESLint 9), ne résout AUCUN type (pas de `parserOptions.project` fonctionnel dans son sandbox) et n'honore pas notre `argsIgnorePattern: '^_'`. Conséquence : sur tout fichier nouveau/modifié, faux positifs massifs (épisode PR #41 : 55 d'un coup) :
+  - `@typescript-eslint/no-unsafe-call` / `-member-access` / `-assignment` car `describe/it/expect` de vitest ET les imports cross-module (ex: `resolvePricing` depuis `@helpers/*`) sont typés `error`.
+  - `no-unused-vars` sur les **noms de params de signatures** (méthodes d'interface, alias de type fonction `(key: string) => string`) — purement documentaires mais flaggés « defined but never used ».
+- **Codacy HONORE les `eslint-disable` inline** (vérifié : 55 → 0). C'est LE levier de suppression — **JAMAIS `.codacy.yml exclude_paths`** qui retire des fichiers entiers de l'analyse (perte de couverture, refusé sur ce repo). Pattern : `/* eslint-disable <règles> -- raison */` en tête de fichier (tests, petits helpers comme `helpers/ocr-models.test.ts`, `src/app/model-pricing.ts`) ou `// eslint-disable-next-line <règles> -- raison` sur la ligne (fichiers larges, suppression chirurgicale, cf. `src/app/app-context.ts`).
+- **Viable en local** car `eslint.config.js` a `reportUnusedDisableDirectives: 'off'` : une directive sans effet local (la règle ne fire pas, types résolus correctement) ne casse PAS `lint:ci --max-warnings 0`. Sans ce flag, les disables seraient « unused » → fail local. Ne PAS réactiver ce flag.
+- **Piège nom de règle** : « `'x' is defined but never used` » vient de la règle **base `no-unused-vars`**, PAS `@typescript-eslint/no-unused-vars` (même message, règle différente) — lister LES DEUX : `no-unused-vars, @typescript-eslint/no-unused-vars`. Les findings « unsafe » sont bien les `@typescript-eslint/no-unsafe-*`. Toujours **mesurer** le delta de findings après push (API `gh api repos/jls42/EurekAI/check-runs/<id>/annotations`) avant de conclure quelle règle cibler.
+- **`.codacy.yml` ne peut PAS activer/désactiver un outil** (seulement le dashboard Code Patterns) ; il ne supporte que `exclude_paths`/`include_paths` (Java glob, fichier débutant par `---`). La correction de fond — Codacy ESLint étant redondant avec notre `lint:ci` type-aware et cassé ici — serait de désactiver l'engine ESLint côté **dashboard Codacy** (action humaine, hors repo).
+- Rappel (cf. Sécurité) : `// codacy:ignore-next-line` n'existe PAS. Finding **Opengrep/Semgrep** via Codacy → `// nosemgrep` ; finding **ESLint** via Codacy → `// eslint-disable-*` (ci-dessus) ; ne jamais mélanger les syntaxes.
+
 ## Sécurité (SAST local)
 
 - **Source de vérité locale** : Opengrep (fork open-source de Semgrep CE) via `npm run security` → `scripts/check-security.sh`. Configs `p/security-audit` + `p/default` + `p/nodejsscan`, `--severity=ERROR --error` (exit 1 sur toute error).
