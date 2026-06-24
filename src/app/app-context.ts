@@ -133,8 +133,8 @@ export interface AppContext extends AppState {
     lang?: string;
   }): string;
   defaultVoiceOptionLabel(role: 'host' | 'guest', locale: string, profileId?: string): string;
-  modelPriceLabel(_modelId: string): string;
-  modelOptionLabel(_modelId: string): string;
+  modelPriceLabel(modelId: string): string;
+  modelOptionLabel(modelId: string): string;
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;

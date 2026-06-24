@@ -93,14 +93,6 @@ export default [
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unsafe-function-type': 'off',
-      // Les environnements CI sans résolution des types vitest (Codacy) typent
-      // describe/it/expect en `error` → cascade no-unsafe-*. Relâché pour les tests
-      // (mocks + valeurs dynamiques), cohérent avec la résolution locale correcte.
-      '@typescript-eslint/no-unsafe-call': 'off',
-      '@typescript-eslint/no-unsafe-member-access': 'off',
-      '@typescript-eslint/no-unsafe-assignment': 'off',
-      '@typescript-eslint/no-unsafe-return': 'off',
-      '@typescript-eslint/no-unsafe-argument': 'off',
       'sonarjs/no-duplicate-string': 'off',
       'sonarjs/publicly-writable-directories': 'off',
       'sonarjs/no-clear-text-protocols': 'off',

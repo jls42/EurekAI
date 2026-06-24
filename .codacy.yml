@@ -1,0 +1,11 @@
+---
+# Codacy lance son propre ESLint SANS résolution de types et SANS notre eslint.config.js
+# (flat config + argsIgnorePattern + parserOptions.project). Résultat : describe/it/expect
+# de vitest et resolvePricing() sont typés `error` -> cascade de faux positifs no-unsafe-*,
+# et les params de signatures d'interface sont vus comme "unused".
+# Ces fichiers restent couverts par notre lint:ci (type-aware, --max-warnings 0), SonarCloud,
+# SonarQube et CodeQL — aucune perte de couverture réelle.
+exclude_paths:
+  - '**/*.test.ts'
+  - 'src/app/model-pricing.ts'
+  - 'src/app/app-context.ts'
