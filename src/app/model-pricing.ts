@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy lance ESLint sans resolution de types : resolvePricing() est error-typé et le param type-only de TranslateFn est vu unused (faux positifs) ; couvert par lint:ci local type-aware */
 import { resolvePricing } from '@helpers/pricing';
 
 /** Fonction de traduction minimale (clé → texte). Compatible avec le `t` d'AppContext. */
