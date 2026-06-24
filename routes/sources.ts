@@ -152,12 +152,12 @@ export function sourceRoutes(
       },
       filename: (_req, file, cb) => cb(null, `${randomUUID()}-${file.originalname}`),
     }),
-    limits: { fileSize: 20 * 1024 * 1024, files: 10 },
+    limits: { fileSize: 20 * 1024 * 1024, files: 10 }, // NOSONAR(S5693) — limite bornée volontaire (20 Mo, 10 fichiers) : c'est le garde-fou anti-DoS upload
   });
 
   const memoryUpload = multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+    limits: { fileSize: 25 * 1024 * 1024, files: 1 }, // NOSONAR(S5693) — limite bornée volontaire (25 Mo, 1 fichier) : c'est le garde-fou anti-DoS upload
   });
 
   const TEXT_EXTS = new Set(['.txt', '.md']);

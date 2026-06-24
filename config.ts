@@ -394,7 +394,7 @@ const resolveMistralDefaults = (
 export interface ResolveVoicesArgs {
   // Réutilise la shape de Profile.mistralVoices pour empêcher un drift silencieux
   // entre le format stocké (profile JSON) et celui consommé ici.
-  profileVoices?: Profile['mistralVoices'];
+  profileVoices?: NonNullable<Profile['mistralVoices']>;
   lang: string;
   // `string` (profile actif) ou `undefined` (anonyme/sans profil). Pas de `null` :
   // un seul sentinel "absent" simplifie les call sites — sinon chacun fait `?? null`
