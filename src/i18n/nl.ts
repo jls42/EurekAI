@@ -151,6 +151,11 @@ export const nl: Record<string, string> = {
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
   'settings.tts': 'TTS',
+  'settings.perMTokens': 'per M tokens (in/uit)',
+  'settings.perKPages': 'per 1000 pagina’s',
+  'settings.perMChars': 'per M tekens',
+  'settings.priceUnknown': 'prijs niet beschikbaar',
+  'settings.ocrHint': 'OCR 3: voordelig. OCR 4: betere kwaliteit, 2× de kosten.',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',

@@ -57,20 +57,45 @@
           >
             <option
               value="mistral-large-latest"
-              x-text="'mistral-large-latest — ' + t('settings.recommended')"
-            ></option>
-            <option value="mistral-medium-latest">mistral-medium-latest</option>
-            <option value="mistral-small-latest">mistral-small-latest</option>
+              x-text="modelOptionLabel('mistral-large-latest') + ' · ' + t('settings.recommended')"
+            >
+              mistral-large-latest
+            </option>
+            <option
+              value="mistral-medium-latest"
+              x-text="modelOptionLabel('mistral-medium-latest')"
+            >
+              mistral-medium-latest
+            </option>
+            <option value="mistral-small-latest" x-text="modelOptionLabel('mistral-small-latest')">
+              mistral-small-latest
+            </option>
           </select>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.aiModelHint')"></p>
         </div>
-        <div class="flex min-w-0 items-center gap-2 text-body-sm text-text-secondary">
-          <span class="shrink-0 whitespace-nowrap" x-text="t('settings.ocr') + ' :'"></span>
-          <span
-            class="min-w-0 truncate font-mono text-xs px-2 py-0.5 rounded-button"
-            style="background: var(--color-input-bg); border: 1px solid var(--color-input-border)"
-            >mistral-ocr-latest</span
+        <div>
+          <label
+            for="cfg-ocr-model"
+            class="text-sm text-text-secondary block mb-1"
+            x-text="t('settings.ocr')"
+            >OCR</label
           >
+          <select
+            id="cfg-ocr-model"
+            x-model="configDraft._ocrModel"
+            class="w-full input-modern px-3 py-2 text-body-sm"
+          >
+            <option
+              value="mistral-ocr-2512"
+              x-text="modelOptionLabel('mistral-ocr-2512') + ' · ' + t('settings.recommended')"
+            >
+              mistral-ocr-2512
+            </option>
+            <option value="mistral-ocr-4-0" x-text="modelOptionLabel('mistral-ocr-4-0')">
+              mistral-ocr-4-0
+            </option>
+          </select>
+          <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ocrHint')"></p>
         </div>
         <div class="flex min-w-0 items-center gap-2 text-body-sm text-text-secondary">
           <span class="shrink-0 whitespace-nowrap" x-text="t('settings.tts') + ' :'"></span>
@@ -78,6 +103,11 @@
             class="min-w-0 truncate font-mono text-xs px-2 py-0.5 rounded-button"
             style="background: var(--color-input-bg); border: 1px solid var(--color-input-border)"
             >voxtral-mini-tts-latest</span
+          >
+          <span
+            class="shrink-0 whitespace-nowrap text-xs"
+            x-text="modelPriceLabel('voxtral-mini-tts-latest')"
+            >$16</span
           >
         </div>
       </div>

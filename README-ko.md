@@ -1,38 +1,38 @@
 <p align="center">
-  <img src="public/assets/logo.webp" alt="EurekAI Logo" width="120" />
+  <img src="public/assets/logo.webp" alt="EurekAI 로고" width="120" />
 </p>
 
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>아무 콘텐츠나 인터랙티브 학습 경험으로 바꾸세요 — <a href="https://mistral.ai">Mistral AI</a> 기반.</strong>
+  <strong>어떤 콘텐츠든 인터랙티브한 학습 경험으로 바꾸세요 — <a href="https://mistral.ai">Mistral AI</a>로 구동됩니다.</strong>
 </p>
 
 <p align="center">
-  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Español</a> · <a href="README-pt.md">🇧🇷 Português</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Nederlands</a> · <a href="README-ar.md">🇸🇦 العربية</a><br>
-  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日本語</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 Polski</a> · <a href="README-ro.md">🇷🇴 Română</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
+  <a href="README-en.md">🇬🇧 영어</a> · <a href="README-es.md">🇪🇸 스페인어</a> · <a href="README-pt.md">🇧🇷 포르투갈어</a> · <a href="README-de.md">🇩🇪 독일어</a> · <a href="README-it.md">🇮🇹 이탈리아어</a> · <a href="README-nl.md">🇳🇱 네덜란드어</a> · <a href="README-ar.md">🇸🇦 아랍어</a><br>
+  <a href="README-hi.md">🇮🇳 힌디어</a> · <a href="README-zh.md">🇨🇳 중국어</a> · <a href="README-ja.md">🇯🇵 일본어</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 폴란드어</a> · <a href="README-ro.md">🇷🇴 루마니아어</a> · <a href="README-sv.md">🇸🇪 스웨덴어</a>
 </p>
 
 <p align="center">
-  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="Démo YouTube"></a>
+  <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="YouTube 데모"></a>
 </p>
 
 <h4 align="center">📊 코드 품질</h4>
 
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="Quality Gate"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="Security Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="Reliability Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="Maintainability Rating"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="품질 게이트"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="보안 등급"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="신뢰성 등급"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="유지보수성 등급"></a>
 </p>
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="Coverage"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="Vulnerabilities"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="Code Smells"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="Lines of Code"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="커버리지"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="취약점"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="코드 스멜"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="코드 줄 수"></a>
 </p>
 <p align="center">
-  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy Badge"></a>
+  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy 배지"></a>
   <a href="https://www.codefactor.io/repository/github/jls42/eurekai"><img src="https://www.codefactor.io/repository/github/jls42/eurekai/badge" alt="CodeFactor"></a>
 </p>
 
@@ -40,11 +40,11 @@
 
 ## 이야기 — 왜 EurekAI인가?
 
-**EurekAI**는 [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([공식 사이트](https://worldwide-hackathon.mistral.ai/))(2026년 3월) 동안 탄생했습니다. 주제가 필요했고, 아주 현실적인 아이디어에서 출발했습니다. 저는 딸과 함께 정기적으로 시험 대비를 하는데, AI를 활용하면 이 과정을 더 재미있고 인터랙티브하게 만들 수 있겠다고 생각했습니다.
+**EurekAI**는 [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([공식 사이트](https://worldwide-hackathon.mistral.ai/))(2026년 3월) 동안 탄생했습니다. 주제가 필요했는데, 아이디어는 아주 현실적인 것에서 나왔습니다. 저는 딸과 함께 정기적으로 시험 대비를 하는데, AI를 활용하면 이 과정을 더 재미있고 인터랙티브하게 만들 수 있지 않을까 생각했습니다.
 
-목표는 **어떤 입력이든** — 수업 사진, 복사해 붙여넣은 텍스트, 음성 녹음, 웹 검색 — 이를 **복습 카드, 플래시카드, 퀴즈, 팟캐스트, 빈칸 채우기, 일러스트** 등으로 바꾸는 것입니다. 이 모든 것은 Mistral AI의 프랑스 모델로 구동되며, 프랑스어권 학생들에게 자연스럽게 맞는 솔루션이 됩니다.
+목표는 **어떤 입력이든** — 수업 사진, 복사해 붙여넣은 텍스트, 음성 녹음, 웹 검색 — 이를 **복습 노트, 플래시카드, 퀴즈, 팟캐스트, 빈칸 채우기, 일러스트, 그리고 더 많은 것들**로 바꾸는 것입니다. 모든 것은 Mistral AI의 프랑스산 모델로 구동되며, 덕분에 프랑스어권 학생들에게 자연스럽게 잘 맞는 솔루션이 됩니다.
 
-[초기 프로토타입](https://github.com/jls42/worldwide-hackathon.mistral.ai)은 해커톤 동안 Mistral 서비스에 대한 개념 증명으로 48시간 만에 만들어졌습니다. 이미 동작했지만 기능은 제한적이었습니다. 그 이후 EurekAI는 진짜 프로젝트가 되었습니다: 빈칸 채우기, 연습문제 탐색, 웹 스크래핑, 구성 가능한 부모 모더레이션, 심층 코드 리뷰 등 훨씬 더 많은 기능을 갖추게 되었습니다. 전체 코드는 AI가 생성합니다 — 주로 [Claude Code](https://code.claude.com/)를 사용하며, [Codex](https://openai.com/codex/)와 [Gemini CLI](https://geminicli.com/)를 통한 일부 기여도 있습니다.
+[초기 프로토타입](https://github.com/jls42/worldwide-hackathon.mistral.ai)은 해커톤 동안 48시간 만에 Mistral 서비스에 대한 개념 증명으로 설계되었으며 — 이미 동작했지만 제한적이었습니다. 그 이후로 EurekAI는 진짜 프로젝트가 되었습니다: 빈칸 채우기, 연습 문제 탐색, 웹 스크래핑, 설정 가능한 보호자 모니터링, 심화 코드 리뷰 등 훨씬 더 많은 기능이 추가되었습니다. 코드 전체는 AI가 생성합니다 — 주로 [Claude Code](https://code.claude.com/), 일부는 [Codex](https://openai.com/codex/)와 [Gemini CLI](https://geminicli.com/)를 통해 기여되었습니다.
 
 ---
 
@@ -52,31 +52,31 @@
 
 | | 기능 | 설명 |
 |---|---|---|
-| 📷 | **파일 가져오기** | 수업 자료를 가져오세요 — 사진, PDF(평균 신뢰 점수가 있는 Mistral OCR 사용, third `high`/`medium`/`low`) 또는 텍스트 파일(TXT, MD). 파일별 재시도와 개별 진행률이 있는 업로드 세션 |
-| 📝 | **텍스트 입력** | 어떤 텍스트든 직접 입력하거나 붙여넣으세요 |
+| 📷 | **파일 가져오기** | 수업 자료를 가져오세요 — 사진, PDF(Mistral OCR로 처리, 평균 신뢰도 점수 `high`/`medium`/`low`) 또는 텍스트 파일(TXT, MD). 업로드 세션은 파일별 재시도와 개별 진행률을 제공합니다 |
+| 📝 | **텍스트 입력** | 원하는 텍스트를 직접 입력하거나 붙여넣으세요 |
 | 🎤 | **음성 입력** | 직접 녹음하세요 — Voxtral STT가 음성을 텍스트로 변환합니다 |
-| 🌐 | **웹 / URL** | URL을 붙여넣거나(Readability + Lightpanda를 통한 직접 스크래핑) 검색어를 입력하세요(Agent Mistral web_search) |
-| 📄 | **복습 카드** | 핵심 포인트, 어휘, 인용문, 일화가 포함된 구조화된 노트 |
-| 🃏 | **플래시카드** | 대화형 Q/A 카드, 음성 읽기 지원 |
-| ❓ | **객관식 퀴즈** | 오답을 적응적으로 복습하는 객관식 문제(개수 설정 가능) |
-| ✏️ | **빈칸 채우기** | 힌트와 관대한 검증이 포함된 완성형 연습문제 |
-| 🎙️ | **팟캐스트** | 2인 음성 미니 팟캐스트 — 기본 Mistral 음성 또는 사용자 지정 음성(부모님!) |
-| 🖼️ | **일러스트** | Mistral Agent가 생성한 교육용 이미지 |
-| 🗣️ | **음성 퀴즈** | 문제를 음성으로 읽고(사용자 지정 음성 가능), 답변은 음성으로, AI가 검증 |
-| 💬 | **AI 튜터** | 도구 호출 기능이 있는 수업 자료 기반의 맥락형 채팅 |
-| 🧠 | **자동 라우터** | `mistral-small-latest` 기반 라우터가 콘텐츠를 분석하고 7가지 사용 가능한 유형 중 생성기 조합을 제안 |
-| 🔒 | **부모 통제** | 프로필별 구성 가능한 모더레이션(사용자 지정 카테고리), 부모 PIN, 채팅 제한 |
-| 🌍 | **다국어 지원** | 인터페이스는 9개 언어로 제공되며, AI 생성은 프롬프트를 통해 15개 언어로 제어 가능 |
-| 🔊 | **음성 읽기** | Mistral Voxtral TTS로 카드와 플래시카드를 들을 수 있음(질문/답변 대화) |
-| 💶 | **API 비용 추적** | 각 생성과 소스의 € 비용을 투명하게 추정(토큰 / 문자 / 페이지 / 오디오 초 단위). 카드별 배지 + 프로젝트별 총합, 대시보드에서 확인 가능 |
-| 🎨 | **프로필별 테마** | 각 프로필은 `dark` 또는 `light` 테마를 선택할 수 있으며 — 프로필 변경 시 유지됨 |
+| 🌐 | **웹 / URL** | URL을 붙여넣거나(Readability + Lightpanda로 직접 스크래핑) 검색어를 입력하세요(Mistral web_search 에이전트 사용) |
+| 📄 | **복습 노트** | 핵심 포인트, 어휘, 인용, 일화가 포함된 구조화된 노트 |
+| 🃏 | **플래시카드** | 인터랙티브한 질문/답변 카드, 대화형 오디오 낭독 |
+| ❓ | **객관식 퀴즈** | 오답의 적응형 복습이 포함된 객관식 문제(개수 설정 가능) |
+| ✏️ | **빈칸 채우기** | 힌트와 관대한 검증이 포함된 완성형 연습 문제 |
+| 🎙️ | **팟캐스트** | 2인 목소리 미니 팟캐스트 오디오 — 기본 Mistral 음성 또는 사용자 지정 음성(부모님용!) |
+| 🖼️ | **일러스트** | Mistral 에이전트가 생성한 교육용 이미지 |
+| 🗣️ | **음성 퀴즈** | 큰 소리로 읽어 주는 문제(사용자 지정 음성 가능), 음성 답변, AI 검증 |
+| 💬 | **AI 튜터** | 수업 문서와 맥락적으로 대화하는 채팅, 도구 호출 지원 |
+| 🧠 | **자동 라우터** | `mistral-small-latest` 기반 라우터가 콘텐츠를 분석하고 사용 가능한 7가지 유형 중 생성 조합을 제안합니다 |
+| 🔒 | **보호자 통제** | 프로필별로 설정 가능한 모더레이션(사용자 지정 가능 카테고리), 보호자 PIN, 채팅 제한 |
+| 🌍 | **다국어** | 인터페이스는 9개 언어로 제공되며; AI 생성은 프롬프트를 통해 15개 언어로 제어할 수 있습니다 |
+| 🔊 | **음성으로 읽기** | Mistral Voxtral TTS로 노트와 플래시카드(질문/답변 대화)를 들을 수 있습니다 |
+| 💶 | **API 비용 추적** | 각 생성과 소스의 € 비용을 투명하게 추정(토큰 / 문자 / 페이지 / 오디오 초). 카드별 배지 + 프로젝트별 총합이 대시보드에 표시됩니다 |
+| 🎨 | **프로필별 테마** | 각 프로필은 자신의 테마 `dark` 또는 `light`를 선택할 수 있으며 — 프로필 변경 시에도 유지됩니다 |
 
 ---
 
 ## 아키텍처 개요
 
 <p align="center">
-  <img src="public/assets/architecture-overview.webp" alt="Architecture Overview" width="800" />
+  <img src="public/assets/architecture-overview.webp" alt="아키텍처 개요" width="800" />
 </p>
 
 ---
@@ -84,7 +84,7 @@
 ## 모델 사용 맵
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="AI Model-to-Task Mapping" width="800" />
+  <img src="public/assets/model-map.webp" alt="AI 모델-작업 매핑" width="800" />
 </p>
 
 ---
@@ -92,7 +92,7 @@
 ## 사용자 여정
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="Student Learning Journey" width="800" />
+  <img src="public/assets/user-journey.webp" alt="학생 학습 여정" width="800" />
 </p>
 
 ---
@@ -101,83 +101,83 @@
 
 ### 멀티모달 입력
 
-EurekAI는 프로필별로 모더레이션된 4가지 소스 유형을 수용합니다(어린이와 청소년은 기본 활성화):
+EurekAI는 프로필에 따라 조정되는 4가지 소스 유형을 지원합니다(어린이와 청소년은 기본 활성화) :
 
-- **파일 가져오기** — JPG, PNG 또는 PDF 파일은 `mistral-ocr-latest`(인쇄된 텍스트, 표, 손글씨)로 처리되거나, 텍스트 파일(TXT, MD)은 직접 가져옵니다. 다중 파일 업로드는 **업로드 세션** 시스템을 사용합니다: 파일별 개별 진행률, 실패한 파일만 재시도하고 다른 파일은 다시 제출하지 않음, 완료되면 세션 닫기. OCR은 평균화된 **신뢰 점수**(`average`, `[0,1]`로 제한, Mistral이 반환한 `averagePageConfidenceScore`를 기반으로 계산)를 노출하며, UI에는 tier `high` / `medium` / `low` 배지 형태로 표시됩니다(~0.9 / ~0.7 임계값) — 품질이 낮아도 차단하지 않고 경고만 표시합니다.
-- **자유 텍스트** — 어떤 내용이든 입력하거나 붙여넣으세요. 모더레이션이 활성화되어 있으면 저장 전에 검열됩니다.
-- **음성 입력** — 브라우저에서 오디오를 녹음합니다. `voxtral-mini-latest`가 전사합니다. `language="fr"` 설정이 인식을 최적화합니다.
-- **웹 / URL** — 하나 이상의 URL을 붙여넣어 콘텐츠를 직접 스크래핑하거나(Readability + Lightpanda, JS 페이지용), 키워드를 입력해 Agent Mistral을 통한 웹 검색을 수행합니다. 단일 입력칸은 두 가지를 모두 허용하며 — URL과 키워드는 자동으로 분리되고, 각 결과는 독립된 소스를 생성합니다.
+- **파일 가져오기** — JPG, PNG 또는 PDF 파일은 Mistral OCR로 처리됩니다 — **OCR 3 (`mistral-ocr-2512`) 기본**, **OCR 4 (`mistral-ocr-4-0`) 선택 사항**은 설정에서 사용 가능(더 나은 품질이지만 비용은 2배) — 인쇄 텍스트, 표, 손글씨에 적합합니다. 또는 텍스트 파일(TXT, MD)을 직접 가져올 수 있습니다. 다중 파일 업로드는 **업로드 세션** 시스템을 사용합니다: 파일별 개별 진행률, 실패한 파일만 재시도하고 다른 파일은 다시 제출하지 않으며, 완료되면 세션을 닫습니다. OCR은 **평균화된 신뢰도 점수**(`average`, `[0,1]`로 클램프, Mistral이 반환한 `averagePageConfidenceScore`를 기반으로 계산)를 노출하며, UI에서는 `high` / `medium` / `low` 등급 배지(임계값 약 0.9 / 약 0.7)로 표시됩니다 — 품질이 낮은 스캔은 차단하지 않고 경고만 합니다.
+- **자유 텍스트** — 원하는 콘텐츠를 직접 입력하거나 붙여넣으세요. 모더레이션이 활성화되어 있으면 저장 전에 검토됩니다.
+- **음성 입력** — 브라우저에서 오디오를 녹음합니다. `voxtral-mini-latest`로 전사됩니다. `language="fr"` 설정이 인식을 최적화합니다.
+- **웹 / URL** — 하나 이상의 URL을 붙여넣어 콘텐츠를 직접 스크래핑하거나(자바스크립트 페이지는 Readability + Lightpanda 사용), Mistral 에이전트를 통해 웹 검색할 키워드를 입력하세요. 단일 필드가 둘 다 허용합니다 — URL과 키워드는 자동으로 분리되며, 각 결과는 독립적인 소스를 생성합니다.
 
 ### AI 콘텐츠 생성
 
-생성되는 학습 자료는 7가지 유형입니다:
+생성되는 학습 자료 유형은 7가지입니다:
 
 | 생성기 | 모델 | 출력 |
 |---|---|---|
-| **복습 카드** | `mistral-large-latest` | 제목, 요약, 핵심 포인트, 어휘, 인용문, 일화 |
-| **플래시카드** | `mistral-large-latest` | 소스 참조가 포함된 Q/A 카드(개수 설정 가능) |
-| **객관식 퀴즈** | `mistral-large-latest` | 객관식 문제, 설명, 적응형 복습(개수 설정 가능) |
-| **빈칸 채우기** | `mistral-large-latest` | 힌트와 관대한 검증(Levenshtein)이 있는 완성 문장 |
-| **팟캐스트** | `mistral-large-latest` + Voxtral TTS | 2인 음성 스크립트 → MP3 오디오 |
-| **일러스트** | Agent `mistral-large-latest` | `image_generation` 도구를 통한 교육용 이미지 |
-| **음성 퀴즈** | `mistral-large-latest` + Voxtral TTS + STT | TTS 문제 → STT 답변 → AI 검증 |
+| **복습 노트** | `mistral-large-latest` | 제목, 요약, 핵심 포인트, 어휘, 인용, 일화 |
+| **플래시카드** | `mistral-large-latest` | 소스 참조가 포함된 질문/답변 카드(개수 설정 가능) |
+| **객관식 퀴즈** | `mistral-large-latest` | 객관식 질문, 설명, 적응형 복습(개수 설정 가능) |
+| **빈칸 채우기** | `mistral-large-latest` | 힌트와 관대한 검증(Levenshtein)이 있는 완성형 문장 |
+| **팟캐스트** | `mistral-large-latest` + Voxtral TTS | 2인 목소리 대본 → MP3 오디오 |
+| **일러스트** | 에이전트 `mistral-large-latest` | 도구 `image_generation`를 통한 교육용 이미지 |
+| **음성 퀴즈** | `mistral-large-latest` + Voxtral TTS + STT | TTS 질문 → STT 답변 → AI 검증 |
 
-### 채팅형 AI 튜터
+### 채팅 기반 AI 튜터
 
-수업 자료 전체에 접근 가능한 대화형 튜터:
+수업 문서에 완전하게 접근할 수 있는 대화형 튜터:
 
 - `mistral-large-latest` 사용
-- **도구 호출**: 대화 중 복습 카드, 플래시카드, 퀴즈 또는 빈칸 채우기를 생성할 수 있음
+- **도구 호출**: 대화 중에 복습 노트, 플래시카드, 퀴즈 또는 빈칸 채우기 문제를 생성할 수 있음
 - 과목당 50개 메시지 기록
-- 프로필에 대해 활성화된 경우 콘텐츠 모더레이션
+- 프로필에서 활성화된 경우 콘텐츠 모더레이션 적용
 
 ### 자동 라우터
 
-라우터는 `mistral-small-latest`를 사용해 소스의 콘텐츠를 분석하고, 7가지 사용 가능한 항목 중 가장 적절한 생성기를 제안합니다. 인터페이스는 실시간 진행률을 표시합니다: 먼저 분석 단계, سپس 개별 생성 단계와 취소 가능성이 이어집니다.
+라우터는 `mistral-small-latest`를 사용하여 소스의 내용을 분석하고, 사용 가능한 7개 중 가장 적절한 생성기를 제안합니다. 인터페이스는 진행 상황을 실시간으로 보여줍니다: 먼저 분석 단계가 나오고, 그다음 개별 생성이 진행되며 취소도 가능합니다.
 
 ### 적응형 학습
 
-- **퀴즈 통계**: 문제별 시도 횟수와 정확도 추적
-- **퀴즈 복습**: 약한 개념을 겨냥한 5~10개의 새 문제 생성
-- **지시문 감지**: 복습 지시문("Je sais ma leçon si je sais...")을 감지해 호환되는 텍스트 생성기(복습 카드, 플래시카드, 퀴즈, 빈칸 채우기)에서 우선 처리
+- **퀴즈 통계**: 질문별 시도 횟수와 정확도 추적
+- **퀴즈 복습**: 약한 개념을 대상으로 하는 5~10개의 새 문제를 생성
+- **지시문 감지**: 복습 지시문(“나는 ...를 알면 수업 내용을 안다”)을 감지하고 호환되는 텍스트 생성기(노트, 플래시카드, 퀴즈, 빈칸 채우기)에서 우선 반영
 
-### 보안 및 부모 통제
+### 보안 & 보호자 통제
 
-- **4개 연령 그룹**: 어린이(≤10세), 청소년(11-15세), 학생(16-25세), 성인(26세 이상)
-- **콘텐츠 모더레이션**: `mistral-moderation-latest` 사용, 10개 카테고리 제공, 어린이/청소년은 기본적으로 5개 차단(`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). 설정에서 프로필별로 카테고리 사용자 지정 가능.
-- **부모 PIN**: SHA-256 해시, 15세 미만 프로필에 필요. 프로덕션 배포에서는 salt가 있는 느린 해시(Argon2id, bcrypt)를 사용할 것.
-- **채팅 제한**: 16세 미만은 AI 채팅이 기본 비활성화이며, 부모가 활성화 가능
+- **4개 연령 그룹**: 어린이(≤10세), 청소년(11-15), 학생(16-25), 성인(26+)
+- **콘텐츠 모더레이션**: `mistral-moderation-latest`과 10개 사용 가능한 카테고리, 어린이/청소년에게는 기본적으로 5개가 차단됨(`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). 카테고리는 설정에서 프로필별로 사용자 지정 가능.
+- **보호자 PIN**: SHA-256 해시, 15세 미만 프로필에 필요합니다. 운영 환경 배포에서는 솔트가 포함된 느린 해시(Argon2id, bcrypt)를 사용하는 것이 좋습니다.
+- **채팅 제한**: 16세 미만은 AI 채팅이 기본적으로 비활성화되며, 보호자가 활성화할 수 있습니다
 
 ### 멀티 프로필 시스템
 
-- 이름, 나이, 아바타, 언어 기본 설정이 있는 여러 프로필
-- **프로필별 음성**(`Profile.mistralVoices?: { host, guest }`) — 각 어린이는 팟캐스트/음성 퀴즈용 음성 쌍을 가질 수 있음
-- **프로필별 테마**(`Profile.theme: 'dark' | 'light'`) — 프로필 변경 시 자동 전환, 백엔드에 유지
+- 이름, 나이, 아바타, 언어 설정을 가진 여러 프로필
+- **프로필별 음성**(`Profile.mistralVoices?: { host, guest }`) — 각 자녀는 자신만의 팟캐스트/음성 퀴즈 음성 쌍을 가질 수 있습니다
+- **프로필별 테마**(`Profile.theme: 'dark' | 'light'`) — 프로필 변경 시 자동 전환, 백엔드에 영구 저장
 - `profileId`를 통해 프로필과 연결된 프로젝트
-- 계단식 삭제: 프로필을 삭제하면 해당 프로필의 모든 프로젝트가 삭제됨
+- 연쇄 삭제: 프로필을 삭제하면 해당 프로필의 모든 프로젝트도 삭제됨
 
 ### API 비용 추적
 
-각 Mistral 호출(chat, OCR, STT, TTS, moderation, agents)은 사용자에게 **투명한** € 추정치를 제공하도록 계측됩니다 — 과금에 대한 놀라움이 없습니다.
+각 Mistral 호출(채팅, OCR, STT, TTS, 모더레이션, 에이전트)은 사용자에게 **투명한** € 추정을 제공하도록 계측됩니다 — 청구에 대한 놀라움이 없습니다.
 
-- **단일 진실 소스**: `helpers/pricing.ts` — 모델 prefix별 `MODEL_PRICING`(예: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), 주기적 재스크래핑을 위한 Mistral 문서 URL이 포함된 `PRICING_SOURCES`
-- **지원 단위**: `tokens`, `characters`(TTS), `pages`(OCR), `audio-seconds`(STT) — `helpers/cost-calc.ts`가 변환을 담당
+- **단일 진실 원천**: `helpers/pricing.ts` — 모델 접두사별 `MODEL_PRICING`(예: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), 주기적 재스크래핑을 위한 Mistral 문서 URL이 포함된 `PRICING_SOURCES`
+- **지원 단위**: `tokens`, `characters`(TTS), `pages`(OCR), `audio-seconds`(STT) — 변환은 `helpers/cost-calc.ts`가 담당
 - **계측 체인**: `helpers/tracked-client.ts`(Mistral 클라이언트 래핑) → `helpers/usage-context.ts`(AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts`(HTTP 응답에 주입)
-- **UI**: 생성별 비용 배지(`src/partials/cost-badge-gen.html`), 소스별 비용 배지(`cost-badge-src.html`), 대시보드의 누적 총합(`Project.totalCost`)
-- **엔드포인트**: `/generate/*` 및 `/sources/*` 응답이 반환 객체(Generation / Source)에 `estimatedCost`, `usage` 및 `costBreakdown`를 추가합니다. `POST /generate/auto/route`는 라우팅 단독 비용을 위한 `costDelta: number` 필드를 추가합니다. `GET /projects/:pid`는 `costLog[]`에서 계산된 합계인 `totalCost`와 전체 히스토리가 포함된 프로젝트를 반환합니다.
+- **UI**: 생성별 비용 배지(`src/partials/cost-badge-gen.html`), 소스별(`cost-badge-src.html`), 대시보드의 누적 총합(`Project.totalCost`)
+- **엔드포인트**: `/generate/*` 및 `/sources/*` 응답은 반환된 객체(Generation / Source)에 `estimatedCost`, `usage` 및 `costBreakdown`를 덧붙입니다. `POST /generate/auto/route`는 라우팅 단독 비용을 위한 `costDelta: number` 필드를 추가합니다. `GET /projects/:pid`는 `totalCost`( `costLog[]`에서 계산된 합계 ) + 전체 이력을 포함한 확장된 프로젝트를 반환합니다
 
-### 다중 제공업체 TTS 및 사용자 지정 음성
+### 멀티 프로바이더 TTS & 사용자 지정 음성
 
-- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100% Mistral 음성 합성, 추가 키 필요 없음
-- **사용자 지정 음성**: 부모는 Mistral Voices API(오디오 샘플 기반)를 통해 자신만의 음성을 만들고 호스트/게스트 역할에 할당할 수 있으며 — 그러면 팟캐스트와 음성 퀴즈가 부모의 목소리로 읽혀 아이에게 훨씬 더 몰입감 있는 경험을 제공합니다
-- 구성 가능한 두 가지 음성 역할: **호스트**(주요 내레이터)와 **게스트**(팟캐스트의 두 번째 음성)
-- 설정에서 전체 Mistral 음성 카탈로그를 사용할 수 있으며, 언어별 필터링 가능
+- **Mistral Voxtral TTS** : `voxtral-mini-tts-latest`, 100% Mistral 음성 합성, 추가 키 불필요
+- **사용자 지정 음성**: 부모는 Mistral Voices API(오디오 샘플 기반)를 통해 자신만의 음성을 만들고 호스트/게스트 역할에 할당할 수 있습니다 — 그러면 팟캐스트와 음성 퀴즈가 부모의 목소리로 재생되어 아이에게 더욱 몰입감 있는 경험을 제공합니다
+- 구성 가능한 두 가지 음성 역할: **호스트**(메인 내레이터)와 **게스트**(팟캐스트의 두 번째 목소리)
+- 설정에서 전체 Mistral 음성 카탈로그를 사용할 수 있으며, 언어별로 필터링 가능합니다
 
 ### 국제화
 
 - 인터페이스는 9개 언어로 제공됩니다: fr, en, es, pt, it, nl, de, hi, ar
 - AI 프롬프트는 15개 언어를 지원합니다(fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
-- 프로필별 언어 설정 가능
+- 프로필별로 언어 설정 가능
 
 ---
 
@@ -187,30 +187,33 @@ EurekAI는 프로필별로 모더레이션된 4가지 소스 유형을 수용합
 |---|---|---|
 | **런타임** | Node.js + TypeScript 6.x | 서버 및 타입 안정성 |
 | **백엔드** | Express 5.x | REST API |
-| **개발 서버** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars partials, 프록시 |
-| **프론트엔드** | HTML + TailwindCSS 4.x + Alpine.js 3.x | 반응형 인터페이스, Vite로 컴파일되는 TypeScript |
-| **템플릿 엔진** | vite-plugin-handlebars | partials 기반 HTML 구성 |
-| **AI** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Moderation |
+| **개발 서버** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars partials, proxy |
+| **프런트엔드** | HTML + TailwindCSS 4.x + Alpine.js 3.x | 반응형 인터페이스, Vite로 컴파일되는 TypeScript |
+| **템플레이팅** | vite-plugin-handlebars | partials를 통한 HTML 구성 |
+| **AI** | Mistral AI SDK 2.x | 채팅, OCR, STT, TTS, 에이전트, 모더레이션 |
 | **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, 내장 음성 합성 |
 | **아이콘** | Lucide 1.x | SVG 아이콘 라이브러리 |
 | **웹 스크래핑** | Readability + linkedom | 웹 페이지의 주요 콘텐츠 추출(Firefox Reader View 기술) |
 | **헤드리스 브라우저** | Lightpanda | JS/SPA 페이지용 초경량 헤드리스 브라우저(Zig + V8) — 스크래핑 폴백 |
-| **Markdown** | Marked | 채팅 내 마크다운 렌더링 |
+| **마크다운** | Marked | 채팅에서 마크다운 렌더링 |
 | **파일 업로드** | Multer 2.x | multipart 폼 처리 |
 | **오디오** | ffmpeg-static | 오디오 세그먼트 연결 |
 | **테스트** | Vitest | 단위 테스트 — 커버리지는 SonarCloud로 측정 |
-| **저장소** | JSON 파일 | 의존성 없는 저장 |
+| **영속성** | JSON 파일 | 의존성 없는 저장소 |
 
 ---
 
-## 모델 참조 | 모델 | 용도 | 이유 |
+## 모델 참조
+
+| 모델 | 용도 | 이유 |
 |---|---|---|
-| `mistral-large-latest` | 학습 카드, 플래시카드, 팟캐스트, 퀴즈, 빈칸 채우기, 채팅, 음성 퀴즈 검증, 이미지 에이전트, 웹 검색 에이전트, 지시문 감지 | 다국어 지원이 가장 뛰어나며 지시사항 추적에 강함 |
-| `mistral-ocr-latest` | 문서 OCR | 인쇄된 텍스트, 표, 손글씨 |
+| `mistral-large-latest` | 노트, 플래시카드, 팟캐스트, 퀴즈, 빈칸 채우기, 채팅, 음성 퀴즈 검증, 이미지 에이전트, 웹 검색 에이전트, 지시문 감지 | 최고의 다국어 성능 + 지시 준수 |
+| `mistral-ocr-2512` (OCR 3, 기본값) | 문서 OCR | 인쇄 텍스트, 표, 손글씨($2 / 1000 pages) |
+| `mistral-ocr-4-0` (OCR 4, 옵션) | 문서 OCR — 상위 품질 | 설정에서 선택 가능, 비용 2배($4 / 1000 pages) |
 | `voxtral-mini-latest` | 음성 인식(STT) | 다국어 STT, `language="fr"`로 최적화 |
-| `voxtral-mini-tts-latest` | 음성 합성(TTS) | 팟캐스트, 음성 퀴즈, 소리 내어 읽기 |
-| `mistral-moderation-latest` | 콘텐츠 모더레이션 | 아동/청소년용 차단 카테고리 5개(+ 탈옥 시도) |
-| `mistral-small-latest` | 자동 라우터 | 라우팅 결정을 위한 콘텐츠의 빠른 분석 |
+| `voxtral-mini-tts-latest` | 음성 합성(TTS) | 팟캐스트, 음성 퀴즈, 음성으로 읽기 |
+| `mistral-moderation-latest` | 콘텐츠 모더레이션 | 어린이/청소년용 5개 차단 카테고리(+ jailbreaking) |
+| `mistral-small-latest` | 자동 라우터 | 라우팅 결정을 위한 빠른 콘텐츠 분석 |
 
 ---
 
@@ -236,7 +239,7 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **참고**: Mistral Voxtral TTS는 유일한 TTS 제공자이며 — `MISTRAL_API_KEY` 외에 추가 키가 필요하지 않습니다.
+> **참고**: Mistral Voxtral TTS는 유일한 TTS 공급자입니다 — `MISTRAL_API_KEY` 외에 추가 키는 필요 없습니다.
 
 ### 환경 변수
 
@@ -244,8 +247,8 @@ npm run dev
 |---|---|---|---|
 | `MISTRAL_API_KEY` | ✅ | — | Mistral API 키(chat, OCR, STT, Voxtral TTS, 에이전트, 모더레이션) |
 | `PORT` | 선택 사항 | `3000` | Express 백엔드의 HTTP 포트 |
-| `NODE_ENV` | 선택 사항 | `development` | `production`인 경우 → Express가 `dist/`에서 프론트엔드를 제공함(그렇지 않으면 `public/`) |
-| `SONAR_TOKEN` | 선택 사항 CI | — | GitHub Actions SonarCloud 워크플로에서만 사용됨 |
+| `NODE_ENV` | 선택 사항 | `development` | `production`이면 Express가 `dist/`에서 프런트엔드를 서빙(그렇지 않으면 `public/`) |
+| `SONAR_TOKEN` | CI 선택 사항 | — | GitHub Actions SonarCloud 워크플로에서만 사용 |
 
 ### 테스트, 코드 품질 및 기여
 
@@ -258,9 +261,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git 훅(Husky)**: `pre-commit`은 `npm test`을, `pre-push`는 `npm run security`을 실행합니다. 둘 다 실패 시 커밋/푸시를 차단합니다.
+**Git 훅(Husky)**: `pre-commit`는 `npm test`을 실행하고, `pre-push`는 `npm run security`를 실행합니다. 두 훅 모두 실패 시 commit/push를 차단합니다.
 
-**필수 외부 도구(선택 사항이지만 `pretest` / `npm run security`에서 사용됨)**:
+**필요한 외부 도구(선택 사항이지만 `pretest` / `npm run security`에서 사용됨)**:
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -270,11 +273,11 @@ pipx install lizard          # ou : pipx run lizard
 ./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
 ```
 
-이 도구들이 없으면 `npm test`은 `pretest`에서 실패하고(lizard 없음) `npm run security`은 실패합니다(opengrep 없음). 그러면 husky 훅이 커밋/푸시를 차단합니다.
+이 도구들이 없으면 `npm test`는 `pretest`에서 실패하고(lizard 없음), `npm run security`는 실패합니다(opengrep 없음). 그러면 husky 훅이 commit/push를 차단합니다.
 
 ---
 
-## 컨테이너 배포
+## 컨테이너로 배포
 
 이미지는 **GitHub Container Registry**에 게시됩니다:
 
@@ -292,7 +295,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`**는 볼륨 권한을 자동으로 조정하는 루트리스 Podman 플래그입니다.
+> **`:U`**는 볼륨 권한을 자동으로 조정하는 rootless Podman 플래그입니다.
 
 ```bash
 # Build local
@@ -303,7 +306,6 @@ podman build -t eurekai -f Containerfile .
 ```
 
 ---
-
 ## 프로젝트 구조
 
 ```
@@ -411,81 +413,81 @@ scripts/                  — Tooling : check-deps, check-security, check-comple
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **AI 기여자용**: 상세한 아키텍처 맥락, 필수 규칙(프롬프트 유출 방지, 오류 코드, 비용 추적) 및 알려진 함정(Lizard CCN, Opengrep, Codacy/Semgrep 마이그레이션)은 [`CLAUDE.md`](CLAUDE.md)를 참고하세요.
+> **AI 기여자를 위한 안내**: 자세한 아키텍처 맥락, 필수 규칙(프롬프트 유출 방지, 오류 코드, 비용 추적) 및 알려진 함정(Lizard CCN, Opengrep, Codacy/Semgrep 마이그레이션)은 [`CLAUDE.md`](CLAUDE.md)를 참고하세요.
 
 ---
 
 ## API 참조
 
-### 설정
+### 구성
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| `GET` | `/api/config` | 현재 설정 |
-| `PUT` | `/api/config` | 설정 수정(모델, 음성, TTS 모델) |
-| `GET` | `/api/config/status` | API 상태: `mistral`(Mistral 키 설정됨), `ttsAvailable`(`mistral`의 별칭, Mistral Voxtral은 유일한 TTS 제공자) |
-| `POST` | `/api/config/reset` | 기본 설정으로 재설정 |
-| `GET` | `/api/config/voices` | Mistral TTS 음성 목록 조회(선택 사항 `?lang=fr`) |
+| `GET` | `/api/config` | 현재 구성 |
+| `PUT` | `/api/config` | 구성 수정(모델, 음성, TTS 모델) |
+| `GET` | `/api/config/status` | API 상태: `mistral`(Mistral 키가 정의됨), `ttsAvailable`(`mistral`의 별칭, Mistral Voxtral이 유일한 TTS 제공자) |
+| `POST` | `/api/config/reset` | 기본 구성으로 재설정 |
+| `GET` | `/api/config/voices` | Mistral TTS 음성 목록 조회(선택적 `?lang=fr`) |
 | `GET` | `/api/moderation-categories` | 사용 가능한 모더레이션 카테고리 + 연령별 기본값 |
 
 ### 프로필
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| `GET` | `/api/profiles` | 모든 프로필 목록 조회 |
+| `GET` | `/api/profiles` | 모든 프로필 나열 |
 | `POST` | `/api/profiles` | 프로필 생성 |
-| `PUT` | `/api/profiles/:id` | 프로필 수정(< 15세의 경우 PIN 필요) |
-| `DELETE` | `/api/profiles/:id` | 프로필 삭제 + 프로젝트 `{pin?}` → `{ok, deletedProjects}` 연쇄 삭제 |
+| `PUT` | `/api/profiles/:id` | 프로필 수정(15세 미만은 PIN 필요) |
+| `DELETE` | `/api/profiles/:id` | 프로필 삭제 + 프로젝트 연쇄 삭제 `{pin?}` → `{ok, deletedProjects}` |
 
 ### 프로젝트
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| `GET` | `/api/projects` | 프로젝트 목록 조회(`?profileId=` 선택 사항) |
-| `POST` | `/api/projects` | `{name, profileId}` 프로젝트 생성 |
+| `GET` | `/api/projects` | 프로젝트 나열(`?profileId=` 선택 가능) |
+| `POST` | `/api/projects` | 프로젝트 `{name, profileId}` 생성 |
 | `GET` | `/api/projects/:pid` | 프로젝트 상세 |
-| `PUT` | `/api/projects/:pid` | `{name}` 이름 변경 |
+| `PUT` | `/api/projects/:pid` | 이름 변경 `{name}` |
 | `DELETE` | `/api/projects/:pid` | 프로젝트 삭제 |
 
 ### 소스
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | 멀티파트 파일 가져오기(JPG/PNG/PDF는 OCR, TXT/MD는 직접 읽기) |
+| `POST` | `/api/projects/:pid/sources/upload` | multipart 파일 가져오기(JPG/PNG/PDF는 OCR, TXT/MD는 직접 읽기) |
 | `POST` | `/api/projects/:pid/sources/text` | 자유 텍스트 `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | STT 음성(멀티파트 오디오) |
+| `POST` | `/api/projects/:pid/sources/voice` | STT 음성(multipart 오디오) |
 | `POST` | `/api/projects/:pid/sources/websearch` | URL 스크래핑 또는 웹 검색 `{query}` — 소스 배열 반환 |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | 소스 삭제 |
-| `POST` | `/api/projects/:pid/moderate` | `{text}` 모더레이션 |
+| `POST` | `/api/projects/:pid/moderate` | 모더레이션 `{text}` |
 | `POST` | `/api/projects/:pid/detect-consigne` | 복습 지시문 감지 |
 
 ### 생성
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | 복습 카드 |
+| `POST` | `/api/projects/:pid/generate/summary` | 복습 자료 |
 | `POST` | `/api/projects/:pid/generate/flashcards` | 플래시카드 |
 | `POST` | `/api/projects/:pid/generate/quiz` | 객관식 퀴즈 |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | 빈칸 채우기 |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | 빈칸 채우기 텍스트 |
 | `POST` | `/api/projects/:pid/generate/podcast` | 팟캐스트 |
-| `POST` | `/api/projects/:pid/generate/image` | 일러스트 |
+| `POST` | `/api/projects/:pid/generate/image` | 일러스트레이션 |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | 음성 퀴즈 |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | 적응형 복습 `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/route` | 라우팅 분석(실행할 생성기 계획) — `{plan, costDelta}` 반환(라우팅 비용만) |
-| `POST` | `/api/projects/:pid/generate/auto` | 백엔드 자동 생성(라우팅 + 7종: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). 병렬 실행 — 7개 이상의 동시 요청을 허용하는 Mistral 티어를 전제로 함; 그렇지 않으면 여러 429가 `failedSteps`에 반환될 수 있음. |
+| `POST` | `/api/projects/:pid/generate/auto` | 백엔드 자동 생성(라우팅 + 7가지 유형: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). 병렬 실행 — rate-limit가 동시 요청 ≥ 7인 Mistral 티어를 가정함; 그렇지 않으면 `failedSteps`에 여러 429가 반환될 수 있음. |
 
-모든 생성 라우트는 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`을 허용합니다. `quiz-review`은 추가로 `{generationId, weakQuestions}`를 요구합니다.
+모든 생성 경로는 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`를 허용합니다. `quiz-review`는 추가로 `{generationId, weakQuestions}`를 요구합니다.
 
-### CRUD 생성
+### CRUD 생성 항목
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | 퀴즈 답변 제출 `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 빈칸 채우기 답변 제출 `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 음성 답변 검증(audio + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 음성 읽기(학습 카드/플래시카드) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` 이름 변경 |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | 생성 삭제 |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 음성 답변 확인(audio + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 음성 읽기(fiches/flashcards) |
+| `PUT` | `/api/projects/:pid/generations/:gid` | 이름 변경 `{title}` |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | 생성 항목 삭제 |
 
 ### 채팅
 | 메서드 | 엔드포인트 | 설명 |
 |---|---|---|
 | `GET` | `/api/projects/:pid/chat` | 채팅 기록 가져오기 |
-| `POST` | `/api/projects/:pid/chat` | `{message, lang, ageGroup}` 메시지 보내기 |
+| `POST` | `/api/projects/:pid/chat` | 메시지 보내기 `{message, lang, ageGroup}` |
 | `DELETE` | `/api/projects/:pid/chat` | 채팅 기록 지우기 |
 
 ---
@@ -494,15 +496,15 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 | 결정 | 근거 |
 |---|---|
-| **React/Vue 대신 Alpine.js** | 최소한의 크기, Vite로 컴파일된 TypeScript와 함께 가벼운 반응성. 속도가 중요한 해커톤에 적합함. |
-| **JSON 파일 기반 영속성** | 의존성 없음, 즉시 시작. 설정할 데이터베이스가 없어서 바로 실행 가능. |
-| **Vite + Handlebars** | 두 세계의 장점: 개발용 빠른 HMR, 코드 구성을 위한 HTML partials, Tailwind JIT. |
-| **중앙화된 프롬프트** | 모든 AI 프롬프트가 `prompts.ts`에 있어 언어/연령대별로 쉽게 반복, 테스트, 조정 가능. |
-| **멀티 생성 시스템** | 각 생성물은 고유 ID를 가진 독립 객체이며, 한 코스에 여러 학습 카드, 퀴즈 등을 허용함. |
-| **연령별 맞춤 프롬프트** | 4개 연령 그룹마다 어휘, 복잡성, 톤이 다름 — 같은 내용도 학습자에 따라 다르게 가르침. |
-| **에이전트 기반 기능** | 이미지 생성과 웹 검색은 임시 Mistral 에이전트를 사용함 — 자동 정리되는 깔끔한 생명주기. |
-| **지능형 URL 스크래핑** | 하나의 입력칸이 URL과 키워드를 함께 허용함 — URL은 Readability(정적 페이지)로 스크래핑하고, JS/SPA 페이지는 Lightpanda로 대체하며, 키워드는 Mistral web_search 에이전트를 트리거함. 각 결과는 독립적인 소스를 생성함. |
-| **100% Mistral TTS** | Mistral Voxtral TTS(`MISTRAL_API_KEY` 외 추가 키 없음) — 비용 체인과 언어별 음성 해석에 통합된 음성 합성. |
+| **React/Vue 대신 Alpine.js** | 최소한의 번들 크기, Vite로 컴파일된 TypeScript와 함께 가벼운 반응성. 속도가 중요한 해커톤에 이상적입니다. |
+| **JSON 파일 기반 영속성** | 의존성 없음, 즉시 시작 가능. 설정해야 할 데이터베이스가 없어서 바로 시작할 수 있습니다. |
+| **Vite + Handlebars** | 개발용 빠른 HMR, 코드 조직을 위한 HTML partials, Tailwind JIT까지 두 세계의 장점을 모두 갖췄습니다. |
+| **중앙화된 프롬프트** | 모든 AI 프롬프트는 `prompts.ts`에 있어 언어/연령 그룹별로 쉽게 반복 개선, 테스트, 조정할 수 있습니다. |
+| **다중 생성 시스템** | 각 생성물은 고유 ID를 가진 독립 객체이며, 한 강의당 여러 개의 자료, 퀴즈 등을 허용합니다. |
+| **연령 맞춤형 프롬프트** | 어휘, 복잡도, 톤이 다른 4개 연령 그룹 — 같은 콘텐츠라도 학습자에 따라 다르게 가르칩니다. |
+| **Agents 기반 기능** | 이미지 생성과 웹 검색은 임시 Mistral Agents를 사용하며, 자동 정리되는 깔끔한 생명주기를 가집니다. |
+| **지능형 URL 스크래핑** | 하나의 필드로 URL과 키워드를 섞어 입력할 수 있습니다 — URL은 Readability(정적 페이지)로 스크래핑하고, JS/SPA 페이지는 Lightpanda로 폴백하며, 키워드는 Mistral web_search Agent를 실행합니다. 각 결과는 독립된 소스를 만듭니다. |
+| **100% Mistral TTS** | Mistral Voxtral TTS(`MISTRAL_API_KEY` 외에 추가 키 없음) — 비용 체인과 언어별 음성 결정에 통합된 음성 합성. |
 
 ---
 
@@ -517,7 +519,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 - **[Readability](https://github.com/mozilla/readability)** — 웹 콘텐츠 추출(Firefox Reader View 기술)
 - **[Lightpanda](https://lightpanda.io)** — JS/SPA 페이지 스크래핑을 위한 초경량 헤드리스 브라우저
 
-2026년 3월 Mistral AI Worldwide Hackathon에서 시작되어, [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) 및 [Gemini CLI](https://geminicli.com/)로 전적으로 AI가 개발했습니다.
+2026년 3월 Mistral AI Worldwide Hackathon에서 시작되었으며, [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/), [Gemini CLI](https://geminicli.com/)와 함께 AI가 전적으로 개발했습니다.
 
 ---
 
@@ -529,5 +531,4 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 [AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**이 문서는 gpt-5.4-mini 모델을 사용하여 fr 버전에서 ko 언어로 번역되었습니다. 번역 과정에 대한 자세한 내용은 https://gitlab.com/jls42/ai-powered-markdown-translator를 참조하세요**
-
+**gpt-5.4-mini로 fr에서 ko로 번역된 기사.**

@@ -77,9 +77,9 @@ if [ -z "${MISTRAL_API_KEY:-}" ]; then
   echo "  MISTRAL_API_KEY not set, skipping"
 else
   # Chat models — tested via /v1/chat/completions
-  chat_models=("mistral-large-latest" "mistral-small-latest")
-  # Non-chat models — tested via /v1/models listing
-  other_models=("mistral-ocr-latest" "voxtral-mini-latest" "voxtral-mini-tts-latest" "mistral-moderation-latest")
+  chat_models=("mistral-large-latest" "mistral-medium-latest" "mistral-small-latest")
+  # Non-chat models — tested via /v1/models listing (OCR 3 défaut + OCR 4 option pinnés)
+  other_models=("mistral-ocr-2512" "mistral-ocr-4-0" "mistral-ocr-latest" "voxtral-mini-latest" "voxtral-mini-tts-latest" "mistral-moderation-latest")
   all_ok=true
 
   for model in "${chat_models[@]}"; do

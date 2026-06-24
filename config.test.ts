@@ -85,6 +85,26 @@ describe('initConfig', () => {
     expect(onDisk.mistralVoicesSource).toBeUndefined();
   });
 
+  it('migration OCR : alias legacy mistral-ocr-latest normalisé vers OCR 3 + persisté', () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({ models: { ocr: 'mistral-ocr-latest' } }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().models.ocr).toBe('mistral-ocr-2512');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.models.ocr).toBe('mistral-ocr-2512');
+  });
+
+  it('migration OCR : OCR 4 explicite préservé sans réécriture', () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({ models: { ocr: 'mistral-ocr-4-0' } }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-0');
+  });
+
   it('avec fichier existant merge avec les defauts', () => {
     writeFileSync(
       join(tempDir, 'config.json'),
@@ -314,6 +334,23 @@ describe('saveConfig', () => {
       'config',
       expect.stringContaining("rejected legacy ttsModel 'eleven_v3'"),
     );
+  });
+
+  it('rejette un models.ocr legacy/alias POST et normalise vers OCR 3', () => {
+    initConfig(tempDir);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({ models: { ocr: 'mistral-ocr-latest' } as any });
+    expect(getConfig().models.ocr).toBe('mistral-ocr-2512');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy/unknown OCR model 'mistral-ocr-latest'"),
+    );
+  });
+
+  it('accepte OCR 4 explicite via saveConfig', () => {
+    initConfig(tempDir);
+    saveConfig({ models: { ocr: 'mistral-ocr-4-0' } as any });
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-0');
   });
 });
 

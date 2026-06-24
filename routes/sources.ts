@@ -6,6 +6,7 @@ import type { Source, OcrConfidence, AgeGroup } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
+import { normalizeOcrModel } from '../helpers/ocr-models.js';
 import { moderateContent } from '../generators/moderation.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
@@ -17,6 +18,7 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
+import { getConfig } from '../config.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -181,7 +183,12 @@ export function sourceRoutes(
         `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
       );
     } else {
-      ({ markdown, elapsed, confidence } = await ocrFile(client, file.path, file.originalname));
+      ({ markdown, elapsed, confidence } = await ocrFile(
+        client,
+        file.path,
+        file.originalname,
+        normalizeOcrModel(getConfig().models.ocr),
+      ));
       const confStr = confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : '';
       logger.info(
         'sources',

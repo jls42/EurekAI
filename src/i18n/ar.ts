@@ -178,6 +178,11 @@ export const ar: Record<string, string> = {
   'settings.podcast': '\u0628\u0648\u062f\u0643\u0627\u0633\u062a',
   'settings.ocr': 'OCR',
   'settings.tts': 'TTS',
+  'settings.perMTokens': 'لكل مليون رمز (إدخال/إخراج)',
+  'settings.perKPages': 'لكل 1000 صفحة',
+  'settings.perMChars': 'لكل مليون حرف',
+  'settings.priceUnknown': 'السعر غير متوفر',
+  'settings.ocrHint': 'OCR 3: اقتصادي. OCR 4: جودة أفضل، التكلفة 2×.',
 
   'dashboard.subtitle': '\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0651\u0645',
   'dashboard.addFirstSources':
