@@ -40,18 +40,18 @@ describe('persistUsage', () => {
     expect(store.appendCostEntry).not.toHaveBeenCalled();
   });
 
-  it('returns null for free model (cost = 0)', () => {
+  it('returns null for zero-cost / unknown model', () => {
     const store = makeStore();
     const entries: ApiUsage[] = [
       {
         promptTokens: 500,
         completionTokens: 100,
         totalTokens: 600,
-        model: 'mistral-moderation-latest',
+        model: 'free-unknown-model',
       },
     ];
 
-    expect(persistUsage(store, 'p1', 'POST /moderate', entries)).toBeNull();
+    expect(persistUsage(store, 'p1', 'POST /gen', entries)).toBeNull();
     expect(store.appendCostEntry).not.toHaveBeenCalled();
   });
 

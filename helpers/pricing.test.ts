@@ -90,13 +90,14 @@ describe('calculateCost', () => {
     expect(calculateCost(usage)).toBeCloseTo(0.003, 6);
   });
 
-  it('returns 0 for free moderation model', () => {
+  it('computes input-token cost for moderation (Moderation 2 = $0.1/M input)', () => {
     const usage: ApiUsage = {
       promptTokens: 1000,
       completionTokens: 100,
       model: 'mistral-moderation-2603',
     };
-    expect(calculateCost(usage)).toBe(0);
+    // 1000 * 0.1 / 1M = 0.0001 ; output non facturé pour la modération
+    expect(calculateCost(usage)).toBeCloseTo(0.0001, 8);
   });
 
   it('returns 0 for unknown model', () => {

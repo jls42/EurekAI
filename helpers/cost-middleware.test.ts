@@ -92,13 +92,13 @@ describe('withCostTracking', () => {
     });
   });
 
-  it('does not call appendCostEntry when cost is 0 (free model)', async () => {
+  it('does not call appendCostEntry when cost is 0 (zero-cost / unknown model)', async () => {
     const usage: ApiUsage[] = [
       {
         promptTokens: 500,
         completionTokens: 100,
         totalTokens: 600,
-        model: 'mistral-moderation-latest',
+        model: 'free-unknown-model',
       },
     ];
 

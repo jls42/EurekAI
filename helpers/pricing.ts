@@ -36,7 +36,9 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // OCR 4 ($4/1000 pages) plus long que 'mistral-ocr' → gagne le greedy-prefix pour mistral-ocr-4-0.
   'mistral-ocr-4': { inputPerMillion: 4000, outputPerMillion: 0, unit: 'pages' },
   'mistral-ocr': { inputPerMillion: 2000, outputPerMillion: 0, unit: 'pages' },
-  'mistral-moderation': { inputPerMillion: 0, outputPerMillion: 0, unit: 'tokens' },
+  // Moderation 2 (mistral-moderation-2603) = $0.1/M tokens input (PAS gratuite — vérifié sur
+  // mistral.ai/pricing). Pas de tokens de complétion facturés (classification) → output 0.
+  'mistral-moderation': { inputPerMillion: 0.1, outputPerMillion: 0, unit: 'tokens' },
 };
 
 /** URLs for scraping up-to-date pricing from Mistral docs. */
