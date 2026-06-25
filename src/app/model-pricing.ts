@@ -19,7 +19,15 @@ export function modelPriceLabel(modelId: string, t: TranslateFn): string {
       return `$${pricing.inputPerMillion / 1000} ${t('settings.perKPages')}`;
     case 'characters':
       return `$${pricing.inputPerMillion} ${t('settings.perMChars')}`;
-    default:
+    case 'audio-seconds':
+      // STT (voxtral-mini) n'est exposé dans aucun sélecteur Réglages → pas de libellé tarifaire.
+      // S'il l'était un jour, ajouter une clé i18n dédiée plutôt que retomber sur priceUnknown.
       return t('settings.priceUnknown');
+    default: {
+      // Exhaustivité compile-time : une nouvelle BillingUnit casse ce `never` et force
+      // un case explicite — évite un "tarif indisponible" silencieux sur un modèle pourtant tarifé.
+      const _exhaustive: never = pricing.unit;
+      return _exhaustive;
+    }
   }
 }

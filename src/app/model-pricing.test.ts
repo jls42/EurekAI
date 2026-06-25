@@ -29,4 +29,10 @@ describe('modelPriceLabel', () => {
   it('returns priceUnknown for an unknown model', () => {
     expect(modelPriceLabel('gpt-4o', t)).toBe('settings.priceUnknown');
   });
+
+  // audio-seconds (STT voxtral-mini) est tarifé mais n'est exposé dans aucun sélecteur Réglages :
+  // choix explicite documenté en code (case dédié) — verrouille le comportement contre une régression.
+  it('returns priceUnknown for audio-seconds models (STT not surfaced in selectors)', () => {
+    expect(modelPriceLabel('voxtral-mini-latest', t)).toBe('settings.priceUnknown');
+  });
 });

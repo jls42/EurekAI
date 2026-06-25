@@ -2,14 +2,14 @@ import { readFileSync } from 'node:fs';
 import { Mistral } from '@mistralai/mistralai';
 import { logger } from '../helpers/logger.js';
 import { timer } from '../helpers/index.js';
-import { DEFAULT_OCR_MODEL } from '../helpers/ocr-models.js';
+import { DEFAULT_OCR_MODEL, type OcrModel } from '../helpers/ocr-models.js';
 import type { OcrConfidence } from '../types.js';
 
 export async function ocrFile(
   client: Mistral,
   filePath: string,
   fileName: string,
-  model: string = DEFAULT_OCR_MODEL,
+  model: OcrModel = DEFAULT_OCR_MODEL,
 ): Promise<{ markdown: string; elapsed: number; confidence?: OcrConfidence }> {
   const content = readFileSync(filePath);
   const stop = timer();
