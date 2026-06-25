@@ -11,6 +11,15 @@ export type OcrModel = (typeof OCR_MODELS)[number];
 /**
  * Défaut OCR 3 (`mistral-ocr-2512`, $2/1000 pages). OCR 4 ($4/1000) reste opt-in :
  * 2× plus cher, réservé aux scans difficiles.
+ *
+ * ⚠ DÉCISION DATÉE (source autoritaire) : OCR 3 est annoncé déprécié au **2026-06-30** dans
+ * les docs Mistral (remplacé par OCR 4, sorti le 2026-06-23). Défaut OCR 3 conservé
+ * **volontairement** pour le coût bas tant qu'il fonctionne — choix temporaire assumé, PAS un
+ * oubli. Déprécié ≠ retiré : aucune date de retraite n'est publiée, le modèle continue de
+ * tourner après le 30/06. Revoir ce défaut après le 2026-06-30, ou au premier signal API/docs
+ * de retirement / erreur OCR. Pas de tripwire automatique sur la date : `/v1/models` renvoie
+ * `deprecation: None` (lag docs) et `scripts/check-deps.sh` ne fait qu'un smoke-test
+ * d'existence — un rappel daté release-time y est encodé en dur (table `known_deprecations`).
  */
 export const DEFAULT_OCR_MODEL: OcrModel = 'mistral-ocr-2512';
 

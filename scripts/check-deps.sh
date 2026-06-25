@@ -111,6 +111,31 @@ else
   fi
 fi
 
+echo ""
+echo "=== Known model deprecations (local table — Mistral docs lag /v1/models) ==="
+# Mistral annonce les dépréciations sur les model cards AVANT que /v1/models ne reflète le
+# champ `deprecation` (vérifié : l'API renvoie None alors que la doc date déjà le retrait).
+# Le smoke-test d'existence ci-dessus ne voit donc rien tant que le modèle reste listé.
+# Cette table locale produit un rappel DATÉ au release-time. Format: "model-id|YYYY-MM-DD".
+known_deprecations=(
+  "mistral-ocr-2512|2026-06-30" # OCR 3 -> remplacé par OCR 4 ; cf. DEFAULT_OCR_MODEL (helpers/ocr-models.ts)
+)
+today_ymd=$(date -u +%Y-%m-%d)
+today_epoch=$(date -u -d "$today_ymd" +%s)
+for entry in "${known_deprecations[@]}"; do
+  IFS='|' read -r dep_model dep_date <<< "$entry"
+  if ! dep_epoch=$(date -u -d "$dep_date" +%s 2>/dev/null); then
+    echo "  (skip $dep_model: '$dep_date' non parsable par cette implémentation de 'date')"
+    continue
+  fi
+  days=$(((dep_epoch - today_epoch) / 86400))
+  if [ "$days" -gt 0 ]; then
+    echo "  ⚠ $dep_model déprécié le $dep_date (dans $days jours) — revoir DEFAULT_OCR_MODEL"
+  else
+    echo "  ⚠ $dep_model déprécié depuis le $dep_date (il y a $((-days)) jours) — revoir DEFAULT_OCR_MODEL"
+  fi
+done
+
 # ── Changelogs with persistent state (disable strict mode for robustness) ──
 set +eo pipefail
 echo ""
