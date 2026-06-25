@@ -120,6 +120,59 @@ Le bouton "Chat" est desactive pour les profils enfant (`Chat desactive pour ce 
 - Le clic ne declenche pas de POST `/chat`
 - Le tooltip s'affiche au hover
 
+## Phase 2bis — Sélection modèle OCR + tarifs modèles (Réglages)
+
+Couvre la feature PR #41 (sélecteur OCR 3/OCR 4 + libellés tarifaires `modelOptionLabel`/`modelPriceLabel`, et routage effectif du modèle OCR choisi). Le reste du skill ne touche **jamais** les Réglages → sans cette phase, la feature n'est pas testée E2E.
+
+### Source unique à relire (ne jamais rededuire la liste / les tarifs ici)
+
+```bash
+grep -E "OCR_MODELS =|DEFAULT_OCR_MODEL" helpers/ocr-models.ts
+grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
+```
+
+### A — Libellés tarifaires dans les Réglages (Chrome, coût API nul)
+
+1. Ouvrir le dialog Réglages : `find` "bouton parametres / reglages / engrenage" puis clic. (Le dialog est `<dialog x-ref="settingsDialog">` ; les selecteurs ont des ids stables `#cfg-main-model`, `#cfg-ocr-model`.)
+2. Lire les options des deux selecteurs + le libellé TTS via `javascript_tool` :
+   ```javascript
+   const opts = (sel) => Array.from(document.querySelectorAll(sel + ' option'))
+     .map((o) => ({ value: o.value, label: o.textContent.trim() }));
+   const tts = document.querySelector('[x-text*="voxtral-mini-tts"]')?.textContent.trim();
+   ({ main: opts('#cfg-main-model'), ocr: opts('#cfg-ocr-model'), tts });
+   ```
+3. Assertions (croiser avec les `grep` ci-dessus, ne rien hardcoder) :
+   - `ocr` = exactement les valeurs de `OCR_MODELS` (`mistral-ocr-2512`, `mistral-ocr-4-0`).
+   - Label OCR 3 contient `$2` ; label OCR 4 contient `$4` ; les deux contiennent l'unite pages (`1000`).
+   - L'option `DEFAULT_OCR_MODEL` porte le suffixe recommande (texte i18n `settings.recommended`).
+   - Labels modele principal : `mistral-large` → `$0.50 / $1.50`, `mistral-medium` → `$1.50 / $7.50`, `mistral-small` → `$0.15 / $0.60`.
+   - `tts` contient `$16`.
+   - **AUCUN** label/span ne contient `tarif indisponible` / `price unavailable` (regression `modelPriceLabel` → `priceUnknown`, ex. unite `audio-seconds` non geree).
+4. Screenshot du dialog (preuve visuelle des tarifs).
+
+### B — Routage effectif des deux modèles OCR (cost-tracking, ~$0.005, 2 uploads)
+
+**⚠ Mute la config** (`PUT /api/config`, restauree en fin de phase) **et ajoute 2 sources de test** au projet. A confirmer avec l'user si mode "etat actuel". But : prouver end-to-end que le modele OCR choisi est bien envoye ET tarife correctement (OCR 4 = 2x OCR 3).
+
+Fixture (generer si absente, sinon demander un fichier a l'user, sinon SKIP en le notant) :
+
+```bash
+if command -v convert >/dev/null; then
+  convert -size 700x200 xc:white -gravity center -pointsize 26 \
+    -annotate 0 "EurekAI OCR test - facture 2026 - total 42 EUR" /tmp/ocr-test.png && echo "/tmp/ocr-test.png"
+else echo "NO_FIXTURE"; fi
+```
+
+Pour chaque `model` dans `OCR_MODELS` :
+
+1. `PUT /api/config` `{"models":{"ocr":"<model>"}}` puis `GET /api/config` → assert `models.ocr === <model>` (`normalizeOcrModel` ne doit PAS reecrire une valeur valide).
+2. `POST /api/projects/$PROJECT_ID/sources/upload` (multipart, champ `files`) avec la fixture.
+3. Attendre la reponse (source enrichie : `markdown` non vide + `estimatedCost` + `costBreakdown` d'unite pages).
+4. Assert : `markdown` non vide (OCR a tourne) ; cout **par page** coherent — OCR 4 ≈ 2x OCR 3 pour le meme fichier (comparer cout/page, pas cout brut, au cas ou le nb de pages differe).
+5. En fin de phase : restaurer `PUT /api/config` `{"models":{"ocr":"<DEFAULT_OCR_MODEL>"}}`.
+
+Si `NO_FIXTURE` et pas de fichier fourni : **SKIP B**, noter `⚪ LOW: OCR live dual-model non teste (pas de fixture)`. Ne jamais inventer un resultat.
+
 ## Phase 3 — Audit securite
 
 Lancer le script securite dedie :
@@ -171,6 +224,12 @@ Compiler dans la reponse a l'user :
 |------------|--------|------|-------|
 | summary    | ✓/✗    | $0.X | ...   |
 ...
+
+### OCR + tarifs modeles (PR #41)
+- Selecteur OCR (OCR 3 / OCR 4 + tarifs) : ✓/✗
+- Libelles tarifaires modele principal + TTS (aucun "tarif indisponible") : ✓/✗
+- Routage live OCR 3 (cout/page ≈ $2/1000) : ✓/✗/skip
+- Routage live OCR 4 (cout/page ≈ 2x OCR 3) : ✓/✗/skip
 
 ### Securite (output script)
 - JSON malformed : ✓/✗
