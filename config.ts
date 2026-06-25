@@ -171,10 +171,10 @@ const removeLegacyGlobalVoiceFields = (): boolean => {
   return changed;
 };
 
-// Migration one-time : normalise un `models.ocr` legacy (`mistral-ocr-latest`, ancien défaut
-// forcé jamais choisi délibérément, ou valeur inconnue) vers un OcrModel valide. Sans ça,
-// mergeSafe préserve l'alias sur disque et le generator partirait silencieusement sur OCR 4
-// ($4/1000) au lieu du défaut OCR 3 ($2/1000) voulu.
+// Migration one-time : normalise un `models.ocr` legacy (`mistral-ocr-latest`, ancien alias
+// mouvant, ou valeur inconnue) vers le défaut OcrModel explicite courant (OCR 4). Sans ça,
+// mergeSafe préserve l'alias mouvant sur disque ; on le fige sur la version explicite pour qu'une
+// future bascule Mistral de `-latest` ne change pas le modèle (ni le tarif) silencieusement.
 // const arrow (pas `function`) : contournement parseur Lizard (cf. CLAUDE.md "Mesurer > deviner").
 const normalizeLegacyOcrModel = (): boolean => {
   const current = currentConfig.models.ocr;
@@ -282,8 +282,8 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
     // Rejection legacy/alias (symétrie avec ttsModel 'eleven_*' ci-dessous) : un client stale
-    // peut POSTer 'mistral-ocr-latest' (ancien défaut) ou une valeur inconnue entre 2 restarts.
-    // On normalise vers un OcrModel valide (OCR 3 par défaut) plutôt que laisser fuir l'alias vers OCR 4.
+    // peut POSTer 'mistral-ocr-latest' (alias mouvant) ou une valeur inconnue entre 2 restarts.
+    // On normalise vers le défaut OcrModel explicite (OCR 4) plutôt que laisser fuir un alias mouvant.
     const requestedOcr = currentConfig.models.ocr;
     const normalizedOcr = normalizeOcrModel(requestedOcr);
     if (requestedOcr !== normalizedOcr) {

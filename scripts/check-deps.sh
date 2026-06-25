@@ -113,27 +113,33 @@ fi
 
 echo ""
 echo "=== Known model deprecations (local table — Mistral docs lag /v1/models) ==="
-# Mistral annonce les dépréciations sur les model cards AVANT que /v1/models ne reflète le
-# champ `deprecation` (vérifié : l'API renvoie None alors que la doc date déjà le retrait).
-# Le smoke-test d'existence ci-dessus ne voit donc rien tant que le modèle reste listé.
-# Cette table locale produit un rappel DATÉ au release-time. Format: "model-id|YYYY-MM-DD".
+# Mistral publie les dates de retrait sur https://docs.mistral.ai/models/overview (colonnes
+# Deprecation / Retirement / Alternative). Le champ `deprecation` de /v1/models est tantôt None
+# (lag, ex. OCR), tantôt peuplé (ex. moderation) — donc peu fiable seul. Le smoke-test d'existence
+# ci-dessus ne voit rien tant que le modèle reste listé. Cette table locale produit un rappel DATÉ
+# au release-time. Format: "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
+# N'y mettre que les modèles RÉELLEMENT utilisés (cf. audit modèles).
 known_deprecations=(
-  "mistral-ocr-2512|2026-06-30" # OCR 3 -> remplacé par OCR 4 ; cf. DEFAULT_OCR_MODEL (helpers/ocr-models.ts)
+  "mistral-ocr-2512|2026-06-30|2026-09-30|OCR 4" # OCR 3 (opt-in) ; défaut = OCR 4
 )
 today_ymd=$(date -u +%Y-%m-%d)
 today_epoch=$(date -u -d "$today_ymd" +%s)
+days_until() { # echo le nb de jours (signé) entre aujourd'hui et $1 (YYYY-MM-DD), ou "" si non parsable
+  local e
+  e=$(date -u -d "$1" +%s 2>/dev/null) || { echo ""; return; }
+  echo "$(((e - today_epoch) / 86400))"
+}
+fmt_date() { # "le $1 (dans N j)" / "depuis le $1 (il y a N j)" selon le signe de $2
+  if [ "$2" -gt 0 ]; then echo "le $1 (dans $2 j)"; else echo "depuis le $1 (il y a $((-$2)) j)"; fi
+}
 for entry in "${known_deprecations[@]}"; do
-  IFS='|' read -r dep_model dep_date <<< "$entry"
-  if ! dep_epoch=$(date -u -d "$dep_date" +%s 2>/dev/null); then
-    echo "  (skip $dep_model: '$dep_date' non parsable par cette implémentation de 'date')"
-    continue
-  fi
-  days=$(((dep_epoch - today_epoch) / 86400))
-  if [ "$days" -gt 0 ]; then
-    echo "  ⚠ $dep_model déprécié le $dep_date (dans $days jours) — revoir DEFAULT_OCR_MODEL"
-  else
-    echo "  ⚠ $dep_model déprécié depuis le $dep_date (il y a $((-days)) jours) — revoir DEFAULT_OCR_MODEL"
-  fi
+  IFS='|' read -r dep_model dep_date ret_date alt <<< "$entry"
+  dd=$(days_until "$dep_date")
+  rd=$(days_until "$ret_date")
+  msg="  ⚠ $dep_model"
+  [ -n "$dd" ] && msg="$msg déprécié $(fmt_date "$dep_date" "$dd")"
+  [ -n "$rd" ] && msg="$msg, RETIRÉ $(fmt_date "$ret_date" "$rd")"
+  echo "$msg — alternative: ${alt:-?}"
 done
 
 # ── Changelogs with persistent state (disable strict mode for robustness) ──

@@ -134,17 +134,19 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
 ### A — Libellés tarifaires dans les Réglages (Chrome, coût API nul)
 
 1. Ouvrir le dialog Réglages : `find` "bouton parametres / reglages / engrenage" puis clic. (Le dialog est `<dialog x-ref="settingsDialog">` ; les selecteurs ont des ids stables `#cfg-main-model`, `#cfg-ocr-model`.)
-2. Lire les options des deux selecteurs + le libellé TTS via `javascript_tool` :
+2. Lire les options des deux selecteurs + le libellé TTS + la ligne ID réel OCR via `javascript_tool` :
    ```javascript
    const opts = (sel) => Array.from(document.querySelectorAll(sel + ' option'))
      .map((o) => ({ value: o.value, label: o.textContent.trim() }));
    const tts = document.querySelector('[x-text*="voxtral-mini-tts"]')?.textContent.trim();
-   ({ main: opts('#cfg-main-model'), ocr: opts('#cfg-ocr-model'), tts });
+   const ocrRealId = document.querySelector('[x-text="configDraft._ocrModel"]')?.textContent.trim();
+   ({ main: opts('#cfg-main-model'), ocr: opts('#cfg-ocr-model'), tts, ocrRealId });
    ```
 3. Assertions (croiser avec les `grep` ci-dessus, ne rien hardcoder) :
-   - `ocr` = exactement les valeurs de `OCR_MODELS` (`mistral-ocr-2512`, `mistral-ocr-4-0`).
-   - Label OCR 3 contient `$2` ; label OCR 4 contient `$4` ; les deux contiennent l'unite pages (`1000`).
-   - L'option `DEFAULT_OCR_MODEL` porte le suffixe recommande (texte i18n `settings.recommended`).
+   - `ocr` (les `option.value`) = exactement les valeurs de `OCR_MODELS` (ordre actuel : OCR 4 puis OCR 3).
+   - Les labels OCR montrent le **nom produit** (`OCR_MODEL_LABELS` : "OCR 4" / "OCR 3"), PAS l'ID brut ; OCR 4 contient `$4`, OCR 3 contient `$2`, les deux l'unite pages (`1000`).
+   - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-0`).
+   - L'option `DEFAULT_OCR_MODEL` (OCR 4) porte le suffixe recommande (texte i18n `settings.recommended`).
    - Labels modele principal : `mistral-large` → `$0.50 / $1.50`, `mistral-medium` → `$1.50 / $7.50`, `mistral-small` → `$0.15 / $0.60`.
    - `tts` contient `$16`.
    - **AUCUN** label/span ne contient `tarif indisponible` / `price unavailable` (regression `modelPriceLabel` → `priceUnknown`, ex. unite `audio-seconds` non geree).

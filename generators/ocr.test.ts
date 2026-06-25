@@ -37,7 +37,7 @@ describe('ocrFile', () => {
       purpose: 'ocr',
     });
     expect(client.ocr.process).toHaveBeenCalledWith({
-      model: 'mistral-ocr-2512',
+      model: 'mistral-ocr-4-0',
       document: { fileId: 'file-123', type: 'file' },
       confidenceScoresGranularity: 'page',
     });
@@ -46,21 +46,21 @@ describe('ocrFile', () => {
     expect(result.confidence).toBeUndefined();
   });
 
-  it('defaults to OCR 3 when no model is provided', async () => {
+  it('defaults to OCR 4 when no model is provided', async () => {
     const client = createClient();
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(client.ocr.process).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'mistral-ocr-2512' }),
+      expect.objectContaining({ model: 'mistral-ocr-4-0' }),
     );
   });
 
-  it('forwards the requested OCR model (e.g. OCR 4) to client.ocr.process', async () => {
+  it('forwards the requested OCR model (e.g. OCR 3 opt-in) to client.ocr.process', async () => {
     const client = createClient();
-    await ocrFile(client, '/tmp/test.pdf', 'test.pdf', 'mistral-ocr-4-0');
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf', 'mistral-ocr-2512');
 
     expect(client.ocr.process).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'mistral-ocr-4-0' }),
+      expect.objectContaining({ model: 'mistral-ocr-2512' }),
     );
   });
 

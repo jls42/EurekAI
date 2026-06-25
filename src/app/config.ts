@@ -1,6 +1,6 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
-import { normalizeOcrModel } from '@helpers/ocr-models';
+import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
 import { modelPriceLabel as priceLabel } from './model-pricing';
 import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
@@ -142,9 +142,12 @@ export function createConfig() {
       return priceLabel(modelId, (k: string) => this.t(k));
     },
 
-    // Libellé d'option de dropdown : "<id> — <tarif>" (Génération + OCR).
+    // Libellé d'option de dropdown : "<nom> — <tarif>". Pour OCR, <nom> = nom produit lisible
+    // (OCR 3 / OCR 4) via OCR_MODEL_LABELS ; sinon l'ID technique. L'ID réel reste affiché en
+    // italique sous le sélecteur OCR (cf. dialog-settings.html, x-text configDraft._ocrModel).
     modelOptionLabel(this: AppContext, modelId: string): string {
-      return `${modelId} — ${this.modelPriceLabel(modelId)}`;
+      const display = (OCR_MODEL_LABELS as Record<string, string>)[modelId] ?? modelId;
+      return `${display} — ${this.modelPriceLabel(modelId)}`;
     },
 
     async saveSettings(this: AppContext) {
