@@ -61,7 +61,8 @@ const deEscapeApiId = (cell: string): string => linkText(cell).replace(/\\/g, ''
 // Deux dates COLLÉES dans la cellule « DeprecationRetirement » (ex. `2/27/20265/31/2026`) → [dep, ret].
 const DATE_RE = /\d{1,2}\/\d{1,2}\/\d{4}/g;
 const isModelId = (id: string): boolean => id.includes('-') && /^[a-z][a-z0-9.-]*$/i.test(id);
-const cell = (cells: string[], i: number): string => cells[i] ?? '';
+// `.at(i)` plutôt que `cells[i]` : évite le faux positif security/detect-object-injection (lecture à index variable).
+const cell = (cells: string[], i: number): string => cells.at(i) ?? '';
 // Une alternative valide a du texte (rejette les cellules vides ou `-` → pas de « remplacer par - »).
 const cleanAlt = (alt: string): string | undefined => (/[a-z]/i.test(alt) ? alt : undefined);
 
@@ -82,15 +83,15 @@ const parseLegacyRow = (line: string): LegacyEntry | null => {
 };
 
 /**
- * Parse la table « Legacy/Deprecated » de l'overview (markdown rendu) en map `apiId → {dep, ret, alt}`.
+ * Parse la table « Legacy/Deprecated » de l'overview (markdown rendu) en `Map<apiId, {dep, ret, alt}>`.
  * Fonction PURE (testable) : ignore header/séparateur et toute ligne dont la 3e cellule n'est pas un id
- * de modèle. Renvoie `{}` si aucune table n'est présente (page sans Legacy / rendu vide).
+ * de modèle. Renvoie une Map vide si aucune table n'est présente (page sans Legacy / rendu vide).
  */
-export function parseLegacyTable(markdown: string): Record<string, LegacyEntry> {
-  const out: Record<string, LegacyEntry> = {};
+export function parseLegacyTable(markdown: string): Map<string, LegacyEntry> {
+  const out = new Map<string, LegacyEntry>();
   for (const line of markdown.split('\n')) {
     const entry = parseLegacyRow(line);
-    if (entry) out[entry.apiId] = entry;
+    if (entry) out.set(entry.apiId, entry);
   }
   return out;
 }
@@ -119,11 +120,11 @@ const formatWarning = (
 const evalAlias = (
   alias: string,
   byAlias: Map<string, ModelEntry>,
-  legacy: Record<string, LegacyEntry>,
+  legacy: Map<string, LegacyEntry>,
 ): string | null => {
   const target = byAlias.get(alias);
   if (!target) return null;
-  const legacyEntry = legacy[target.id];
+  const legacyEntry = legacy.get(target.id);
   const deprecation = target.deprecation ?? legacyEntry?.deprecation;
   if (!deprecation && !legacyEntry) return null;
   return formatWarning(alias, target.id, deprecation ?? undefined, legacyEntry);
@@ -136,7 +137,7 @@ const evalAlias = (
  */
 export function analyzeModels(
   models: ModelEntry[],
-  legacy: Record<string, LegacyEntry> = {},
+  legacy: Map<string, LegacyEntry> = new Map(),
 ): string[] {
   const byAlias = buildAliasMap(models);
   const warnings: string[] = [];
@@ -157,20 +158,22 @@ export async function fetchModels(key: string): Promise<ModelEntry[]> {
 }
 
 // I/O Lightpanda (non testée : navigateur headless ~40 s/page). Rend l'overview JS et parse la table.
-const fetchLegacyTable = async (): Promise<Record<string, LegacyEntry>> => {
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy ESLint ne résout pas les types @lightpanda/browser (faux positifs) ; couvert par lint:ci local type-aware */
+const fetchLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
   const r = await lightpanda.fetch(OVERVIEW_URL, { dump: true, dumpOptions: { type: 'markdown' } });
   const md = typeof r === 'string' ? r : r.toString('utf-8');
   return parseLegacyTable(md);
 };
+/* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 
 // Dégradation gracieuse : un échec overview (réseau/Lightpanda) ne casse pas le diagnostic API-seul.
-const loadLegacyTable = async (): Promise<Record<string, LegacyEntry>> => {
+const loadLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
   try {
     return await fetchLegacyTable();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.log(`check-models: overview indisponible (${msg}) — diagnostic API seul.`);
-    return {};
+    return new Map();
   }
 };
 

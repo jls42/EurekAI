@@ -19,7 +19,7 @@ const LEGACY_MD = [
 describe('parseLegacyTable', () => {
   it('parses the api id, both glued dates (deprecation+retirement) and the alternative', () => {
     const t = parseLegacyTable(LEGACY_MD);
-    expect(t['mistral-ocr-2505']).toEqual({
+    expect(t.get('mistral-ocr-2505')).toEqual({
       apiId: 'mistral-ocr-2505',
       deprecation: '2/27/2026',
       retirement: '5/31/2026',
@@ -28,20 +28,20 @@ describe('parseLegacyTable', () => {
   });
 
   it('ignores the header and separator rows (only model-id rows kept)', () => {
-    expect(Object.keys(parseLegacyTable(LEGACY_MD))).toEqual([
+    expect([...parseLegacyTable(LEGACY_MD).keys()]).toEqual([
       'mistral-ocr-2505',
       'mistral-moderation-2411',
     ]);
   });
 
-  it('returns {} on markdown without a legacy table', () => {
-    expect(parseLegacyTable('# Overview\nno table here\njust prose')).toEqual({});
+  it('returns an empty map on markdown without a legacy table', () => {
+    expect(parseLegacyTable('# Overview\nno table here\njust prose').size).toBe(0);
   });
 
   it('drops a non-link / dash alternative cell (no "remplacer par -")', () => {
     const md =
       '| M | V | API | DeprecationRetirement | Alternative |\n| [X](u) | 1 | foo\\-bar\\-2401 | 1/1/20262/2/2026 | - |';
-    expect(parseLegacyTable(md)['foo-bar-2401'].alternative).toBeUndefined();
+    expect(parseLegacyTable(md).get('foo-bar-2401')?.alternative).toBeUndefined();
   });
 });
 
