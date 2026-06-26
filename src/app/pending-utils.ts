@@ -9,7 +9,7 @@
  * `?? {}` tolère un `pendingById` absent (state partiel des mocks de tests) → renvoie alors `false`.
  */
 export function pendingOfTypeExists(
-  pendingById: Record<string, { type: string; status: string }>,
+  pendingById: Record<string, { type: string; status: string }> | undefined,
   type: string,
 ): boolean {
   return Object.values(pendingById ?? {}).some((p) => p.type === type && p.status === 'pending');

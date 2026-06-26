@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- `crypto.subtle` peut être undefined en contexte non sécurisé (app servie en HTTP non-localhost) ; le typage lib.dom (Crypto non-null) ne reflète pas ce cas runtime géré volontairement */
 import type { Source } from '../../types';
 
 /**

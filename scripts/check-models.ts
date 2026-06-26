@@ -7,7 +7,6 @@
  * Informatif et **NON BLOQUANT** : `exit 0` toujours, skip sans `MISTRAL_API_KEY`, tolérant au shape
  * de la réponse. Appelé par `scripts/check-deps.sh` (`|| true`). Usage direct : `npx tsx scripts/check-models.ts`.
  */
-import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 
 // Alias `-latest` réellement résolus par EurekAI. Le champ `deprecation` de l'API les concernant doit
@@ -47,18 +46,7 @@ export function analyzeModels(models: ModelEntry[]): string[] {
   return warnings;
 }
 
-function resolveApiKey(): string | undefined {
-  if (process.env.MISTRAL_API_KEY) return process.env.MISTRAL_API_KEY;
-  try {
-    const env = readFileSync(new URL('../.env', import.meta.url), 'utf-8');
-    const m = /^MISTRAL_API_KEY=(.+)$/m.exec(env);
-    return m?.[1]?.trim().replace(/^["']|["']$/g, '');
-  } catch {
-    return undefined;
-  }
-}
-
-async function fetchModels(key: string): Promise<ModelEntry[]> {
+export async function fetchModels(key: string): Promise<ModelEntry[]> {
   const res = await fetch('https://api.mistral.ai/v1/models', {
     headers: { Authorization: `Bearer ${key}` },
   });
@@ -67,10 +55,12 @@ async function fetchModels(key: string): Promise<ModelEntry[]> {
   return data.data ?? [];
 }
 
-async function main(): Promise<void> {
-  const key = resolveApiKey();
+export async function main(): Promise<void> {
+  // Lancé via check-deps.sh (qui source .env) → process.env peuplé. En standalone, sourcer .env
+  // avant (cf. CLAUDE.md « API Mistral en local »), sinon skip gracieux.
+  const key = process.env.MISTRAL_API_KEY;
   if (!key) {
-    console.log('check-models: MISTRAL_API_KEY absent — skip (non bloquant).');
+    console.log('check-models: MISTRAL_API_KEY absent (source .env avant) — skip (non bloquant).');
     return;
   }
   try {
