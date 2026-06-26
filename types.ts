@@ -55,6 +55,15 @@ export interface Source {
   usage?: GenerationUsage;
   costBreakdown?: string[];
   ocrConfidence?: OcrConfidence;
+  /** sha256 hex du fichier source brut (image/pdf/txt) — détecte les ré-imports (dédup). */
+  contentHash?: string;
+}
+
+/** Doublon détecté à l'upload (même contentHash qu'une source existante ou un fichier du même lot). */
+export interface DuplicateUpload {
+  filename: string;
+  contentHash: string;
+  existingSourceId?: string;
 }
 
 export interface StudyFiche {

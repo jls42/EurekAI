@@ -239,6 +239,11 @@ export const ar: Record<string, string> = {
   'sources.fileStatus.uploading': '\u062a\u062d\u0644\u064a\u0644 OCR...',
   'sources.fileStatus.done': '\u0645\u0643\u062a\u0645\u0644',
   'sources.fileStatus.error': '\u062e\u0637\u0623',
+  'sources.fileStatus.hashing': 'جارٍ التحقق…',
+  'sources.fileStatus.duplicate': 'مُستورد بالفعل',
+  'sources.importAnyway': 'استيراد على أي حال',
+  'sources.ignore': 'تجاهل',
+  'sources.duplicateWarning': '{n} ملف موجود بالفعل في المشروع',
   'sources.addedSources':
     '\u0627\u0644\u0645\u0635\u0627\u062f\u0631 \u0627\u0644\u0645\u0636\u0627\u0641\u0629',
   'sources.deselectAll':

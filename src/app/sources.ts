@@ -1,8 +1,9 @@
 import { addCostDelta } from './cost-utils';
+import { hashFile, findExistingDuplicate } from './source-dedup';
 import type { AppContext, AppState } from './app-context';
 import type { Source } from '../../types';
 
-type UploadResult = 'applied' | 'ignored' | 'failed';
+type UploadResult = 'applied' | 'ignored' | 'failed' | 'duplicate';
 type UploadSession = AppState['uploadSessions'][number];
 type UploadFile = UploadSession['files'][number];
 
@@ -88,6 +89,8 @@ export async function _uploadSingleFile(
   const file = session.files.find((f: UploadFile) => f.id === fileId);
   if (!file?.file) return 'ignored';
 
+  // Re-upload d'un fichier déjà marqué doublon = décision explicite « Importer quand même ».
+  const forced = file.status === 'duplicate';
   file.status = 'uploading';
   file.errorMsg = null;
   this.$nextTick(() => this.refreshIcons());
@@ -95,6 +98,7 @@ export async function _uploadSingleFile(
   const formData = new FormData();
   formData.append('files', file.file, file.name);
   formData.append('lang', this.locale);
+  if (forced) formData.append('allowDuplicates', 'true');
 
   try {
     const res = await fetch(`/api/projects/${session.projectId}/sources/upload`, {
@@ -102,14 +106,42 @@ export async function _uploadSingleFile(
       body: formData,
     });
     if (!_isSessionActive(this, session)) return 'ignored';
-    if (!res.ok) return _handleUploadHttpError(this, session, file, res);
-    const newSources = await res.json();
-    if (!_isSessionActive(this, session)) return 'ignored';
-    _applyUploadSuccess(this, session, file, newSources);
-    return 'applied';
+    return await _handleUploadResponse(this, session, file, res);
   } catch (e: unknown) {
     return _handleUploadException(this, session, file, e);
   }
+}
+
+// Garde serveur : réponse { sources, failures, duplicates } quand le fichier est un doublon (OCR
+// skippé). Sinon array nu (full success). On normalise AVANT le push (spread d'un objet = crash).
+async function _handleUploadResponse(
+  ctx: AppContext,
+  session: UploadSession,
+  file: UploadFile,
+  res: Response,
+): Promise<UploadResult> {
+  if (!res.ok) return _handleUploadHttpError(ctx, session, file, res);
+  const payload = await res.json();
+  if (!_isSessionActive(ctx, session)) return 'ignored';
+  if (_responseHasDuplicate(payload, file.name)) {
+    file.status = 'duplicate';
+    ctx.$nextTick(() => ctx.refreshIcons());
+    return 'duplicate';
+  }
+  _applyUploadSuccess(ctx, session, file, _extractSources(payload));
+  return 'applied';
+}
+
+/** Réponse upload normalisée : array nu (full success) ou objet { sources, failures, duplicates }. */
+function _extractSources(payload: unknown): Source[] {
+  if (Array.isArray(payload)) return payload as Source[];
+  return (payload as { sources?: Source[] }).sources ?? [];
+}
+
+function _responseHasDuplicate(payload: unknown, filename: string): boolean {
+  if (Array.isArray(payload)) return false;
+  const dups = (payload as { duplicates?: Array<{ filename: string }> }).duplicates ?? [];
+  return dups.some((d) => d.filename === filename);
 }
 
 export function _createUploadSession(
@@ -137,6 +169,9 @@ export async function _runUploadLoop(
   let applied = 0;
   let interrupted = false;
   for (const fileEntry of session.files) {
+    // Pré-check client : un doublon déjà détecté n'est PAS uploadé (zéro coût OCR). L'utilisateur le
+    // force via « Importer quand même » (retryFile) qui rappelle _uploadSingleFile avec allowDuplicates.
+    if (fileEntry.status === 'duplicate') continue;
     const result = await _uploadSingleFile.call(ctx, session, fileEntry.id);
     if (result === 'ignored') {
       interrupted = true;
@@ -145,6 +180,39 @@ export async function _runUploadLoop(
     if (result === 'applied') applied++;
   }
   return { applied, interrupted };
+}
+
+/**
+ * Pré-check client (best-effort) : hash chaque fichier et marque 'duplicate' ceux qui dupliquent une
+ * source existante ou un fichier antérieur du même lot. Statut transitoire 'hashing' pendant le calcul.
+ * Si `crypto.subtle` est absent (hash null), aucun marquage : le garde serveur prend le relais.
+ */
+export async function _markClientDuplicates(
+  ctx: AppContext,
+  session: UploadSession,
+): Promise<void> {
+  const seen = new Set<string>();
+  for (const f of session.files) {
+    if (!f.file) continue;
+    f.status = 'hashing';
+    ctx.$nextTick(() => ctx.refreshIcons());
+    const hash = await hashFile(f.file);
+    if (!_isSessionActive(ctx, session)) return;
+    const existing = findExistingDuplicate(hash, f.name, ctx.sources);
+    const intraBatch = hash ? seen.has(hash) : false;
+    if (existing || intraBatch) {
+      f.status = 'duplicate';
+    } else {
+      f.status = 'pending';
+      if (hash) seen.add(hash);
+    }
+  }
+  ctx.$nextTick(() => ctx.refreshIcons());
+}
+
+function _notifyDuplicates(ctx: AppContext, session: UploadSession): void {
+  const n = session.files.filter((f: UploadFile) => f.status === 'duplicate').length;
+  if (n > 0) ctx.showToast(ctx.t('sources.duplicateWarning', { n: String(n) }), 'warning');
 }
 
 export function _maybeFinalizeUpload(
@@ -262,7 +330,10 @@ export function createSources() {
       if (!fileList || fileList.length === 0 || !projectId) return;
       const session = _createUploadSession(this, fileList, projectId);
       if (!session) return;
+      await _markClientDuplicates(this, session);
+      if (!_isSessionActive(this, session)) return;
       const { applied, interrupted } = await _runUploadLoop(this, session);
+      _notifyDuplicates(this, session);
       _maybeFinalizeUpload(this, applied, interrupted, projectId);
       _maybeCleanupSession.call(this, session.id);
     },
@@ -271,7 +342,7 @@ export function createSources() {
       const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
       if (!session) return;
       const file = session.files.find((f: UploadFile) => f.id === fileId);
-      if (file?.status !== 'error') return;
+      if (file?.status !== 'error' && file?.status !== 'duplicate') return;
 
       const result = await _uploadSingleFile.call(this, session, fileId);
       if (result === 'applied') {
@@ -285,7 +356,7 @@ export function createSources() {
       const session = this.uploadSessions.find((s: UploadSession) => s.id === sessionId);
       if (!session) return;
       const file = session.files.find((f: UploadFile) => f.id === fileId);
-      if (file?.status !== 'error') return;
+      if (file?.status !== 'error' && file?.status !== 'duplicate') return;
 
       session.files = session.files.filter((f: UploadFile) => f.id !== fileId);
       if (session.files.length === 0) {

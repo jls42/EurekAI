@@ -99,7 +99,7 @@ type UploadSession = {
     id: string;
     name: string;
     file: File | null;
-    status: 'pending' | 'uploading' | 'done' | 'error';
+    status: 'pending' | 'hashing' | 'uploading' | 'done' | 'duplicate' | 'error';
     errorMsg: string | null;
   }>;
 };
@@ -258,8 +258,12 @@ export function createState() {
     ...initProjectState(),
     ...initSourceState(),
     get uploading(): boolean {
+      // 'hashing' = pré-check en cours → encore "en upload". 'duplicate' = en attente de décision
+      // utilisateur (Importer quand même / Ignorer) → PAS bloquant, exclu pour ne pas figer l'UI.
       return this.uploadSessions.some((s) =>
-        s.files.some((f) => f.status === 'pending' || f.status === 'uploading'),
+        s.files.some(
+          (f) => f.status === 'pending' || f.status === 'hashing' || f.status === 'uploading',
+        ),
       );
     },
     ...initVoiceState(),

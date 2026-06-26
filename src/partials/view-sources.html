@@ -333,6 +333,16 @@
             data-lucide="x-circle"
             class="w-4 h-4 text-danger shrink-0"
           ></i>
+          <i
+            x-show="file.status === 'hashing'"
+            data-lucide="loader-2"
+            class="w-4 h-4 text-text-secondary animate-spin shrink-0"
+          ></i>
+          <i
+            x-show="file.status === 'duplicate'"
+            data-lucide="copy"
+            class="w-4 h-4 text-warning shrink-0"
+          ></i>
           <span class="text-body-sm truncate" x-text="file.name">File</span>
           <span
             class="text-sm text-text-secondary ml-auto shrink-0"
@@ -340,19 +350,19 @@
             >Status</span
           >
           <button
-            x-show="file.status === 'error'"
+            x-show="file.status === 'error' || file.status === 'duplicate'"
             @click="retryFile(session.id, file.id)"
-            :aria-label="t('common.retry')"
-            :title="t('common.retry')"
+            :aria-label="file.status === 'duplicate' ? t('sources.importAnyway') : t('common.retry')"
+            :title="file.status === 'duplicate' ? t('sources.importAnyway') : t('common.retry')"
             class="p-1 rounded hover:bg-surface-hover text-primary shrink-0"
           >
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
           </button>
           <button
-            x-show="file.status === 'error'"
+            x-show="file.status === 'error' || file.status === 'duplicate'"
             @click="dismissFailedFile(session.id, file.id)"
-            :aria-label="t('common.close')"
-            :title="t('common.close')"
+            :aria-label="file.status === 'duplicate' ? t('sources.ignore') : t('common.close')"
+            :title="file.status === 'duplicate' ? t('sources.ignore') : t('common.close')"
             class="p-1 rounded hover:bg-surface-hover text-text-secondary shrink-0"
           >
             <i data-lucide="x" class="w-3.5 h-3.5"></i>
