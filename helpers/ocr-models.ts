@@ -1,0 +1,55 @@
+/**
+ * Source de vérité unique pour les modèles OCR Mistral sélectionnables.
+ * Importable backend (`../helpers/ocr-models.js`) ET frontend (`@helpers/ocr-models`).
+ */
+
+/** Modèles OCR proposés. Ordre = ordre d'affichage du dropdown ; OCR 4 = recommandé/défaut. */
+export const OCR_MODELS = ['mistral-ocr-4-0', 'mistral-ocr-2512'] as const;
+
+export type OcrModel = (typeof OCR_MODELS)[number];
+
+/**
+ * Noms produit lisibles affichés à l'UI ("OCR 4" / "OCR 3"). La valeur stockée en config et
+ * envoyée à l'API reste l'ID technique (clé de cet objet) — ne jamais persister le label.
+ */
+export const OCR_MODEL_LABELS: Record<OcrModel, string> = {
+  'mistral-ocr-4-0': 'OCR 4',
+  'mistral-ocr-2512': 'OCR 3',
+};
+
+/**
+ * Cycle de vie des modèles OCR — dates de dépréciation / retrait (docs.mistral.ai/models/overview).
+ * **SOURCE UNIQUE de ces dates** : le JSDoc, le sélecteur Réglages (suffixe « retiré le … » affiché
+ * À L'UTILISATEUR) et la doc s'y réfèrent — ne pas redupliquer la date ailleurs. Absent de la map =
+ * modèle courant (aucun retrait connu). Prépare l'auto-désactivation des modèles retirés (backlog #6).
+ */
+export const OCR_MODEL_RETIREMENT: Partial<
+  Record<OcrModel, { deprecation: string; retirement: string }>
+> = {
+  'mistral-ocr-2512': { deprecation: '2026-06-30', retirement: '2026-09-30' },
+};
+
+/**
+ * Défaut **OCR 4** (`mistral-ocr-4-0`, $4/1000 pages) = modèle OCR courant Mistral (ce vers quoi
+ * l'alias `mistral-ocr-latest` résout). OCR 3 (`mistral-ocr-2512`, $2/1000) reste sélectionnable en
+ * opt-in (moins cher) MAIS est **en fin de vie** — dates dans `OCR_MODEL_RETIREMENT` (source unique),
+ * **affichées à l'utilisateur dans le sélecteur**. Le défaut est volontairement OCR 4 pour ne PAS
+ * utiliser un modèle en retrait par défaut (alternative documentée : OCR 4). Un éventuel retour OCR 3
+ * par défaut doit tenir compte de sa retraite (après quoi les appels OCR 3 cessent de fonctionner).
+ */
+export const DEFAULT_OCR_MODEL: OcrModel = 'mistral-ocr-4-0';
+
+/**
+ * Normalise une valeur de modèle OCR (config disque, payload client, alias legacy) vers un
+ * `OcrModel` valide. L'alias legacy `mistral-ocr-latest` ET toute valeur inconnue / absente
+ * retombent sur le défaut (OCR 4) — pin le modèle courant explicitement plutôt que de laisser
+ * un alias mouvant suivre silencieusement une future version (cf. piège modération 2026-06).
+ *
+ * Signature `unknown` + guard `typeof` : sous `strict: true`, passer `string | undefined`
+ * à `Array.includes` ne typecheck pas.
+ */
+export function normalizeOcrModel(v: unknown): OcrModel {
+  return typeof v === 'string' && (OCR_MODELS as readonly string[]).includes(v)
+    ? (v as OcrModel)
+    : DEFAULT_OCR_MODEL;
+}

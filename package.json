@@ -30,7 +30,7 @@
   },
   "dependencies": {
     "@lightpanda/browser": "^1.2.0",
-    "@mistralai/mistralai": "^2.2.0",
+    "@mistralai/mistralai": "^2.3.0",
     "@mozilla/readability": "^0.6.0",
     "alpinejs": "^3.15.8",
     "dotenv": "^17.0.0",

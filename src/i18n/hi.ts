@@ -180,6 +180,12 @@ export const hi: Record<string, string> = {
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
   'settings.tts': 'TTS',
+  'settings.perMTokens': 'प्रति M टोकन (इन/आउट)',
+  'settings.perKPages': 'प्रति 1000 पृष्ठ',
+  'settings.perMChars': 'प्रति M वर्ण',
+  'settings.priceUnknown': 'मूल्य अनुपलब्ध',
+  'settings.ocrHint': 'OCR 3: किफायती। OCR 4: बेहतर गुणवत्ता, 2× लागत।',
+  'settings.ocrRetiredOn': 'समाप्ति तिथि:',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':

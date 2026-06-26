@@ -1,9 +1,11 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
+import { normalizeOcrModel, OCR_MODEL_LABELS, OCR_MODEL_RETIREMENT } from '@helpers/ocr-models';
+import { modelPriceLabel as priceLabel } from './model-pricing';
 import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
 
-type ConfigDraft = AppConfig & { _mainModel?: string };
+type ConfigDraft = AppConfig & { _mainModel?: string; _ocrModel?: string };
 type VoiceRole = 'host' | 'guest';
 
 interface VoicesEnrichedEntry {
@@ -60,6 +62,7 @@ export function createConfig() {
           const config = (await configRes.json()) as AppConfig;
           const draft = structuredClone(config) as ConfigDraft;
           draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
+          draft._ocrModel = normalizeOcrModel(config.models?.ocr);
           this.configDraft = draft;
         }
       } catch (e) {
@@ -134,6 +137,23 @@ export function createConfig() {
       return `${this.voiceLabel(match)} ${this.t('profile.voiceDefaultSuffix')}`;
     },
 
+    // Libellé tarifaire d'un modèle, dérivé de MODEL_PRICING (cf. model-pricing.ts).
+    modelPriceLabel(this: AppContext, modelId: string): string {
+      return priceLabel(modelId, (k: string) => this.t(k));
+    },
+
+    // Libellé d'option de dropdown : "<nom> — <tarif>". Pour OCR, <nom> = nom produit lisible
+    // (OCR 3 / OCR 4) via OCR_MODEL_LABELS ; sinon l'ID technique. L'ID réel reste affiché en
+    // italique sous le sélecteur OCR (cf. dialog-settings.html, x-text configDraft._ocrModel).
+    modelOptionLabel(this: AppContext, modelId: string): string {
+      const display = (OCR_MODEL_LABELS as Record<string, string>)[modelId] ?? modelId;
+      const base = `${display} — ${this.modelPriceLabel(modelId)}`;
+      // Marqueur de fin de vie affiché à l'utilisateur pour un modèle en retrait (ex. OCR 3) :
+      // date depuis OCR_MODEL_RETIREMENT (source unique), libellé « retiré le » via i18n.
+      const eol = (OCR_MODEL_RETIREMENT as Record<string, { retirement: string }>)[modelId];
+      return eol ? `${base} · ${this.t('settings.ocrRetiredOn')} ${eol.retirement}` : base;
+    },
+
     async saveSettings(this: AppContext) {
       try {
         const draft = this.configDraft as unknown as ConfigDraft;
@@ -146,13 +166,14 @@ export function createConfig() {
           translate: mainModel,
           quizVerify: mainModel,
           chat: mainModel,
-          ocr: 'mistral-ocr-latest',
+          ocr: normalizeOcrModel(draft._ocrModel),
         };
         if (draft.ttsModel?.startsWith('eleven_')) {
           draft.ttsModel = 'voxtral-mini-tts-latest';
         }
         const payload = { ...draft } as ConfigDraft & Record<string, unknown>;
         delete payload._mainModel;
+        delete payload._ocrModel;
         delete payload.mistralVoices;
         delete payload.mistralVoicesSource;
         const res = await fetch('/api/config', {
@@ -164,6 +185,7 @@ export function createConfig() {
           const saved = (await res.json()) as AppConfig;
           const updated = structuredClone(saved) as ConfigDraft;
           updated._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
+          updated._ocrModel = normalizeOcrModel(saved.models?.ocr);
           this.configDraft = updated;
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
@@ -186,6 +208,7 @@ export function createConfig() {
           const saved = (await res.json()) as AppConfig;
           const reset = structuredClone(saved) as ConfigDraft;
           reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
+          reset._ocrModel = normalizeOcrModel(saved.models?.ocr);
           this.configDraft = reset;
           await this.loadMistralVoices?.();
           this.showToast(this.t('toast.settingsReset'), 'success');

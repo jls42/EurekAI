@@ -5,6 +5,7 @@ import type { MistralVoice, VoiceId } from './helpers/voice-types.js';
 import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
+import { DEFAULT_OCR_MODEL, normalizeOcrModel } from './helpers/ocr-models.js';
 
 const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
 
@@ -15,7 +16,7 @@ const DEFAULT_CONFIG: AppConfig = {
     quiz: MISTRAL_LARGE_LATEST,
     podcast: MISTRAL_LARGE_LATEST,
     translate: MISTRAL_LARGE_LATEST,
-    ocr: 'mistral-ocr-latest',
+    ocr: DEFAULT_OCR_MODEL,
     quizVerify: MISTRAL_LARGE_LATEST,
     chat: MISTRAL_LARGE_LATEST,
   },
@@ -170,6 +171,20 @@ const removeLegacyGlobalVoiceFields = (): boolean => {
   return changed;
 };
 
+// Migration one-time : normalise un `models.ocr` legacy (`mistral-ocr-latest`, ancien alias
+// mouvant, ou valeur inconnue) vers le défaut OcrModel explicite courant (OCR 4). Sans ça,
+// mergeSafe préserve l'alias mouvant sur disque ; on le fige sur la version explicite pour qu'une
+// future bascule Mistral de `-latest` ne change pas le modèle (ni le tarif) silencieusement.
+// const arrow (pas `function`) : contournement parseur Lizard (cf. CLAUDE.md "Mesurer > deviner").
+const normalizeLegacyOcrModel = (): boolean => {
+  const current = currentConfig.models.ocr;
+  const normalized = normalizeOcrModel(current);
+  if (current === normalized) return false;
+  currentConfig.models.ocr = normalized;
+  logger.info('config', `migration: ocr model '${current}' -> '${normalized}'`);
+  return true;
+};
+
 // Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
 // (lastLoadFailed), tente d'abord un `.corrupt.bak` à côté du fichier à écraser.
 //
@@ -243,7 +258,8 @@ export function initConfig(outputDir: string): void {
   }
   const migrated = migrateLegacyElevenLabsFields();
   const globalVoicesRemoved = removeLegacyGlobalVoiceFields();
-  if (migrated || globalVoicesRemoved) {
+  const ocrNormalized = normalizeLegacyOcrModel();
+  if (migrated || globalVoicesRemoved || ocrNormalized) {
     try {
       persistConfig();
     } catch (e) {
@@ -265,6 +281,18 @@ export function resetConfig(): AppConfig {
 export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   if (partial.models) {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
+    // Rejection legacy/alias (symétrie avec ttsModel 'eleven_*' ci-dessous) : un client stale
+    // peut POSTer 'mistral-ocr-latest' (alias mouvant) ou une valeur inconnue entre 2 restarts.
+    // On normalise vers le défaut OcrModel explicite (OCR 4) plutôt que laisser fuir un alias mouvant.
+    const requestedOcr = currentConfig.models.ocr;
+    const normalizedOcr = normalizeOcrModel(requestedOcr);
+    if (requestedOcr !== normalizedOcr) {
+      logger.warn(
+        'config',
+        `rejected legacy/unknown OCR model '${requestedOcr}' at saveConfig, using '${normalizedOcr}'`,
+      );
+      currentConfig.models.ocr = normalizedOcr;
+    }
   }
   if (partial.ttsModel) {
     // Rejection legacy : une UI pré-PR ou client automatisé peut encore POSTer un ttsModel
@@ -366,7 +394,7 @@ const resolveMistralDefaults = (
 export interface ResolveVoicesArgs {
   // Réutilise la shape de Profile.mistralVoices pour empêcher un drift silencieux
   // entre le format stocké (profile JSON) et celui consommé ici.
-  profileVoices?: Profile['mistralVoices'];
+  profileVoices?: NonNullable<Profile['mistralVoices']>;
   lang: string;
   // `string` (profile actif) ou `undefined` (anonyme/sans profil). Pas de `null` :
   // un seul sentinel "absent" simplifie les call sites — sinon chacun fait `?? null`

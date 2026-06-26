@@ -44,6 +44,10 @@ vi.mock('./generate.js', () => ({
   getMarkdown: vi.fn(() => '# Combined markdown'),
 }));
 
+vi.mock('../config.js', () => ({
+  getConfig: vi.fn(() => ({ models: { ocr: 'mistral-ocr-2512' } })),
+}));
+
 import { ocrFile } from '../generators/ocr.js';
 import { moderateContent } from '../generators/moderation.js';
 import { transcribeAudio } from '../generators/stt.js';
@@ -1196,8 +1200,13 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(ocrFile).toHaveBeenCalledTimes(2);
-    expect(ocrFile).toHaveBeenCalledWith(client, '/tmp/file1.jpg', 'devoir.jpg');
-    expect(ocrFile).toHaveBeenCalledWith(client, '/tmp/file2.pdf', 'cours.pdf');
+    expect(ocrFile).toHaveBeenCalledWith(
+      client,
+      '/tmp/file1.jpg',
+      'devoir.jpg',
+      'mistral-ocr-2512',
+    );
+    expect(ocrFile).toHaveBeenCalledWith(client, '/tmp/file2.pdf', 'cours.pdf', 'mistral-ocr-2512');
 
     expect(res.json).toHaveBeenCalledTimes(1);
     const results = res.json.mock.calls[0][0];

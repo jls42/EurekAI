@@ -77,9 +77,9 @@ if [ -z "${MISTRAL_API_KEY:-}" ]; then
   echo "  MISTRAL_API_KEY not set, skipping"
 else
   # Chat models — tested via /v1/chat/completions
-  chat_models=("mistral-large-latest" "mistral-small-latest")
-  # Non-chat models — tested via /v1/models listing
-  other_models=("mistral-ocr-latest" "voxtral-mini-latest" "voxtral-mini-tts-latest" "mistral-moderation-latest")
+  chat_models=("mistral-large-latest" "mistral-medium-latest" "mistral-small-latest")
+  # Non-chat models — tested via /v1/models listing (OCR 3 défaut + OCR 4 option pinnés)
+  other_models=("mistral-ocr-2512" "mistral-ocr-4-0" "mistral-ocr-latest" "voxtral-mini-latest" "voxtral-mini-tts-latest" "mistral-moderation-latest")
   all_ok=true
 
   for model in "${chat_models[@]}"; do
@@ -110,6 +110,37 @@ else
     echo "  ⚠ Some models are unavailable — check Mistral docs for renames/deprecations"
   fi
 fi
+
+echo ""
+echo "=== Known model deprecations (local table — Mistral docs lag /v1/models) ==="
+# Mistral publie les dates de retrait sur https://docs.mistral.ai/models/overview (colonnes
+# Deprecation / Retirement / Alternative). Le champ `deprecation` de /v1/models est tantôt None
+# (lag, ex. OCR), tantôt peuplé (ex. moderation) — donc peu fiable seul. Le smoke-test d'existence
+# ci-dessus ne voit rien tant que le modèle reste listé. Cette table locale produit un rappel DATÉ
+# au release-time. Format: "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
+# N'y mettre que les modèles RÉELLEMENT utilisés (cf. audit modèles).
+known_deprecations=(
+  "mistral-ocr-2512|2026-06-30|2026-09-30|OCR 4" # OCR 3 (opt-in) ; défaut = OCR 4
+)
+today_ymd=$(date -u +%Y-%m-%d)
+today_epoch=$(date -u -d "$today_ymd" +%s)
+days_until() { # echo le nb de jours (signé) entre aujourd'hui et $1 (YYYY-MM-DD), ou "" si non parsable
+  local e
+  e=$(date -u -d "$1" +%s 2>/dev/null) || { echo ""; return; }
+  echo "$(((e - today_epoch) / 86400))"
+}
+fmt_date() { # "le $1 (dans N j)" / "depuis le $1 (il y a N j)" selon le signe de $2
+  if [ "$2" -gt 0 ]; then echo "le $1 (dans $2 j)"; else echo "depuis le $1 (il y a $((-$2)) j)"; fi
+}
+for entry in "${known_deprecations[@]}"; do
+  IFS='|' read -r dep_model dep_date ret_date alt <<< "$entry"
+  dd=$(days_until "$dep_date")
+  rd=$(days_until "$ret_date")
+  msg="  ⚠ $dep_model"
+  [ -n "$dd" ] && msg="$msg déprécié $(fmt_date "$dep_date" "$dd")"
+  [ -n "$rd" ] && msg="$msg, RETIRÉ $(fmt_date "$ret_date" "$rd")"
+  echo "$msg — alternative: ${alt:-?}"
+done
 
 # ── Changelogs with persistent state (disable strict mode for robustness) ──
 set +eo pipefail

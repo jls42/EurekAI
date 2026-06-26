@@ -151,6 +151,12 @@ export const it: Record<string, string> = {
   'settings.podcast': 'Podcast',
   'settings.ocr': 'OCR',
   'settings.tts': 'TTS',
+  'settings.perMTokens': 'per M token (in/out)',
+  'settings.perKPages': 'per 1000 pagine',
+  'settings.perMChars': 'per M caratteri',
+  'settings.priceUnknown': 'prezzo non disponibile',
+  'settings.ocrHint': 'OCR 3: economico. OCR 4: qualità migliore, costo 2×.',
+  'settings.ocrRetiredOn': 'ritirato il',
 
   'dashboard.subtitle': 'Pannello',
   'dashboard.addFirstSources': 'Aggiungi le tue prime fonti',

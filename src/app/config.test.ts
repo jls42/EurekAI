@@ -361,7 +361,8 @@ describe('saveSettings', () => {
     expect(putCall[0]).toBe('/api/config');
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.models.summary).toBe('mistral-large-latest');
-    expect(sentBody.models.ocr).toBe('mistral-ocr-latest');
+    // _ocrModel absent → normalisé vers le défaut OCR 4 (modèle courant)
+    expect(sentBody.models.ocr).toBe('mistral-ocr-4-0');
     expect(sentBody._mainModel).toBeUndefined();
     expect(sentBody.mistralVoices).toBeUndefined();
     expect(sentBody.mistralVoicesSource).toBeUndefined();
@@ -369,6 +370,20 @@ describe('saveSettings', () => {
     expect(ctx.showToast).toHaveBeenCalledWith('toast.settingsSaved', 'success');
     expect(ctx.$refs.settingsDialog.close).toHaveBeenCalled();
     expect(ctx.apiStatus).toEqual(statusData);
+  });
+
+  it('forwards the selected OCR model (OCR 3 opt-in) on save and strips _ocrModel', async () => {
+    mockFetchOk({ models: {}, ttsModel: 'voxtral-mini-tts-2603' }); // PUT /api/config
+    mockFetchOk({ mistral: true, ttsAvailable: true }); // GET /api/config/status
+
+    const ctx = makeContext();
+    ctx.configDraft._ocrModel = 'mistral-ocr-2512';
+    await config.saveSettings.call(ctx);
+
+    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
+    const sentBody = JSON.parse(putCall[1].body as string);
+    expect(sentBody.models.ocr).toBe('mistral-ocr-2512');
+    expect(sentBody._ocrModel).toBeUndefined();
   });
 
   it('auto-corrige ttsModel quand un ID eleven_* legacy est présent', async () => {

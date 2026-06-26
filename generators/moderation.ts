@@ -42,7 +42,11 @@ export async function moderateContent(
 
   for (const chunk of chunks) {
     const response = await client.classifiers.moderate({
-      model: 'mistral-moderation-latest',
+      // Pinné explicitement (PAS `-latest`) : `mistral-moderation-latest` pointe encore sur
+      // `mistral-moderation-2411`, déprécié/retiré ~2026-06-30 (docs Mistral overview), et Mistral
+      // n'a PAS repointé l'alias. `mistral-moderation-2603` = "Mistral Moderation 2", remplaçant
+      // courant (dep=None). Sécurité enfant : la modération ne doit pas casser silencieusement.
+      model: 'mistral-moderation-2603',
       inputs: [chunk],
     });
 

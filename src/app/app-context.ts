@@ -133,6 +133,10 @@ export interface AppContext extends AppState {
     lang?: string;
   }): string;
   defaultVoiceOptionLabel(role: 'host' | 'guest', locale: string, profileId?: string): string;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- nom de param documentaire dans une signature d'interface ; Codacy n'honore pas notre argsIgnorePattern
+  modelPriceLabel(modelId: string): string;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
+  modelOptionLabel(modelId: string): string;
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;

@@ -37,13 +37,31 @@ describe('ocrFile', () => {
       purpose: 'ocr',
     });
     expect(client.ocr.process).toHaveBeenCalledWith({
-      model: 'mistral-ocr-latest',
+      model: 'mistral-ocr-4-0',
       document: { fileId: 'file-123', type: 'file' },
       confidenceScoresGranularity: 'page',
     });
     expect(result.markdown).toBe('# Page 1');
     expect(typeof result.elapsed).toBe('number');
     expect(result.confidence).toBeUndefined();
+  });
+
+  it('defaults to OCR 4 when no model is provided', async () => {
+    const client = createClient();
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
+
+    expect(client.ocr.process).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'mistral-ocr-4-0' }),
+    );
+  });
+
+  it('forwards the requested OCR model (e.g. OCR 3 opt-in) to client.ocr.process', async () => {
+    const client = createClient();
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf', 'mistral-ocr-2512');
+
+    expect(client.ocr.process).toHaveBeenCalledWith(
+      expect.objectContaining({ model: 'mistral-ocr-2512' }),
+    );
   });
 
   it('combines multiple pages into single markdown', async () => {

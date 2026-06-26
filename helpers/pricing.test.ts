@@ -28,6 +28,18 @@ describe('resolvePricing', () => {
     expect(p).toEqual(MODEL_PRICING['voxtral-mini']);
   });
 
+  it('resolves mistral-ocr-4-0 to OCR 4 pricing (longer prefix wins over mistral-ocr)', () => {
+    expect(resolvePricing('mistral-ocr-4-0')).toEqual(MODEL_PRICING['mistral-ocr-4']);
+  });
+
+  it('resolves mistral-ocr-2512 to OCR 3 pricing', () => {
+    expect(resolvePricing('mistral-ocr-2512')).toEqual(MODEL_PRICING['mistral-ocr']);
+  });
+
+  it('resolves mistral-medium-latest to mistral-medium pricing', () => {
+    expect(resolvePricing('mistral-medium-latest')).toEqual(MODEL_PRICING['mistral-medium']);
+  });
+
   it('returns null for unknown model', () => {
     expect(resolvePricing('gpt-4o')).toBeNull();
   });
@@ -56,19 +68,36 @@ describe('calculateCost', () => {
     expect(calculateCost(usage)).toBeCloseTo(0.006, 6);
   });
 
+  it('calculates page-based cost for OCR 4 (2x OCR 3)', () => {
+    const usage: ApiUsage = { pagesProcessed: 3, model: 'mistral-ocr-4-0' };
+    // 3 * 4000 / 1M = 0.012
+    expect(calculateCost(usage)).toBeCloseTo(0.012, 6);
+  });
+
+  it('calculates token-based cost for mistral-medium', () => {
+    const usage: ApiUsage = {
+      promptTokens: 1000,
+      completionTokens: 500,
+      model: 'mistral-medium-latest',
+    };
+    // (1000 * 1.5 + 500 * 7.5) / 1M = (1500 + 3750) / 1M = 0.00525
+    expect(calculateCost(usage)).toBeCloseTo(0.00525, 6);
+  });
+
   it('calculates audio-second cost for STT', () => {
     const usage: ApiUsage = { promptAudioSeconds: 60, model: 'voxtral-mini-latest' };
     // 60 * 50 / 1M = 0.003
     expect(calculateCost(usage)).toBeCloseTo(0.003, 6);
   });
 
-  it('returns 0 for free moderation model', () => {
+  it('computes input-token cost for moderation (Moderation 2 = $0.1/M input)', () => {
     const usage: ApiUsage = {
       promptTokens: 1000,
       completionTokens: 100,
       model: 'mistral-moderation-2603',
     };
-    expect(calculateCost(usage)).toBe(0);
+    // 1000 * 0.1 / 1M = 0.0001 ; output non facturé pour la modération
+    expect(calculateCost(usage)).toBeCloseTo(0.0001, 8);
   });
 
   it('returns 0 for unknown model', () => {
