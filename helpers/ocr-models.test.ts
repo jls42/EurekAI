@@ -3,13 +3,12 @@ import { describe, it, expect } from 'vitest';
 import {
   OCR_MODELS,
   OCR_MODEL_LABELS,
-  OCR_MODEL_RETIREMENT,
   DEFAULT_OCR_MODEL,
   normalizeOcrModel,
 } from './ocr-models.js';
 
 describe('ocr-models', () => {
-  it('DEFAULT_OCR_MODEL is OCR 4 (modèle courant ; OCR 3 retiré le 2026-09-30)', () => {
+  it('DEFAULT_OCR_MODEL is OCR 4 (OCR 4 et OCR 3 tous deux courants)', () => {
     expect(DEFAULT_OCR_MODEL).toBe('mistral-ocr-4-0');
   });
 
@@ -20,15 +19,6 @@ describe('ocr-models', () => {
   it('OCR_MODEL_LABELS mappe les ids vers les noms produit', () => {
     expect(OCR_MODEL_LABELS['mistral-ocr-4-0']).toBe('OCR 4');
     expect(OCR_MODEL_LABELS['mistral-ocr-2512']).toBe('OCR 3');
-  });
-
-  it('OCR_MODEL_RETIREMENT documente la fin de vie OCR 3 (source unique de la date affichée)', () => {
-    expect(OCR_MODEL_RETIREMENT['mistral-ocr-2512']).toEqual({
-      deprecation: '2026-06-30',
-      retirement: '2026-09-30',
-    });
-    // OCR 4 = modèle courant : pas d'entrée (sinon il serait marqué "en retrait" dans l'UI).
-    expect(OCR_MODEL_RETIREMENT['mistral-ocr-4-0']).toBeUndefined();
   });
 
   describe('normalizeOcrModel', () => {

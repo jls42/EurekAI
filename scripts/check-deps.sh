@@ -120,7 +120,9 @@ echo "=== Known model deprecations (local table — Mistral docs lag /v1/models)
 # au release-time. Format: "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
 # N'y mettre que les modèles RÉELLEMENT utilisés (cf. audit modèles).
 known_deprecations=(
-  "mistral-ocr-2512|2026-06-30|2026-09-30|OCR 4" # OCR 3 (opt-in) ; défaut = OCR 4
+  # Aucun modèle OCR proposé n'est en retrait : OCR 4 et OCR 3 (mistral-ocr-2512) sont tous deux
+  # courants (docs.mistral.ai/models/overview, section « Premier »). Format si besoin un jour :
+  # "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
 )
 today_ymd=$(date -u +%Y-%m-%d)
 today_epoch=$(date -u -d "$today_ymd" +%s)
