@@ -156,6 +156,7 @@ export const it: Record<string, string> = {
   'settings.perMChars': 'per M caratteri',
   'settings.priceUnknown': 'prezzo non disponibile',
   'settings.ocrHint': 'OCR 3: economico. OCR 4: qualità migliore, costo 2×.',
+  'settings.ocrRetiredOn': 'ritirato il',
 
   'dashboard.subtitle': 'Pannello',
   'dashboard.addFirstSources': 'Aggiungi le tue prime fonti',

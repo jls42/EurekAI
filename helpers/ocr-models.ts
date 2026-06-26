@@ -18,15 +18,24 @@ export const OCR_MODEL_LABELS: Record<OcrModel, string> = {
 };
 
 /**
+ * Cycle de vie des modèles OCR — dates de dépréciation / retrait (docs.mistral.ai/models/overview).
+ * **SOURCE UNIQUE de ces dates** : le JSDoc, le sélecteur Réglages (suffixe « retiré le … » affiché
+ * À L'UTILISATEUR) et la doc s'y réfèrent — ne pas redupliquer la date ailleurs. Absent de la map =
+ * modèle courant (aucun retrait connu). Prépare l'auto-désactivation des modèles retirés (backlog #6).
+ */
+export const OCR_MODEL_RETIREMENT: Partial<
+  Record<OcrModel, { deprecation: string; retirement: string }>
+> = {
+  'mistral-ocr-2512': { deprecation: '2026-06-30', retirement: '2026-09-30' },
+};
+
+/**
  * Défaut **OCR 4** (`mistral-ocr-4-0`, $4/1000 pages) = modèle OCR courant Mistral (ce vers quoi
- * l'alias `mistral-ocr-latest` résout). OCR 3 (`mistral-ocr-2512`, $2/1000) reste sélectionnable
- * en opt-in (moins cher).
- *
- * ⚠ RETRAITS DATÉS (source autoritaire : https://docs.mistral.ai/models/overview) :
- * OCR 3 `mistral-ocr-2512` est **déprécié le 2026-06-30** et **retiré le 2026-09-30**
- * (alternative = OCR 4). Le défaut est volontairement OCR 4 pour ne PAS utiliser un modèle en
- * retrait par défaut. Si OCR 3 est un jour re-choisi comme défaut pour le coût, le faire en
- * connaissance de la retraite 2026-09-30 (après quoi les appels OCR 3 cesseront de fonctionner).
+ * l'alias `mistral-ocr-latest` résout). OCR 3 (`mistral-ocr-2512`, $2/1000) reste sélectionnable en
+ * opt-in (moins cher) MAIS est **en fin de vie** — dates dans `OCR_MODEL_RETIREMENT` (source unique),
+ * **affichées à l'utilisateur dans le sélecteur**. Le défaut est volontairement OCR 4 pour ne PAS
+ * utiliser un modèle en retrait par défaut (alternative documentée : OCR 4). Un éventuel retour OCR 3
+ * par défaut doit tenir compte de sa retraite (après quoi les appels OCR 3 cessent de fonctionner).
  */
 export const DEFAULT_OCR_MODEL: OcrModel = 'mistral-ocr-4-0';
 

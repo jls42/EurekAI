@@ -158,6 +158,7 @@ export const de: Record<string, string> = {
   'settings.perMChars': 'pro Mio. Zeichen',
   'settings.priceUnknown': 'Preis nicht verfügbar',
   'settings.ocrHint': 'OCR 3: günstig. OCR 4: bessere Qualität, 2× Kosten.',
+  'settings.ocrRetiredOn': 'eingestellt am',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'F\u00fcge deine ersten Quellen hinzu',

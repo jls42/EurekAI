@@ -166,6 +166,7 @@ export const fr: Record<string, string> = {
   'settings.perMChars': 'par M caractères',
   'settings.priceUnknown': 'tarif indisponible',
   'settings.ocrHint': 'OCR 3 : économique. OCR 4 : meilleure qualité, coût 2×.',
+  'settings.ocrRetiredOn': 'retiré le',
 
   // Dashboard
   'dashboard.subtitle': 'Tableau de bord',

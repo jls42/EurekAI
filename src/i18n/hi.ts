@@ -185,6 +185,7 @@ export const hi: Record<string, string> = {
   'settings.perMChars': 'प्रति M वर्ण',
   'settings.priceUnknown': 'मूल्य अनुपलब्ध',
   'settings.ocrHint': 'OCR 3: किफायती। OCR 4: बेहतर गुणवत्ता, 2× लागत।',
+  'settings.ocrRetiredOn': 'समाप्ति तिथि:',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':

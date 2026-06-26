@@ -183,6 +183,7 @@ export const ar: Record<string, string> = {
   'settings.perMChars': 'لكل مليون حرف',
   'settings.priceUnknown': 'السعر غير متوفر',
   'settings.ocrHint': 'OCR 3: اقتصادي. OCR 4: جودة أفضل، التكلفة 2×.',
+  'settings.ocrRetiredOn': 'يُسحب في',
 
   'dashboard.subtitle': '\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0651\u0645',
   'dashboard.addFirstSources':

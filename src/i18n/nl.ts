@@ -156,6 +156,7 @@ export const nl: Record<string, string> = {
   'settings.perMChars': 'per M tekens',
   'settings.priceUnknown': 'prijs niet beschikbaar',
   'settings.ocrHint': 'OCR 3: voordelig. OCR 4: betere kwaliteit, 2× de kosten.',
+  'settings.ocrRetiredOn': 'uitgefaseerd op',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',
