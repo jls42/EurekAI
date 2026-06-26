@@ -842,4 +842,41 @@ describe('createSources', () => {
       expect(ctx.viewSourceDragging).toBe(false);
     });
   });
+
+  describe('dedup (Feature A)', () => {
+    it('marks a file as duplicate via client pre-check (filename fallback, no crypto.subtle)', async () => {
+      const src = createSources();
+      const ctx = makeContext({ sources: [{ id: 's1', filename: 'dup.pdf' }] });
+      const file = new File(['x'], 'dup.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      expect(ctx.uploadSessions[0].files[0].status).toBe('duplicate');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('marks a file as duplicate when the server returns duplicates[] (HTTP-LAN fallback)', async () => {
+      const src = createSources();
+      const ctx = makeContext();
+      mockFetchOk({ sources: [], failures: [], duplicates: [{ filename: 'srv.pdf' }] });
+      const file = new File(['y'], 'srv.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      expect(globalThis.fetch).toHaveBeenCalled();
+      expect(ctx.uploadSessions[0].files[0].status).toBe('duplicate');
+      expect(ctx.sources).toHaveLength(0);
+    });
+
+    it('re-imports a duplicate with allowDuplicates=true when forced via retry', async () => {
+      const src = createSources();
+      const ctx = makeContext({ sources: [{ id: 's1', filename: 'dup.pdf' }] });
+      const file = new File(['x'], 'dup.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      const session = ctx.uploadSessions[0];
+      expect(session.files[0].status).toBe('duplicate');
+      mockFetchOk([{ id: 's2', filename: 'dup.pdf' }]);
+      await src.retryFile.call(ctx, session.id, session.files[0].id);
+      const body = vi.mocked(globalThis.fetch).mock.calls.at(-1)?.[1]?.body as FormData;
+      expect(body.get('allowDuplicates')).toBe('true');
+      expect(ctx.sources.some((s: any) => s.id === 's2')).toBe(true);
+    });
+  });
 });
