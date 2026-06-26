@@ -41,18 +41,14 @@
       >
         <button
           @click="generate(cat.key)"
-          :disabled="isLoading(cat.key) || (['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
+          :disabled="(['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
           :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
           :aria-label="t('a11y.generateCategory', { category: t('gen.' + cat.key) })"
           class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
           :style="'color:' + cat.color"
         >
-          <i x-show="!isLoading(cat.key)" :data-lucide="cat.icon" class="w-4 h-4"></i>
-          <span
-            x-show="isLoading(cat.key)"
-            class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-          ></span>
-          <span x-text="isLoading(cat.key) ? '...' : t('gen.' + cat.key)"></span>
+          <i :data-lucide="cat.icon" class="w-4 h-4"></i>
+          <span x-text="t('gen.' + cat.key)"></span>
         </button>
       </template>
     </div>

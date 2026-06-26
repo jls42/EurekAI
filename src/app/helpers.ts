@@ -1,5 +1,6 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
+import { pendingOfTypeExists } from './pending-utils';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
@@ -603,7 +604,7 @@ const projectColor = function (index: number) {
 };
 
 const hasPendingOfType = function (this: AppContext, type: string): boolean {
-  return Object.values(this.pendingById).some((p) => p.type === type && p.status === 'pending');
+  return pendingOfTypeExists(this.pendingById, type);
 };
 
 const isLoading = function (this: AppContext, type: string): boolean {
@@ -611,10 +612,6 @@ const isLoading = function (this: AppContext, type: string): boolean {
     return this.loading[type] === true || this.hasPendingOfType(type);
   }
   return this.loading[type] === true;
-};
-
-const canStartGenerate = function (this: AppContext, type: string): boolean {
-  return !this.isLoading(type);
 };
 
 const upsertGenerationById = function (this: AppContext, gen: Generation): void {
@@ -1066,7 +1063,6 @@ const PODCAST_HELPERS = {
 const GENERATION_STATE_HELPERS = {
   hasPendingOfType,
   isLoading,
-  canStartGenerate,
   upsertGenerationById,
   applyGenerationEvent,
   reconcilePendings,

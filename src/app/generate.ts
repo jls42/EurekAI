@@ -1,5 +1,6 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
+import { pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import type { AppContext } from './app-context';
@@ -349,9 +350,11 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
  * reads `this.currentProjectId` directly afterwards — keeping the projectId
  * source as a literal property access avoids re-tainting the URL flow for
  * Codacy `rule-node-ssrf`. */
-export function canStartGenerate(state: AppContext, type?: string): boolean {
+export function canStartGenerate(state: AppContext): boolean {
   if (!state.currentProjectId) return false;
-  if (type && state.loading[type]) return false;
+  // Plus de verrou `loading[type]` : N générations du même type en parallèle sont autorisées —
+  // re-cliquer le bouton lance une génération de plus (un pending de plus, annulable
+  // individuellement). Un double-clic produit donc 2 générations, comportement voulu par la feature.
   const moderationStatus = state.blockedModerationStatus();
   if (state.currentProfile?.useModeration && moderationStatus) {
     state.showToast(state.moderationBlockedMessage(moderationStatus), 'error');
@@ -475,7 +478,9 @@ const cleanupGenerateState = function (
   // Guard projectId au cleanup pour ne pas effacer un nouveau pending si
   // l'utilisateur a switché de projet entre temps.
   if (state.currentProjectId === projectId) {
-    state.loading[type] = false;
+    // N en parallèle : ne libère le bouton/spinner que s'il ne reste AUCUN autre pending de ce type
+    // (le pending courant est déjà retiré de pendingById ici).
+    if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
     delete state.abortControllers[type];
     delete state.abortControllersByGid[gid];
   }
@@ -517,7 +522,7 @@ const setupGenerateAllPending = function (state: AppContext, controller: AbortCo
 
 const cleanupGenerateAllPending = function (state: AppContext): void {
   for (const type of GENERATE_ALL_TYPES) {
-    state.loading[type] = false;
+    if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
     delete state.abortControllers[type];
   }
   state.$nextTick(() => state.refreshIcons());
@@ -555,7 +560,7 @@ const cleanupGenerateAutoPending = function (state: AppContext, plannedTypes: st
   // Les types individuels se nettoient dans leurs propres finally ; ceci
   // attrape les cas d'abort précoce avant que les promises démarrent.
   for (const type of plannedTypes) {
-    state.loading[type] = false;
+    if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
     delete state.abortControllers[type];
   }
   state.$nextTick(() => state.refreshIcons());
@@ -599,7 +604,7 @@ const runGenerateAuto = async function (state: AppContext): Promise<void> {
 };
 
 const runSingleGenerate = async function (state: AppContext, type: string): Promise<void> {
-  if (!canStartGenerate(state, type)) return;
+  if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
   if (!projectId) return;
   if (!isSingleGenerateTargetSafe(projectId, type)) return;
