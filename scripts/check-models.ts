@@ -137,7 +137,7 @@ const evalAlias = (
  */
 export function analyzeModels(
   models: ModelEntry[],
-  legacy: Map<string, LegacyEntry> = new Map(),
+  legacy = new Map<string, LegacyEntry>(),
 ): string[] {
   const byAlias = buildAliasMap(models);
   const warnings: string[] = [];
