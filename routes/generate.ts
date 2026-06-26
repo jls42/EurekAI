@@ -376,7 +376,7 @@ function makeTrackerEntry(
 }
 
 interface PersistedCostFields {
-  usage?: Generation['usage'];
+  usage?: NonNullable<Generation['usage']>;
   cost?: number;
   costBreakdown?: string[];
 }

@@ -26,7 +26,7 @@ describe('collectStream', () => {
   it('stream vide retourne Buffer vide', async () => {
     async function* gen() {}
     const result = await collectStream(gen());
-    expect(result.length).toBe(0);
+    expect(result).toHaveLength(0);
   });
 
   it('ReadableStream sans Symbol.asyncIterator utilise getReader()', async () => {

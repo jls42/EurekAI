@@ -2,17 +2,25 @@ function stripArticles(text: string): string {
   return text.replace(/^(l'|d'|un |une |le |la |les |des |du |de la |de l')/i, '').trim();
 }
 
+const TRIM_PUNCTUATION = new Set('.,;:!?\'"()-');
+
+/** Retire la ponctuation en tête/fin sans regex (évite le faux positif sonarjs S8786 / slow-regex). */
+function trimPunctuation(text: string): string {
+  let start = 0;
+  let end = text.length;
+  while (start < end && TRIM_PUNCTUATION.has(text[start])) start++;
+  while (end > start && TRIM_PUNCTUATION.has(text[end - 1])) end--;
+  return text.slice(start, end);
+}
+
 export function normalizeAnswer(text: string): string {
-  return stripArticles(
-    text
-      .toLowerCase()
-      .normalize('NFD')
-      .replaceAll(/[\u0300-\u036f]/g, '')
-      .trim()
-      .replaceAll(/\s+/g, ' ')
-      // eslint-disable-next-line sonarjs/slow-regex -- bounded char-class, anchored, no backtracking risk (voir NOSONAR S5852)
-      .replaceAll(/^[.,;:!?'"()-]+|[.,;:!?'"()-]+$/g, ''),
-  );
+  const collapsed = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replaceAll(/[\u0300-\u036f]/g, '')
+    .trim()
+    .replaceAll(/\s+/g, ' ');
+  return stripArticles(trimPunctuation(collapsed));
 }
 
 function levenshtein(a: string, b: string): number {
@@ -60,15 +68,8 @@ export function validateFillBlankAnswer(
 // lui, "é" precompose (U+00E9) et "e"+accent combinant (U+0065 U+0301) comparent
 // faux alors qu'ils sont visuellement identiques.
 function normalizeKeepingAccents(text: string): string {
-  return stripArticles(
-    text
-      .toLowerCase()
-      .normalize('NFC')
-      .trim()
-      .replaceAll(/\s+/g, ' ')
-      // eslint-disable-next-line sonarjs/slow-regex -- bounded char-class, anchored, no backtracking risk (voir NOSONAR S5852)
-      .replaceAll(/^[.,;:!?'"()-]+|[.,;:!?'"()-]+$/g, ''),
-  );
+  const collapsed = text.toLowerCase().normalize('NFC').trim().replaceAll(/\s+/g, ' ');
+  return stripArticles(trimPunctuation(collapsed));
 }
 
 // Vrai quand la saisie correspond a l'orthographe canonique (accents inclus),

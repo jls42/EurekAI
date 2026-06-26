@@ -500,7 +500,7 @@ describe('GET /:pid/events (SSE)', () => {
       startedAt: new Date().toISOString(),
       sourceIds: [],
     });
-    expect(res.writes.length).toBe(writesBeforeAdd);
+    expect(res.writes).toHaveLength(writesBeforeAdd);
   });
 
   // Régression-lock : pid inconnu = 404, jamais d'EventEmitter listener leaké
@@ -576,7 +576,7 @@ describe('GET /:pid/events (SSE)', () => {
         sourceIds: [],
       });
     }).not.toThrow();
-    expect(res.writes.length).toBe(writesBefore);
+    expect(res.writes).toHaveLength(writesBefore);
 
     req._trigger('close');
   });

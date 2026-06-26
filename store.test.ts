@@ -495,7 +495,7 @@ describe('results format migration', () => {
     const loaded = store.getProject(p.meta.id);
     expect(loaded).not.toBeNull();
     expect(Array.isArray(loaded!.results.generations)).toBe(true);
-    expect(loaded!.results.generations.length).toBe(4);
+    expect(loaded!.results.generations).toHaveLength(4);
 
     const types = loaded!.results.generations.map((g) => g.type);
     expect(types).toContain('summary');
