@@ -144,6 +144,11 @@ for entry in "${known_deprecations[@]}"; do
   echo "$msg — alternative: ${alt:-?}"
 done
 
+# Vérification dynamique des alias -latest via l'API /v1/models (source de vérité, non bloquant).
+echo ""
+echo "── Alias -latest vs API /v1/models ──"
+npx tsx scripts/check-models.ts || true
+
 # ── Changelogs with persistent state (disable strict mode for robustness) ──
 set +eo pipefail
 echo ""
