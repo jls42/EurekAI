@@ -1,6 +1,6 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
-import { normalizeOcrModel, OCR_MODEL_LABELS, OCR_MODEL_RETIREMENT } from '@helpers/ocr-models';
+import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
 import { modelPriceLabel as priceLabel } from './model-pricing';
 import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
@@ -147,11 +147,7 @@ export function createConfig() {
     // italique sous le sélecteur OCR (cf. dialog-settings.html, x-text configDraft._ocrModel).
     modelOptionLabel(this: AppContext, modelId: string): string {
       const display = (OCR_MODEL_LABELS as Record<string, string>)[modelId] ?? modelId;
-      const base = `${display} — ${this.modelPriceLabel(modelId)}`;
-      // Marqueur de fin de vie affiché à l'utilisateur pour un modèle en retrait (ex. OCR 3) :
-      // date depuis OCR_MODEL_RETIREMENT (source unique), libellé « retiré le » via i18n.
-      const eol = (OCR_MODEL_RETIREMENT as Record<string, { retirement: string }>)[modelId];
-      return eol ? `${base} · ${this.t('settings.ocrRetiredOn')} ${eol.retirement}` : base;
+      return `${display} — ${this.modelPriceLabel(modelId)}`;
     },
 
     async saveSettings(this: AppContext) {

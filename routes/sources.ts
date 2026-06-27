@@ -1,8 +1,9 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
+import { readFileSync, unlinkSync } from 'node:fs';
 import { Mistral } from '@mistralai/mistralai';
-import type { Source, OcrConfidence, AgeGroup } from '../types.js';
+import type { Source, OcrConfidence, AgeGroup, DuplicateUpload } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
@@ -28,6 +29,29 @@ function pendingModeration(): Source['moderation'] {
 
 // cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
+
+// Dédup ré-import : sha256 du fichier brut (avant OCR) ; comparé aux contentHash existants.
+const hashFileContent = (path: string): string | undefined => {
+  try {
+    return createHash('sha256').update(readFileSync(path)).digest('hex');
+  } catch {
+    return undefined;
+  }
+};
+
+const findDuplicateId = (
+  hash: string | undefined,
+  existing: Map<string, string>,
+  seen: Map<string, string>,
+): string | undefined => (hash ? (existing.get(hash) ?? seen.get(hash)) : undefined);
+
+const tryUnlinkOrphan = (path: string): void => {
+  try {
+    unlinkSync(path);
+  } catch (e) {
+    logger.warn('sources', `unlink orphan duplicate failed: ${path}`, e);
+  }
+};
 
 // Sous-helper : valide le query input pour /sources/websearch. Retourne null si
 // invalide (et envoie déjà la réponse HTTP) — caller juste `return` après.
@@ -166,6 +190,7 @@ export function sourceRoutes(
     file: Express.Multer.File,
     pid: string,
     modCats: string[] | null,
+    contentHash: string | undefined,
   ): Promise<Source> {
     const name = file.originalname.toLowerCase();
     const dotIdx = name.lastIndexOf('.');
@@ -176,7 +201,7 @@ export function sourceRoutes(
     let confidence: OcrConfidence | undefined;
     if (isText) {
       const stop = startTimer();
-      markdown = (await import('node:fs')).readFileSync(file.path, 'utf-8');
+      markdown = readFileSync(file.path, 'utf-8');
       elapsed = stop();
       logger.info(
         'sources',
@@ -204,6 +229,7 @@ export function sourceRoutes(
       filePath: `projects/${pid}/uploads/${file.filename}`,
       moderation: modCats ? pendingModeration() : undefined,
       ocrConfidence: confidence,
+      contentHash,
     };
   }
 
@@ -214,10 +240,11 @@ export function sourceRoutes(
     file: Express.Multer.File,
     pid: string,
     modCats: string[] | null,
+    contentHash: string | undefined,
   ): Promise<UploadOutcome> {
     try {
       const { result: source, usage } = await runWithUsageTracking(() =>
-        processUploadedFile(file, pid, modCats),
+        processUploadedFile(file, pid, modCats, contentHash),
       );
       const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
       if (persisted) {
@@ -255,32 +282,62 @@ export function sourceRoutes(
     res: Response,
     results: Source[],
     failures: UploadFailure[],
+    duplicates: DuplicateUpload[],
   ): void => {
-    if (results.length === 0) {
+    if (results.length === 0 && duplicates.length === 0) {
       // error = code stable ; failures[] expose par-fichier { filename, error: code }.
       res.status(500).json({ error: 'upload_failed', failures });
       return;
     }
-    if (failures.length === 0) {
+    // Array nu en full success (contrat historique) ; objet enrichi dès qu'il y a failures/doublons.
+    if (failures.length === 0 && duplicates.length === 0) {
       res.json(results);
       return;
     }
-    res.json({ sources: results, failures });
+    res.json({ sources: results, failures, duplicates });
+  };
+
+  // Map contentHash -> id des sources déjà persistées (garde dédup serveur, filet du pré-check client).
+  const buildExistingHashMap = (pid: string): Map<string, string> => {
+    const map = new Map<string, string>();
+    for (const s of store.getProject(pid)?.sources ?? []) {
+      if (s.contentHash && !map.has(s.contentHash)) map.set(s.contentHash, s.id);
+    }
+    return map;
   };
 
   const processUploadBatch = async (
     files: Express.Multer.File[],
     pid: string,
     modCats: string[] | null,
-  ): Promise<{ results: Source[]; failures: UploadFailure[] }> => {
+    allowDuplicates: boolean,
+  ): Promise<{ results: Source[]; failures: UploadFailure[]; duplicates: DuplicateUpload[] }> => {
     const results: Source[] = [];
     const failures: UploadFailure[] = [];
+    const duplicates: DuplicateUpload[] = [];
+    const existing = buildExistingHashMap(pid);
+    const seen = new Map<string, string>(); // hash -> id créé dans ce lot (intra-batch)
     for (const file of files) {
-      const outcome = await attemptFileUpload(file, pid, modCats);
-      if (outcome.source) results.push(outcome.source);
-      else if (outcome.failure) failures.push(outcome.failure);
+      const hash = hashFileContent(file.path);
+      const dupId = findDuplicateId(hash, existing, seen);
+      // Doublon marqué seulement contre une source PERSISTÉE (existing) ou déjà réussie ce lot (seen) :
+      // un fichier dont l'OCR échoue ne bloque pas un suivant identique.
+      if (!allowDuplicates && dupId && hash) {
+        tryUnlinkOrphan(file.path);
+        duplicates.push({
+          filename: file.originalname,
+          contentHash: hash,
+          existingSourceId: dupId,
+        });
+        continue;
+      }
+      const outcome = await attemptFileUpload(file, pid, modCats, hash);
+      if (outcome.source) {
+        results.push(outcome.source);
+        if (hash) seen.set(hash, outcome.source.id);
+      } else if (outcome.failure) failures.push(outcome.failure);
     }
-    return { results, failures };
+    return { results, failures, duplicates };
   };
 
   // Upload files (OCR)
@@ -299,12 +356,19 @@ export function sourceRoutes(
     }
 
     const modCats = getModerationCategories(store, profileStore, pid);
-    const { results, failures } = await processUploadBatch(files, pid, modCats);
+    const allowDuplicates =
+      req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
+    const { results, failures, duplicates } = await processUploadBatch(
+      files,
+      pid,
+      modCats,
+      allowDuplicates,
+    );
 
     if (results.length > 0) {
       triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
     }
-    sendUploadResponse(res, results, failures);
+    sendUploadResponse(res, results, failures, duplicates);
   });
 
   // Add text source

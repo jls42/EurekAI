@@ -442,7 +442,7 @@ describe('createSources', () => {
       await src.handleFiles.call(ctx, fileList);
 
       vi.advanceTimersByTime(5000);
-      expect(ctx.uploadSessions.length).toBe(1);
+      expect(ctx.uploadSessions).toHaveLength(1);
       expect(ctx.uploadSessions[0].files[0].status).toBe('error');
       expect(ctx.uploading).toBe(false);
     });
@@ -677,7 +677,7 @@ describe('createSources', () => {
       await src.handleFiles.call(ctx, fileList);
 
       const session = ctx.uploadSessions[0];
-      expect(session.files.length).toBe(1);
+      expect(session.files).toHaveLength(1);
 
       src.dismissFailedFile.call(ctx, session.id, session.files[0].id);
       expect(ctx.uploadSessions).toEqual([]);
@@ -692,7 +692,7 @@ describe('createSources', () => {
       const session = ctx.uploadSessions[0];
       const doneFile = session.files[0];
       src.dismissFailedFile.call(ctx, session.id, doneFile.id);
-      expect(session.files.length).toBe(1);
+      expect(session.files).toHaveLength(1);
     });
 
     it('triggers cleanup when remaining files are all done', async () => {
@@ -707,7 +707,7 @@ describe('createSources', () => {
       const errorFile = session.files.find((f: any) => f.status === 'error');
       src.dismissFailedFile.call(ctx, session.id, errorFile.id);
 
-      expect(session.files.length).toBe(1);
+      expect(session.files).toHaveLength(1);
       expect(session.files[0].status).toBe('done');
       vi.advanceTimersByTime(3000);
       expect(ctx.uploadSessions).toEqual([]);
@@ -722,7 +722,7 @@ describe('createSources', () => {
       // Session is cleaned up in finally, but we can verify it was created with the right shape
       // by checking that uploading went through the cycle (no TS errors)
       expect(ctx.uploading).toBe(false);
-      expect(ctx.sources.length).toBe(1);
+      expect(ctx.sources).toHaveLength(1);
     });
 
     it('does not push source when user switches project mid-flight', async () => {
@@ -840,6 +840,43 @@ describe('createSources', () => {
       src.stopDrag.call(ctx);
 
       expect(ctx.viewSourceDragging).toBe(false);
+    });
+  });
+
+  describe('dedup (Feature A)', () => {
+    it('marks a file as duplicate via client pre-check (filename fallback, no crypto.subtle)', async () => {
+      const src = createSources();
+      const ctx = makeContext({ sources: [{ id: 's1', filename: 'dup.pdf' }] });
+      const file = new File(['x'], 'dup.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      expect(ctx.uploadSessions[0].files[0].status).toBe('duplicate');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.uploading).toBe(false);
+    });
+
+    it('marks a file as duplicate when the server returns duplicates[] (HTTP-LAN fallback)', async () => {
+      const src = createSources();
+      const ctx = makeContext();
+      mockFetchOk({ sources: [], failures: [], duplicates: [{ filename: 'srv.pdf' }] });
+      const file = new File(['y'], 'srv.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      expect(globalThis.fetch).toHaveBeenCalled();
+      expect(ctx.uploadSessions[0].files[0].status).toBe('duplicate');
+      expect(ctx.sources).toHaveLength(0);
+    });
+
+    it('re-imports a duplicate with allowDuplicates=true when forced via retry', async () => {
+      const src = createSources();
+      const ctx = makeContext({ sources: [{ id: 's1', filename: 'dup.pdf' }] });
+      const file = new File(['x'], 'dup.pdf', { type: 'application/pdf' });
+      await src.handleFiles.call(ctx, makeFileList(file));
+      const session = ctx.uploadSessions[0];
+      expect(session.files[0].status).toBe('duplicate');
+      mockFetchOk([{ id: 's2', filename: 'dup.pdf' }]);
+      await src.retryFile.call(ctx, session.id, session.files[0].id);
+      const body = vi.mocked(globalThis.fetch).mock.calls.at(-1)?.[1]?.body as FormData;
+      expect(body.get('allowDuplicates')).toBe('true');
+      expect(ctx.sources.some((s: any) => s.id === 's2')).toBe(true);
     });
   });
 });

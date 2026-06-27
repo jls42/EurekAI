@@ -28,7 +28,7 @@ import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { aiLimiter } from '../helpers/rate-limit.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
 
 const FILL_BLANK = 'fill-blank';
 

@@ -41,7 +41,7 @@ describe('i18n dictionaries sync', () => {
       });
 
       it('should have the same number of keys as fr.ts', () => {
-        expect(dictKeys.length).toBe(refKeys.length);
+        expect(dictKeys).toHaveLength(refKeys.length);
       });
 
       it('should have no empty values', () => {

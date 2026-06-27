@@ -376,7 +376,7 @@ function makeTrackerEntry(
 }
 
 interface PersistedCostFields {
-  usage?: Generation['usage'];
+  usage?: NonNullable<Generation['usage']>;
   cost?: number;
   costBreakdown?: string[];
 }
@@ -1016,6 +1016,14 @@ export function generateRoutes(
     req: Request,
     res: Response,
   ): { markdown: string; lang: string; ageGroup: AgeGroup } | null {
+    // Même validation stricte que les autres /generate/* (buildGenContext) : rejette les
+    // types invalides (lang:12345, ageGroup:[]) AVANT tout appel LLM. Sans ça, `lang || 'fr'`
+    // laissait passer un non-string truthy et exécutait le routeur (200 + coût) au lieu de 400.
+    const validation = validateGenRequestBody(req.body);
+    if (!validation.ok) {
+      res.status(400).json({ error: validation.error });
+      return null;
+    }
     const project = store.getProject(String(req.params.pid));
     if (!project) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });

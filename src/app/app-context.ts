@@ -210,7 +210,6 @@ export interface AppContext extends AppState {
   activeGenerations(): Array<{ key: string; label: string; color: string; icon: string }>;
   hasPendingOfType(type: string): boolean;
   isLoading(type: string): boolean;
-  canStartGenerate(type: string): boolean;
   upsertGenerationById(gen: Generation): void;
   resetSession(): void;
   profileNotifications(): PersistedNotification[];

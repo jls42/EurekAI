@@ -184,10 +184,11 @@ describe('generate', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
-  it('returns early if already loading', async () => {
+  it('allows a new generation of the same type even if one is already loading (N parallel)', async () => {
     const ctx = makeContext({ loading: { summary: true } });
     await gen.generate.call(ctx, 'summary');
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    // Feature C : plus de verrou loading[type] — re-cliquer lance une génération de plus.
+    expect(globalThis.fetch).toHaveBeenCalled();
   });
 
   it('shows moderation toast if blocked and moderation enabled', async () => {

@@ -7,15 +7,11 @@
     </h2>
     <button
       @click="generate('summary')"
-      :disabled="isLoading('summary') || sources.length === 0"
+      :disabled="sources.length === 0"
       class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
     >
-      <i x-show="!isLoading('summary')" data-lucide="plus" class="w-4 h-4"></i>
-      <span
-        x-show="isLoading('summary')"
-        class="w-4 h-4 animate-spin rounded-full border-2 border-gen-summary border-t-transparent"
-      ></span>
-      <span x-text="isLoading('summary') ? t('common.loading') : t('summary.new')"></span>
+      <i data-lucide="plus" class="w-4 h-4"></i>
+      <span x-text="t('summary.new')"></span>
     </button>
   </div>
 

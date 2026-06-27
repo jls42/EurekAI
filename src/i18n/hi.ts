@@ -185,7 +185,6 @@ export const hi: Record<string, string> = {
   'settings.perMChars': 'प्रति M वर्ण',
   'settings.priceUnknown': 'मूल्य अनुपलब्ध',
   'settings.ocrHint': 'OCR 3: किफायती। OCR 4: बेहतर गुणवत्ता, 2× लागत।',
-  'settings.ocrRetiredOn': 'समाप्ति तिथि:',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':
@@ -242,6 +241,11 @@ export const hi: Record<string, string> = {
   'sources.fileStatus.uploading': 'OCR \u0935\u093F\u0936\u094D\u0932\u0947\u0937\u0923...',
   'sources.fileStatus.done': '\u092A\u0942\u0930\u094D\u0923',
   'sources.fileStatus.error': '\u0924\u094D\u0930\u0941\u091F\u093F',
+  'sources.fileStatus.hashing': 'जाँच हो रही है…',
+  'sources.fileStatus.duplicate': 'पहले से आयातित',
+  'sources.importAnyway': 'फिर भी आयात करें',
+  'sources.ignore': 'अनदेखा करें',
+  'sources.duplicateWarning': '{n} फ़ाइल(ें) पहले से प्रोजेक्ट में',
   'sources.addedSources':
     '\u091C\u094B\u0921\u093C\u0947 \u0917\u090F \u0938\u094D\u0930\u094B\u0924',
   'sources.deselectAll':

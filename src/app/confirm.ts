@@ -1,4 +1,5 @@
 import type { AppContext } from './app-context';
+import { pendingOfTypeExists } from './pending-utils';
 
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
 // readClientGid). Validation pré-fetch pour Codacy `rule-node-ssrf` : la regex
@@ -74,7 +75,11 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   // de la fetch ne s'exécutera pas pour ce type. Clear loading[type]
   // explicitement pour libérer le bouton/spinner UI sans attendre la fin du
   // bulk auto fetch (qui peut être 60s+).
-  if (!hadLocalController && state.loading[type] === true) {
+  if (
+    !hadLocalController &&
+    state.loading[type] === true &&
+    !pendingOfTypeExists(state.pendingById, type)
+  ) {
     state.loading[type] = false;
   }
   const label = state.t('gen.' + type) || type;
@@ -198,7 +203,7 @@ const cancelOne = function (this: AppContext, key: string) {
     controller.abort();
     delete this.abortControllers[key];
   }
-  this.loading[key] = false;
+  if (!pendingOfTypeExists(this.pendingById, key)) this.loading[key] = false;
   const label = this.t('gen.' + key) || key;
   this.showToast(this.t('toast.cancelledOne', { type: label }), 'info');
 };
