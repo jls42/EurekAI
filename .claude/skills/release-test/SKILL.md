@@ -295,7 +295,7 @@ Le script teste (cf. son entete) :
 - **Validation types** : `POST /generate/summary` avec `{lang:12345, ageGroup:[], profileId:null}` → doit retourner `{"error":"invalid_input"}` 400 sans creer de generation
 - **SSRF** : `POST /sources/websearch` avec URL `127.0.0.1`, `169.254.169.254`, `[::ffff:7f00:0001]`, `198.18.0.1` → doit retourner `failures[]` SANS creer de source ni appeler Mistral (verif cote `costLog`)
 - **Rate-limit general** : burst 350 GET `/api/projects` → doit voir des 429 apparaitre au-dela de 300/min
-- **Rate-limit AI** : burst 70 POST `/generate/route` → doit voir des 429 apparaitre au-dela de 60/min
+- **Rate-limit AI** : burst 75 POST `/generate/summary` avec body invalide (`{lang:12345}`) → 400 invalid_input (gratuit, rejete AVANT le LLM) ou 429 au-dela de 60/min. **Jamais `/generate/route`** : cette route est lenient (`lang || 'fr'`) et EXECUTE le routeur LLM (cout) au lieu de rejeter — un burst non throttle facturerait le run.
 - **Pas de fuite secrets** : grep des reponses d'erreur pour `MISTRAL_API_KEY|sk-|api_key|password|/mnt/|/home/` → doit etre vide
 
 Lire la sortie du script. Tout `[FAIL]` est un finding bloquant. Tout `[WARN]` est a discuter.

@@ -151,13 +151,18 @@ fi
 
 # --- 6. Rate-limit AI ---
 section "Rate-limit AI (60/min sur /generate)"
-# Note : on n'utilise pas /generate/route ici car il consomme du Mistral.
-# A la place, on touche /generate/auto avec un body invalide qui sera rejete tot
-# (400 invalid_input du validateGenRequestBody) — meme route, meme limiter.
+# On burst /generate/summary avec un body invalide (lang non-string) : rejete en
+# 400 invalid_input par validateGenRequestBody AVANT tout appel LLM (cf. section 3)
+# ET avant addPendingEntry (pas de pending orphelin), tout en passant par le MEME
+# aiLimiter (regex /generate|sources|chat dans server.ts) → on observe les 429.
+# IMPORTANT : NE PAS utiliser /generate/route ici. Cette route est lenient
+# (`lang = req.body.lang || 'fr'`) et EXECUTE le routeur LLM (cout ~$0.0009/appel)
+# au lieu de rejeter — un burst non throttle facturerait le run et fausserait le
+# cost-tracking. /generate/summary ne coute jamais rien sur body invalide.
 codes=""
 for _ in $(seq 1 75); do
   c=$(curl -s -o /dev/null -w '%{http_code}\n' --max-time 2 -X POST \
-    "$BASE/api/projects/$PROJECT_ID/generate/route" \
+    "$BASE/api/projects/$PROJECT_ID/generate/summary" \
     -H 'content-type: application/json' \
     -d '{"lang":12345}')
   codes="$codes$c\n"
