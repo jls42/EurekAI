@@ -1552,6 +1552,29 @@ describe('generateRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
     });
 
+    it('returns 400 invalid_input on a wrong-typed lang WITHOUT calling the router (F2)', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      // lang:12345 (non-string truthy) doit etre rejete AVANT tout appel LLM (pas de cout).
+      const req = mockReq({ params: { pid }, body: { lang: 12345 } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
+      expect(routeRequest).not.toHaveBeenCalled();
+    });
+
     it('returns route plan on success', async () => {
       const project = store.createProject('Test');
       const pid = project.meta.id;
