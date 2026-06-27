@@ -1,6 +1,6 @@
 ---
 name: release-test
-description: Suite de tests E2E pre-release pour EurekAI. Lance le dev server si necessaire, joue le golden path via Chrome (tous les generateurs depuis des sources reelles), audit securite (SSRF, rate-limit, validation, headers, JSON malformed), et compile un rapport de findings. A utiliser avant chaque release/merge sur main, ou quand l'user demande "lance les tests de release", "verifie avant release", "/release-test".
+description: Suite de tests E2E pre-release pour EurekAI. Lance le dev server si necessaire, joue le golden path via Chrome (tous les generateurs depuis des sources reelles), couvre les features recentes (N generations paralleles du meme type, dedup re-import sources, selection OCR + tarifs, garde-fou check-models), audit securite (SSRF, rate-limit, validation, headers, JSON malformed), et compile un rapport de findings. A utiliser avant chaque release/merge sur main, ou quand l'user demande "lance les tests de release", "verifie avant release", "/release-test".
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -175,6 +175,110 @@ Pour chaque `model` dans `OCR_MODELS` :
 
 Si `NO_FIXTURE` et pas de fichier fourni : **SKIP B**, noter `⚪ LOW: OCR live dual-model non teste (pas de fixture)`. Ne jamais inventer un resultat.
 
+## Phase 2ter — N generations paralleles du meme type (Feature C, PR #42)
+
+Couvre l'invariant PR #42 : re-cliquer un bouton de generation lance une generation **de plus** (pas de verrou sur `loading[type]`), les boutons restent **cliquables** (label+icone, pas de spinner-disable), N pendings visibles via chips (1/gid), et `loading[type]` n'est libere que quand **aucun** pending du type ne reste (`pendingOfTypeExists`).
+
+### Source unique a relire (ne pas rededuire la logique)
+
+```bash
+grep -n "pendingOfTypeExists" src/app/pending-utils.ts src/app/helpers.ts
+grep -nE "canStartGenerate|loading\[" src/app/generate.ts | head
+```
+
+### A — Lancement parallele (API, deterministe, ~2x cout d'un generateur rapide)
+
+Le `gid` est genere cote client et passe via `body.gid` (UUID v4 STRICT cote backend). Deux gids distincts prouvent deux pendings independants.
+
+```bash
+GID1=$(python3 -c 'import uuid; print(uuid.uuid4())'); GID2=$(python3 -c 'import uuid; print(uuid.uuid4())')
+GENS_BEFORE=$(curl -s "$BASE/api/projects/$PROJECT_ID" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("results",{}).get("generations",[])))')
+# Lancer 2 flashcards (rapide, count=5) en parallele avec 2 gids distincts :
+for G in "$GID1" "$GID2"; do
+  curl -s -X POST "$BASE/api/projects/$PROJECT_ID/generate/flashcards" \
+    -H 'content-type: application/json' \
+    -d "{\"gid\":\"$G\",\"lang\":\"fr\",\"ageGroup\":\"enfant\",\"profileId\":\"$PROFILE_ID\",\"count\":5}" -o /dev/null -w "%{http_code}\n" &
+done; wait
+```
+
+Assertions :
+- Les **deux** POST retournent **200** (aucun n'est rejete/verrouille par l'autre).
+- `GET /api/projects` apres completion : `generations.length === GENS_BEFORE + 2` et `pendingTracker` ne contient **aucun** `status:'pending'` du type (libere car plus aucun pending — `pendingOfTypeExists`).
+
+### B — Invariant UI : le bouton reste cliquable pendant un pending (Chrome)
+
+1. Sur la vue Sources, lancer un generateur **lent** (podcast/quiz-vocal) via clic.
+2. **Pendant** le pending (badge/chip visible), relire le meme bouton via query JS :
+   ```javascript
+   const b = [...document.querySelectorAll('button[aria-label^="Générer"]')]
+     .find((x) => /podcast|vocal/i.test(x.getAttribute('aria-label')));
+   ({ disabled: b?.disabled, label: b?.getAttribute('aria-label'), hasIcon: !!b?.querySelector('svg, .icon-chip') });
+   ```
+   Assert `disabled === false` (le bouton n'est PAS verrouille) et `label`/`hasIcon` toujours presents (pas de bascule "loading"). Regression si le bouton se grise/passe en spinner.
+3. Re-cliquer ce bouton pendant le pending → **2e** `POST /generate/<type>` part (chip supplementaire). Compter les chips de pending du type : doit etre `>= 2`.
+
+## Phase 2quater — Dedup re-import sources (Feature A, PR #42)
+
+Couvre : re-importer un fichier deja importe → detecte comme doublon (sha256 `contentHash`, garde serveur), **200** (pas 500) quand le lot ne contient QUE des doublons, **pas de double facturation OCR**, et `allowDuplicates` force le re-import. **Chainer apres Phase 2bis B** (reutilise la fixture deja uploadee → 0 OCR pour le check de rejet).
+
+### Source unique a relire
+
+```bash
+grep -nE "contentHash|hashFileContent|allowDuplicates" routes/sources.ts | head
+grep -nE "findExistingDuplicate|hashFile" src/app/source-dedup.ts | head
+```
+
+### A — Rejet du doublon (API, cout $0, ne mute rien)
+
+Pre-req : au moins 1 source avec `contentHash` (la fixture de 2bis B, sinon l'uploader 1×). `FIX=/tmp/ocr-test.png`.
+
+```bash
+COST_BEFORE=$(curl -s "$BASE/api/projects/$PROJECT_ID" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("totalCost",0))')
+SRC_BEFORE=$(curl -s "$BASE/api/projects/$PROJECT_ID" | python3 -c 'import json,sys; print(len(json.load(sys.stdin).get("sources",[])))')
+# Re-upload SANS allowDuplicates :
+curl -s -X POST "$BASE/api/projects/$PROJECT_ID/sources/upload" -F "files=@$FIX" -w '\n__HTTP_%{http_code}'
+```
+
+Assertions :
+- **HTTP 200** (pas 500 — regression du contrat "lot 100% doublons").
+- Reponse = objet `{ ..., duplicates: [...] }` avec `duplicates.length >= 1` (pas un array nu, et la fixture n'est PAS dans `sources`).
+- `GET /api/projects` : `sources.length === SRC_BEFORE` (aucune source creee) **ET** `totalCost === COST_BEFORE` (aucun OCR refacture). ← invariant anti-double-facturation, le plus important.
+
+### B — Re-import force (API, +1 OCR ~ $0.004, MUTE le projet → confirmer en mode "etat actuel")
+
+```bash
+curl -s -X POST "$BASE/api/projects/$PROJECT_ID/sources/upload" -F "files=@$FIX" -F "allowDuplicates=true" -w '\n__HTTP_%{http_code}'
+```
+
+Assertions : **200** + une nouvelle source creee, son `contentHash` **identique** a l'originale ; `totalCost` a augmente (OCR refait — choix explicite). Si l'user refuse la mutation : **SKIP B**, noter `⚪ LOW: re-import force non teste`.
+
+### C — UX dialogue par fichier (Chrome, optionnel)
+
+Glisser/uploader le meme fichier via l'UI → statut **`'duplicate'`** par fichier, avec actions **« Importer quand meme »** (re-upload `allowDuplicates`) et **« Ignorer »** (dismiss). Screenshot.
+
+## Phase 2quinquies — check-models : surveillance modeles (Feature B, PR #42)
+
+Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (resolution alias `-latest` + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) pour alerter sur un alias pointant vers une version depreciee/retiree. Script, pas d'UI.
+
+1. **Path nominal** (avec cle) — rend l'overview via Lightpanda (~40s, budget timeout 120s) :
+   ```bash
+   set -a; . ./.env; set +a
+   timeout 120 npx tsx scripts/check-models.ts; echo "exit=$?"
+   ```
+   - Assert `exit=0` (**toujours** non bloquant).
+   - Sortie = soit `alias OK`, soit des alertes `⚠ ... deprecie ou retire`. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue (ex. `mistral-moderation-latest → mistral-moderation-2411 ... retire ...`). Reporter le contenu verbatim.
+2. **Path skip** (sans cle) :
+   ```bash
+   env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"
+   ```
+   - Assert `exit=0` + sortie contient `absent` / `skip`.
+3. **Cablage non bloquant** dans `check-deps.sh` + pin moderation coherent :
+   ```bash
+   grep -n "check-models" scripts/check-deps.sh   # doit etre suivi de `|| true`
+   grep -n "mistral-moderation" generators/moderation.ts   # doit etre pinne 2603, pas -latest
+   ```
+4. (Unit deja couvert : `parseLegacyTable`, cross-reference, degradation gracieuse — ne pas redupliquer ici.)
+
 ## Phase 3 — Audit securite
 
 Lancer le script securite dedie :
@@ -233,6 +337,15 @@ Compiler dans la reponse a l'user :
 - Routage live OCR 3 (cout/page ≈ $2/1000) : ✓/✗/skip
 - Routage live OCR 4 (cout/page ≈ 2x OCR 3) : ✓/✗/skip
 
+### Features PR #42
+- N generations paralleles (2 gids distincts, 2 gens, tracker vide) : ✓/✗
+- Bouton reste cliquable pendant un pending (pas de spinner-disable) : ✓/✗
+- Dedup rejet (200, duplicates[], 0 source, 0 cout OCR) : ✓/✗
+- Dedup re-import force (allowDuplicates, contentHash identique) : ✓/✗/skip
+- check-models nominal (exit 0, alias OK ou alertes reportees) : ✓/✗
+- check-models skip sans cle (exit 0, "absent") : ✓/✗
+- Cablage check-deps.sh `|| true` + pin moderation 2603 : ✓/✗
+
 ### Securite (output script)
 - JSON malformed : ✓/✗
 - Helmet headers : ✓/✗
@@ -277,5 +390,8 @@ Quand l'app change et que le skill commence a echouer :
 - **Refactor des endpoints** : si `/generate/auto/route` devient `/generate/orchestrate` par exemple, mettre a jour la phase 3.
 - **Nouveau code d'erreur** : ajouter dans `security-tests.sh` la regex d'assertion correspondante.
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
+- **N generations paralleles (Phase 2ter)** ancree sur `src/app/pending-utils.ts` (`pendingOfTypeExists`) + `body.gid` (UUID v4). Si le contrat gid ou la liberation de `loading[type]` change, mettre a jour la phase.
+- **Dedup sources (Phase 2quater)** ancree sur le contrat `/sources/upload` (array nu en full success, objet `{sources,duplicates?}` sinon, 200 sur lot 100% doublons, `allowDuplicates==='true'` strict) + `contentHash`. Si le contrat reponse evolue, mettre a jour la phase.
+- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda) + son cablage `|| true` dans `check-deps.sh`. Si le script devient bloquant ou change de source, mettre a jour la phase.
 
 Ouvrir une PR `chore(release-test): update for <changement>` quand cette maintenance est faite.
