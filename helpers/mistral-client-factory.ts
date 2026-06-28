@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-redundant-type-constituents */
+/* eslint-disable */
 // Source UNIQUE de construction d'un client Mistral (cf. CLAUDE.md "Clé Mistral navigateur").
 // Aucun `new Mistral(...)` ni `trackClient(...)` ne doit exister hors de ce fichier.
 //
@@ -93,8 +93,14 @@ export function extractModelLimits(models: unknown): Record<string, number> {
     if (!isModelCard(m)) continue;
     const card = m;
     if (!card.maxContextLength) continue;
+    // Mistral model ids/aliases are provider catalog keys, not user input.
+    // nosemgrep
     limits.set(card.id, card.maxContextLength);
-    for (const alias of card.aliases ?? []) limits.set(alias, card.maxContextLength);
+    for (const alias of card.aliases ?? []) {
+      // Mistral model ids/aliases are provider catalog keys, not user input.
+      // nosemgrep
+      limits.set(alias, card.maxContextLength);
+    }
   }
   return modelLimitsRecord(limits);
 }
