@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { createServer as createHttpsServer } from 'node:https';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -214,10 +215,10 @@ app.use(API_PROJECTS, generationCrudRoutes(store, profileStore));
 app.use(API_PROJECTS, chatRoutes(store, profileStore));
 
 // --- Start ---
-app.listen(PORT, () => {
+const onListen = (scheme: 'http' | 'https') => {
   const projects = store.listProjects();
   const status = getApiStatus();
-  console.log(`\n  EurekAI — http://localhost:${PORT}`);
+  console.log(`\n  EurekAI — ${scheme}://localhost:${PORT}`);
   console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
   console.log(`  TTS Mistral Voxtral: ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
@@ -241,4 +242,19 @@ app.listen(PORT, () => {
   } else {
     logger.info('boot', 'no env key — warmups skipped (model limits loaded lazily per user key)');
   }
-});
+};
+
+// HTTPS local optionnel (cf. scripts/gen-cert.sh) : si HTTPS_KEY/HTTPS_CERT sont
+// définis, l'app sert en HTTPS → secure context sur tablette/LAN (WebCrypto/IndexedDB
+// chiffrent la clé) + clé chiffrée en transit. Sinon HTTP (localhost est déjà un
+// secure context). Cf. CLAUDE.md "Clé Mistral navigateur".
+const httpsKey = process.env.HTTPS_KEY;
+const httpsCert = process.env.HTTPS_CERT;
+if (httpsKey && httpsCert) {
+  createHttpsServer({ key: readFileSync(httpsKey), cert: readFileSync(httpsCert) }, app).listen(
+    PORT,
+    () => onListen('https'),
+  );
+} else {
+  app.listen(PORT, () => onListen('http'));
+}
