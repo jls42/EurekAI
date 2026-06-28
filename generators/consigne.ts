@@ -8,12 +8,12 @@ export interface ConsigneResult {
   keyTopics: string[];
 }
 
-export const detectConsigne = async (
+export async function detectConsigne(
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
   lang = 'fr',
-): Promise<ConsigneResult> => {
+): Promise<ConsigneResult> {
   const response = await client.chat.complete({
     model,
     messages: [
@@ -33,4 +33,4 @@ export const detectConsigne = async (
     text: result.text ?? '',
     keyTopics: Array.isArray(result.keyTopics) ? result.keyTopics : [],
   };
-};
+}

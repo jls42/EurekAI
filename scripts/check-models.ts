@@ -148,14 +148,14 @@ export function analyzeModels(
   return warnings;
 }
 
-export const fetchModels = async (key: string): Promise<ModelEntry[]> => {
+export async function fetchModels(key: string): Promise<ModelEntry[]> {
   const res = await fetch('https://api.mistral.ai/v1/models', {
     headers: { Authorization: `Bearer ${key}` },
   });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = (await res.json()) as { data?: ModelEntry[] };
   return data.data ?? [];
-};
+}
 
 // I/O Lightpanda (non testée : navigateur headless ~40 s/page). Rend l'overview JS et parse la table.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy ESLint ne résout pas les types @lightpanda/browser (faux positifs) ; couvert par lint:ci local type-aware */
@@ -187,7 +187,7 @@ const reportWarnings = (warnings: string[]): void => {
   console.log('  → pinner explicitement la version courante (cf. generators/moderation.ts).');
 };
 
-export const main = async (): Promise<void> => {
+export async function main(): Promise<void> {
   // Lancé via check-deps.sh (qui source .env) → process.env peuplé. En standalone, sourcer .env
   // avant (cf. CLAUDE.md « API Mistral en local »), sinon skip gracieux.
   const key = process.env.MISTRAL_API_KEY;
@@ -203,7 +203,7 @@ export const main = async (): Promise<void> => {
     const msg = e instanceof Error ? e.message : String(e);
     console.log(`check-models: vérification impossible (${msg}) — skip (non bloquant).`);
   }
-};
+}
 
 // Guard CLI (robuste ESM/tsx) : ne lance main() que si exécuté directement, pas à l'import (tests).
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

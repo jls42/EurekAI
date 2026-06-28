@@ -1,12 +1,12 @@
 import { Mistral } from '@mistralai/mistralai';
 import { timer } from '../helpers/index.js';
 
-export const transcribeAudio = async (
+export async function transcribeAudio(
   client: Mistral,
   audioBuffer: Buffer,
   fileName: string,
   language = 'fr',
-): Promise<{ text: string; elapsed: number }> => {
+): Promise<{ text: string; elapsed: number }> {
   const stop = timer();
 
   const response = await client.audio.transcriptions.complete({
@@ -17,4 +17,4 @@ export const transcribeAudio = async (
 
   const elapsed = stop();
   return { text: response.text, elapsed };
-};
+}

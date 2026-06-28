@@ -42,14 +42,14 @@ export interface ChatResult {
   toolCalls: string[];
 }
 
-export const chatWithSources = async (
+export async function chatWithSources(
   client: Mistral,
   messages: Array<{ role: string; content: string }>,
   sourceContext: string,
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
-): Promise<ChatResult> => {
+): Promise<ChatResult> {
   const docsLabel = lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
   const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
 
@@ -105,4 +105,4 @@ export const chatWithSources = async (
     reply: typeof content === 'string' ? content : '',
     toolCalls,
   };
-};
+}

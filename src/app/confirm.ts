@@ -17,7 +17,7 @@ const PID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 // pending (404 = race avec un completion ; même résultat fonctionnel pour
 // l'UI). Retourne `false` UNIQUEMENT en cas de réseau down / 5xx — l'UI
 // rollbacke alors le pending pour ne pas mentir à l'utilisateur.
-const postCancel = async (pid: string, gid: string, allowedUrls: string[]): Promise<boolean> => {
+async function postCancel(pid: string, gid: string, allowedUrls: string[]): Promise<boolean> {
   if (!PID_SAFE.test(pid) || !GID_UUID_V4.test(gid)) return false;
   const safePid = encodeURIComponent(pid);
   const safeGid = encodeURIComponent(gid);
@@ -40,7 +40,7 @@ const postCancel = async (pid: string, gid: string, allowedUrls: string[]): Prom
     }
   }
   return false;
-};
+}
 
 // Construit la whitelist d'URLs /cancel autorisées pour ce projet à partir
 // des gids actuellement présents dans pendingById. Ce shape (Array statique

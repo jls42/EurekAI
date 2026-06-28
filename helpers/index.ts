@@ -123,13 +123,13 @@ const assertResolvedAddressesArePublic = async (host: string): Promise<void> => 
  * Valide une URL fournie par l'utilisateur avant un fetch sortant.
  * Defense contre SSRF (CodeQL js/request-forgery).
  */
-export const assertSafeFetchUrl = async (rawUrl: string): Promise<URL> => {
+export async function assertSafeFetchUrl(rawUrl: string): Promise<URL> {
   const parsed = parseHttpUrl(rawUrl);
   const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
   assertHostNotPrivate(host);
   await assertResolvedAddressesArePublic(host);
   return parsed;
-};
+}
 
 const SAFE_HOST_RE = /^[A-Za-z0-9.\-:[\]]{1,255}$/;
 
@@ -145,7 +145,7 @@ const buildSafeFetchUrl = (parsed: URL): string => {
 
 const buildFetchAllowlist = (safeUrlStr: string): string[] => [safeUrlStr];
 
-const fetchWithReadability = async (safeUrlStr: string): Promise<string> => {
+async function fetchWithReadability(safeUrlStr: string): Promise<string> {
   const allowedUrls = buildFetchAllowlist(safeUrlStr);
   if (allowedUrls.includes(safeUrlStr)) {
     const res = await fetch(safeUrlStr, {
@@ -167,12 +167,12 @@ const fetchWithReadability = async (safeUrlStr: string): Promise<string> => {
     return article?.textContent?.trim() || '';
   }
   throw new Error('URL non autorisee');
-};
+}
 
-const autoFallbackToLightpanda = async (
+async function autoFallbackToLightpanda(
   safeUrlStr: string,
   readabilityText: string,
-): Promise<{ text: string; engine: ScrapeEngine }> => {
+): Promise<{ text: string; engine: ScrapeEngine }> {
   try {
     const lpText = await fetchWithLightpanda(safeUrlStr);
     return { text: lpText, engine: 'lightpanda' };
@@ -180,13 +180,13 @@ const autoFallbackToLightpanda = async (
     if (readabilityText.length > 0) return { text: readabilityText, engine: 'readability' };
     throw new Error('Could not extract content from page');
   }
-};
+}
 
 /** Fetch a URL and extract its main text content. */
-export const fetchPageContent = async (
+export async function fetchPageContent(
   url: string,
   mode: ScrapeMode = 'auto',
-): Promise<{ text: string; engine: ScrapeEngine }> => {
+): Promise<{ text: string; engine: ScrapeEngine }> {
   const safeUrl = await assertSafeFetchUrl(url);
   const safeUrlStr = buildSafeFetchUrl(safeUrl);
 
@@ -200,15 +200,15 @@ export const fetchPageContent = async (
     throw new Error('Readability could not extract content');
   }
   return autoFallbackToLightpanda(safeUrlStr, text);
-};
+}
 
 /** Fallback: use Lightpanda headless browser for JS-rendered content. */
-const fetchWithLightpanda = async (url: string): Promise<string> => {
+async function fetchWithLightpanda(url: string): Promise<string> {
   const { lightpanda } = await import('@lightpanda/browser');
   const result = await lightpanda.fetch(url, { dump: true, dumpOptions: { type: 'markdown' } });
   const text = typeof result === 'string' ? result : result.toString('utf-8');
   return text.trim();
-};
+}
 
 /** Extract text content from a Mistral chat completion response choice. */
 export function getContent(response: {

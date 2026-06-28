@@ -18,7 +18,7 @@ function isValidFillBlank(data: FillBlankItem[]): boolean {
   );
 }
 
-export const generateFillBlank = async (
+export async function generateFillBlank(
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
@@ -26,7 +26,7 @@ export const generateFillBlank = async (
   ageGroup: AgeGroup = 'enfant',
   count = 10,
   exclusions?: string,
-): Promise<FillBlankItem[]> => {
+): Promise<FillBlankItem[]> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: fillBlankSystem(ageGroup) },
     { role: 'user', content: fillBlankUser(markdown, count, lang, exclusions) },
@@ -68,4 +68,4 @@ export const generateFillBlank = async (
     );
   }
   return retryData;
-};
+}

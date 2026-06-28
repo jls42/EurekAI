@@ -57,11 +57,11 @@ export function finalizeDeleteProfile(state: AppContext, id: string): void {
   state.showToast(state.t('toast.profileDeleted'), 'success');
 }
 
-export const executeDeleteProfile = async (
+export async function executeDeleteProfile(
   state: AppContext,
   id: string,
   pin?: string,
-): Promise<void> => {
+): Promise<void> {
   try {
     // fetch inline (pas extrait dans un helper, pas de constante top-fichier pour le préfixe)
     // pour préserver l'analyse taint Codacy : `rule-node-ssrf` a besoin de voir l'URL littérale
@@ -82,7 +82,7 @@ export const executeDeleteProfile = async (
     const msg = e instanceof Error ? e.message : String(e);
     state.showToast(state.t(TOAST_ERROR, { error: msg }), 'error');
   }
-};
+}
 
 export function deleteConfirmMessage(state: AppContext, id: string): string {
   const projectCount = state.currentProfile?.id === id ? state.projects.length : 0;

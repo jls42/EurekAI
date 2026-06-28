@@ -125,7 +125,7 @@ function modelLimitsRecord(limits: Map<string, number>): Record<string, number> 
 // les a pas chargées (cas .env vide → warmups skippés, mais une clé utilisateur
 // arrive). Fire-and-forget, idempotent, ne bloque jamais la requête.
 let modelLimitsWarmStarted = false;
-const loadModelLimits = async (client: Mistral): Promise<void> => {
+async function loadModelLimits(client: Mistral): Promise<void> {
   try {
     const models: unknown = await client.models.list();
     setModelLimits(extractModelLimits(models));
@@ -134,7 +134,7 @@ const loadModelLimits = async (client: Mistral): Promise<void> => {
     const message = e instanceof Error ? e.message : String(e);
     logger.warn('models', `lazy limits load failed: ${message}`);
   }
-};
+}
 
 function warmModelLimitsOnce(client: Mistral): void {
   if (modelLimitsWarmStarted || Object.keys(getModelLimits()).length > 0) return;

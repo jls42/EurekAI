@@ -24,11 +24,11 @@ export interface TtsOptions {
 
 // --- Mistral TTS ---
 
-export const textToSpeech = async (
+export async function textToSpeech(
   text: string,
   voiceId: VoiceId,
   options: TtsOptions,
-): Promise<Buffer> => {
+): Promise<Buffer> {
   const response = await options.mistralClient.audio.speech.complete({
     input: text,
     model: options.model,
@@ -45,7 +45,7 @@ export const textToSpeech = async (
     throw err;
   }
   return Buffer.from(response.audioData, 'base64');
-};
+}
 
 // --- Voice listing helpers ---
 
@@ -68,7 +68,7 @@ function toMistralVoice(v: unknown): MistralVoice {
 
 const MAX_VOICE_PAGES = 50;
 
-const fetchAllVoices = async (client: Mistral): Promise<MistralVoice[]> => {
+async function fetchAllVoices(client: Mistral): Promise<MistralVoice[]> {
   const voices: MistralVoice[] = [];
   let offset = 0;
   for (let page = 0; page < MAX_VOICE_PAGES; page++) {
@@ -79,14 +79,14 @@ const fetchAllVoices = async (client: Mistral): Promise<MistralVoice[]> => {
     offset += items.length;
   }
   return voices;
-};
+}
 
 function matchesLang(voice: MistralVoice, lang: string): boolean {
   return voice.languages.some((l) => l.startsWith(lang));
 }
 
-export const listVoices = async (client: Mistral, lang?: string): Promise<MistralVoice[]> => {
+export async function listVoices(client: Mistral, lang?: string): Promise<MistralVoice[]> {
   const voices = await fetchAllVoices(client);
   if (!lang) return voices;
   return voices.filter((v) => matchesLang(v, lang));
-};
+}

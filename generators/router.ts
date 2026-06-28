@@ -142,13 +142,13 @@ export function normalizePlan(
   return deduped.slice(0, MAX_PLAN_LENGTH);
 }
 
-export const routeRequest = async (
+export async function routeRequest(
   client: Mistral,
   markdown: string,
   model = 'mistral-small-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
-): Promise<RoutePlan> => {
+): Promise<RoutePlan> {
   const response = await client.chat.complete({
     model,
     messages: [
@@ -169,4 +169,4 @@ export const routeRequest = async (
   const parsed = safeParseJson<RoutePlan>(raw);
   parsed.plan = normalizePlan(parsed.plan ?? [], lang, markdown);
   return parsed;
-};
+}

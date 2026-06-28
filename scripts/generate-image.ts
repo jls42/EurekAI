@@ -69,12 +69,12 @@ export function parseArgs(): ParsedOptions {
   return options;
 }
 
-export const requestImage = async (
+export async function requestImage(
   ai: GoogleGenAI,
   modelId: string,
   prompt: string,
   ratio: string,
-) => {
+) {
   return ai.models.generateContent({
     model: modelId,
     contents: prompt,
@@ -83,7 +83,7 @@ export const requestImage = async (
       imageConfig: { aspectRatio: ratio },
     },
   });
-};
+}
 
 export function savePartAsImage(part: unknown, output: string): boolean {
   if (typeof part !== 'object' || part === null || !('inlineData' in part)) return false;
@@ -106,12 +106,12 @@ export function logTextPart(part: unknown): void {
   }
 }
 
-export const generateImage = async (
+export async function generateImage(
   prompt: string,
   output: string,
   ratio: string,
   model: string,
-): Promise<boolean> => {
+): Promise<boolean> {
   if (!VALID_RATIOS.includes(ratio)) {
     console.error(`Erreur: Ratio invalide '${ratio}'. Valides: ${VALID_RATIOS.join(', ')}`);
     process.exit(1);
@@ -135,7 +135,7 @@ export const generateImage = async (
 
   console.error('Erreur: Aucune image générée');
   return false;
-};
+}
 
 const { prompt, output, ratio, model } = parseArgs();
 

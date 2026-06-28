@@ -180,11 +180,11 @@ function handleBatchSummaryResult(ctx: BatchSummaryCtx): void {
   });
 }
 
-const generateFlashcardsAudio = async (
+async function generateFlashcardsAudio(
   cards: Array<{ question: string; answer: string }>,
   voices: { host: VoiceId; guest: VoiceId },
   ttsOpts: TtsOptions,
-): Promise<Buffer> => {
+): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
   const segments: Buffer[] = [];
   for (let i = 0; i < cards.length; i++) {
@@ -194,7 +194,7 @@ const generateFlashcardsAudio = async (
     segments.push(...cardSegments);
   }
   return concatMp3(segments);
-};
+}
 
 interface SectionAudioCtx {
   gen: Generation;
@@ -208,10 +208,7 @@ interface SectionAudioCtx {
   gid: string;
 }
 
-const generateSectionAudio = async (
-  ctx: SectionAudioCtx,
-  res: Response,
-): Promise<string | null> => {
+async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promise<string | null> {
   const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
@@ -233,7 +230,7 @@ const generateSectionAudio = async (
     });
   }
   return audioUrl;
-};
+}
 
 function resolveReadAloudContext(
   store: ProjectStore,
@@ -504,11 +501,11 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   };
 
   // Sous-helper : pipeline batch summary all-sections.
-  const runBatchSummaryReadAloud = async (
+  async function runBatchSummaryReadAloud(
     ctx: ReadAloudCtx,
     summaryGen: SummaryGeneration,
     res: Response,
-  ): Promise<void> => {
+  ): Promise<void> {
     const { result: batchResult, usage: batchUsage } = await runWithUsageTracking(() =>
       generateBatchAudio(summaryGen, ctx.voiceId, ctx.ttsOpts, ctx.projectDir, ctx.pid),
     );
@@ -528,10 +525,10 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       res,
       costDelta: batchCost?.cost,
     });
-  };
+  }
 
   // Sous-helper : pipeline dual-voice flashcards.
-  const runFlashcardsReadAloud = async (ctx: ReadAloudCtx, res: Response): Promise<void> => {
+  async function runFlashcardsReadAloud(ctx: ReadAloudCtx, res: Response): Promise<void> {
     const cards = ctx.gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
     const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
       generateFlashcardsAudio(cards, ctx.voices, ctx.ttsOpts),
@@ -549,14 +546,14 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       `read-aloud-${ctx.baseId}-all`,
     );
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
-  };
+  }
 
   // Sous-helper : pipeline section unique.
-  const runSingleSectionReadAloud = async (
+  async function runSingleSectionReadAloud(
     ctx: ReadAloudCtx,
     section: string,
     res: Response,
-  ): Promise<void> => {
+  ): Promise<void> {
     const { result: audioUrl, usage: secUsage } = await runWithUsageTracking(() =>
       generateSectionAudio(
         {
@@ -580,14 +577,14 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       secUsage,
     );
     if (audioUrl) res.json({ audioUrl, ...(secCost && { costDelta: secCost.cost }) });
-  };
+  }
 
   // Sous-helper extrait : dispatche entre les 3 pipelines selon (gen.type, section).
-  const runReadAloudPipeline = async (
+  async function runReadAloudPipeline(
     ctx: ReadAloudCtx,
     section: string,
     res: Response,
-  ): Promise<void> => {
+  ): Promise<void> {
     if (section === 'all' && ctx.gen.type === 'summary') {
       await runBatchSummaryReadAloud(ctx, ctx.gen as SummaryGeneration, res); // NOSONAR(S4325) — narrow after gen.type === 'summary'
       return;
@@ -597,7 +594,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       return;
     }
     await runSingleSectionReadAloud(ctx, section, res);
-  };
+  }
 
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {

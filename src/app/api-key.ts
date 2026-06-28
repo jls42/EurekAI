@@ -179,7 +179,7 @@ function openKeyDb(): Promise<IDBDatabase> {
   });
 }
 
-const loadOrCreateMasterKey = async (): Promise<CryptoKey | null> => {
+async function loadOrCreateMasterKey(): Promise<CryptoKey | null> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle || typeof indexedDB === 'undefined') return null;
   try {
@@ -200,7 +200,7 @@ const loadOrCreateMasterKey = async (): Promise<CryptoKey | null> => {
     console.warn('[api-key] master key indisponible (IndexedDB bloqué ?) → mode clair', e);
     return null;
   }
-};
+}
 
 let masterKeyPromise: Promise<CryptoKey | null> | null = null;
 function getMasterKey(): Promise<CryptoKey | null> {
@@ -209,10 +209,7 @@ function getMasterKey(): Promise<CryptoKey | null> {
 }
 
 /** Chiffre avec une master key donnée (testable en node : crypto.subtle natif). */
-export const encryptWithKey = async (
-  masterKey: CryptoKey,
-  plaintext: string,
-): Promise<KeyRecord> => {
+export async function encryptWithKey(masterKey: CryptoKey, plaintext: string): Promise<KeyRecord> {
   const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const ct = await globalThis.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
@@ -220,7 +217,7 @@ export const encryptWithKey = async (
     enc.encode(plaintext),
   );
   return { encrypted: true, iv: toB64(iv.buffer), ct: toB64(ct) };
-};
+}
 
 /** Déchiffre ; retourne null si la master key ne correspond pas (clé purgée/corrompue). */
 export function decryptWithKey(
@@ -233,18 +230,18 @@ export function decryptWithKey(
     .catch(() => null);
 }
 
-const encryptKey = async (plaintext: string): Promise<KeyRecord> => {
+async function encryptKey(plaintext: string): Promise<KeyRecord> {
   const mk = await getMasterKey();
   if (!mk) return { encrypted: false, value: plaintext }; // mode dégradé (consenti côté UI)
   return encryptWithKey(mk, plaintext);
-};
+}
 
-const decryptRecord = async (rec: KeyRecord): Promise<string | null> => {
+async function decryptRecord(rec: KeyRecord): Promise<string | null> {
   if (!rec.encrypted) return rec.value;
   const mk = await getMasterKey();
   if (!mk) return null;
   return decryptWithKey(mk, rec);
-};
+}
 
 // --- API publique (état mémoire + cycle de vie) -------------------------------
 
@@ -257,18 +254,18 @@ export function getActiveKey(): string | null {
 }
 
 /** Le stockage au repos est-il chiffrable ? false = secure context indisponible (UI : bandeau). */
-export const isStorageEncryptable = async (): Promise<boolean> => {
+export async function isStorageEncryptable(): Promise<boolean> {
   return (await getMasterKey()) !== null;
-};
+}
 
 /**
  * Charge la clé active (profil > global) en mémoire. Re-chiffre une clé stockée en clair
  * si on est repassé en secure context. Retourne le statut pour piloter le gate UI.
  */
-export const loadActiveKey = async (
+export async function loadActiveKey(
   profileId: string | undefined,
   storage: StorageLike = localStorage,
-): Promise<KeyStatus> => {
+): Promise<KeyStatus> {
   const resolved = resolveRecord(storage, profileId);
   if (!resolved) {
     activeKey = null;
@@ -285,16 +282,16 @@ export const loadActiveKey = async (
     persistRecord(storage, resolved.scope, profileId, await encryptKey(plain));
   }
   return 'ok';
-};
+}
 
 /** Enregistre une clé (chiffrée si possible) pour la portée donnée et l'active. */
-export const setKey = async (
+export async function setKey(
   opts: { scope: 'global' | 'profile'; profileId?: string; plaintext: string },
   storage: StorageLike = localStorage,
-): Promise<void> => {
+): Promise<void> {
   persistRecord(storage, opts.scope, opts.profileId, await encryptKey(opts.plaintext));
   activeKey = opts.plaintext;
-};
+}
 
 function removeFromGlobal(storage: StorageLike): void {
   const keyring = readProviderKeyring(storage, GLOBAL_SLOT);
@@ -308,14 +305,14 @@ export function clearProfileApiKey(profileId: string, storage: StorageLike = loc
 }
 
 /** Supprime une clé (portée). N'efface l'`activeKey` mémoire que si plus rien ne résout. */
-export const clearKey = async (
+export async function clearKey(
   opts: { scope: 'global' | 'profile'; profileId?: string },
   storage: StorageLike = localStorage,
-): Promise<void> => {
+): Promise<void> {
   if (opts.scope === 'global') removeFromGlobal(storage);
   else if (opts.profileId) clearProfileApiKey(opts.profileId, storage);
   await loadActiveKey(opts.profileId, storage);
-};
+}
 
 /**
  * Master key perdue (purge navigateur) → les ciphertexts sont indéchiffrables.

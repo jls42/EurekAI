@@ -94,12 +94,12 @@ const runChatModeration = async (
   return null;
 };
 
-const validateChatRequest = async (
+async function validateChatRequest(
   req: { params: { pid: string }; body: RawChatBody | undefined },
   store: ProjectStore,
   profileStore: ProfileStore,
   client: Mistral,
-): Promise<ChatRequestContext | ChatValidationError> => {
+): Promise<ChatRequestContext | ChatValidationError> {
   const resolved = resolveProjectAndProfile(req, store, profileStore);
   if (resolved instanceof ChatValidationError) return resolved;
 
@@ -110,7 +110,7 @@ const validateChatRequest = async (
   if (modError) return modError;
 
   return { ...resolved, ...body };
-};
+}
 
 interface ToolCallCtx {
   client: Mistral;
@@ -194,7 +194,7 @@ const CHAT_TOOL_EXECUTORS: Record<string, (ctx: ToolCallCtx) => Promise<Generati
   },
 };
 
-const processChatToolCalls = async (
+async function processChatToolCalls(
   toolCalls: string[],
   ctx: ToolCallCtx,
   store: ProjectStore,
@@ -204,7 +204,7 @@ const processChatToolCalls = async (
   generations: Generation[];
   failedTools: string[];
   failedCost: number;
-}> => {
+}> {
   const generatedIds: string[] = [];
   const generations: Generation[] = [];
   const failedTools: string[] = [];
@@ -249,7 +249,7 @@ const processChatToolCalls = async (
   }
 
   return { generatedIds, generations, failedTools, failedCost };
-};
+}
 
 const appendUserAndBuildHistory = (
   store: ProjectStore,

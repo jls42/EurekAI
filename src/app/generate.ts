@@ -55,10 +55,10 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
-export const aggregateGenerateResults = async (
+export async function aggregateGenerateResults(
   responses: Response[],
   state: AppContext,
-): Promise<number> => {
+): Promise<number> {
   let failures = 0;
   for (const r of responses) {
     if (r.ok) {
@@ -70,7 +70,7 @@ export const aggregateGenerateResults = async (
     }
   }
   return failures;
-};
+}
 
 export function showGenerateAllResult(failures: number, total: number, state: AppContext): void {
   if (failures > 0 && failures < total) {
@@ -105,12 +105,12 @@ export function buildGenerateBody(state: AppContext): AutoBody {
   };
 }
 
-export const runAutoRoute = async (
+export async function runAutoRoute(
   state: AppContext,
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-): Promise<AutoRoute | null> => {
+): Promise<AutoRoute | null> {
   const routeRes = await fetch(
     // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
     '/api/projects/' + projectId + '/generate/route',
@@ -128,7 +128,7 @@ export const runAutoRoute = async (
   const route = (await routeRes.json()) as AutoRoute;
   if (route.costDelta) addCostDelta(state, route.costDelta, 'generate/route');
   return route;
-};
+}
 
 export function populateAutoPlan(
   state: AppContext,
@@ -232,14 +232,14 @@ const handleAutoStepResponse = async function (
   return 'success';
 };
 
-export const runAutoStep = async (
+export async function runAutoStep(
   state: AppContext,
   type: string,
   projectId: string,
   body: AutoBody,
   controller: AbortController,
   allowedUrls: string[],
-): Promise<StepResult> => {
+): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
   // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
   const url = '/api/projects/' + encodeURIComponent(projectId) + '/generate/' + type;
@@ -262,15 +262,15 @@ export const runAutoStep = async (
     delete state.abortControllers[type];
     state.$nextTick(() => state.refreshIcons());
   }
-};
+}
 
-export const runAutoSteps = async (
+export async function runAutoSteps(
   state: AppContext,
   plannedTypes: string[],
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-): Promise<{ failures: number; codes: FailedStepCode[] }> => {
+): Promise<{ failures: number; codes: FailedStepCode[] }> {
   const safeProjectId = encodeURIComponent(projectId);
   const allowedUrls = AUTO_AGENT_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
@@ -286,7 +286,7 @@ export const runAutoSteps = async (
   });
   await Promise.all(promises);
   return { failures, codes };
-};
+}
 
 // Sélection priorisée du toast partial-fail : un code actionnable utilisateur
 // (auth_required > quota_exceeded) prime sur 'partial' générique. Évite de
