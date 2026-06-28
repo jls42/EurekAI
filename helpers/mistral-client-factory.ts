@@ -6,7 +6,7 @@
 // Les clients construits depuis un header NE sont PAS cachés (la clé utilisateur ne doit
 // pas rester en mémoire au-delà de la requête) ; seul l'`envClient` est un singleton.
 
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-redundant-type-constituents -- Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`, réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) → faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas. */
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`, réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) → faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas. */
 import { Mistral } from '@mistralai/mistralai';
 import type { Request, Response, NextFunction } from 'express';
 import { trackClient } from './tracked-client.js';
@@ -58,16 +58,36 @@ interface ModelCard {
   aliases?: string[];
 }
 
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((alias) => typeof alias === 'string');
+}
+
+function modelData(models: unknown): unknown[] {
+  if (!models || typeof models !== 'object') return [];
+  const data = (models as { data?: unknown }).data;
+  return Array.isArray(data) ? data : [];
+}
+
+function isModelCard(value: unknown): value is ModelCard {
+  if (!value || typeof value !== 'object') return false;
+  const card = value as { id?: unknown; maxContextLength?: unknown; aliases?: unknown };
+  if (typeof card.id !== 'string') return false;
+  if (card.maxContextLength !== undefined && typeof card.maxContextLength !== 'number')
+    return false;
+  return card.aliases === undefined || isStringArray(card.aliases);
+}
+
 /** Aplati la liste de modèles Mistral → { id|alias: maxContextLength }. */
-export function extractModelLimits(models: { data?: unknown[] }): Record<string, number> {
-  const limits: Record<string, number> = {};
-  for (const m of models.data ?? []) {
-    const card = m as ModelCard;
+export function extractModelLimits(models: unknown): Record<string, number> {
+  const limits = new Map<string, number>();
+  for (const m of modelData(models)) {
+    if (!isModelCard(m)) continue;
+    const card = m;
     if (!card.maxContextLength) continue;
-    limits[card.id] = card.maxContextLength;
-    for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
+    limits.set(card.id, card.maxContextLength);
+    for (const alias of card.aliases ?? []) limits.set(alias, card.maxContextLength);
   }
-  return limits;
+  return Object.fromEntries(limits);
 }
 
 // Charge paresseusement les limites de contexte au 1er client résolu si le boot ne
@@ -79,7 +99,9 @@ function warmModelLimitsOnce(client: Mistral): void {
   modelLimitsWarmStarted = true;
   client.models
     .list()
-    .then((models) => setModelLimits(extractModelLimits(models)))
+    .then((models) => {
+      setModelLimits(extractModelLimits(models));
+    })
     .catch((e: Error) => {
       modelLimitsWarmStarted = false;
       logger.warn('models', `lazy limits load failed: ${e.message}`);

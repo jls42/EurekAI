@@ -36,6 +36,12 @@ function makeStorage(): StorageLike {
   };
 }
 
+function parseStoredJson(storage: StorageLike, slot: string): unknown {
+  const raw = storage.getItem(slot);
+  if (raw === null) throw new Error(`slot missing: ${slot}`);
+  return JSON.parse(raw) as unknown;
+}
+
 beforeEach(() => {
   // purgeKeyring réinitialise la master key mémoïsée → chaque test repart propre.
   purgeKeyring(makeStorage());
@@ -50,7 +56,8 @@ describe('api-key — chemin chiffré (IndexedDB master key)', () => {
   it('setKey persiste un KeyRecord CHIFFRÉ (encrypted:true, iv+ct)', async () => {
     const st = makeStorage();
     await setKey({ scope: 'global', plaintext: 'sk-secret-xyz' }, st);
-    const rec = JSON.parse(st.getItem('sf-api-keys-global')!).mistral as KeyRecord;
+    const rec = (parseStoredJson(st, 'sf-api-keys-global') as { mistral?: unknown })
+      .mistral as KeyRecord;
     expect(rec.encrypted).toBe(true);
     if (rec.encrypted) {
       expect(typeof rec.iv).toBe('string');
@@ -80,7 +87,8 @@ describe('api-key — chemin chiffré (IndexedDB master key)', () => {
     expect(await loadActiveKey(undefined, st)).toBe('ok');
     expect(getActiveKey()).toBe('sk-plain');
     // Au retour en secure context, le record sur disque devient chiffré.
-    const rec = JSON.parse(st.getItem('sf-api-keys-global')!).mistral as KeyRecord;
+    const rec = (parseStoredJson(st, 'sf-api-keys-global') as { mistral?: unknown })
+      .mistral as KeyRecord;
     expect(rec.encrypted).toBe(true);
   });
 

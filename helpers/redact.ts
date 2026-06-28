@@ -42,11 +42,12 @@ function redactError(err: Error, secrets: string[]): unknown {
 }
 
 function redactObject(obj: Record<string, unknown>, secrets: string[]): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(obj)) {
-    out[k] = SENSITIVE_KEY_RE.test(k) ? REDACTED : redactSecrets(v, secrets);
-  }
-  return out;
+  return Object.fromEntries(
+    Object.entries(obj).map(([k, v]) => [
+      k,
+      SENSITIVE_KEY_RE.test(k) ? REDACTED : redactSecrets(v, secrets),
+    ]),
+  );
 }
 
 /** Masque les secrets connus dans une valeur quelconque (string/array/objet plain/Error). */

@@ -516,174 +516,654 @@ function handleGeneration(
   };
 }
 
-// eslint-disable-next-line max-lines-per-function -- factory de routes (déclare tous les handlers) ; Codacy limite à 50, non applicable ici. Notre lint:complexity (Lizard CCN) couvre la complexité réelle.
-export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
-  const router = Router();
+interface AutoCtx {
+  client: Mistral;
+  markdown: string;
+  rawMarkdown: string;
+  config: ReturnType<typeof getConfig>;
+  hasConsigne: boolean;
+  lang: string;
+  ageGroup: AgeGroup;
+  sourceIds: string[];
+  count?: number;
+  pid: string;
+  store: ProjectStore;
+  generations: Generation[];
+  profileVoices?: { host?: VoiceId; guest?: VoiceId };
+  profileId?: string;
+}
 
+type StepOutcome =
+  | { ok: true; gen: Generation }
+  | { ok: false; agent: AutoAgentType; code: FailedStepCode };
+
+const makeGen = (
+  type: string,
+  data: Generation['data'],
+  ctx: Pick<GenContext, 'lang' | 'sourceIds'>,
+): Generation =>
+  ({
+    id: randomUUID(),
+    title: autoTitle(type, data, ctx.lang),
+    createdAt: new Date().toISOString(),
+    sourceIds: ctx.sourceIds,
+    type,
+    data,
+  }) as Generation;
+
+const buildSummaryGeneration = async (ctx: GenContext): Promise<Generation> => {
+  logger.info(
+    'summary',
+    `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+  );
+  const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
+  const data = await generateSummary(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.summary,
+    ctx.hasConsigne,
+    ctx.lang,
+    ctx.ageGroup,
+    exclusions,
+  );
+  logger.info(
+    'summary',
+    `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
+  );
+  return makeGen('summary', data, ctx);
+};
+
+const buildFlashcardsGeneration = async (ctx: GenContext): Promise<Generation> => {
+  const exclusions = buildExclusionContext(ctx.project.results.generations, 'flashcards');
+  const data = await generateFlashcards(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.flashcards,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    exclusions,
+  );
+  return makeGen('flashcards', data, ctx);
+};
+
+const buildQuizGeneration = async (ctx: GenContext): Promise<Generation> => {
+  const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz');
+  const data = await generateQuiz(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    exclusions,
+  );
+  return makeGen('quiz', data, ctx);
+};
+
+const buildPodcastGeneration = async (
+  store: ProjectStore,
+  ctx: GenContext,
+): Promise<Generation> => {
+  logger.info('podcast', 'Generating script...');
+  const exclusions = buildExclusionContext(ctx.project.results.generations, 'podcast');
+  const podcastResult = await generatePodcastScript(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.podcast,
+    ctx.lang,
+    ctx.ageGroup,
+    exclusions,
+  );
+  logger.info('podcast', `Script OK: ${podcastResult.script.length} lines`);
+  logger.info('podcast', 'Generating audio...');
+  const audioBuffer = await generateAudio(
+    podcastResult.script,
+    resolveVoices({
+      profileVoices: ctx.profileVoices,
+      lang: ctx.lang,
+      profileId: ctx.profileId,
+      flow: 'podcast',
+    }),
+    { model: ctx.config.ttsModel, mistralClient: ctx.client },
+  );
+  const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
+  logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
+  return createPodcastGeneration({
+    id: randomUUID(),
+    title: autoTitle('podcast', null, ctx.lang),
+    createdAt: new Date().toISOString(),
+    sourceIds: ctx.sourceIds,
+    type: 'podcast',
+    data: {
+      script: podcastResult.script,
+      audioUrl,
+      sourceRefs: podcastResult.sourceRefs,
+      speakers: podcastResult.names,
+    },
+    lang: ctx.lang,
+  });
+};
+
+const buildQuizVocalGeneration = async (
+  store: ProjectStore,
+  ctx: GenContext,
+): Promise<Generation> => {
+  logger.info(QUIZ_VOCAL, 'Generating quiz (TTS-friendly)...');
+  const exclusions = buildExclusionContext(ctx.project.results.generations, QUIZ_VOCAL);
+  const data = await generateQuizVocal(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    exclusions,
+  );
+  logger.info(QUIZ_VOCAL, `Quiz OK: ${data.length} questions`);
+  const audioUrls = await buildQuizVocalAudioUrls(store, ctx, data);
+  return createQuizVocalGeneration({
+    id: randomUUID(),
+    title: autoTitle(QUIZ_VOCAL, data),
+    createdAt: new Date().toISOString(),
+    sourceIds: ctx.sourceIds,
+    type: 'quiz-vocal',
+    data,
+    audioUrls,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+  });
+};
+
+const buildQuizVocalAudioUrls = async (
+  store: ProjectStore,
+  ctx: Pick<GenContext, 'config' | 'client' | 'profileVoices' | 'lang' | 'profileId' | 'pid'>,
+  data: QuizQuestion[],
+): Promise<string[]> => {
+  logger.info(QUIZ_VOCAL, 'Generating TTS for each question...');
+  const audioUrls: string[] = [];
+  const projectDir = store.getProjectDir(ctx.pid);
+  const hostVoice = resolveVoices({
+    profileVoices: ctx.profileVoices,
+    lang: ctx.lang,
+    profileId: ctx.profileId,
+    flow: QUIZ_VOCAL,
+  }).host;
+  const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
+  for (let i = 0; i < data.length; i += 1) {
+    const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
+    audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
+    logger.info(QUIZ_VOCAL, `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
+  }
+  return audioUrls;
+};
+
+const buildImageGeneration = async (store: ProjectStore, ctx: GenContext): Promise<Generation> => {
+  logger.info('image', `Generating via agent... lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
+  const data = await generateImage(
+    ctx.client,
+    ctx.rawMarkdown,
+    store.getProjectDir(ctx.pid),
+    ctx.pid,
+    ctx.lang,
+    ctx.ageGroup,
+  );
+  logger.info('image', 'OK');
+  return makeGen('image', data, ctx);
+};
+
+const buildFillBlankGeneration = async (ctx: GenContext): Promise<Generation> => {
+  logger.info(
+    FILL_BLANK,
+    `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+  );
+  const exclusions = buildExclusionContext(ctx.project.results.generations, FILL_BLANK);
+  const data = await generateFillBlank(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    exclusions,
+  );
+  return makeGen(FILL_BLANK, data, ctx);
+};
+
+const AUTO_EXECUTORS: Record<string, (ctx: AutoCtx) => Promise<Generation>> = {
+  summary: async (ctx) => buildAutoSummary(ctx),
+  flashcards: async (ctx) => buildAutoFlashcards(ctx),
+  quiz: async (ctx) => buildAutoQuiz(ctx),
+  [FILL_BLANK]: async (ctx) => buildAutoFillBlank(ctx),
+  podcast: async (ctx) => buildAutoPodcast(ctx),
+  [QUIZ_VOCAL]: async (ctx) => buildAutoQuizVocal(ctx),
+  image: async (ctx) => buildAutoImage(ctx),
+};
+
+const buildAutoSummary = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateSummary(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.summary,
+    ctx.hasConsigne,
+    ctx.lang,
+    ctx.ageGroup,
+    buildExclusionContext(ctx.generations, 'summary'),
+  );
+  return makeGen('summary', data, ctx);
+};
+
+const buildAutoFlashcards = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateFlashcards(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.flashcards,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    buildExclusionContext(ctx.generations, 'flashcards'),
+  );
+  return makeGen('flashcards', data, ctx);
+};
+
+const buildAutoQuiz = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateQuiz(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    buildExclusionContext(ctx.generations, 'quiz'),
+  );
+  return makeGen('quiz', data, ctx);
+};
+
+const buildAutoFillBlank = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateFillBlank(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    buildExclusionContext(ctx.generations, FILL_BLANK),
+  );
+  return makeGen(FILL_BLANK, data, ctx);
+};
+
+const buildAutoPodcast = async (ctx: AutoCtx): Promise<Generation> => {
+  const podcastResult = await generatePodcastScript(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.podcast,
+    ctx.lang,
+    ctx.ageGroup,
+    buildExclusionContext(ctx.generations, 'podcast'),
+  );
+  const audioBuffer = await generateAudio(
+    podcastResult.script,
+    resolveVoices({
+      profileVoices: ctx.profileVoices,
+      lang: ctx.lang,
+      profileId: ctx.profileId,
+      flow: 'podcast',
+    }),
+    { model: ctx.config.ttsModel, mistralClient: ctx.client },
+  );
+  const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
+  return {
+    ...makeGen(
+      'podcast',
+      {
+        script: podcastResult.script,
+        audioUrl,
+        sourceRefs: podcastResult.sourceRefs,
+        speakers: podcastResult.names,
+      },
+      ctx,
+    ),
+    lang: ctx.lang,
+  } as Generation;
+};
+
+const buildAutoQuizVocal = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateQuizVocal(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.quiz,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count,
+    buildExclusionContext(ctx.generations, QUIZ_VOCAL),
+  );
+  const audioUrls = await buildQuizVocalAudioUrls(ctx.store, ctx, data);
+  return {
+    ...makeGen(QUIZ_VOCAL, data, ctx),
+    audioUrls,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+  } as Generation;
+};
+
+const buildAutoImage = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateImage(
+    ctx.client,
+    ctx.rawMarkdown,
+    ctx.store.getProjectDir(ctx.pid),
+    ctx.pid,
+    ctx.lang,
+    ctx.ageGroup,
+  );
+  return makeGen('image', data, ctx);
+};
+
+const prepareRouteRequest = (
+  store: ProjectStore,
+  req: Request,
+  res: Response,
+): { markdown: string; lang: string; ageGroup: AgeGroup } | null => {
+  const validation = validateGenRequestBody(req.body);
+  if (!validation.ok) {
+    res.status(400).json({ error: validation.error });
+    return null;
+  }
+  const project = store.getProject(String(req.params.pid));
+  if (!project) {
+    res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+    return null;
+  }
+  const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
+  if (rawMarkdown === null) {
+    res.status(400).json({ error: 'no_sources' });
+    return null;
+  }
+  const markdown =
+    req.body.useConsigne !== false ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+  const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
+  if (ctxError) {
+    res.status(400).json({ error: ctxError });
+    return null;
+  }
+  return { markdown, lang: req.body.lang || 'fr', ageGroup: req.body.ageGroup || 'enfant' };
+};
+
+const pickAutoStepFailureCode = (
+  result: Exclude<PromoteResult, { kind: 'promoted' }>,
+): FailedStepCode => {
+  switch (result.kind) {
+    case 'failed':
+      return result.code;
+    case 'cancelled':
+      return 'cancelled';
+    case 'missing':
+      return 'internal_error';
+    default:
+      return assertNever(result);
+  }
+};
+
+const runStepBody = async (
+  step: { agent: AutoAgentType },
+  executor: (ctx: AutoCtx) => Promise<Generation>,
+  autoCtx: AutoCtx,
+  st: ProjectStore,
+  pid: string,
+  gid: string,
+): Promise<StepOutcome> => {
+  const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+  const persisted = persistUsage(
+    st,
+    pid,
+    `POST /api/projects/${pid}/generate/auto/${step.agent}`,
+    usage,
+  );
+  const promoteResult = st.promoteToGeneration(pid, gid, buildFinalGeneration(gid, gen, persisted));
+  if (promoteResult.kind === 'promoted') {
+    logger.info('auto', `${step.agent} OK`);
+    return { ok: true, gen: promoteResult.generation };
+  }
+  const code = pickAutoStepFailureCode(promoteResult);
+  if (promoteResult.kind === 'missing')
+    logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
+  else logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
+  return { ok: false, agent: step.agent, code };
+};
+
+const runStepCatch = (
+  err: unknown,
+  step: { agent: AutoAgentType },
+  st: ProjectStore,
+  pid: string,
+  gid: string,
+): StepOutcome => {
+  const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(
+      st,
+      pid,
+      `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+      failedUsage,
+    );
+  }
+  const code = extractErrorCode(err, step.agent);
+  st.markPendingFailed(pid, gid, code);
+  logger.error('auto', `${step.agent} FAILED:`, err);
+  return { ok: false, agent: step.agent, code };
+};
+
+const runStep = async (
+  step: { agent: AutoAgentType },
+  autoCtx: AutoCtx,
+  st: ProjectStore,
+  pid: string,
+): Promise<StepOutcome> => {
+  const executor = AUTO_EXECUTORS[step.agent];
+  if (!executor) {
+    logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
+    return { ok: false, agent: step.agent, code: 'internal_error' };
+  }
+  const gid = randomUUID();
+  const added = st.addPendingEntry(pid, makeTrackerEntry(step.agent, gid, autoCtx.sourceIds));
+  if (!added) {
+    logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
+    return { ok: false, agent: step.agent, code: 'internal_error' };
+  }
+  try {
+    return await runStepBody(step, executor, autoCtx, st, pid, gid);
+  } catch (err) {
+    return runStepCatch(err, step, st, pid, gid);
+  }
+};
+
+const pushStepOutcome = (
+  outcome: StepOutcome,
+  generations: Generation[],
+  failedSteps: FailedStep[],
+): void => {
+  if (outcome.ok) generations.push(outcome.gen);
+  else failedSteps.push({ agent: outcome.agent, code: outcome.code });
+};
+
+const pushRejectedStep = (
+  reason: unknown,
+  step: { agent: AutoAgentType },
+  st: ProjectStore,
+  pid: string,
+  failedSteps: FailedStep[],
+): void => {
+  logger.error('auto', `${step.agent} unexpected rejection:`, reason);
+  const failedUsage = (reason as { apiUsage?: ApiUsage[] })?.apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(
+      st,
+      pid,
+      `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
+      failedUsage,
+    );
+  }
+  failedSteps.push({ agent: step.agent, code: extractErrorCode(reason, step.agent) });
+};
+
+const executePlan = async (
+  plan: Array<{ agent: AutoAgentType }>,
+  autoCtx: AutoCtx,
+  st: ProjectStore,
+  pid: string,
+  generations: Generation[],
+  failedSteps: FailedStep[],
+): Promise<void> => {
+  const settled = await Promise.allSettled(plan.map((step) => runStep(step, autoCtx, st, pid)));
+  settled.forEach((outcome, idx) => {
+    const step = plan[idx];
+    if (outcome.status === 'rejected') pushRejectedStep(outcome.reason, step, st, pid, failedSteps);
+    else pushStepOutcome(outcome.value, generations, failedSteps);
+  });
+};
+
+const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set<AutoAgentType>([
+  'podcast',
+  QUIZ_VOCAL,
+]);
+
+const splitByTtsAvailability = <T extends { agent: AutoAgentType }>(
+  plan: T[],
+  ttsAvailable: boolean,
+): { runnable: T[]; ttsSkipped: T[] } => {
+  if (ttsAvailable) return { runnable: plan, ttsSkipped: [] };
+  const runnable: T[] = [];
+  const ttsSkipped: T[] = [];
+  for (const step of plan) {
+    if (TTS_DEPENDENT_AGENTS.has(step.agent)) ttsSkipped.push(step);
+    else runnable.push(step);
+  }
+  return { runnable, ttsSkipped };
+};
+
+const runAutoRouting = async (
+  store: ProjectStore,
+  client: Mistral,
+  markdown: string,
+  lang: string,
+  ageGroup: AgeGroup,
+  pid: string,
+) => {
+  logger.info('auto', 'Smart routing: analyzing content...');
+  const { result: route, usage } = await runWithUsageTracking(() =>
+    routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
+  );
+  persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
+  logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
+  const { executable, skipped } = splitByAutoExecutable(route.plan);
+  const { runnable, ttsSkipped } = splitByTtsAvailability(executable, true);
+  if (ttsSkipped.length > 0) {
+    logger.warn(
+      'auto',
+      `skipped (tts unavailable): [${ttsSkipped.map((s) => s.agent).join(', ')}]`,
+    );
+  }
+  if (skipped.length > 0) {
+    logger.warn(
+      'auto',
+      `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
+    );
+  }
+  return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
+};
+
+const toAutoCtx = (
+  store: ProjectStore,
+  baseCtx: Omit<GenContext, 'req' | 'res' | 'client'>,
+  client: Mistral,
+): AutoCtx => ({
+  client,
+  markdown: baseCtx.markdown,
+  rawMarkdown: baseCtx.rawMarkdown,
+  config: baseCtx.config,
+  hasConsigne: baseCtx.hasConsigne,
+  lang: baseCtx.lang,
+  ageGroup: baseCtx.ageGroup,
+  sourceIds: baseCtx.sourceIds,
+  count: baseCtx.count,
+  pid: baseCtx.pid,
+  store,
+  generations: baseCtx.project.results.generations,
+  profileVoices: baseCtx.profileVoices,
+  profileId: baseCtx.profileId,
+});
+
+const registerCoreGenerationRoutes = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post(
     '/:pid/generate/summary',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        logger.info(
-          'summary',
-          `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-        );
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
-        const data = await generateSummary(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.summary,
-          ctx.hasConsigne,
-          ctx.lang,
-          ctx.ageGroup,
-          exclusions,
-        );
-        logger.info(
-          'summary',
-          `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
-        );
-        return {
-          id: randomUUID(),
-          title: autoTitle('summary', data, ctx.lang),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'summary',
-          data,
-        };
-      },
-      undefined,
-      { agentName: 'summary', trackedType: 'summary' },
-    ),
+    handleGeneration(store, profileStore, buildSummaryGeneration, undefined, {
+      agentName: 'summary',
+      trackedType: 'summary',
+    }),
   );
-
   router.post(
     '/:pid/generate/flashcards',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'flashcards');
-        const data = await generateFlashcards(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.flashcards,
-          ctx.lang,
-          ctx.ageGroup,
-          ctx.count,
-          exclusions,
-        );
-        return {
-          id: randomUUID(),
-          title: autoTitle('flashcards', data, ctx.lang),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'flashcards',
-          data,
-        };
-      },
-      'flashcards',
-      { agentName: 'flashcards', trackedType: 'flashcards' },
-    ),
+    handleGeneration(store, profileStore, buildFlashcardsGeneration, 'flashcards', {
+      agentName: 'flashcards',
+      trackedType: 'flashcards',
+    }),
   );
-
   router.post(
     '/:pid/generate/quiz',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz');
-        const data = await generateQuiz(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.quiz,
-          ctx.lang,
-          ctx.ageGroup,
-          ctx.count,
-          exclusions,
-        );
-        return {
-          id: randomUUID(),
-          title: autoTitle('quiz', data, ctx.lang),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'quiz',
-          data,
-        };
-      },
-      'quiz',
-      { agentName: 'quiz', trackedType: 'quiz' },
-    ),
+    handleGeneration(store, profileStore, buildQuizGeneration, 'quiz', {
+      agentName: 'quiz',
+      trackedType: 'quiz',
+    }),
   );
+};
 
+const registerMediaGenerationRoutes = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post(
     '/:pid/generate/podcast',
+    handleGeneration(store, profileStore, (ctx) => buildPodcastGeneration(store, ctx), 'podcast', {
+      agentName: 'podcast',
+      trackedType: 'podcast',
+    }),
+  );
+  router.post(
+    '/:pid/generate/quiz-vocal',
+    handleGeneration(store, profileStore, (ctx) => buildQuizVocalGeneration(store, ctx), 'quiz', {
+      agentName: QUIZ_VOCAL,
+      trackedType: QUIZ_VOCAL,
+    }),
+  );
+  router.post(
+    '/:pid/generate/image',
     handleGeneration(
       store,
       profileStore,
-      async (ctx) => {
-        logger.info('podcast', 'Generating script...');
-        const exclusions = buildExclusionContext(ctx.project.results.generations, 'podcast');
-        const podcastResult = await generatePodcastScript(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.podcast,
-          ctx.lang,
-          ctx.ageGroup,
-          exclusions,
-        );
-        logger.info('podcast', `Script OK: ${podcastResult.script.length} lines`);
-
-        logger.info('podcast', 'Generating audio...');
-        const audioBuffer = await generateAudio(
-          podcastResult.script,
-          resolveVoices({
-            profileVoices: ctx.profileVoices,
-            lang: ctx.lang,
-            profileId: ctx.profileId,
-            flow: 'podcast',
-          }),
-          { model: ctx.config.ttsModel, mistralClient: ctx.client },
-        );
-        const audioUrl = saveAudioFile(
-          audioBuffer,
-          store.getProjectDir(ctx.pid),
-          ctx.pid,
-          'podcast',
-        );
-        logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
-
-        // lang figé sur la génération pour que le badge beta audio (hi/ar) reste
-        // cohérent après un changement de locale UI ultérieur.
-        return createPodcastGeneration({
-          id: randomUUID(),
-          title: autoTitle('podcast', null, ctx.lang),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'podcast',
-          data: {
-            script: podcastResult.script,
-            audioUrl,
-            sourceRefs: podcastResult.sourceRefs,
-            speakers: podcastResult.names,
-          },
-          lang: ctx.lang,
-        });
-      },
-      'podcast',
-      { agentName: 'podcast', trackedType: 'podcast' },
+      (ctx) => buildImageGeneration(store, ctx),
+      'mistral-large-latest',
+      { checkRawMarkdown: true, agentName: 'image', trackedType: 'image' },
     ),
   );
+  router.post(
+    '/:pid/generate/fill-blank',
+    handleGeneration(store, profileStore, buildFillBlankGeneration, 'quiz', {
+      agentName: FILL_BLANK,
+      trackedType: FILL_BLANK,
+    }),
+  );
+};
 
-  // Quiz-review : validations early en pre-handler. La closure passée à
-  // handleGeneration n'a plus aucun `return null` ni `ctx.res.status` — tout
-  // ce qui pourrait échouer côté input est déjà validé. Permet au commit
-  // pending lifecycle d'ajouter un tracker entry sans risquer de pendings
-  // orphelins quand un input est rejeté.
+const registerQuizReviewRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/generate/quiz-review', async (req, res) => {
-    // Auth-first AVANT validateQuizReviewInputs (sinon 400 sortirait avant 401).
     const resolved = resolveClient(req);
     if (!resolved.ok) {
       res.status(resolved.status).json({ error: resolved.error });
@@ -720,361 +1200,27 @@ export function generateRoutes(store: ProjectStore, profileStore: ProfileStore):
       { skipContextCheck: true, agentName: 'quiz-review', trackedType: 'quiz' },
     )(req, res);
   });
+};
 
-  router.post(
-    '/:pid/generate/quiz-vocal',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        logger.info(QUIZ_VOCAL, 'Generating quiz (TTS-friendly)...');
-        const exclusions = buildExclusionContext(ctx.project.results.generations, QUIZ_VOCAL);
-        const data = await generateQuizVocal(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.quiz,
-          ctx.lang,
-          ctx.ageGroup,
-          ctx.count,
-          exclusions,
-        );
-        logger.info(QUIZ_VOCAL, `Quiz OK: ${data.length} questions`);
-
-        logger.info(QUIZ_VOCAL, 'Generating TTS for each question...');
-        const audioUrls: string[] = [];
-        const projectDir = store.getProjectDir(ctx.pid);
-        const hostVoice = resolveVoices({
-          profileVoices: ctx.profileVoices,
-          lang: ctx.lang,
-          profileId: ctx.profileId,
-          flow: QUIZ_VOCAL,
-        }).host;
-        const ttsOpts = {
-          model: ctx.config.ttsModel,
-          mistralClient: ctx.client,
-        } as const;
-        for (let i = 0; i < data.length; i++) {
-          const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
-          audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
-          logger.info(
-            QUIZ_VOCAL,
-            `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`,
-          );
-        }
-
-        // lang + ageGroup figés pour que verifyAnswer utilise le contexte de
-        // génération, jamais le profil courant (qui peut changer après coup).
-        return createQuizVocalGeneration({
-          id: randomUUID(),
-          title: autoTitle(QUIZ_VOCAL, data),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'quiz-vocal',
-          data,
-          audioUrls,
-          lang: ctx.lang,
-          ageGroup: ctx.ageGroup,
-        });
-      },
-      'quiz',
-      { agentName: QUIZ_VOCAL, trackedType: QUIZ_VOCAL },
-    ),
-  );
-
-  router.post(
-    '/:pid/generate/image',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        logger.info(
-          'image',
-          `Generating via agent... lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-        );
-        const projectDir = store.getProjectDir(ctx.pid);
-        const data = await generateImage(
-          ctx.client,
-          ctx.rawMarkdown,
-          projectDir,
-          ctx.pid,
-          ctx.lang,
-          ctx.ageGroup,
-        );
-        logger.info('image', 'OK');
-
-        return {
-          id: randomUUID(),
-          title: autoTitle('image', data),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'image',
-          data,
-        };
-      },
-      'mistral-large-latest',
-      { checkRawMarkdown: true, agentName: 'image', trackedType: 'image' },
-    ),
-  );
-
-  // --- Fill-in-the-blanks ---
-  router.post(
-    '/:pid/generate/fill-blank',
-    handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
-        logger.info(
-          FILL_BLANK,
-          `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
-        );
-        const exclusions = buildExclusionContext(ctx.project.results.generations, FILL_BLANK);
-        const data = await generateFillBlank(
-          ctx.client,
-          ctx.markdown,
-          ctx.config.models.quiz,
-          ctx.lang,
-          ctx.ageGroup,
-          ctx.count,
-          exclusions,
-        );
-        return {
-          id: randomUUID(),
-          title: autoTitle(FILL_BLANK, data, ctx.lang),
-          createdAt: new Date().toISOString(),
-          sourceIds: ctx.sourceIds,
-          type: 'fill-blank',
-          data,
-        };
-      },
-      'quiz',
-      { agentName: FILL_BLANK, trackedType: FILL_BLANK },
-    ),
-  );
-
-  // --- Smart Routing (Auto) — structure multi-generation ---
-  interface AutoCtx {
-    client: Mistral;
-    markdown: string;
-    // rawMarkdown sans consigne, utilisé par l'executor image (aligné sur /generate/image).
-    rawMarkdown: string;
-    config: ReturnType<typeof getConfig>;
-    hasConsigne: boolean;
-    lang: string;
-    ageGroup: AgeGroup;
-    sourceIds: string[];
-    count?: number;
-    pid: string;
-    store: ProjectStore;
-    generations: Generation[];
-    profileVoices?: { host?: VoiceId; guest?: VoiceId };
-    profileId?: string;
-  }
-
-  function makeGen(type: string, data: Generation['data'], ctx: AutoCtx): Generation {
-    return {
-      id: randomUUID(),
-      title: autoTitle(type, data, ctx.lang),
-      createdAt: new Date().toISOString(),
-      sourceIds: ctx.sourceIds,
-      type,
-      data,
-    } as Generation;
-  }
-
-  const AUTO_EXECUTORS: Record<string, (ctx: AutoCtx) => Promise<Generation>> = {
-    summary: async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'summary');
-      const data = await generateSummary(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.summary,
-        ctx.hasConsigne,
-        ctx.lang,
-        ctx.ageGroup,
-        excl,
-      );
-      return makeGen('summary', data, ctx);
-    },
-    flashcards: async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'flashcards');
-      const data = await generateFlashcards(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.flashcards,
-        ctx.lang,
-        ctx.ageGroup,
-        ctx.count,
-        excl,
-      );
-      return makeGen('flashcards', data, ctx);
-    },
-    quiz: async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'quiz');
-      const data = await generateQuiz(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.quiz,
-        ctx.lang,
-        ctx.ageGroup,
-        ctx.count,
-        excl,
-      );
-      return makeGen('quiz', data, ctx);
-    },
-    'fill-blank': async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, FILL_BLANK);
-      const data = await generateFillBlank(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.quiz,
-        ctx.lang,
-        ctx.ageGroup,
-        ctx.count,
-        excl,
-      );
-      return makeGen(FILL_BLANK, data, ctx);
-    },
-    podcast: async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, 'podcast');
-      const podcastResult = await generatePodcastScript(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.podcast,
-        ctx.lang,
-        ctx.ageGroup,
-        excl,
-      );
-      const audioBuffer = await generateAudio(
-        podcastResult.script,
-        resolveVoices({
-          profileVoices: ctx.profileVoices,
-          lang: ctx.lang,
-          profileId: ctx.profileId,
-          flow: 'podcast',
-        }),
-        { model: ctx.config.ttsModel, mistralClient: ctx.client },
-      );
-      const audioUrl = saveAudioFile(
-        audioBuffer,
-        ctx.store.getProjectDir(ctx.pid),
-        ctx.pid,
-        'podcast',
-      );
-      return {
-        ...makeGen(
-          'podcast',
-          {
-            script: podcastResult.script,
-            audioUrl,
-            sourceRefs: podcastResult.sourceRefs,
-            speakers: podcastResult.names,
-          },
-          ctx,
-        ),
-        // Figer lang pour le badge beta audio (hi/ar) — même contrat que la route dédiée.
-        lang: ctx.lang,
-      } as Generation;
-    },
-    'quiz-vocal': async (ctx) => {
-      const excl = buildExclusionContext(ctx.generations, QUIZ_VOCAL);
-      const data = await generateQuizVocal(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.quiz,
-        ctx.lang,
-        ctx.ageGroup,
-        ctx.count,
-        excl,
-      );
-      const audioUrls: string[] = [];
-      const projectDir = ctx.store.getProjectDir(ctx.pid);
-      const hostVoice = resolveVoices({
-        profileVoices: ctx.profileVoices,
-        lang: ctx.lang,
-        profileId: ctx.profileId,
-        flow: QUIZ_VOCAL,
-      }).host;
-      const ttsOpts = {
-        model: ctx.config.ttsModel,
-        mistralClient: ctx.client,
-      } as const;
-      for (let i = 0; i < data.length; i += 1) {
-        const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
-        audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
-      }
-      return {
-        ...makeGen(QUIZ_VOCAL, data, ctx),
-        audioUrls,
-        lang: ctx.lang,
-        ageGroup: ctx.ageGroup,
-      } as Generation;
-    },
-    image: async (ctx) => {
-      // Utilise rawMarkdown (sans consigne) pour rester aligné sur la route dédiée
-      // /generate/image et ne pas polluer le prompt image avec la consigne de révision.
-      const data = await generateImage(
-        ctx.client,
-        ctx.rawMarkdown,
-        ctx.store.getProjectDir(ctx.pid),
-        ctx.pid,
-        ctx.lang,
-        ctx.ageGroup,
-      );
-      return makeGen('image', data, ctx);
-    },
-  };
-
-  // Sous-helper extrait : valide les inputs route + prépare le markdown
-  // (consigne + context limit). Retourne null après envoi 4xx si invalide.
-  function prepareRouteRequest(
-    req: Request,
-    res: Response,
-  ): { markdown: string; lang: string; ageGroup: AgeGroup } | null {
-    // Même validation stricte que les autres /generate/* (buildGenContext) : rejette les
-    // types invalides (lang:12345, ageGroup:[]) AVANT tout appel LLM. Sans ça, `lang || 'fr'`
-    // laissait passer un non-string truthy et exécutait le routeur (200 + coût) au lieu de 400.
-    const validation = validateGenRequestBody(req.body);
-    if (!validation.ok) {
-      res.status(400).json({ error: validation.error });
-      return null;
-    }
-    const project = store.getProject(String(req.params.pid));
-    if (!project) {
-      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return null;
-    }
-    const lang = req.body.lang || 'fr';
-    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-    const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
-    if (rawMarkdown === null) {
-      res.status(400).json({ error: 'no_sources' });
-      return null;
-    }
-    const useConsigneRoute = req.body.useConsigne !== false;
-    const markdown = useConsigneRoute ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-    const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
-    if (ctxError) {
-      res.status(400).json({ error: ctxError });
-      return null;
-    }
-    return { markdown, lang, ageGroup };
-  }
-
-  // --- Route analysis only (for 2-phase auto) ---
+const registerRouteAnalysisRoute = (router: Router, store: ProjectStore): void => {
   router.post('/:pid/generate/route', async (req, res) => {
     try {
-      // Auth-first (pas de pending tracker ici, mais cohérence + pas d'IO sans clé).
       const resolved = resolveClient(req);
       if (!resolved.ok) {
         res.status(resolved.status).json({ error: resolved.error });
         return;
       }
-      const prepared = prepareRouteRequest(req, res);
+      const prepared = prepareRouteRequest(store, req, res);
       if (!prepared) return;
-      const { markdown, lang, ageGroup } = prepared;
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
-        routeRequest(resolved.client, markdown, ROUTER_MODEL, lang, ageGroup),
+        routeRequest(
+          resolved.client,
+          prepared.markdown,
+          ROUTER_MODEL,
+          prepared.lang,
+          prepared.ageGroup,
+        ),
       );
       const routeCost = persistUsage(
         store,
@@ -1098,245 +1244,51 @@ export function generateRoutes(store: ProjectStore, profileStore: ProfileStore):
       res.status(500).json({ error: extractErrorCode(e, 'route') });
     }
   });
+};
 
-  type StepOutcome =
-    | { ok: true; gen: Generation }
-    | { ok: false; agent: AutoAgentType; code: FailedStepCode };
+const sendAutoRouteResponse = (
+  res: Response,
+  executablePlan: Array<{ agent: AutoAgentType }>,
+  skippedSteps: Array<{ agent: string }>,
+  generations: Generation[],
+  failedSteps: FailedStep[],
+): void => {
+  const allFailed = generations.length === 0 && failedSteps.length > 0;
+  res.status(allFailed ? 502 : 200).json({
+    route: executablePlan,
+    generations,
+    ...(failedSteps.length > 0 && { failedSteps }),
+    ...(skippedSteps.length > 0 && { skippedSteps }),
+    ...(allFailed && { error: 'all_steps_failed' }),
+  });
+};
 
-  // Le UI ne passe pas par /generate/auto (il fait runAutoSteps avec N
-  // /generate/<type>), mais cette route reste utilisable pour appels batch.
-  // Chaque step a son propre gid serveur (le body.gid global serait incohérent
-  // avec N générations en parallèle). Le pending lifecycle suit les mêmes
-  // invariants que handleGeneration : pas de req.on('close') cancel.
-  async function runStep(
-    step: { agent: AutoAgentType },
-    autoCtx: AutoCtx,
-    st: ProjectStore,
-    pid: string,
-  ): Promise<StepOutcome> {
-    const executor = AUTO_EXECUTORS[step.agent];
-    if (!executor) {
-      // Cas impossible : executablePlan est déjà filtré via splitByAutoExecutable.
-      logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
-      return { ok: false, agent: step.agent, code: 'internal_error' };
-    }
-    const gid = randomUUID();
-    const added = st.addPendingEntry(pid, makeTrackerEntry(step.agent, gid, autoCtx.sourceIds));
-    if (!added) {
-      // Improbable : gid serveur fresh à chaque step (UUID v4 unique).
-      logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
-      return { ok: false, agent: step.agent, code: 'internal_error' };
-    }
-    try {
-      return await runStepBody(step, executor, autoCtx, st, pid, gid);
-    } catch (err) {
-      return runStepCatch(err, step, st, pid, gid);
-    }
-  }
-
-  async function runStepBody(
-    step: { agent: AutoAgentType },
-    executor: (ctx: AutoCtx) => Promise<Generation>,
-    autoCtx: AutoCtx,
-    st: ProjectStore,
-    pid: string,
-    gid: string,
-  ): Promise<StepOutcome> {
-    const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
-    const persisted = persistUsage(
-      st,
-      pid,
-      `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-      usage,
-    );
-    const finalGen = buildFinalGeneration(gid, gen, persisted);
-    const promoteResult = st.promoteToGeneration(pid, gid, finalGen);
-    if (promoteResult.kind === 'promoted') {
-      logger.info('auto', `${step.agent} OK`);
-      return { ok: true, gen: promoteResult.generation };
-    }
-    // Race cancel/fail / OU bug observabilité (kind === 'missing' = entry retirée
-    // sous nos pieds entre addPendingEntry et promoteToGeneration). On distingue
-    // 'missing' de 'cancelled' explicitement : 'missing' = symptôme d'un cleanup
-    // imprévu (tracker corrompu, race avec deleteProject), donc 'internal_error'
-    // côté client pour ne pas masquer un bug en code utilisateur 'cancelled'.
-    // Switch exhaustif (assertNever) verrouille le passage de tout futur arm.
-    const code = pickAutoStepFailureCode(promoteResult);
-    if (promoteResult.kind === 'missing') {
-      logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
-    } else {
-      logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
-    }
-    return { ok: false, agent: step.agent, code };
-  }
-
-  function pickAutoStepFailureCode(
-    result: Exclude<PromoteResult, { kind: 'promoted' }>,
-  ): FailedStepCode {
-    switch (result.kind) {
-      case 'failed':
-        return result.code;
-      case 'cancelled':
-        return 'cancelled';
-      case 'missing':
-        return 'internal_error';
-      default:
-        return assertNever(result);
-    }
-  }
-
-  function runStepCatch(
-    err: unknown,
-    step: { agent: AutoAgentType },
-    st: ProjectStore,
-    pid: string,
-    gid: string,
-  ): StepOutcome {
-    const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-    if (failedUsage?.length) {
-      persistUsage(
-        st,
-        pid,
-        `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-        failedUsage,
-      );
-    }
-    const code = extractErrorCode(err, step.agent);
-    st.markPendingFailed(pid, gid, code);
-    logger.error('auto', `${step.agent} FAILED:`, err);
-    return { ok: false, agent: step.agent, code };
-  }
-
-  // Parallélisation alignée sur le comportement UI (cf. src/app/generate.ts:260).
-  // Changement observable acté : buildExclusionContext voit l'état initial du projet
-  // pour tous les agents, pas les générations produites par les autres étapes en cours.
-  async function executePlan(
-    plan: Array<{ agent: AutoAgentType }>,
-    autoCtx: AutoCtx,
-    st: ProjectStore,
-    pid: string,
-    generations: Generation[],
-    failedSteps: FailedStep[],
-  ) {
-    const settled = await Promise.allSettled(plan.map((step) => runStep(step, autoCtx, st, pid)));
-    // Ordre de sortie = ordre du plan (Promise.allSettled préserve l'ordre d'input).
-    settled.forEach((outcome, idx) => {
-      const step = plan[idx];
-      if (outcome.status === 'rejected') {
-        // runStep catche déjà tout. Ce cas ne devrait pas arriver, mais on le capte
-        // quand même pour ne jamais perdre un step du plan.
-        logger.error('auto', `${step.agent} unexpected rejection:`, outcome.reason);
-        // Si l'erreur porte un apiUsage (cas où l'exception a fui tracked-client
-        // sans passer par runStepCatch), persister quand même pour ne pas
-        // perdre le coût Mistral déjà facturé. Mirror du pattern runStepCatch.
-        const failedUsage = (outcome.reason as { apiUsage?: ApiUsage[] })?.apiUsage;
-        if (failedUsage?.length) {
-          persistUsage(
-            st,
-            pid,
-            `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-            failedUsage,
-          );
-        }
-        failedSteps.push({ agent: step.agent, code: extractErrorCode(outcome.reason, step.agent) });
-        return;
-      }
-      const result = outcome.value;
-      if (result.ok) {
-        generations.push(result.gen);
-      } else {
-        failedSteps.push({ agent: result.agent, code: result.code });
-      }
-    });
-  }
-
-  // Agents qui nécessitent Mistral Voxtral TTS configuré.
-  // Source unique serveur pour le filtrage quand `apiStatus.ttsAvailable` est faux :
-  // l'UI fait déjà ce filtrage côté client (src/app/generate.ts) ; cette liste garantit
-  // le même comportement pour les consommateurs API directs (sinon
-  // `enrichPlanForLearning` en injecte et tous échouent en `auth_required`).
-  const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set<AutoAgentType>([
-    'podcast',
-    QUIZ_VOCAL,
-  ]);
-
-  function splitByTtsAvailability<T extends { agent: AutoAgentType }>(
-    plan: T[],
-    ttsAvailable: boolean,
-  ): { runnable: T[]; ttsSkipped: T[] } {
-    if (ttsAvailable) return { runnable: plan, ttsSkipped: [] };
-    const runnable: T[] = [];
-    const ttsSkipped: T[] = [];
-    for (const step of plan) {
-      if (TTS_DEPENDENT_AGENTS.has(step.agent)) ttsSkipped.push(step);
-      else runnable.push(step);
-    }
-    return { runnable, ttsSkipped };
-  }
-
-  // Route analysis + split en une étape : persiste l'usage, trace le plan, isole les
-  // steps non-auto-executable ET les steps TTS si le provider n'est pas configuré,
-  // pour les remonter dans la réponse sans bloquer l'exécution (et sans produire
-  // des auth_required/tts_upstream_error systématiques).
-  async function runAutoRouting(
-    client: Mistral,
-    markdown: string,
-    lang: string,
-    ageGroup: AgeGroup,
-    pid: string,
-  ) {
-    logger.info('auto', 'Smart routing: analyzing content...');
-    const { result: route, usage } = await runWithUsageTracking(() =>
-      routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
-    );
-    persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
-    logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
-    const { executable, skipped } = splitByAutoExecutable(route.plan);
-    // Un client a été résolu (auth-first) → la même clé fait chat ET TTS Voxtral,
-    // donc TTS est disponible. (Avant : filtrage sur getApiStatus() env-only, faux
-    // avec une clé navigateur + .env vide — cf. CLAUDE.md.)
-    const { runnable, ttsSkipped } = splitByTtsAvailability(executable, true);
-    if (ttsSkipped.length > 0) {
-      logger.warn(
-        'auto',
-        `skipped (tts unavailable): [${ttsSkipped.map((s) => s.agent).join(', ')}]`,
-      );
-    }
-    if (skipped.length > 0) {
-      logger.warn(
-        'auto',
-        `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
-      );
-    }
-    return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
-  }
-
-  function toAutoCtx(
-    baseCtx: Omit<GenContext, 'req' | 'res' | 'client'>,
-    client: Mistral,
-  ): AutoCtx {
-    return {
-      client,
-      markdown: baseCtx.markdown,
-      rawMarkdown: baseCtx.rawMarkdown,
-      config: baseCtx.config,
-      hasConsigne: baseCtx.hasConsigne,
-      lang: baseCtx.lang,
-      ageGroup: baseCtx.ageGroup,
-      sourceIds: baseCtx.sourceIds,
-      count: baseCtx.count,
-      pid: baseCtx.pid,
+const handleAutoRouteError = (
+  store: ProjectStore,
+  req: Request,
+  res: Response,
+  e: unknown,
+): void => {
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(
       store,
-      generations: baseCtx.project.results.generations,
-      profileVoices: baseCtx.profileVoices,
-      profileId: baseCtx.profileId,
-    };
+      String(req.params.pid),
+      `POST /api/projects/${req.params.pid}/generate/auto/failed`,
+      failedUsage,
+    );
   }
+  logger.error('auto', 'error:', e);
+  res.status(500).json({ error: extractErrorCode(e) });
+};
 
+const registerAutoRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
-      // Auth-first : la route /auto ne lit PAS body.gid (chaque step a son gid
-      // serveur) ; on résout la clé en tête, avant tout IO/addPendingEntry.
       const resolved = resolveClient(req);
       if (!resolved.ok) {
         res.status(resolved.status).json({ error: resolved.error });
@@ -1349,48 +1301,36 @@ export function generateRoutes(store: ProjectStore, profileStore: ProfileStore):
       }
       const { ctx } = built;
       const { executable: executablePlan, skipped: skippedSteps } = await runAutoRouting(
+        store,
         resolved.client,
         ctx.markdown,
         ctx.lang,
         ctx.ageGroup,
         ctx.pid,
       );
-
       const generations: Generation[] = [];
       const failedSteps: FailedStep[] = [];
       await executePlan(
         executablePlan,
-        toAutoCtx(ctx, resolved.client),
+        toAutoCtx(store, ctx, resolved.client),
         store,
         ctx.pid,
         generations,
         failedSteps,
       );
-
-      const allFailed = generations.length === 0 && failedSteps.length > 0;
-      res.status(allFailed ? 502 : 200).json({
-        route: executablePlan,
-        generations,
-        ...(failedSteps.length > 0 && { failedSteps }),
-        ...(skippedSteps.length > 0 && { skippedSteps }),
-        // Code stable (snake_case) cohérent avec FailedStepCode — pas une clé i18n :
-        // les consommateurs API doivent pouvoir brancher leur propre message.
-        ...(allFailed && { error: 'all_steps_failed' }),
-      });
+      sendAutoRouteResponse(res, executablePlan, skippedSteps, generations, failedSteps);
     } catch (e) {
-      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(
-          store,
-          String(req.params.pid),
-          `POST /api/projects/${req.params.pid}/generate/auto/failed`,
-          failedUsage,
-        );
-      }
-      logger.error('auto', 'error:', e);
-      res.status(500).json({ error: extractErrorCode(e) });
+      handleAutoRouteError(store, req, res, e);
     }
   });
+};
 
+export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
+  const router = Router();
+  registerCoreGenerationRoutes(router, store, profileStore);
+  registerQuizReviewRoute(router, store, profileStore);
+  registerMediaGenerationRoutes(router, store, profileStore);
+  registerRouteAnalysisRoute(router, store);
+  registerAutoRoute(router, store, profileStore);
   return router;
 }

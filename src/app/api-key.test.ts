@@ -25,6 +25,12 @@ function makeStorage(): StorageLike {
   };
 }
 
+function parseStoredJson(storage: StorageLike, slot: string): unknown {
+  const raw = storage.getItem(slot);
+  if (raw === null) throw new Error(`slot missing: ${slot}`);
+  return JSON.parse(raw) as unknown;
+}
+
 const genKey = () =>
   globalThis.crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, false, [
     'encrypt',
@@ -55,7 +61,7 @@ describe('setKey / loadActiveKey (mode dégradé node : pas d IndexedDB → clai
     const st = makeStorage();
     await setKey({ scope: 'global', plaintext: 'sk-global' }, st);
     expect(getActiveKey()).toBe('sk-global');
-    expect(JSON.parse(st.getItem('sf-api-keys-global')!)).toEqual({
+    expect(parseStoredJson(st, 'sf-api-keys-global')).toEqual({
       mistral: { encrypted: false, value: 'sk-global' },
     });
   });

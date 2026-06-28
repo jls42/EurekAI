@@ -238,18 +238,20 @@ export async function runAutoStep(
   projectId: string,
   body: AutoBody,
   controller: AbortController,
-  allowedUrls: Set<string>,
+  allowedUrls: string[],
 ): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
   // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + projectId + '/generate/' + type;
-  // Whitelist canonique (cf. commit 00af5f2, rule-node-ssrf) : `allowedUrls.has(url)`
-  // immédiatement avant `fetch(url, ...)` dans la même fonction.
-  if (!allowedUrls.has(url)) return { kind: 'failed', code: 'internal_error' };
+  const url = '/api/projects/' + encodeURIComponent(projectId) + '/generate/' + type;
   try {
-    const res = await fetch(url, withAiHeaders(postJson(body, controller.signal)));
-    if (state.currentProjectId !== projectId) return 'aborted';
-    return await handleAutoStepResponse(state, type, res);
+    // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
+    // par Codacy `rule-node-ssrf` ; AUTO_AGENT_TYPES borne la liste finie de routes.
+    if (allowedUrls.includes(url)) {
+      const res = await fetch(url, withAiHeaders(postJson(body, controller.signal)));
+      if (state.currentProjectId !== projectId) return 'aborted';
+      return await handleAutoStepResponse(state, type, res);
+    }
+    return { kind: 'failed', code: 'internal_error' };
   } catch (e: unknown) {
     if (e instanceof Error && e.name === 'AbortError') return 'aborted';
     const msg = e instanceof Error ? e.message : String(e);
@@ -269,8 +271,9 @@ export async function runAutoSteps(
   body: AutoBody,
   controller: AbortController,
 ): Promise<{ failures: number; codes: FailedStepCode[] }> {
-  const allowedUrls = new Set(
-    AUTO_AGENT_TYPES.map((t) => '/api/projects/' + projectId + '/generate/' + t),
+  const safeProjectId = encodeURIComponent(projectId);
+  const allowedUrls = AUTO_AGENT_TYPES.map(
+    (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
   let failures = 0;
   const codes: FailedStepCode[] = [];

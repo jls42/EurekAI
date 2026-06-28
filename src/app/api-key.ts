@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- (1) crypto.subtle / indexedDB peuvent être undefined hors secure context (le typage lib.dom non-null ne reflète pas ce cas runtime géré). (2) Codacy lance son propre ESLint sans résolution de types (DOM/crypto/IndexedDB typés `error`, accès indexés du keyring) → faux positifs ; notre lint:ci type-aware ne les flague pas. Cf. CLAUDE.md section Codacy. */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- (1) crypto.subtle / indexedDB peuvent être undefined hors secure context (le typage lib.dom non-null ne reflète pas ce cas runtime géré). (2) Codacy lance son propre ESLint sans résolution de types (DOM/crypto/IndexedDB typés `error`) → faux positifs ; notre lint:ci type-aware ne les flague pas. Cf. CLAUDE.md section Codacy. */
 
 // Trousseau de clés API côté navigateur (cf. CLAUDE.md "Clé Mistral navigateur").
 //
@@ -23,7 +23,8 @@ export type KeyRecord =
   | { encrypted: true; iv: string; ct: string }
   | { encrypted: false; value: string };
 
-type ProviderRecord = Partial<Record<string, KeyRecord>>;
+type ProviderKeyring = Map<string, KeyRecord>;
+type ProfileKeyrings = Map<string, ProviderKeyring>;
 
 // --- Storage (localStorage, schéma { [provider]: KeyRecord }) -----------------
 
@@ -47,18 +48,54 @@ function writeSlot(storage: StorageLike, slot: string, value: unknown): void {
   }
 }
 
-function readGlobal(storage: StorageLike): ProviderRecord {
-  return readSlot(storage, GLOBAL_SLOT) as ProviderRecord;
+function isKeyRecord(value: unknown): value is KeyRecord {
+  if (!value || typeof value !== 'object') return false;
+  const rec = value as { encrypted?: unknown; iv?: unknown; ct?: unknown; value?: unknown };
+  return rec.encrypted === true
+    ? typeof rec.iv === 'string' && typeof rec.ct === 'string'
+    : rec.encrypted === false && typeof rec.value === 'string';
 }
-function readProfiles(storage: StorageLike): Record<string, ProviderRecord> {
-  return readSlot(storage, PROFILE_SLOT) as Record<string, ProviderRecord>;
+
+function readProviderKeyring(storage: StorageLike, slot: string): ProviderKeyring {
+  const keyring: ProviderKeyring = new Map();
+  for (const [provider, rec] of Object.entries(readSlot(storage, slot))) {
+    if (isKeyRecord(rec)) keyring.set(provider, rec);
+  }
+  return keyring;
+}
+
+function writeProviderKeyring(storage: StorageLike, slot: string, keyring: ProviderKeyring): void {
+  writeSlot(storage, slot, Object.fromEntries(keyring));
+}
+
+function readProfiles(storage: StorageLike): ProfileKeyrings {
+  const profiles: ProfileKeyrings = new Map();
+  for (const [profileId, value] of Object.entries(readSlot(storage, PROFILE_SLOT))) {
+    if (!value || typeof value !== 'object') continue;
+    const keyring: ProviderKeyring = new Map();
+    for (const [provider, rec] of Object.entries(value)) {
+      if (isKeyRecord(rec)) keyring.set(provider, rec);
+    }
+    profiles.set(profileId, keyring);
+  }
+  return profiles;
+}
+
+function writeProfiles(storage: StorageLike, profiles: ProfileKeyrings): void {
+  writeSlot(
+    storage,
+    PROFILE_SLOT,
+    Object.fromEntries(
+      [...profiles].map(([profileId, keyring]) => [profileId, Object.fromEntries(keyring)]),
+    ),
+  );
 }
 
 function globalRecord(storage: StorageLike): KeyRecord | undefined {
-  return readGlobal(storage)[PROVIDER];
+  return readProviderKeyring(storage, GLOBAL_SLOT).get(PROVIDER);
 }
 function profileRecord(storage: StorageLike, profileId: string): KeyRecord | undefined {
-  return readProfiles(storage)[profileId]?.[PROVIDER];
+  return readProfiles(storage).get(profileId)?.get(PROVIDER);
 }
 
 /** Résout le KeyRecord effectif pour un profil : profil > global. */
@@ -89,16 +126,17 @@ function persistRecord(
   rec: KeyRecord,
 ): void {
   if (scope === 'global') {
-    const g = readGlobal(storage);
-    g[PROVIDER] = rec;
-    writeSlot(storage, GLOBAL_SLOT, g);
+    const keyring = readProviderKeyring(storage, GLOBAL_SLOT);
+    keyring.set(PROVIDER, rec);
+    writeProviderKeyring(storage, GLOBAL_SLOT, keyring);
     return;
   }
   if (!profileId) return;
-  const all = readProfiles(storage);
-  all[profileId] ??= {};
-  all[profileId][PROVIDER] = rec;
-  writeSlot(storage, PROFILE_SLOT, all);
+  const profiles = readProfiles(storage);
+  const keyring = profiles.get(profileId) ?? new Map<string, KeyRecord>();
+  keyring.set(PROVIDER, rec);
+  profiles.set(profileId, keyring);
+  writeProfiles(storage, profiles);
 }
 
 // --- Crypto (AES-GCM + master key non-extractable IndexedDB) ------------------
@@ -114,16 +152,17 @@ const toB64 = (buf: ArrayBuffer): string => {
 };
 const fromB64 = (b64: string): ArrayBuffer => {
   const s = atob(b64);
-  const buf = new ArrayBuffer(s.length);
-  const bytes = new Uint8Array(buf);
-  for (let i = 0; i < s.length; i++) bytes[i] = s.codePointAt(i) ?? 0;
-  return buf;
+  return Uint8Array.from(s, (ch) => ch.charCodeAt(0)).buffer;
 };
 
 function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
+    req.onsuccess = () => {
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      reject(req.error ?? new Error('IndexedDB request failed'));
+    };
   });
 }
 
@@ -131,8 +170,12 @@ function openKeyDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
+    req.onsuccess = () => {
+      resolve(req.result);
+    };
+    req.onerror = () => {
+      reject(req.error ?? new Error('IndexedDB open failed'));
+    };
   });
 }
 
@@ -257,20 +300,16 @@ export async function setKey(
 }
 
 function removeFromGlobal(storage: StorageLike): void {
-  const g = readGlobal(storage);
-  if (g[PROVIDER]) {
-    delete g[PROVIDER];
-    writeSlot(storage, GLOBAL_SLOT, g);
-  }
+  const keyring = readProviderKeyring(storage, GLOBAL_SLOT);
+  if (!keyring.delete(PROVIDER)) return;
+  writeProviderKeyring(storage, GLOBAL_SLOT, keyring);
 }
 
 /** Supprime la clé d'un profil du trousseau (appelé aussi à la suppression du profil). */
 export function clearProfileApiKey(profileId: string, storage: StorageLike = localStorage): void {
-  const all = readProfiles(storage);
-  if (all[profileId]) {
-    delete all[profileId];
-    writeSlot(storage, PROFILE_SLOT, all);
-  }
+  const profiles = readProfiles(storage);
+  if (!profiles.delete(profileId)) return;
+  writeProfiles(storage, profiles);
 }
 
 /** Supprime une clé (portée). N'efface l'`activeKey` mémoire que si plus rien ne résout. */
