@@ -878,8 +878,8 @@ const prepareRouteRequest = (
     res.status(400).json({ error: 'no_sources' });
     return null;
   }
-  const markdown =
-    req.body.useConsigne !== false ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
+  const useRawMarkdown = req.body.useConsigne === false;
+  const markdown = useRawMarkdown ? rawMarkdown : applyConsigne(rawMarkdown, project.consigne);
   const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
   if (ctxError) {
     res.status(400).json({ error: ctxError });

@@ -6,8 +6,9 @@
 // Les clients construits depuis un header NE sont PAS cachés (la clé utilisateur ne doit
 // pas rester en mémoire au-delà de la requête) ; seul l'`envClient` est un singleton.
 
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-redundant-type-constituents -- Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`, réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) → faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas. */
-import { Mistral } from '@mistralai/mistralai';
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-redundant-type-constituents -- Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`, réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) → faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas. */
+import { Mistral as MistralSdk } from '@mistralai/mistralai';
+import type { Mistral } from '@mistralai/mistralai';
 import type { Request, Response, NextFunction } from 'express';
 import { trackClient } from './tracked-client.js';
 import { recordUsage } from './usage-context.js';
@@ -46,8 +47,13 @@ export function keyFingerprint(key: string): string {
   return h.toString(16);
 }
 
+function createRawMistralClient(apiKey: string): unknown {
+  return new MistralSdk({ apiKey, timeoutMs: TIMEOUT_MS, retryConfig: RETRY_CONFIG });
+}
+
 export function buildTrackedClient(apiKey: string): Mistral {
-  const client = new Mistral({ apiKey, timeoutMs: TIMEOUT_MS, retryConfig: RETRY_CONFIG });
+  const rawClient = createRawMistralClient(apiKey);
+  const client = rawClient as Mistral;
   trackClient(client, recordUsage); // track-once : appelé UNE fois par instance.
   return client;
 }
@@ -64,7 +70,8 @@ function isStringArray(value: unknown): value is string[] {
 
 function modelData(models: unknown): unknown[] {
   if (!models || typeof models !== 'object') return [];
-  const data = (models as { data?: unknown }).data;
+  const descriptor = Object.getOwnPropertyDescriptor(models, 'data');
+  const data: unknown = descriptor?.value;
   return Array.isArray(data) ? data : [];
 }
 
@@ -87,38 +94,57 @@ export function extractModelLimits(models: unknown): Record<string, number> {
     limits.set(card.id, card.maxContextLength);
     for (const alias of card.aliases ?? []) limits.set(alias, card.maxContextLength);
   }
-  return Object.fromEntries(limits);
+  return modelLimitsRecord(limits);
+}
+
+function modelLimitsRecord(limits: Map<string, number>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [modelId, maxContextLength] of limits) {
+    Object.defineProperty(out, modelId, {
+      value: maxContextLength,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return out;
 }
 
 // Charge paresseusement les limites de contexte au 1er client résolu si le boot ne
 // les a pas chargées (cas .env vide → warmups skippés, mais une clé utilisateur
 // arrive). Fire-and-forget, idempotent, ne bloque jamais la requête.
 let modelLimitsWarmStarted = false;
+async function loadModelLimits(client: Mistral): Promise<void> {
+  try {
+    const models: unknown = await client.models.list();
+    setModelLimits(extractModelLimits(models));
+  } catch (e: unknown) {
+    modelLimitsWarmStarted = false;
+    const message = e instanceof Error ? e.message : String(e);
+    logger.warn('models', `lazy limits load failed: ${message}`);
+  }
+}
+
 function warmModelLimitsOnce(client: Mistral): void {
   if (modelLimitsWarmStarted || Object.keys(getModelLimits()).length > 0) return;
   modelLimitsWarmStarted = true;
-  client.models
-    .list()
-    .then((models) => {
-      setModelLimits(extractModelLimits(models));
-    })
-    .catch((e: Error) => {
-      modelLimitsWarmStarted = false;
-      logger.warn('models', `lazy limits load failed: ${e.message}`);
-    });
+  void loadModelLimits(client);
 }
 
 // Singleton env : construit au plus une fois si la clé d'env existe (warmups + fallback).
 let envClient: Mistral | null | undefined;
 export function getEnvClient(): Mistral | null {
-  if (envClient === undefined) {
-    const key = process.env.MISTRAL_API_KEY;
-    envClient = key ? buildTrackedClient(key) : null;
+  if (envClient !== undefined) return envClient;
+  const key = process.env.MISTRAL_API_KEY;
+  if (key) {
+    envClient = buildTrackedClient(key);
+    return envClient;
   }
+  envClient = null;
   return envClient;
 }
 export function hasEnvKey(): boolean {
-  return !!process.env.MISTRAL_API_KEY;
+  return process.env.MISTRAL_API_KEY !== undefined && process.env.MISTRAL_API_KEY !== '';
 }
 function envFallbackAllowed(allowEnv: boolean): boolean {
   return allowEnv && process.env.EUREKAI_REQUIRE_USER_KEY !== 'true' && hasEnvKey();
@@ -165,18 +191,21 @@ export type ClientResolution =
 
 function envResolution(): ClientResolution {
   const client = getEnvClient();
-  if (!client) return { ok: false, status: 401, error: 'auth_required' };
+  if (client === null) return { ok: false, status: 401, error: 'auth_required' };
   warmModelLimitsOnce(client);
   return { ok: true, client, fingerprint: keyFingerprint(process.env.MISTRAL_API_KEY ?? '') };
+}
+
+function okClientResolution(client: Mistral, key: string): ClientResolution {
+  warmModelLimitsOnce(client);
+  return { ok: true, client, fingerprint: keyFingerprint(key) };
 }
 
 /** Résout un client tracké prêt à l'emploi, ou une erreur HTTP stable (400/401). */
 export function resolveClient(req: Request, opts: { allowEnv?: boolean } = {}): ClientResolution {
   const r = resolveApiKey(req, opts);
   if (r.kind === 'header') {
-    const client = buildTrackedClient(r.key);
-    warmModelLimitsOnce(client);
-    return { ok: true, client, fingerprint: keyFingerprint(r.key) };
+    return okClientResolution(buildTrackedClient(r.key), r.key);
   }
   if (r.kind === 'env') return envResolution();
   if (r.kind === KIND_HEADER_INVALID) return { ok: false, status: 400, error: 'invalid_api_key' };
