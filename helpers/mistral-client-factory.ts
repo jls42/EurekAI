@@ -1,0 +1,182 @@
+// Source UNIQUE de construction d'un client Mistral (cf. CLAUDE.md "Clé Mistral navigateur").
+// Aucun `new Mistral(...)` ni `trackClient(...)` ne doit exister hors de ce fichier.
+//
+// La clé n'est jamais persistée côté serveur : elle arrive par requête via le header
+// `X-EurekAI-AI-Key` (résolu par le navigateur) avec fallback sur `MISTRAL_API_KEY` (env).
+// Les clients construits depuis un header NE sont PAS cachés (la clé utilisateur ne doit
+// pas rester en mémoire au-delà de la requête) ; seul l'`envClient` est un singleton.
+
+import { Mistral } from '@mistralai/mistralai';
+import type { Request, Response, NextFunction } from 'express';
+import { createHash } from 'node:crypto';
+import { trackClient } from './tracked-client.js';
+import { recordUsage } from './usage-context.js';
+import { getModelLimits, setModelLimits } from '../config.js';
+import { logger } from './logger.js';
+
+const TIMEOUT_MS = 120_000;
+const RETRY_CONFIG = {
+  strategy: 'backoff' as const,
+  backoff: { initialInterval: 500, maxInterval: 10_000, exponent: 1.5, maxElapsedTime: 120_000 },
+  retryConnectionErrors: true,
+};
+
+export const KEY_HEADER = 'x-eurekai-ai-key';
+export const PROVIDER_HEADER = 'x-eurekai-ai-provider';
+const MAX_KEY_LEN = 512;
+// Printable ASCII sans espace ni contrôle : anti-CRLF (la clé finit dans un header
+// HTTP vers Mistral) tout en restant compatible Base64 (+ / = . autorisés). On ne
+// suppose PAS le charset exact Mistral, juste l'absence d'injection d'en-tête.
+const KEY_FORMAT_RE = /^[\x21-\x7E]+$/;
+
+export function validateKeyFormat(raw: unknown): raw is string {
+  return (
+    typeof raw === 'string' &&
+    raw.length > 0 &&
+    raw.length <= MAX_KEY_LEN &&
+    KEY_FORMAT_RE.test(raw)
+  );
+}
+
+export function keyFingerprint(key: string): string {
+  return createHash('sha256').update(key).digest('hex').slice(0, 16);
+}
+
+export function buildTrackedClient(apiKey: string): Mistral {
+  const client = new Mistral({ apiKey, timeoutMs: TIMEOUT_MS, retryConfig: RETRY_CONFIG });
+  trackClient(client, recordUsage); // track-once : appelé UNE fois par instance.
+  return client;
+}
+
+interface ModelCard {
+  id: string;
+  maxContextLength?: number;
+  aliases?: string[];
+}
+
+/** Aplati la liste de modèles Mistral → { id|alias: maxContextLength }. */
+export function extractModelLimits(models: { data?: unknown[] }): Record<string, number> {
+  const limits: Record<string, number> = {};
+  for (const m of models.data ?? []) {
+    const card = m as ModelCard;
+    if (!card.maxContextLength) continue;
+    limits[card.id] = card.maxContextLength;
+    for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
+  }
+  return limits;
+}
+
+// Charge paresseusement les limites de contexte au 1er client résolu si le boot ne
+// les a pas chargées (cas .env vide → warmups skippés, mais une clé utilisateur
+// arrive). Fire-and-forget, idempotent, ne bloque jamais la requête.
+let modelLimitsWarmStarted = false;
+function warmModelLimitsOnce(client: Mistral): void {
+  if (modelLimitsWarmStarted || Object.keys(getModelLimits()).length > 0) return;
+  modelLimitsWarmStarted = true;
+  client.models
+    .list()
+    .then((models) => setModelLimits(extractModelLimits(models)))
+    .catch((e: Error) => {
+      modelLimitsWarmStarted = false;
+      logger.warn('models', `lazy limits load failed: ${e.message}`);
+    });
+}
+
+// Singleton env : construit au plus une fois si la clé d'env existe (warmups + fallback).
+let envClient: Mistral | null | undefined;
+export function getEnvClient(): Mistral | null {
+  if (envClient === undefined) {
+    const key = process.env.MISTRAL_API_KEY;
+    envClient = key ? buildTrackedClient(key) : null;
+  }
+  return envClient;
+}
+export function hasEnvKey(): boolean {
+  return !!process.env.MISTRAL_API_KEY;
+}
+function envFallbackAllowed(allowEnv: boolean): boolean {
+  return allowEnv && process.env.EUREKAI_REQUIRE_USER_KEY !== 'true' && hasEnvKey();
+}
+
+// Discriminants extraits en const (évite no-duplicate-string sonarjs sur 3 usages runtime).
+const KIND_HEADER_INVALID = 'header-invalid';
+const KIND_UNSUPPORTED = 'unsupported-provider';
+
+type KeyResolution =
+  | { kind: 'header'; key: string }
+  | { kind: typeof KIND_HEADER_INVALID }
+  | { kind: typeof KIND_UNSUPPORTED }
+  | { kind: 'env' }
+  | { kind: 'none' };
+
+function headerValue(req: Request, name: string): string | undefined {
+  const v = req.headers[name];
+  if (typeof v === 'string') return v;
+  return Array.isArray(v) ? v[0] : undefined;
+}
+
+/**
+ * Résout la clé d'une requête. Règle anti-facturation silencieuse : un header présent
+ * mais malformé NE retombe JAMAIS sur l'env (sinon une clé navigateur cassée facturerait
+ * l'hôte). Le fallback env n'est utilisé que si le header est strictement absent.
+ */
+export function resolveApiKey(req: Request, opts: { allowEnv?: boolean } = {}): KeyResolution {
+  const provider = headerValue(req, PROVIDER_HEADER);
+  if (provider !== undefined && provider !== 'mistral') return { kind: KIND_UNSUPPORTED };
+  const raw = headerValue(req, KEY_HEADER);
+  if (raw !== undefined && raw !== '') {
+    return validateKeyFormat(raw) ? { kind: 'header', key: raw } : { kind: KIND_HEADER_INVALID };
+  }
+  return envFallbackAllowed(opts.allowEnv !== false) ? { kind: 'env' } : { kind: 'none' };
+}
+
+export type ClientResolution =
+  | { ok: true; client: Mistral; fingerprint: string }
+  | { ok: false; status: 400; error: 'invalid_api_key' | 'unsupported_provider' }
+  | { ok: false; status: 401; error: 'auth_required' };
+
+function envResolution(): ClientResolution {
+  const client = getEnvClient();
+  if (!client) return { ok: false, status: 401, error: 'auth_required' };
+  warmModelLimitsOnce(client);
+  return { ok: true, client, fingerprint: keyFingerprint(process.env.MISTRAL_API_KEY ?? '') };
+}
+
+/** Résout un client tracké prêt à l'emploi, ou une erreur HTTP stable (400/401). */
+export function resolveClient(req: Request, opts: { allowEnv?: boolean } = {}): ClientResolution {
+  const r = resolveApiKey(req, opts);
+  if (r.kind === 'header') {
+    const client = buildTrackedClient(r.key);
+    warmModelLimitsOnce(client);
+    return { ok: true, client, fingerprint: keyFingerprint(r.key) };
+  }
+  if (r.kind === 'env') return envResolution();
+  if (r.kind === KIND_HEADER_INVALID) return { ok: false, status: 400, error: 'invalid_api_key' };
+  if (r.kind === KIND_UNSUPPORTED) {
+    return { ok: false, status: 400, error: 'unsupported_provider' };
+  }
+  return { ok: false, status: 401, error: 'auth_required' };
+}
+
+/**
+ * Garde Express PRÉ-multer : rejette une requête sans clé utilisable AVANT que multer
+ * n'écrive des fichiers temporaires (uploads OCR/STT/quiz-vocal). Ne construit PAS de
+ * client (juste un check présence/format) — le handler appelle resolveClient ensuite.
+ * (On évite d'augmenter Express.Request, qui casse le typage de req.params.)
+ */
+export function requireKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const r = resolveApiKey(req);
+  if (r.kind === 'header' || r.kind === 'env') {
+    next();
+    return;
+  }
+  if (r.kind === KIND_UNSUPPORTED) {
+    res.status(400).json({ error: 'unsupported_provider' });
+    return;
+  }
+  if (r.kind === KIND_HEADER_INVALID) {
+    res.status(400).json({ error: 'invalid_api_key' });
+    return;
+  }
+  res.status(401).json({ error: 'auth_required' });
+}

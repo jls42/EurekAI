@@ -20,6 +20,7 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { getConfig } from '../config.js';
+import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -29,6 +30,10 @@ function pendingModeration(): Source['moderation'] {
 
 // cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
+
+// Texte vide/non-string (arrow pour éviter l'agglomération Lizard + garder les
+// handlers sous CCN 8 après ajout de la garde auth resolveOr4xx).
+const isBlankString = (v: unknown): boolean => !v || typeof v !== 'string' || v.trim().length === 0;
 
 // Dédup ré-import : sha256 du fichier brut (avant OCR) ; comparé aux contentHash existants.
 const hashFileContent = (path: string): string | undefined => {
@@ -101,14 +106,19 @@ const pendingLang = new Map<string, string>();
 const triggerConsigneDetection = (
   store: ProjectStore,
   client: Mistral,
+  fingerprint: string,
   pid: string,
   lang = 'fr',
 ): void => {
-  if (inFlight.has(pid)) {
-    pendingLang.set(pid, lang);
+  // Coalesce par (pid, clé) : deux profils/clés distinctes sur le même projet ne
+  // partagent PAS le même scan (sinon le replay facturerait la mauvaise clé). Même
+  // clé (même fingerprint) → coalescing normal d'une rafale d'uploads.
+  const ck = `${pid}:${fingerprint}`;
+  if (inFlight.has(ck)) {
+    pendingLang.set(ck, lang);
     return;
   }
-  inFlight.add(pid);
+  inFlight.add(ck);
   void (async () => {
     try {
       await runConsigneDetection(store, client, pid, lang);
@@ -119,11 +129,11 @@ const triggerConsigneDetection = (
       // `inFlight` pour toujours sans déclencher le replay.
       logger.error('consigne', 'IIFE crash', e);
     } finally {
-      inFlight.delete(pid);
-      const nextLang = pendingLang.get(pid);
+      inFlight.delete(ck);
+      const nextLang = pendingLang.get(ck);
       if (nextLang !== undefined) {
-        pendingLang.delete(pid);
-        triggerConsigneDetection(store, client, pid, nextLang);
+        pendingLang.delete(ck);
+        triggerConsigneDetection(store, client, fingerprint, pid, nextLang);
       }
     }
   })();
@@ -161,12 +171,21 @@ const triggerModeration = async (
   }
 };
 
-export function sourceRoutes(
-  store: ProjectStore,
-  client: Mistral,
-  profileStore: ProfileStore,
-): Router {
+export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
+
+  // Auth-first : résout le client (header > env) en tête de handler IA, ou répond
+  // 4xx stable et retourne null. Le client + son fingerprint (hash non sensible de la
+  // clé, pour le coalescing consigne par pid+clé) sont ensuite threadés dans les helpers.
+  const resolveOr4xx = (
+    req: Request,
+    res: Response,
+  ): { client: Mistral; fingerprint: string } | null => {
+    const r = resolveClient(req);
+    if (r.ok) return { client: r.client, fingerprint: r.fingerprint };
+    res.status(r.status).json({ error: r.error });
+    return null;
+  };
 
   const dynamicUpload = multer({
     storage: multer.diskStorage({
@@ -187,6 +206,7 @@ export function sourceRoutes(
   const TEXT_EXTS = new Set(['.txt', '.md']);
 
   async function processUploadedFile(
+    client: Mistral,
     file: Express.Multer.File,
     pid: string,
     modCats: string[] | null,
@@ -237,6 +257,7 @@ export function sourceRoutes(
   type UploadOutcome = { source?: Source; failure?: UploadFailure };
 
   async function attemptFileUpload(
+    client: Mistral,
     file: Express.Multer.File,
     pid: string,
     modCats: string[] | null,
@@ -244,7 +265,7 @@ export function sourceRoutes(
   ): Promise<UploadOutcome> {
     try {
       const { result: source, usage } = await runWithUsageTracking(() =>
-        processUploadedFile(file, pid, modCats, contentHash),
+        processUploadedFile(client, file, pid, modCats, contentHash),
       );
       const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
       if (persisted) {
@@ -266,12 +287,14 @@ export function sourceRoutes(
   }
 
   function triggerUploadDownstream(
+    client: Mistral,
+    fingerprint: string,
     pid: string,
     lang: string,
     modCats: string[] | null,
     results: Source[],
   ) {
-    triggerConsigneDetection(store, client, pid, lang);
+    triggerConsigneDetection(store, client, fingerprint, pid, lang);
     if (!modCats) return;
     for (const src of results) {
       void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
@@ -307,6 +330,7 @@ export function sourceRoutes(
   };
 
   const processUploadBatch = async (
+    client: Mistral,
     files: Express.Multer.File[],
     pid: string,
     modCats: string[] | null,
@@ -331,7 +355,7 @@ export function sourceRoutes(
         });
         continue;
       }
-      const outcome = await attemptFileUpload(file, pid, modCats, hash);
+      const outcome = await attemptFileUpload(client, file, pid, modCats, hash);
       if (outcome.source) {
         results.push(outcome.source);
         if (hash) seen.set(hash, outcome.source.id);
@@ -340,39 +364,52 @@ export function sourceRoutes(
     return { results, failures, duplicates };
   };
 
-  // Upload files (OCR)
-  router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
-    const pid = String(req.params.pid);
-    const project = store.getProject(pid);
-    if (!project) {
-      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return;
-    }
+  // Upload files (OCR). withMistralClient AVANT multer → pas de fichier temporaire
+  // écrit si la clé manque/est invalide (cf. helpers/mistral-client-factory).
+  router.post(
+    '/:pid/sources/upload',
+    requireKeyMiddleware,
+    dynamicUpload.array('files'),
+    async (req, res) => {
+      const resolved = resolveOr4xx(req, res);
+      if (!resolved) return;
+      const { client, fingerprint } = resolved;
+      const pid = String(req.params.pid);
+      const project = store.getProject(pid);
+      if (!project) {
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+        return;
+      }
 
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      res.status(400).json({ error: 'Aucun fichier envoye' });
-      return;
-    }
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: 'Aucun fichier envoye' });
+        return;
+      }
 
-    const modCats = getModerationCategories(store, profileStore, pid);
-    const allowDuplicates =
-      req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
-    const { results, failures, duplicates } = await processUploadBatch(
-      files,
-      pid,
-      modCats,
-      allowDuplicates,
-    );
+      const modCats = getModerationCategories(store, profileStore, pid);
+      const allowDuplicates =
+        req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
+      const { results, failures, duplicates } = await processUploadBatch(
+        client,
+        files,
+        pid,
+        modCats,
+        allowDuplicates,
+      );
 
-    if (results.length > 0) {
-      triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
-    }
-    sendUploadResponse(res, results, failures, duplicates);
-  });
+      if (results.length > 0) {
+        triggerUploadDownstream(client, fingerprint, pid, req.body.lang || 'fr', modCats, results);
+      }
+      sendUploadResponse(res, results, failures, duplicates);
+    },
+  );
 
-  // Add text source
+  // Add text source (modération + détection consigne → appels Mistral → clé requise).
   router.post('/:pid/sources/text', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client, fingerprint } = resolved;
     const project = store.getProject(req.params.pid);
     if (!project) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
@@ -380,7 +417,7 @@ export function sourceRoutes(
     }
 
     const { text } = req.body;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    if (isBlankString(text)) {
       res.status(400).json({ error: 'Texte requis' });
       return;
     }
@@ -408,7 +445,7 @@ export function sourceRoutes(
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
     const lang = req.body.lang || 'fr';
-    triggerConsigneDetection(store, client, req.params.pid, lang);
+    triggerConsigneDetection(store, client, fingerprint, req.params.pid, lang);
     res.json(source);
   });
 
@@ -446,6 +483,7 @@ export function sourceRoutes(
   // Sous-helper extrait : pipeline STT (transcribe + persist usage + validate
   // text). Retourne null + envoie déjà la réponse 400 si transcription vide.
   async function runSttPipeline(
+    client: Mistral,
     pid: string,
     file: Express.Multer.File,
     lang: string,
@@ -465,6 +503,8 @@ export function sourceRoutes(
   }
 
   function persistAndDispatchVoiceSource(
+    client: Mistral,
+    fingerprint: string,
     pid: string,
     text: string,
     elapsed: number,
@@ -475,37 +515,53 @@ export function sourceRoutes(
     const source = buildVoiceSource(text, persisted, modCats);
     store.addSource(pid, source);
     logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-    triggerConsigneDetection(store, client, pid, lang);
+    triggerConsigneDetection(store, client, fingerprint, pid, lang);
     if (modCats) {
       void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
     }
     return source;
   }
 
-  router.post('/:pid/sources/voice', memoryUpload.single('audio'), async (req, res) => {
-    const pid = String(req.params.pid);
-    if (!store.getProject(pid)) {
-      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return;
-    }
-    const file = req.file;
-    if (!file) {
-      res.status(400).json({ error: 'Fichier audio requis' });
-      return;
-    }
+  router.post(
+    '/:pid/sources/voice',
+    requireKeyMiddleware,
+    memoryUpload.single('audio'),
+    async (req, res) => {
+      const resolved = resolveOr4xx(req, res);
+      if (!resolved) return;
+      const { client, fingerprint } = resolved;
+      const pid = String(req.params.pid);
+      if (!store.getProject(pid)) {
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+        return;
+      }
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: 'Fichier audio requis' });
+        return;
+      }
 
-    try {
-      const lang = req.body.lang || 'fr';
-      const stt = await runSttPipeline(pid, file, lang, res);
-      if (!stt) return;
-      const source = persistAndDispatchVoiceSource(pid, stt.text, stt.elapsed, stt.persisted, lang);
-      res.json(source);
-    } catch (e) {
-      persistFailedUsage(pid, e);
-      logger.error('sources', 'STT error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'stt') });
-    }
-  });
+      try {
+        const lang = req.body.lang || 'fr';
+        const stt = await runSttPipeline(client, pid, file, lang, res);
+        if (!stt) return;
+        const source = persistAndDispatchVoiceSource(
+          client,
+          fingerprint,
+          pid,
+          stt.text,
+          stt.elapsed,
+          stt.persisted,
+          lang,
+        );
+        res.json(source);
+      } catch (e) {
+        persistFailedUsage(pid, e);
+        logger.error('sources', 'STT error:', e);
+        res.status(500).json({ error: extractErrorCode(e, 'stt') });
+      }
+    },
+  );
 
   // Discrimine les erreurs SSRF des erreurs reseau/parse pour decider du fallback LLM.
   // Sans ce check, une URL bloquee par assertSafeFetchUrl (IP privee, loopback,
@@ -529,6 +585,7 @@ export function sourceRoutes(
   };
 
   async function scrapeUrl(
+    client: Mistral,
     url: string,
     scrapeMode: string,
     lang: string,
@@ -603,6 +660,7 @@ export function sourceRoutes(
   }
 
   async function searchByKeywords(
+    client: Mistral,
     searchQuery: string,
     lang: string,
     ageGroup: AgeGroup,
@@ -673,6 +731,7 @@ export function sourceRoutes(
   };
 
   async function collectWebSources(
+    client: Mistral,
     pid: string,
     req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },
     modCats: string[] | null,
@@ -687,14 +746,14 @@ export function sourceRoutes(
 
     for (const url of urls) {
       const outcome = await trackWebSource(pid, `URL scrape: ${url}`, () =>
-        scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
+        scrapeUrl(client, url, scrapeMode, lang, ageGroup, modCats, now),
       );
       pushOutcome(outcome, sources, failures);
     }
 
     if (searchQuery) {
       const outcome = await trackWebSource(pid, `Keyword search: ${searchQuery}`, () =>
-        searchByKeywords(searchQuery, lang, ageGroup, modCats, now),
+        searchByKeywords(client, searchQuery, lang, ageGroup, modCats, now),
       );
       pushOutcome(outcome, sources, failures);
     }
@@ -707,6 +766,7 @@ export function sourceRoutes(
   // modération. Retourne true si OK pour continuer, false si bloquée (réponse
   // déjà envoyée).
   async function checkWebsearchModeration(
+    client: Mistral,
     res: Response,
     query: string,
     modCats: string[] | null,
@@ -736,19 +796,24 @@ export function sourceRoutes(
   // consigne detection + moderation async par source. Sépare la logique métier
   // du try/catch du handler /sources/websearch pour rester sous CCN 8.
   function persistWebsearchSources(
+    client: Mistral,
+    fingerprint: string,
     pid: string,
     sources: Source[],
     modCats: string[] | null,
     lang: string,
   ): void {
     for (const s of sources) store.addSource(pid, s);
-    triggerConsigneDetection(store, client, pid, lang);
+    triggerConsigneDetection(store, client, fingerprint, pid, lang);
     for (const s of sources) {
       if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
     }
   }
 
   router.post('/:pid/sources/websearch', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client, fingerprint } = resolved;
     const pid = String(req.params.pid);
     if (!store.getProject(pid)) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
@@ -759,17 +824,17 @@ export function sourceRoutes(
     if (query === null) return;
 
     const modCats = getModerationCategories(store, profileStore, pid);
-    if (!(await checkWebsearchModeration(res, query, modCats))) return;
+    if (!(await checkWebsearchModeration(client, res, query, modCats))) return;
 
     try {
-      const { sources, failures } = await collectWebSources(pid, req, modCats);
+      const { sources, failures } = await collectWebSources(client, pid, req, modCats);
       if (sources.length === 0) {
         // Tous les inputs ont échoué : on surface les failures pour que l'UI
         // puisse afficher un toast au lieu d'un échec silencieux.
         res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
-      persistWebsearchSources(pid, sources, modCats, req.body.lang || 'fr');
+      persistWebsearchSources(client, fingerprint, pid, sources, modCats, req.body.lang || 'fr');
       respondWebsearchSources(res, sources, failures);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
@@ -789,6 +854,9 @@ export function sourceRoutes(
 
   // Consigne detection (manual trigger)
   router.post('/:pid/detect-consigne', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client } = resolved;
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
@@ -816,6 +884,9 @@ export function sourceRoutes(
 
   // Moderation
   router.post('/:pid/moderate', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client } = resolved;
     const { text } = req.body;
     if (!text) {
       res.status(400).json({ error: 'text requis' });

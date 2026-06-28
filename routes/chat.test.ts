@@ -8,6 +8,13 @@ import { chatRoutes } from './chat.js';
 
 // --- Mocks ---
 
+// Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
+const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock('../generators/chat.js', () => ({
   chatWithSources: vi.fn().mockResolvedValue({ reply: 'Hello!', toolCalls: [] }),
 }));
@@ -61,7 +68,7 @@ let store: ProjectStore;
 let profileStore: ProfileStore;
 let tempDir: string;
 let router: any;
-const client = {} as any;
+const client = mockClient as any;
 
 function getHandler(r: any, method: string, path: string) {
   for (const layer of r.stack) {
@@ -97,7 +104,7 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-chat-route-'));
   store = new ProjectStore(tempDir);
   profileStore = new ProfileStore(tempDir);
-  router = chatRoutes(store, client, profileStore);
+  router = chatRoutes(store, profileStore);
   vi.clearAllMocks();
 });
 

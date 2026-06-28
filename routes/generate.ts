@@ -18,7 +18,8 @@ import type {
 import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
-import { getConfig, getApiStatus, resolveVoices, getModelLimits } from '../config.js';
+import { getConfig, resolveVoices, getModelLimits } from '../config.js';
+import { resolveClient } from '../helpers/mistral-client-factory.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
@@ -143,6 +144,9 @@ const checkModeration = (
 };
 
 interface GenContext {
+  // Client Mistral résolu par requête (header `X-EurekAI-AI-Key` > env). Injecté
+  // dans le handler après `resolveClient` (auth-first), jamais un singleton global.
+  client: Mistral;
   project: ReturnType<ProjectStore['getProject']> & {};
   markdown: string;
   rawMarkdown: string;
@@ -236,7 +240,7 @@ function buildGenContext(
   modelId?: string,
   options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
 ):
-  | { ok: true; ctx: Omit<GenContext, 'req' | 'res'> }
+  | { ok: true; ctx: Omit<GenContext, 'req' | 'res' | 'client'> }
   | { ok: false; error: string; status: number } {
   const validation = validateGenRequestBody(body);
   if (!validation.ok) return { ok: false, error: validation.error, status: 400 };
@@ -473,6 +477,13 @@ function handleGeneration(
 ) {
   return async (req: Request, res: Response) => {
     const pid = req.params.pid as string;
+    // Auth-first : résoudre la clé AVANT toute validation/IO (et donc avant
+    // addPendingEntry → aucun pending tracker orphelin si pas de clé).
+    const resolved = resolveClient(req);
+    if (!resolved.ok) {
+      res.status(resolved.status).json({ error: resolved.error });
+      return;
+    }
     const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error });
@@ -493,7 +504,7 @@ function handleGeneration(
       await runGeneratorAndPersist(
         store,
         generatorFn,
-        { ...result.ctx, req, res },
+        { ...result.ctx, req, res, client: resolved.client },
         pid,
         gid,
         options,
@@ -505,11 +516,7 @@ function handleGeneration(
   };
 }
 
-export function generateRoutes(
-  store: ProjectStore,
-  client: Mistral,
-  profileStore: ProfileStore,
-): Router {
+export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 
   router.post(
@@ -524,7 +531,7 @@ export function generateRoutes(
         );
         const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
         const data = await generateSummary(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.summary,
           ctx.hasConsigne,
@@ -558,7 +565,7 @@ export function generateRoutes(
       async (ctx) => {
         const exclusions = buildExclusionContext(ctx.project.results.generations, 'flashcards');
         const data = await generateFlashcards(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.flashcards,
           ctx.lang,
@@ -588,7 +595,7 @@ export function generateRoutes(
       async (ctx) => {
         const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz');
         const data = await generateQuiz(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.quiz,
           ctx.lang,
@@ -619,7 +626,7 @@ export function generateRoutes(
         logger.info('podcast', 'Generating script...');
         const exclusions = buildExclusionContext(ctx.project.results.generations, 'podcast');
         const podcastResult = await generatePodcastScript(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.podcast,
           ctx.lang,
@@ -637,7 +644,7 @@ export function generateRoutes(
             profileId: ctx.profileId,
             flow: 'podcast',
           }),
-          { model: ctx.config.ttsModel, mistralClient: client },
+          { model: ctx.config.ttsModel, mistralClient: ctx.client },
         );
         const audioUrl = saveAudioFile(
           audioBuffer,
@@ -675,6 +682,12 @@ export function generateRoutes(
   // pending lifecycle d'ajouter un tracker entry sans risquer de pendings
   // orphelins quand un input est rejeté.
   router.post('/:pid/generate/quiz-review', async (req, res) => {
+    // Auth-first AVANT validateQuizReviewInputs (sinon 400 sortirait avant 401).
+    const resolved = resolveClient(req);
+    if (!resolved.ok) {
+      res.status(resolved.status).json({ error: resolved.error });
+      return;
+    }
     const validation = validateQuizReviewInputs(store, req.params.pid, req.body);
     if (!validation.ok) {
       res.status(validation.status).json({ error: validation.error });
@@ -686,7 +699,7 @@ export function generateRoutes(
       profileStore,
       async (ctx) => {
         const data = await generateQuizReview(
-          client,
+          ctx.client,
           markdown,
           weakQuestions,
           ctx.config.models.quiz,
@@ -716,7 +729,7 @@ export function generateRoutes(
         logger.info(QUIZ_VOCAL, 'Generating quiz (TTS-friendly)...');
         const exclusions = buildExclusionContext(ctx.project.results.generations, QUIZ_VOCAL);
         const data = await generateQuizVocal(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.quiz,
           ctx.lang,
@@ -737,7 +750,7 @@ export function generateRoutes(
         }).host;
         const ttsOpts = {
           model: ctx.config.ttsModel,
-          mistralClient: client,
+          mistralClient: ctx.client,
         } as const;
         for (let i = 0; i < data.length; i++) {
           const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
@@ -779,7 +792,7 @@ export function generateRoutes(
         );
         const projectDir = store.getProjectDir(ctx.pid);
         const data = await generateImage(
-          client,
+          ctx.client,
           ctx.rawMarkdown,
           projectDir,
           ctx.pid,
@@ -815,7 +828,7 @@ export function generateRoutes(
         );
         const exclusions = buildExclusionContext(ctx.project.results.generations, FILL_BLANK);
         const data = await generateFillBlank(
-          client,
+          ctx.client,
           ctx.markdown,
           ctx.config.models.quiz,
           ctx.lang,
@@ -1049,12 +1062,18 @@ export function generateRoutes(
   // --- Route analysis only (for 2-phase auto) ---
   router.post('/:pid/generate/route', async (req, res) => {
     try {
+      // Auth-first (pas de pending tracker ici, mais cohérence + pas d'IO sans clé).
+      const resolved = resolveClient(req);
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ error: resolved.error });
+        return;
+      }
       const prepared = prepareRouteRequest(req, res);
       if (!prepared) return;
       const { markdown, lang, ageGroup } = prepared;
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
-        routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
+        routeRequest(resolved.client, markdown, ROUTER_MODEL, lang, ageGroup),
       );
       const routeCost = persistUsage(
         store,
@@ -1242,8 +1261,9 @@ export function generateRoutes(
 
   function splitByTtsAvailability<T extends { agent: AutoAgentType }>(
     plan: T[],
+    ttsAvailable: boolean,
   ): { runnable: T[]; ttsSkipped: T[] } {
-    if (getApiStatus().ttsAvailable) return { runnable: plan, ttsSkipped: [] };
+    if (ttsAvailable) return { runnable: plan, ttsSkipped: [] };
     const runnable: T[] = [];
     const ttsSkipped: T[] = [];
     for (const step of plan) {
@@ -1257,7 +1277,13 @@ export function generateRoutes(
   // steps non-auto-executable ET les steps TTS si le provider n'est pas configuré,
   // pour les remonter dans la réponse sans bloquer l'exécution (et sans produire
   // des auth_required/tts_upstream_error systématiques).
-  async function runAutoRouting(markdown: string, lang: string, ageGroup: AgeGroup, pid: string) {
+  async function runAutoRouting(
+    client: Mistral,
+    markdown: string,
+    lang: string,
+    ageGroup: AgeGroup,
+    pid: string,
+  ) {
     logger.info('auto', 'Smart routing: analyzing content...');
     const { result: route, usage } = await runWithUsageTracking(() =>
       routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
@@ -1265,7 +1291,10 @@ export function generateRoutes(
     persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
     logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
     const { executable, skipped } = splitByAutoExecutable(route.plan);
-    const { runnable, ttsSkipped } = splitByTtsAvailability(executable);
+    // Un client a été résolu (auth-first) → la même clé fait chat ET TTS Voxtral,
+    // donc TTS est disponible. (Avant : filtrage sur getApiStatus() env-only, faux
+    // avec une clé navigateur + .env vide — cf. CLAUDE.md.)
+    const { runnable, ttsSkipped } = splitByTtsAvailability(executable, true);
     if (ttsSkipped.length > 0) {
       logger.warn(
         'auto',
@@ -1281,7 +1310,10 @@ export function generateRoutes(
     return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
   }
 
-  function toAutoCtx(baseCtx: Omit<GenContext, 'req' | 'res'>): AutoCtx {
+  function toAutoCtx(
+    baseCtx: Omit<GenContext, 'req' | 'res' | 'client'>,
+    client: Mistral,
+  ): AutoCtx {
     return {
       client,
       markdown: baseCtx.markdown,
@@ -1302,6 +1334,13 @@ export function generateRoutes(
 
   router.post('/:pid/generate/auto', async (req, res) => {
     try {
+      // Auth-first : la route /auto ne lit PAS body.gid (chaque step a son gid
+      // serveur) ; on résout la clé en tête, avant tout IO/addPendingEntry.
+      const resolved = resolveClient(req);
+      if (!resolved.ok) {
+        res.status(resolved.status).json({ error: resolved.error });
+        return;
+      }
       const built = buildGenContext(store, profileStore, req.params.pid, req.body, ROUTER_MODEL);
       if (!built.ok) {
         res.status(built.status).json({ error: built.error });
@@ -1309,6 +1348,7 @@ export function generateRoutes(
       }
       const { ctx } = built;
       const { executable: executablePlan, skipped: skippedSteps } = await runAutoRouting(
+        resolved.client,
         ctx.markdown,
         ctx.lang,
         ctx.ageGroup,
@@ -1317,7 +1357,14 @@ export function generateRoutes(
 
       const generations: Generation[] = [];
       const failedSteps: FailedStep[] = [];
-      await executePlan(executablePlan, toAutoCtx(ctx), store, ctx.pid, generations, failedSteps);
+      await executePlan(
+        executablePlan,
+        toAutoCtx(ctx, resolved.client),
+        store,
+        ctx.pid,
+        generations,
+        failedSteps,
+      );
 
       const allFailed = generations.length === 0 && failedSteps.length > 0;
       res.status(allFailed ? 502 : 200).json({

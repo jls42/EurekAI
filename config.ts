@@ -325,12 +325,19 @@ export function getApiStatus(): {
   mistral: boolean;
   ttsAvailable: boolean;
   voiceCacheReady: boolean;
+  requireUserKey: boolean;
 } {
-  const hasMistral = !!process.env.MISTRAL_API_KEY;
+  // `requireUserKey` : déploiement exposé qui force chaque navigateur à fournir sa clé.
+  // Dans ce cas la clé d'env ne sert qu'aux warmups → le serveur n'est PAS "prêt" du
+  // point de vue requêtes, donc `mistral`/`ttsAvailable` doivent rester false (sinon le
+  // frontend saute le gate puis se prend des 401). Cf. CLAUDE.md.
+  const requireUserKey = process.env.EUREKAI_REQUIRE_USER_KEY === 'true';
+  const hasMistral = !!process.env.MISTRAL_API_KEY && !requireUserKey;
   return {
     mistral: hasMistral,
     ttsAvailable: hasMistral,
     voiceCacheReady,
+    requireUserKey,
   };
 }
 

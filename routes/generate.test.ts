@@ -9,6 +9,13 @@ import type { Source } from '../types.js';
 
 // --- Mock generators ---
 
+// Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
+const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock('../generators/summary.js', () => ({
   generateSummary: vi.fn().mockResolvedValue({
     title: 'Test Summary',
@@ -205,13 +212,12 @@ describe('generateRoutes', () => {
   let store: ProjectStore;
   let profileStore: ProfileStore;
   let router: any;
-  const mockClient = {} as any;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'gen-test-'));
     store = new ProjectStore(tmpDir);
     profileStore = new ProfileStore(tmpDir);
-    router = generateRoutes(store, mockClient, profileStore);
+    router = generateRoutes(store, profileStore);
     vi.clearAllMocks();
   });
 
@@ -1857,18 +1863,13 @@ describe('generateRoutes', () => {
       ]);
     });
 
-    it('skippe podcast/quiz-vocal quand TTS indisponible (parité UI/serveur)', async () => {
-      // Régression à prévenir : src/app/generate.ts:247-255 filtre déjà côté UI, mais les
-      // consommateurs API directs sur une instance sans MISTRAL_API_KEY obtenaient
-      // auth_required/tts_upstream_error systématiques sur des steps audio INJECTÉS par
-      // enrichPlanForLearning (pas choisis par le LLM).
+    it('exécute les steps audio quand un client est résolu (split sur client effectif, pas getApiStatus env-only)', async () => {
+      // Correction clé-navigateur : le split audio se base sur le CLIENT EFFECTIF
+      // résolu (header > env), pas sur getApiStatus().ttsAvailable (env-only, faux avec
+      // une clé navigateur + .env vide). Une clé valide fait chat ET TTS Voxtral →
+      // podcast/quiz-vocal ne sont plus skippés à tort. Sans clé du tout, /generate/auto
+      // renvoie 401 en amont (resolveClient), aucun step ne tourne.
       const { routeRequest } = await import('../generators/router.js');
-      const { getApiStatus } = await import('../config.js');
-      (getApiStatus as any).mockReturnValueOnce({
-        mistral: false,
-        ttsAvailable: false,
-        voiceCacheReady: false,
-      });
       (routeRequest as any).mockResolvedValueOnce({
         plan: [
           { agent: 'summary', reason: 'r' },
@@ -1894,15 +1895,14 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const body = res.json.mock.calls[0][0];
-      // summary + quiz exécutés, podcast + quiz-vocal skippés (pas failed).
-      expect(body.generations.map((g: any) => g.type)).toEqual(['summary', 'quiz']);
-      expect(body.skippedSteps).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ agent: 'podcast' }),
-          expect.objectContaining({ agent: 'quiz-vocal' }),
-        ]),
-      );
-      // Aucun failedStep audio ne doit apparaître — on a évité de tenter.
+      // Les 4 steps s'exécutent (client résolu → TTS dispo) ; aucun skip TTS.
+      expect(body.generations.map((g: any) => g.type)).toEqual([
+        'summary',
+        'podcast',
+        'quiz-vocal',
+        'quiz',
+      ]);
+      expect(body.skippedSteps).toBeUndefined();
       expect(body.failedSteps).toBeUndefined();
     });
 

@@ -378,6 +378,20 @@ describe('getApiStatus', () => {
     expect(s2.ttsAvailable).toBe(s2.mistral);
   });
 
+  it('requireUserKey false par défaut', () => {
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    expect(getApiStatus().requireUserKey).toBe(false);
+  });
+
+  it('EUREKAI_REQUIRE_USER_KEY=true → mistral/ttsAvailable false malgré env (gate forcé), requireUserKey true', () => {
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    vi.stubEnv('EUREKAI_REQUIRE_USER_KEY', 'true');
+    const status = getApiStatus();
+    expect(status.requireUserKey).toBe(true);
+    expect(status.mistral).toBe(false);
+    expect(status.ttsAvailable).toBe(false);
+  });
+
   it('voiceCacheReady reflète le succès du warmup listVoices', () => {
     setVoiceCache([]);
     expect(getApiStatus().voiceCacheReady).toBe(false);

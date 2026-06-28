@@ -27,6 +27,7 @@ import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { aiLimiter } from '../helpers/rate-limit.js';
+import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
 
@@ -264,14 +265,18 @@ function resolveReadAloudContext(
   };
 }
 
-export function generationCrudRoutes(
-  store: ProjectStore,
-  client: Mistral,
-  profileStore: ProfileStore,
-): Router {
+export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 
   router.use(aiLimiter);
+
+  // Auth-first : résout le client (header > env) ou répond 4xx stable.
+  const resolveOr4xx = (req: Request, res: Response): Mistral | null => {
+    const r = resolveClient(req);
+    if (r.ok) return r.client;
+    res.status(r.status).json({ error: r.error });
+    return null;
+  };
 
   // --- Quiz attempt (save score) ---
   router.post('/:pid/generations/:gid/quiz-attempt', async (req, res) => {
@@ -417,31 +422,39 @@ export function generationCrudRoutes(
   }
 
   // --- Quiz vocal: verify spoken answer ---
-  router.post('/:pid/generations/:gid/vocal-answer', upload.single('audio'), async (req, res) => {
-    try {
-      const target = validateVocalAnswerTarget(req, res);
-      if (!target) return;
-      const { quizGen, question } = target;
-      const { lang, ageGroup } = resolveVocalAnswerLocale(quizGen, req);
-      const config = getConfig();
-      const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
-      const result = await verifyAnswer(
-        client,
-        question.question,
-        question.choices,
-        question.correct,
-        transcription,
-        { model: config.models.quizVerify, lang, ageGroup },
-      );
+  // requireKeyMiddleware AVANT multer → pas d'upload audio écrit en mémoire sans clé.
+  router.post(
+    '/:pid/generations/:gid/vocal-answer',
+    requireKeyMiddleware,
+    upload.single('audio'),
+    async (req, res) => {
+      const client = resolveOr4xx(req, res);
+      if (!client) return;
+      try {
+        const target = validateVocalAnswerTarget(req, res);
+        if (!target) return;
+        const { quizGen, question } = target;
+        const { lang, ageGroup } = resolveVocalAnswerLocale(quizGen, req);
+        const config = getConfig();
+        const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
+        const result = await verifyAnswer(
+          client,
+          question.question,
+          question.choices,
+          question.correct,
+          transcription,
+          { model: config.models.quizVerify, lang, ageGroup },
+        );
 
-      res.json({ correct: result.correct, feedback: result.feedback, transcription });
-    } catch (e) {
-      logger.error('quiz-vocal', 'vocal answer error:', e);
-      // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
-      // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
-      res.status(500).json({ error: extractErrorCode(e, 'stt') });
-    }
-  });
+        res.json({ correct: result.correct, feedback: result.feedback, transcription });
+      } catch (e) {
+        logger.error('quiz-vocal', 'vocal answer error:', e);
+        // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
+        // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
+        res.status(500).json({ error: extractErrorCode(e, 'stt') });
+      }
+    },
+  );
 
   const VALID_READ_ALOUD_SECTIONS = new Set([
     'intro',
@@ -585,6 +598,8 @@ export function generationCrudRoutes(
 
   // --- Read Aloud (TTS) ---
   router.post('/:pid/generations/:gid/read-aloud', async (req, res) => {
+    const client = resolveOr4xx(req, res);
+    if (!client) return;
     const pid = String(req.params.pid);
     try {
       const validated = validateReadAloudTarget(pid, req, res);

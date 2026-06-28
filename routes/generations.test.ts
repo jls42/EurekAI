@@ -14,6 +14,13 @@ import type {
 
 // --- Mock external dependencies ---
 
+// Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
+const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
+
 vi.mock('../generators/tts-provider.js', () => ({
   textToSpeech: vi.fn().mockResolvedValue(Buffer.from('fake-audio')),
 }));
@@ -81,13 +88,13 @@ let quizVocalGid: string;
 let summaryGid: string;
 let flashcardsGid: string;
 
-const client = {} as any;
+const client = mockClient as any;
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-generations-route-'));
   store = new ProjectStore(tempDir);
   const profileStore = { get: vi.fn(() => null) } as any;
-  router = generationCrudRoutes(store, client, profileStore);
+  router = generationCrudRoutes(store, profileStore);
 
   // Create a project and populate it with various generation types
   const project = store.createProject('Test Project');
