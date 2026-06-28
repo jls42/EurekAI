@@ -152,7 +152,7 @@ const toB64 = (buf: ArrayBuffer): string => {
 };
 const fromB64 = (b64: string): ArrayBuffer => {
   const s = atob(b64);
-  return Uint8Array.from(s, (ch) => ch.charCodeAt(0)).buffer;
+  return Uint8Array.from(s, (ch) => ch.codePointAt(0) ?? 0).buffer;
 };
 
 function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
@@ -220,20 +220,14 @@ export async function encryptWithKey(masterKey: CryptoKey, plaintext: string): P
 }
 
 /** Déchiffre ; retourne null si la master key ne correspond pas (clé purgée/corrompue). */
-export async function decryptWithKey(
+export function decryptWithKey(
   masterKey: CryptoKey,
   rec: Extract<KeyRecord, { encrypted: true }>,
 ): Promise<string | null> {
-  try {
-    const pt = await globalThis.crypto.subtle.decrypt(
-      { name: 'AES-GCM', iv: fromB64(rec.iv) },
-      masterKey,
-      fromB64(rec.ct),
-    );
-    return dec.decode(pt);
-  } catch {
-    return null;
-  }
+  return globalThis.crypto.subtle
+    .decrypt({ name: 'AES-GCM', iv: fromB64(rec.iv) }, masterKey, fromB64(rec.ct))
+    .then((pt) => dec.decode(pt))
+    .catch(() => null);
 }
 
 async function encryptKey(plaintext: string): Promise<KeyRecord> {
@@ -301,15 +295,13 @@ export async function setKey(
 
 function removeFromGlobal(storage: StorageLike): void {
   const keyring = readProviderKeyring(storage, GLOBAL_SLOT);
-  if (!keyring.delete(PROVIDER)) return;
-  writeProviderKeyring(storage, GLOBAL_SLOT, keyring);
+  if (keyring.delete(PROVIDER)) writeProviderKeyring(storage, GLOBAL_SLOT, keyring);
 }
 
 /** Supprime la clé d'un profil du trousseau (appelé aussi à la suppression du profil). */
 export function clearProfileApiKey(profileId: string, storage: StorageLike = localStorage): void {
   const profiles = readProfiles(storage);
-  if (!profiles.delete(profileId)) return;
-  writeProfiles(storage, profiles);
+  if (profiles.delete(profileId)) writeProfiles(storage, profiles);
 }
 
 /** Supprime une clé (portée). N'efface l'`activeKey` mémoire que si plus rien ne résout. */
