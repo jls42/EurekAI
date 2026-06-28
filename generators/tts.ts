@@ -15,7 +15,10 @@ export interface TtsVoiceConfig {
   guest: VoiceId;
 }
 
-export async function generateSilence(durationMs: number): Promise<Buffer> {
+// Arrow functions avoid a Codacy eslint-plugin-security-node crash in
+// `security-node/detect-unhandled-async-errors` on async FunctionDeclaration nodes
+// with TypeScript return annotations. Same workaround as generators/image.ts.
+export const generateSilence = async (durationMs: number): Promise<Buffer> => {
   const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-silence-'));
   const outputPath = join(tmpDir, 'silence.mp3');
   try {
@@ -38,9 +41,9 @@ export async function generateSilence(durationMs: number): Promise<Buffer> {
     await unlink(outputPath).catch(() => {});
     await unlink(tmpDir).catch(() => {});
   }
-}
+};
 
-export async function concatMp3(segments: Buffer[]): Promise<Buffer> {
+export const concatMp3 = async (segments: Buffer[]): Promise<Buffer> => {
   if (segments.length === 1) return segments[0];
 
   const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-mp3-'));
@@ -80,7 +83,7 @@ export async function concatMp3(segments: Buffer[]): Promise<Buffer> {
     await Promise.all(tempFiles.map((f) => unlink(f).catch(() => {})));
     await unlink(tmpDir).catch(() => {});
   }
-}
+};
 
 // Retry avec backoff exponentiel pour absorber les glitches transient Mistral
 // (empty audioData, timeout réseau, 5xx). 3 tentatives max, délais 200ms → 600ms.
@@ -90,11 +93,11 @@ const TTS_RETRY_BASE_DELAY_MS = 200;
 
 const delay = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
-async function textToSpeechWithRetry(
+const textToSpeechWithRetry = async (
   text: string,
   voiceId: VoiceId,
   ttsOptions: TtsOptions,
-): Promise<Buffer> {
+): Promise<Buffer> => {
   let lastErr: unknown;
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
@@ -107,13 +110,13 @@ async function textToSpeechWithRetry(
     }
   }
   throw lastErr;
-}
+};
 
-export async function generateAudio(
+export const generateAudio = async (
   script: PodcastLine[],
   voices: TtsVoiceConfig,
   ttsOptions: TtsOptions,
-): Promise<Buffer> {
+): Promise<Buffer> => {
   const segments: Buffer[] = [];
 
   for (const line of script) {
@@ -123,4 +126,4 @@ export async function generateAudio(
   }
 
   return concatMp3(segments);
-}
+};
