@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-confusing-void-expression, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-redundant-type-constituents */
 // Source UNIQUE de construction d'un client Mistral (cf. CLAUDE.md "Clé Mistral navigateur").
 // Aucun `new Mistral(...)` ni `trackClient(...)` ne doit exister hors de ce fichier.
 //
@@ -5,8 +6,9 @@
 // `X-EurekAI-AI-Key` (résolu par le navigateur) avec fallback sur `MISTRAL_API_KEY` (env).
 // Les clients construits depuis un header NE sont PAS cachés (la clé utilisateur ne doit
 // pas rester en mémoire au-delà de la requête) ; seul l'`envClient` est un singleton.
-
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-redundant-type-constituents -- Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`, réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) → faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas. */
+// Codacy lance son propre ESLint sans résolution de types (Mistral typé `any`,
+// réponses SDK en `error`, accès `req.headers[name]` avec un nom constant) :
+// faux positifs ; cf. CLAUDE.md section Codacy. Notre lint:ci type-aware ne les flague pas.
 import { Mistral as MistralSdk } from '@mistralai/mistralai';
 import type { Mistral } from '@mistralai/mistralai';
 import type { Request, Response, NextFunction } from 'express';
@@ -100,6 +102,9 @@ export function extractModelLimits(models: unknown): Record<string, number> {
 function modelLimitsRecord(limits: Map<string, number>): Record<string, number> {
   const out: Record<string, number> = {};
   for (const [modelId, maxContextLength] of limits) {
+    // Mistral model ids/aliases are converted to own data properties only; this avoids
+    // prototype mutation while preserving the legacy Record<string, number> API.
+    // nosemgrep
     Object.defineProperty(out, modelId, {
       value: maxContextLength,
       enumerable: true,
