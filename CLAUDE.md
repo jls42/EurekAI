@@ -143,6 +143,7 @@ Cycle de vie des générations en cours :
 - **Verifier regulierement les dependances** : utiliser le skill `/check-sdk-updates` qui lance `check-deps.sh`, fetch les changelogs GitHub et analyse les nouvelles capabilities API. A lancer avant chaque release ou quand une API renvoie des erreurs inattendues.
 - Quand une erreur ou mauvaise approche est identifiee, ajouter une regle ici ou dans `.claude/rules/`
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
+- **Modele des sous-agents** : spawner **TOUS** les sous-agents (Explore, Plan, recherche, review, general-purpose, etc.) en **Opus** — **jamais Haiku**. Passer `model: "opus"` explicitement a l'outil Agent.
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)
 - **Avant chaque commit** : verifier si `CLAUDE.md`, `.claude/rules/` ou `README.md` doivent etre mis a jour pour refleter les changements. Mettre a jour si necessaire, montrer le diff README a l'utilisateur pour validation avant traduction
 - **Après chaque `git push`** (sur une PR, jamais main) : surveiller les checks GitHub automatiquement.
