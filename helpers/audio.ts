@@ -1,7 +1,7 @@
 /** Collecte un ReadableStream ou un iterable de chunks en un seul Buffer */
-export async function collectStream(
+export const collectStream = async (
   stream: AsyncIterable<Uint8Array | Buffer> | ReadableStream<Uint8Array>,
-): Promise<Buffer> {
+): Promise<Buffer> => {
   const chunks: Buffer[] = [];
 
   if (Symbol.asyncIterator in (stream as object)) {
@@ -18,4 +18,4 @@ export async function collectStream(
   }
 
   return Buffer.concat(chunks);
-}
+};

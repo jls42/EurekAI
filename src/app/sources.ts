@@ -17,11 +17,11 @@ export function _isSessionActive(ctx: AppContext, session: UploadSession): boole
   );
 }
 
-export async function _resolveHttpError(
+export const _resolveHttpError = async (
   ctx: AppContext,
   session: UploadSession,
   res: Response,
-): Promise<string | null> {
+): Promise<string | null> => {
   try {
     const err = await res.json();
     if (!_isSessionActive(ctx, session)) return null;
@@ -30,7 +30,7 @@ export async function _resolveHttpError(
     if (!_isSessionActive(ctx, session)) return null;
     return res.statusText;
   }
-}
+};
 
 export function _applyUploadSuccess(
   ctx: AppContext,
@@ -51,12 +51,12 @@ export function _applyUploadSuccess(
   }
 }
 
-export async function _handleUploadHttpError(
+export const _handleUploadHttpError = async (
   ctx: AppContext,
   session: UploadSession,
   file: UploadFile,
   res: Response,
-): Promise<UploadResult> {
+): Promise<UploadResult> => {
   const resolved = await _resolveHttpError(ctx, session, res);
   if (resolved === null) return 'ignored';
   file.status = 'error';
@@ -64,7 +64,7 @@ export async function _handleUploadHttpError(
   ctx.$nextTick(() => ctx.refreshIcons());
   ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
   return 'failed';
-}
+};
 
 export function _handleUploadException(
   ctx: AppContext,
@@ -81,7 +81,7 @@ export function _handleUploadException(
   return 'failed';
 }
 
-export async function _uploadSingleFile(
+export const _uploadSingleFile = async function (
   this: AppContext,
   session: UploadSession,
   fileId: string,
@@ -111,16 +111,16 @@ export async function _uploadSingleFile(
   } catch (e: unknown) {
     return _handleUploadException(this, session, file, e);
   }
-}
+};
 
 // Garde serveur : réponse { sources, failures, duplicates } quand le fichier est un doublon (OCR
 // skippé). Sinon array nu (full success). On normalise AVANT le push (spread d'un objet = crash).
-async function _handleUploadResponse(
+const _handleUploadResponse = async (
   ctx: AppContext,
   session: UploadSession,
   file: UploadFile,
   res: Response,
-): Promise<UploadResult> {
+): Promise<UploadResult> => {
   if (!res.ok) return _handleUploadHttpError(ctx, session, file, res);
   const payload = await res.json();
   if (!_isSessionActive(ctx, session)) return 'ignored';
@@ -131,7 +131,7 @@ async function _handleUploadResponse(
   }
   _applyUploadSuccess(ctx, session, file, _extractSources(payload));
   return 'applied';
-}
+};
 
 /** Réponse upload normalisée : array nu (full success) ou objet { sources, failures, duplicates }. */
 function _extractSources(payload: unknown): Source[] {
@@ -163,10 +163,10 @@ export function _createUploadSession(
   return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
 }
 
-export async function _runUploadLoop(
+export const _runUploadLoop = async (
   ctx: AppContext,
   session: UploadSession,
-): Promise<{ applied: number; interrupted: boolean }> {
+): Promise<{ applied: number; interrupted: boolean }> => {
   let applied = 0;
   let interrupted = false;
   for (const fileEntry of session.files) {
@@ -181,17 +181,17 @@ export async function _runUploadLoop(
     if (result === 'applied') applied++;
   }
   return { applied, interrupted };
-}
+};
 
 /**
  * Pré-check client (best-effort) : hash chaque fichier et marque 'duplicate' ceux qui dupliquent une
  * source existante ou un fichier antérieur du même lot. Statut transitoire 'hashing' pendant le calcul.
  * Si `crypto.subtle` est absent (hash null), aucun marquage : le garde serveur prend le relais.
  */
-export async function _markClientDuplicates(
+export const _markClientDuplicates = async (
   ctx: AppContext,
   session: UploadSession,
-): Promise<void> {
+): Promise<void> => {
   const seen = new Set<string>();
   for (const f of session.files) {
     if (!f.file) continue;
@@ -209,7 +209,7 @@ export async function _markClientDuplicates(
     }
   }
   ctx.$nextTick(() => ctx.refreshIcons());
-}
+};
 
 function _notifyDuplicates(ctx: AppContext, session: UploadSession): void {
   const n = session.files.filter((f: UploadFile) => f.status === 'duplicate').length;

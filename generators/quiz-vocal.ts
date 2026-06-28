@@ -6,32 +6,32 @@ import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 
-export async function ttsQuestion(
+export const ttsQuestion = async (
   question: QuizQuestion,
   voiceId: VoiceId,
   ttsOptions: TtsOptions,
   lang = 'fr',
-): Promise<Buffer> {
+): Promise<Buffer> => {
   // Phase 2.5 — Transformer "A) Paris" en "choix A : Paris" (localisé) avant TTS,
   // pour éviter que le moteur ne prononce "A parenthèse fermée Paris".
   const spokenChoices = question.choices.map((c) => toSpokenChoice(c, lang));
   const text = `${question.question} ${spokenChoices.join('. ')}`;
   return textToSpeech(text, voiceId, ttsOptions);
-}
+};
 
-export async function transcribeAudio(
+export const transcribeAudio = async (
   client: Mistral,
   buffer: Buffer,
   filename: string,
   lang = 'fr',
-): Promise<string> {
+): Promise<string> => {
   const result = await client.audio.transcriptions.complete({
     model: 'voxtral-mini-latest',
     file: { fileName: filename, content: new Uint8Array(buffer) },
     language: lang,
   });
   return result.text;
-}
+};
 
 export interface VerifyAnswerOptions {
   model?: string;
@@ -39,14 +39,14 @@ export interface VerifyAnswerOptions {
   ageGroup?: AgeGroup;
 }
 
-export async function verifyAnswer(
+export const verifyAnswer = async (
   client: Mistral,
   question: string,
   choices: string[],
   correctIndex: number,
   studentAnswer: string,
   options: VerifyAnswerOptions = {},
-): Promise<{ correct: boolean; feedback: string }> {
+): Promise<{ correct: boolean; feedback: string }> => {
   const { model = 'mistral-large-latest', lang = 'fr', ageGroup = 'enfant' } = options;
   // Phase 2.5 — Aligner le strip sur le parseur de label (via stripChoiceLabel) pour absorber
   // les mêmes dérives typographiques que toSpokenChoice. Avant : strip strict /^[A-D]\)\s*/
@@ -75,7 +75,7 @@ export async function verifyAnswer(
 
   const raw = getContent(response);
   return safeParseJson<{ correct: boolean; feedback: string }>(raw);
-}
+};
 
 export function createQuizVocalGeneration(
   fields: Omit<QuizVocalGeneration, 'lang' | 'ageGroup'> & {

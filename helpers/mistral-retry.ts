@@ -33,7 +33,7 @@ const describeError = (err: unknown): string => {
   return o.name ?? 'unknown';
 };
 
-export async function callWithRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+export const callWithRetry = async <T>(label: string, fn: () => Promise<T>): Promise<T> => {
   let lastError: unknown;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -47,4 +47,4 @@ export async function callWithRetry<T>(label: string, fn: () => Promise<T>): Pro
     }
   }
   throw lastError ?? new Error(`callWithRetry: no attempt executed for ${label}`);
-}
+};

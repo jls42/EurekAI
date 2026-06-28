@@ -399,7 +399,7 @@ function buildFinalGeneration(
   return final;
 }
 
-async function runGeneratorAndPersist(
+const runGeneratorAndPersist = async (
   store: ProjectStore,
   generatorFn: (ctx: GenContext) => Promise<Generation | null>,
   ctx: GenContext,
@@ -407,7 +407,7 @@ async function runGeneratorAndPersist(
   gid: string,
   options: HandleGenerationOptions | undefined,
   res: Response,
-): Promise<void> {
+): Promise<void> => {
   const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
   if (!gen) {
     // Defense en profondeur : aucune closure ne devrait return null après le commit
@@ -448,7 +448,7 @@ async function runGeneratorAndPersist(
   }
   store.addGeneration(pid, finalGen);
   res.json(finalGen);
-}
+};
 
 function handleGenerationFailure(
   store: ProjectStore,

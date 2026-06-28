@@ -32,11 +32,11 @@ function chunkText(text: string): string[] {
   return chunks;
 }
 
-export async function moderateContent(
+export const moderateContent = async (
   client: Mistral,
   text: string,
   blockedCategories?: string[],
-): Promise<ModerationResult> {
+): Promise<ModerationResult> => {
   const chunks = chunkText(text);
   let categories: Record<string, boolean> = {};
 
@@ -60,4 +60,4 @@ export async function moderateContent(
   }
 
   return { status: 'safe', categories };
-}
+};

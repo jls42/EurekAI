@@ -5,12 +5,12 @@ import { timer } from '../helpers/index.js';
 import { DEFAULT_OCR_MODEL, type OcrModel } from '../helpers/ocr-models.js';
 import type { OcrConfidence } from '../types.js';
 
-export async function ocrFile(
+export const ocrFile = async (
   client: Mistral,
   filePath: string,
   fileName: string,
   model: OcrModel = DEFAULT_OCR_MODEL,
-): Promise<{ markdown: string; elapsed: number; confidence?: OcrConfidence }> {
+): Promise<{ markdown: string; elapsed: number; confidence?: OcrConfidence }> => {
   const content = readFileSync(filePath);
   const stop = timer();
 
@@ -49,7 +49,7 @@ export async function ocrFile(
   }
 
   return { markdown, elapsed, confidence };
-}
+};
 
 function extractConfidence(
   pages: Array<{ confidenceScores?: { averagePageConfidenceScore: number } | null }>,

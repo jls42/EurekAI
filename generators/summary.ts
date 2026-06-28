@@ -75,7 +75,7 @@ function extractSummary(raw: string): StudyFiche {
   return data as unknown as StudyFiche;
 }
 
-export async function generateSummary(
+export const generateSummary = async (
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
@@ -83,7 +83,7 @@ export async function generateSummary(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   exclusions?: string,
-): Promise<StudyFiche> {
+): Promise<StudyFiche> => {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: summarySystem(ageGroup) },
     { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions) },
@@ -148,4 +148,4 @@ export async function generateSummary(
   }
 
   return retryData;
-}
+};

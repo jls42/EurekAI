@@ -27,7 +27,7 @@ function isValidQuiz(data: QuizQuestion[]): boolean {
   );
 }
 
-async function generateQuizWithRetry(
+const generateQuizWithRetry = async (
   client: Mistral,
   systemPrompt: string,
   userPrompt: string,
@@ -35,7 +35,7 @@ async function generateQuizWithRetry(
   errorMsg: string,
   model: string,
   type = 'quiz',
-): Promise<QuizQuestion[]> {
+): Promise<QuizQuestion[]> => {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
@@ -68,9 +68,9 @@ async function generateQuizWithRetry(
     throw new Error(errorMsg);
   }
   return retryData;
-}
+};
 
-export async function generateQuiz(
+export const generateQuiz = async (
   client: Mistral,
   markdown: string,
   model = MISTRAL_LARGE_LATEST,
@@ -78,7 +78,7 @@ export async function generateQuiz(
   ageGroup: AgeGroup = 'enfant',
   count?: number,
   exclusions?: string,
-): Promise<QuizQuestion[]> {
+): Promise<QuizQuestion[]> => {
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),
@@ -87,9 +87,9 @@ export async function generateQuiz(
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
   );
-}
+};
 
-export async function generateQuizVocal(
+export const generateQuizVocal = async (
   client: Mistral,
   markdown: string,
   model = MISTRAL_LARGE_LATEST,
@@ -97,7 +97,7 @@ export async function generateQuizVocal(
   ageGroup: AgeGroup = 'enfant',
   count?: number,
   exclusions?: string,
-): Promise<QuizQuestion[]> {
+): Promise<QuizQuestion[]> => {
   return generateQuizWithRetry(
     client,
     quizVocalSystem(ageGroup, lang),
@@ -107,16 +107,16 @@ export async function generateQuizVocal(
     model,
     'quiz-vocal',
   );
-}
+};
 
-export async function generateQuizReview(
+export const generateQuizReview = async (
   client: Mistral,
   markdown: string,
   weakQuestions: QuizQuestion[],
   model = MISTRAL_LARGE_LATEST,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
-): Promise<QuizQuestion[]> {
+): Promise<QuizQuestion[]> => {
   const weakConcepts = weakQuestions.map((q) => q.question).join('\n- ');
   return generateQuizWithRetry(
     client,
@@ -126,4 +126,4 @@ export async function generateQuizReview(
     "Le modele n'a pas reussi a generer la revision quiz apres 2 tentatives",
     model,
   );
-}
+};

@@ -17,11 +17,11 @@ import { pathToFileURL } from 'node:url';
 import { lightpanda } from '@lightpanda/browser';
 import { PRICING_SOURCES, MODEL_PRICING } from '../helpers/pricing.js';
 
-async function renderMarkdown(url: string): Promise<string> {
+const renderMarkdown = async (url: string): Promise<string> => {
   const r = await lightpanda.fetch(url, { dump: true, dumpOptions: { type: 'markdown' } });
   const text = typeof r === 'string' ? r : r.toString('utf-8');
   return text.trim();
-}
+};
 
 /**
  * Extrait les prix (`$N`) du markdown rendu AVEC leur contexte (lignes adjacentes = label d'unité).
@@ -61,7 +61,7 @@ const PAGE_FALLBACK: Record<string, RegExp> = {
   'mistral-moderation': /moderation/i,
 };
 
-async function reportModel(prefix: string, url: string): Promise<string> {
+const reportModel = async (prefix: string, url: string): Promise<string> => {
   try {
     let snippets = extractPriceSnippets(await renderMarkdown(url));
     const fallback = PAGE_FALLBACK[prefix];
@@ -73,9 +73,9 @@ async function reportModel(prefix: string, url: string): Promise<string> {
   } catch (e) {
     return `  ${prefix}: ERROR ${e instanceof Error ? e.message : String(e)}`;
   }
-}
+};
 
-async function main(): Promise<void> {
+const main = async (): Promise<void> => {
   const filter = process.argv[2];
   const entries = Object.entries(PRICING_SOURCES).filter(([p]) => !filter || p.includes(filter));
   console.log(`Rendu Lightpanda des tarifs Mistral (${entries.length} modèle(s), séquentiel)...\n`);
@@ -86,7 +86,7 @@ async function main(): Promise<void> {
   console.log(
     '\nNote: comparaison manuelle — vérifier Current vs Found, mettre à jour pricing.ts si écart.',
   );
-}
+};
 
 // Guard CLI (robuste ESM/tsx) : ne lance main() que si exécuté directement, pas à l'import (tests).
 if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {

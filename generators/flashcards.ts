@@ -17,7 +17,7 @@ function isValidFlashcards(data: Flashcard[]): boolean {
   );
 }
 
-export async function generateFlashcards(
+export const generateFlashcards = async (
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
@@ -25,7 +25,7 @@ export async function generateFlashcards(
   ageGroup: AgeGroup = 'enfant',
   count?: number,
   exclusions?: string,
-): Promise<Flashcard[]> {
+): Promise<Flashcard[]> => {
   const effectiveCount = count ?? 5;
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: flashcardsSystem(ageGroup, effectiveCount) },
@@ -66,4 +66,4 @@ export async function generateFlashcards(
     throw new Error("Le modele n'a pas reussi a generer des flashcards valides apres 2 tentatives");
   }
   return retryData;
-}
+};

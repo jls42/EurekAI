@@ -36,14 +36,14 @@ function parsePodcastResponse(raw: string): ParsedPodcastResponse {
   return { script, sourceRefs };
 }
 
-export async function generatePodcastScript(
+export const generatePodcastScript = async (
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   exclusions?: string,
-): Promise<PodcastResult> {
+): Promise<PodcastResult> => {
   const names = pickPodcastNames();
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
     { role: 'system', content: podcastSystem(ageGroup, names) },
@@ -88,7 +88,7 @@ export async function generatePodcastScript(
     throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");
   }
   return { ...retryResult, names };
-}
+};
 
 // Force `data.speakers` non-undefined à la création (le `?` du type vit pour la
 // rétrocompat de lecture des anciennes générations DB sans speakers — pas pour

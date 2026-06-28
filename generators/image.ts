@@ -40,12 +40,12 @@ export function extractImageRef(outputs: unknown[]): ImageResult | null {
   return null;
 }
 
-async function downloadAndSaveImage(
+const downloadAndSaveImage = async (
   client: Mistral,
   fileId: string,
   projectDir: string,
   pid: string,
-): Promise<string> {
+): Promise<string> => {
   console.log(`    Image fileId: ${fileId}, downloading...`);
   const fileStream = await client.files.download({ fileId });
   const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
@@ -53,7 +53,7 @@ async function downloadAndSaveImage(
   writeFileSync(join(projectDir, imageFilename), imageBuffer);
   console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
   return `/output/projects/${pid}/${imageFilename}`;
-}
+};
 
 // Arrow function (pas `function` declaration) pour contourner un crash du
 // plugin Codacy `eslint-plugin-security-node` (rule `detect-unhandled-async-errors`)

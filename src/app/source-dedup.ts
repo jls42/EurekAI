@@ -6,7 +6,7 @@ import type { Source } from '../../types';
  * (contexte non sécurisé — ex. app servie en HTTP sur un LAN) : le garde serveur rattrape alors la
  * détection au moment de l'upload. Identique au sha256 calculé côté serveur (mêmes octets bruts).
  */
-export async function hashFile(file: File): Promise<string | null> {
+export const hashFile = async (file: File): Promise<string | null> => {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) return null;
   try {
@@ -15,7 +15,7 @@ export async function hashFile(file: File): Promise<string | null> {
   } catch {
     return null;
   }
-}
+};
 
 /**
  * Pré-check client : un fichier (hash + nom) duplique-t-il une source déjà présente dans le projet ?
