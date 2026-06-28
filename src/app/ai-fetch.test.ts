@@ -1,14 +1,15 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return -- Codacy lance son propre ESLint sans résolution de types (globals/mocks vitest typés `error`, accès indexés de mock) → faux positifs ; cf. CLAUDE.md section Codacy */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { withAiHeaders } from './ai-fetch';
 import { setKey, _resetActiveKey } from './api-key';
 import type { StorageLike } from './profile-locale';
 
 function makeStorage(): StorageLike {
-  const data: Record<string, string> = {};
+  const data = new Map<string, string>();
   return {
-    getItem: (k) => (k in data ? data[k] : null),
+    getItem: (k) => data.get(k) ?? null,
     setItem: (k, v) => {
-      data[k] = v;
+      data.set(k, v);
     },
   };
 }

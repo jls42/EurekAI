@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return -- Codacy lance son propre ESLint sans résolution de types (globals/mocks vitest typés `error`, accès indexés de mock) → faux positifs ; cf. CLAUDE.md section Codacy */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 // trackClient mocké : on vérifie le "track-once" sans wrapper réellement le SDK.
@@ -80,11 +81,11 @@ describe('resolveApiKey (précédence + anti-facturation silencieuse)', () => {
 });
 
 describe('keyFingerprint', () => {
-  it('déterministe, distinct par clé, non réversible (16 hex)', () => {
+  it('déterministe, distinct par clé, non réversible (hash djb2 non-crypto)', () => {
     const a = keyFingerprint('key-A');
     expect(a).toBe(keyFingerprint('key-A'));
     expect(a).not.toBe(keyFingerprint('key-B'));
-    expect(a).toMatch(/^[0-9a-f]{16}$/);
+    expect(a).toMatch(/^[0-9a-f]{1,8}$/);
     expect(a).not.toContain('key-A');
   });
 });

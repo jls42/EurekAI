@@ -4,6 +4,7 @@
 // On expose un décorateur d'init plutôt qu'un wrapper de fetch global : le shape
 // `fetch(url, withAiHeaders(init))` reste un `fetch(url, …)` littéral, condition pour que
 // l'analyse SSRF du repo reconnaisse les fetch d'URL externes (src/app/generate.ts).
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Codacy ESLint sans résolution de types (Headers/HeadersInit typés `error`) → faux positifs ; notre lint:ci type-aware ne les flague pas. Cf. CLAUDE.md section Codacy. */
 
 import { getActiveKey } from './api-key';
 

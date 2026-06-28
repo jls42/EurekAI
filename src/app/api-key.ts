@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unnecessary-condition -- crypto.subtle / indexedDB peuvent être undefined hors secure context (app servie en HTTP non-localhost) ; le typage lib.dom ne reflète pas ce cas runtime géré volontairement */
+/* eslint-disable @typescript-eslint/no-unnecessary-condition, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- (1) crypto.subtle / indexedDB peuvent être undefined hors secure context (le typage lib.dom non-null ne reflète pas ce cas runtime géré). (2) Codacy lance son propre ESLint sans résolution de types (DOM/crypto/IndexedDB typés `error`, accès indexés du keyring) → faux positifs ; notre lint:ci type-aware ne les flague pas. Cf. CLAUDE.md section Codacy. */
 
 // Trousseau de clés API côté navigateur (cf. CLAUDE.md "Clé Mistral navigateur").
 //
@@ -109,21 +109,21 @@ const dec = new TextDecoder();
 const toB64 = (buf: ArrayBuffer): string => {
   const bytes = new Uint8Array(buf);
   let s = '';
-  for (const b of bytes) s += String.fromCharCode(b);
+  for (const b of bytes) s += String.fromCodePoint(b);
   return btoa(s);
 };
 const fromB64 = (b64: string): ArrayBuffer => {
   const s = atob(b64);
   const buf = new ArrayBuffer(s.length);
   const bytes = new Uint8Array(buf);
-  for (let i = 0; i < s.length; i++) bytes[i] = s.charCodeAt(i);
+  for (let i = 0; i < s.length; i++) bytes[i] = s.codePointAt(i) ?? 0;
   return buf;
 };
 
 function idbRequest<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB request failed'));
   });
 }
 
@@ -132,7 +132,7 @@ function openKeyDb(): Promise<IDBDatabase> {
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => reject(req.error ?? new Error('IndexedDB open failed'));
   });
 }
 

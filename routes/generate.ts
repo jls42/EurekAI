@@ -516,6 +516,7 @@ function handleGeneration(
   };
 }
 
+// eslint-disable-next-line max-lines-per-function -- factory de routes (déclare tous les handlers) ; Codacy limite à 50, non applicable ici. Notre lint:complexity (Lizard CCN) couvre la complexité réelle.
 export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 

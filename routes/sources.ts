@@ -153,6 +153,24 @@ const getModerationCategories = (
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
 };
 
+// Sous-helper websearch : si modération activée, vérifie que la query passe la modération.
+// Retourne true si OK, false si bloquée (réponse 400 déjà envoyée). Module-scope (n'utilise
+// que des params) — cf. SonarQube S7721 ; arrow pour éviter l'agglomération Lizard.
+const checkWebsearchModeration = async (
+  client: Mistral,
+  res: Response,
+  query: string,
+  modCats: string[] | null,
+): Promise<boolean> => {
+  if (!modCats) return true;
+  const modResult = await moderateContent(client, query.trim(), modCats);
+  if (modResult.status !== 'safe') {
+    res.status(400).json({ error: 'moderation.blocked' });
+    return false;
+  }
+  return true;
+};
+
 const triggerModeration = async (
   store: ProjectStore,
   client: Mistral,
@@ -171,6 +189,7 @@ const triggerModeration = async (
   }
 };
 
+// eslint-disable-next-line max-lines-per-function -- factory de routes (déclare tous les handlers) ; Codacy limite à 50, non applicable ici. Notre lint:complexity (Lizard CCN) couvre la complexité réelle.
 export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 
@@ -762,23 +781,6 @@ export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): R
   }
 
   // Web search / URL scrape source
-  // Sous-helper : si modération activée, vérifie que la query passe la
-  // modération. Retourne true si OK pour continuer, false si bloquée (réponse
-  // déjà envoyée).
-  async function checkWebsearchModeration(
-    client: Mistral,
-    res: Response,
-    query: string,
-    modCats: string[] | null,
-  ): Promise<boolean> {
-    if (!modCats) return true;
-    const modResult = await moderateContent(client, query.trim(), modCats);
-    if (modResult.status !== 'safe') {
-      res.status(400).json({ error: 'moderation.blocked' });
-      return false;
-    }
-    return true;
-  }
 
   // Sous-helper : envoie la réponse partial vs full success.
   function respondWebsearchSources(res: Response, sources: Source[], failures: unknown[]): void {
