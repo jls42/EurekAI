@@ -1,4 +1,5 @@
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
+import { clearProfileApiKey } from './api-key';
 import type { AppContext } from './app-context';
 import type { Profile } from '../../types';
 import type { CreateProfileBody } from '../../routes/profiles';
@@ -42,12 +43,13 @@ export function buildDeleteOpts(pin?: string): RequestInit {
 
 export function finalizeDeleteProfile(state: AppContext, id: string): void {
   clearProfileLocale(id);
+  clearProfileApiKey(id); // purge la clé Mistral locale du profil supprimé
   state.profiles = state.profiles.filter((p: Profile) => p.id !== id);
   if (state.currentProfile?.id === id) {
     state.currentProfile = null;
     localStorage.removeItem(LS_PROFILE_ID);
     if (state.profiles.length > 0) {
-      state.selectProfile(state.profiles[0].id);
+      void state.selectProfile(state.profiles[0].id);
     } else {
       state.showProfilePicker = true;
     }
@@ -141,7 +143,7 @@ export function buildCreateProfileBody(
 
 export function applyCreateProfileSuccess(state: AppContext, profile: Profile): void {
   state.profiles.push(profile);
-  state.selectProfile(profile.id);
+  void state.selectProfile(profile.id);
   state.newProfileName = '';
   state.newProfileAge = '';
   state.newProfileAvatar = '0';
@@ -215,12 +217,13 @@ const fetchProfilesInto = async function (state: AppContext): Promise<void> {
 
 const loadProfiles = async function (this: AppContext) {
   await fetchProfilesInto(this);
-  // Restore last selected profile
+  // Restore last selected profile. await : selectProfile charge la clé Mistral (async)
+  // qui doit être prête avant loadConfig (boot) → loadMistralVoices.
   const saved = localStorage.getItem(LS_PROFILE_ID);
   if (saved && this.profiles.some((p: Profile) => p.id === saved)) {
-    this.selectProfile(saved);
+    await this.selectProfile(saved);
   } else if (this.profiles.length > 0) {
-    this.selectProfile(this.profiles[0].id);
+    await this.selectProfile(this.profiles[0].id);
   } else {
     this.showProfilePicker = true;
   }
@@ -238,7 +241,7 @@ const applyProfileTheme = function (state: AppContext, profile: Profile): void {
   document.documentElement.dataset.theme = state.theme;
 };
 
-const selectProfile = function (this: AppContext, id: string) {
+const selectProfile = async function (this: AppContext, id: string) {
   const profile = this.profiles.find((p: Profile) => p.id === id);
   if (!profile) return;
   this.currentProfile = profile;
@@ -246,13 +249,16 @@ const selectProfile = function (this: AppContext, id: string) {
   localStorage.setItem(LS_PROFILE_ID, id);
   this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
   applyProfileTheme(this, profile);
-  // Reset project state and reload projects for this profile.
+  // Reset project state (synchrone) for this profile.
   // resetSession() abort les fetches en vol et vide loading/toasts/pendings :
   // empêche un toast `generationDone` du profil précédent d'apparaître ici.
   this.currentProjectId = null;
   this.currentProject = null;
   this.resetSession();
   this.resetState();
+  // Charge la clé Mistral du profil AVANT loadProjects (déchiffrement IndexedDB async,
+  // doit être résolu avant les fetchs IA). Reste après les resets synchrones.
+  await this.refreshKeyState(id);
   this.loadProjects();
 };
 
@@ -411,6 +417,36 @@ const requireParentalAccess = function (this: AppContext, callback: () => void) 
   });
 };
 
+// Garde PIN générique sur un profil CIBLÉ (≠ requireParentalAccess qui dépend de
+// editingProfile). Utilisé pour la modification/suppression de la clé Mistral d'un
+// profil mineur protégé. Sans PIN → exécute directement.
+const requireProfilePin = function (this: AppContext, profileId: string, callback: () => void) {
+  const profile = this.profiles.find((p: Profile) => p.id === profileId);
+  if (!profile?.hasPin) {
+    callback();
+    return;
+  }
+  this.requirePin(async (pin: string) => {
+    try {
+      // SSRF: literal `/api/profiles/` inline (cf. requireParentalAccess).
+      const res = await fetch('/api/profiles/' + profileId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      if (!res.ok) {
+        this.showToast(this.t('profile.pinWrong'), 'error');
+        return;
+      }
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e);
+      this.showToast(this.t(TOAST_ERROR, { error: msg }), 'error');
+      return;
+    }
+    callback();
+  });
+};
+
 const autoSaveProfile = function (this: AppContext, immediate?: boolean) {
   if (!this.editingProfile) return;
   if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
@@ -552,6 +588,7 @@ export function createProfiles() {
   return {
     loadProfiles,
     selectProfile,
+    requireProfilePin,
     createProfile,
     deleteProfile,
     _saveController: null as AbortController | null,

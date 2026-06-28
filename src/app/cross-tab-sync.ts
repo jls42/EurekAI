@@ -4,11 +4,15 @@
 // les deux cas. Un 5+ tabs ouverts → 4+ events par écriture, charge négligeable.
 
 const NOTIFS_STORAGE_SLOT = 'sf-profile-notifications';
+// Clés du trousseau API (cf. src/app/api-key.ts) : une écriture dans un autre onglet
+// (saisie/suppression de clé) doit recharger la clé active ici.
+const API_KEY_SLOTS = new Set(['sf-api-keys-global', 'sf-profile-api-keys']);
 export const CROSS_TAB_SYNC_BROKEN_EVENT = 'cross-tab-sync-broken';
 
 interface AlpineDataStackEntry {
   notificationsVersion?: number;
   crossTabSyncBroken?: boolean;
+  refreshKeyState?: () => Promise<void>;
 }
 
 function getAlpineStackEntry(root: Element | null): AlpineDataStackEntry | undefined {
@@ -27,7 +31,12 @@ export function handleCrossTabStorageEvent(
   event: { key: string | null },
   doc: Document,
   warned: { value: boolean },
-): 'bumped' | 'wrong-key' | 'drift' {
+): 'bumped' | 'wrong-key' | 'drift' | 'key-synced' {
+  if (event.key !== null && API_KEY_SLOTS.has(event.key)) {
+    const stack = getAlpineStackEntry(doc.querySelector('[x-data="app()"]'));
+    void stack?.refreshKeyState?.();
+    return 'key-synced';
+  }
   if (event.key !== NOTIFS_STORAGE_SLOT) return 'wrong-key';
   const root = doc.querySelector('[x-data="app()"]');
   const stack = getAlpineStackEntry(root);

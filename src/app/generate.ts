@@ -2,6 +2,7 @@ import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
+import { withAiHeaders } from './ai-fetch';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import type { AppContext } from './app-context';
 import type { FailedStepCode, Generation, Source } from '../../types';
@@ -113,7 +114,7 @@ export async function runAutoRoute(
   const routeRes = await fetch(
     // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
     '/api/projects/' + projectId + '/generate/route',
-    postJson(body, controller.signal),
+    withAiHeaders(postJson(body, controller.signal)),
   );
   if (!routeRes.ok) {
     const err = await routeRes.json().catch(() => ({}));
@@ -139,7 +140,7 @@ export function populateAutoPlan(
   state.loading.auto = false;
   delete state.abortControllers.auto;
   for (const step of plan) {
-    if (ttsTypes.has(step.agent) && !state.apiStatus.ttsAvailable) continue;
+    if (ttsTypes.has(step.agent) && !state.ttsReady()) continue;
     // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
     // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
     if (!AUTO_AGENTS_SET.has(step.agent)) continue;
@@ -246,7 +247,7 @@ export async function runAutoStep(
   // immédiatement avant `fetch(url, ...)` dans la même fonction.
   if (!allowedUrls.has(url)) return { kind: 'failed', code: 'internal_error' };
   try {
-    const res = await fetch(url, postJson(body, controller.signal));
+    const res = await fetch(url, withAiHeaders(postJson(body, controller.signal)));
     if (state.currentProjectId !== projectId) return 'aborted';
     return await handleAutoStepResponse(state, type, res);
   } catch (e: unknown) {
@@ -502,7 +503,7 @@ const fetchSingleGenerate = async function (
   // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
   // par Codacy `rule-node-ssrf` (même pattern que confirm.ts).
   if (allowedUrls.includes(url)) {
-    return await fetch(url, postJson({ ...body, gid }, signal));
+    return await fetch(url, withAiHeaders(postJson({ ...body, gid }, signal)));
   }
   return null;
 };
@@ -538,9 +539,9 @@ const runGenerateAll = async function (state: AppContext): Promise<void> {
     const body = buildGenerateBody(state);
     const base = '/api/projects/' + projectId;
     const responses = await Promise.all([
-      fetch(base + '/generate/summary', postJson(body, controller.signal)),
-      fetch(base + '/generate/flashcards', postJson(body, controller.signal)),
-      fetch(base + '/generate/quiz', postJson(body, controller.signal)),
+      fetch(base + '/generate/summary', withAiHeaders(postJson(body, controller.signal))),
+      fetch(base + '/generate/flashcards', withAiHeaders(postJson(body, controller.signal))),
+      fetch(base + '/generate/quiz', withAiHeaders(postJson(body, controller.signal))),
     ]);
     if (state.currentProjectId !== projectId) return;
     const failures = await aggregateGenerateResults(responses, state);
@@ -746,11 +747,14 @@ export function createGenerate() {
       try {
         const body: Record<string, unknown> = { lang: getLocale() };
         if (section) body.section = section;
-        const res = await fetch(this.apiBase() + '/generations/' + gen.id + '/read-aloud', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+        const res = await fetch(
+          this.apiBase() + '/generations/' + gen.id + '/read-aloud',
+          withAiHeaders({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          }),
+        );
         if (res.ok) {
           applyVoiceResult(this, gen, await res.json(), section);
         } else {

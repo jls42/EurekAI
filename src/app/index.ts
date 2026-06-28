@@ -65,6 +65,13 @@ export function app() {
       await this.loadProfiles();
       await this.loadConfig();
 
+      // Onboarding clé Mistral : aucune clé effective (env absente ET pas de clé
+      // navigateur pour le profil actif) → ouvre le gate de saisie. Les switches de
+      // profil ultérieurs ne re-spamment pas le modal (boutons grisés + Réglages).
+      if (this.currentProfile && !this.mistralReady()) {
+        this.openApiKeyDialog('global');
+      }
+
       this.$nextTick(() => this.refreshIcons());
     },
   };

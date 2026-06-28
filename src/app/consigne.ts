@@ -1,4 +1,5 @@
 import type { AppContext } from './app-context';
+import { withAiHeaders } from './ai-fetch';
 import type { Consigne, ProjectData } from '../../types';
 
 export function createConsigne() {
@@ -25,11 +26,14 @@ export function createConsigne() {
       this.consigneLoading = true;
       this.showToast(this.t('toast.consigneAnalyzing'), 'info');
       try {
-        const res = await fetch(this.apiBase() + '/detect-consigne', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ lang: this.locale }),
-        });
+        const res = await fetch(
+          this.apiBase() + '/detect-consigne',
+          withAiHeaders({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lang: this.locale }),
+          }),
+        );
         if (res.ok) {
           this.consigne = (await res.json()) as Consigne;
           this.showToast(

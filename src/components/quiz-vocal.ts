@@ -1,5 +1,6 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { parseChoiceLabel } from '@helpers/choice-labels';
+import { withAiHeaders } from '../app/ai-fetch';
 import type { AppContext } from '../app/app-context';
 import type { Generation, QuizQuestion, QuizVocalGeneration } from '../../types';
 
@@ -137,7 +138,7 @@ const submitVocalAnswer = async function (this: QuizVocalContext, blob: Blob) {
   try {
     const res = await fetch(
       '/api/projects/' + this.currentProjectId + '/generations/' + this.gen.id + '/vocal-answer',
-      { method: 'POST', body: buildVocalFormData(idx, blob) },
+      withAiHeaders({ method: 'POST', body: buildVocalFormData(idx, blob) }),
     );
     if (!res.ok) {
       this.feedback = buildVocalErrorFeedback(this.t, 'quiz.verificationError');

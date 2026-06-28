@@ -205,7 +205,16 @@ type MistralVoice = {
 
 const initSettingsState = () => ({
   showSettings: false,
-  apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false },
+  apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false, requireUserKey: false },
+  // Clé Mistral navigateur (cf. src/app/api-key.ts). Champs RÉACTIFS : les gates
+  // mistralReady()/ttsReady() en dépendent, mutés au boot/save/clear/switch profil.
+  hasMistralKey: false,
+  keyStorageDegraded: false,
+  showApiKeyDialog: false,
+  apiKeyInput: '',
+  apiKeyScope: 'global' as 'global' | 'profile',
+  apiKeyConsentClear: false,
+  keyTestStatus: '' as '' | 'testing' | 'ok' | 'invalid' | 'quota' | 'network' | 'missing',
   allModerationCategories: [] as string[],
   moderationDefaults: {} as Record<string, string[]>,
   mistralVoicesList: [] as MistralVoice[],

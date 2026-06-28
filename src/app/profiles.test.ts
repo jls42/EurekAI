@@ -47,6 +47,7 @@ function makeCtx(overrides: Record<string, any> = {}): Record<string, any> {
     resetState: vi.fn(),
     resetSession: vi.fn(),
     loadProjects: vi.fn(),
+    refreshKeyState: vi.fn(() => Promise.resolve()),
     showToast: vi.fn(),
     t: vi.fn((key: string) => key),
     confirmDelete: vi.fn((_target: string, cb: () => void) => cb()),
@@ -101,17 +102,19 @@ describe('createProfiles', () => {
       expect(ctx.setLocale).toHaveBeenCalledWith('en', true);
     });
 
-    it('resets project state and reloads projects', () => {
+    it('resets project state and reloads projects', async () => {
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
         currentProjectId: 'old-proj',
         currentProject: { id: 'old-proj' },
       });
-      callMethod('selectProfile', ctx, 'p1');
+      // selectProfile est async (await refreshKeyState avant loadProjects).
+      await callMethod('selectProfile', ctx, 'p1');
 
       expect(ctx.currentProjectId).toBeNull();
       expect(ctx.currentProject).toBeNull();
       expect(ctx.resetState).toHaveBeenCalledOnce();
+      expect(ctx.refreshKeyState).toHaveBeenCalledWith('p1');
       expect(ctx.loadProjects).toHaveBeenCalledOnce();
     });
 

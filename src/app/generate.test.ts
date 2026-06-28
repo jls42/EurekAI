@@ -61,7 +61,13 @@ function makeContext(overrides: any = {}) {
     moderationBlockedMessage: gen.moderationBlockedMessage,
     flaggedCategoryLabels: vi.fn(() => ''),
     configDraft: { models: { summary: 'mistral-large-latest' } },
-    apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true },
+    apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true, requireUserKey: false },
+    ttsReady(this: { apiStatus?: { ttsAvailable?: boolean } }) {
+      return Boolean(this.apiStatus?.ttsAvailable);
+    },
+    mistralReady(this: { apiStatus?: { mistral?: boolean } }) {
+      return Boolean(this.apiStatus?.mistral);
+    },
     generate: gen.generate,
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,

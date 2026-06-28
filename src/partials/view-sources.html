@@ -41,8 +41,8 @@
       >
         <button
           @click="generate(cat.key)"
-          :disabled="(['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable)"
-          :title="['podcast','quiz-vocal'].includes(cat.key) && !apiStatus.ttsAvailable ? t('gen.needsTts') : ''"
+          :disabled="(['podcast','quiz-vocal'].includes(cat.key) && !ttsReady())"
+          :title="['podcast','quiz-vocal'].includes(cat.key) && !ttsReady() ? t('gen.needsTts') : ''"
           :aria-label="t('a11y.generateCategory', { category: t('gen.' + cat.key) })"
           class="flex items-center justify-center gap-2 px-3 py-2.5 bg-white rounded-button shadow-card font-semibold text-sm btn-lift focus-ring disabled:opacity-50"
           :style="'color:' + cat.color"

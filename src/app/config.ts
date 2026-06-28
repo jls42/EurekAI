@@ -4,6 +4,8 @@ import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
 import { modelPriceLabel as priceLabel } from './model-pricing';
 import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
+import { setKey, clearKey, loadActiveKey, isStorageEncryptable, purgeKeyring } from './api-key';
+import { withAiHeaders } from './ai-fetch';
 
 type ConfigDraft = AppConfig & { _mainModel?: string; _ocrModel?: string };
 type VoiceRole = 'host' | 'guest';
@@ -29,7 +31,14 @@ interface VoicesEnrichedEntry {
  * Si false, la sélection dynamique par langue retombe sur DEFAULT_CONFIG (voix FR) — UI
  * peut griser les sélecteurs de voix ou afficher un badge "voice catalog loading".
  */
-type ApiStatus = { mistral: boolean; ttsAvailable: boolean; voiceCacheReady: boolean };
+type ApiStatus = {
+  mistral: boolean;
+  ttsAvailable: boolean;
+  voiceCacheReady: boolean;
+  requireUserKey: boolean;
+};
+
+type ValidateStatus = 'ok' | 'invalid' | 'quota' | 'network' | 'missing';
 
 type ModerationCategoriesPayload = {
   all?: string[];
@@ -72,7 +81,7 @@ export function createConfig() {
 
     async loadMistralVoices(this: AppContext) {
       try {
-        const voicesRes = await fetch('/api/config/voices');
+        const voicesRes = await fetch('/api/config/voices', withAiHeaders());
         if (!voicesRes.ok) return;
         const raw = (await voicesRes.json()) as MistralVoice[];
         const enriched: VoicesEnrichedEntry[] = raw.map((v) => {
@@ -219,6 +228,98 @@ export function createConfig() {
 
     closeSettingsDialog(this: AppContext) {
       (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
+    },
+
+    // --- Clé Mistral navigateur (cf. src/app/api-key.ts) ---
+
+    // Disponibilité EFFECTIVE = clé d'env utilisable (apiStatus.mistral est déjà false
+    // quand EUREKAI_REQUIRE_USER_KEY) OU clé navigateur chargée pour le profil actif.
+    mistralReady(this: AppContext): boolean {
+      return this.apiStatus.mistral || this.hasMistralKey;
+    },
+    ttsReady(this: AppContext): boolean {
+      return this.mistralReady();
+    },
+
+    // Charge la clé active (profil > global) en mémoire et synchronise les flags réactifs.
+    // 'broken' (master key IndexedDB perdue) → purge du trousseau + gate réouvert.
+    async refreshKeyState(this: AppContext, profileId?: string): Promise<void> {
+      const pid = profileId ?? this.currentProfile?.id;
+      const status = await loadActiveKey(pid);
+      if (status === 'broken') {
+        purgeKeyring();
+        this.hasMistralKey = false;
+      } else {
+        this.hasMistralKey = status === 'ok';
+      }
+      this.keyStorageDegraded = !(await isStorageEncryptable());
+    },
+
+    openApiKeyDialog(this: AppContext, scope: 'global' | 'profile' = 'global') {
+      this.apiKeyScope = this.currentProfile ? scope : 'global';
+      this.apiKeyInput = '';
+      this.apiKeyConsentClear = false;
+      this.keyTestStatus = '';
+      this.showApiKeyDialog = true;
+      this.$nextTick(() => {
+        (this.$refs.apiKeyDialog as HTMLDialogElement | undefined)?.showModal();
+        this.refreshIcons();
+      });
+    },
+    closeApiKeyDialog(this: AppContext) {
+      this.showApiKeyDialog = false;
+      (this.$refs.apiKeyDialog as HTMLDialogElement | undefined)?.close();
+    },
+
+    async saveApiKey(this: AppContext) {
+      const key = this.apiKeyInput.trim();
+      if (!key) return;
+      // Hors secure context : stockage en clair → consentement explicite obligatoire.
+      if (!(await isStorageEncryptable()) && !this.apiKeyConsentClear) {
+        this.keyStorageDegraded = true;
+        return;
+      }
+      const scope = this.apiKeyScope;
+      const profileId = this.currentProfile?.id;
+      const commit = async () => {
+        await setKey({ scope, profileId, plaintext: key });
+        await this.refreshKeyState(profileId);
+        this.closeApiKeyDialog();
+        await this.loadMistralVoices?.();
+        this.showToast(this.t('toast.keySaved'), 'success');
+      };
+      if (scope === 'profile' && profileId) this.requireProfilePin(profileId, () => void commit());
+      else await commit();
+    },
+
+    async clearApiKey(this: AppContext, scope: 'global' | 'profile') {
+      const profileId = this.currentProfile?.id;
+      const commit = async () => {
+        await clearKey({ scope, profileId });
+        await this.refreshKeyState(profileId);
+        this.showToast(this.t('toast.keyCleared'), 'success');
+      };
+      if (scope === 'profile' && profileId) this.requireProfilePin(profileId, () => void commit());
+      else await commit();
+    },
+
+    async testApiKey(this: AppContext) {
+      const key = this.apiKeyInput.trim();
+      if (!key) {
+        this.keyTestStatus = 'missing';
+        return;
+      }
+      this.keyTestStatus = 'testing';
+      try {
+        const res = await fetch(
+          '/api/providers/mistral/validate',
+          withAiHeaders({ method: 'POST' }, { keyOverride: key }),
+        );
+        const data = (await res.json()) as { status: ValidateStatus };
+        this.keyTestStatus = data.status;
+      } catch {
+        this.keyTestStatus = 'network';
+      }
     },
   };
 }
