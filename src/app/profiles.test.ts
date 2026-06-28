@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./profile-locale', () => ({
   getProfileLocale: vi.fn((_id: string, fallback: string) => fallback),
@@ -1529,6 +1529,71 @@ describe('createProfiles', () => {
         }),
         expect.any(AbortSignal),
       );
+    });
+  });
+
+  describe('requireProfilePin (garde PIN sur profil ciblé)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    it('profil sans PIN → exécute le callback directement (pas de requirePin)', () => {
+      const cb = vi.fn();
+      const ctx = makeCtx({ profiles: [{ id: 'p1', hasPin: false }] });
+      callMethod('requireProfilePin', ctx, 'p1', cb);
+      expect(cb).toHaveBeenCalledTimes(1);
+      expect(ctx.requirePin).not.toHaveBeenCalled();
+    });
+
+    it('profil inconnu → callback direct (pas de gate)', () => {
+      const cb = vi.fn();
+      const ctx = makeCtx({ profiles: [] });
+      callMethod('requireProfilePin', ctx, 'absent', cb);
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    // requirePin reçoit un callback async : on capture sa promesse pour l'attendre
+    // (requireProfilePin lui-même n'est pas async → callMethod retourne avant le fetch).
+    const pinCtx = (overrides: Record<string, any>, pin: string) => {
+      const captured: { promise?: Promise<unknown> } = {};
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', hasPin: true }],
+        requirePin: vi.fn((fn: (p: string) => unknown) => {
+          captured.promise = Promise.resolve(fn(pin));
+        }),
+        ...overrides,
+      });
+      return { ctx, captured };
+    };
+
+    it('profil avec PIN → requirePin, PIN correct (fetch ok) → callback', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true }));
+      const cb = vi.fn();
+      const { ctx, captured } = pinCtx({}, '1234');
+      callMethod('requireProfilePin', ctx, 'p1', cb);
+      await captured.promise;
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/profiles/p1', expect.any(Object));
+      expect(cb).toHaveBeenCalledTimes(1);
+    });
+
+    it('PIN incorrect (fetch !ok) → toast pinWrong, callback NON appelé', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+      const cb = vi.fn();
+      const { ctx, captured } = pinCtx({}, '0000');
+      callMethod('requireProfilePin', ctx, 'p1', cb);
+      await captured.promise;
+      expect(ctx.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('erreur réseau → toast erreur, callback NON appelé', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network down')));
+      const cb = vi.fn();
+      const { ctx, captured } = pinCtx({}, '1234');
+      callMethod('requireProfilePin', ctx, 'p1', cb);
+      await captured.promise;
+      expect(ctx.showToast).toHaveBeenCalled();
+      expect(cb).not.toHaveBeenCalled();
     });
   });
 });

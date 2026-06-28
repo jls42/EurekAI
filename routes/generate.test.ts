@@ -10,9 +10,14 @@ import type { Source } from '../types.js';
 // --- Mock generators ---
 
 // Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
-const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+// `authOverride` permet de simuler un échec de résolution (401/400) pour tester les
+// gardes auth-first sans toucher au reste de la suite (réinitialisé en afterEach).
+const { mockClient, authState } = vi.hoisted(() => ({
+  mockClient: {} as unknown,
+  authState: { override: null as { ok: false; status: number; error: string } | null },
+}));
 vi.mock('../helpers/mistral-client-factory.js', () => ({
-  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  resolveClient: () => authState.override ?? { ok: true, client: mockClient, fingerprint: 'test' },
   requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
@@ -223,6 +228,57 @@ describe('generateRoutes', () => {
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    authState.override = null;
+  });
+
+  // --- Auth-first : resolveClient échoue → 4xx AVANT toute IO/addPendingEntry ---
+  describe('auth-first (résolution clé échoue)', () => {
+    const forceAuthFail = () => {
+      authState.override = { ok: false, status: 401, error: 'auth_required' };
+    };
+
+    it('summary (handleGeneration) → 401 sans persister de génération', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: { lang: 'fr' } }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+      expect(store.getProject(pid)!.results.generations).toHaveLength(0);
+    });
+
+    it('quiz-review → 401 AVANT validateQuizReviewInputs', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const res = mockRes();
+      // body volontairement invalide : le 401 doit primer sur le 400 de validation.
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+    });
+
+    it('route → 401 avant prepareRouteRequest', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+    });
+
+    it('auto → 401 avant tout step/addPendingEntry', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+      expect(store.getProject(pid)!.results.generations).toHaveLength(0);
+    });
   });
 
   // --- handleGeneration wrapper tests ---

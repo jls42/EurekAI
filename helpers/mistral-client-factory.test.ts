@@ -5,14 +5,21 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 vi.mock('./tracked-client.js', () => ({ trackClient: vi.fn() }));
 
 import { trackClient } from './tracked-client.js';
+import { setModelLimits } from '../config.js';
 import {
   validateKeyFormat,
   resolveApiKey,
   keyFingerprint,
   buildTrackedClient,
+  resolveClient,
+  requireKeyMiddleware,
 } from './mistral-client-factory.js';
 
 const reqWith = (headers: Record<string, string | undefined>) => ({ headers }) as never;
+const mockRes = () => {
+  const r = { status: vi.fn(() => r), json: vi.fn(() => r) };
+  return r;
+};
 
 describe('validateKeyFormat (anti-CRLF, Base64-friendly)', () => {
   it('accepte du printable ASCII y compris + / = . _ -', () => {
@@ -96,5 +103,109 @@ describe('buildTrackedClient (track-once)', () => {
     buildTrackedClient('k1');
     buildTrackedClient('k2');
     expect(trackClient).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('resolveClient (client tracké ou erreur HTTP stable)', () => {
+  const ORIG = { ...process.env };
+  beforeEach(() => {
+    // model-limits déjà chargées → warmModelLimitsOnce devient un no-op (pas de réseau).
+    setModelLimits({ 'mistral-large': 128000 });
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.EUREKAI_REQUIRE_USER_KEY;
+  });
+  afterEach(() => {
+    process.env = { ...ORIG };
+  });
+
+  it('header valide → ok + client + fingerprint', () => {
+    const r = resolveClient(reqWith({ 'x-eurekai-ai-key': 'goodkey123' }));
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.client).toBeDefined();
+      expect(r.fingerprint).toMatch(/^[0-9a-f]{1,8}$/);
+    }
+  });
+  it('header absent + env présent → ok via envClient', () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    const r = resolveClient(reqWith({}));
+    expect(r.ok).toBe(true);
+  });
+  it('header malformé → 400 invalid_api_key (jamais fallback env)', () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    const r = resolveClient(reqWith({ 'x-eurekai-ai-key': 'bad\nkey' }));
+    expect(r).toMatchObject({ ok: false, status: 400, error: 'invalid_api_key' });
+  });
+  it('provider ≠ mistral → 400 unsupported_provider', () => {
+    const r = resolveClient(
+      reqWith({ 'x-eurekai-ai-provider': 'openai', 'x-eurekai-ai-key': 'k' }),
+    );
+    expect(r).toMatchObject({ ok: false, status: 400, error: 'unsupported_provider' });
+  });
+  it('aucune clé (header absent + pas d env) → 401 auth_required', () => {
+    const r = resolveClient(reqWith({}));
+    expect(r).toMatchObject({ ok: false, status: 401, error: 'auth_required' });
+  });
+  it('allowEnv:false → 401 même avec env présent', () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    const r = resolveClient(reqWith({}), { allowEnv: false });
+    expect(r).toMatchObject({ ok: false, status: 401, error: 'auth_required' });
+  });
+});
+
+describe('requireKeyMiddleware (garde pré-multer)', () => {
+  const ORIG = { ...process.env };
+  beforeEach(() => {
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.EUREKAI_REQUIRE_USER_KEY;
+  });
+  afterEach(() => {
+    process.env = { ...ORIG };
+  });
+
+  it('header valide → next() sans réponse', () => {
+    const res = mockRes();
+    const next = vi.fn();
+    requireKeyMiddleware(
+      reqWith({ 'x-eurekai-ai-key': 'goodkey123' }),
+      res as never,
+      next as never,
+    );
+    expect(next).toHaveBeenCalledTimes(1);
+    expect(res.status).not.toHaveBeenCalled();
+  });
+  it('env présent (header absent) → next()', () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    const res = mockRes();
+    const next = vi.fn();
+    requireKeyMiddleware(reqWith({}), res as never, next as never);
+    expect(next).toHaveBeenCalledTimes(1);
+  });
+  it('header malformé → 400 invalid_api_key, pas de next()', () => {
+    const res = mockRes();
+    const next = vi.fn();
+    requireKeyMiddleware(reqWith({ 'x-eurekai-ai-key': 'bad\nkey' }), res as never, next as never);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_api_key' });
+  });
+  it('provider non supporté → 400 unsupported_provider', () => {
+    const res = mockRes();
+    const next = vi.fn();
+    requireKeyMiddleware(
+      reqWith({ 'x-eurekai-ai-provider': 'openai', 'x-eurekai-ai-key': 'k' }),
+      res as never,
+      next as never,
+    );
+    expect(next).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({ error: 'unsupported_provider' });
+  });
+  it('aucune clé → 401 auth_required', () => {
+    const res = mockRes();
+    const next = vi.fn();
+    requireKeyMiddleware(reqWith({}), res as never, next as never);
+    expect(next).not.toHaveBeenCalled();
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
   });
 });

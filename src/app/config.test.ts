@@ -1,5 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+
+vi.mock('./api-key', () => ({
+  setKey: vi.fn(() => Promise.resolve()),
+  clearKey: vi.fn(() => Promise.resolve()),
+  loadActiveKey: vi.fn(() => Promise.resolve('ok')),
+  isStorageEncryptable: vi.fn(() => Promise.resolve(true)),
+  purgeKeyring: vi.fn(),
+}));
+vi.mock('./ai-fetch', () => ({
+  withAiHeaders: vi.fn((init: unknown, opts?: { keyOverride?: string }) => ({
+    ...(init as object),
+    _override: opts?.keyOverride,
+  })),
+}));
+
 import { createConfig } from './config';
+import { setKey, clearKey, loadActiveKey, isStorageEncryptable, purgeKeyring } from './api-key';
 
 globalThis.fetch = vi.fn();
 
@@ -18,7 +34,32 @@ function makeContext(overrides: any = {}) {
     } as any,
     t: vi.fn((key: string) => key),
     showToast: vi.fn(),
-    $refs: { settingsDialog: { close: vi.fn() } },
+    $refs: {
+      settingsDialog: { close: vi.fn() },
+      apiKeyDialog: { showModal: vi.fn(), close: vi.fn() },
+    },
+    $nextTick: (cb?: () => void) => {
+      cb?.();
+      return Promise.resolve();
+    },
+    refreshIcons: vi.fn(),
+    requireProfilePin: vi.fn((_id: string, cb: () => void) => cb()),
+    hasMistralKey: false,
+    keyStorageDegraded: false,
+    showApiKeyDialog: false,
+    apiKeyInput: '',
+    apiKeyScope: 'global',
+    apiKeyConsentClear: false,
+    keyTestStatus: '',
+    currentProfile: null as { id: string } | null,
+    mistralReady: config.mistralReady,
+    ttsReady: config.ttsReady,
+    refreshKeyState: config.refreshKeyState,
+    openApiKeyDialog: config.openApiKeyDialog,
+    closeApiKeyDialog: config.closeApiKeyDialog,
+    saveApiKey: config.saveApiKey,
+    clearApiKey: config.clearApiKey,
+    testApiKey: config.testApiKey,
     loadConfig: config.loadConfig,
     loadMistralVoices: config.loadMistralVoices,
     translateEmotion: config.translateEmotion,
@@ -521,5 +562,133 @@ describe('closeSettingsDialog', () => {
     const ctx = makeContext({ $refs: { settingsDialog: undefined } });
     // Should not throw
     expect(() => config.closeSettingsDialog.call(ctx)).not.toThrow();
+  });
+});
+
+// --- Clé Mistral navigateur ---
+describe('clé Mistral navigateur (méthodes config)', () => {
+  beforeEach(() => {
+    vi.mocked(setKey).mockClear().mockResolvedValue(undefined);
+    vi.mocked(clearKey).mockClear().mockResolvedValue(undefined);
+    vi.mocked(loadActiveKey).mockClear().mockResolvedValue('ok');
+    vi.mocked(isStorageEncryptable).mockClear().mockResolvedValue(true);
+    vi.mocked(purgeKeyring).mockClear();
+  });
+
+  it('mistralReady / ttsReady : env OU clé navigateur', () => {
+    expect(config.mistralReady.call(makeContext({ apiStatus: { mistral: false } }))).toBe(false);
+    expect(config.mistralReady.call(makeContext({ apiStatus: { mistral: true } }))).toBe(true);
+    const ctx = makeContext({ apiStatus: { mistral: false }, hasMistralKey: true });
+    expect(config.mistralReady.call(ctx)).toBe(true);
+    expect(config.ttsReady.call(ctx)).toBe(true);
+  });
+
+  it('refreshKeyState : ok → hasMistralKey true, non dégradé', async () => {
+    const ctx = makeContext();
+    await config.refreshKeyState.call(ctx, 'p1');
+    expect(loadActiveKey).toHaveBeenCalledWith('p1');
+    expect(ctx.hasMistralKey).toBe(true);
+    expect(ctx.keyStorageDegraded).toBe(false);
+  });
+
+  it('refreshKeyState : broken → purge + hasMistralKey false', async () => {
+    vi.mocked(loadActiveKey).mockResolvedValue('broken');
+    const ctx = makeContext({ hasMistralKey: true });
+    await config.refreshKeyState.call(ctx);
+    expect(purgeKeyring).toHaveBeenCalled();
+    expect(ctx.hasMistralKey).toBe(false);
+  });
+
+  it('refreshKeyState : storage non chiffrable → keyStorageDegraded true', async () => {
+    vi.mocked(isStorageEncryptable).mockResolvedValue(false);
+    const ctx = makeContext();
+    await config.refreshKeyState.call(ctx);
+    expect(ctx.keyStorageDegraded).toBe(true);
+  });
+
+  it('openApiKeyDialog (profil) + closeApiKeyDialog', () => {
+    const ctx = makeContext({ currentProfile: { id: 'p1' } });
+    config.openApiKeyDialog.call(ctx, 'profile');
+    expect(ctx.showApiKeyDialog).toBe(true);
+    expect(ctx.apiKeyScope).toBe('profile');
+    expect(ctx.$refs.apiKeyDialog.showModal).toHaveBeenCalled();
+    config.closeApiKeyDialog.call(ctx);
+    expect(ctx.showApiKeyDialog).toBe(false);
+  });
+
+  it('openApiKeyDialog force global sans profil', () => {
+    const ctx = makeContext({ currentProfile: null });
+    config.openApiKeyDialog.call(ctx, 'profile');
+    expect(ctx.apiKeyScope).toBe('global');
+  });
+
+  it('saveApiKey (global) : setKey + voices + toast', async () => {
+    const ctx = makeContext({
+      apiKeyInput: '  sk-test  ',
+      loadMistralVoices: vi.fn(() => Promise.resolve()),
+    });
+    await config.saveApiKey.call(ctx);
+    expect(setKey).toHaveBeenCalledWith({
+      scope: 'global',
+      profileId: undefined,
+      plaintext: 'sk-test',
+    });
+    expect(ctx.loadMistralVoices).toHaveBeenCalled();
+    expect(ctx.showToast).toHaveBeenCalled();
+  });
+
+  it('saveApiKey : clé vide → no-op', async () => {
+    const ctx = makeContext({ apiKeyInput: '   ' });
+    await config.saveApiKey.call(ctx);
+    expect(setKey).not.toHaveBeenCalled();
+  });
+
+  it('saveApiKey : dégradé sans consentement → bloque + flag', async () => {
+    vi.mocked(isStorageEncryptable).mockResolvedValue(false);
+    const ctx = makeContext({ apiKeyInput: 'sk-x', apiKeyConsentClear: false });
+    await config.saveApiKey.call(ctx);
+    expect(setKey).not.toHaveBeenCalled();
+    expect(ctx.keyStorageDegraded).toBe(true);
+  });
+
+  it('saveApiKey (profil) : passe par requireProfilePin', async () => {
+    const pin = vi.fn((_id: string, cb: () => void) => cb());
+    const ctx = makeContext({
+      apiKeyInput: 'sk-x',
+      apiKeyScope: 'profile',
+      currentProfile: { id: 'p1' },
+      requireProfilePin: pin,
+      loadMistralVoices: vi.fn(() => Promise.resolve()),
+    });
+    await config.saveApiKey.call(ctx);
+    expect(pin).toHaveBeenCalledWith('p1', expect.any(Function));
+    expect(setKey).toHaveBeenCalledWith({ scope: 'profile', profileId: 'p1', plaintext: 'sk-x' });
+  });
+
+  it('clearApiKey (global) : clearKey + toast', async () => {
+    const ctx = makeContext();
+    await config.clearApiKey.call(ctx, 'global');
+    expect(clearKey).toHaveBeenCalledWith({ scope: 'global', profileId: undefined });
+    expect(ctx.showToast).toHaveBeenCalled();
+  });
+
+  it('testApiKey : clé vide → missing', async () => {
+    const ctx = makeContext({ apiKeyInput: '' });
+    await config.testApiKey.call(ctx);
+    expect(ctx.keyTestStatus).toBe('missing');
+  });
+
+  it('testApiKey : succès → status serveur', async () => {
+    mockFetchOk({ status: 'ok' });
+    const ctx = makeContext({ apiKeyInput: 'sk-x' });
+    await config.testApiKey.call(ctx);
+    expect(ctx.keyTestStatus).toBe('ok');
+  });
+
+  it('testApiKey : fetch throw → network', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('down'));
+    const ctx = makeContext({ apiKeyInput: 'sk-x' });
+    await config.testApiKey.call(ctx);
+    expect(ctx.keyTestStatus).toBe('network');
   });
 });

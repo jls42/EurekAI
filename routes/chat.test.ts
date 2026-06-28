@@ -9,9 +9,12 @@ import { chatRoutes } from './chat.js';
 // --- Mocks ---
 
 // Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
-const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+const { mockClient, authState } = vi.hoisted(() => ({
+  mockClient: {} as unknown,
+  authState: { override: null as { ok: false; status: number; error: string } | null },
+}));
 vi.mock('../helpers/mistral-client-factory.js', () => ({
-  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  resolveClient: () => authState.override ?? { ok: true, client: mockClient, fingerprint: 'test' },
   requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
@@ -110,6 +113,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
+  authState.override = null;
 });
 
 // ============================================================
@@ -117,6 +121,17 @@ afterEach(() => {
 // ============================================================
 
 describe('POST /:pid/chat', () => {
+  it('résolution clé échoue (resolveOr4xx) → 4xx stable', async () => {
+    authState.override = { ok: false, status: 401, error: 'auth_required' };
+    const pid = store.createProject('Test').meta.id;
+    addSource(pid);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+    await handler(mockReq({ params: { pid }, body: { message: 'Bonjour' } }), res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+  });
+
   it('retourne 404 quand le projet est introuvable', async () => {
     const handler = getHandler(router, 'post', '/:pid/chat');
     const req = mockReq({
