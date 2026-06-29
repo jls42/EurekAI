@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';

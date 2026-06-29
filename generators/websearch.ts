@@ -3,12 +3,12 @@ import { timer, extractAllText } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
 import { websearchInstructions, websearchInput } from '../prompts.js';
 
-export async function webSearchEnrich(
+export const webSearchEnrich = async (
   client: Mistral,
   query: string,
   lang = 'fr',
   ageGroup: import('../types.js').AgeGroup = 'enfant',
-): Promise<{ text: string; elapsed: number }> {
+): Promise<{ text: string; elapsed: number }> => {
   const stop = timer();
 
   const agent = await client.beta.agents.create({
@@ -37,4 +37,4 @@ export async function webSearchEnrich(
       logger.warn('websearch', 'agent delete failed', e);
     }
   }
-}
+};

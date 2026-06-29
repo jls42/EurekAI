@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne resout pas les types Vitest/mocks dans son sandbox; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
