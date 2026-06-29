@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';

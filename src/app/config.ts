@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
 import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';

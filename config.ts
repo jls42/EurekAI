@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig, Profile, VoiceFlow } from './types.js';

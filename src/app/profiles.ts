@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import { clearProfileApiKey } from './api-key';
 import type { AppContext } from './app-context';

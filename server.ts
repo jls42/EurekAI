@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';

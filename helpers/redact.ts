@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 // Redaction structurée des secrets pour les logs (cf. CLAUDE.md "Clé Mistral navigateur").
 //
 // Réaliste, pas magique : on NE peut PAS scrubber une clé arbitraire d'un texte

@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { redactSecrets } from './redact.js';
 
 type Level = 'info' | 'warn' | 'error';

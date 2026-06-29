@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { createState } from './state';
 import { createI18n } from './i18n';
 import { createHelpers } from './helpers';

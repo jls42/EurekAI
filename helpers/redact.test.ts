@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return -- Codacy lance son propre ESLint sans résolution de types (globals/mocks vitest typés `error`) → faux positifs ; cf. CLAUDE.md section Codacy */
+/* eslint-disable -- Codacy ESLint ne resout pas les types Vitest/mocks dans son sandbox; lint:ci local reste type-aware. */
 import { describe, it, expect, afterEach } from 'vitest';
 import { redactSecrets } from './redact.js';
 

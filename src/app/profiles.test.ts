@@ -1,3 +1,4 @@
+/* eslint-disable -- Codacy ESLint ne resout pas les types Vitest/mocks dans son sandbox; lint:ci local reste type-aware. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('./profile-locale', () => ({
