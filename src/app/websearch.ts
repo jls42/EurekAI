@@ -34,7 +34,7 @@ export function createWebsearch() {
             body: JSON.stringify({
               query,
               lang: this.locale,
-              ageGroup: this.currentProfile?.ageGroup || 'enfant',
+              ageGroup: this.currentProfile?.ageGroup ?? 'enfant',
               scrapeMode: this.scrapeMode,
             }),
           }),

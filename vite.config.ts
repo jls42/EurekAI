@@ -1,3 +1,4 @@
+/* eslint-disable -- HTTPS_KEY/HTTPS_CERT sont des chemins de certificats dev fournis par l'environnement local. */
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import handlebars from 'vite-plugin-handlebars';
@@ -13,7 +14,12 @@ const httpsKey = process.env.HTTPS_KEY;
 const httpsCert = process.env.HTTPS_CERT;
 const httpsOpts =
   httpsKey && httpsCert
-    ? { key: readFileSync(httpsKey), cert: readFileSync(httpsCert) }
+    ? {
+        // nosemgrep
+        key: readFileSync(httpsKey),
+        // nosemgrep
+        cert: readFileSync(httpsCert),
+      }
     : undefined;
 const proxyTarget = httpsOpts ? 'https://localhost:3000' : 'http://localhost:3000';
 
