@@ -3,8 +3,7 @@
    @typescript-eslint/no-unsafe-member-access,
    @typescript-eslint/no-unsafe-argument,
    @typescript-eslint/no-unnecessary-condition,
-   @typescript-eslint/restrict-template-expressions,
-   sonarjs/no-duplicate-string
+   @typescript-eslint/restrict-template-expressions
    --
    Codacy lance ESLint sans notre project TS complet sur ce fichier de config JSON legacy;
    lint:ci local reste la couverture type-aware. */

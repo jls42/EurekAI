@@ -74,11 +74,13 @@ function makeContext(overrides: any = {}) {
     flaggedCategoryLabels: vi.fn(() => ''),
     configDraft: { models: { summary: 'mistral-large-latest' } },
     apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true, requireUserKey: false },
-    ttsReady(this: { apiStatus?: { ttsAvailable?: boolean } }) {
-      return Boolean(this.apiStatus?.ttsAvailable);
+    ttsReady() {
+      const ctx = this as { apiStatus?: { ttsAvailable?: boolean } };
+      return Boolean(ctx.apiStatus?.ttsAvailable);
     },
-    mistralReady(this: { apiStatus?: { mistral?: boolean } }) {
-      return Boolean(this.apiStatus?.mistral);
+    mistralReady() {
+      const ctx = this as { apiStatus?: { mistral?: boolean } };
+      return Boolean(ctx.apiStatus?.mistral);
     },
     generate: gen.generate,
     generateAll: gen.generateAll,

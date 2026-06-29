@@ -1570,7 +1570,8 @@ describe('createProfiles', () => {
       const captured: { promise?: Promise<unknown> } = {};
       const ctx = makeCtx({
         profiles: [{ id: 'p1', hasPin: true }],
-        requirePin: vi.fn((fn: (p: string) => unknown) => {
+        requirePin: vi.fn((fn: unknown) => {
+          if (typeof fn !== 'function') return;
           captured.promise = Promise.resolve(fn(pin));
         }),
         ...overrides,

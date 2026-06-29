@@ -11,7 +11,8 @@
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
-import { mkdirSync, readFileSync } from 'node:fs';
+import { mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createServer as createHttpsServer } from 'node:https';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -244,15 +245,19 @@ const onListen = (scheme: 'http' | 'https') => {
       .then((voices) => {
         setVoiceCache(voices);
       })
-      .catch((e: Error) =>
-        logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${e.message}`),
-      );
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${message}`);
+      });
     envClient.models
       .list()
       .then((models) => {
         setModelLimits(extractModelLimits(models));
       })
-      .catch((e: Error) => logger.warn('models', `limits not loaded: ${e.message}`));
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        logger.warn('models', `limits not loaded: ${message}`);
+      });
   } else {
     logger.info('boot', 'no env key — warmups skipped (model limits loaded lazily per user key)');
   }
@@ -264,11 +269,16 @@ const onListen = (scheme: 'http' | 'https') => {
 // secure context). Cf. CLAUDE.md "Clé Mistral navigateur".
 const httpsKey = process.env.HTTPS_KEY;
 const httpsCert = process.env.HTTPS_CERT;
-if (httpsKey && httpsCert) {
-  createHttpsServer({ key: readFileSync(httpsKey), cert: readFileSync(httpsCert) }, app).listen(
-    PORT,
-    () => onListen('https'),
-  );
-} else {
+async function startServer(): Promise<void> {
+  if (httpsKey && httpsCert) {
+    const [key, cert] = await Promise.all([readFile(httpsKey), readFile(httpsCert)]);
+    createHttpsServer({ key, cert }, app).listen(PORT, () => onListen('https'));
+    return;
+  }
   app.listen(PORT, () => onListen('http'));
 }
+
+void startServer().catch((e: unknown) => {
+  logger.error('boot', 'server start failed:', e);
+  process.exitCode = 1;
+});

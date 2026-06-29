@@ -4,6 +4,7 @@
    @typescript-eslint/no-redundant-type-constituents,
    @typescript-eslint/no-unsafe-assignment,
    @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
    @typescript-eslint/no-unsafe-member-access
    --
    Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;

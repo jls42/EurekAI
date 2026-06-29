@@ -132,7 +132,9 @@ interface ToolCallCtx {
   hasConsigne: boolean;
 }
 
-const CHAT_TOOL_EXECUTORS = new Map<string, (ctx: ToolCallCtx) => Promise<Generation>>([
+type ChatToolExecutor = (ctx: ToolCallCtx) => Promise<Generation>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+const CHAT_TOOL_EXECUTORS = new Map<string, ChatToolExecutor>([
   [
     'summary',
     async (ctx) => {

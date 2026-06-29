@@ -4,7 +4,9 @@
    @typescript-eslint/no-unnecessary-condition,
    @typescript-eslint/no-unsafe-assignment,
    @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
    @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
    @typescript-eslint/restrict-template-expressions
    --
    Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
@@ -12,7 +14,8 @@
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID, createHash } from 'node:crypto';
-import { readFileSync, unlinkSync } from 'node:fs';
+import { unlinkSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { Mistral } from '@mistralai/mistralai';
 import type { Source, OcrConfidence, AgeGroup, DuplicateUpload } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -47,9 +50,11 @@ const errorModeration = (): Source['moderation'] => ({ status: 'error', categori
 const isBlankString = (v: unknown): boolean => !v || typeof v !== 'string' || v.trim().length === 0;
 
 // Dédup ré-import : sha256 du fichier brut (avant OCR) ; comparé aux contentHash existants.
-const hashFileContent = (path: string): string | undefined => {
+const hashFileContent = async (path: string): Promise<string | undefined> => {
   try {
-    return createHash('sha256').update(readFileSync(path)).digest('hex');
+    return createHash('sha256')
+      .update(await readFile(path))
+      .digest('hex');
   } catch {
     return undefined;
   }
@@ -268,9 +273,9 @@ const uploadedFileExt = (file: Express.Multer.File): string => {
   return dotIdx >= 0 ? name.slice(dotIdx) : '';
 };
 
-const readTextUpload = (file: Express.Multer.File): ProcessedUpload => {
+const readTextUpload = async (file: Express.Multer.File): Promise<ProcessedUpload> => {
   const stop = startTimer();
-  const markdown = readFileSync(file.path, 'utf-8');
+  const markdown = await readFile(file.path, 'utf-8');
   const elapsed = stop();
   logger.info(
     'sources',
@@ -307,7 +312,7 @@ const processUploadedFile = async (
   contentHash: string | undefined,
 ): Promise<Source> => {
   const isText = TEXT_EXTS.has(uploadedFileExt(file));
-  const processed = isText ? readTextUpload(file) : await readOcrUpload(client, file);
+  const processed = isText ? await readTextUpload(file) : await readOcrUpload(client, file);
   return {
     id: randomUUID(),
     filename: file.originalname,
@@ -405,7 +410,7 @@ const processUploadBatch = async (
   const existing = buildExistingHashMap(store, pid);
   const seen = new Map<string, string>();
   for (const file of files) {
-    const hash = hashFileContent(file.path);
+    const hash = await hashFileContent(file.path);
     const dupId = findDuplicateId(hash, existing, seen);
     if (!allowDuplicates && dupId && hash) {
       tryUnlinkOrphan(file.path);
@@ -635,6 +640,13 @@ const pushOutcome = (
   if (outcome.failure) failures.push(outcome.failure);
 };
 
+const normalizeWebSearchBody = (body: WebSearchBody) => ({
+  lang: body.lang ?? 'fr',
+  ageGroup: body.ageGroup ?? 'enfant',
+  scrapeMode: body.scrapeMode ?? 'auto',
+  ...parseWebInput(body.query.trim()),
+});
+
 const collectWebSources = async (
   store: ProjectStore,
   client: Mistral,
@@ -642,10 +654,7 @@ const collectWebSources = async (
   body: WebSearchBody,
   modCats: string[] | null,
 ): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> => {
-  const lang = body.lang || 'fr';
-  const ageGroup: AgeGroup = body.ageGroup || 'enfant';
-  const { urls, searchQuery } = parseWebInput(body.query.trim());
-  const scrapeMode = body.scrapeMode || 'auto';
+  const { lang, ageGroup, scrapeMode, urls, searchQuery } = normalizeWebSearchBody(body);
   const sources: Source[] = [];
   const failures: WebSourceFailure[] = [];
   const now = new Date().toISOString();

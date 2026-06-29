@@ -204,8 +204,9 @@ const isOptionalFiniteNumberish = (v: unknown): boolean =>
   v === undefined || v === null || Number.isFinite(Number(v));
 
 type ModelConfig = ReturnType<typeof getConfig>['models'];
+type ModelSelector = (models: ModelConfig) => string; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
 
-const MODEL_SELECTORS = new Map<string, (models: ModelConfig) => string>([
+const MODEL_SELECTORS = new Map<string, ModelSelector>([
   ['summary', (models) => models.summary],
   ['flashcards', (models) => models.flashcards],
   ['quiz', (models) => models.quiz],
@@ -724,8 +725,8 @@ const buildQuizVocalAudioUrls = async (
     flow: QUIZ_VOCAL,
   }).host;
   const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
-  for (let i = 0; i < data.length; i += 1) {
-    const audioBuffer = await ttsQuestion(data[i], hostVoice, ttsOpts, ctx.lang);
+  for (const [i, question] of data.entries()) {
+    const audioBuffer = await ttsQuestion(question, hostVoice, ttsOpts, ctx.lang);
     audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
     logger.info(QUIZ_VOCAL, `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
   }
@@ -764,7 +765,9 @@ const buildFillBlankGeneration = async (ctx: GenContext): Promise<Generation> =>
   return makeGen(FILL_BLANK, data, ctx);
 };
 
-const AUTO_EXECUTORS = new Map<string, (ctx: AutoCtx) => Promise<Generation>>([
+type AutoExecutor = (ctx: AutoCtx) => Promise<Generation>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+const AUTO_EXECUTORS = new Map<string, AutoExecutor>([
   ['summary', async (ctx) => buildAutoSummary(ctx)],
   ['flashcards', async (ctx) => buildAutoFlashcards(ctx)],
   ['quiz', async (ctx) => buildAutoQuiz(ctx)],
@@ -939,7 +942,7 @@ const pickAutoStepFailureCode = (
 
 const runStepBody = async (
   step: { agent: AutoAgentType },
-  executor: (ctx: AutoCtx) => Promise<Generation>,
+  executor: AutoExecutor,
   autoCtx: AutoCtx,
   st: ProjectStore,
   pid: string,
@@ -1047,11 +1050,18 @@ const executePlan = async (
   generations: Generation[],
   failedSteps: FailedStep[],
 ): Promise<void> => {
-  const settled = await Promise.allSettled(plan.map((step) => runStep(step, autoCtx, st, pid)));
-  settled.forEach((outcome, idx) => {
-    const step = plan[idx];
-    if (outcome.status === 'rejected') pushRejectedStep(outcome.reason, step, st, pid, failedSteps);
-    else pushStepOutcome(outcome.value, generations, failedSteps);
+  const settled = await Promise.all(
+    plan.map(async (step) => {
+      try {
+        return { step, outcome: await runStep(step, autoCtx, st, pid) } as const;
+      } catch (reason) {
+        return { step, reason } as const;
+      }
+    }),
+  );
+  settled.forEach((result) => {
+    if ('reason' in result) pushRejectedStep(result.reason, result.step, st, pid, failedSteps);
+    else pushStepOutcome(result.outcome, generations, failedSteps);
   });
 };
 
