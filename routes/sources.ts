@@ -52,9 +52,12 @@ const isBlankString = (v: unknown): boolean => !v || typeof v !== 'string' || v.
 // Dédup ré-import : sha256 du fichier brut (avant OCR) ; comparé aux contentHash existants.
 const hashFileContent = async (path: string): Promise<string | undefined> => {
   try {
-    return createHash('sha256')
-      .update(await readFile(path))
-      .digest('hex');
+    return (
+      createHash('sha256')
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is Multer's server-side temp file path.
+        .update(await readFile(path))
+        .digest('hex')
+    );
   } catch {
     return undefined;
   }
@@ -275,6 +278,7 @@ const uploadedFileExt = (file: Express.Multer.File): string => {
 
 const readTextUpload = async (file: Express.Multer.File): Promise<ProcessedUpload> => {
   const stop = startTimer();
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- file.path is created by Multer diskStorage, not a client-supplied filename.
   const markdown = await readFile(file.path, 'utf-8');
   const elapsed = stop();
   logger.info(

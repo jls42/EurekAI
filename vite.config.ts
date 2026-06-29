@@ -14,12 +14,22 @@ export default defineConfig(async () => {
   const httpsCert = process.env.HTTPS_CERT;
   const httpsOpts =
     httpsKey && httpsCert
-      ? { key: await readFile(httpsKey), cert: await readFile(httpsCert) }
+      ? {
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted local dev certificate paths.
+          key: await readFile(httpsKey),
+          // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted local dev certificate paths.
+          cert: await readFile(httpsCert),
+        }
       : undefined;
   const proxyTarget = httpsOpts ? 'https://localhost:3000' : 'http://localhost:3000';
 
   return {
-    plugins: [tailwindcss(), handlebars({ partialDirectory: resolve(__dirname, 'src/partials') })],
+    plugins: [
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Codacy ne resout pas les types du plugin Vite.
+      tailwindcss(),
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Codacy ne resout pas les types du plugin Vite.
+      handlebars({ partialDirectory: resolve(__dirname, 'src/partials') }),
+    ],
     root: 'src',
     resolve: { alias: { '@helpers': resolve(__dirname, 'helpers') } },
     publicDir: resolve(__dirname, 'public/assets'),

@@ -271,7 +271,12 @@ const httpsKey = process.env.HTTPS_KEY;
 const httpsCert = process.env.HTTPS_CERT;
 async function startServer(): Promise<void> {
   if (httpsKey && httpsCert) {
-    const [key, cert] = await Promise.all([readFile(httpsKey), readFile(httpsCert)]);
+    const [key, cert] = await Promise.all([
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted deployment/dev certificate paths.
+      readFile(httpsKey),
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted deployment/dev certificate paths.
+      readFile(httpsCert),
+    ]);
     createHttpsServer({ key, cert }, app).listen(PORT, () => onListen('https'));
     return;
   }

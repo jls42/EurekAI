@@ -2,6 +2,15 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import sonarjs from 'eslint-plugin-sonarjs';
 
+const codacySecurityCompatPlugin = {
+  rules: {
+    'detect-non-literal-fs-filename': {
+      meta: { type: 'problem', schema: [] },
+      create: () => ({}),
+    },
+  },
+};
+
 // Config pragmatique pour projet TS legacy sans ESLint précédent.
 // Stratégie : règles à fort ROI en error, règles bruyantes en warn le temps
 // du refactor progressif, règles redondantes avec d'autres outils en off.
@@ -66,6 +75,11 @@ export default [
         AbortController: 'readonly',
         AbortSignal: 'readonly',
       },
+    },
+    plugins: {
+      // Compat locale pour les suppressions inline de règles Codacy-only.
+      // La sécurité réelle reste portée par npm run security, CodeQL et Sonar.
+      security: codacySecurityCompatPlugin,
     },
     rules: {
       // Gardes à fort ROI — error
