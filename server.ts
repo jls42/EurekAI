@@ -283,7 +283,9 @@ async function startServer(): Promise<void> {
   app.listen(PORT, () => onListen('http'));
 }
 
-void startServer().catch((e: unknown) => {
+try {
+  await startServer();
+} catch (e: unknown) {
   logger.error('boot', 'server start failed:', e);
   process.exitCode = 1;
-});
+}
