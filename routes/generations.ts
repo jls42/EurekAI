@@ -1,4 +1,13 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-redundant-type-constituents,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { Mistral } from '@mistralai/mistralai';

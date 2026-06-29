@@ -1,4 +1,14 @@
-/* eslint-disable */
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-redundant-type-constituents,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return
+   --
+   Codacy lance ESLint sans les types réels du SDK Mistral/Express headers; lint:ci local
+   reste la couverture type-aware. */
 // Source UNIQUE de construction d'un client Mistral (cf. CLAUDE.md "Clé Mistral navigateur").
 // Aucun `new Mistral(...)` ni `trackClient(...)` ne doit exister hors de ce fichier.
 //

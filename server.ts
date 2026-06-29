@@ -1,4 +1,13 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
@@ -232,13 +241,17 @@ const onListen = (scheme: 'http' | 'https') => {
   const envClient = getEnvClient();
   if (envClient) {
     listVoices(envClient)
-      .then(setVoiceCache)
+      .then((voices) => {
+        setVoiceCache(voices);
+      })
       .catch((e: Error) =>
         logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${e.message}`),
       );
     envClient.models
       .list()
-      .then((models) => setModelLimits(extractModelLimits(models)))
+      .then((models) => {
+        setModelLimits(extractModelLimits(models));
+      })
       .catch((e: Error) => logger.warn('models', `limits not loaded: ${e.message}`));
   } else {
     logger.info('boot', 'no env key — warmups skipped (model limits loaded lazily per user key)');

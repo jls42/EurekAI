@@ -1,4 +1,3 @@
-/* eslint-disable -- HTTPS_KEY/HTTPS_CERT sont des chemins de certificats dev fournis par l'environnement local. */
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 import handlebars from 'vite-plugin-handlebars';

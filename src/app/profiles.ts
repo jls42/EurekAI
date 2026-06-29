@@ -1,4 +1,10 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-argument
+   --
+   Codacy lance ESLint avec un typage Alpine/fetch incomplet; lint:ci local reste type-aware. */
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import { clearProfileApiKey } from './api-key';
 import type { AppContext } from './app-context';
@@ -453,7 +459,7 @@ const autoSaveProfile = function (this: AppContext, immediate?: boolean) {
   if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
   const doSave = async () => {
     const editing = this.editingProfile;
-    if (!isProfileFormValid(editing) || !editing) return;
+    if (!editing || !isProfileFormValid(editing)) return;
     const { id, locale } = editing;
     const updates = buildProfileUpdates(editing);
     if (this._saveController) this._saveController.abort();

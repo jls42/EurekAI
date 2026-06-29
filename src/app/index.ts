@@ -1,4 +1,9 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint avec un typage Alpine incomplet; lint:ci local reste type-aware. */
 import { createState } from './state';
 import { createI18n } from './i18n';
 import { createHelpers } from './helpers';

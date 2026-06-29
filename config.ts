@@ -1,4 +1,13 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unnecessary-condition,
+   @typescript-eslint/restrict-template-expressions,
+   sonarjs/no-duplicate-string
+   --
+   Codacy lance ESLint sans notre project TS complet sur ce fichier de config JSON legacy;
+   lint:ci local reste la couverture type-aware. */
 import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AppConfig, Profile, VoiceFlow } from './types.js';
@@ -49,6 +58,13 @@ interface MergeResult {
   config: AppConfig;
   shapeInvalid: boolean;
 }
+
+type LegacyRuntimeConfig = AppConfig & {
+  ttsProvider?: unknown;
+  voices?: unknown;
+  mistralVoices?: unknown;
+  mistralVoicesSource?: unknown;
+};
 
 function mergeSafe(saved: unknown): MergeResult {
   if (!isPlainObject(saved)) {
@@ -122,13 +138,16 @@ function loadSavedConfig(): { config: AppConfig; loadFailed: boolean } {
 // les `function foo()` top-level consécutives (cf. CLAUDE.md "Mesurer > deviner").
 const removeLegacyTtsFields = (): string[] => {
   const removed: string[] = [];
-  const legacy = currentConfig as unknown as Record<string, unknown>;
-  for (const key of ['ttsProvider', 'voices']) {
-    if (legacy[key] !== undefined) {
-      delete legacy[key];
-      removed.push(key);
-      logger.info('config', `migration: removed legacy field '${key}'`);
-    }
+  const legacy = currentConfig as LegacyRuntimeConfig;
+  if (legacy.ttsProvider !== undefined) {
+    delete legacy.ttsProvider;
+    removed.push('ttsProvider');
+    logger.info('config', "migration: removed legacy field 'ttsProvider'");
+  }
+  if (legacy.voices !== undefined) {
+    delete legacy.voices;
+    removed.push('voices');
+    logger.info('config', "migration: removed legacy field 'voices'");
   }
   return removed;
 };
@@ -154,20 +173,21 @@ function migrateLegacyElevenLabsFields(): boolean {
   return changed;
 }
 
-const LEGACY_GLOBAL_VOICE_KEYS = ['mistralVoices', 'mistralVoicesSource'] as const;
-
 // S3: arrow `const` plutôt que `function` — adjacence avec migrateLegacyElevenLabsFields
 // ci-dessus déclencherait autrement l'agglomération du parseur TS de Lizard
 // (cf. CLAUDE.md "Mesurer > deviner").
 const removeLegacyGlobalVoiceFields = (): boolean => {
-  const legacy = currentConfig as unknown as Record<string, unknown>;
+  const legacy = currentConfig as LegacyRuntimeConfig;
   let changed = false;
-  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
-    if (legacy[key] !== undefined) {
-      delete legacy[key];
-      changed = true;
-      logger.info('config', `migration: removed legacy field '${key}'`);
-    }
+  if (legacy.mistralVoices !== undefined) {
+    delete legacy.mistralVoices;
+    changed = true;
+    logger.info('config', "migration: removed legacy field 'mistralVoices'");
+  }
+  if (legacy.mistralVoicesSource !== undefined) {
+    delete legacy.mistralVoicesSource;
+    changed = true;
+    logger.info('config', "migration: removed legacy field 'mistralVoicesSource'");
   }
   return changed;
 };
@@ -312,11 +332,15 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
   // AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
   // silencieusement par saveConfig (branches ci-dessus n'y touchent pas) — mais une
   // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilité.
-  const legacy = partial as Record<string, unknown>;
-  for (const key of LEGACY_GLOBAL_VOICE_KEYS) {
-    if (legacy[key] !== undefined) {
-      logger.warn('config', `rejected legacy field '${key}' at saveConfig (cleaned at boot)`);
-    }
+  const legacy = partial as Partial<LegacyRuntimeConfig>;
+  if (legacy.mistralVoices !== undefined) {
+    logger.warn('config', "rejected legacy field 'mistralVoices' at saveConfig (cleaned at boot)");
+  }
+  if (legacy.mistralVoicesSource !== undefined) {
+    logger.warn(
+      'config',
+      "rejected legacy field 'mistralVoicesSource' at saveConfig (cleaned at boot)",
+    );
   }
   persistConfig();
   return currentConfig;

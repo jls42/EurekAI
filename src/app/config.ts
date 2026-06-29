@@ -1,4 +1,3 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
 import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
@@ -8,7 +7,11 @@ import type { AppConfig } from '../../types';
 import { setKey, clearKey, loadActiveKey, isStorageEncryptable, purgeKeyring } from './api-key';
 import { withAiHeaders } from './ai-fetch';
 
-type ConfigDraft = AppConfig & { _mainModel?: string; _ocrModel?: string };
+interface ConfigDraft extends AppConfig {
+  _mainModel?: string;
+  _ocrModel?: string;
+}
+
 type VoiceRole = 'host' | 'guest';
 
 interface VoicesEnrichedEntry {
@@ -32,19 +35,19 @@ interface VoicesEnrichedEntry {
  * Si false, la sélection dynamique par langue retombe sur DEFAULT_CONFIG (voix FR) — UI
  * peut griser les sélecteurs de voix ou afficher un badge "voice catalog loading".
  */
-type ApiStatus = {
+interface ApiStatus {
   mistral: boolean;
   ttsAvailable: boolean;
   voiceCacheReady: boolean;
   requireUserKey: boolean;
-};
+}
 
 type ValidateStatus = 'ok' | 'invalid' | 'quota' | 'network' | 'missing';
 
-type ModerationCategoriesPayload = {
+interface ModerationCategoriesPayload {
   all?: string[];
   defaults?: Record<string, string[]>;
-};
+}
 
 const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
@@ -137,7 +140,7 @@ export function createConfig() {
       profileId?: string,
     ): string {
       const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
-      if (!list || list.length === 0) return this.t(PROFILE_VOICE_DEFAULT_I18N);
+      if (list.length === 0) return this.t(PROFILE_VOICE_DEFAULT_I18N);
       const lang = (locale || 'fr').slice(0, 2);
       const voices = list as unknown as MistralVoice[];
       const result = selectVoices({ voices, lang, profileId });

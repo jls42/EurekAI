@@ -1,4 +1,15 @@
-/* eslint-disable -- Codacy ESLint ne lit pas notre flat config/type project sur cette PR; lint:ci local reste la source type-aware. */
+/* eslint-disable
+   @typescript-eslint/array-type,
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-redundant-type-constituents,
+   @typescript-eslint/no-unnecessary-condition,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/restrict-template-expressions
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
@@ -109,9 +120,14 @@ const resolveSourceIds = (body: GenRequestBody, sources: Source[]): string[] => 
   return ids.length > 0 ? ids : sources.map((s) => s.id);
 };
 
+const contextLimitFor = (limits: Record<string, number>, modelId: string): number => {
+  const descriptor = Object.getOwnPropertyDescriptor(limits, modelId);
+  return typeof descriptor?.value === 'number' ? descriptor.value : 128_000;
+};
+
 const checkContextLimit = (markdown: string, modelId: string): string | null => {
   const limits = getModelLimits();
-  const limit = limits[modelId] ?? 128_000;
+  const limit = contextLimitFor(limits, modelId);
   const estimatedTokens = Math.ceil(markdown.length / 2);
   if (estimatedTokens > limit * 0.8) {
     const pct = Math.round((estimatedTokens / limit) * 100);
@@ -187,6 +203,24 @@ const isOptionalStringArray = (v: unknown): boolean =>
 const isOptionalFiniteNumberish = (v: unknown): boolean =>
   v === undefined || v === null || Number.isFinite(Number(v));
 
+type ModelConfig = ReturnType<typeof getConfig>['models'];
+
+const MODEL_SELECTORS = new Map<string, (models: ModelConfig) => string>([
+  ['summary', (models) => models.summary],
+  ['flashcards', (models) => models.flashcards],
+  ['quiz', (models) => models.quiz],
+  ['podcast', (models) => models.podcast],
+  ['translate', (models) => models.translate],
+  ['quizVerify', (models) => models.quizVerify],
+  ['chat', (models) => models.chat],
+  ['ocr', (models) => models.ocr],
+]);
+
+const configuredModel = (models: ModelConfig, modelId?: string): string => {
+  if (!modelId) return models.summary;
+  return MODEL_SELECTORS.get(modelId)?.(models) ?? modelId;
+};
+
 type ValidateResult = { ok: true } | { ok: false; error: string };
 
 const INVALID: ValidateResult = { ok: false, error: 'invalid_input' };
@@ -259,8 +293,7 @@ function buildGenContext(
   const hasConsigne =
     useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
   const config = getConfig();
-  const models = config.models as Record<string, string>;
-  const resolvedModel = modelId ? models[modelId] || modelId : models.summary;
+  const resolvedModel = configuredModel(config.models, modelId);
   const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
   const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
   if (ctxError) return { ok: false, error: ctxError, status: 400 };
@@ -731,15 +764,15 @@ const buildFillBlankGeneration = async (ctx: GenContext): Promise<Generation> =>
   return makeGen(FILL_BLANK, data, ctx);
 };
 
-const AUTO_EXECUTORS: Record<string, (ctx: AutoCtx) => Promise<Generation>> = {
-  summary: async (ctx) => buildAutoSummary(ctx),
-  flashcards: async (ctx) => buildAutoFlashcards(ctx),
-  quiz: async (ctx) => buildAutoQuiz(ctx),
-  [FILL_BLANK]: async (ctx) => buildAutoFillBlank(ctx),
-  podcast: async (ctx) => buildAutoPodcast(ctx),
-  [QUIZ_VOCAL]: async (ctx) => buildAutoQuizVocal(ctx),
-  image: async (ctx) => buildAutoImage(ctx),
-};
+const AUTO_EXECUTORS = new Map<string, (ctx: AutoCtx) => Promise<Generation>>([
+  ['summary', async (ctx) => buildAutoSummary(ctx)],
+  ['flashcards', async (ctx) => buildAutoFlashcards(ctx)],
+  ['quiz', async (ctx) => buildAutoQuiz(ctx)],
+  [FILL_BLANK, async (ctx) => buildAutoFillBlank(ctx)],
+  ['podcast', async (ctx) => buildAutoPodcast(ctx)],
+  [QUIZ_VOCAL, async (ctx) => buildAutoQuizVocal(ctx)],
+  ['image', async (ctx) => buildAutoImage(ctx)],
+]);
 
 const buildAutoSummary = async (ctx: AutoCtx): Promise<Generation> => {
   const data = await generateSummary(
@@ -879,8 +912,8 @@ const prepareRouteRequest = (
     res.status(400).json({ error: 'no_sources' });
     return null;
   }
-  const useRawMarkdown = req.body.useConsigne === false;
-  const markdown = useRawMarkdown ? rawMarkdown : applyConsigne(rawMarkdown, project.consigne);
+  const useConsigne = req.body.useConsigne !== false;
+  const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
   const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
   if (ctxError) {
     res.status(400).json({ error: ctxError });
@@ -959,7 +992,7 @@ const runStep = async (
   st: ProjectStore,
   pid: string,
 ): Promise<StepOutcome> => {
-  const executor = AUTO_EXECUTORS[step.agent];
+  const executor = AUTO_EXECUTORS.get(step.agent);
   if (!executor) {
     logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
     return { ok: false, agent: step.agent, code: 'internal_error' };
