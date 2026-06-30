@@ -1,5 +1,6 @@
 import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
+import { withAiHeaders } from './ai-fetch';
 import { registerGeneration } from './generate';
 import type { AppContext } from './app-context';
 import type { Generation } from '../../types';
@@ -83,15 +84,18 @@ const sendChatMessage = async function (this: AppContext) {
   this.$nextTick(() => this.scrollChatBottom());
 
   try {
-    const res = await fetch(this.apiBase() + '/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: msg,
-        lang: getLocale(),
-        ageGroup: this.currentProfile?.ageGroup || 'enfant',
+    const res = await fetch(
+      this.apiBase() + '/chat',
+      withAiHeaders({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: msg,
+          lang: getLocale(),
+          ageGroup: this.currentProfile.ageGroup,
+        }),
       }),
-    });
+    );
     await dispatchChatResponse(this, res);
   } catch {
     this.chatMessages.push({

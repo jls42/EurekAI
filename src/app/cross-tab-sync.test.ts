@@ -99,6 +99,26 @@ describe('handleCrossTabStorageEvent', () => {
     assert.equal(stack.notificationsVersion, 2);
   });
 
+  it('returns "key-synced" and recharge la clé quand un slot trousseau change dans un autre onglet', () => {
+    const refresh = makeStub<Promise<void>>(() => Promise.resolve());
+    const stack = { refreshKeyState: refresh.fn } as unknown as {
+      notificationsVersion?: number;
+      crossTabSyncBroken?: boolean;
+    };
+    const { doc } = makeDoc(stack);
+
+    assert.equal(
+      handleCrossTabStorageEvent({ key: 'sf-api-keys-global' }, doc, warned),
+      'key-synced',
+    );
+    assert.equal(
+      handleCrossTabStorageEvent({ key: 'sf-profile-api-keys' }, doc, warned),
+      'key-synced',
+    );
+    assert.equal(refresh.calls.length, 2);
+    assert.equal(warnCalls.length, 0);
+  });
+
   it('bumps notificationsVersion when alpine stack is present and field is a number', () => {
     const stack = makeStack(3);
     const { doc } = makeDoc(stack);

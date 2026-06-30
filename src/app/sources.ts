@@ -1,4 +1,5 @@
 import { addCostDelta } from './cost-utils';
+import { withAiHeaders } from './ai-fetch';
 import { hashFile, findExistingDuplicate } from './source-dedup';
 import type { AppContext, AppState } from './app-context';
 import type { Source } from '../../types';
@@ -101,10 +102,10 @@ export async function _uploadSingleFile(
   if (forced) formData.append('allowDuplicates', 'true');
 
   try {
-    const res = await fetch(`/api/projects/${session.projectId}/sources/upload`, {
-      method: 'POST',
-      body: formData,
-    });
+    const res = await fetch(
+      `/api/projects/${session.projectId}/sources/upload`,
+      withAiHeaders({ method: 'POST', body: formData }),
+    );
     if (!_isSessionActive(this, session)) return 'ignored';
     return await _handleUploadResponse(this, session, file, res);
   } catch (e: unknown) {
@@ -303,11 +304,14 @@ const runAddText = async function (state: AppContext): Promise<void> {
   const session = startAddTextSession(state, projectId);
   if (!session) return;
   try {
-    const res = await fetch(state.apiBase() + '/sources/text', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, lang: state.locale }),
-    });
+    const res = await fetch(
+      state.apiBase() + '/sources/text',
+      withAiHeaders({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, lang: state.locale }),
+      }),
+    );
     await handleAddTextResponse(state, session, res);
   } catch (e: unknown) {
     if (!_isSessionActive(state, session)) return;

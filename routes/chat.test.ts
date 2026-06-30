@@ -1,3 +1,15 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/unbound-method
+   --
+   Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -7,6 +19,16 @@ import { ProfileStore } from '../profiles.js';
 import { chatRoutes } from './chat.js';
 
 // --- Mocks ---
+
+// Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
+const { mockClient, authState } = vi.hoisted(() => ({
+  mockClient: {} as unknown,
+  authState: { override: null as { ok: false; status: number; error: string } | null },
+}));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => authState.override ?? { ok: true, client: mockClient, fingerprint: 'test' },
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 vi.mock('../generators/chat.js', () => ({
   chatWithSources: vi.fn().mockResolvedValue({ reply: 'Hello!', toolCalls: [] }),
@@ -61,7 +83,7 @@ let store: ProjectStore;
 let profileStore: ProfileStore;
 let tempDir: string;
 let router: any;
-const client = {} as any;
+const client = mockClient as any;
 
 function getHandler(r: any, method: string, path: string) {
   for (const layer of r.stack) {
@@ -97,12 +119,13 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-chat-route-'));
   store = new ProjectStore(tempDir);
   profileStore = new ProfileStore(tempDir);
-  router = chatRoutes(store, client, profileStore);
+  router = chatRoutes(store, profileStore);
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
+  authState.override = null;
 });
 
 // ============================================================
@@ -110,6 +133,17 @@ afterEach(() => {
 // ============================================================
 
 describe('POST /:pid/chat', () => {
+  it('résolution clé échoue (resolveOr4xx) → 4xx stable', async () => {
+    authState.override = { ok: false, status: 401, error: 'auth_required' };
+    const pid = store.createProject('Test').meta.id;
+    addSource(pid);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+    await handler(mockReq({ params: { pid }, body: { message: 'Bonjour' } }), res);
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+  });
+
   it('retourne 404 quand le projet est introuvable', async () => {
     const handler = getHandler(router, 'post', '/:pid/chat');
     const req = mockReq({

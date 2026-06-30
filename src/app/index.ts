@@ -1,3 +1,9 @@
+/* eslint-disable
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint avec un typage Alpine incomplet; lint:ci local reste type-aware. */
 import { createState } from './state';
 import { createI18n } from './i18n';
 import { createHelpers } from './helpers';
@@ -64,6 +70,13 @@ export function app() {
 
       await this.loadProfiles();
       await this.loadConfig();
+
+      // Onboarding clé Mistral : aucune clé effective (env absente ET pas de clé
+      // navigateur pour le profil actif) → ouvre le gate de saisie. Les switches de
+      // profil ultérieurs ne re-spamment pas le modal (boutons grisés + Réglages).
+      if (this.currentProfile && !this.mistralReady()) {
+        this.openApiKeyDialog('global');
+      }
 
       this.$nextTick(() => this.refreshIcons());
     },

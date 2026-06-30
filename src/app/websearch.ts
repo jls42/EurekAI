@@ -1,4 +1,5 @@
 import { addCostDelta } from './cost-utils';
+import { withAiHeaders } from './ai-fetch';
 import type { AppContext } from './app-context';
 import type { Source } from '../../types';
 
@@ -25,16 +26,19 @@ export function createWebsearch() {
       if (!query || !this.currentProjectId) return;
       this.loading.websearch = true;
       try {
-        const res = await fetch(this.apiBase() + '/sources/websearch', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            query,
-            lang: this.locale,
-            ageGroup: this.currentProfile?.ageGroup || 'enfant',
-            scrapeMode: this.scrapeMode,
+        const res = await fetch(
+          this.apiBase() + '/sources/websearch',
+          withAiHeaders({
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              query,
+              lang: this.locale,
+              ageGroup: this.currentProfile?.ageGroup ?? 'enfant',
+              scrapeMode: this.scrapeMode,
+            }),
           }),
-        });
+        );
         if (!res.ok) {
           const err = (await res.json()) as { error?: string };
           this.showToast(

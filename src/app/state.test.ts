@@ -114,6 +114,7 @@ describe('createState', () => {
       mistral: false,
       ttsAvailable: false,
       voiceCacheReady: false,
+      requireUserKey: false,
     });
     expect(state.mistralVoicesList).toEqual([]);
   });

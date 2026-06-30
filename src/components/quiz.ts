@@ -1,4 +1,5 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
+import { withAiHeaders } from '../app/ai-fetch';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
 import type { Generation, QuizGeneration, QuizQuestion, QuizStats } from '../../types';
@@ -122,11 +123,14 @@ const reviewErrors = async function (this: QuizContext) {
 
   this.reviewing = true;
   try {
-    const res = await fetch('/api/projects/' + pid + '/generate/quiz-review', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ generationId: this.gen.id, weakQuestions }),
-    });
+    const res = await fetch(
+      '/api/projects/' + pid + '/generate/quiz-review',
+      withAiHeaders({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ generationId: this.gen.id, weakQuestions }),
+      }),
+    );
     if (res.ok) {
       const newGen = (await res.json()) as Generation;
       this.generations.push(newGen);

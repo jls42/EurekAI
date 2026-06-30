@@ -1,4 +1,5 @@
 import { addCostDelta } from './cost-utils';
+import { withAiHeaders } from './ai-fetch';
 import type { AppContext } from './app-context';
 import type { Source } from '../../types';
 
@@ -53,10 +54,10 @@ export function createRecorder() {
         const formData = new FormData();
         formData.append('audio', blob, 'recording.webm');
         formData.append('lang', this.locale);
-        const res = await fetch(this.apiBase() + '/sources/voice', {
-          method: 'POST',
-          body: formData,
-        });
+        const res = await fetch(
+          this.apiBase() + '/sources/voice',
+          withAiHeaders({ method: 'POST', body: formData }),
+        );
         if (!res.ok) {
           const err = (await res.json()) as { error?: string };
           this.showToast(

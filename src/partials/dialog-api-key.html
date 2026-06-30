@@ -1,0 +1,100 @@
+<dialog x-ref="apiKeyDialog" class="rounded-dialog p-6 max-w-md w-full shadow-float glass">
+  <div>
+    <div
+      class="w-14 h-14 mx-auto mb-3 bg-primary/10 rounded-[1rem] border border-primary/20 flex items-center justify-center"
+    >
+      <i data-lucide="key-round" class="w-7 h-7 text-primary"></i>
+    </div>
+    <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+    <h2
+      class="font-heading font-bold text-lg text-text-primary mb-2 text-center"
+      x-text="t('apiKey.title')"
+    >
+      Clé API Mistral
+    </h2>
+    <p class="text-body-sm text-text-secondary mb-4 text-center" x-text="t('apiKey.info')"></p>
+
+    <!-- Portée : globale (ce navigateur) / ce profil -->
+    <div class="flex gap-2 mb-3" x-show="currentProfile">
+      <button
+        type="button"
+        @click="apiKeyScope = 'global'"
+        :class="apiKeyScope === 'global' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary'"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors btn-press focus-ring"
+        x-text="t('apiKey.scopeGlobal')"
+      >
+        Globale
+      </button>
+      <button
+        type="button"
+        @click="apiKeyScope = 'profile'"
+        :class="apiKeyScope === 'profile' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary'"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors btn-press focus-ring"
+        x-text="t('apiKey.scopeProfile')"
+      >
+        Ce profil
+      </button>
+    </div>
+
+    <input
+      type="password"
+      x-model="apiKeyInput"
+      :aria-label="t('apiKey.label')"
+      @keydown.enter="saveApiKey()"
+      class="input-modern w-full px-3 py-2 mb-2 font-mono text-body-sm"
+      :placeholder="t('apiKey.placeholder')"
+      autocomplete="off"
+      spellcheck="false"
+    />
+
+    <!-- Tester la clé -->
+    <div class="flex items-center gap-2 mb-3">
+      <button
+        type="button"
+        @click="testApiKey()"
+        :disabled="!apiKeyInput.trim() || keyTestStatus === 'testing'"
+        class="rounded-button px-3 py-1.5 text-body-sm font-semibold bg-gray-100 text-text-secondary hover:bg-gray-200 transition-colors btn-press focus-ring disabled:opacity-50"
+        x-text="t('apiKey.test')"
+      >
+        Tester
+      </button>
+      <span
+        class="text-body-sm"
+        x-show="keyTestStatus"
+        :class="keyTestStatus === 'ok' ? 'text-success' : (keyTestStatus === 'testing' ? 'text-text-secondary' : 'text-danger')"
+        x-text="keyTestStatus ? t('apiKey.status.' + keyTestStatus) : ''"
+      ></span>
+    </div>
+
+    <!-- Mode dégradé (HTTP-LAN sans chiffrement) : consentement explicite au clair -->
+    <div
+      x-show="keyStorageDegraded"
+      class="mb-3 p-3 rounded-card bg-amber-50 border border-amber-200"
+    >
+      <p class="text-body-sm text-amber-700 mb-2" x-text="t('apiKey.degradedWarn')"></p>
+      <label class="flex items-center gap-2 text-body-sm text-amber-800">
+        <input
+          type="checkbox"
+          x-model="apiKeyConsentClear"
+          :aria-label="t('apiKey.degradedConsent')"
+        />
+        <!-- Texte de repli statique : a11y SonarQube S6853 (x-text rempli au runtime) -->
+        <span x-text="t('apiKey.degradedConsent')">Stocker la clé en clair sur cet appareil</span>
+      </label>
+    </div>
+
+    <div class="flex gap-2">
+      <button
+        @click="closeApiKeyDialog()"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-gray-100 text-text-secondary hover:bg-gray-200 transition-colors card-lift btn-press focus-ring"
+        x-text="t('common.cancel')"
+      ></button>
+      <button
+        @click="saveApiKey()"
+        :disabled="!apiKeyInput.trim() || (keyStorageDegraded && !apiKeyConsentClear)"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
+        x-text="t('common.save')"
+      ></button>
+    </div>
+  </div>
+</dialog>

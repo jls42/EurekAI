@@ -1,3 +1,15 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/unbound-method
+   --
+   Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
@@ -7,6 +19,14 @@ import { ProfileStore } from '../profiles.js';
 import { sourceRoutes } from './sources.js';
 
 // --- Mocks ---
+
+// La clé est résolue par requête : on mocke la factory pour retourner un client stub
+// (les generators sont eux-mêmes mockés). requireKeyMiddleware = pass-through.
+const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 vi.mock('../generators/ocr.js', () => ({
   ocrFile: vi.fn().mockResolvedValue({ markdown: '# OCR result', elapsed: 1.5 }),
@@ -61,7 +81,7 @@ let store: ProjectStore;
 let profileStore: ProfileStore;
 let tempDir: string;
 let router: any;
-const client = {} as any;
+const client = mockClient as any;
 
 function getHandler(r: any, method: string, path: string) {
   for (const layer of r.stack) {
@@ -87,7 +107,7 @@ beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-sources-route-'));
   store = new ProjectStore(tempDir);
   profileStore = new ProfileStore(tempDir);
-  router = sourceRoutes(store, client, profileStore);
+  router = sourceRoutes(store, profileStore);
   vi.clearAllMocks();
 });
 

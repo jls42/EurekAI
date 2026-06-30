@@ -1,3 +1,15 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/unbound-method
+   --
+   Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createGenerate } from './generate';
 
@@ -61,7 +73,15 @@ function makeContext(overrides: any = {}) {
     moderationBlockedMessage: gen.moderationBlockedMessage,
     flaggedCategoryLabels: vi.fn(() => ''),
     configDraft: { models: { summary: 'mistral-large-latest' } },
-    apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true },
+    apiStatus: { mistral: true, ttsAvailable: true, voiceCacheReady: true, requireUserKey: false },
+    ttsReady() {
+      const ctx = this as { apiStatus?: { ttsAvailable?: boolean } };
+      return Boolean(ctx.apiStatus?.ttsAvailable);
+    },
+    mistralReady() {
+      const ctx = this as { apiStatus?: { mistral?: boolean } };
+      return Boolean(ctx.apiStatus?.mistral);
+    },
     generate: gen.generate,
     generateAll: gen.generateAll,
     generateAuto: gen.generateAuto,

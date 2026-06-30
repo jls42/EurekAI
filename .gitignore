@@ -25,3 +25,7 @@ TODO.md
 TODO-after-hackathon.md
 todo-feature.md
 .codex
+
+# Certificats TLS locaux (scripts/gen-cert.sh) — jamais commités
+certs/
+*.pem

@@ -1,14 +1,29 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import dotenv from 'dotenv';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import helmet from 'helmet';
 import { mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
+import { createServer as createHttpsServer } from 'node:https';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { Mistral } from '@mistralai/mistralai';
 
-import { trackClient } from './helpers/tracked-client.js';
 import { logger } from './helpers/logger.js';
-import { recordUsage } from './helpers/usage-context.js';
+import {
+  getEnvClient,
+  resolveClient,
+  extractModelLimits,
+} from './helpers/mistral-client-factory.js';
+import { extractErrorCode } from './helpers/error-codes.js';
 import { ProjectStore } from './store.js';
 import {
   initConfig,
@@ -34,22 +49,17 @@ dotenv.config({ override: true, quiet: true });
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// --- Validation ---
+// --- Clé API ---
+// `.env` peut être VIDE : l'app démarre quand même. La clé Mistral est résolue PAR
+// REQUÊTE (header `X-EurekAI-AI-Key` fourni par le navigateur, fallback env pour
+// ECS/k8s) via helpers/mistral-client-factory. Cf. CLAUDE.md "Clé Mistral navigateur".
 if (!process.env.MISTRAL_API_KEY) {
-  console.error('ERREUR: MISTRAL_API_KEY non defini dans .env');
-  process.exit(1);
+  logger.warn(
+    'boot',
+    'MISTRAL_API_KEY absent — mode clé-utilisateur (le navigateur fournit sa clé par requête)',
+  );
 }
 
-const client = new Mistral({
-  apiKey: process.env.MISTRAL_API_KEY,
-  timeoutMs: 120_000,
-  retryConfig: {
-    strategy: 'backoff',
-    backoff: { initialInterval: 500, maxInterval: 10_000, exponent: 1.5, maxElapsedTime: 120_000 },
-    retryConnectionErrors: true,
-  },
-});
-trackClient(client, recordUsage);
 const app = express();
 app.disable('x-powered-by');
 const PORT = Number(process.env.PORT) || 3000;
@@ -131,15 +141,49 @@ app.post('/api/config/reset', (_req, res) => {
     res.status(500).json({ error: 'Failed to reset configuration' });
   }
 });
-app.get('/api/config/voices', async (req, res) => {
+app.get('/api/config/voices', aiLimiter, async (req, res) => {
+  const resolved = resolveClient(req);
+  if (!resolved.ok) {
+    // Header présent mais malformé → 400 actionnable. Pas de clé → [] (boot,
+    // non-actionnable, le front ignore déjà) SANS setVoiceCache (ne pas écraser un warmup réussi).
+    if (resolved.status === 400) {
+      res.status(400).json({ error: resolved.error });
+      return;
+    }
+    res.json([]);
+    return;
+  }
   try {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
-    const voices = await listVoices(client, lang);
+    const voices = await listVoices(resolved.client, lang);
     if (!lang) setVoiceCache(voices);
     res.json(voices);
   } catch (e) {
     logger.error('config', 'List voices error', e);
     res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
+  }
+});
+
+// Validation d'une clé (bouton « tester » des réglages ; clé brouillon via header).
+// TOUJOURS 200 + { status } (jamais le 400 de resolveClient → le front gère un statut
+// unique) ; allowEnv:false pour qu'une clé vide ne valide pas l'env de l'hôte.
+const validateErrorStatus = (e: unknown): 'invalid' | 'quota' | 'network' => {
+  const code = extractErrorCode(e, 'mistral');
+  if (code === 'quota_exceeded') return 'quota';
+  if (code === 'upstream_unavailable') return 'network';
+  return 'invalid';
+};
+app.post('/api/providers/mistral/validate', aiLimiter, async (req, res) => {
+  const resolved = resolveClient(req, { allowEnv: false });
+  if (!resolved.ok) {
+    res.json({ status: resolved.status === 401 ? 'missing' : 'invalid' });
+    return;
+  }
+  try {
+    await resolved.client.models.list();
+    res.json({ status: 'ok' });
+  } catch (e) {
+    res.json({ status: validateErrorStatus(e) });
   }
 });
 
@@ -160,7 +204,12 @@ app.use('/api', generalLimiter);
 // sources scrape/upload, chat). Empile sur generalLimiter ci-dessus. Le
 // regex match les sous-paths sous /api/projects/:pid/{generate|sources|chat}.
 // /events (SSE) n'est pas dans ces prefix donc reste non-affecte.
-const AI_PATH_RE = /^\/api\/projects\/[^/]+\/(generate|sources|chat)(\/|$)/;
+// detect-consigne + moderate sont sous /:pid/ (PAS sous /sources/) et appellent
+// aussi Mistral → inclus dans la couverture aiLimiter (sinon oracle + appels facturants
+// non protégés). /api/config/voices et /api/providers/* reçoivent aiLimiter en direct
+// (cf. routes ci-dessus, définies avant ce middleware).
+const AI_PATH_RE =
+  /^\/api\/projects\/[^/]+\/(generate|sources|chat|detect-consigne|moderate)(\/|$)/;
 app.use((req, res, next) => {
   if (AI_PATH_RE.test(req.path)) {
     aiLimiter(req, res, next);
@@ -171,41 +220,72 @@ app.use((req, res, next) => {
 
 app.use('/api/profiles', profileRoutes(outputDir, store));
 app.use(API_PROJECTS, projectRoutes(store));
-app.use(API_PROJECTS, sourceRoutes(store, client, profileStore));
-app.use(API_PROJECTS, generateRoutes(store, client, profileStore));
-app.use(API_PROJECTS, generationCrudRoutes(store, client, profileStore));
-app.use(API_PROJECTS, chatRoutes(store, client, profileStore));
+app.use(API_PROJECTS, sourceRoutes(store, profileStore));
+app.use(API_PROJECTS, generateRoutes(store, profileStore));
+app.use(API_PROJECTS, generationCrudRoutes(store, profileStore));
+app.use(API_PROJECTS, chatRoutes(store, profileStore));
 
 // --- Start ---
-app.listen(PORT, () => {
+const onListen = (scheme: 'http' | 'https') => {
   const projects = store.listProjects();
   const status = getApiStatus();
-  console.log(`\n  EurekAI — http://localhost:${PORT}`);
+  console.log(`\n  EurekAI — ${scheme}://localhost:${PORT}`);
   console.log(`  API Mistral: ${status.mistral ? 'OK' : NON_CONFIGURE}`);
   console.log(`  TTS Mistral Voxtral: ${status.ttsAvailable ? 'OK' : NON_CONFIGURE}`);
   console.log(`  Projets: ${projects.length}`);
   projects.forEach((p) => console.log(`    - ${p.name} (${p.id.slice(0, 8)}...)`));
   console.log();
 
-  // Non-blocking cache warmup (optional, app works without)
-  // Catch en logger structuré — le frontend lit voiceCacheReady via /api/config/status
-  // pour griser les sélecteurs de voix et alerter les users non-FR du fallback.
-  listVoices(client)
-    .then(setVoiceCache)
-    .catch((e: Error) =>
-      logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${e.message}`),
-    );
-  client.models
-    .list()
-    .then((models) => {
-      const limits: Record<string, number> = {};
-      for (const m of models.data ?? []) {
-        const card = m as { id: string; maxContextLength?: number; aliases?: string[] };
-        if (!card.maxContextLength) continue;
-        limits[card.id] = card.maxContextLength;
-        for (const alias of card.aliases ?? []) limits[alias] = card.maxContextLength;
-      }
-      setModelLimits(limits);
-    })
-    .catch((e: Error) => logger.warn('models', `limits not loaded: ${e.message}`));
-});
+  // Warmups optionnels : SEULEMENT si une clé d'env existe (sinon ils échoueraient).
+  // Sans clé d'env, voiceCacheReady reste false (le front gère le fallback) et les
+  // model-limits se chargent paresseusement au 1er client utilisateur (cf. factory).
+  const envClient = getEnvClient();
+  if (envClient) {
+    listVoices(envClient)
+      .then((voices) => {
+        setVoiceCache(voices);
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        logger.warn('voice-cache', `warmup failed (lang fallback to FR active): ${message}`);
+      });
+    envClient.models
+      .list()
+      .then((models) => {
+        setModelLimits(extractModelLimits(models));
+      })
+      .catch((e: unknown) => {
+        const message = e instanceof Error ? e.message : String(e);
+        logger.warn('models', `limits not loaded: ${message}`);
+      });
+  } else {
+    logger.info('boot', 'no env key — warmups skipped (model limits loaded lazily per user key)');
+  }
+};
+
+// HTTPS local optionnel (cf. scripts/gen-cert.sh) : si HTTPS_KEY/HTTPS_CERT sont
+// définis, l'app sert en HTTPS → secure context sur tablette/LAN (WebCrypto/IndexedDB
+// chiffrent la clé) + clé chiffrée en transit. Sinon HTTP (localhost est déjà un
+// secure context). Cf. CLAUDE.md "Clé Mistral navigateur".
+const httpsKey = process.env.HTTPS_KEY;
+const httpsCert = process.env.HTTPS_CERT;
+async function startServer(): Promise<void> {
+  if (httpsKey && httpsCert) {
+    const [key, cert] = await Promise.all([
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted deployment/dev certificate paths.
+      readFile(httpsKey),
+      // eslint-disable-next-line security/detect-non-literal-fs-filename -- HTTPS_* are trusted deployment/dev certificate paths.
+      readFile(httpsCert),
+    ]);
+    createHttpsServer({ key, cert }, app).listen(PORT, () => onListen('https'));
+    return;
+  }
+  app.listen(PORT, () => onListen('http'));
+}
+
+try {
+  await startServer();
+} catch (e: unknown) {
+  logger.error('boot', 'server start failed:', e);
+  process.exitCode = 1;
+}

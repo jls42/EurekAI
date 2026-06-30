@@ -1,0 +1,39 @@
+# .dockerignore — exclut du build context (cf. Containerfile multi-stage).
+# Évite d'embarquer secrets, données utilisateur et artefacts lourds dans le
+# contexte envoyé au build (sécurité + vitesse). Aligné sur .gitignore.
+
+# Dépendances & artefacts build (recompilés dans le conteneur)
+node_modules
+dist
+coverage
+.scannerwork
+
+# Secrets & TLS — NE JAMAIS dans le build context
+.env
+.env.*
+certs
+*.pem
+
+# Données utilisateur persistées (runtime / volume, jamais dans l'image)
+output
+test-output
+
+# Historique git & CI/hooks (inutiles dans l'image)
+.git
+.gitignore
+.dockerignore
+.github
+.husky
+
+# Outillage & docs hors runtime
+.claude
+.codex
+docs
+*.log
+*.swp
+
+# Médias volumineux
+*.mp3
+*.mp4
+*.aac
+*.wav

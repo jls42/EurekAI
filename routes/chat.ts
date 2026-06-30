@@ -1,3 +1,12 @@
+/* eslint-disable
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-redundant-type-constituents,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-member-access
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
@@ -21,7 +30,9 @@ import { logger } from '../helpers/logger.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 const CHAT_ROUTE_PATH = '/:pid/chat';
+const FILL_BLANK = 'fill-blank';
 import { extractErrorCode } from '../helpers/error-codes.js';
+import { resolveClient } from '../helpers/mistral-client-factory.js';
 
 type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
 
@@ -121,77 +132,91 @@ interface ToolCallCtx {
   hasConsigne: boolean;
 }
 
-const CHAT_TOOL_EXECUTORS: Record<string, (ctx: ToolCallCtx) => Promise<Generation>> = {
-  summary: async (ctx) => {
-    const data = await generateSummary(
-      ctx.client,
-      ctx.markdown,
-      ctx.config.models.summary,
-      ctx.hasConsigne,
-      ctx.lang,
-      ctx.ageGroup,
-    );
-    return {
-      id: randomUUID(),
-      title: autoTitle('summary', data, ctx.lang),
-      createdAt: new Date().toISOString(),
-      sourceIds: ctx.sourceIds,
-      type: 'summary',
-      data,
-    };
-  },
-  flashcards: async (ctx) => {
-    const data = await generateFlashcards(
-      ctx.client,
-      ctx.markdown,
-      ctx.config.models.flashcards,
-      ctx.lang,
-      ctx.ageGroup,
-    );
-    return {
-      id: randomUUID(),
-      title: autoTitle('flashcards', data, ctx.lang),
-      createdAt: new Date().toISOString(),
-      sourceIds: ctx.sourceIds,
-      type: 'flashcards',
-      data,
-    };
-  },
-  quiz: async (ctx) => {
-    const data = await generateQuiz(
-      ctx.client,
-      ctx.markdown,
-      ctx.config.models.quiz,
-      ctx.lang,
-      ctx.ageGroup,
-    );
-    return {
-      id: randomUUID(),
-      title: autoTitle('quiz', data, ctx.lang),
-      createdAt: new Date().toISOString(),
-      sourceIds: ctx.sourceIds,
-      type: 'quiz',
-      data,
-    };
-  },
-  'fill-blank': async (ctx) => {
-    const data = await generateFillBlank(
-      ctx.client,
-      ctx.markdown,
-      ctx.config.models.quiz,
-      ctx.lang,
-      ctx.ageGroup,
-    );
-    return {
-      id: randomUUID(),
-      title: autoTitle('fill-blank', data, ctx.lang),
-      createdAt: new Date().toISOString(),
-      sourceIds: ctx.sourceIds,
-      type: 'fill-blank',
-      data,
-    };
-  },
-};
+type ChatToolExecutor = (ctx: ToolCallCtx) => Promise<Generation>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+const CHAT_TOOL_EXECUTORS = new Map<string, ChatToolExecutor>([
+  [
+    'summary',
+    async (ctx) => {
+      const data = await generateSummary(
+        ctx.client,
+        ctx.markdown,
+        ctx.config.models.summary,
+        ctx.hasConsigne,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle('summary', data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: 'summary',
+        data,
+      };
+    },
+  ],
+  [
+    'flashcards',
+    async (ctx) => {
+      const data = await generateFlashcards(
+        ctx.client,
+        ctx.markdown,
+        ctx.config.models.flashcards,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle('flashcards', data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: 'flashcards',
+        data,
+      };
+    },
+  ],
+  [
+    'quiz',
+    async (ctx) => {
+      const data = await generateQuiz(
+        ctx.client,
+        ctx.markdown,
+        ctx.config.models.quiz,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle('quiz', data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: 'quiz',
+        data,
+      };
+    },
+  ],
+  [
+    FILL_BLANK,
+    async (ctx) => {
+      const data = await generateFillBlank(
+        ctx.client,
+        ctx.markdown,
+        ctx.config.models.quiz,
+        ctx.lang,
+        ctx.ageGroup,
+      );
+      return {
+        id: randomUUID(),
+        title: autoTitle(FILL_BLANK, data, ctx.lang),
+        createdAt: new Date().toISOString(),
+        sourceIds: ctx.sourceIds,
+        type: FILL_BLANK,
+        data,
+      };
+    },
+  ],
+]);
 
 async function processChatToolCalls(
   toolCalls: string[],
@@ -212,7 +237,7 @@ async function processChatToolCalls(
   for (const call of toolCalls) {
     try {
       const type = call.replace('generate_', '');
-      const executor = CHAT_TOOL_EXECUTORS[type];
+      const executor = CHAT_TOOL_EXECUTORS.get(type);
       if (executor) {
         const { result: gen, usage } = await runWithUsageTracking(() => executor(ctx));
         const persisted = persistUsage(
@@ -352,15 +377,21 @@ const handleChatError = (e: unknown, store: ProjectStore, pid: string, res: Resp
   res.status(500).json({ error: extractErrorCode(e, 'chat') });
 };
 
-export function chatRoutes(
-  store: ProjectStore,
-  client: Mistral,
-  profileStore: ProfileStore,
-): Router {
+export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
+
+  // Auth-first : résout le client (header > env) ou répond 4xx stable.
+  const resolveOr4xx = (req: Request, res: Response): Mistral | null => {
+    const r = resolveClient(req);
+    if (r.ok) return r.client;
+    res.status(r.status).json({ error: r.error });
+    return null;
+  };
 
   // Send message
   router.post(CHAT_ROUTE_PATH, async (req, res) => {
+    const client = resolveOr4xx(req, res);
+    if (!client) return;
     const pid = String(req.params.pid);
     try {
       const validated = await validateChatRequest(

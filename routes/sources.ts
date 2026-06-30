@@ -1,7 +1,21 @@
+/* eslint-disable
+   @typescript-eslint/consistent-type-definitions,
+   @typescript-eslint/no-misused-promises,
+   @typescript-eslint/no-unnecessary-condition,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/restrict-template-expressions
+   --
+   Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
+   lint:ci local reste la couverture type-aware. */
 import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID, createHash } from 'node:crypto';
-import { readFileSync, unlinkSync } from 'node:fs';
+import { unlinkSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { Mistral } from '@mistralai/mistralai';
 import type { Source, OcrConfidence, AgeGroup, DuplicateUpload } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -20,6 +34,7 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { getConfig } from '../config.js';
+import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -30,10 +45,19 @@ function pendingModeration(): Source['moderation'] {
 // cf. CLAUDE.md "Pièges Lizard"
 const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
+// Texte vide/non-string (arrow pour éviter l'agglomération Lizard + garder les
+// handlers sous CCN 8 après ajout de la garde auth resolveOr4xx).
+const isBlankString = (v: unknown): boolean => !v || typeof v !== 'string' || v.trim().length === 0;
+
 // Dédup ré-import : sha256 du fichier brut (avant OCR) ; comparé aux contentHash existants.
-const hashFileContent = (path: string): string | undefined => {
+const hashFileContent = async (path: string): Promise<string | undefined> => {
   try {
-    return createHash('sha256').update(readFileSync(path)).digest('hex');
+    return (
+      createHash('sha256')
+        // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is Multer's server-side temp file path.
+        .update(await readFile(path))
+        .digest('hex')
+    );
   } catch {
     return undefined;
   }
@@ -101,14 +125,19 @@ const pendingLang = new Map<string, string>();
 const triggerConsigneDetection = (
   store: ProjectStore,
   client: Mistral,
+  fingerprint: string,
   pid: string,
   lang = 'fr',
 ): void => {
-  if (inFlight.has(pid)) {
-    pendingLang.set(pid, lang);
+  // Coalesce par (pid, clé) : deux profils/clés distinctes sur le même projet ne
+  // partagent PAS le même scan (sinon le replay facturerait la mauvaise clé). Même
+  // clé (même fingerprint) → coalescing normal d'une rafale d'uploads.
+  const ck = `${pid}:${fingerprint}`;
+  if (inFlight.has(ck)) {
+    pendingLang.set(ck, lang);
     return;
   }
-  inFlight.add(pid);
+  inFlight.add(ck);
   void (async () => {
     try {
       await runConsigneDetection(store, client, pid, lang);
@@ -119,11 +148,11 @@ const triggerConsigneDetection = (
       // `inFlight` pour toujours sans déclencher le replay.
       logger.error('consigne', 'IIFE crash', e);
     } finally {
-      inFlight.delete(pid);
-      const nextLang = pendingLang.get(pid);
+      inFlight.delete(ck);
+      const nextLang = pendingLang.get(ck);
       if (nextLang !== undefined) {
-        pendingLang.delete(pid);
-        triggerConsigneDetection(store, client, pid, nextLang);
+        pendingLang.delete(ck);
+        triggerConsigneDetection(store, client, fingerprint, pid, nextLang);
       }
     }
   })();
@@ -141,6 +170,24 @@ const getModerationCategories = (
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return null;
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
+};
+
+// Sous-helper websearch : si modération activée, vérifie que la query passe la modération.
+// Retourne true si OK, false si bloquée (réponse 400 déjà envoyée). Module-scope (n'utilise
+// que des params) — cf. SonarQube S7721 ; arrow pour éviter l'agglomération Lizard.
+const checkWebsearchModeration = async (
+  client: Mistral,
+  res: Response,
+  query: string,
+  modCats: string[] | null,
+): Promise<boolean> => {
+  if (!modCats) return true;
+  const modResult = await moderateContent(client, query.trim(), modCats);
+  if (modResult.status !== 'safe') {
+    res.status(400).json({ error: 'moderation.blocked' });
+    return false;
+  }
+  return true;
 };
 
 const triggerModeration = async (
@@ -161,623 +208,673 @@ const triggerModeration = async (
   }
 };
 
-export function sourceRoutes(
-  store: ProjectStore,
-  client: Mistral,
-  profileStore: ProfileStore,
-): Router {
-  const router = Router();
+type ResolvedClient = { client: Mistral; fingerprint: string };
+type UploadFailure = { filename: string; error: string };
+type UploadOutcome = { source?: Source; failure?: UploadFailure };
+type UploadBatchOutcome = {
+  results: Source[];
+  failures: UploadFailure[];
+  duplicates: DuplicateUpload[];
+};
+type WebSourceFailure = { label: string; code: string };
+type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
+type WebSearchBody = { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string };
+type ProcessedUpload = { markdown: string; elapsed: number; confidence?: OcrConfidence };
+type SttPipelineResult = {
+  text: string;
+  elapsed: number;
+  persisted: ReturnType<typeof persistUsage>;
+};
 
-  const dynamicUpload = multer({
+const TEXT_EXTS = new Set(['.txt', '.md']);
+
+// Discrimine les erreurs SSRF des erreurs reseau/parse pour decider du fallback LLM.
+const SSRF_ERROR_MARKERS = [
+  'URL invalide',
+  'Protocole non autorise',
+  'Hostname interdit',
+  'IP privee interdite',
+  'Resolution DNS impossible',
+  'Hostname resout vers IP privee',
+  'URL sans hostname',
+  'Host format invalide',
+  'Redirect refuse',
+];
+
+// Auth-first : résout le client (header > env) en tête de handler IA, ou répond
+// 4xx stable et retourne null.
+const resolveOr4xx = (req: Request, res: Response): ResolvedClient | null => {
+  const r = resolveClient(req);
+  if (r.ok) return { client: r.client, fingerprint: r.fingerprint };
+  res.status(r.status).json({ error: r.error });
+  return null;
+};
+
+const createDynamicUpload = (store: ProjectStore) =>
+  multer({
     storage: multer.diskStorage({
       destination: (req, _file, cb) => {
         const pid = String(req.params.pid);
         cb(null, store.getUploadDir(pid));
       },
-      filename: (_req, file, cb) => cb(null, `${randomUUID()}-${file.originalname}`),
+      filename: (_req, file, cb) => {
+        cb(null, `${randomUUID()}-${file.originalname}`);
+      },
     }),
     limits: { fileSize: 20 * 1024 * 1024, files: 10 }, // NOSONAR(S5693) — limite bornée volontaire (20 Mo, 10 fichiers) : c'est le garde-fou anti-DoS upload
   });
 
-  const memoryUpload = multer({
+const createMemoryUpload = () =>
+  multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 25 * 1024 * 1024, files: 1 }, // NOSONAR(S5693) — limite bornée volontaire (25 Mo, 1 fichier) : c'est le garde-fou anti-DoS upload
   });
 
-  const TEXT_EXTS = new Set(['.txt', '.md']);
+const uploadedFileExt = (file: Express.Multer.File): string => {
+  const name = file.originalname.toLowerCase();
+  const dotIdx = name.lastIndexOf('.');
+  return dotIdx >= 0 ? name.slice(dotIdx) : '';
+};
 
-  async function processUploadedFile(
-    file: Express.Multer.File,
-    pid: string,
-    modCats: string[] | null,
-    contentHash: string | undefined,
-  ): Promise<Source> {
-    const name = file.originalname.toLowerCase();
-    const dotIdx = name.lastIndexOf('.');
-    const ext = dotIdx >= 0 ? name.slice(dotIdx) : '';
-    const isText = TEXT_EXTS.has(ext);
-    let markdown: string;
-    let elapsed: number;
-    let confidence: OcrConfidence | undefined;
-    if (isText) {
-      const stop = startTimer();
-      markdown = readFileSync(file.path, 'utf-8');
-      elapsed = stop();
-      logger.info(
-        'sources',
-        `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
-      );
-    } else {
-      ({ markdown, elapsed, confidence } = await ocrFile(
-        client,
-        file.path,
-        file.originalname,
-        normalizeOcrModel(getConfig().models.ocr),
-      ));
-      const confStr = confidence ? `, confidence: ${(confidence.average * 100).toFixed(0)}%` : '';
-      logger.info(
-        'sources',
-        `OCR OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars${confStr})`,
-      );
-    }
-    return {
-      id: randomUUID(),
-      filename: file.originalname,
-      markdown,
-      uploadedAt: new Date().toISOString(),
-      sourceType: isText ? 'text' : 'ocr',
-      filePath: `projects/${pid}/uploads/${file.filename}`,
-      moderation: modCats ? pendingModeration() : undefined,
-      ocrConfidence: confidence,
-      contentHash,
-    };
-  }
+const readTextUpload = async (file: Express.Multer.File): Promise<ProcessedUpload> => {
+  const stop = startTimer();
+  // eslint-disable-next-line security/detect-non-literal-fs-filename -- file.path is created by Multer diskStorage, not a client-supplied filename.
+  const markdown = await readFile(file.path, 'utf-8');
+  const elapsed = stop();
+  logger.info(
+    'sources',
+    `TXT OK: ${file.originalname} (${elapsed.toFixed(1)}s, ${markdown.length} chars)`,
+  );
+  return { markdown, elapsed };
+};
 
-  type UploadFailure = { filename: string; error: string };
-  type UploadOutcome = { source?: Source; failure?: UploadFailure };
+const readOcrUpload = async (
+  client: Mistral,
+  file: Express.Multer.File,
+): Promise<ProcessedUpload> => {
+  const result = await ocrFile(
+    client,
+    file.path,
+    file.originalname,
+    normalizeOcrModel(getConfig().models.ocr),
+  );
+  const confStr = result.confidence
+    ? `, confidence: ${(result.confidence.average * 100).toFixed(0)}%`
+    : '';
+  logger.info(
+    'sources',
+    `OCR OK: ${file.originalname} (${result.elapsed.toFixed(1)}s, ${result.markdown.length} chars${confStr})`,
+  );
+  return result;
+};
 
-  async function attemptFileUpload(
-    file: Express.Multer.File,
-    pid: string,
-    modCats: string[] | null,
-    contentHash: string | undefined,
-  ): Promise<UploadOutcome> {
-    try {
-      const { result: source, usage } = await runWithUsageTracking(() =>
-        processUploadedFile(file, pid, modCats, contentHash),
-      );
-      const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
-      if (persisted) {
-        source.estimatedCost = persisted.cost;
-        source.usage = persisted.usage;
-        source.costBreakdown = persisted.costBreakdown;
-      }
-      store.addSource(pid, source);
-      return { source };
-    } catch (e) {
-      const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
-      }
-      logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
-      // Code stable (pas d'err.message brut) : les détails restent dans logger.error ci-dessus.
-      return { failure: { filename: file.originalname, error: extractErrorCode(e) } };
-    }
-  }
-
-  function triggerUploadDownstream(
-    pid: string,
-    lang: string,
-    modCats: string[] | null,
-    results: Source[],
-  ) {
-    triggerConsigneDetection(store, client, pid, lang);
-    if (!modCats) return;
-    for (const src of results) {
-      void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
-    }
-  }
-
-  const sendUploadResponse = (
-    res: Response,
-    results: Source[],
-    failures: UploadFailure[],
-    duplicates: DuplicateUpload[],
-  ): void => {
-    if (results.length === 0 && duplicates.length === 0) {
-      // error = code stable ; failures[] expose par-fichier { filename, error: code }.
-      res.status(500).json({ error: 'upload_failed', failures });
-      return;
-    }
-    // Array nu en full success (contrat historique) ; objet enrichi dès qu'il y a failures/doublons.
-    if (failures.length === 0 && duplicates.length === 0) {
-      res.json(results);
-      return;
-    }
-    res.json({ sources: results, failures, duplicates });
+const processUploadedFile = async (
+  client: Mistral,
+  file: Express.Multer.File,
+  pid: string,
+  modCats: string[] | null,
+  contentHash: string | undefined,
+): Promise<Source> => {
+  const isText = TEXT_EXTS.has(uploadedFileExt(file));
+  const processed = isText ? await readTextUpload(file) : await readOcrUpload(client, file);
+  return {
+    id: randomUUID(),
+    filename: file.originalname,
+    markdown: processed.markdown,
+    uploadedAt: new Date().toISOString(),
+    sourceType: isText ? 'text' : 'ocr',
+    filePath: `projects/${pid}/uploads/${file.filename}`,
+    moderation: modCats ? pendingModeration() : undefined,
+    ocrConfidence: processed.confidence,
+    contentHash,
   };
+};
 
-  // Map contentHash -> id des sources déjà persistées (garde dédup serveur, filet du pré-check client).
-  const buildExistingHashMap = (pid: string): Map<string, string> => {
-    const map = new Map<string, string>();
-    for (const s of store.getProject(pid)?.sources ?? []) {
-      if (s.contentHash && !map.has(s.contentHash)) map.set(s.contentHash, s.id);
-    }
-    return map;
-  };
-
-  const processUploadBatch = async (
-    files: Express.Multer.File[],
-    pid: string,
-    modCats: string[] | null,
-    allowDuplicates: boolean,
-  ): Promise<{ results: Source[]; failures: UploadFailure[]; duplicates: DuplicateUpload[] }> => {
-    const results: Source[] = [];
-    const failures: UploadFailure[] = [];
-    const duplicates: DuplicateUpload[] = [];
-    const existing = buildExistingHashMap(pid);
-    const seen = new Map<string, string>(); // hash -> id créé dans ce lot (intra-batch)
-    for (const file of files) {
-      const hash = hashFileContent(file.path);
-      const dupId = findDuplicateId(hash, existing, seen);
-      // Doublon marqué seulement contre une source PERSISTÉE (existing) ou déjà réussie ce lot (seen) :
-      // un fichier dont l'OCR échoue ne bloque pas un suivant identique.
-      if (!allowDuplicates && dupId && hash) {
-        tryUnlinkOrphan(file.path);
-        duplicates.push({
-          filename: file.originalname,
-          contentHash: hash,
-          existingSourceId: dupId,
-        });
-        continue;
-      }
-      const outcome = await attemptFileUpload(file, pid, modCats, hash);
-      if (outcome.source) {
-        results.push(outcome.source);
-        if (hash) seen.set(hash, outcome.source.id);
-      } else if (outcome.failure) failures.push(outcome.failure);
-    }
-    return { results, failures, duplicates };
-  };
-
-  // Upload files (OCR)
-  router.post('/:pid/sources/upload', dynamicUpload.array('files'), async (req, res) => {
-    const pid = String(req.params.pid);
-    const project = store.getProject(pid);
-    if (!project) {
-      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return;
-    }
-
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) {
-      res.status(400).json({ error: 'Aucun fichier envoye' });
-      return;
-    }
-
-    const modCats = getModerationCategories(store, profileStore, pid);
-    const allowDuplicates =
-      req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
-    const { results, failures, duplicates } = await processUploadBatch(
-      files,
-      pid,
-      modCats,
-      allowDuplicates,
+const attemptFileUpload = async (
+  store: ProjectStore,
+  client: Mistral,
+  file: Express.Multer.File,
+  pid: string,
+  modCats: string[] | null,
+  contentHash: string | undefined,
+): Promise<UploadOutcome> => {
+  try {
+    const { result: source, usage } = await runWithUsageTracking(() =>
+      processUploadedFile(client, file, pid, modCats, contentHash),
     );
-
-    if (results.length > 0) {
-      triggerUploadDownstream(pid, req.body.lang || 'fr', modCats, results);
+    const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload`, usage);
+    if (persisted) {
+      source.estimatedCost = persisted.cost;
+      source.usage = persisted.usage;
+      source.costBreakdown = persisted.costBreakdown;
     }
-    sendUploadResponse(res, results, failures, duplicates);
-  });
+    store.addSource(pid, source);
+    return { source };
+  } catch (e) {
+    const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
+    }
+    logger.error('sources', `Upload FAIL: ${file.originalname}`, e);
+    return { failure: { filename: file.originalname, error: extractErrorCode(e) } };
+  }
+};
 
-  // Add text source
+const triggerUploadDownstream = (
+  store: ProjectStore,
+  client: Mistral,
+  fingerprint: string,
+  pid: string,
+  lang: string,
+  modCats: string[] | null,
+  results: Source[],
+): void => {
+  triggerConsigneDetection(store, client, fingerprint, pid, lang);
+  if (!modCats) return;
+  for (const src of results)
+    void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+};
+
+const sendUploadResponse = (
+  res: Response,
+  results: Source[],
+  failures: UploadFailure[],
+  duplicates: DuplicateUpload[],
+): void => {
+  if (results.length === 0 && duplicates.length === 0) {
+    res.status(500).json({ error: 'upload_failed', failures });
+    return;
+  }
+  if (failures.length === 0 && duplicates.length === 0) {
+    res.json(results);
+    return;
+  }
+  res.json({ sources: results, failures, duplicates });
+};
+
+const buildExistingHashMap = (store: ProjectStore, pid: string): Map<string, string> => {
+  const map = new Map<string, string>();
+  for (const s of store.getProject(pid)?.sources ?? []) {
+    if (s.contentHash && !map.has(s.contentHash)) map.set(s.contentHash, s.id);
+  }
+  return map;
+};
+
+const processUploadBatch = async (
+  store: ProjectStore,
+  client: Mistral,
+  files: Express.Multer.File[],
+  pid: string,
+  modCats: string[] | null,
+  allowDuplicates: boolean,
+): Promise<UploadBatchOutcome> => {
+  const results: Source[] = [];
+  const failures: UploadFailure[] = [];
+  const duplicates: DuplicateUpload[] = [];
+  const existing = buildExistingHashMap(store, pid);
+  const seen = new Map<string, string>();
+  for (const file of files) {
+    const hash = await hashFileContent(file.path);
+    const dupId = findDuplicateId(hash, existing, seen);
+    if (!allowDuplicates && dupId && hash) {
+      tryUnlinkOrphan(file.path);
+      duplicates.push({ filename: file.originalname, contentHash: hash, existingSourceId: dupId });
+      continue;
+    }
+    const outcome = await attemptFileUpload(store, client, file, pid, modCats, hash);
+    if (outcome.source) {
+      results.push(outcome.source);
+      if (hash) seen.set(hash, outcome.source.id);
+    } else if (outcome.failure) failures.push(outcome.failure);
+  }
+  return { results, failures, duplicates };
+};
+
+const buildVoiceSource = (
+  text: string,
+  persisted: ReturnType<typeof persistUsage>,
+  modCats: string[] | null,
+): Source => ({
+  id: randomUUID(),
+  filename: 'Enregistrement vocal',
+  markdown: text.trim(),
+  uploadedAt: new Date().toISOString(),
+  sourceType: 'voice',
+  moderation: modCats ? pendingModeration() : undefined,
+  ...(persisted && {
+    usage: persisted.usage,
+    estimatedCost: persisted.cost,
+    costBreakdown: persisted.costBreakdown,
+  }),
+});
+
+const persistFailedUsage = (store: ProjectStore, pid: string, e: unknown): void => {
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
+  }
+};
+
+const runSttPipeline = async (
+  store: ProjectStore,
+  client: Mistral,
+  pid: string,
+  file: Express.Multer.File,
+  lang: string,
+  res: Response,
+): Promise<SttPipelineResult | null> => {
+  const { result: sttResult, usage } = await runWithUsageTracking(() =>
+    transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
+  );
+  const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
+  const { text, elapsed } = sttResult;
+  if (!text || text.trim().length === 0) {
+    res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
+    return null;
+  }
+  return { text, elapsed, persisted };
+};
+
+const persistAndDispatchVoiceSource = (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+  fingerprint: string,
+  pid: string,
+  stt: SttPipelineResult,
+  lang: string,
+): Source => {
+  const modCats = getModerationCategories(store, profileStore, pid);
+  const source = buildVoiceSource(stt.text, stt.persisted, modCats);
+  store.addSource(pid, source);
+  logger.info('sources', `STT OK: ${stt.text.length} chars (${stt.elapsed.toFixed(1)}s)`);
+  triggerConsigneDetection(store, client, fingerprint, pid, lang);
+  if (modCats) void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+  return source;
+};
+
+const isSsrfError = (err: unknown): boolean => {
+  if (!(err instanceof Error)) return false;
+  return SSRF_ERROR_MARKERS.some((marker) => err.message.includes(marker));
+};
+
+const webSource = (
+  label: string,
+  markdown: string,
+  now: string,
+  modCats: string[] | null,
+  scrapeEngine?: Source['scrapeEngine'],
+): Source => ({
+  id: randomUUID(),
+  filename: label.slice(0, 80),
+  markdown,
+  uploadedAt: now,
+  sourceType: 'websearch',
+  scrapeEngine,
+  moderation: modCats ? pendingModeration() : undefined,
+});
+
+const handleScrapeFailure = (scrapeError: unknown, url: string): void => {
+  if (scrapeError instanceof SyntaxError) {
+    logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
+    throw scrapeError;
+  }
+  if (isSsrfError(scrapeError)) {
+    logger.warn(
+      'sources',
+      `URL rejected (SSRF guard): "${url}" — ${(scrapeError as Error).message}`,
+    );
+    throw scrapeError;
+  }
+  logger.warn(
+    'sources',
+    `URL scrape failed for "${url}", falling back to web search:`,
+    scrapeError,
+  );
+};
+
+const scrapeDirectUrl = async (
+  url: string,
+  scrapeMode: string,
+  modCats: string[] | null,
+  now: string,
+): Promise<Source> => {
+  const stop = startTimer();
+  const result = await fetchPageContent(url, scrapeMode as Parameters<typeof fetchPageContent>[1]);
+  const elapsed = stop();
+  logger.info(
+    'sources',
+    `URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`,
+  );
+  return webSource(url, result.text, now, modCats, result.engine);
+};
+
+const fallbackWebSearchUrl = async (
+  client: Mistral,
+  url: string,
+  lang: string,
+  ageGroup: AgeGroup,
+  modCats: string[] | null,
+  now: string,
+): Promise<Source | null> => {
+  try {
+    const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
+    logger.info(
+      'sources',
+      `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
+    );
+    return webSource(url, text, now, modCats, 'mistral');
+  } catch (e) {
+    logger.error('sources', `URL failed completely: "${url}"`, e);
+    return null;
+  }
+};
+
+const scrapeUrl = async (
+  client: Mistral,
+  url: string,
+  scrapeMode: string,
+  lang: string,
+  ageGroup: AgeGroup,
+  modCats: string[] | null,
+  now: string,
+): Promise<Source | null> => {
+  try {
+    return await scrapeDirectUrl(url, scrapeMode, modCats, now);
+  } catch (scrapeError) {
+    handleScrapeFailure(scrapeError, url);
+  }
+  return fallbackWebSearchUrl(client, url, lang, ageGroup, modCats, now);
+};
+
+const searchByKeywords = async (
+  client: Mistral,
+  searchQuery: string,
+  lang: string,
+  ageGroup: AgeGroup,
+  modCats: string[] | null,
+  now: string,
+): Promise<Source> => {
+  const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
+  const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
+  logger.info(
+    'sources',
+    `Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
+  );
+  return webSource(`${webLabel}: ${searchQuery.slice(0, 50)}`, text, now, modCats);
+};
+
+const trackWebSource = async (
+  store: ProjectStore,
+  pid: string,
+  label: string,
+  fn: () => Promise<Source | null>,
+): Promise<WebSourceOutcome> => {
+  try {
+    const { result: source, usage } = await runWithUsageTracking(fn);
+    const persisted = persistUsage(
+      store,
+      pid,
+      `POST /api/projects/${pid}/sources/websearch`,
+      usage,
+    );
+    if (source && persisted) {
+      source.estimatedCost = persisted.cost;
+      source.usage = persisted.usage;
+      source.costBreakdown = persisted.costBreakdown;
+    }
+    if (!source) return { source: null, failure: { label, code: 'upstream_unavailable' } };
+    return { source, failure: null };
+  } catch (err) {
+    const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
+    }
+    logger.error('sources', `${label} failed`, err);
+    return { source: null, failure: { label, code: extractErrorCode(err) } };
+  }
+};
+
+const pushOutcome = (
+  outcome: WebSourceOutcome,
+  sources: Source[],
+  failures: WebSourceFailure[],
+): void => {
+  if (outcome.source) sources.push(outcome.source);
+  if (outcome.failure) failures.push(outcome.failure);
+};
+
+const normalizeWebSearchBody = (body: WebSearchBody) => ({
+  lang: body.lang ?? 'fr',
+  ageGroup: body.ageGroup ?? 'enfant',
+  scrapeMode: body.scrapeMode ?? 'auto',
+  ...parseWebInput(body.query.trim()),
+});
+
+const collectWebSources = async (
+  store: ProjectStore,
+  client: Mistral,
+  pid: string,
+  body: WebSearchBody,
+  modCats: string[] | null,
+): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> => {
+  const { lang, ageGroup, scrapeMode, urls, searchQuery } = normalizeWebSearchBody(body);
+  const sources: Source[] = [];
+  const failures: WebSourceFailure[] = [];
+  const now = new Date().toISOString();
+  for (const url of urls) {
+    const outcome = await trackWebSource(store, pid, `URL scrape: ${url}`, () =>
+      scrapeUrl(client, url, scrapeMode, lang, ageGroup, modCats, now),
+    );
+    pushOutcome(outcome, sources, failures);
+  }
+  if (searchQuery) {
+    const outcome = await trackWebSource(store, pid, `Keyword search: ${searchQuery}`, () =>
+      searchByKeywords(client, searchQuery, lang, ageGroup, modCats, now),
+    );
+    pushOutcome(outcome, sources, failures);
+  }
+  return { sources, failures };
+};
+
+const respondWebsearchSources = (
+  res: Response,
+  sources: Source[],
+  failures: WebSourceFailure[],
+): void => {
+  if (failures.length > 0) res.json({ sources, failures });
+  else res.json(sources);
+};
+
+const persistWebsearchSources = (
+  store: ProjectStore,
+  client: Mistral,
+  fingerprint: string,
+  pid: string,
+  sources: Source[],
+  modCats: string[] | null,
+  lang: string,
+): void => {
+  for (const s of sources) store.addSource(pid, s);
+  triggerConsigneDetection(store, client, fingerprint, pid, lang);
+  for (const s of sources) {
+    if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
+  }
+};
+
+const registerUploadRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  dynamicUpload: ReturnType<typeof createDynamicUpload>,
+): void => {
+  router.post(
+    '/:pid/sources/upload',
+    requireKeyMiddleware,
+    dynamicUpload.array('files'),
+    async (req, res) => {
+      const resolved = resolveOr4xx(req, res);
+      if (!resolved) return;
+      const { client, fingerprint } = resolved;
+      const pid = String(req.params.pid);
+      if (!store.getProject(pid)) {
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+        return;
+      }
+      const files = req.files as Express.Multer.File[];
+      if (!files || files.length === 0) {
+        res.status(400).json({ error: 'Aucun fichier envoye' });
+        return;
+      }
+      const modCats = getModerationCategories(store, profileStore, pid);
+      const allowDuplicates =
+        req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
+      const { results, failures, duplicates } = await processUploadBatch(
+        store,
+        client,
+        files,
+        pid,
+        modCats,
+        allowDuplicates,
+      );
+      if (results.length > 0) {
+        triggerUploadDownstream(
+          store,
+          client,
+          fingerprint,
+          pid,
+          req.body.lang || 'fr',
+          modCats,
+          results,
+        );
+      }
+      sendUploadResponse(res, results, failures, duplicates);
+    },
+  );
+};
+
+const registerTextRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/sources/text', async (req, res) => {
-    const project = store.getProject(req.params.pid);
-    if (!project) {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client, fingerprint } = resolved;
+    if (!store.getProject(req.params.pid)) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
-
     const { text } = req.body;
-    if (!text || typeof text !== 'string' || text.trim().length === 0) {
+    if (isBlankString(text)) {
       res.status(400).json({ error: 'Texte requis' });
       return;
     }
-
     const modCats = getModerationCategories(store, profileStore, req.params.pid);
-    let sourceModeration: Source['moderation'] = undefined;
-    if (modCats) {
-      const modResult = await moderateContent(client, text.trim(), modCats);
-      if (modResult.status !== 'safe') {
-        res.status(400).json({ error: 'moderation.blocked' });
-        return;
-      }
-      sourceModeration = modResult;
+    const moderation = modCats ? await moderateContent(client, text.trim(), modCats) : undefined;
+    if (moderation?.status && moderation.status !== 'safe') {
+      res.status(400).json({ error: 'moderation.blocked' });
+      return;
     }
-
     const source: Source = {
       id: randomUUID(),
       filename: 'Texte libre',
       markdown: text.trim(),
       uploadedAt: new Date().toISOString(),
       sourceType: 'text',
-      moderation: sourceModeration,
+      moderation,
       estimatedCost: 0,
     };
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
-    const lang = req.body.lang || 'fr';
-    triggerConsigneDetection(store, client, req.params.pid, lang);
+    triggerConsigneDetection(store, client, fingerprint, req.params.pid, req.body.lang || 'fr');
     res.json(source);
   });
+};
 
-  // Sous-helper extrait du handler /sources/voice : construit la Source à partir
-  // du résultat STT + persistance usage. Sépare la logique métier du try/catch
-  // du handler pour rester sous CCN 8.
-  function buildVoiceSource(
-    text: string,
-    persisted: ReturnType<typeof persistUsage>,
-    modCats: string[] | null,
-  ): Source {
-    return {
-      id: randomUUID(),
-      filename: 'Enregistrement vocal',
-      markdown: text.trim(),
-      uploadedAt: new Date().toISOString(),
-      sourceType: 'voice',
-      moderation: modCats ? pendingModeration() : undefined,
-      ...(persisted && {
-        usage: persisted.usage,
-        estimatedCost: persisted.cost,
-        costBreakdown: persisted.costBreakdown,
-      }),
-    };
-  }
-
-  function persistFailedUsage(pid: string, e: unknown): void {
-    const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-    if (failedUsage?.length) {
-      persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice/failed`, failedUsage);
-    }
-  }
-
-  // Voice input (Voxtral STT)
-  // Sous-helper extrait : pipeline STT (transcribe + persist usage + validate
-  // text). Retourne null + envoie déjà la réponse 400 si transcription vide.
-  async function runSttPipeline(
-    pid: string,
-    file: Express.Multer.File,
-    lang: string,
-    res: Response,
-  ): Promise<{ text: string; elapsed: number; persisted: ReturnType<typeof persistUsage> } | null> {
-    const { result: sttResult, usage } = await runWithUsageTracking(() =>
-      transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
-    );
-    // Persist IMMEDIATELY — before business validation (empty transcription still costs)
-    const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
-    const { text, elapsed } = sttResult;
-    if (!text || text.trim().length === 0) {
-      res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
-      return null;
-    }
-    return { text, elapsed, persisted };
-  }
-
-  function persistAndDispatchVoiceSource(
-    pid: string,
-    text: string,
-    elapsed: number,
-    persisted: ReturnType<typeof persistUsage>,
-    lang: string,
-  ): Source {
-    const modCats = getModerationCategories(store, profileStore, pid);
-    const source = buildVoiceSource(text, persisted, modCats);
-    store.addSource(pid, source);
-    logger.info('sources', `STT OK: ${text.length} chars (${elapsed.toFixed(1)}s)`);
-    triggerConsigneDetection(store, client, pid, lang);
-    if (modCats) {
-      void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
-    }
-    return source;
-  }
-
-  router.post('/:pid/sources/voice', memoryUpload.single('audio'), async (req, res) => {
-    const pid = String(req.params.pid);
-    if (!store.getProject(pid)) {
-      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return;
-    }
-    const file = req.file;
-    if (!file) {
-      res.status(400).json({ error: 'Fichier audio requis' });
-      return;
-    }
-
-    try {
-      const lang = req.body.lang || 'fr';
-      const stt = await runSttPipeline(pid, file, lang, res);
-      if (!stt) return;
-      const source = persistAndDispatchVoiceSource(pid, stt.text, stt.elapsed, stt.persisted, lang);
-      res.json(source);
-    } catch (e) {
-      persistFailedUsage(pid, e);
-      logger.error('sources', 'STT error:', e);
-      res.status(500).json({ error: extractErrorCode(e, 'stt') });
-    }
-  });
-
-  // Discrimine les erreurs SSRF des erreurs reseau/parse pour decider du fallback LLM.
-  // Sans ce check, une URL bloquee par assertSafeFetchUrl (IP privee, loopback,
-  // metadata cloud, RFC 2544, IPv4-mapped IPv6 hex) etait fallback sur webSearchEnrich
-  // qui passe l'URL au LLM Mistral -> consommation quota + DoS amplification possible.
-  // Les messages d'erreur viennent de assertSafeFetchUrl dans helpers/index.ts.
-  const SSRF_ERROR_MARKERS = [
-    'URL invalide',
-    'Protocole non autorise',
-    'Hostname interdit',
-    'IP privee interdite',
-    'Resolution DNS impossible',
-    'Hostname resout vers IP privee',
-    'URL sans hostname',
-    'Host format invalide',
-    'Redirect refuse',
-  ];
-  const isSsrfError = (err: unknown): boolean => {
-    if (!(err instanceof Error)) return false;
-    return SSRF_ERROR_MARKERS.some((marker) => err.message.includes(marker));
-  };
-
-  async function scrapeUrl(
-    url: string,
-    scrapeMode: string,
-    lang: string,
-    ageGroup: AgeGroup,
-    modCats: string[] | null,
-    now: string,
-  ): Promise<Source | null> {
-    try {
-      const stop = startTimer();
-      const result = await fetchPageContent(
-        url,
-        scrapeMode as Parameters<typeof fetchPageContent>[1],
-      );
-      const elapsed = stop();
-      logger.info(
-        'sources',
-        `URL scraped [${result.engine}]: "${url}" (${elapsed.toFixed(1)}s, ${result.text.length} chars)`,
-      );
-      return {
-        id: randomUUID(),
-        filename: url.slice(0, 80),
-        markdown: result.text,
-        uploadedAt: now,
-        sourceType: 'websearch',
-        scrapeEngine: result.engine,
-        moderation: modCats ? pendingModeration() : undefined,
-      };
-    } catch (scrapeError) {
-      // Discrimination : SyntaxError signe un bug de parseur (JSON/HTML corrompu côté
-      // notre code), pas une panne réseau — on log en error et rethrow pour surfacer le
-      // bug au lieu de le masquer derrière un fallback web search trompeur.
-      // Note : TypeError n'est PAS rethrow ici car `fetch()` natif de Node lance
-      // `TypeError: fetch failed` sur DNS/TLS/ECONNREFUSED — c'est le cas le plus courant
-      // pour les URLs mortes saisies par un enfant, elles doivent fallback sur la web search.
-      if (scrapeError instanceof SyntaxError) {
-        logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
-        throw scrapeError;
+const registerVoiceRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  memoryUpload: ReturnType<typeof createMemoryUpload>,
+): void => {
+  router.post(
+    '/:pid/sources/voice',
+    requireKeyMiddleware,
+    memoryUpload.single('audio'),
+    async (req, res) => {
+      const resolved = resolveOr4xx(req, res);
+      if (!resolved) return;
+      const { client, fingerprint } = resolved;
+      const pid = String(req.params.pid);
+      if (!store.getProject(pid)) {
+        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+        return;
       }
-      // SSRF guard : pas de fallback LLM sur URL bloquee (cf. isSsrfError ci-dessus).
-      if (isSsrfError(scrapeError)) {
-        logger.warn(
-          'sources',
-          `URL rejected (SSRF guard): "${url}" — ${(scrapeError as Error).message}`,
+      const file = req.file;
+      if (!file) {
+        res.status(400).json({ error: 'Fichier audio requis' });
+        return;
+      }
+      try {
+        const lang = req.body.lang || 'fr';
+        const stt = await runSttPipeline(store, client, pid, file, lang, res);
+        if (!stt) return;
+        res.json(
+          persistAndDispatchVoiceSource(store, profileStore, client, fingerprint, pid, stt, lang),
         );
-        throw scrapeError;
+      } catch (e) {
+        persistFailedUsage(store, pid, e);
+        logger.error('sources', 'STT error:', e);
+        res.status(500).json({ error: extractErrorCode(e, 'stt') });
       }
-      logger.warn(
-        'sources',
-        `URL scrape failed for "${url}", falling back to web search:`,
-        scrapeError,
-      );
-    }
-    try {
-      const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
-      logger.info(
-        'sources',
-        `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
-      );
-      return {
-        id: randomUUID(),
-        filename: url.slice(0, 80),
-        markdown: text,
-        uploadedAt: now,
-        sourceType: 'websearch',
-        scrapeEngine: 'mistral',
-        moderation: modCats ? pendingModeration() : undefined,
-      };
-    } catch (e) {
-      logger.error('sources', `URL failed completely: "${url}"`, e);
-      return null;
-    }
-  }
+    },
+  );
+};
 
-  async function searchByKeywords(
-    searchQuery: string,
-    lang: string,
-    ageGroup: AgeGroup,
-    modCats: string[] | null,
-    now: string,
-  ): Promise<Source> {
-    const { text, elapsed } = await webSearchEnrich(client, searchQuery, lang, ageGroup);
-    const webLabel = lang === 'en' ? 'Web search' : 'Recherche web';
-    logger.info(
-      'sources',
-      `Web search OK: "${searchQuery}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
-    );
-    return {
-      id: randomUUID(),
-      filename: `${webLabel}: ${searchQuery.slice(0, 50)}`,
-      markdown: text,
-      uploadedAt: now,
-      sourceType: 'websearch',
-      moderation: modCats ? pendingModeration() : undefined,
-    };
-  }
-
-  type WebSourceFailure = { label: string; code: string };
-  type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
-
-  async function trackWebSource(
-    pid: string,
-    label: string,
-    fn: () => Promise<Source | null>,
-  ): Promise<WebSourceOutcome> {
-    try {
-      const { result: source, usage } = await runWithUsageTracking(fn);
-      const persisted = persistUsage(
-        store,
-        pid,
-        `POST /api/projects/${pid}/sources/websearch`,
-        usage,
-      );
-      if (source && persisted) {
-        source.estimatedCost = persisted.cost;
-        source.usage = persisted.usage;
-        source.costBreakdown = persisted.costBreakdown;
-      }
-      // scrapeUrl peut renvoyer null quand scrape + fallback échouent tous les
-      // deux (cf. `logger.error('URL failed completely')`). C'est un échec
-      // silencieux du point de vue de l'endpoint, on le surface en failure.
-      if (!source) {
-        return { source: null, failure: { label, code: 'upstream_unavailable' } };
-      }
-      return { source, failure: null };
-    } catch (err) {
-      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
-      }
-      logger.error('sources', `${label} failed`, err);
-      return { source: null, failure: { label, code: extractErrorCode(err) } };
-    }
-  }
-
-  const pushOutcome = (
-    outcome: WebSourceOutcome,
-    sources: Source[],
-    failures: WebSourceFailure[],
-  ): void => {
-    if (outcome.source) sources.push(outcome.source);
-    if (outcome.failure) failures.push(outcome.failure);
-  };
-
-  async function collectWebSources(
-    pid: string,
-    req: { body: { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string } },
-    modCats: string[] | null,
-  ): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> {
-    const lang = req.body.lang || 'fr';
-    const ageGroup: AgeGroup = req.body.ageGroup || 'enfant';
-    const { urls, searchQuery } = parseWebInput(req.body.query.trim());
-    const scrapeMode = req.body.scrapeMode || 'auto';
-    const sources: Source[] = [];
-    const failures: WebSourceFailure[] = [];
-    const now = new Date().toISOString();
-
-    for (const url of urls) {
-      const outcome = await trackWebSource(pid, `URL scrape: ${url}`, () =>
-        scrapeUrl(url, scrapeMode, lang, ageGroup, modCats, now),
-      );
-      pushOutcome(outcome, sources, failures);
-    }
-
-    if (searchQuery) {
-      const outcome = await trackWebSource(pid, `Keyword search: ${searchQuery}`, () =>
-        searchByKeywords(searchQuery, lang, ageGroup, modCats, now),
-      );
-      pushOutcome(outcome, sources, failures);
-    }
-
-    return { sources, failures };
-  }
-
-  // Web search / URL scrape source
-  // Sous-helper : si modération activée, vérifie que la query passe la
-  // modération. Retourne true si OK pour continuer, false si bloquée (réponse
-  // déjà envoyée).
-  async function checkWebsearchModeration(
-    res: Response,
-    query: string,
-    modCats: string[] | null,
-  ): Promise<boolean> {
-    if (!modCats) return true;
-    const modResult = await moderateContent(client, query.trim(), modCats);
-    if (modResult.status !== 'safe') {
-      res.status(400).json({ error: 'moderation.blocked' });
-      return false;
-    }
-    return true;
-  }
-
-  // Sous-helper : envoie la réponse partial vs full success.
-  function respondWebsearchSources(res: Response, sources: Source[], failures: unknown[]): void {
-    // Partial success : wrapper {sources, failures} (miroir du contrat
-    // UploadFailure de /sources/upload). Full success : array nu pour
-    // backwards compat.
-    if (failures.length > 0) {
-      res.json({ sources, failures });
-    } else {
-      res.json(sources);
-    }
-  }
-
-  // Sous-helper extrait : persiste les sources scrapées dans le store + trigger
-  // consigne detection + moderation async par source. Sépare la logique métier
-  // du try/catch du handler /sources/websearch pour rester sous CCN 8.
-  function persistWebsearchSources(
-    pid: string,
-    sources: Source[],
-    modCats: string[] | null,
-    lang: string,
-  ): void {
-    for (const s of sources) store.addSource(pid, s);
-    triggerConsigneDetection(store, client, pid, lang);
-    for (const s of sources) {
-      if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
-    }
-  }
-
+const registerWebsearchRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/sources/websearch', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client, fingerprint } = resolved;
     const pid = String(req.params.pid);
     if (!store.getProject(pid)) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
-
     const query = validateWebsearchQuery(req, res);
     if (query === null) return;
-
     const modCats = getModerationCategories(store, profileStore, pid);
-    if (!(await checkWebsearchModeration(res, query, modCats))) return;
-
+    if (!(await checkWebsearchModeration(client, res, query, modCats))) return;
     try {
-      const { sources, failures } = await collectWebSources(pid, req, modCats);
+      const { sources, failures } = await collectWebSources(store, client, pid, req.body, modCats);
       if (sources.length === 0) {
-        // Tous les inputs ont échoué : on surface les failures pour que l'UI
-        // puisse afficher un toast au lieu d'un échec silencieux.
         res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
-      persistWebsearchSources(pid, sources, modCats, req.body.lang || 'fr');
+      persistWebsearchSources(
+        store,
+        client,
+        fingerprint,
+        pid,
+        sources,
+        modCats,
+        req.body.lang || 'fr',
+      );
       respondWebsearchSources(res, sources, failures);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
       res.status(500).json({ error: extractErrorCode(e) });
     }
   });
+};
 
-  // Delete source
+const registerDeleteRoute = (router: Router, store: ProjectStore): void => {
   router.delete('/:pid/sources/:sid', (req, res) => {
     const result = store.deleteSource(req.params.pid, req.params.sid);
     if (!result) {
@@ -786,9 +883,13 @@ export function sourceRoutes(
     }
     res.json({ ok: true });
   });
+};
 
-  // Consigne detection (manual trigger)
+const registerConsigneRoute = (router: Router, store: ProjectStore): void => {
   router.post('/:pid/detect-consigne', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const { client } = resolved;
     const pid = String(req.params.pid);
     const project = store.getProject(pid);
     if (!project) {
@@ -800,9 +901,12 @@ export function sourceRoutes(
       return;
     }
     try {
-      const lang = req.body.lang || 'fr';
-      const markdown = getMarkdown(project.sources);
-      const result = await detectConsigne(client, markdown, undefined, lang);
+      const result = await detectConsigne(
+        client,
+        getMarkdown(project.sources),
+        undefined,
+        req.body.lang || 'fr',
+      );
       if (!store.setConsigne(pid, result)) {
         res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
@@ -813,22 +917,34 @@ export function sourceRoutes(
       res.status(500).json({ error: extractErrorCode(e) });
     }
   });
+};
 
-  // Moderation
+const registerModerateRoute = (router: Router): void => {
   router.post('/:pid/moderate', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
     const { text } = req.body;
     if (!text) {
       res.status(400).json({ error: 'text requis' });
       return;
     }
     try {
-      const result = await moderateContent(client, text);
-      res.json(result);
+      res.json(await moderateContent(resolved.client, text));
     } catch (e) {
       logger.error('moderation', 'error:', e);
       res.status(500).json({ error: extractErrorCode(e) });
     }
   });
+};
 
+export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
+  const router = Router();
+  registerUploadRoute(router, store, profileStore, createDynamicUpload(store));
+  registerTextRoute(router, store, profileStore);
+  registerVoiceRoute(router, store, profileStore, createMemoryUpload());
+  registerWebsearchRoute(router, store, profileStore);
+  registerDeleteRoute(router, store);
+  registerConsigneRoute(router, store);
+  registerModerateRoute(router);
   return router;
 }

@@ -1,3 +1,15 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/unbound-method
+   --
+   Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -8,6 +20,18 @@ import { getMarkdown, generateRoutes } from './generate.js';
 import type { Source } from '../types.js';
 
 // --- Mock generators ---
+
+// Clé résolue par requête : factory mockée → client stub (generators eux-mêmes mockés).
+// `authOverride` permet de simuler un échec de résolution (401/400) pour tester les
+// gardes auth-first sans toucher au reste de la suite (réinitialisé en afterEach).
+const { mockClient, authState } = vi.hoisted(() => ({
+  mockClient: {} as unknown,
+  authState: { override: null as { ok: false; status: number; error: string } | null },
+}));
+vi.mock('../helpers/mistral-client-factory.js', () => ({
+  resolveClient: () => authState.override ?? { ok: true, client: mockClient, fingerprint: 'test' },
+  requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
+}));
 
 vi.mock('../generators/summary.js', () => ({
   generateSummary: vi.fn().mockResolvedValue({
@@ -205,18 +229,68 @@ describe('generateRoutes', () => {
   let store: ProjectStore;
   let profileStore: ProfileStore;
   let router: any;
-  const mockClient = {} as any;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'gen-test-'));
     store = new ProjectStore(tmpDir);
     profileStore = new ProfileStore(tmpDir);
-    router = generateRoutes(store, mockClient, profileStore);
+    router = generateRoutes(store, profileStore);
     vi.clearAllMocks();
   });
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    authState.override = null;
+  });
+
+  // --- Auth-first : resolveClient échoue → 4xx AVANT toute IO/addPendingEntry ---
+  describe('auth-first (résolution clé échoue)', () => {
+    const forceAuthFail = () => {
+      authState.override = { ok: false, status: 401, error: 'auth_required' };
+    };
+
+    it('summary (handleGeneration) → 401 sans persister de génération', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: { lang: 'fr' } }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+      expect(store.getProject(pid)!.results.generations).toHaveLength(0);
+    });
+
+    it('quiz-review → 401 AVANT validateQuizReviewInputs', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const res = mockRes();
+      // body volontairement invalide : le 401 doit primer sur le 400 de validation.
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+    });
+
+    it('route → 401 avant prepareRouteRequest', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+    });
+
+    it('auto → 401 avant tout step/addPendingEntry', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+      expect(store.getProject(pid)!.results.generations).toHaveLength(0);
+    });
   });
 
   // --- handleGeneration wrapper tests ---
@@ -1857,18 +1931,13 @@ describe('generateRoutes', () => {
       ]);
     });
 
-    it('skippe podcast/quiz-vocal quand TTS indisponible (parité UI/serveur)', async () => {
-      // Régression à prévenir : src/app/generate.ts:247-255 filtre déjà côté UI, mais les
-      // consommateurs API directs sur une instance sans MISTRAL_API_KEY obtenaient
-      // auth_required/tts_upstream_error systématiques sur des steps audio INJECTÉS par
-      // enrichPlanForLearning (pas choisis par le LLM).
+    it('exécute les steps audio quand un client est résolu (split sur client effectif, pas getApiStatus env-only)', async () => {
+      // Correction clé-navigateur : le split audio se base sur le CLIENT EFFECTIF
+      // résolu (header > env), pas sur getApiStatus().ttsAvailable (env-only, faux avec
+      // une clé navigateur + .env vide). Une clé valide fait chat ET TTS Voxtral →
+      // podcast/quiz-vocal ne sont plus skippés à tort. Sans clé du tout, /generate/auto
+      // renvoie 401 en amont (resolveClient), aucun step ne tourne.
       const { routeRequest } = await import('../generators/router.js');
-      const { getApiStatus } = await import('../config.js');
-      (getApiStatus as any).mockReturnValueOnce({
-        mistral: false,
-        ttsAvailable: false,
-        voiceCacheReady: false,
-      });
       (routeRequest as any).mockResolvedValueOnce({
         plan: [
           { agent: 'summary', reason: 'r' },
@@ -1894,15 +1963,14 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       const body = res.json.mock.calls[0][0];
-      // summary + quiz exécutés, podcast + quiz-vocal skippés (pas failed).
-      expect(body.generations.map((g: any) => g.type)).toEqual(['summary', 'quiz']);
-      expect(body.skippedSteps).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ agent: 'podcast' }),
-          expect.objectContaining({ agent: 'quiz-vocal' }),
-        ]),
-      );
-      // Aucun failedStep audio ne doit apparaître — on a évité de tenter.
+      // Les 4 steps s'exécutent (client résolu → TTS dispo) ; aucun skip TTS.
+      expect(body.generations.map((g: any) => g.type)).toEqual([
+        'summary',
+        'podcast',
+        'quiz-vocal',
+        'quiz',
+      ]);
+      expect(body.skippedSteps).toBeUndefined();
       expect(body.failedSteps).toBeUndefined();
     });
 

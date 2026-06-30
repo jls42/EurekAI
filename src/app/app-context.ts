@@ -67,9 +67,11 @@ export interface AppContext extends AppState {
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
 
-  selectProfile(id: string): void;
+  selectProfile(id: string): Promise<void>;
   loadMistralVoices?(): Promise<void>;
   requirePin(callback: (pin: string) => void): void;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- noms de params documentaires (Codacy n'honore pas argsIgnorePattern)
+  requireProfilePin(profileId: string, callback: () => void): void;
   confirmDelete(message: string, callback: () => void | Promise<void>): void;
   setLocale(lang: string, skipProfileSync?: boolean): void;
   resetState(): void;
@@ -140,6 +142,15 @@ export interface AppContext extends AppState {
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;
+  // Clé Mistral navigateur (cf. src/app/api-key.ts + config.ts)
+  mistralReady(): boolean;
+  ttsReady(): boolean;
+  refreshKeyState(profileId?: string): Promise<void>;
+  openApiKeyDialog(scope?: 'global' | 'profile'): void;
+  closeApiKeyDialog(): void;
+  saveApiKey(): Promise<void>;
+  clearApiKey(scope: 'global' | 'profile'): Promise<void>;
+  testApiKey(): Promise<void>;
 
   blockedModerationSource(): Source | null;
   blockedModerationStatus(): string | null;

@@ -1,3 +1,15 @@
+/* eslint-disable
+   @typescript-eslint/no-confusing-void-expression,
+   @typescript-eslint/no-explicit-any,
+   @typescript-eslint/no-non-null-assertion,
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-assignment,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-member-access,
+   @typescript-eslint/no-unsafe-return,
+   @typescript-eslint/unbound-method
+   --
+   Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -376,6 +388,20 @@ describe('getApiStatus', () => {
     vi.stubEnv('MISTRAL_API_KEY', '');
     const s2 = getApiStatus();
     expect(s2.ttsAvailable).toBe(s2.mistral);
+  });
+
+  it('requireUserKey false par défaut', () => {
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    expect(getApiStatus().requireUserKey).toBe(false);
+  });
+
+  it('EUREKAI_REQUIRE_USER_KEY=true → mistral/ttsAvailable false malgré env (gate forcé), requireUserKey true', () => {
+    vi.stubEnv('MISTRAL_API_KEY', 'test-key');
+    vi.stubEnv('EUREKAI_REQUIRE_USER_KEY', 'true');
+    const status = getApiStatus();
+    expect(status.requireUserKey).toBe(true);
+    expect(status.mistral).toBe(false);
+    expect(status.ttsAvailable).toBe(false);
   });
 
   it('voiceCacheReady reflète le succès du warmup listVoices', () => {

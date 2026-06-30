@@ -229,8 +229,8 @@ npm install
 
 # Configurer les clés API
 cp .env.example .env
-# Éditez .env avec vos clés :
-#   MISTRAL_API_KEY=<your_api_key>           (requis)
+# Éditez .env (toutes optionnelles) :
+#   MISTRAL_API_KEY=<your_api_key>           (optionnel — sinon chaque utilisateur saisit sa clé dans l'app)
 #   SONAR_TOKEN=...                          (optionnel, CI SonarCloud uniquement)
 
 # Lancer le développement
@@ -241,11 +241,22 @@ npm run dev
 
 > **Note** : Mistral Voxtral TTS est le seul provider TTS — aucune clé supplémentaire nécessaire au-delà de `MISTRAL_API_KEY`.
 
+> **Clé API saisie par l'utilisateur** : `MISTRAL_API_KEY` est désormais **optionnelle**. Si elle est absente, l'app démarre quand même et invite chaque utilisateur à saisir **sa propre clé Mistral** dans l'interface. La clé est **stockée dans le navigateur** (chiffrée via Web Crypto + IndexedDB en contexte sécurisé) et envoyée par requête — **jamais persistée sur le serveur**. Précédence : clé du profil > clé globale navigateur > `MISTRAL_API_KEY` (env). Définir `EUREKAI_REQUIRE_USER_KEY=true` force chaque utilisateur à fournir sa clé (la clé d'env ne sert plus qu'aux préchargements).
+
+> **HTTPS local (tablette/LAN)** : `localhost` est déjà un contexte sécurisé. Pour un accès LAN (tablette), génère un certificat local et active HTTPS pour débloquer le chiffrement navigateur + chiffrer la clé en transit :
+> ```bash
+> ./scripts/gen-cert.sh 192.168.1.42   # mkcert si dispo, sinon openssl self-signed
+> export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
+> npm run dev                          # Express + Vite en HTTPS
+> ```
+
 ### Variables d'environnement
 
 | Variable | Requis | Défaut | Rôle |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | ✅ | — | Clé API Mistral (chat, OCR, STT, TTS Voxtral, agents, modération) |
+| `MISTRAL_API_KEY` | optionnel | — | Clé API Mistral (chat, OCR, STT, TTS Voxtral, agents, modération). Si absente, l'utilisateur saisit sa clé dans l'app (stockée navigateur, jamais serveur) |
+| `EUREKAI_REQUIRE_USER_KEY` | optionnel | `false` | `true` → désactive le fallback sur `MISTRAL_API_KEY` pour les requêtes IA (chaque utilisateur DOIT fournir sa clé). Utile sur une instance exposée |
+| `HTTPS_KEY` / `HTTPS_CERT` | optionnel | — | Chemins clé/cert TLS (cf. `scripts/gen-cert.sh`) → Express et Vite servent en HTTPS (secure context LAN/tablette) |
 | `PORT` | optionnel | `3000` | Port HTTP du backend Express |
 | `NODE_ENV` | optionnel | `development` | Si `production` → Express sert le frontend depuis `dist/` (sinon `public/`) |
 | `SONAR_TOKEN` | optionnel CI | — | Utilisé uniquement par le workflow GitHub Actions SonarCloud |
