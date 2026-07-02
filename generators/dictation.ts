@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy lance ESLint sans résoudre les types du SDK Mistral ni des helpers cross-module ; lint:ci local reste type-aware. */
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
@@ -28,7 +29,7 @@ export async function generateDictation(
   count = DICTATION_DEFAULT_WORDS,
 ): Promise<DictationItem[]> {
   const capped = Math.min(count, DICTATION_MAX_WORDS);
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     { role: 'system', content: dictationSystem(ageGroup) },
     { role: 'user', content: dictationUser(markdown, lang, capped) },
   ];
