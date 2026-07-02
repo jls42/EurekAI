@@ -41,6 +41,13 @@ vi.mock('../generators/summary.js', () => ({
     vocabulary: [],
     fun_fact: 'Fun fact',
   }),
+  generateRemediationSummary: vi.fn().mockResolvedValue({
+    title: 'Notions a revoir',
+    summary: 'Re-explication ciblee',
+    key_points: ['point faible 1'],
+    vocabulary: [],
+    fun_fact: '',
+  }),
 }));
 
 vi.mock('../generators/flashcards.js', () => ({
@@ -264,6 +271,17 @@ describe('generateRoutes', () => {
       forceAuthFail();
       const pid = store.createProject('Test').meta.id;
       const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
+      const res = mockRes();
+      // body volontairement invalide : le 401 doit primer sur le 400 de validation.
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(401);
+      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+    });
+
+    it('remediation-summary → 401 AVANT validateQuizReviewInputs', async () => {
+      forceAuthFail();
+      const pid = store.createProject('Test').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
       const res = mockRes();
       // body volontairement invalide : le 401 doit primer sur le 400 de validation.
       await handler(mockReq({ params: { pid }, body: {} }), res);
@@ -1608,6 +1626,154 @@ describe('generateRoutes', () => {
         await handler(req, res);
         const tracker = store.getProject(pid)!.results.pendingTracker ?? [];
         expect(tracker, `cas "${c.name}" laisse un pending orphelin`).toHaveLength(0);
+      }
+    });
+  });
+
+  describe('POST /:pid/generate/remediation-summary', () => {
+    function setupQuizProject() {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.addGeneration(pid, {
+        id: 'gen-quiz',
+        title: 'Quiz (5 questions)',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
+      });
+      return pid;
+    }
+
+    const weakQuestions = [
+      { question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' },
+    ];
+
+    it('validates generationId and weakQuestions (400)', async () => {
+      const pid = setupQuizProject();
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const req = mockReq({ params: { pid }, body: { weakQuestions } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'generationId et weakQuestions requis' });
+    });
+
+    it('returns 404 when original generation is not a quiz', async () => {
+      const pid = setupQuizProject();
+      store.addGeneration(pid, {
+        id: 'gen-summary',
+        title: 'Summary',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'summary',
+        data: { title: 'T', summary: 'S', key_points: [], vocabulary: [] },
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const req = mockReq({
+        params: { pid },
+        body: { generationId: 'gen-summary', weakQuestions },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Quiz original introuvable' });
+    });
+
+    it('generates a summary generation titled "Rappel — {titre original}"', async () => {
+      const pid = setupQuizProject();
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const req = mockReq({
+        params: { pid },
+        body: { generationId: 'gen-quiz', weakQuestions, lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const gen = res.json.mock.calls[0][0];
+      expect(gen.type).toBe('summary');
+      expect(gen.title).toBe('Rappel — Quiz (5 questions)');
+      expect(gen.sourceIds).toEqual(['src-1']);
+      expect(gen.data.title).toBe('Notions a revoir');
+
+      const { generateRemediationSummary } = await import('../generators/summary.js');
+      expect(generateRemediationSummary).toHaveBeenCalledWith(
+        mockClient,
+        expect.stringContaining('Content'), // markdown avec en-tête "# Source 1 — …"
+        weakQuestions,
+        'm', // model summary de la config de test
+        'fr',
+        'enfant',
+      );
+    });
+
+    it('uses English label "Recap" when lang=en', async () => {
+      const pid = setupQuizProject();
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const req = mockReq({
+        params: { pid },
+        body: { generationId: 'gen-quiz', weakQuestions, lang: 'en' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const gen = res.json.mock.calls[0][0];
+      expect(gen.title).toBe('Recap — Quiz (5 questions)');
+    });
+
+    it('returns 400 no_sources when original quiz references missing sources', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addGeneration(pid, {
+        id: 'gen-quiz',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['ghost-src'],
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E1' }],
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const req = mockReq({
+        params: { pid },
+        body: { generationId: 'gen-quiz', weakQuestions, lang: 'fr' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+    });
+
+    it('early 4xx ne laisse jamais de pending tracker orphelin', async () => {
+      const pid = setupQuizProject();
+      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
+      const cases: Array<Record<string, unknown>> = [
+        { weakQuestions },
+        { generationId: 'gen-quiz' },
+        { generationId: 'unknown-id', weakQuestions },
+      ];
+
+      for (const body of cases) {
+        const req = mockReq({ params: { pid }, body });
+        const res = mockRes();
+        await handler(req, res);
+        const tracker = store.getProject(pid)!.results.pendingTracker ?? [];
+        expect(tracker).toHaveLength(0);
       }
     });
   });
