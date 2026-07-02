@@ -45,6 +45,7 @@ Alpine.data('app', app);
 Alpine.data('quizComponent', quizComponent);
 Alpine.data('quizVocalComponent', quizVocalComponent);
 Alpine.data('fillBlankComponent', fillBlankComponent);
+// eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- Codacy ne résout pas les types Alpine.
 Alpine.data('dictationComponent', dictationComponent);
 Alpine.data('flashcardsComponent', flashcardsComponent);
 

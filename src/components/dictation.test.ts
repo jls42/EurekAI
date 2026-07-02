@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any -- Codacy lance ESLint sans resolution des types vitest : faux positifs ; couvert par lint:ci local type-aware */
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Codacy lance ESLint sans resolution des types vitest : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { dictationComponent } from './dictation';
 
@@ -28,7 +28,9 @@ function createDictation(items = sampleItems) {
   comp.showToast = vi.fn();
   comp.t = vi.fn((key: string) => key);
   comp.$refs = { wordAudio: makeAudio(), dictationInput: { focus: vi.fn() } };
-  comp.$nextTick = (cb: () => void) => cb();
+  comp.$nextTick = (cb: () => void) => {
+    cb();
+  };
   return comp;
 }
 
