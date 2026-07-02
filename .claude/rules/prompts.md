@@ -26,12 +26,12 @@ Toutes les fonctions de prompt vivent dans `prompts.ts`. Les generators (`genera
 - **Vue détail fiche** (`src/partials/view-summary.html`, bloc `x-text="summaryData(gen).title"`) affiche `data.title` **brut sans préfixe** → le title LLM doit être auto-suffisant et lisible seul.
 - Ne JAMAIS mentionner `"Fiche —"` dans le prompt : ça réinjecte le token "Fiche" à côté du champ title (anti-pattern).
 
-## Retry prompt
+## Retry prompts
 
-Le retry dans `generators/summary.ts` (quand le premier JSON est invalide) doit respecter **la même discipline** que le prompt initial :
-- Pas d'écho des formulations problématiques de l'ancienne version.
-- Si le prompt initial dit "objet JSON unique", le retry le dit aussi — pas "UNE SEULE fiche COMPLETE".
-- Un test dédié dans `generators/summary.test.ts` asserte le contenu du 2e mock call.
+Tous les messages de retry (2e appel après réponse invalide) sont **factorisés dans `prompts.ts`** — `summaryRetryUser()`, `quizRetryUser(kind)`, `flashcardsRetryUser(count)`, `fillBlankRetryUser()`, `dictationRetryUser()`, `podcastRetryUser()`. Jamais de string inline dans un generator. Même discipline que le prompt initial :
+- Pas d'écho des formulations problématiques (pas de « UNE SEULE fiche COMPLETE »).
+- **Contrat aligné sur le system prompt** : le retry summary demande « autant que necessaire pour tout couvrir » + le champ `citations` — jamais un rabot de couverture type « 5-7 » quand le system dit « 10-25 typiquement » (bug historique corrigé).
+- Chaque generator asserte le contenu de son 2e mock call contre la fonction factorisée (`generators/*.test.ts`), + verrous de contenu dans `prompts.test.ts` (describe `RETRY PROMPTS`).
 
 ## Emphases MAJUSCULES
 
