@@ -2,9 +2,11 @@
    @typescript-eslint/no-misused-promises,
    @typescript-eslint/no-unsafe-assignment,
    @typescript-eslint/no-unsafe-member-access,
-   @typescript-eslint/no-unsafe-argument
+   @typescript-eslint/no-unsafe-argument,
+   @typescript-eslint/no-unsafe-call,
+   @typescript-eslint/no-unsafe-return
    --
-   Codacy lance ESLint avec un typage Alpine/fetch incomplet; lint:ci local reste type-aware. */
+   Codacy lance ESLint avec un typage Alpine/fetch/imports incomplet; lint:ci local reste type-aware. */
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import { clearProfileApiKey } from './api-key';
 import { normalizeReadingComfort, READING_COMFORT_LIMITS } from '@helpers/reading-comfort';
@@ -14,21 +16,21 @@ import type { CreateProfileBody } from '../../routes/profiles';
 
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
 
-// `??` pèse 2 en CCN Lizard (cf. CLAUDE.md) → fallback via helper ternaire.
-const editingComfortField = (
-  value: number | undefined,
-  field: 'letterSpacing' | 'wordSpacing' | 'lineHeight',
-): number => (value === undefined ? READING_COMFORT_LIMITS[field].default : value);
+// Helper de fallback : `??` pèse 2 en CCN Lizard (cf. CLAUDE.md) → un seul `??`
+// par helper, accès aux limites par objet littéral (pas d'indexation dynamique,
+// faux positif « Object Injection Sink » côté Codacy sinon).
+const comfortValue = (value: number | undefined, limit: { default: number }): number =>
+  value ?? limit.default;
 
 // Shape complet pour les x-model du panneau confort (sliders + select police) :
 // chaque champ reçoit sa valeur effective ou le défaut des limites partagées.
 const toEditingReadingComfort = (comfort: Profile['readingComfort']) => {
-  const c = comfort || {};
+  const c = comfort ?? {};
   return {
-    font: c.font || 'default',
-    letterSpacing: editingComfortField(c.letterSpacing, 'letterSpacing'),
-    wordSpacing: editingComfortField(c.wordSpacing, 'wordSpacing'),
-    lineHeight: editingComfortField(c.lineHeight, 'lineHeight'),
+    font: c.font ?? 'default',
+    letterSpacing: comfortValue(c.letterSpacing, READING_COMFORT_LIMITS.letterSpacing),
+    wordSpacing: comfortValue(c.wordSpacing, READING_COMFORT_LIMITS.wordSpacing),
+    lineHeight: comfortValue(c.lineHeight, READING_COMFORT_LIMITS.lineHeight),
   };
 };
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
@@ -578,6 +580,7 @@ const applyThemeLive = function (this: AppContext) {
 
 // Aperçu live du confort de lecture pendant l'édition (même comportement que
 // applyThemeLive : s'applique globalement, re-synchronisé au selectProfile).
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy (ESLint sans types) compte le param `this` typé comme unused.
 const applyReadingComfortLive = function (this: AppContext) {
   applyReadingComfortVars(this.editingProfile?.readingComfort);
   this.autoSaveProfile(true);

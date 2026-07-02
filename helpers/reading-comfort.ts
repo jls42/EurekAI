@@ -24,13 +24,14 @@ export const READING_COMFORT_LIMITS = {
   lineHeight: { min: 1.2, max: 2.5, default: 1.7 },
 } as const;
 
-type NumericField = keyof typeof READING_COMFORT_LIMITS;
+type ComfortLimit = { readonly min: number; readonly max: number; readonly default: number };
 
-const clampField = (raw: unknown, field: NumericField): number | undefined => {
+// Accès aux limites par objet littéral (jamais `LIMITS[field]` dynamique) : évite
+// le faux positif « Object Injection Sink » du plugin security côté Codacy.
+const clampField = (raw: unknown, limit: ComfortLimit): number | undefined => {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return undefined;
-  const { min, max, default: def } = READING_COMFORT_LIMITS[field];
-  const clamped = Math.min(max, Math.max(min, raw));
-  return clamped === def ? undefined : clamped;
+  const clamped = Math.min(limit.max, Math.max(limit.min, raw));
+  return clamped === limit.default ? undefined : clamped;
 };
 
 /**
@@ -40,13 +41,14 @@ const clampField = (raw: unknown, field: NumericField): number | undefined => {
  */
 export const normalizeReadingComfort = (raw: unknown): ReadingComfort | undefined => {
   if (!isPlainObject(raw)) return undefined;
-  const r = raw;
   const out: ReadingComfort = {};
-  if (r.font === 'luciole') out.font = 'luciole';
-  for (const field of Object.keys(READING_COMFORT_LIMITS) as NumericField[]) {
-    const value = clampField(r[field], field);
-    if (value !== undefined) out[field] = value;
-  }
+  if (raw.font === 'luciole') out.font = 'luciole';
+  const letterSpacing = clampField(raw.letterSpacing, READING_COMFORT_LIMITS.letterSpacing);
+  if (letterSpacing !== undefined) out.letterSpacing = letterSpacing;
+  const wordSpacing = clampField(raw.wordSpacing, READING_COMFORT_LIMITS.wordSpacing);
+  if (wordSpacing !== undefined) out.wordSpacing = wordSpacing;
+  const lineHeight = clampField(raw.lineHeight, READING_COMFORT_LIMITS.lineHeight);
+  if (lineHeight !== undefined) out.lineHeight = lineHeight;
   return Object.keys(out).length > 0 ? out : undefined;
 };
 
