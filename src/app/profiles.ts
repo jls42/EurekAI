@@ -7,11 +7,30 @@
    Codacy lance ESLint avec un typage Alpine/fetch incomplet; lint:ci local reste type-aware. */
 import { clearProfileLocale, getProfileLocale, setProfileLocale } from './profile-locale';
 import { clearProfileApiKey } from './api-key';
+import { normalizeReadingComfort, READING_COMFORT_LIMITS } from '@helpers/reading-comfort';
 import type { AppContext } from './app-context';
 import type { Profile } from '../../types';
 import type { CreateProfileBody } from '../../routes/profiles';
 
 type EditingProfile = Profile & { _verifiedPin?: string; hasPin?: boolean };
+
+// `??` pèse 2 en CCN Lizard (cf. CLAUDE.md) → fallback via helper ternaire.
+const editingComfortField = (
+  value: number | undefined,
+  field: 'letterSpacing' | 'wordSpacing' | 'lineHeight',
+): number => (value === undefined ? READING_COMFORT_LIMITS[field].default : value);
+
+// Shape complet pour les x-model du panneau confort (sliders + select police) :
+// chaque champ reçoit sa valeur effective ou le défaut des limites partagées.
+const toEditingReadingComfort = (comfort: Profile['readingComfort']) => {
+  const c = comfort || {};
+  return {
+    font: c.font || 'default',
+    letterSpacing: editingComfortField(c.letterSpacing, 'letterSpacing'),
+    wordSpacing: editingComfortField(c.wordSpacing, 'wordSpacing'),
+    lineHeight: editingComfortField(c.lineHeight, 'lineHeight'),
+  };
+};
 type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined;
 
 const LS_PROFILE_ID = 'sf-profileId';
@@ -161,8 +180,17 @@ export function applyCreateProfileSuccess(state: AppContext, profile: Profile): 
 }
 
 export function buildProfileUpdates(editingProfile: EditingProfile): Record<string, unknown> {
-  const { name, age, avatar, locale, mistralVoices, theme, _verifiedPin, updatedAt } =
-    editingProfile;
+  const {
+    name,
+    age,
+    avatar,
+    locale,
+    mistralVoices,
+    theme,
+    readingComfort,
+    _verifiedPin,
+    updatedAt,
+  } = editingProfile;
   const updates: Record<string, unknown> = {
     name: name.trim(),
     age,
@@ -170,6 +198,8 @@ export function buildProfileUpdates(editingProfile: EditingProfile): Record<stri
     locale,
     mistralVoices: buildVoicesUpdate(mistralVoices),
     theme: theme || null,
+    // null = reset explicite côté serveur quand tout est revenu au défaut.
+    readingComfort: normalizeReadingComfort(readingComfort) ?? null,
     _updatedAt: updatedAt,
   };
   if (_verifiedPin) updates.pin = _verifiedPin;
@@ -236,6 +266,34 @@ const loadProfiles = async function (this: AppContext) {
   }
 };
 
+// Applique (ou retire) les variables CSS de confort de lecture sur :root.
+// Les défauts vivent dans theme.css — retirer la propriété = rendu actuel.
+// Normalisation par le MÊME helper que le serveur (clamp identique, cf.
+// helpers/reading-comfort.ts) : l'aperçu live ne peut pas montrer une valeur
+// que la persistance refuserait.
+const applyReadingComfortVars = function (comfort: unknown): void {
+  const root = document.documentElement.style;
+  const c = normalizeReadingComfort(comfort);
+  if (c?.font === 'luciole') {
+    root.setProperty('--reading-font', "'Luciole', 'Manrope', sans-serif");
+  } else {
+    root.removeProperty('--reading-font');
+  }
+  setOrRemoveVar(root, '--reading-letter-spacing', c?.letterSpacing, 'em');
+  setOrRemoveVar(root, '--reading-word-spacing', c?.wordSpacing, 'em');
+  setOrRemoveVar(root, '--reading-line-height', c?.lineHeight, '');
+};
+
+const setOrRemoveVar = (
+  root: CSSStyleDeclaration,
+  name: string,
+  value: number | undefined,
+  unit: string,
+): void => {
+  if (value === undefined) root.removeProperty(name);
+  else root.setProperty(name, `${value}${unit}`);
+};
+
 const applyProfileTheme = function (state: AppContext, profile: Profile): void {
   if (profile.theme) {
     state.theme = profile.theme;
@@ -256,6 +314,7 @@ const selectProfile = async function (this: AppContext, id: string) {
   localStorage.setItem(LS_PROFILE_ID, id);
   this.setLocale(getProfileLocale(id, profile.locale || 'fr'), true);
   applyProfileTheme(this, profile);
+  applyReadingComfortVars(profile.readingComfort);
   // Reset project state (synchrone) for this profile.
   // resetSession() abort les fetches en vol et vide loading/toasts/pendings :
   // empêche un toast `generationDone` du profil précédent d'apparaître ici.
@@ -380,6 +439,7 @@ const startEditProfile = function (this: AppContext, id: string) {
       guest: profile.mistralVoices?.guest ?? '',
     },
     theme: profile.theme,
+    readingComfort: toEditingReadingComfort(profile.readingComfort),
   };
   this.showProfilePicker = true;
   this.showProfileForm = false;
@@ -516,6 +576,13 @@ const applyThemeLive = function (this: AppContext) {
   this.autoSaveProfile(true);
 };
 
+// Aperçu live du confort de lecture pendant l'édition (même comportement que
+// applyThemeLive : s'applique globalement, re-synchronisé au selectProfile).
+const applyReadingComfortLive = function (this: AppContext) {
+  applyReadingComfortVars(this.editingProfile?.readingComfort);
+  this.autoSaveProfile(true);
+};
+
 const closeEditProfile = function (this: AppContext) {
   this.autoSaveProfile(true);
   this.editingProfile = null;
@@ -525,6 +592,8 @@ const resetProfileDefaults = function (this: AppContext) {
   if (!this.editingProfile) return;
   this.editingProfile.mistralVoices = { host: '', guest: '' };
   this.editingProfile.theme = undefined;
+  this.editingProfile.readingComfort = toEditingReadingComfort(undefined);
+  applyReadingComfortVars(this.editingProfile.readingComfort);
   this.applyThemeLive();
   this.showToast(this.t('toast.profileReset'), 'success');
 };
@@ -608,6 +677,7 @@ export function createProfiles() {
     toggleModerationCategory,
     autoSaveParental,
     applyThemeLive,
+    applyReadingComfortLive,
     closeEditProfile,
     resetProfileDefaults,
     saveEditProfile,
