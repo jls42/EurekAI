@@ -29,6 +29,9 @@ export default [
       // .mjs scripts utilisent leur propre runtime (Node sans tsconfig) —
       // hors du scope du typed-linting, projectService ne les résout pas.
       'scripts/**/*.mjs',
+      // Config legacy destinée au seul ESLint 8 de Codacy (cf. en-tête du
+      // fichier) : hors tsconfig.eslint.json, ne pas la typed-linter ici.
+      '.eslintrc.cjs',
     ],
   },
   js.configs.recommended,

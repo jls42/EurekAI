@@ -8,5 +8,6 @@
   ],
   "project": ["**/*.ts"],
   "ignoreDependencies": ["tailwindcss"],
+  "ignore": [".eslintrc.cjs"],
   "ignoreExportsUsedInFile": true
 }
