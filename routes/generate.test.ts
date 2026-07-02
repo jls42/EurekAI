@@ -507,6 +507,7 @@ describe('generateRoutes', () => {
         'fr', // default lang
         'enfant', // default ageGroup
         '', // exclusions (no previous generations)
+        undefined, // register
       );
     });
 
@@ -539,7 +540,69 @@ describe('generateRoutes', () => {
         'en',
         'ado',
         '', // exclusions
+        undefined, // register
       );
+    });
+
+    it('rejette un register invalide avec 400 invalid_input', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: { register: 'shakespeare' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
+    });
+
+    it('register falc : exclusions vides (même contenu) + titre préfixé « Version facile »', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      // Une fiche existante qui produirait normalement un contexte d'exclusions.
+      store.addGeneration(pid, {
+        id: 'gen-prev',
+        title: 'Fiche — Test Summary',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'summary',
+        data: { title: 'Test Summary', summary: 'S', key_points: ['k'], vocabulary: [] },
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const req = mockReq({ params: { pid }, body: { register: 'falc', lang: 'fr' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(generateSummary).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        false,
+        'fr',
+        'enfant',
+        '', // exclusions forcées vides en falc (on simplifie le MÊME contenu)
+        'falc',
+      );
+      const gen = res.json.mock.calls[0][0];
+      expect(gen.title).toBe('Version facile — Test Summary');
     });
 
     it('applies consigne when project has one and useConsigne is not false', async () => {
@@ -574,6 +637,7 @@ describe('generateRoutes', () => {
         'fr',
         'enfant',
         '', // exclusions
+        undefined, // register
       );
     });
 
@@ -604,6 +668,7 @@ describe('generateRoutes', () => {
         'fr',
         'enfant',
         '', // exclusions
+        undefined, // register
       );
     });
 
@@ -714,6 +779,7 @@ describe('generateRoutes', () => {
         'fr',
         'enfant',
         '', // exclusions
+        undefined, // register
       );
       // Markdown should not contain source 1
       const calledMarkdown = (generateSummary as any).mock.calls[0][1] as string;

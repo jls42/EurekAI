@@ -10,6 +10,7 @@ import {
   quizUser,
   quizReviewSystem,
   quizReviewUser,
+  registerInstruction,
   summaryRemediationSystem,
   summaryRemediationUser,
   podcastSystem,
@@ -86,6 +87,31 @@ describe('SUMMARY', () => {
   it('summaryUser inclut le markdown complet', () => {
     const md = 'x'.repeat(5000);
     expect(summaryUser(md).length).toBeGreaterThan(5000);
+  });
+});
+
+describe('registerInstruction (registre falc)', () => {
+  it("vide pour standard/undefined, bloc style pour 'falc'", () => {
+    expect(registerInstruction()).toBe('');
+    expect(registerInstruction('standard')).toBe('');
+    expect(registerInstruction('falc')).toContain('phrases courtes');
+  });
+
+  it("anti-leak : pas de qualificatif de document recyclable ('facile', 'simplifie', 'fiche')", () => {
+    const lower = registerInstruction('falc').toLowerCase();
+    expect(lower).not.toContain('facile');
+    expect(lower).not.toContain('simplifi');
+    expect(lower).not.toContain('fiche');
+    expect(lower).not.toContain('falc');
+  });
+
+  it('summaryUser ajoute le bloc en fin de prompt seulement en falc', () => {
+    const falc = summaryUser('contenu', false, 'fr', undefined, 'falc');
+    const standard = summaryUser('contenu', false, 'fr');
+    expect(falc).toContain("STYLE D'ECRITURE");
+    expect(standard).not.toContain("STYLE D'ECRITURE");
+    // Le bloc est APRÈS le markdown (loin du champ title, cf. anti-leak).
+    expect(falc.indexOf("STYLE D'ECRITURE")).toBeGreaterThan(falc.indexOf('contenu'));
   });
 });
 

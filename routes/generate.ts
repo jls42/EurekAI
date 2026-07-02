@@ -26,6 +26,7 @@ import type {
   PendingTrackerEntry,
   PromoteErrorOutcome,
   PromoteErrorResponse,
+  SummaryRegister,
 } from '../types.js';
 import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -113,6 +114,9 @@ interface GenRequestBody {
   lang?: string;
   ageGroup?: AgeGroup;
   count?: number | string;
+  // Registre d'écriture des fiches (falc = « très facile à lire ») — accepté
+  // par validateGenRequestBody sur toutes les routes, consommé par summary seul.
+  register?: SummaryRegister;
 }
 
 const resolveSourceIds = (body: GenRequestBody, sources: Source[]): string[] => {
@@ -178,6 +182,7 @@ interface GenContext {
   // Propagé pour que resolveVoices() applique la rotation déterministe par profil
   // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
   profileId?: string;
+  register?: SummaryRegister;
   req: Request;
   res: Response;
 }
@@ -202,6 +207,8 @@ const isOptionalStringArray = (v: unknown): boolean =>
   v === undefined || (Array.isArray(v) && v.every((s) => typeof s === 'string'));
 const isOptionalFiniteNumberish = (v: unknown): boolean =>
   v === undefined || v === null || Number.isFinite(Number(v));
+const isOptionalRegister = (v: unknown): boolean =>
+  v === undefined || v === 'standard' || v === 'falc';
 
 type ModelConfig = ReturnType<typeof getConfig>['models'];
 type ModelSelector = (models: ModelConfig) => string; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
@@ -240,6 +247,7 @@ const allChecksPass = (b: Record<string, unknown>): boolean =>
   isOptionalBoolean(b.useConsigne) &&
   isOptionalStringArray(b.sourceIds) &&
   isOptionalFiniteNumberish(b.count) &&
+  isOptionalRegister(b.register) &&
   (b.gid === undefined || typeof b.gid === 'string');
 
 const validateGenRequestBody = (body: unknown): ValidateResult => {
@@ -314,6 +322,7 @@ function buildGenContext(
       hasConsigne,
       sourceIds: resolveSourceIds(body, project.sources),
       count: parseCount(body.count),
+      register: body.register,
       pid,
       profileVoices: profile?.mistralVoices,
       profileId: profileId || undefined,
@@ -338,6 +347,12 @@ const reviewLabelForLang = (lang: string): string => (lang === 'en' ? 'Review' :
 
 // Préfixe titre de la fiche de remédiation — même précédent fr/en que reviewLabelForLang.
 const remediationLabelForLang = (lang: string): string => (lang === 'en' ? 'Recap' : 'Rappel');
+
+// Préfixe titre des fiches en registre falc — distingue la version simplifiée de
+// la fiche d'origine dans la liste (le LLM ne connaît pas le mot « facile »,
+// anti-leak : le préfixe est posé côté serveur, jamais dans le prompt).
+const falcLabelForLang = (lang: string): string =>
+  lang === 'en' ? 'Easy version' : 'Version facile';
 
 function validateQuizReviewInputs(
   store: ProjectStore,
@@ -592,9 +607,14 @@ const makeGen = (
 const buildSummaryGeneration = async (ctx: GenContext): Promise<Generation> => {
   logger.info(
     'summary',
-    `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
+    `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, model: ${ctx.config.models.summary}, consigne: ${ctx.hasConsigne}, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}, register: ${ctx.register ?? 'standard'}`,
   );
-  const exclusions = buildExclusionContext(ctx.project.results.generations, 'summary');
+  const isFalc = ctx.register === 'falc';
+  // FALC : on simplifie le MÊME contenu — les exclusions de diversité pousseraient
+  // le modèle à éviter les points déjà couverts par la fiche d'origine.
+  const exclusions = isFalc
+    ? ''
+    : buildExclusionContext(ctx.project.results.generations, 'summary');
   const data = await generateSummary(
     ctx.client,
     ctx.markdown,
@@ -603,12 +623,15 @@ const buildSummaryGeneration = async (ctx: GenContext): Promise<Generation> => {
     ctx.lang,
     ctx.ageGroup,
     exclusions,
+    ctx.register,
   );
   logger.info(
     'summary',
     `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
   );
-  return makeGen('summary', data, ctx);
+  const gen = makeGen('summary', data, ctx);
+  if (isFalc) gen.title = `${falcLabelForLang(ctx.lang)} — ${data.title}`;
+  return gen;
 };
 
 const buildFlashcardsGeneration = async (ctx: GenContext): Promise<Generation> => {

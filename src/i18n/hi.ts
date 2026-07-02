@@ -303,6 +303,7 @@ export const hi: Record<string, string> = {
   'summary.funFact':
     '\u0915\u094D\u092F\u093E \u0906\u092A \u091C\u093E\u0928\u0924\u0947 \u0939\u0948\u0902?',
   'summary.audioAll': 'सभी',
+  'summary.simplify': 'बहुत आसान पठन संस्करण',
   'summary.audioIntro': 'परिचय',
   'summary.audioKeyPoints': 'मुख्य बिंदु',
   'summary.audioFunFact': 'क्या आप जानते हैं?',

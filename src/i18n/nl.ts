@@ -242,6 +242,7 @@ export const nl: Record<string, string> = {
   'summary.keyPoints': 'Belangrijkste punten',
   'summary.funFact': 'Wist je dat?',
   'summary.audioAll': 'Alles',
+  'summary.simplify': 'Zeer makkelijk leesbare versie',
   'summary.audioIntro': 'Intro',
   'summary.audioKeyPoints': 'Belangrijkste punten',
   'summary.audioFunFact': 'Wist je dat?',

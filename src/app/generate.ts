@@ -607,7 +607,11 @@ const runGenerateAuto = async function (state: AppContext): Promise<void> {
   }
 };
 
-const runSingleGenerate = async function (state: AppContext, type: string): Promise<void> {
+const runSingleGenerate = async function (
+  state: AppContext,
+  type: string,
+  extraBody?: Record<string, unknown>,
+): Promise<void> {
   if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
   if (!projectId) return;
@@ -621,7 +625,9 @@ const runSingleGenerate = async function (state: AppContext, type: string): Prom
     const res = await fetchSingleGenerate(
       projectId,
       type,
-      buildGenerateBody(state),
+      // extraBody surcharge le body standard (ex: register/sourceIds pour la
+      // version FALC d'une fiche existante) sans dupliquer le lifecycle.
+      { ...buildGenerateBody(state), ...extraBody },
       gid,
       controller.signal,
     );
@@ -659,8 +665,22 @@ export function createGenerate() {
       return this.t('moderation.blocked') + (cats ? ` (${cats})` : '');
     },
 
-    async generate(this: AppContext, type: string) {
-      await runSingleGenerate(this, type);
+    async generate(this: AppContext, type: string, extraBody?: Record<string, unknown>) {
+      await runSingleGenerate(this, type, extraBody);
+    },
+
+    // « Version très facile à lire » : régénère la MÊME fiche (mêmes sources)
+    // en registre falc. Nouvelle génération standard (gid/pending/SSE/coût) —
+    // pas de mutation in-place. Si la fiche d'origine porte une langue (pas le
+    // cas des summaries aujourd'hui), elle prime sur la langue UI courante.
+    async generateSimplified(this: AppContext, gen: Generation) {
+      const extraBody: Record<string, unknown> = {
+        sourceIds: gen.sourceIds,
+        register: 'falc',
+      };
+      const lang = (gen as { lang?: string }).lang;
+      if (lang) extraBody.lang = lang;
+      await runSingleGenerate(this, 'summary', extraBody);
     },
 
     async generateAll(this: AppContext) {

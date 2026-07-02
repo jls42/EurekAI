@@ -245,6 +245,7 @@ export const de: Record<string, string> = {
   'summary.keyPoints': 'Wichtige Punkte',
   'summary.funFact': 'Wusstest du schon?',
   'summary.audioAll': 'Alles',
+  'summary.simplify': 'Sehr leicht lesbare Version',
   'summary.audioIntro': 'Intro',
   'summary.audioKeyPoints': 'Wichtige Punkte',
   'summary.audioFunFact': 'Schon gewusst?',

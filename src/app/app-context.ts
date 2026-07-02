@@ -156,7 +156,8 @@ export interface AppContext extends AppState {
   blockedModerationSource(): Source | null;
   blockedModerationStatus(): string | null;
   moderationBlockedMessage(status: string | null): string;
-  generate(type: string): Promise<void>;
+  generate(type: string, extraBody?: Record<string, unknown>): Promise<void>;
+  generateSimplified(gen: Generation): Promise<void>;
   generateAll(): Promise<void>;
   generateAuto(): Promise<void>;
   generateVoice(gen: Generation, section?: string): Promise<void>;

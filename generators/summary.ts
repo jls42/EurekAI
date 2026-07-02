@@ -8,7 +8,7 @@ import {
   summaryRemediationSystem,
   summaryRemediationUser,
 } from '../prompts.js';
-import type { StudyFiche, AgeGroup, QuizQuestion } from '../types.js';
+import type { StudyFiche, AgeGroup, QuizQuestion, SummaryRegister } from '../types.js';
 
 // `const = function` plutôt que `function` pour empêcher Lizard d'agglomérer le CCN
 // avec unwrapAndMerge / extractSummary qui suivent (cf. CLAUDE.md piège connu).
@@ -162,10 +162,11 @@ export async function generateSummary(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   exclusions?: string,
+  register?: SummaryRegister,
 ): Promise<StudyFiche> {
   const messages: ChatMessage[] = [
     { role: 'system', content: summarySystem(ageGroup) },
-    { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions) },
+    { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions, register) },
   ];
   return completeStudyFiche(client, model, messages);
 }

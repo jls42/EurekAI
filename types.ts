@@ -30,6 +30,10 @@ export interface Profile {
   updatedAt?: string;
 }
 
+// Registre d'écriture des fiches : 'falc' = « facile à lire et à comprendre »
+// (phrases courtes, mots simples) — cf. prompts.ts registerInstruction.
+export type SummaryRegister = 'standard' | 'falc';
+
 // --- Sources ---
 
 export type ModerationStatus = 'pending' | 'safe' | 'unsafe' | 'error';

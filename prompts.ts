@@ -1,6 +1,6 @@
 import { logger } from './helpers/logger.js';
 import { spokenChoiceLabel } from './helpers/choice-labels.js';
-import type { AgeGroup, PodcastSpeakers } from './types.js';
+import type { AgeGroup, PodcastSpeakers, SummaryRegister } from './types.js';
 
 // ── Language helper ──────────────────────────────────────────────────
 
@@ -163,11 +163,21 @@ ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
 }
 
+// Bloc de style pour le registre 'falc' (facile a lire et a comprendre).
+// Regle positive uniquement, placee en FIN de prompt user, loin du champ "title"
+// (anti-leak : aucun qualificatif de document du type "facile"/"simplifie" qui
+// pourrait etre recycle dans les sorties texte libre).
+export function registerInstruction(register?: SummaryRegister): string {
+  if (register !== 'falc') return '';
+  return `\n\nSTYLE D'ECRITURE : phrases courtes (une idee par phrase), mots simples du quotidien, present de l'indicatif autant que possible, pas de subordonnees ni de pronoms ambigus. Quand un mot difficile est indispensable, explique-le juste apres. Applique ce style a summary, key_points et aux definitions.`;
+}
+
 export function summaryUser(
   markdown: string,
   hasConsigne = false,
   lang = 'fr',
   exclusions?: string,
+  register?: SummaryRegister,
 ): string {
   const consigneBlock = hasConsigne
     ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
@@ -179,6 +189,7 @@ ${consigneBlock}
 
 ${markdown}${langInstruction(lang)}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
+  prompt += registerInstruction(register);
   return prompt;
 }
 

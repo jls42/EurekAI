@@ -252,6 +252,38 @@ describe('generate', () => {
     expect(ctx.loading.summary).toBe(false);
   });
 
+  it('extraBody surcharge le body standard (register/sourceIds)', async () => {
+    mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+    const ctx = makeContext();
+    await gen.generate.call(ctx, 'summary', { sourceIds: ['s9'], register: 'falc' });
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    expect(String(url)).toBe('/api/projects/pid-1/generate/summary');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.register).toBe('falc');
+    expect(body.sourceIds).toEqual(['s9']);
+    expect(body.lang).toBe('fr'); // le reste du body standard est conservé
+  });
+
+  it('generateSimplified régénère la fiche en falc avec ses sources', async () => {
+    mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+    const ctx = makeContext();
+    await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s1', 's2'] } as any);
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.register).toBe('falc');
+    expect(body.sourceIds).toEqual(['s1', 's2']);
+    expect(body.lang).toBe('fr'); // pas de lang stockée sur la fiche → langue UI
+  });
+
+  it('generateSimplified fait primer la langue de la fiche quand elle existe', async () => {
+    mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+    const ctx = makeContext();
+    await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s1'], lang: 'en' } as any);
+    const [, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.lang).toBe('en');
+  });
+
   it('handles abort error (ignores)', async () => {
     const abortError = new DOMException('Aborted', 'AbortError');
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(abortError);
