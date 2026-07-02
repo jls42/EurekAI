@@ -23,6 +23,12 @@ describe('diversityParams', () => {
     expect(p.presencePenalty).toBe(0);
   });
 
+  it('returns correct params for dictation (penalty 0 : la phrase doit re-contenir le mot)', () => {
+    const p = diversityParams('dictation');
+    expect(p.temperature).toBe(0.9);
+    expect(p.presencePenalty).toBe(0);
+  });
+
   it('returns default params for unknown type', () => {
     const p = diversityParams('unknown');
     expect(p.temperature).toBe(0.7);
@@ -94,6 +100,19 @@ describe('buildExclusionContext', () => {
     expect(result).toContain('MOTS/CONCEPTS DEJA UTILISES');
     expect(result).toContain('- alternateur');
     expect(result).toContain('- turbine');
+  });
+
+  it('extracts dictation words', () => {
+    const gens = [
+      {
+        type: 'dictation',
+        data: [{ word: 'toujours' }, { word: 'école' }],
+      },
+    ] as unknown as Generation[];
+    const result = buildExclusionContext(gens, 'dictation');
+    expect(result).toContain('MOTS DEJA TRAVAILLES');
+    expect(result).toContain('- toujours');
+    expect(result).toContain('- école');
   });
 
   it('extracts podcast first host lines', () => {

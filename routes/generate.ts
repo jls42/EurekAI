@@ -797,6 +797,7 @@ const buildDictationGeneration = async (
     DICTATION,
     `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}, count: ${ctx.count ?? DICTATION_DEFAULT_WORDS}`,
   );
+  const exclusions = buildExclusionContext(ctx.project.results.generations, DICTATION);
   const data = await generateDictation(
     ctx.client,
     ctx.markdown,
@@ -804,6 +805,7 @@ const buildDictationGeneration = async (
     ctx.lang,
     ctx.ageGroup,
     ctx.count ?? DICTATION_DEFAULT_WORDS,
+    exclusions,
   );
   logger.info(DICTATION, `items OK: ${data.length} mots`);
   const audioUrls = await buildDictationAudioUrls(store, ctx, data);
@@ -979,6 +981,7 @@ const buildAutoDictation = async (ctx: AutoCtx): Promise<Generation> => {
     ctx.lang,
     ctx.ageGroup,
     ctx.count ?? DICTATION_DEFAULT_WORDS,
+    buildExclusionContext(ctx.generations, DICTATION),
   );
   const audioUrls = await buildDictationAudioUrls(ctx.store, ctx, data);
   return {
@@ -1307,8 +1310,8 @@ const registerMediaGenerationRoutes = (
       trackedType: FILL_BLANK,
     }),
   );
-  // Générable par bouton uniquement (SINGLE_GENERATE_TYPES), jamais par
-  // l'auto-router : exige une source « liste de mots » dédiée.
+  // Dictée : auto-routable (AUTO_AGENT_TYPES) et TTS-dépendante (référencée
+  // dans TTS_DEPENDENT_AGENTS).
   router.post(
     '/:pid/generate/dictation',
     handleGeneration(

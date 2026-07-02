@@ -8,6 +8,9 @@ const PARAMS: Record<string, { temperature: number; presencePenalty: number }> =
   'fill-blank': { temperature: 0.9, presencePenalty: 0.3 },
   podcast: { temperature: 1, presencePenalty: 0.2 },
   summary: { temperature: 0.4, presencePenalty: 0 },
+  // dictation : presencePenalty 0 volontaire — `sentence` doit re-contenir `word`
+  // EXACTEMENT (affichage à trou) ; une penalty décourage cette ré-émission.
+  dictation: { temperature: 0.9, presencePenalty: 0 },
 };
 
 export function diversityParams(type: string) {
@@ -27,6 +30,9 @@ interface QuestionItem {
 }
 interface AnswerItem {
   answer?: unknown;
+}
+interface WordItem {
+  word?: unknown;
 }
 interface PodcastLine {
   speaker?: unknown;
@@ -70,6 +76,13 @@ function extractFillBlankAnswers(gens: Generation[]): string[] {
   });
 }
 
+function extractDictationWords(gens: Generation[]): string[] {
+  return gens.flatMap((g) => {
+    const items: WordItem[] = Array.isArray(g.data) ? (g.data as WordItem[]) : [];
+    return items.map((item) => item.word).filter((w): w is string => Boolean(w));
+  });
+}
+
 function extractPodcastTopics(gens: Generation[]): string[] {
   return gens
     .map((g) => {
@@ -94,6 +107,7 @@ const EXTRACTORS: Record<string, (gens: Generation[]) => string[]> = {
   'quiz-vocal': extractQuizQuestions,
   flashcards: extractFlashcardQuestions,
   'fill-blank': extractFillBlankAnswers,
+  dictation: extractDictationWords,
   podcast: extractPodcastTopics,
   summary: extractSummaryKeyPoints,
 };
@@ -103,6 +117,9 @@ const HEADERS: Record<string, string> = {
   'quiz-vocal': 'QUESTIONS DEJA GENEREES (NE PAS REPETER) :',
   flashcards: 'FLASHCARDS DEJA GENEREES (NE PAS REPETER) :',
   'fill-blank': 'MOTS/CONCEPTS DEJA UTILISES (NE PAS REPETER) :',
+  // Pas de « NE PAS REPETER » ici : le LLM l'appliquait à la phrase-exemple et
+  // masquait le mot dedans (`Le ______ chaud…`) — la consigne vise le CHOIX des mots.
+  dictation: "MOTS DEJA TRAVAILLES (CHOISIS D'AUTRES MOTS) :",
   podcast: 'PODCASTS DEJA GENERES (CHOISIS UN ANGLE DIFFERENT) :',
   summary: 'POINTS DEJA COUVERTS (UTILISE DES EXEMPLES ET FORMULATIONS DIFFERENTS) :',
 };

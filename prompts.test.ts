@@ -204,6 +204,21 @@ describe('DICTATION', () => {
     expect(result).toContain('au maximum 10');
     expect(result).toContain('English');
   });
+
+  it("system : plus de consigne d'ordre deterministe (figeait le 1er mot)", () => {
+    expect(dictationSystem('enfant')).not.toContain('plus simple au plus difficile');
+  });
+
+  it('user : exclusions appendees quand presentes', () => {
+    const result = dictationUser(
+      'contenu',
+      'fr',
+      10,
+      "MOTS DEJA TRAVAILLES (CHOISIS D'AUTRES MOTS) :\n- avion",
+    );
+    expect(result).toContain('MOTS DEJA TRAVAILLES');
+    expect(result).toContain('- avion');
+  });
 });
 
 describe('PODCAST', () => {
