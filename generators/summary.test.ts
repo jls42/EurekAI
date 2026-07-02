@@ -171,6 +171,18 @@ describe('generateSummary', () => {
     expect(result.summary).toBe('Resume');
     expect(result.key_points).toEqual(['Point 1']);
   });
+
+  it("registre falc : le bloc STYLE D'ECRITURE atteint le prompt user, absent sinon", async () => {
+    const client = mockClient(validSummary);
+    await generateSummary(client, 'contenu', 'm', false, 'fr', 'enfant', undefined, 'falc');
+    const falcUser = client.chat.complete.mock.calls[0][0].messages[1].content;
+    expect(falcUser).toContain("STYLE D'ECRITURE");
+
+    const client2 = mockClient(validSummary);
+    await generateSummary(client2, 'contenu', 'm', false, 'fr', 'enfant');
+    const stdUser = client2.chat.complete.mock.calls[0][0].messages[1].content;
+    expect(stdUser).not.toContain("STYLE D'ECRITURE");
+  });
 });
 
 describe('generateRemediationSummary', () => {
