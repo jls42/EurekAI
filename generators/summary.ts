@@ -85,6 +85,43 @@ interface ChatMessage {
   content: string;
 }
 
+// Normalise key_points : le LLM le renvoie parfois en texte (puces sur plusieurs
+// lignes) au lieu d'un tableau. On découpe alors par lignes en retirant les
+// puces/numéros de tête. `const = function` (anti-agglomération Lizard, cf. CLAUDE.md).
+const coerceKeyPoints = function (v: unknown): string[] {
+  if (Array.isArray(v)) {
+    return v.filter((x): x is string => typeof x === 'string' && x.trim() !== '');
+  }
+  if (typeof v === 'string' && v.trim() !== '') {
+    return v
+      .split(/\r?\n+/)
+      .map((line) => line.replace(/^[\s•*\-\d.)]+/, '').trim())
+      .filter((line) => line !== '');
+  }
+  return [];
+};
+
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.trim() !== '';
+const asArrayOr = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+// Récupération de dernier recours : une fiche avec title+summary valides reste
+// utilisable même si key_points est vide/malformé (cas observé en remédiation sur
+// des summary très structurés « **1.** … **2.** … »). On normalise les champs
+// secondaires plutôt que de renvoyer une erreur totale. null si le cœur manque.
+const salvageFiche = function (data: unknown): StudyFiche | null {
+  if (!data || typeof data !== 'object') return null;
+  const d = data as Record<string, unknown>;
+  if (!isNonEmptyString(d.title) || !isNonEmptyString(d.summary)) return null;
+  return {
+    title: d.title,
+    summary: d.summary,
+    key_points: coerceKeyPoints(d.key_points),
+    fun_fact: typeof d.fun_fact === 'string' ? d.fun_fact : '',
+    vocabulary: asArrayOr<StudyFiche['vocabulary'][number]>(d.vocabulary),
+    citations: asArrayOr<NonNullable<StudyFiche['citations']>[number]>(d.citations),
+  };
+};
+
 // Cœur partagé generateSummary / generateRemediationSummary : appel Mistral,
 // extraction/validation StudyFiche, retry unique avec la même discipline anti-leak
 // que le prompt initial (cf. .claude/rules/prompts.md §Retry).
@@ -118,7 +155,7 @@ const completeStudyFiche = async (
     {
       role: 'user',
       content:
-        "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.",
+        "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7, jamais vide), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.",
     },
   );
 
@@ -141,17 +178,24 @@ const completeStudyFiche = async (
 
   const retryData = extractSummary(retryRaw);
 
-  if (!isValidSummary(retryData)) {
-    logger.error('summary', `retry also failed. Got: ${JSON.stringify(retryData).slice(0, 200)}`);
-    // SyntaxError (et non Error) pour que extractErrorCode mappe vers llm_invalid_json.
-    // Tradeoff observabilité assumé : le code agrège deux causes racines (JSON non parsable
-    // ET JSON parsable mais schéma invalide — ex. title manquant, key_points vide). La
-    // distinction n'apporte rien côté UX (dans les deux cas le LLM a raté), mais pour
-    // debug on s'appuie sur le logger.error juste au-dessus qui sérialise retryData.
-    throw new SyntaxError("Le modele n'a pas reussi a generer une fiche valide apres 2 tentatives");
+  if (isValidSummary(retryData)) return retryData;
+
+  // Récupération avant échec total : une fiche title+summary valides est utilisable
+  // (key_points parfois vide/en texte sur des summary très structurés, ex. remédiation).
+  // Mieux vaut une fiche normalisée qu'un 500 (bug « Échec de Fiche » sur fiche de rappel).
+  const salvaged = salvageFiche(retryData);
+  if (salvaged) {
+    logger.warn(
+      'summary',
+      `retry incomplet, fiche récupérée (key_points normalisé: ${salvaged.key_points.length})`,
+    );
+    return salvaged;
   }
 
-  return retryData;
+  logger.error('summary', `retry also failed. Got: ${JSON.stringify(retryData).slice(0, 200)}`);
+  // SyntaxError (et non Error) pour que extractErrorCode mappe vers llm_invalid_json.
+  // On n'atteint ce throw que si title OU summary manque (fiche vraiment inutilisable).
+  throw new SyntaxError("Le modele n'a pas reussi a generer une fiche valide apres 2 tentatives");
 };
 
 export async function generateSummary(

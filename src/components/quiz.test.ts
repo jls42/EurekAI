@@ -281,7 +281,11 @@ describe('quizComponent', () => {
 
       expect(registerGeneration).toHaveBeenCalledTimes(1);
       expect(registerGeneration).toHaveBeenCalledWith(comp, quizGen);
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationSummaryError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.showToast).not.toHaveBeenCalledWith('toast.remediationGenerated', 'success');
       expect(comp.reviewing).toBe(false);
     });
@@ -294,7 +298,11 @@ describe('quizComponent', () => {
 
       expect(registerGeneration).toHaveBeenCalledTimes(1);
       expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen);
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationQuizError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.reviewing).toBe(false);
     });
 
@@ -305,9 +313,61 @@ describe('quizComponent', () => {
       await comp.remediate();
 
       expect(registerGeneration).not.toHaveBeenCalled();
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationSummaryError',
+        'error',
+        expect.any(Function),
+      );
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationQuizError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.reviewing).toBe(false);
+    });
+
+    it('réessai ciblé (toast fiche) : régénère UNIQUEMENT la fiche, pas le quiz', async () => {
+      mockRemediationFetch({ ok: false }, { ok: true, gen: quizGen });
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+      await comp.remediate();
+
+      const retryFn = (comp.showToast as any).mock.calls.find(
+        (c: any[]) => c[0] === 'toast.remediationSummaryError',
+      )?.[2] as () => void;
+      expect(typeof retryFn).toBe('function');
+
+      vi.mocked(registerGeneration).mockClear();
+      mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: false });
+      retryFn();
+      await vi.waitFor(() => expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen));
+
+      const urls: string[] = (global.fetch as any).mock.calls.map((c: any[]) => c[0] as string);
+      expect(urls.some((u) => u.includes('remediation-summary'))).toBe(true);
+      expect(urls.some((u) => u.includes('quiz-review'))).toBe(false);
+    });
+
+    it('réessai qui échoue re-propose un réessai (chaîne), sans enregistrement', async () => {
+      mockRemediationFetch({ ok: true, gen: summaryGen }, 'reject');
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+      await comp.remediate();
+
+      const retryFn = (comp.showToast as any).mock.calls.find(
+        (c: any[]) => c[0] === 'toast.remediationQuizError',
+      )?.[2] as () => void;
+      vi.mocked(registerGeneration).mockClear();
+      (comp.showToast as any).mockClear();
+      mockRemediationFetch({ ok: false }, 'reject');
+      retryFn();
+      await vi.waitFor(() =>
+        expect(comp.showToast).toHaveBeenCalledWith(
+          'toast.remediationQuizError',
+          'error',
+          expect.any(Function),
+        ),
+      );
+      expect(registerGeneration).not.toHaveBeenCalled();
     });
 
     it('ne fait rien si tout est correct', async () => {
