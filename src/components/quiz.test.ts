@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { quizComponent } from './quiz';
+import { registerGeneration } from '../app/generate';
+
+vi.mock('../app/generate', () => ({
+  registerGeneration: vi.fn(),
+}));
 
 function createQuiz(questions: any[]) {
   const gen = {
@@ -209,47 +214,106 @@ describe('quizComponent', () => {
     });
   });
 
-  describe('reviewErrors()', () => {
-    it('appelle fetch quiz-review avec les questions faibles', async () => {
-      const newGen = { id: 'gen-review-1', type: 'quiz', data: [] };
-      global.fetch = vi.fn(() =>
-        Promise.resolve({ ok: true, json: () => Promise.resolve(newGen) }),
-      ) as any;
+  describe('remediate()', () => {
+    const summaryGen = { id: 'gen-remed-1', type: 'summary', data: {} };
+    const quizGen = { id: 'gen-review-1', type: 'quiz', data: [] };
 
+    // Mock fetch qui répond selon la cible (fiche de rappel vs quiz-review).
+    function mockRemediationFetch(
+      summaryRes: { ok: boolean; gen?: any } | 'reject',
+      quizRes: { ok: boolean; gen?: any } | 'reject',
+    ) {
+      global.fetch = vi.fn((url: string) => {
+        const target = url.includes('remediation-summary') ? summaryRes : quizRes;
+        if (target === 'reject') return Promise.reject(new Error('network'));
+        return Promise.resolve({
+          ok: target.ok,
+          status: target.ok ? 200 : 500,
+          json: () => Promise.resolve(target.gen),
+        });
+      }) as any;
+    }
+
+    beforeEach(() => {
+      vi.mocked(registerGeneration).mockClear();
+    });
+
+    it('appelle les deux routes en parallele avec les questions faibles', async () => {
+      mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
       const comp = createQuiz(sampleQuestions);
       // q0 correct (ci=1), q1 incorrect (ci=0)
       comp.answers = { 0: 1, 1: 0 };
-      await comp.reviewErrors();
+      await comp.remediate();
 
-      expect(global.fetch).toHaveBeenCalledWith('/api/projects/proj-1/generate/quiz-review', {
+      const expectedInit = expect.objectContaining({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           generationId: 'gen-quiz-1',
           weakQuestions: [sampleQuestions[1]],
         }),
       });
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/generate/remediation-summary',
+        expectedInit,
+      );
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/projects/proj-1/generate/quiz-review',
+        expectedInit,
+      );
     });
 
-    it('ajoute la generation et montre toast sur succes', async () => {
-      const newGen = { id: 'gen-review-1', type: 'quiz', data: [] };
-      global.fetch = vi.fn(() =>
-        Promise.resolve({ ok: true, json: () => Promise.resolve(newGen) }),
-      ) as any;
-
+    it('enregistre les deux generations via registerGeneration + toast succes', async () => {
+      mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
       const comp = createQuiz(sampleQuestions);
-      comp.answers = { 0: 0 }; // q0 incorrect
-      await comp.reviewErrors();
+      comp.answers = { 0: 0 };
+      await comp.remediate();
 
-      expect(comp.generations).toContainEqual(newGen);
-      expect(comp.openGens['gen-review-1']).toBe(true);
-      expect(comp.showToast).toHaveBeenCalledWith('toast.reviewGenerated', 'success');
+      expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen);
+      expect(registerGeneration).toHaveBeenCalledWith(comp, quizGen);
+      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationGenerated', 'success');
+    });
+
+    it('succes partiel : fiche en echec → quiz quand meme enregistre', async () => {
+      mockRemediationFetch({ ok: false }, { ok: true, gen: quizGen });
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+      await comp.remediate();
+
+      expect(registerGeneration).toHaveBeenCalledTimes(1);
+      expect(registerGeneration).toHaveBeenCalledWith(comp, quizGen);
+      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
+      expect(comp.showToast).not.toHaveBeenCalledWith('toast.remediationGenerated', 'success');
+      expect(comp.reviewing).toBe(false);
+    });
+
+    it('succes partiel : rejet reseau du quiz → fiche quand meme enregistree', async () => {
+      mockRemediationFetch({ ok: true, gen: summaryGen }, 'reject');
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+      await comp.remediate();
+
+      expect(registerGeneration).toHaveBeenCalledTimes(1);
+      expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen);
+      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.reviewing).toBe(false);
+    });
+
+    it('double echec : deux toasts erreur, aucun enregistrement', async () => {
+      mockRemediationFetch('reject', { ok: false });
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+      await comp.remediate();
+
+      expect(registerGeneration).not.toHaveBeenCalled();
+      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.reviewing).toBe(false);
     });
 
     it('ne fait rien si tout est correct', async () => {
       const comp = createQuiz(sampleQuestions);
       comp.answers = { 0: 1, 1: 2, 2: 1 }; // all correct
-      await comp.reviewErrors();
+      await comp.remediate();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 
@@ -257,37 +321,21 @@ describe('quizComponent', () => {
       const comp = createQuiz(sampleQuestions);
       comp.answers = { 0: 0 };
 
-      let resolvePromise: (v: any) => void;
+      const resolvers: Array<(v: any) => void> = [];
       global.fetch = vi.fn(
         () =>
           new Promise((resolve) => {
-            resolvePromise = resolve;
+            resolvers.push(resolve);
           }),
       ) as any;
 
-      const promise = comp.reviewErrors();
+      const promise = comp.remediate();
       expect(comp.reviewing).toBe(true);
 
-      resolvePromise!({ ok: true, json: () => Promise.resolve({ id: 'r1' }) });
+      for (const resolve of resolvers) {
+        resolve({ ok: true, json: () => Promise.resolve({ id: 'r1' }) });
+      }
       await promise;
-      expect(comp.reviewing).toBe(false);
-    });
-
-    it('affiche erreur si fetch echoue', async () => {
-      global.fetch = vi.fn(() => Promise.resolve({ ok: false, status: 500 })) as any;
-      const comp = createQuiz(sampleQuestions);
-      comp.answers = { 0: 0 };
-      await comp.reviewErrors();
-      expect(comp.showToast).toHaveBeenCalledWith('toast.reviewError', 'error');
-      expect(comp.reviewing).toBe(false);
-    });
-
-    it('affiche erreur si fetch leve une exception', async () => {
-      global.fetch = vi.fn(() => Promise.reject(new Error('network'))) as any;
-      const comp = createQuiz(sampleQuestions);
-      comp.answers = { 0: 0 };
-      await comp.reviewErrors();
-      expect(comp.showToast).toHaveBeenCalledWith('toast.reviewError', 'error');
       expect(comp.reviewing).toBe(false);
     });
   });

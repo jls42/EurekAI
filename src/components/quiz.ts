@@ -1,5 +1,6 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { withAiHeaders } from '../app/ai-fetch';
+import { registerGeneration } from '../app/generate';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
 import type { Generation, QuizGeneration, QuizQuestion, QuizStats } from '../../types';
@@ -14,12 +15,14 @@ interface QuizContext extends StepByStepBase<QuizQuestion>, AppContext {
   selectChoice(ci: number): void;
   restoreState(): void;
   submitAttempt(): Promise<void>;
-  reviewErrors(): Promise<void>;
+  remediate(): Promise<void>;
   retryWrongQuestions(): void;
   resetQuiz(): void;
 }
 
 type QuizGen = Generation & { data: QuizQuestion[]; stats?: QuizStats };
+
+const API_PROJECTS = '/api/projects/';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Méthodes extraites de quizComponent — `const = function` pour éviter
@@ -82,14 +85,11 @@ const onFinish = function (this: QuizContext) {
 const submitAttempt = async function (this: QuizContext) {
   const pid = this.currentProjectId;
   try {
-    const res = await fetch(
-      '/api/projects/' + pid + '/generations/' + this.gen.id + '/quiz-attempt',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ answers: this.answers }),
-      },
-    );
+    const res = await fetch(API_PROJECTS + pid + '/generations/' + this.gen.id + '/quiz-attempt', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers: this.answers }),
+    });
     if (res.ok) {
       const result = (await res.json()) as { stats: QuizStats };
       (this.gen as QuizGen).stats = result.stats;
@@ -116,35 +116,63 @@ const collectWeakQuestions = function (
   return weak;
 };
 
-const reviewErrors = async function (this: QuizContext) {
+const postRemediationTarget = async function (
+  this: QuizContext,
+  target: 'remediation-summary' | 'quiz-review',
+  weakQuestions: QuizQuestion[],
+): Promise<Generation> {
   const pid = this.currentProjectId;
-  const weakQuestions = collectWeakQuestions(this.items(), this.answers);
-  if (weakQuestions.length === 0) return;
-
-  this.reviewing = true;
-  try {
+  const allowedUrls = [
+    API_PROJECTS + pid + '/generate/remediation-summary',
+    API_PROJECTS + pid + '/generate/quiz-review',
+  ];
+  const url = API_PROJECTS + pid + '/generate/' + target;
+  // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
+  // par Codacy `rule-node-ssrf` (même pattern que src/app/generate.ts).
+  if (allowedUrls.includes(url)) {
     const res = await fetch(
-      '/api/projects/' + pid + '/generate/quiz-review',
+      url,
       withAiHeaders({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ generationId: this.gen.id, weakQuestions }),
       }),
     );
-    if (res.ok) {
-      const newGen = (await res.json()) as Generation;
-      this.generations.push(newGen);
-      this.openGens[newGen.id] = true;
-      this.showToast(this.t('toast.reviewGenerated'), 'success');
-    } else {
-      console.error('Quiz review failed:', res.status);
-      this.showToast(this.t('toast.reviewError'), 'error');
-    }
-  } catch {
-    this.showToast(this.t('toast.reviewError'), 'error');
-  } finally {
-    this.reviewing = false;
+    if (!res.ok) throw new Error(`${target} failed: ${res.status}`);
+    return (await res.json()) as Generation;
   }
+  throw new Error('invalid remediation target');
+};
+
+// « M'entraîner sur mes erreurs » : fiche de rappel + quiz de révision, générés en
+// parallèle (allSettled, jamais Promise.all : un rejet réseau masquerait l'autre
+// résultat). Succès partiel : chaque génération obtenue est affichée même si
+// l'autre a échoué.
+const remediate = async function (this: QuizContext) {
+  const weakQuestions = collectWeakQuestions(this.items(), this.answers);
+  if (weakQuestions.length === 0) return;
+
+  this.reviewing = true;
+  const [fiche, quiz] = await Promise.allSettled([
+    postRemediationTarget.call(this, 'remediation-summary', weakQuestions),
+    postRemediationTarget.call(this, 'quiz-review', weakQuestions),
+  ]);
+  if (fiche.status === 'fulfilled') {
+    registerGeneration(this, fiche.value);
+  } else {
+    console.error('Remediation summary failed:', fiche.reason);
+    this.showToast(this.t('toast.remediationSummaryError'), 'error');
+  }
+  if (quiz.status === 'fulfilled') {
+    registerGeneration(this, quiz.value);
+  } else {
+    console.error('Remediation quiz failed:', quiz.reason);
+    this.showToast(this.t('toast.remediationQuizError'), 'error');
+  }
+  if (fiche.status === 'fulfilled' && quiz.status === 'fulfilled') {
+    this.showToast(this.t('toast.remediationGenerated'), 'success');
+  }
+  this.reviewing = false;
 };
 
 const retryWrongQuestions = function (this: QuizContext) {
@@ -177,7 +205,7 @@ export function quizComponent(gen: QuizGeneration) {
     restoreState,
     onFinish,
     submitAttempt,
-    reviewErrors,
+    remediate,
     retryWrongQuestions,
     resetQuiz,
   };
