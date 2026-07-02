@@ -300,6 +300,7 @@ export const ar: Record<string, string> = {
     '\u0627\u0644\u0646\u0642\u0627\u0637 \u0627\u0644\u0631\u0626\u064a\u0633\u064a\u0629',
   'summary.funFact': '\u0647\u0644 \u062a\u0639\u0644\u0645\u061f',
   'summary.audioAll': 'الكل',
+  'summary.simplify': 'نسخة سهلة القراءة جدًا',
   'summary.audioIntro': 'مقدمة',
   'summary.audioKeyPoints': 'النقاط الرئيسية',
   'summary.audioFunFact': 'هل تعلم؟',

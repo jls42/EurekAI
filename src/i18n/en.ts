@@ -241,6 +241,7 @@ export const en: Record<string, string> = {
   'summary.keyPoints': 'Key Points',
   'summary.funFact': 'Did you know?',
   'summary.audioAll': 'All',
+  'summary.simplify': 'Very easy-to-read version',
   'summary.audioIntro': 'Intro',
   'summary.audioKeyPoints': 'Key points',
   'summary.audioFunFact': 'Fun fact',

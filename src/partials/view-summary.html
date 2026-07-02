@@ -164,6 +164,15 @@
             ></audio>
           </div>
 
+          <!-- Version FALC : régénère la même fiche en registre « très facile à lire » -->
+          <button
+            @click="generateSimplified(gen)"
+            class="mb-4 px-3 min-h-touch rounded-button text-body-sm font-semibold bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 btn-press focus-ring flex items-center gap-1.5"
+          >
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            <span x-text="t('summary.simplify')">Version très facile à lire</span>
+          </button>
+
           <!-- Intro section (content only, no audio controls) -->
           <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
           <h3
