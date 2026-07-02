@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generatePodcastScript } from './podcast.js';
-import { PODCAST_NAME_POOL } from '../prompts.js';
+import { PODCAST_NAME_POOL, podcastRetryUser } from '../prompts.js';
 
 const validPodcast = {
   script: [
@@ -48,6 +48,7 @@ describe('generatePodcastScript', () => {
     const result = await generatePodcastScript(client, 'content');
     expect(result.script).toEqual(validPodcast.script);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(podcastRetryUser());
   });
 
   it('throws when both fail', async () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateFillBlank } from './fill-blank.js';
+import { fillBlankRetryUser } from '../prompts.js';
 
 const validFillBlank = [
   { sentence: 'Le ___ est bleu', answer: 'ciel', hint: 'Au-dessus de nous', category: 'nature' },
@@ -37,6 +38,7 @@ describe('generateFillBlank', () => {
     const result = await generateFillBlank(client, 'content');
     expect(result).toEqual(validFillBlank);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(fillBlankRetryUser());
   });
 
   it('throws when both fail', async () => {

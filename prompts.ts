@@ -611,7 +611,7 @@ export function websearchInput(query: string, lang = 'fr'): string {
 // pas d'echo de formulations a risque, contrat aligne sur le system prompt.
 
 export function summaryRetryUser(): string {
-  return "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7, jamais vide), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.";
+  return "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (autant que necessaire pour tout couvrir, jamais vide), fun_fact, vocabulary, citations. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.";
 }
 
 const QUIZ_RETRY_MESSAGES = {
@@ -641,7 +641,7 @@ export function dictationRetryUser(): string {
 }
 
 export function podcastRetryUser(): string {
-  return 'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.';
+  return 'Ta reponse etait vide ou incomplete. Regenere le script podcast avec speaker (host/guest) et text. JSON valide uniquement.';
 }
 
 // ── Consigne (detection) ────────────────────────────────────────────

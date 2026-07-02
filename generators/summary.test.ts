@@ -65,6 +65,10 @@ describe('generateSummary', () => {
     // Règle positive présente — assertions simples
     expect(retryUserMessage).toContain('objet JSON unique');
     expect(retryUserMessage).toContain('premier niveau');
+    // Contrat aligné sur summarySystem : couverture non rabotée + citations listées.
+    expect(retryUserMessage).toContain('autant que necessaire');
+    expect(retryUserMessage).toContain('citations');
+    expect(retryUserMessage).not.toContain('5-7');
   });
 
   it('throws when both attempts fail', async () => {

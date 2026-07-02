@@ -13,6 +13,9 @@ import {
   registerInstruction,
   dictationSystem,
   dictationUser,
+  summaryRetryUser,
+  quizRetryUser,
+  podcastRetryUser,
   summaryRemediationSystem,
   summaryRemediationUser,
   podcastSystem,
@@ -219,6 +222,26 @@ describe('DICTATION', () => {
     );
     expect(result).toContain('MOTS DEJA TRAVAILLES');
     expect(result).toContain('- avion');
+  });
+});
+
+describe('RETRY PROMPTS', () => {
+  it('summaryRetryUser : contrat aligne sur summarySystem (couverture non rabotee + citations)', () => {
+    const msg = summaryRetryUser();
+    expect(msg).toContain('autant que necessaire');
+    expect(msg).toContain('citations');
+    expect(msg).not.toContain('5-7');
+    expect(msg.toLowerCase()).not.toContain('fiche complete');
+  });
+
+  it('podcastRetryUser : pas de qualificatif de document pres du champ text', () => {
+    expect(podcastRetryUser()).not.toContain('podcast complet');
+  });
+
+  it('quizRetryUser : 3 variantes distinctes', () => {
+    expect(quizRetryUser('quiz')).toContain('QCM');
+    expect(quizRetryUser('quiz-vocal')).toContain('oral');
+    expect(quizRetryUser('quiz-review')).toContain('NOUVELLES');
   });
 });
 

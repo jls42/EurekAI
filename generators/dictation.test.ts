@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-explicit-any -- Codacy lance ESLint sans resolution des types vitest : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect, vi } from 'vitest';
 import { generateDictation, shuffleItems, DICTATION_MAX_WORDS } from './dictation.js';
+import { dictationRetryUser } from '../prompts.js';
 
 const validItems = [
   { word: 'toujours', sentence: 'Mon chat dort toujours ici.', rule: 'Se termine par un s muet.' },
@@ -108,6 +109,7 @@ describe('generateDictation', () => {
     expect(result).toHaveLength(validItems.length);
     expect(result).toEqual(expect.arrayContaining(validItems));
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(dictationRetryUser());
   });
 
   it('throw après deux échecs', async () => {
