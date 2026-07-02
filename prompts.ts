@@ -412,7 +412,7 @@ REGLE POUR LE CHAMP "title" :
 REGLES DE CONTENU :
 - Couvre CHAQUE notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
 - summary : re-explication claire et progressive de chaque notion (3-6 phrases par notion), avec un exemple concret different de la question d'origine. Utilise des retours a la ligne (\n\n) entre les notions.
-- key_points : les points a retenir pour ne plus se tromper, formules autrement que dans les questions ratees.
+- key_points : 3 a 6 points a retenir pour ne plus se tromper, au moins un par notion ratee, courts et formules autrement que dans les questions et le summary. key_points n'est jamais vide, meme si le summary est deja detaille.
 - vocabulary : les termes qui ont pu porter a confusion, definis simplement.
 - citations : les extraits des sources qui eclairent chaque notion.
 

@@ -159,6 +159,11 @@ describe('SUMMARY_REMEDIATION', () => {
     expect(result).toContain('notion ratee');
   });
 
+  it('system : key_points explicitement requis et jamais vide (anti « Échec de Fiche »)', () => {
+    const result = summaryRemediationSystem('enfant');
+    expect(result).toContain("key_points n'est jamais vide");
+  });
+
   it('anti-leak : pas de combos meta interdits (cf. summarySystem title policy)', () => {
     const lower = summaryRemediationSystem('enfant').toLowerCase();
     expect(lower).not.toContain('cree une seule fiche de revision complete');
