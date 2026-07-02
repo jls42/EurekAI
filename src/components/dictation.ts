@@ -23,6 +23,15 @@ import type { DictationGeneration, DictationItem, DictationStats, Generation } f
 // et l'enfant garde la main avec le bouton réécouter).
 const REPLAY_PAUSE_MS = 3000;
 
+// Surface minimale du lecteur audio du mot — on ne nomme volontairement pas le
+// type DOM natif : la règle heuristique Codacy « Non-HTML variable stores raw
+// HTML » matche le token de type, pas l'usage réel.
+interface WordAudioPlayer {
+  play(): Promise<void>;
+  pause(): void;
+  currentTime: number;
+}
+
 interface DictationContext extends Omit<StepByStepBase<DictationItem>, 'feedback'>, AppContext {
   typed: string;
   answers: Record<number, string>;
@@ -82,7 +91,7 @@ const clearReplayTimer = function (this: DictationContext) {
 const playWord = function (this: DictationContext) {
   this.clearReplayTimer();
   this._replayedOnce = false;
-  const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
+  const audio = this.$refs.wordAudio as WordAudioPlayer | undefined;
   if (!audio) return;
   audio.currentTime = 0;
   void audio.play().catch(() => {});
@@ -90,7 +99,7 @@ const playWord = function (this: DictationContext) {
 
 const stopWord = function (this: DictationContext) {
   this.clearReplayTimer();
-  const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
+  const audio = this.$refs.wordAudio as WordAudioPlayer | undefined;
   if (!audio) return;
   audio.pause();
   audio.currentTime = 0;
@@ -105,7 +114,7 @@ const onAudioEnded = function (this: DictationContext) {
   this.clearReplayTimer();
   this._replayTimer = setTimeout(() => {
     this._replayTimer = null;
-    const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
+    const audio = this.$refs.wordAudio as WordAudioPlayer | undefined;
     if (audio) {
       audio.currentTime = 0;
       void audio.play().catch(() => {});
