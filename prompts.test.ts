@@ -22,6 +22,7 @@ import {
   fillBlankSystem,
   fillBlankUser,
   chatSystem,
+  chatDocsLabel,
   imageSystem,
   imageUser,
   websearchInstructions,
@@ -332,6 +333,13 @@ describe('chatSystem', () => {
 
   it("chatSystem('fr') contient une instruction explicite sur le français (explicite > implicite)", () => {
     expect(chatSystem('fr')).toContain('français');
+  });
+
+  it('référence le même marqueur documents que celui injecté par generators/chat.ts', () => {
+    expect(chatSystem('fr')).toContain(`--- ${chatDocsLabel('fr')} ---`);
+    expect(chatSystem('en')).toContain(`--- ${chatDocsLabel('en')} ---`);
+    expect(chatDocsLabel('en')).toBe('COURSE DOCUMENTS');
+    expect(chatDocsLabel('es')).toBe('DOCUMENTS DE COURS');
   });
 });
 

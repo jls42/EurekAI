@@ -540,12 +540,19 @@ ${content}`;
 
 // ── Chat ─────────────────────────────────────────────────────────────
 
+// Marqueur du bloc documents injecté par generators/chat.ts — source unique :
+// chatSystem y fait référence, chat.ts l'écrit. Une divergence = le system pointe
+// un marqueur inexistant (bug historique en anglais).
+export function chatDocsLabel(lang = 'fr'): string {
+  return lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
+}
+
 export function chatSystem(lang = 'fr', ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un tuteur bienveillant, patient et enthousiaste.
 ${ageInstruction(ageGroup)}
 
 PERIMETRE :
-- Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- DOCUMENTS DE COURS ---").
+- Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- ${chatDocsLabel(lang)} ---").
 - Base TOUJOURS tes reponses pedagogiques sur ces documents quand le sujet y est traite.
 - Si l'eleve pose une question hors-sujet (qui n'a aucun rapport avec les cours fournis), redirige poliment : "Cette question sort du cadre de tes cours, mais voyons ce que tes documents disent sur [sujet adjacent]." Ne refuse pas seche, propose un pont.
 - Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.

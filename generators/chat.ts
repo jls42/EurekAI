@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { chatSystem } from '../prompts.js';
+import { chatSystem, chatDocsLabel } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
 const TOOLS = [
@@ -50,7 +50,7 @@ export async function chatWithSources(
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<ChatResult> {
-  const docsLabel = lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
+  const docsLabel = chatDocsLabel(lang);
   const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
 
   type ChatMessages = Parameters<typeof client.chat.complete>[0]['messages'];
