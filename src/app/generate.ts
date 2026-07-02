@@ -500,8 +500,8 @@ const fetchSingleGenerate = async function (
   signal: AbortSignal,
 ): Promise<Response | null> {
   const safeProjectId = encodeURIComponent(projectId);
-  // SINGLE_GENERATE_TYPES (superset des agents auto + dictée) : la dictée est
-  // générable par bouton mais reste hors de l'auto-router (cf. generation-types.ts).
+  // SINGLE_GENERATE_TYPES (= agents auto, dictée incluse) : chaque type a son
+  // endpoint de génération unitaire /generate/<type> (cf. generation-types.ts).
   const allowedUrls = SINGLE_GENERATE_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );

@@ -2405,6 +2405,41 @@ describe('generateRoutes', () => {
       expect(result.generations[0].type).toBe('summary');
       expect(result.failedSteps).toEqual([{ agent: 'podcast', code: 'tts_upstream_error' }]);
     });
+
+    // Régression-lock : la dictée est désormais un agent auto-exécutable (feat/dictee-auto).
+    // Si un refactor la retire de AUTO_AGENTS_SET / AUTO_EXECUTORS, ce test casse.
+    it('executes dictation from the routed plan (auto now includes dictation)', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'dictation', reason: 'orthographe à travailler' }],
+        context: 'Dictation context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Contenu avec du vocabulaire à travailler',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const req = mockReq({ params: { pid }, body: { lang: 'fr' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const result = res.json.mock.calls[0][0];
+      expect(result.generations).toHaveLength(1);
+      expect(result.generations[0].type).toBe('dictation');
+      // 1 MP3 par mot : le générateur mocké renvoie 2 mots.
+      expect(result.generations[0].audioUrls).toHaveLength(2);
+      expect(result.failedSteps).toBeUndefined();
+
+      const updatedProject = store.getProject(pid);
+      expect(updatedProject!.results.generations[0].type).toBe('dictation');
+    });
   });
 
   describe('POST /:pid/generate/auto (HTTP 502 + codes stables)', () => {

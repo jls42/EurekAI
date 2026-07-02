@@ -73,7 +73,9 @@ function enrichPlanForLearning(
   // Budget post-truncation : n'injecte que ce qui rentre sans évincer un agent déjà choisi
   // par le LLM. Si le LLM a explicitement demandé `image` pour du contenu visuel
   // (carte, anatomie, schéma), on ne la sacrifie pas au profit d'un format audio opportuniste.
-  const candidates = ['podcast', 'quiz-vocal'].filter((a) => !seen.has(a));
+  // Ordre = priorité d'injection : podcast/quiz-vocal avant dictation (la plus coûteuse en TTS,
+  // 1 lecture par mot) — sur budget serré, la dictée cède sa place aux deux autres formats audio.
+  const candidates = ['podcast', 'quiz-vocal', 'dictation'].filter((a) => !seen.has(a));
   const available = MAX_PLAN_LENGTH - plan.length;
   for (const agent of candidates.slice(0, Math.max(0, available))) {
     insertBeforeImageOrAppend(plan, {
@@ -90,8 +92,8 @@ function enrichPlanForLearning(
  * 3. Sinon : déduplication (1ère occurrence gardée, ordre du modèle préservé).
  * 4. Invariant summary : ajouté en tête s'il est absent ; jamais déplacé s'il est présent.
  * 5. Pour une vraie matière de révision, injecte opportunément les formats audio absents
- *    (podcast, quiz-vocal) SEULEMENT si le budget MAX_PLAN_LENGTH le permet — on ne tronque
- *    jamais un agent choisi par le LLM (notamment `image` pour du contenu visuel).
+ *    (podcast, quiz-vocal, dictation) SEULEMENT si le budget MAX_PLAN_LENGTH le permet — on ne
+ *    tronque jamais un agent choisi par le LLM (notamment `image` pour du contenu visuel).
  * 6. Troncature finale aux MAX_PLAN_LENGTH premiers (filet de sécurité).
  *
  * Politique : le choix du modèle prime. Pas de complétion forcée à 3, pas d'enrichissement

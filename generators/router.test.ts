@@ -140,7 +140,7 @@ describe('normalizePlan', () => {
     expect(result[0].reason).toBe('first');
   });
 
-  it('preserves all 7 agents when LLM proposes the full set (budget = 7)', () => {
+  it('preserves all 8 agents when LLM proposes the full set (budget = 8)', () => {
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
@@ -150,10 +150,11 @@ describe('normalizePlan', () => {
         { agent: 'podcast', reason: 'r' },
         { agent: 'quiz-vocal', reason: 'r' },
         { agent: 'image', reason: 'r' },
+        { agent: 'dictation', reason: 'r' },
       ],
       'fr',
     );
-    expect(result).toHaveLength(7);
+    expect(result).toHaveLength(8);
     expect(result.map((s) => s.agent)).toEqual([
       'summary',
       'flashcards',
@@ -162,6 +163,7 @@ describe('normalizePlan', () => {
       'podcast',
       'quiz-vocal',
       'image',
+      'dictation',
     ]);
   });
 
@@ -188,7 +190,7 @@ describe('normalizePlan', () => {
     expect(resultJa[0].reason).toContain('Fiche de synthèse');
   });
 
-  it('re-adds podcast and quiz-vocal for substantial study material', () => {
+  it('re-adds podcast, quiz-vocal and dictation for substantial study material', () => {
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r1' },
@@ -197,7 +199,13 @@ describe('normalizePlan', () => {
       'fr',
       'a'.repeat(500),
     );
-    expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz', 'podcast', 'quiz-vocal']);
+    expect(result.map((s) => s.agent)).toEqual([
+      'summary',
+      'quiz',
+      'podcast',
+      'quiz-vocal',
+      'dictation',
+    ]);
   });
 
   it('does not force audio formats for genuinely short material', () => {
@@ -238,10 +246,11 @@ Definition tres courte.`;
     expect(result.map((s) => s.agent)).toEqual(['summary', 'quiz']);
   });
 
-  it('preserves LLM-chosen image and enriches with quiz-vocal when budget allows', () => {
+  it('preserves LLM-chosen image and enriches with quiz-vocal + dictation when budget allows', () => {
     // Politique : le LLM a explicitement demandé image (ex. carte, anatomie).
-    // L'enrichment audio ne doit pas l'évincer — budget MAX_PLAN_LENGTH = 7 respecté.
-    // Plan entrant = 6 agents dont image ; il reste 1 slot pour l'enrichment → quiz-vocal injecté.
+    // L'enrichment audio ne doit pas l'évincer — budget MAX_PLAN_LENGTH = 8 respecté.
+    // Plan entrant = 6 agents dont image ; il reste 2 slots pour l'enrichment
+    // → quiz-vocal puis dictation injectés AVANT image, sans la tronquer.
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
@@ -261,13 +270,14 @@ Definition tres courte.`;
       'fill-blank',
       'podcast',
       'quiz-vocal',
+      'dictation',
       'image',
     ]);
   });
 
   it('enriches audio when budget allows and image is present', () => {
-    // Budget disponible (3 agents libres sur 6) : podcast ET quiz-vocal sont injectés
-    // AVANT image, sans la tronquer.
+    // Budget large (5 slots libres sur 8) : podcast, quiz-vocal ET dictation sont
+    // injectés AVANT image, sans la tronquer.
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
@@ -282,12 +292,13 @@ Definition tres courte.`;
       'quiz',
       'podcast',
       'quiz-vocal',
+      'dictation',
       'image',
     ]);
   });
 
-  it('injects both audio agents when image is present with budget = 7', () => {
-    // 5 agents dont image, budget = 7 : podcast ET quiz-vocal s'insèrent avant image.
+  it('injects the three audio agents when image is present with budget = 8', () => {
+    // 5 agents dont image, budget = 8 : podcast, quiz-vocal ET dictation s'insèrent avant image.
     const result = normalizePlan(
       [
         { agent: 'summary', reason: 'r' },
@@ -306,7 +317,26 @@ Definition tres courte.`;
       'fill-blank',
       'podcast',
       'quiz-vocal',
+      'dictation',
       'image',
     ]);
+  });
+
+  it('dictation is a valid agent kept by normalizePlan (no longer filtered out)', () => {
+    const result = normalizePlan([{ agent: 'dictation', reason: 'orthographe' }], 'fr');
+    // summary est préfixé (invariant), dictation choisie par le LLM est conservée.
+    expect(result.map((s) => s.agent)).toEqual(['summary', 'dictation']);
+  });
+
+  it('does not enrich dictation for genuinely short material', () => {
+    const result = normalizePlan(
+      [
+        { agent: 'summary', reason: 'r1' },
+        { agent: 'quiz', reason: 'r2' },
+      ],
+      'fr',
+      'Definition courte.',
+    );
+    expect(result.map((s) => s.agent)).not.toContain('dictation');
   });
 });

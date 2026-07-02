@@ -115,6 +115,15 @@ const DEFAULT_REASONS: Record<string, Record<string, string>> = {
     pt: 'Quiz oral para reforçar a memorização ativa',
     nl: 'Mondelinge quiz om actieve herinnering te versterken',
   },
+  dictation: {
+    fr: "Entraînement d'orthographe sur les mots clés du contenu",
+    en: 'Spelling practice on the key words of the content',
+    es: 'Práctica de ortografía sobre las palabras clave del contenido',
+    de: 'Rechtschreibübung zu den Schlüsselwörtern des Inhalts',
+    it: 'Esercizio di ortografia sulle parole chiave del contenuto',
+    pt: 'Treino de ortografia sobre as palavras-chave do conteúdo',
+    nl: 'Spellingsoefening op de kernwoorden van de inhoud',
+  },
 };
 
 export function defaultReasonFor(agent: string, lang = 'fr'): string {
@@ -622,18 +631,20 @@ Agents disponibles:
 - "podcast": cree un podcast educatif a ecouter (dialogue entre 2 personnes)
 - "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
 - "image": genere une illustration pedagogique du sujet
+- "dictation": entraine l'orthographe (l'eleve ecrit sous la dictee les mots importants du contenu)
 
 REGLE DE CARDINAL :
 - Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
 - Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-7 agents.
 - 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
-- Maximum 7 agents pour un contenu riche et varie.
+- Maximum 8 agents pour un contenu riche et varie.
 - Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
 
 CRITERES STRATEGIQUES :
 - Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
 - Contenu pedagogique standard (cours, chapitre, lecon) : envisage un format audio si le contenu s'y prete (narratif, explicatif, facilement recitable a voix haute).
 - Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
+- Contenu avec des mots nouveaux, du vocabulaire specifique ou une orthographe a travailler : envisage dictation.
 - Contenu explicatif, factuel ou facilement recitable a voix haute : prioriser quiz-vocal.
 - Contenu narratif, biographique, historique ou avec progression logique : prioriser podcast.
 - Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
