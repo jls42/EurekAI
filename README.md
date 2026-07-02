@@ -65,7 +65,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🖼️ | **Illustrations** | Images éducatives générées par un Agent Mistral |
 | 🗣️ | **Quiz vocal** | Questions lues à voix haute (voix custom possible), réponse orale, vérification IA |
 | 💬 | **Tuteur IA** | Chat contextuel avec vos documents de cours, avec appel d'outils |
-| 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 7 types disponibles |
+| 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 8 types disponibles |
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
 | 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS |
@@ -111,7 +111,7 @@ EurekAI accepte 4 types de sources, modérées selon le profil (activé par déf
 
 ### Génération de contenu IA
 
-Sept types de matériel d'apprentissage généré :
+Huit types de matériel d'apprentissage généré :
 
 | Générateur | Modèle | Sortie |
 |---|---|---|
@@ -119,6 +119,7 @@ Sept types de matériel d'apprentissage généré :
 | **Flashcards** | `mistral-large-latest` | Cartes Q/R avec références aux sources (nombre configurable) |
 | **Quiz QCM** | `mistral-large-latest` | Questions à choix multiples, explications, révision adaptative (nombre configurable) |
 | **Textes à trous** | `mistral-large-latest` | Phrases à compléter avec indices, validation tolérante (Levenshtein) |
+| **Dictée** | `mistral-large-latest` + Voxtral TTS | Mots clés dictés en audio (1 MP3/mot) → saisie clavier → correction stricte (accents) avec règle expliquée |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | Script 2 voix → audio MP3 |
 | **Illustration** | Agent `mistral-large-latest` | Image éducative via l'outil `image_generation` |
 | **Quiz vocal** | `mistral-large-latest` + Voxtral TTS + STT | Questions TTS → réponse STT → vérification IA |
@@ -134,7 +135,7 @@ Un tuteur conversationnel avec accès complet aux documents de cours :
 
 ### Routeur automatique
 
-Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources et proposer les générateurs les plus pertinents parmi les 7 disponibles. L'interface affiche la progression en temps réel : d'abord une phase d'analyse, puis les générations individuelles avec annulation possible.
+Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources et proposer les générateurs les plus pertinents parmi les 8 disponibles. L'interface affiche la progression en temps réel : d'abord une phase d'analyse, puis les générations individuelles avec annulation possible.
 
 ### Apprentissage adaptatif
 
@@ -326,11 +327,11 @@ server.ts                 — Point d'entrée Express, monte les routes + config
 config.ts                 — Config runtime (modèles, voix, TTS provider), persistée dans output/config.json
 store.ts                  — ProjectStore : CRUD projets/sources/générations, persistance JSON
 profiles.ts               — ProfileStore : gestion des profils, hachage PIN
-types.ts                  — Types TypeScript : Source, Generation (7 types), QuizStats, Profile
+types.ts                  — Types TypeScript : Source, Generation (8 types), QuizStats, Profile
 prompts.ts                — Tous les prompts IA centralisés (system + user templates, 15 langues)
 
 generators/
-  auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (7 agents) + MAX_AUTO_PLAN_LENGTH
+  auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (8 agents) + MAX_AUTO_PLAN_LENGTH
   ocr.ts                  — OCR via Mistral (JPG, PNG, PDF) avec extraction interne des scores de confiance moyens par page
   summary.ts              — Génération de fiche de révision (JSON structuré)
   flashcards.ts           — Flashcards Q/R (5-50, configurable)
@@ -352,7 +353,7 @@ routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
   sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, scraping URL + recherche web, modération
-  generate.ts             — Endpoints de génération (7 types + auto + route)
+  generate.ts             — Endpoints de génération (8 types + auto + route)
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
 
@@ -477,14 +478,14 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
 | `POST` | `/api/projects/:pid/generate/quiz` | Quiz QCM |
 | `POST` | `/api/projects/:pid/generate/fill-blank` | Textes à trous |
-| `POST` | `/api/projects/:pid/generate/dictation` | Dictée (mots + phrases-exemples + règles, 1 audio TTS par mot ; hors auto-router) |
+| `POST` | `/api/projects/:pid/generate/dictation` | Dictée (mots + phrases-exemples + règles, 1 audio TTS par mot ; aussi proposée par l'auto-router) |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustration |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz vocal |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Révision adaptative `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/remediation-summary` | Fiche de rappel ciblée sur les questions ratées d'un quiz `{generationId, weakQuestions}` — appelée en parallèle de `quiz-review` par le bouton « M'entraîner sur mes erreurs » |
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) — renvoie `{plan, costDelta}` (coût du routage seul) |
-| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 7 types : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 7 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
+| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 8 types : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 8 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
 
 Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` et `remediation-summary` exigent en plus `{generationId, weakQuestions}`.
 

@@ -65,6 +65,6 @@ Retirer les emphases **décoratives** (`MAIS`, `AUTONOME`, `CHAQUE replique`, `C
 
 ## Voir aussi
 
-- `generators/auto-agents.ts` — source unique de vérité sur la liste des 7 agents (`AUTO_AGENTS_SET`, `MAX_AUTO_PLAN_LENGTH`). Ne pas dupliquer.
+- `generators/auto-agents.ts` — source unique de vérité sur la liste des 8 agents auto (`AUTO_AGENTS_SET`, `MAX_AUTO_PLAN_LENGTH`), dictée incluse depuis feat/dictee-auto. Ne pas dupliquer.
 - `generators/router.ts` — `normalizePlan` documente la politique : choix du modèle prime, enrichment budget-aware, pas de troncature sacrificielle d'un agent LLM-choisi.
 - `config.ts` `resolveVoices` (object-arg `lang`/`profileId`/`flow`) — TTS voix par langue + rotation déterministe par profil (cf. CLAUDE.md section TTS).

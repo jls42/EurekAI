@@ -862,6 +862,7 @@ const AUTO_EXECUTORS = new Map<string, AutoExecutor>([
   ['podcast', async (ctx) => buildAutoPodcast(ctx)],
   [QUIZ_VOCAL, async (ctx) => buildAutoQuizVocal(ctx)],
   ['image', async (ctx) => buildAutoImage(ctx)],
+  [DICTATION, async (ctx) => buildAutoDictation(ctx)],
 ]);
 
 const buildAutoSummary = async (ctx: AutoCtx): Promise<Generation> => {
@@ -964,6 +965,24 @@ const buildAutoQuizVocal = async (ctx: AutoCtx): Promise<Generation> => {
   const audioUrls = await buildQuizVocalAudioUrls(ctx.store, ctx, data);
   return {
     ...makeGen(QUIZ_VOCAL, data, ctx),
+    audioUrls,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+  } as Generation;
+};
+
+const buildAutoDictation = async (ctx: AutoCtx): Promise<Generation> => {
+  const data = await generateDictation(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.summary,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count ?? DICTATION_DEFAULT_WORDS,
+  );
+  const audioUrls = await buildDictationAudioUrls(ctx.store, ctx, data);
+  return {
+    ...makeGen(DICTATION, data, ctx),
     audioUrls,
     lang: ctx.lang,
     ageGroup: ctx.ageGroup,
@@ -1155,6 +1174,7 @@ const executePlan = async (
 const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set<AutoAgentType>([
   'podcast',
   QUIZ_VOCAL,
+  DICTATION,
 ]);
 
 const splitByTtsAvailability = <T extends { agent: AutoAgentType }>(

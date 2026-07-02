@@ -11,6 +11,7 @@ export const AUTO_AGENT_TYPES = [
   'podcast',
   'quiz-vocal',
   'image',
+  'dictation',
 ] as const;
 
 export type AutoAgentType = (typeof AUTO_AGENT_TYPES)[number];

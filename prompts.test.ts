@@ -506,10 +506,10 @@ describe('defaultReasonFor', () => {
 // ── routerSystem invariants ─────────────────────────────────────────
 
 describe('routerSystem invariants', () => {
-  it('contient la règle de cardinal 4-7 agents et la liste des 7 agents', () => {
+  it('contient la règle de cardinal 4-7 agents et la liste des 8 agents', () => {
     const result = routerSystem('enfant', 'fr');
     expect(result).toContain('4-7 agents');
-    expect(result).toContain('Maximum 7 agents');
+    expect(result).toContain('Maximum 8 agents');
     for (const agent of [
       'summary',
       'flashcards',
@@ -518,6 +518,7 @@ describe('routerSystem invariants', () => {
       'podcast',
       'quiz-vocal',
       'image',
+      'dictation',
     ]) {
       expect(result).toContain(`"${agent}"`);
     }
