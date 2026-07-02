@@ -24,7 +24,11 @@ export const READING_COMFORT_LIMITS = {
   lineHeight: { min: 1.2, max: 2.5, default: 1.7 },
 } as const;
 
-type ComfortLimit = { readonly min: number; readonly max: number; readonly default: number };
+interface ComfortLimit {
+  readonly min: number;
+  readonly max: number;
+  readonly default: number;
+}
 
 // Accès aux limites par objet littéral (jamais `LIMITS[field]` dynamique) : évite
 // le faux positif « Object Injection Sink » du plugin security côté Codacy.
