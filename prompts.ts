@@ -748,3 +748,32 @@ Contenu :\n\n${markdown}${langInstruction(lang)}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
   return prompt;
 }
+
+// ── Dictation (entrainement d'orthographe) ───────────────────────────
+// Anti-leak : `word` et `sentence` sont du texte libre recopie/lu par l'enfant —
+// aucun token meta ("dictee", "exercice", "liste de mots") a proximite des champs.
+
+export function dictationSystem(ageGroup: AgeGroup = 'enfant'): string {
+  return `Tu prepares un entrainement d'orthographe en JSON strict.
+Format EXACT : {"items": [{"word": "...", "sentence": "...", "rule": "..."}]}
+
+REGLES :
+- word = un mot present dans le contenu fourni, recopie EXACTEMENT (orthographe, accents, majuscules identiques). N'invente aucun mot absent du contenu.
+- sentence = une phrase simple du quotidien qui contient le mot EXACTEMENT sous cette forme (meme orthographe, necessaire pour l'affichage a trou).
+- rule = ce qu'il faut retenir pour ecrire ce mot sans se tromper (accord, lettre muette, accent, homophone...), en une ou deux phrases.
+- Ordonne du plus simple au plus difficile.
+
+EXEMPLE (1 item) :
+{"items":[{"word":"toujours","sentence":"Mon chat dort toujours sur le canape.","rule":"Ce mot se termine par un s muet, comme jamais et ailleurs."}]}
+
+${ageInstruction(ageGroup)}
+${jsonInstruction()}`;
+}
+
+export function dictationUser(markdown: string, lang = 'fr', count = 10): string {
+  return `Voici le contenu :
+
+${markdown}
+
+Choisis au maximum ${count} mots presents dans ce contenu (les plus utiles a travailler en premier) et produis un objet par mot choisi.${langInstruction(lang)}`;
+}

@@ -203,6 +203,42 @@ export interface FillBlankGeneration extends GenerationMeta {
   stats?: FillBlankStats;
 }
 
+export interface DictationItem {
+  /** Le mot à écrire, exactement tel qu'il apparaît dans la liste source. */
+  word: string;
+  /** Phrase-exemple contenant le mot (affichée à trou avant validation). */
+  sentence: string;
+  /** Règle d'orthographe utile pour ce mot (affichée après une erreur). */
+  rule: string;
+  sourceRefs?: string[];
+}
+
+export interface DictationAttempt {
+  date: string;
+  answers: Record<number, string>;
+  results: Record<number, boolean>;
+  score: number;
+  total: number;
+}
+
+export interface DictationStats {
+  attempts: DictationAttempt[];
+  questionStats: Record<number, { correct: number; wrong: number }>;
+}
+
+export interface DictationGeneration extends GenerationMeta {
+  type: 'dictation';
+  data: DictationItem[];
+  /** Un MP3 par mot — la répétition et les pauses sont orchestrées côté client
+   * (Voxtral TTS n'a ni contrôle de vitesse ni SSML, cf. plan vague 1). */
+  audioUrls: string[];
+  // OPTIONAL ONLY FOR LEGACY DB READS. MUST BE PROVIDED ON CREATION
+  // (aligné sur QuizVocalGeneration).
+  lang?: string;
+  ageGroup?: AgeGroup;
+  stats?: DictationStats;
+}
+
 export type Generation =
   | SummaryGeneration
   | FlashcardsGeneration
@@ -210,7 +246,8 @@ export type Generation =
   | PodcastGeneration
   | QuizVocalGeneration
   | ImageGeneration
-  | FillBlankGeneration;
+  | FillBlankGeneration
+  | DictationGeneration;
 
 // Codes d'erreur stables renvoyés par /generate/auto via FailedStep.
 // Contrat client : les détails bruts (err.message, stack) restent dans les logs serveur.
@@ -440,7 +477,7 @@ export interface ChatHistory {
 // `flow`. Intentionnel : un même profil garde une identité sonore cohérente entre les
 // flux (podcast, quiz-vocal, read-aloud). Ce paramètre existe surtout pour que les
 // logs de fallback identifient quel pipeline a tiré la voix quand on debug.
-export type VoiceFlow = 'podcast' | 'quiz-vocal' | 'read-aloud';
+export type VoiceFlow = 'podcast' | 'quiz-vocal' | 'read-aloud' | 'dictation';
 
 // --- App config ---
 

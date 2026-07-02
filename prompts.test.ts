@@ -11,6 +11,8 @@ import {
   quizReviewSystem,
   quizReviewUser,
   registerInstruction,
+  dictationSystem,
+  dictationUser,
   summaryRemediationSystem,
   summaryRemediationUser,
   podcastSystem,
@@ -173,6 +175,28 @@ describe('SUMMARY_REMEDIATION', () => {
     expect(result).toContain('Q1 ratee');
     expect(result).toContain('Q2 ratee');
     expect(result.length).toBeGreaterThan(3000);
+    expect(result).toContain('English');
+  });
+});
+
+describe('DICTATION', () => {
+  it('system : format EXACT + regle word recopie', () => {
+    const result = dictationSystem('enfant');
+    expect(result).toContain('{"items"');
+    expect(result).toContain('recopie EXACTEMENT');
+  });
+
+  it("anti-leak : pas de token meta ('dictee', 'exercice', 'liste de mots') pres de word/sentence", () => {
+    const lower = dictationSystem('enfant').toLowerCase();
+    expect(lower).not.toContain('dictee');
+    expect(lower).not.toContain('exercice');
+    expect(lower).not.toContain('liste de mots');
+  });
+
+  it('user : contenu + cap + langInstruction', () => {
+    const result = dictationUser('toujours ecole', 'en', 10);
+    expect(result).toContain('toujours ecole');
+    expect(result).toContain('au maximum 10');
     expect(result).toContain('English');
   });
 });

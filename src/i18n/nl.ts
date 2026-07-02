@@ -1,4 +1,19 @@
 export const nl: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'Dictee',
+  'gen.dictation': 'Dictee',
+  'a11y.dictationAnswer': 'Woord om te schrijven',
+  'dictation.heading': 'Dictee van de week',
+  'dictation.new': 'Nieuw dictee',
+  'dictation.emptyTitle': 'Nog geen dictees',
+  'dictation.emptyWithSources': 'Importeer je woordenlijst (foto of tekst) en start een dictee',
+  'dictation.playWord': 'Luister naar het woord',
+  'dictation.replay': 'Opnieuw luisteren',
+  'dictation.placeholder': 'Typ het woord dat je hoorde…',
+  'dictation.correctSpelling': 'De juiste spelling is: {word}',
+  'dictation.perfect': 'Perfect! Geen fouten!',
+  'dictation.keepGoing': 'Ga zo door, je gaat vooruit!',
+  'dictation.restart': 'Opnieuw beginnen',
   skipLink: 'Ga naar hoofdinhoud',
 
   'nav.dashboard': 'Dashboard',

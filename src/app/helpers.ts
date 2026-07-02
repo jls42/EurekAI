@@ -65,6 +65,7 @@ const TRACKED_TYPES: ReadonlySet<string> = new Set([
   'quiz-vocal',
   'image',
   'fill-blank',
+  'dictation',
 ]);
 
 // Catégories transientes affichées dans la bannière mais hors `categories[]`
@@ -225,6 +226,7 @@ const genIcon = function (type: string) {
     'quiz-vocal': 'mic',
     image: 'image',
     'fill-blank': 'pencil-line',
+    dictation: 'spell-check',
     auto: 'sparkles',
   };
   return map[type] || 'sparkles';
@@ -565,6 +567,7 @@ const genColor = function (type: string) {
     'quiz-vocal': 'var(--color-gen-quizvocal)',
     image: 'var(--color-gen-image)',
     'fill-blank': 'var(--color-gen-fillblank)',
+    dictation: 'var(--color-gen-dictation)',
   };
   return colors[type] || COLOR_PRIMARY;
 };

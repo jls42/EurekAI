@@ -1,4 +1,20 @@
 export const pt: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'Ditado',
+  'gen.dictation': 'Ditado',
+  'a11y.dictationAnswer': 'Palavra a escrever',
+  'dictation.heading': 'Ditado da semana',
+  'dictation.new': 'Novo ditado',
+  'dictation.emptyTitle': 'Ainda não há ditados',
+  'dictation.emptyWithSources':
+    'Importe a sua lista de palavras (foto ou texto) e inicie um ditado',
+  'dictation.playWord': 'Ouvir a palavra',
+  'dictation.replay': 'Ouvir novamente',
+  'dictation.placeholder': 'Escreve a palavra que ouviste…',
+  'dictation.correctSpelling': 'A ortografia correta é: {word}',
+  'dictation.perfect': 'Perfeito! Zero erros!',
+  'dictation.keepGoing': 'Continua, estás a progredir!',
+  'dictation.restart': 'Recomeçar',
   skipLink: 'Ir para o conte\u00fado principal',
 
   'nav.dashboard': 'Painel',

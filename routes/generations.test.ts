@@ -331,6 +331,69 @@ describe('POST /:pid/generations/:gid/quiz-attempt', () => {
 });
 
 // ================================================================
+// Dictation attempt: POST /:pid/generations/:gid/dictation-attempt
+// ================================================================
+
+describe('POST /:pid/generations/:gid/dictation-attempt', () => {
+  const DICTATION_ATTEMPT_PATH = '/:pid/generations/:gid/dictation-attempt';
+  let dictationGid: string;
+
+  beforeEach(() => {
+    const dictationGen = {
+      id: 'dict-gen-1',
+      title: 'Dictée (2 mots)',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'dictation',
+      data: [
+        { word: 'toujours', sentence: 'Mon chat dort toujours ici.', rule: 'S muet final.' },
+        { word: 'école', sentence: "Je vais à l'école.", rule: 'Accent aigu.' },
+      ],
+      audioUrls: ['/a0.mp3', '/a1.mp3'],
+      lang: 'fr',
+    } as any;
+    store.addGeneration(pid, dictationGen);
+    dictationGid = dictationGen.id;
+  });
+
+  it('retourne 400 quand answers est manquant', async () => {
+    const handler = getHandler(router, 'post', DICTATION_ATTEMPT_PATH);
+    const res = mockRes();
+    await handler(mockReq({ params: { pid, gid: dictationGid }, body: {} }), res);
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+  });
+
+  it('retourne 404 quand la generation n est pas une dictée', async () => {
+    const handler = getHandler(router, 'post', DICTATION_ATTEMPT_PATH);
+    const res = mockRes();
+    await handler(mockReq({ params: { pid, gid: quizGid }, body: { answers: { 0: 'x' } } }), res);
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Entrainement introuvable' });
+  });
+
+  it('score strict via diffDictation : accent manquant = faux, casse ignorée', async () => {
+    const handler = getHandler(router, 'post', DICTATION_ATTEMPT_PATH);
+    const res = mockRes();
+    // 0: 'Toujours' correct (casse ignorée) ; 1: 'ecole' FAUX (accent manquant)
+    await handler(
+      mockReq({
+        params: { pid, gid: dictationGid },
+        body: { answers: { 0: 'Toujours', 1: 'ecole' } },
+      }),
+      res,
+    );
+    const result = res.json.mock.calls[0][0];
+    expect(result.attempt.score).toBe(1);
+    expect(result.attempt.total).toBe(2);
+    expect(result.results).toEqual({ 0: true, 1: false });
+    // Persisté dans les stats de la génération
+    const gen = store.getGeneration(pid, dictationGid) as any;
+    expect(gen.stats.attempts).toHaveLength(1);
+    expect(gen.stats.questionStats[1].wrong).toBe(1);
+  });
+});
+
 // Fill-blank attempt: POST /:pid/generations/:gid/fill-blank-attempt
 // ================================================================
 

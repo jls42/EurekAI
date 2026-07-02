@@ -21,6 +21,8 @@ import type {
   SummaryGeneration,
   FillBlankGeneration,
   FillBlankAttempt,
+  DictationGeneration,
+  DictationAttempt,
   FailedSection,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
@@ -30,6 +32,7 @@ import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
 import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
+import { diffDictation } from '../helpers/dictation-diff.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
@@ -43,6 +46,9 @@ import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-f
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
 
 const FILL_BLANK = 'fill-blank';
+const DICTATION = 'dictation';
+const ERR_ANSWERS_REQUIRED = 'answers requis';
+const LOG_ATTEMPT_ERROR = 'attempt error';
 
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
 
@@ -102,6 +108,35 @@ const scoreFillBlankAttempt = (
     if (match) score++;
     bumpQuestionStat(stats.questionStats, qi, match);
   }
+  return { score, results, stats };
+};
+
+// Comparaison STRICTE via diffDictation (accents significatifs) — le serveur reste
+// la source de vérité du score, comme pour quiz/fill-blank.
+const scoreDictationAttempt = (
+  dGen: DictationGeneration,
+  answers: Record<string, unknown>,
+): {
+  score: number;
+  results: Record<number, boolean>;
+  stats: NonNullable<DictationGeneration['stats']>;
+} => {
+  const stats = (dGen.stats ??= { attempts: [], questionStats: {} });
+  let score = 0;
+  // .at() + fromEntries plutôt que data[qi]/results[qi] : le plugin security de
+  // Codacy flagge l'indexation dynamique en « Object Injection Sink » (faux
+  // positif sur un index numérique, mais le fix structurel est aussi lisible).
+  const entries: [number, boolean][] = [];
+  for (const [qiStr, childAnswer] of Object.entries(answers)) {
+    const qi = Number(qiStr);
+    const expected = dGen.data.at(qi)?.word;
+    if (!expected) continue;
+    const { correct } = diffDictation(String(childAnswer), expected);
+    entries.push([qi, correct]);
+    if (correct) score++;
+    bumpQuestionStat(stats.questionStats, qi, correct);
+  }
+  const results = Object.fromEntries(entries) as Record<number, boolean>;
   return { score, results, stats };
 };
 
@@ -294,7 +329,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
-        res.status(400).json({ error: 'answers requis' });
+        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
@@ -318,7 +353,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       });
       res.json({ attempt, stats });
     } catch (e) {
-      logger.error('quiz', 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
+      logger.error('quiz', LOG_ATTEMPT_ERROR, { pid: req.params.pid, gid: req.params.gid }, e);
       res.status(500).json({ error: extractErrorCode(e, 'quiz') });
     }
   });
@@ -328,7 +363,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
-        res.status(400).json({ error: 'answers requis' });
+        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
@@ -353,8 +388,39 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       });
       res.json({ attempt, stats, results });
     } catch (e) {
-      logger.error(FILL_BLANK, 'attempt error', { pid: req.params.pid, gid: req.params.gid }, e);
+      logger.error(FILL_BLANK, LOG_ATTEMPT_ERROR, { pid: req.params.pid, gid: req.params.gid }, e);
       res.status(500).json({ error: extractErrorCode(e, FILL_BLANK) });
+    }
+  });
+
+  router.post('/:pid/generations/:gid/dictation-attempt', (req, res) => {
+    try {
+      const { answers } = req.body;
+      if (!answers || typeof answers !== 'object') {
+        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
+        return;
+      }
+      const gen = store.getGeneration(req.params.pid, req.params.gid);
+      if (gen?.type !== DICTATION) {
+        res.status(404).json({ error: 'Entrainement introuvable' });
+        return;
+      }
+
+      const { score, results, stats } = scoreDictationAttempt(gen, answers);
+      const attempt: DictationAttempt = {
+        date: new Date().toISOString(),
+        answers: answers as Record<number, string>,
+        results,
+        score,
+        total: gen.data.length,
+      };
+      stats.attempts.push(attempt);
+
+      store.updateGeneration(req.params.pid, req.params.gid, { stats });
+      res.json({ attempt, stats, results });
+    } catch (e) {
+      logger.error(DICTATION, LOG_ATTEMPT_ERROR, { pid: req.params.pid, gid: req.params.gid }, e);
+      res.status(500).json({ error: extractErrorCode(e, DICTATION) });
     }
   });
 

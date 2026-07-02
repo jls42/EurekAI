@@ -48,6 +48,8 @@
   --color-gen-quizvocal-rgb: 231, 111, 81;
   --color-gen-image-rgb: 233, 30, 99;
   --color-gen-fillblank-rgb: 67, 160, 71;
+  --color-gen-dictation: #0284c7;
+  --color-gen-dictation-rgb: 2, 132, 199;
 
   /* Confort de lecture (surchargées par profil via setProperty — cf.
      src/app/profiles.ts applyReadingComfortVars ; défauts = rendu actuel) */
@@ -132,6 +134,8 @@
   --color-gen-image-rgb: 244, 143, 177;
   --color-gen-fillblank: #81c784;
   --color-gen-fillblank-rgb: 129, 199, 132;
+  --color-gen-dictation: #38bdf8;
+  --color-gen-dictation-rgb: 56, 189, 248;
 
   --glass-bg: rgba(15, 26, 46, 0.75);
   --glass-border: rgba(61, 100, 160, 0.3);

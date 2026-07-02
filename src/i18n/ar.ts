@@ -1,4 +1,19 @@
 export const ar: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'إملاء',
+  'gen.dictation': 'إملاء',
+  'a11y.dictationAnswer': 'الكلمة المطلوب كتابتها',
+  'dictation.heading': 'إملاء الأسبوع',
+  'dictation.new': 'إملاء جديد',
+  'dictation.emptyTitle': 'لا يوجد إملاء بعد',
+  'dictation.emptyWithSources': 'استورد قائمة كلماتك (صورة أو نص) ثم ابدأ الإملاء',
+  'dictation.playWord': 'استمع إلى الكلمة',
+  'dictation.replay': 'إعادة الاستماع',
+  'dictation.placeholder': 'اكتب الكلمة التي سمعتها…',
+  'dictation.correctSpelling': 'التهجئة الصحيحة هي: {word}',
+  'dictation.perfect': 'ممتاز! بدون أخطاء!',
+  'dictation.keepGoing': 'واصل، أنت تتقدم!',
+  'dictation.restart': 'البدء من جديد',
   skipLink:
     '\u0627\u0646\u062a\u0642\u0644 \u0625\u0644\u0649 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0627\u0644\u0631\u0626\u064a\u0633\u064a',
 

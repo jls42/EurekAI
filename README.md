@@ -60,6 +60,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 | 🃏 | **Flashcards** | Cartes Q/R interactives, lecture audio dialoguée |
 | ❓ | **Quiz QCM** | Questions à choix multiples avec révision adaptative des erreurs (nombre configurable) |
 | ✏️ | **Textes à trous** | Exercices à compléter avec indices et validation tolérante |
+| 🔤 | **Dictée** | Mots dictés en audio (Voxtral TTS) depuis une liste importée, saisie clavier, correction stricte lettre à lettre avec règle d'orthographe expliquée |
 | 🎙️ | **Podcast** | Mini-podcast 2 voix en audio — voix Mistral par défaut ou voix personnalisées (parents !) |
 | 🖼️ | **Illustrations** | Images éducatives générées par un Agent Mistral |
 | 🗣️ | **Quiz vocal** | Questions lues à voix haute (voix custom possible), réponse orale, vérification IA |
@@ -476,6 +477,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
 | `POST` | `/api/projects/:pid/generate/quiz` | Quiz QCM |
 | `POST` | `/api/projects/:pid/generate/fill-blank` | Textes à trous |
+| `POST` | `/api/projects/:pid/generate/dictation` | Dictée (mots + phrases-exemples + règles, 1 audio TTS par mot ; hors auto-router) |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustration |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz vocal |
@@ -491,6 +493,7 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Soumettre les réponses quiz `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Soumettre les réponses textes à trous `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Soumettre les réponses de dictée `{answers}` (score serveur strict) |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Vérifier une réponse orale (audio + questionIndex) |
 | `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Lecture TTS à voix haute (fiches/flashcards) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Renommer `{title}` |
