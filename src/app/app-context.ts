@@ -81,6 +81,7 @@ export interface AppContext extends AppState {
   autoSaveProfile(immediate?: boolean): void;
   autoSaveParental(): Promise<void>;
   applyThemeLive(): void;
+  applyReadingComfortLive(): void;
   closePinDialog(): void;
   requireParentalAccess(callback: () => void): void;
   _toggleProfileProp(id: string, prop: string): Promise<void>;

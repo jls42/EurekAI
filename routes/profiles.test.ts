@@ -745,6 +745,59 @@ describe('profileRoutes', () => {
       expect(res.json.mock.calls[0][0].profile.name).toBe('Fresh');
       expect(store.get(created.id)!.name).toBe('Fresh');
     });
+
+    describe('readingComfort', () => {
+      it('persiste normalisé sans PIN (préférence, pas un champ parental)', async () => {
+        const store = new ProfileStore(tmpDir);
+        const created = store.create('Enfant', 9, '0', 'fr', '1234');
+
+        const handler = getHandler(router, 'put', '/:id');
+        const req = mockReq({
+          params: { id: created.id },
+          // letterSpacing 99 doit être clampé à la borne max ; font default droppée.
+          body: { readingComfort: { font: 'luciole', letterSpacing: 99, lineHeight: 1.7 } },
+        });
+        const res = mockRes();
+
+        await handler(req, res);
+
+        expect(res.status).not.toHaveBeenCalledWith(403);
+        expect(store.get(created.id)!.readingComfort).toEqual({
+          font: 'luciole',
+          letterSpacing: 0.3,
+        });
+      });
+
+      it('400 sur types invalides (fail-closed à la frontière HTTP)', async () => {
+        const store = new ProfileStore(tmpDir);
+        const created = store.create('Adulte', 30, '0', 'fr');
+
+        const handler = getHandler(router, 'put', '/:id');
+        for (const bad of ['luciole', { font: 'papyrus' }, { letterSpacing: 'large' }, [0.1]]) {
+          const req = mockReq({ params: { id: created.id }, body: { readingComfort: bad } });
+          const res = mockRes();
+          await handler(req, res);
+          expect(res.status).toHaveBeenCalledWith(400);
+          expect(res.json).toHaveBeenCalledWith({ error: 'Confort de lecture invalide' });
+        }
+        expect(store.get(created.id)!.readingComfort).toBeUndefined();
+      });
+
+      it('null réinitialise la préférence', async () => {
+        const store = new ProfileStore(tmpDir);
+        const created = store.create('Adulte', 30, '0', 'fr');
+        store.update(created.id, { readingComfort: { font: 'luciole' } });
+        expect(store.get(created.id)!.readingComfort).toEqual({ font: 'luciole' });
+
+        const handler = getHandler(router, 'put', '/:id');
+        const req = mockReq({ params: { id: created.id }, body: { readingComfort: null } });
+        const res = mockRes();
+
+        await handler(req, res);
+
+        expect(store.get(created.id)!.readingComfort).toBeUndefined();
+      });
+    });
   });
 
   // ===== DELETE /:id =====

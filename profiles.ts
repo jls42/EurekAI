@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import type { AgeGroup, Profile } from './types.js';
 import type { VoiceId } from './helpers/voice-types.js';
+import { normalizeReadingComfort } from './helpers/reading-comfort.js';
 import { logger } from './helpers/logger.js';
 
 export function ageToGroup(age: number): AgeGroup {
@@ -113,6 +114,34 @@ const applyModerationCategories = (raw: string[]): string[] => {
     );
   }
   return raw.filter((c) => allowed.includes(c));
+};
+
+type ProfileUpdates = Partial<
+  Pick<
+    Profile,
+    | 'name'
+    | 'age'
+    | 'avatar'
+    | 'locale'
+    | 'useModeration'
+    | 'moderationCategories'
+    | 'useConsigne'
+    | 'chatEnabled'
+    | 'mistralVoices'
+    | 'theme'
+    | 'readingComfort'
+  >
+>;
+
+// Champs scalaires à affectation directe — extraction hors de update() pour
+// garder sa cognitive complexity Sonar sous le seuil (chaque `if` compte).
+const applyScalarUpdates = (profile: Profile, updates: ProfileUpdates): void => {
+  if (updates.name !== undefined) profile.name = updates.name;
+  if (updates.avatar !== undefined) profile.avatar = updates.avatar;
+  if (updates.locale !== undefined) profile.locale = updates.locale;
+  if (updates.useModeration !== undefined) profile.useModeration = updates.useModeration;
+  if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
+  if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
 };
 
 // Mute le profile.theme si valide ('dark' | 'light' | falsy=undefined), sinon
@@ -388,37 +417,15 @@ export class ProfileStore {
     return this.list().find((p) => p.id === id) ?? null;
   }
 
-  update(
-    id: string,
-    updates: Partial<
-      Pick<
-        Profile,
-        | 'name'
-        | 'age'
-        | 'avatar'
-        | 'locale'
-        | 'useModeration'
-        | 'moderationCategories'
-        | 'useConsigne'
-        | 'chatEnabled'
-        | 'mistralVoices'
-        | 'theme'
-      >
-    >,
-  ): Profile | null {
+  update(id: string, updates: ProfileUpdates): Profile | null {
     const profiles = this.list();
     const idx = profiles.findIndex((p) => p.id === id);
     if (idx === -1) return null;
     const profile = profiles[idx];
-    if (updates.name !== undefined) profile.name = updates.name;
-    if (updates.avatar !== undefined) profile.avatar = updates.avatar;
-    if (updates.locale !== undefined) profile.locale = updates.locale;
-    if (updates.useModeration !== undefined) profile.useModeration = updates.useModeration;
+    applyScalarUpdates(profile, updates);
     if (updates.moderationCategories !== undefined) {
       profile.moderationCategories = applyModerationCategories(updates.moderationCategories);
     }
-    if (updates.useConsigne !== undefined) profile.useConsigne = updates.useConsigne;
-    if (updates.chatEnabled !== undefined) profile.chatEnabled = updates.chatEnabled;
     if (updates.mistralVoices !== undefined) {
       // Accepte uniquement null (reset) ou objet structuré. Primitives (string/number/
       // boolean) ET arrays sont rejetés avec warn — sans ça, un client buggé qui POSTe
@@ -439,6 +446,12 @@ export class ProfileStore {
     }
     if (updates.theme !== undefined) {
       applyTheme(profile, updates.theme);
+    }
+    if (updates.readingComfort !== undefined) {
+      // normalizeReadingComfort clamp les plages et retourne undefined pour un
+      // objet vide/au défaut ou un null explicite (reset) — même helper que
+      // l'aperçu live client (cf. helpers/reading-comfort.ts).
+      profile.readingComfort = normalizeReadingComfort(updates.readingComfort);
     }
     if (updates.age !== undefined) {
       profile.age = updates.age;
