@@ -112,6 +112,40 @@ describe('generateSummary', () => {
     expect(result).toEqual(validSummary);
   });
 
+  it('récupère une fiche title+summary même si key_points est vide (pas de 500)', async () => {
+    // Cas observé : summary très structuré mais key_points vide → fiche utilisable
+    const incomplete = {
+      title: 'Les climats de la France',
+      summary: '**1.** Le climat océanique est doux et pluvieux.',
+      key_points: [],
+    };
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(incomplete) } }] });
+
+    const result = await generateSummary(client, 'content');
+    expect(result.title).toBe('Les climats de la France');
+    expect(result.summary).toContain('océanique');
+    expect(result.key_points).toEqual([]);
+    expect(client.chat.complete).toHaveBeenCalledTimes(2);
+  });
+
+  it('récupère et normalise key_points fourni en texte (string → tableau)', async () => {
+    const stringKp = {
+      title: 'Les climats',
+      summary: 'Explication des climats.',
+      key_points: '- Le climat océanique est doux\n- Le climat méditerranéen est chaud',
+      vocabulary: [],
+    };
+    const client = mockClient(stringKp);
+    const result = await generateSummary(client, 'content');
+    expect(result.key_points).toEqual([
+      'Le climat océanique est doux',
+      'Le climat méditerranéen est chaud',
+    ]);
+  });
+
   it('merges multiple fiches {"fiches": [fiche1, fiche2]} with deduplication', async () => {
     const fiche1 = {
       title: 'Volcans',
@@ -251,6 +285,23 @@ describe('generateRemediationSummary', () => {
     await expect(
       generateRemediationSummary(client, 'content', weakQuestions),
     ).rejects.toBeInstanceOf(SyntaxError);
+  });
+
+  it('récupère une fiche de rappel title+summary même si key_points vide (bug « Échec de Fiche »)', async () => {
+    const incomplete = {
+      title: 'Rappel : les climats',
+      summary: '**1.** Le climat océanique...\n\n**2.** Le climat méditerranéen...',
+      key_points: [],
+    };
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(incomplete) } }] });
+
+    const result = await generateRemediationSummary(client, 'content', weakQuestions);
+    expect(result.title).toBe('Rappel : les climats');
+    expect(result.key_points).toEqual([]);
+    expect(client.chat.complete).toHaveBeenCalledTimes(2);
   });
 });
 

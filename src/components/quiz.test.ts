@@ -281,7 +281,11 @@ describe('quizComponent', () => {
 
       expect(registerGeneration).toHaveBeenCalledTimes(1);
       expect(registerGeneration).toHaveBeenCalledWith(comp, quizGen);
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationSummaryError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.showToast).not.toHaveBeenCalledWith('toast.remediationGenerated', 'success');
       expect(comp.reviewing).toBe(false);
     });
@@ -294,7 +298,11 @@ describe('quizComponent', () => {
 
       expect(registerGeneration).toHaveBeenCalledTimes(1);
       expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen);
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationQuizError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.reviewing).toBe(false);
     });
 
@@ -305,8 +313,16 @@ describe('quizComponent', () => {
       await comp.remediate();
 
       expect(registerGeneration).not.toHaveBeenCalled();
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationSummaryError', 'error');
-      expect(comp.showToast).toHaveBeenCalledWith('toast.remediationQuizError', 'error');
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationSummaryError',
+        'error',
+        expect.any(Function),
+      );
+      expect(comp.showToast).toHaveBeenCalledWith(
+        'toast.remediationQuizError',
+        'error',
+        expect.any(Function),
+      );
       expect(comp.reviewing).toBe(false);
     });
 

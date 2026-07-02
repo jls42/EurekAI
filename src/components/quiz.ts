@@ -144,10 +144,31 @@ const postRemediationTarget = async function (
   throw new Error('invalid remediation target');
 };
 
+// Réessai CIBLÉ d'une seule cible de remédiation (pas les deux) : évite de
+// régénérer la moitié déjà réussie. Le toast d'échec re-propose le réessai (chaîne).
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte `this`/params typés comme unused.
+const retryRemediationTarget = async function (
+  this: QuizContext,
+  target: 'remediation-summary' | 'quiz-review',
+  weakQuestions: QuizQuestion[],
+  errorKey: string,
+): Promise<void> {
+  try {
+    const gen = await postRemediationTarget.call(this, target, weakQuestions);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas Generation cross-module.
+    registerGeneration(this, gen);
+  } catch (e) {
+    console.error(`Remediation ${target} retry failed:`, e);
+    this.showToast(this.t(errorKey), 'error', () => {
+      void retryRemediationTarget.call(this, target, weakQuestions, errorKey);
+    });
+  }
+};
+
 // « M'entraîner sur mes erreurs » : fiche de rappel + quiz de révision, générés en
 // parallèle (allSettled, jamais Promise.all : un rejet réseau masquerait l'autre
 // résultat). Succès partiel : chaque génération obtenue est affichée même si
-// l'autre a échoué.
+// l'autre a échoué. Chaque échec propose un réessai ciblé (cf. retryRemediationTarget).
 // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy (ESLint sans résolution de types) compte le param `this` typé comme unused.
 const remediate = async function (this: QuizContext) {
   const weakQuestions = collectWeakQuestions(this.items(), this.answers);
@@ -163,14 +184,28 @@ const remediate = async function (this: QuizContext) {
     registerGeneration(this, fiche.value);
   } else {
     console.error('Remediation summary failed:', fiche.reason);
-    this.showToast(this.t('toast.remediationSummaryError'), 'error');
+    this.showToast(this.t('toast.remediationSummaryError'), 'error', () => {
+      void retryRemediationTarget.call(
+        this,
+        'remediation-summary',
+        weakQuestions,
+        'toast.remediationSummaryError',
+      );
+    });
   }
   if (quiz.status === 'fulfilled') {
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
     registerGeneration(this, quiz.value);
   } else {
     console.error('Remediation quiz failed:', quiz.reason);
-    this.showToast(this.t('toast.remediationQuizError'), 'error');
+    this.showToast(this.t('toast.remediationQuizError'), 'error', () => {
+      void retryRemediationTarget.call(
+        this,
+        'quiz-review',
+        weakQuestions,
+        'toast.remediationQuizError',
+      );
+    });
   }
   if (fiche.status === 'fulfilled' && quiz.status === 'fulfilled') {
     this.showToast(this.t('toast.remediationGenerated'), 'success');
