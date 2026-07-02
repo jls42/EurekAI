@@ -1949,7 +1949,7 @@ describe('generateRoutes', () => {
         'fr',
         'enfant',
         10,
-        expect.stringContaining('MOTS DEJA TRAVAILLES'),
+        expect.stringContaining('deja travaille les mots'),
       );
       const exclusions = vi.mocked(generateDictation).mock.calls[0][6];
       expect(exclusions).toContain('- toujours');

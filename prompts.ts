@@ -75,6 +75,32 @@ function jsonInstruction(): string {
   return 'Reponds UNIQUEMENT en JSON valide.';
 }
 
+// ── Exclusions (diversité inter-générations) ─────────────────────────
+// Headers du bloc injecté par helpers/diversity.ts#buildExclusionContext dans
+// les user prompts, AVANT langInstruction. Règle positive scoped au CHOIX du
+// contenu : jamais d'impératif générique type « NE PAS REPETER » — le LLM peut
+// l'appliquer au texte qu'il rédige (bug observé : mot masqué par « ______ »
+// dans sa propre phrase de dictée).
+const EXCLUSION_HEADERS: Record<string, string> = {
+  quiz: "Tu as deja genere les questions ci-dessous. Propose-en d'autres, sur de nouveaux points du contenu, avec de nouvelles formulations :",
+  'quiz-vocal':
+    "Tu as deja genere les questions ci-dessous. Propose-en d'autres, sur de nouveaux points du contenu, avec de nouvelles formulations :",
+  flashcards:
+    "Tu as deja genere les cartes ci-dessous. Propose-en d'autres, sur d'autres notions du contenu :",
+  'fill-blank':
+    "Tu as deja utilise les mots ci-dessous. Choisis d'autres mots et d'autres phrases du contenu :",
+  dictation: "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :",
+  podcast: 'Tu as deja traite les angles ci-dessous. Choisis un angle et une accroche differents :',
+  summary:
+    "Points deja couverts par d'autres documents du projet. Utilise d'autres exemples et d'autres formulations :",
+};
+
+export function exclusionHeader(type: string): string {
+  return (
+    EXCLUSION_HEADERS[type] ?? 'Tu as deja genere le contenu ci-dessous. Propose autre chose :'
+  );
+}
+
 // Contrat `RoutePlan.plan` (cf. generators/router.ts) exige `reason: string`.
 // Langues non listées retombent sur FR (fallback documenté).
 
@@ -182,7 +208,8 @@ ${jsonInstruction()}`;
 }
 
 // Bloc de style pour le registre 'falc' (facile a lire et a comprendre).
-// Regle positive uniquement, placee en FIN de prompt user, loin du champ "title"
+// Regle positive uniquement, placee apres le markdown (avant langInstruction,
+// qui reste dernier), loin du champ "title"
 // (anti-leak : aucun qualificatif de document du type "facile"/"simplifie" qui
 // pourrait etre recycle dans les sorties texte libre).
 export function registerInstruction(register?: SummaryRegister): string {
@@ -205,10 +232,10 @@ export function summaryUser(
 Rappel : le champ "title" nomme uniquement le sujet du cours.
 ${consigneBlock}
 
-${markdown}${langInstruction(lang)}`;
+${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
   prompt += registerInstruction(register);
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Flashcards ───────────────────────────────────────────────────────
@@ -222,7 +249,6 @@ EXEMPLE (1 item — la reponse doit etre auto-suffisante, comprehensible sans re
 
 Reponses courtes (1-2 phrases) mais auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
 ${sourceRefsInstruction('flashcard')}
-Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${jsonInstruction()}`;
 }
 
@@ -232,9 +258,9 @@ export function flashcardsUser(
   lang = 'fr',
   exclusions?: string,
 ): string {
-  let prompt = `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  let prompt = `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Quiz ─────────────────────────────────────────────────────────────
@@ -248,7 +274,6 @@ Les mauvaises reponses doivent etre credibles mais clairement fausses quand on c
 EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
 {"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 ${jsonInstruction()}`;
 }
 
@@ -340,7 +365,6 @@ REGLE DE PONCTUATION (quiz vocal) :
 - A l'interieur du texte de chaque choix (apres "A) "), AUCUNE parenthese, crochet ou artefact typographique n'est autorise. Reformule la phrase si besoin.
 - La question elle-meme ne doit contenir aucune parenthese.
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${vocalRewriteRules(lang)}
 ${jsonInstruction()}`;
 }
@@ -360,9 +384,9 @@ RAPPEL : tout doit etre en langage oral lisible (pas de chiffres romains, pas d'
 Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 export function quizUser(markdown: string, count = 15, lang = 'fr', exclusions?: string): string {
@@ -373,9 +397,9 @@ Ne mets PAS la source qui contient seulement la question — mets celle qui cont
 Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
@@ -504,14 +528,13 @@ STRUCTURE :
 
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
-Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle completement different : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
 ${jsonInstruction()}`;
 }
 
 export function podcastUser(markdown: string, lang = 'fr', exclusions?: string): string {
-  let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Image ───────────────────────────────────────────────────────────
@@ -788,7 +811,6 @@ export function verifyAnswerUser(question: string, studentAnswer: string): strin
 export function fillBlankSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie specialise dans les exercices a trous.
 ${ageInstruction(ageGroup)}
-Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices completement differents : nouveaux mots cles, nouvelles phrases, nouveaux angles.
 Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
 L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
 
@@ -821,9 +843,9 @@ export function fillBlankUser(
 Format JSON :
 {"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Dictation (entrainement d'orthographe) ───────────────────────────
@@ -852,7 +874,7 @@ export function dictationUser(markdown: string, lang = 'fr', count = 10, exclusi
 
 ${markdown}
 
-Choisis au maximum ${count} mots presents dans ce contenu et produis un objet par mot choisi. Pioche dans des passages differents du contenu, pas seulement les plus evidents.${langInstruction(lang)}`;
+Choisis au maximum ${count} mots presents dans ce contenu et produis un objet par mot choisi. Pioche dans des passages differents du contenu, pas seulement les plus evidents.`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }

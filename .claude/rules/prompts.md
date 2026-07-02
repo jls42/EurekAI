@@ -52,6 +52,13 @@ Retirer les emphases **décoratives** (`MAIS`, `AUTONOME`, `CHAQUE replique`, `C
 - **Pas de pattern recyclable** dans la forme (ex: `"Brasilia — explication..."` avec tiret cadratin → le LLM peut template-iser "X — Y" pour toutes ses flashcards). Privilégier phrase simple.
 - **Technique pédagogique transférable** dans l'explication plutôt que contenu très spécifique (ex: pour un quiz, expliquer pourquoi un distracteur est tentant, pas juste restituer un fait chronologique).
 
+## Bloc d'exclusions (diversité inter-générations)
+
+- Les headers du bloc « déjà généré » vivent dans `prompts.ts` (`exclusionHeader(type)`) — `helpers/diversity.ts#buildExclusionContext` ne porte que la mécanique (filtrage par type, extracteurs, cap 2000 chars).
+- **Règle positive, scoped au CHOIX du contenu** (« Tu as déjà généré… propose-en d'autres ») — jamais d'impératif générique type « NE PAS RÉPÉTER » : le LLM peut l'appliquer au texte qu'il rédige. Bug observé en conditions réelles : mots masqués par `______` dans leurs propres phrases de dictée.
+- La consigne de diversité vit UNIQUEMENT dans ce bloc (présent seulement quand un historique existe) — pas de phrase « tu DOIS proposer… complètement différentes » dupliquée dans les system prompts.
+- Ordre des blocs user : markdown → exclusions → registre éventuel → `langInstruction` **toujours en dernier** (verrouillé par le describe `ORDRE DES BLOCS USER` de `prompts.test.ts`).
+
 ## Contrat JSON
 
 - `jsonInstruction()` fournit `"Reponds UNIQUEMENT en JSON valide."` → appeler en fin de system prompt.

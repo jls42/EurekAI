@@ -221,9 +221,9 @@ describe('DICTATION', () => {
       'contenu',
       'fr',
       10,
-      "MOTS DEJA TRAVAILLES (CHOISIS D'AUTRES MOTS) :\n- avion",
+      "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :\n- avion",
     );
-    expect(result).toContain('MOTS DEJA TRAVAILLES');
+    expect(result).toContain('deja travaille les mots');
     expect(result).toContain('- avion');
   });
 });
@@ -266,6 +266,29 @@ describe('USER PROMPTS (router / consigne / verifyAnswer)', () => {
     expect(result).toContain('Capitale de la France ?');
     expect(result).toContain('Paris');
     expect(result).toContain('correcte ou fausse');
+  });
+});
+
+describe('ORDRE DES BLOCS USER (langInstruction en dernier)', () => {
+  it('summaryUser : exclusions et registre avant langInstruction', () => {
+    const exclusions =
+      "Points deja couverts par d'autres documents du projet. Utilise d'autres exemples et d'autres formulations :\n- X";
+    const result = summaryUser('contenu', false, 'fr', exclusions, 'falc');
+    const langIdx = result.indexOf('Ne mélange pas les langues');
+    expect(langIdx).toBeGreaterThan(result.indexOf('- X'));
+    expect(langIdx).toBeGreaterThan(result.indexOf("STYLE D'ECRITURE"));
+  });
+
+  it('dictationUser : exclusions avant langInstruction', () => {
+    const result = dictationUser('contenu', 'en', 10, 'bloc :\n- mot');
+    expect(result.indexOf('English')).toBeGreaterThan(result.indexOf('- mot'));
+  });
+
+  it('quizUser et podcastUser : exclusions avant langInstruction', () => {
+    const quiz = quizUser('contenu', 15, 'en', 'bloc :\n- Q1');
+    expect(quiz.indexOf('English')).toBeGreaterThan(quiz.indexOf('- Q1'));
+    const pod = podcastUser('contenu', 'en', 'bloc :\n- angle');
+    expect(pod.indexOf('English')).toBeGreaterThan(pod.indexOf('- angle'));
   });
 });
 

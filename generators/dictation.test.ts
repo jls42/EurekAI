@@ -62,10 +62,10 @@ describe('generateDictation', () => {
       'fr',
       'enfant',
       10,
-      "MOTS DEJA TRAVAILLES (CHOISIS D'AUTRES MOTS) :\n- avion",
+      "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :\n- avion",
     );
     const userMsg = client.chat.complete.mock.calls[0][0].messages[1].content;
-    expect(userMsg).toContain('MOTS DEJA TRAVAILLES');
+    expect(userMsg).toContain('deja travaille les mots');
     expect(userMsg).toContain('- avion');
   });
 

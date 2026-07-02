@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import { exclusionHeader } from '../prompts.js';
 import type { Generation } from '../types.js';
 
 const PARAMS: Record<string, { temperature: number; presencePenalty: number }> = {
@@ -112,18 +113,6 @@ const EXTRACTORS: Record<string, (gens: Generation[]) => string[]> = {
   summary: extractSummaryKeyPoints,
 };
 
-const HEADERS: Record<string, string> = {
-  quiz: 'QUESTIONS DEJA GENEREES (NE PAS REPETER) :',
-  'quiz-vocal': 'QUESTIONS DEJA GENEREES (NE PAS REPETER) :',
-  flashcards: 'FLASHCARDS DEJA GENEREES (NE PAS REPETER) :',
-  'fill-blank': 'MOTS/CONCEPTS DEJA UTILISES (NE PAS REPETER) :',
-  // Pas de « NE PAS REPETER » ici : le LLM l'appliquait à la phrase-exemple et
-  // masquait le mot dedans (`Le ______ chaud…`) — la consigne vise le CHOIX des mots.
-  dictation: "MOTS DEJA TRAVAILLES (CHOISIS D'AUTRES MOTS) :",
-  podcast: 'PODCASTS DEJA GENERES (CHOISIS UN ANGLE DIFFERENT) :',
-  summary: 'POINTS DEJA COUVERTS (UTILISE DES EXEMPLES ET FORMULATIONS DIFFERENTS) :',
-};
-
 export function buildExclusionContext(
   generations: Generation[],
   type: string,
@@ -138,7 +127,8 @@ export function buildExclusionContext(
   const items = extractor(matching);
   if (items.length === 0) return '';
 
-  const header = HEADERS[type] || 'CONTENU DEJA GENERE (NE PAS REPETER) :';
+  // Texte centralisé dans prompts.ts (règle positive scoped au choix du contenu).
+  const header = exclusionHeader(type);
   let result = header;
   for (const item of items) {
     const line = `\n- ${item}`;
