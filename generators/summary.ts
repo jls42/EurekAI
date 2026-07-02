@@ -80,7 +80,10 @@ function extractSummary(raw: string): StudyFiche {
   return data as unknown as StudyFiche;
 }
 
-type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+interface ChatMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
 
 // Cœur partagé generateSummary / generateRemediationSummary : appel Mistral,
 // extraction/validation StudyFiche, retry unique avec la même discipline anti-leak

@@ -148,6 +148,7 @@ const postRemediationTarget = async function (
 // parallèle (allSettled, jamais Promise.all : un rejet réseau masquerait l'autre
 // résultat). Succès partiel : chaque génération obtenue est affichée même si
 // l'autre a échoué.
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy (ESLint sans résolution de types) compte le param `this` typé comme unused.
 const remediate = async function (this: QuizContext) {
   const weakQuestions = collectWeakQuestions(this.items(), this.answers);
   if (weakQuestions.length === 0) return;
@@ -158,12 +159,14 @@ const remediate = async function (this: QuizContext) {
     postRemediationTarget.call(this, 'quiz-review', weakQuestions),
   ]);
   if (fiche.status === 'fulfilled') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
     registerGeneration(this, fiche.value);
   } else {
     console.error('Remediation summary failed:', fiche.reason);
     this.showToast(this.t('toast.remediationSummaryError'), 'error');
   }
   if (quiz.status === 'fulfilled') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
     registerGeneration(this, quiz.value);
   } else {
     console.error('Remediation quiz failed:', quiz.reason);

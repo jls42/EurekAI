@@ -1762,7 +1762,7 @@ describe('generateRoutes', () => {
     it('early 4xx ne laisse jamais de pending tracker orphelin', async () => {
       const pid = setupQuizProject();
       const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
-      const cases: Array<Record<string, unknown>> = [
+      const cases: Record<string, unknown>[] = [
         { weakQuestions },
         { generationId: 'gen-quiz' },
         { generationId: 'unknown-id', weakQuestions },
