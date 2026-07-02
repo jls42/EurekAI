@@ -51,6 +51,13 @@
   --color-gen-dictation: #0284c7;
   --color-gen-dictation-rgb: 2, 132, 199;
 
+  /* Confort de lecture (surchargées par profil via setProperty — cf.
+     src/app/profiles.ts applyReadingComfortVars ; défauts = rendu actuel) */
+  --reading-font: 'Manrope', sans-serif;
+  --reading-letter-spacing: normal;
+  --reading-word-spacing: normal;
+  --reading-line-height: 1.7;
+
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(229, 231, 235, 0.55);

@@ -88,7 +88,12 @@ describe('createProfiles', () => {
 
   describe('selectProfile', () => {
     beforeEach(() => {
-      vi.stubGlobal('document', { documentElement: { dataset: {} } });
+      vi.stubGlobal('document', {
+        documentElement: {
+          dataset: {},
+          style: { setProperty: vi.fn(), removeProperty: vi.fn() },
+        },
+      });
       vi.stubGlobal(
         'matchMedia',
         vi.fn(() => ({ matches: false })),
@@ -138,6 +143,41 @@ describe('createProfiles', () => {
 
       expect(ctx.currentProfile).toBeNull();
       expect(ctx.setLocale).not.toHaveBeenCalled();
+    });
+
+    it('applique le confort de lecture du profil (vars CSS)', () => {
+      const ctx = makeCtx({
+        profiles: [
+          {
+            id: 'p1',
+            name: 'Alice',
+            locale: 'fr',
+            readingComfort: { font: 'luciole', letterSpacing: 0.12 },
+          },
+        ],
+      });
+      callMethod('selectProfile', ctx, 'p1');
+
+      const style = (document as any).documentElement.style;
+      expect(style.setProperty).toHaveBeenCalledWith(
+        '--reading-font',
+        "'Luciole', 'Manrope', sans-serif",
+      );
+      expect(style.setProperty).toHaveBeenCalledWith('--reading-letter-spacing', '0.12em');
+      // wordSpacing/lineHeight absents → retour aux défauts theme.css.
+      expect(style.removeProperty).toHaveBeenCalledWith('--reading-word-spacing');
+      expect(style.removeProperty).toHaveBeenCalledWith('--reading-line-height');
+    });
+
+    it('retire toutes les vars pour un profil sans préférence', () => {
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
+      });
+      callMethod('selectProfile', ctx, 'p1');
+
+      const style = (document as any).documentElement.style;
+      expect(style.setProperty).not.toHaveBeenCalled();
+      expect(style.removeProperty).toHaveBeenCalledWith('--reading-font');
     });
   });
 
@@ -557,6 +597,7 @@ describe('createProfiles', () => {
         locale: 'en',
         mistralVoices: { host: '', guest: '' },
         theme: undefined,
+        readingComfort: { font: 'default', letterSpacing: 0, wordSpacing: 0, lineHeight: 1.7 },
       });
       expect(ctx.showProfileForm).toBe(false);
     });
@@ -1019,7 +1060,12 @@ describe('createProfiles', () => {
 
   describe('resetProfileDefaults', () => {
     beforeEach(() => {
-      vi.stubGlobal('document', { documentElement: { dataset: {} } });
+      vi.stubGlobal('document', {
+        documentElement: {
+          dataset: {},
+          style: { setProperty: vi.fn(), removeProperty: vi.fn() },
+        },
+      });
       vi.stubGlobal(
         'matchMedia',
         vi.fn(() => ({ matches: true })),
@@ -1052,6 +1098,15 @@ describe('createProfiles', () => {
       callMethod('resetProfileDefaults', ctx);
       expect(ctx.editingProfile.mistralVoices).toEqual({ host: '', guest: '' });
       expect(ctx.editingProfile.theme).toBeUndefined();
+      expect(ctx.editingProfile.readingComfort).toEqual({
+        font: 'default',
+        letterSpacing: 0,
+        wordSpacing: 0,
+        lineHeight: 1.7,
+      });
+      // Tout au défaut → les vars CSS sont retirées (retour au rendu standard).
+      const style = (document as any).documentElement.style;
+      expect(style.removeProperty).toHaveBeenCalledWith('--reading-font');
       expect(ctx.showToast).toHaveBeenCalledWith('toast.profileReset', 'success');
     });
 

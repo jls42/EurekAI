@@ -1,6 +1,7 @@
 import { Router, type Request, type Response } from 'express';
 import { ProfileStore, verifyPin, profileToPublic } from '../profiles.js';
 import { ProjectStore } from '../store.js';
+import { isValidReadingComfortInput } from '../helpers/reading-comfort.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { authLimiter } from '../helpers/rate-limit.js';
@@ -80,7 +81,8 @@ const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
     | 'useModeration'
     | 'moderationCategories'
     | 'useConsigne'
-    | 'chatEnabled';
+    | 'chatEnabled'
+    | 'readingComfort';
   isValid: (v: unknown) => boolean;
   error: string;
 }> = [
@@ -96,6 +98,13 @@ const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
   },
   { field: 'useConsigne', isValid: isValidBoolean, error: 'Consigne invalide' },
   { field: 'chatEnabled', isValid: isValidBoolean, error: 'Chat invalide' },
+  // Préférence de présentation — PAS dans PARENTAL_FIELDS (pas de PIN requis)
+  // ni dans CREATE_PROFILE_ALLOWED_FIELDS (éditable uniquement via update).
+  {
+    field: 'readingComfort',
+    isValid: isValidReadingComfortInput,
+    error: 'Confort de lecture invalide',
+  },
 ];
 
 const validateUpdateProfileInput = (fields: Record<string, unknown>): string | null => {
