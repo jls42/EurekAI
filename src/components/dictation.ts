@@ -33,7 +33,6 @@ interface DictationContext extends Omit<StepByStepBase<DictationItem>, 'feedback
   currentWord(): DictationItem | undefined;
   maskedSentence(): string | null;
   audioUrl(): string | undefined;
-  audioElement(): HTMLAudioElement | undefined;
   playWord(): void;
   stopWord(): void;
   clearReplayTimer(): void;
@@ -73,10 +72,6 @@ const audioUrl = function (this: DictationContext): string | undefined {
   return idx === undefined ? undefined : (this.gen as DictationGeneration).audioUrls.at(idx);
 };
 
-const audioElement = function (this: DictationContext): HTMLAudioElement | undefined {
-  return this.$refs.wordAudio as HTMLAudioElement | undefined;
-};
-
 const clearReplayTimer = function (this: DictationContext) {
   if (this._replayTimer) {
     clearTimeout(this._replayTimer);
@@ -87,7 +82,7 @@ const clearReplayTimer = function (this: DictationContext) {
 const playWord = function (this: DictationContext) {
   this.clearReplayTimer();
   this._replayedOnce = false;
-  const audio = this.audioElement();
+  const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
   if (!audio) return;
   audio.currentTime = 0;
   void audio.play().catch(() => {});
@@ -95,7 +90,7 @@ const playWord = function (this: DictationContext) {
 
 const stopWord = function (this: DictationContext) {
   this.clearReplayTimer();
-  const audio = this.audioElement();
+  const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
   if (!audio) return;
   audio.pause();
   audio.currentTime = 0;
@@ -110,7 +105,7 @@ const onAudioEnded = function (this: DictationContext) {
   this.clearReplayTimer();
   this._replayTimer = setTimeout(() => {
     this._replayTimer = null;
-    const audio = this.audioElement();
+    const audio = this.$refs.wordAudio as HTMLAudioElement | undefined;
     if (audio) {
       audio.currentTime = 0;
       void audio.play().catch(() => {});
@@ -246,7 +241,6 @@ export function dictationComponent(gen: DictationGeneration) {
     currentWord,
     maskedSentence,
     audioUrl,
-    audioElement,
     clearReplayTimer,
     playWord,
     stopWord,
