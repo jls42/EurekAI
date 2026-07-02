@@ -4,6 +4,7 @@ import { pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
+import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
 import type { AppContext } from './app-context';
 import type { FailedStepCode, Generation, Source } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
@@ -499,7 +500,9 @@ const fetchSingleGenerate = async function (
   signal: AbortSignal,
 ): Promise<Response | null> {
   const safeProjectId = encodeURIComponent(projectId);
-  const allowedUrls = AUTO_AGENT_TYPES.map(
+  // SINGLE_GENERATE_TYPES (superset des agents auto + dictée) : la dictée est
+  // générable par bouton mais reste hors de l'auto-router (cf. generation-types.ts).
+  const allowedUrls = SINGLE_GENERATE_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
   const url = '/api/projects/' + safeProjectId + '/generate/' + type;
@@ -512,7 +515,7 @@ const fetchSingleGenerate = async function (
 };
 
 const isSingleGenerateTargetSafe = function (projectId: string, type: string): boolean {
-  return PROJECT_ID_SAFE.test(projectId) && AUTO_AGENTS_SET.has(type);
+  return PROJECT_ID_SAFE.test(projectId) && SINGLE_GENERATE_SET.has(type);
 };
 
 const GENERATE_ALL_TYPES = ['summary', 'flashcards', 'quiz'] as const;
