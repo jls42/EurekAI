@@ -25,6 +25,31 @@ if (typeof globalThis.document === 'undefined') {
 
 const gen = createGenerate();
 
+const defaultLoading = {
+  summary: false,
+  flashcards: false,
+  quiz: false,
+  podcast: false,
+  'quiz-vocal': false,
+  image: false,
+  'fill-blank': false,
+  auto: false,
+  all: false,
+  voice: false,
+  websearch: false,
+};
+
+const genBindings = {
+  generate: gen.generate,
+  generateAll: gen.generateAll,
+  generateAuto: gen.generateAuto,
+  generateVoice: gen.generateVoice,
+  _audioSectionOrder: gen._audioSectionOrder,
+  playSection: gen.playSection,
+  initSummaryAudio: gen.initSummaryAudio,
+  isBatchComplete: gen.isBatchComplete,
+};
+
 function makeContext(overrides: any = {}) {
   return {
     currentProjectId: 'pid-1',
@@ -32,19 +57,7 @@ function makeContext(overrides: any = {}) {
     sources: [],
     generations: [],
     selectedIds: [],
-    loading: {
-      summary: false,
-      flashcards: false,
-      quiz: false,
-      podcast: false,
-      'quiz-vocal': false,
-      image: false,
-      'fill-blank': false,
-      auto: false,
-      all: false,
-      voice: false,
-      websearch: false,
-    },
+    loading: { ...defaultLoading },
     abortControllers: {},
     abortControllersByGid: {},
     pendingById: {},
@@ -82,14 +95,7 @@ function makeContext(overrides: any = {}) {
       const ctx = this as { apiStatus?: { mistral?: boolean } };
       return Boolean(ctx.apiStatus?.mistral);
     },
-    generate: gen.generate,
-    generateAll: gen.generateAll,
-    generateAuto: gen.generateAuto,
-    generateVoice: gen.generateVoice,
-    _audioSectionOrder: gen._audioSectionOrder,
-    playSection: gen.playSection,
-    initSummaryAudio: gen.initSummaryAudio,
-    isBatchComplete: gen.isBatchComplete,
+    ...genBindings,
     ...overrides,
   };
 }
