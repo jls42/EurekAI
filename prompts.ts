@@ -606,6 +606,44 @@ export function websearchInput(query: string, lang = 'fr'): string {
   return `Recherche des informations sur : ${query}. Donne un resume structure avec les points cles.${langInstruction(lang)}`;
 }
 
+// ── Retry prompts (2e appel apres reponse invalide) ─────────────────
+// Meme discipline que les prompts initiaux (cf. .claude/rules/prompts.md §Retry) :
+// pas d'echo de formulations a risque, contrat aligne sur le system prompt.
+
+export function summaryRetryUser(): string {
+  return "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7, jamais vide), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.";
+}
+
+const QUIZ_RETRY_MESSAGES = {
+  quiz: 'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
+  'quiz-vocal':
+    'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
+  'quiz-review':
+    'Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM. JSON valide uniquement.',
+} as const;
+
+export type QuizRetryKind = keyof typeof QUIZ_RETRY_MESSAGES;
+
+export function quizRetryUser(kind: QuizRetryKind): string {
+  return QUIZ_RETRY_MESSAGES[kind];
+}
+
+export function flashcardsRetryUser(count: number): string {
+  return `Ta reponse etait vide ou incomplete. Regenere les ${count} flashcards avec question et answer. Reponds en JSON valide.`;
+}
+
+export function fillBlankRetryUser(): string {
+  return 'Ta reponse etait vide ou incomplete. Regenere les exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.';
+}
+
+export function dictationRetryUser(): string {
+  return 'Ta reponse etait vide ou incomplete. Regenere les items. Chaque item doit avoir word, sentence (une phrase qui contient le mot ecrit en toutes lettres) et rule. JSON valide uniquement.';
+}
+
+export function podcastRetryUser(): string {
+  return 'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.';
+}
+
 // ── Consigne (detection) ────────────────────────────────────────────
 // Centralise (Phase 1A.2) le prompt inline historique de generators/consigne.ts.
 // Texte strictement verbatim — la valeur retournee est identique a

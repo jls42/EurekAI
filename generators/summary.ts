@@ -7,6 +7,7 @@ import {
   summaryUser,
   summaryRemediationSystem,
   summaryRemediationUser,
+  summaryRetryUser,
 } from '../prompts.js';
 import type { StudyFiche, AgeGroup, QuizQuestion, SummaryRegister } from '../types.js';
 
@@ -150,14 +151,7 @@ const completeStudyFiche = async (
     logger.warn('summary', `JSON parse failed, retrying: ${(e as Error).message}`);
   }
 
-  messages.push(
-    { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content:
-        "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7, jamais vide), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.",
-    },
-  );
+  messages.push({ role: 'assistant', content: raw }, { role: 'user', content: summaryRetryUser() });
 
   let retryRaw: string;
   try {

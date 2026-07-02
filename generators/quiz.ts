@@ -8,6 +8,7 @@ import {
   quizReviewUser,
   quizVocalSystem,
   quizVocalUser,
+  quizRetryUser,
 } from '../prompts.js';
 import type { QuizQuestion, AgeGroup } from '../types.js';
 
@@ -83,7 +84,7 @@ export async function generateQuiz(
     client,
     quizSystem(ageGroup),
     quizUser(markdown, count, lang, exclusions),
-    'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
+    quizRetryUser('quiz'),
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
   );
@@ -102,7 +103,7 @@ export async function generateQuizVocal(
     client,
     quizVocalSystem(ageGroup, lang),
     quizVocalUser(markdown, count, lang, exclusions),
-    'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
+    quizRetryUser('quiz-vocal'),
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,
     'quiz-vocal',
@@ -122,7 +123,7 @@ export async function generateQuizReview(
     client,
     quizReviewSystem(ageGroup),
     quizReviewUser(weakConcepts, markdown, lang),
-    'Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM. JSON valide uniquement.',
+    quizRetryUser('quiz-review'),
     "Le modele n'a pas reussi a generer la revision quiz apres 2 tentatives",
     model,
   );

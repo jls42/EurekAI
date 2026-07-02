@@ -2,7 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
-import { podcastSystem, podcastUser, pickPodcastNames } from '../prompts.js';
+import { podcastSystem, podcastUser, pickPodcastNames, podcastRetryUser } from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
 
 interface ParsedPodcastResponse {
@@ -71,8 +71,7 @@ export async function generatePodcastScript(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content:
-        'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.',
+      content: podcastRetryUser(),
     },
   );
 

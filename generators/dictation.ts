@@ -4,7 +4,7 @@ import { randomInt } from 'node:crypto';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { maskWordInSentence } from '../helpers/dictation-diff.js';
-import { dictationSystem, dictationUser } from '../prompts.js';
+import { dictationSystem, dictationUser, dictationRetryUser } from '../prompts.js';
 import type { DictationItem, AgeGroup } from '../types.js';
 
 // Cap serveur DUR : chaque item coûte un appel TTS (borne coût + latence,
@@ -83,11 +83,7 @@ export async function generateDictation(
   console.warn('Dictation validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
   messages.push(
     { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content:
-        'Ta reponse etait vide ou incomplete. Regenere les items. Chaque item doit avoir word, sentence (une phrase qui contient le mot ecrit en toutes lettres) et rule. JSON valide uniquement.',
-    },
+    { role: 'user', content: dictationRetryUser() },
   );
 
   const retry = await client.chat.complete({

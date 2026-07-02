@@ -1,7 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
-import { flashcardsSystem, flashcardsUser } from '../prompts.js';
+import { flashcardsSystem, flashcardsUser, flashcardsRetryUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
 
 function isValidFlashcards(data: Flashcard[]): boolean {
@@ -49,7 +49,7 @@ export async function generateFlashcards(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content: `Ta reponse etait vide ou incomplete. Regenere les ${effectiveCount} flashcards avec question et answer. Reponds en JSON valide.`,
+      content: flashcardsRetryUser(effectiveCount),
     },
   );
 
