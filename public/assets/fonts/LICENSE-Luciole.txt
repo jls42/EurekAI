@@ -1,0 +1,12 @@
+Luciole © Laurent Bourcellier & Jonathan Perez
+
+Les fontes Luciole (Luciole-Regular, Luciole-Bold, Luciole-Italic,
+Luciole-BoldItalic) sont distribuées gratuitement sous Licence publique
+Creative Commons Attribution 4.0 International :
+https://creativecommons.org/licenses/by/4.0/legalcode.fr
+
+These fonts are freely available under Creative Commons Attribution 4.0
+International Public License:
+https://creativecommons.org/licenses/by/4.0/legalcode
+
+Source : https://luciole-vision.com (Luciole_webfonts.zip)

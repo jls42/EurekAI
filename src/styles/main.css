@@ -46,6 +46,40 @@
   --font-size-body-sm--line-height: 1.6;
 }
 
+/* ====== Fonts locales ====== */
+/* Luciole (https://luciole-vision.com, CC BY 4.0 — © Laurent Bourcellier &
+   Jonathan Perez), police française conçue pour les lecteurs malvoyants.
+   Servie depuis public/assets/fonts/ (publicDir → /fonts/), chargée uniquement
+   quand un profil active le confort de lecture (font-display: swap). */
+@font-face {
+  font-family: 'Luciole';
+  src: url('/fonts/Luciole-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Luciole';
+  src: url('/fonts/Luciole-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Luciole';
+  src: url('/fonts/Luciole-Italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Luciole';
+  src: url('/fonts/Luciole-BoldItalic.woff2') format('woff2');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
 /* ====== Base styles ====== */
 [x-cloak] {
   display: none !important;
@@ -657,6 +691,14 @@ dialog[open] {
     box-shadow 300ms ease,
     transform 300ms ease,
     background-color 300ms ease;
+  /* Confort de lecture par profil (défauts = comportement actuel, surchargés via
+     setProperty par src/app/profiles.ts). Volontairement sur les cartes de contenu
+     pédagogique uniquement — jamais body/nav/pickers. Les h1..h6 gardent Sora et
+     leurs letter-spacing négatifs (règles élément > héritage). */
+  font-family: var(--reading-font);
+  letter-spacing: var(--reading-letter-spacing);
+  word-spacing: var(--reading-word-spacing);
+  line-height: var(--reading-line-height);
 }
 .gen-card:hover {
   transform: translateY(-2px);

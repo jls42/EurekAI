@@ -1,8 +1,10 @@
 import type { GenerationUsage } from './helpers/pricing.js';
 import type { VoiceId } from './helpers/voice-types.js';
 import type { EventKey } from './helpers/event-key.js';
+import type { ReadingComfort } from './helpers/reading-comfort.js';
 
 export type { EventKey } from './helpers/event-key.js';
+export type { ReadingComfort } from './helpers/reading-comfort.js';
 
 // --- Profiles ---
 
@@ -21,6 +23,7 @@ export interface Profile {
   chatEnabled: boolean;
   mistralVoices?: { host?: VoiceId; guest?: VoiceId };
   theme?: 'dark' | 'light';
+  readingComfort?: ReadingComfort;
   pinHash?: string;
   hasPin?: boolean;
   createdAt: string;

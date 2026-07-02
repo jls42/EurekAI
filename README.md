@@ -531,6 +531,7 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 - **[Marked](https://marked.js.org)** — Parseur Markdown
 - **[Readability](https://github.com/mozilla/readability)** — Extraction de contenu web (techno Firefox Reader View)
 - **[Lightpanda](https://lightpanda.io)** — Navigateur headless ultra-léger pour le scraping de pages JS/SPA
+- **[Luciole](https://luciole-vision.com)** — Police conçue pour les lecteurs malvoyants, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (option « Confort de lecture » des profils)
 
 Initié pendant le Mistral AI Worldwide Hackathon (mars 2026), développé intégralement par IA avec [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) et [Gemini CLI](https://geminicli.com/).
 
