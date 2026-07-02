@@ -48,6 +48,15 @@ export function ageInstruction(ageGroup: AgeGroup = 'enfant'): string {
   return AGE_INSTRUCTIONS[ageGroup];
 }
 
+// Libellés d'audience courts pour les user prompts (routeur) — même source de
+// vérité que AGE_INSTRUCTIONS, repris verbatim de l'ex-table de generators/router.ts.
+const AGE_LABELS: Record<AgeGroup, string> = {
+  enfant: 'un enfant de 6-10 ans',
+  ado: 'un adolescent de 11-15 ans',
+  etudiant: 'un etudiant de 16-25 ans',
+  adulte: 'un adulte',
+};
+
 // ── Source refs helper (DRY) ────────────────────────────────────────
 
 function sourceRefsInstruction(itemName: string): string {
@@ -659,6 +668,10 @@ Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTo
 ${jsonInstruction()}${langInstruction(lang)}`;
 }
 
+export function consigneUser(markdown: string): string {
+  return `Analyse ces documents et detecte les consignes de revision, programmes de controle ou objectifs d'apprentissage :\n\n${markdown}`;
+}
+
 // ── Router (orchestrateur) ──────────────────────────────────────────
 // Centralise (Phase 1A.2) le prompt inline historique de generators/router.ts.
 // Texte strictement verbatim — la valeur retournee est identique a celle qui
@@ -697,6 +710,10 @@ CRITERES STRATEGIQUES :
 
 Reponds en JSON strict:
 {"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
+}
+
+export function routerUser(markdown: string, ageGroup: AgeGroup = 'enfant'): string {
+  return `Analyse ce contenu et decide quel materiel educatif generer pour ${AGE_LABELS[ageGroup]}:\n\n${markdown}`;
 }
 
 // ── Feedback age instruction (verifyAnswer-specific) ────────────────
@@ -760,6 +777,10 @@ Question: "Quelle planete est la plus proche du Soleil ?" — eleve repond "Venu
 Feedback attendu: {"correct": false, "feedback": "Non, la planete la plus proche du Soleil est Mercure."}
 
 Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
+}
+
+export function verifyAnswerUser(question: string, studentAnswer: string): string {
+  return `Question: ${question}\nReponse de l'eleve: ${studentAnswer}\n\nLa reponse est-elle correcte ou fausse ?`;
 }
 
 // ── Fill-in-the-blanks ────────────────────────────────────────────────

@@ -1,7 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
-import { routerSystem, defaultReasonFor } from '../prompts.js';
+import { routerSystem, routerUser, defaultReasonFor } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 import { AUTO_AGENTS_SET, MAX_AUTO_PLAN_LENGTH } from './auto-agents.js';
 
@@ -13,13 +13,6 @@ export interface RoutePlan {
 // Source unique : AUTO_AGENTS_SET garantit que VALID_AGENTS et AUTO_EXECUTABLE
 // (côté routes/generate.ts) ne peuvent pas diverger silencieusement.
 const VALID_AGENTS = AUTO_AGENTS_SET;
-
-const AGE_LABELS: Record<AgeGroup, string> = {
-  enfant: 'un enfant de 6-10 ans',
-  ado: 'un adolescent de 11-15 ans',
-  etudiant: 'un etudiant de 16-25 ans',
-  adulte: 'un adulte',
-};
 
 const MAX_PLAN_LENGTH = MAX_AUTO_PLAN_LENGTH;
 const SUBSTANTIAL_MATERIAL_CHARS = 350;
@@ -160,7 +153,7 @@ export async function routeRequest(
       },
       {
         role: 'user',
-        content: `Analyse ce contenu et decide quel materiel educatif generer pour ${AGE_LABELS[ageGroup]}:\n\n${markdown}`,
+        content: routerUser(markdown, ageGroup),
       },
     ],
     responseFormat: { type: 'json_object' },

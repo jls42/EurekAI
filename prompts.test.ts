@@ -32,6 +32,9 @@ import {
   websearchInput,
   defaultReasonFor,
   routerSystem,
+  routerUser,
+  consigneUser,
+  verifyAnswerUser,
   feedbackAgeInstruction,
   vocalRewriteRules,
   quizVocalSystem,
@@ -242,6 +245,27 @@ describe('RETRY PROMPTS', () => {
     expect(quizRetryUser('quiz')).toContain('QCM');
     expect(quizRetryUser('quiz-vocal')).toContain('oral');
     expect(quizRetryUser('quiz-review')).toContain('NOUVELLES');
+  });
+});
+
+describe('USER PROMPTS (router / consigne / verifyAnswer)', () => {
+  it('routerUser : audience + markdown', () => {
+    const result = routerUser('du contenu de cours', 'ado');
+    expect(result).toContain('un adolescent de 11-15 ans');
+    expect(result).toContain('du contenu de cours');
+  });
+
+  it('consigneUser : detection consignes + markdown', () => {
+    const result = consigneUser('mes documents');
+    expect(result).toContain('consignes de revision');
+    expect(result).toContain('mes documents');
+  });
+
+  it('verifyAnswerUser : question + reponse eleve + interrogation binaire', () => {
+    const result = verifyAnswerUser('Capitale de la France ?', 'Paris');
+    expect(result).toContain('Capitale de la France ?');
+    expect(result).toContain('Paris');
+    expect(result).toContain('correcte ou fausse');
   });
 });
 

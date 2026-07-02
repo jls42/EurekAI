@@ -1,6 +1,6 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
-import { consigneSystem } from '../prompts.js';
+import { consigneSystem, consigneUser } from '../prompts.js';
 
 export interface ConsigneResult {
   found: boolean;
@@ -20,7 +20,7 @@ export async function detectConsigne(
       { role: 'system', content: consigneSystem(lang) },
       {
         role: 'user',
-        content: `Analyse ces documents et detecte les consignes de revision, programmes de controle ou objectifs d'apprentissage :\n\n${markdown}`,
+        content: consigneUser(markdown),
       },
     ],
     responseFormat: { type: 'json_object' },
