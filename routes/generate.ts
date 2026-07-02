@@ -27,6 +27,7 @@ import type {
   PromoteErrorOutcome,
   PromoteErrorResponse,
   SummaryRegister,
+  DictationItem,
 } from '../types.js';
 import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -34,6 +35,8 @@ import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
 import { generateSummary, generateRemediationSummary } from '../generators/summary.js';
+import { generateDictation, DICTATION_DEFAULT_WORDS } from '../generators/dictation.js';
+import { textToSpeech } from '../generators/tts-provider.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
 import { generatePodcastScript, createPodcastGeneration } from '../generators/podcast.js';
@@ -759,6 +762,64 @@ const buildQuizVocalAudioUrls = async (
   return audioUrls;
 };
 
+const DICTATION = 'dictation';
+
+// 1 MP3 par mot (pattern buildQuizVocalAudioUrls) — la répétition et les pauses
+// sont orchestrées côté client (Voxtral TTS n'a ni vitesse ni SSML), donc pas de
+// concat/silence ffmpeg côté serveur.
+const buildDictationAudioUrls = async (
+  store: ProjectStore,
+  ctx: Pick<GenContext, 'config' | 'client' | 'profileVoices' | 'lang' | 'profileId' | 'pid'>,
+  data: DictationItem[],
+): Promise<string[]> => {
+  logger.info(DICTATION, 'Generating TTS for each word...');
+  const audioUrls: string[] = [];
+  const projectDir = store.getProjectDir(ctx.pid);
+  const hostVoice = resolveVoices({
+    profileVoices: ctx.profileVoices,
+    lang: ctx.lang,
+    profileId: ctx.profileId,
+    flow: DICTATION,
+  }).host;
+  const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
+  for (const [i, item] of data.entries()) {
+    const audioBuffer = await textToSpeech(item.word, hostVoice, ttsOpts);
+    audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `dictation-w${i}`));
+  }
+  return audioUrls;
+};
+
+const buildDictationGeneration = async (
+  store: ProjectStore,
+  ctx: GenContext,
+): Promise<Generation> => {
+  logger.info(
+    DICTATION,
+    `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}, count: ${ctx.count ?? DICTATION_DEFAULT_WORDS}`,
+  );
+  const data = await generateDictation(
+    ctx.client,
+    ctx.markdown,
+    ctx.config.models.summary,
+    ctx.lang,
+    ctx.ageGroup,
+    ctx.count ?? DICTATION_DEFAULT_WORDS,
+  );
+  logger.info(DICTATION, `items OK: ${data.length} mots`);
+  const audioUrls = await buildDictationAudioUrls(store, ctx, data);
+  return {
+    id: randomUUID(),
+    title: autoTitle(DICTATION, data, ctx.lang),
+    createdAt: new Date().toISOString(),
+    sourceIds: ctx.sourceIds,
+    type: DICTATION,
+    data,
+    audioUrls,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+  };
+};
+
 const buildImageGeneration = async (store: ProjectStore, ctx: GenContext): Promise<Generation> => {
   logger.info('image', `Generating via agent... lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`);
   const data = await generateImage(
@@ -1225,6 +1286,21 @@ const registerMediaGenerationRoutes = (
       agentName: FILL_BLANK,
       trackedType: FILL_BLANK,
     }),
+  );
+  // Générable par bouton uniquement (SINGLE_GENERATE_TYPES), jamais par
+  // l'auto-router : exige une source « liste de mots » dédiée.
+  router.post(
+    '/:pid/generate/dictation',
+    handleGeneration(
+      store,
+      profileStore,
+      (ctx) => buildDictationGeneration(store, ctx),
+      'summary',
+      {
+        agentName: DICTATION,
+        trackedType: DICTATION,
+      },
+    ),
   );
 };
 

@@ -102,6 +102,21 @@ vi.mock('../generators/quiz-vocal.js', () => ({
   createQuizVocalGeneration: (fields: unknown) => fields,
 }));
 
+vi.mock('../generators/tts-provider.js', () => ({
+  textToSpeech: vi.fn().mockResolvedValue(Buffer.from('fake-word-audio')),
+}));
+
+vi.mock('../generators/dictation.js', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    generateDictation: vi.fn().mockResolvedValue([
+      { word: 'toujours', sentence: 'Mon chat dort toujours ici.', rule: 'S muet final.' },
+      { word: 'école', sentence: "Je vais à l'école.", rule: 'Accent aigu.' },
+    ]),
+  };
+});
+
 vi.mock('../generators/image.js', () => ({
   generateImage: vi.fn().mockResolvedValue({
     imageUrl: '/output/projects/test/image.png',
@@ -1841,6 +1856,61 @@ describe('generateRoutes', () => {
         const tracker = store.getProject(pid)!.results.pendingTracker ?? [];
         expect(tracker).toHaveLength(0);
       }
+    });
+  });
+
+  describe('POST /:pid/generate/dictation', () => {
+    it('génère items + 1 audio par mot, lang/ageGroup figés', async () => {
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'mots.txt',
+        markdown: 'toujours école',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/dictation');
+      const req = mockReq({ params: { pid }, body: { lang: 'fr', ageGroup: 'enfant' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      const gen = res.json.mock.calls[0][0];
+      expect(gen.type).toBe('dictation');
+      expect(gen.title).toBe('Dictée (2 mots)');
+      expect(gen.data).toHaveLength(2);
+      expect(gen.audioUrls).toHaveLength(2);
+      expect(gen.lang).toBe('fr');
+      expect(gen.ageGroup).toBe('enfant');
+    });
+
+    it('la voix est résolue avec flow dictation', async () => {
+      const { resolveVoices } = await import('../config.js');
+      vi.mocked(resolveVoices).mockClear();
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'mots.txt',
+        markdown: 'toujours école',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/dictation');
+      await handler(mockReq({ params: { pid }, body: {} }), mockRes());
+
+      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'dictation' }));
+    });
+
+    it('400 no_sources sans source (avant addPendingEntry)', async () => {
+      const pid = store.createProject('Vide').meta.id;
+      const handler = getHandler(router, 'post', '/:pid/generate/dictation');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+      expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
     });
   });
 

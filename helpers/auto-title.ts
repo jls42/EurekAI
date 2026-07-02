@@ -16,6 +16,8 @@ const TITLE_FORMATTERS: Record<string, (data: unknown, lang: string) => string> 
   image: () => 'Illustration',
   'fill-blank': (data, lang) =>
     `${lang === 'en' ? 'Fill-in-the-blanks' : 'Textes à trous'} (${arrayLen(data)})`,
+  dictation: (data, lang) =>
+    lang === 'en' ? `Dictation (${arrayLen(data)} words)` : `Dictée (${arrayLen(data)} mots)`,
 };
 
 export function autoTitle(type: string, data: unknown, lang = 'fr'): string {
