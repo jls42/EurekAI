@@ -379,6 +379,45 @@ Format JSON :
 Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 }
 
+export function summaryRemediationSystem(ageGroup: AgeGroup = 'enfant'): string {
+  return String.raw`Tu es un expert en pedagogie adaptative. L'eleve a rate certaines questions : re-explique UNIQUEMENT les notions concernees, sous un autre angle que les questions d'origine (definition simple, cas concret, contre-exemple).
+Produis UN SEUL objet JSON strict.
+Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
+
+REGLE POUR LE CHAMP "title" :
+- title = le sujet commun des notions, court et descriptif.
+- Exemples attendus : "Les phases de la Lune", "L'accord du participe passe".
+- title ne doit pas contenir de qualificatif sur le format du document.
+
+REGLES DE CONTENU :
+- Couvre CHAQUE notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
+- summary : re-explication claire et progressive de chaque notion (3-6 phrases par notion), avec un exemple concret different de la question d'origine. Utilise des retours a la ligne (\n\n) entre les notions.
+- key_points : les points a retenir pour ne plus se tromper, formules autrement que dans les questions ratees.
+- vocabulary : les termes qui ont pu porter a confusion, definis simplement.
+- citations : les extraits des sources qui eclairent chaque notion.
+
+REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
+- Format canonique : un bracket par source, meme en multi-citation.
+- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+
+${ageInstruction(ageGroup)}
+${jsonInstruction()}`;
+}
+
+export function summaryRemediationUser(
+  weakConcepts: string,
+  markdown: string,
+  lang = 'fr',
+): string {
+  return `L'eleve a rate ces questions :
+- ${weakConcepts}
+
+Remplis l'objet JSON attendu en re-expliquant uniquement les notions concernees par ces questions, a partir des sources ci-dessous. Les sources sont numerotees (# Source 1, # Source 2, etc.).
+Rappel : le champ "title" nomme uniquement le sujet.
+
+${markdown}${langInstruction(lang)}`;
+}
+
 // ── Podcast ──────────────────────────────────────────────────────────
 
 // Pool de prenoms epicenes (neutres en genre) pour les personnages du podcast.

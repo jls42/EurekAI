@@ -2,8 +2,13 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
-import { summarySystem, summaryUser } from '../prompts.js';
-import type { StudyFiche, AgeGroup } from '../types.js';
+import {
+  summarySystem,
+  summaryUser,
+  summaryRemediationSystem,
+  summaryRemediationUser,
+} from '../prompts.js';
+import type { StudyFiche, AgeGroup, QuizQuestion } from '../types.js';
 
 // `const = function` plutôt que `function` pour empêcher Lizard d'agglomérer le CCN
 // avec unwrapAndMerge / extractSummary qui suivent (cf. CLAUDE.md piège connu).
@@ -75,20 +80,16 @@ function extractSummary(raw: string): StudyFiche {
   return data as unknown as StudyFiche;
 }
 
-export async function generateSummary(
-  client: Mistral,
-  markdown: string,
-  model = 'mistral-large-latest',
-  hasConsigne = false,
-  lang = 'fr',
-  ageGroup: AgeGroup = 'enfant',
-  exclusions?: string,
-): Promise<StudyFiche> {
-  const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: summarySystem(ageGroup) },
-    { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions) },
-  ];
+type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 
+// Cœur partagé generateSummary / generateRemediationSummary : appel Mistral,
+// extraction/validation StudyFiche, retry unique avec la même discipline anti-leak
+// que le prompt initial (cf. .claude/rules/prompts.md §Retry).
+const completeStudyFiche = async (
+  client: Mistral,
+  model: string,
+  messages: ChatMessage[],
+): Promise<StudyFiche> => {
   const response = await client.chat.complete({
     model,
     messages,
@@ -148,4 +149,39 @@ export async function generateSummary(
   }
 
   return retryData;
+};
+
+export async function generateSummary(
+  client: Mistral,
+  markdown: string,
+  model = 'mistral-large-latest',
+  hasConsigne = false,
+  lang = 'fr',
+  ageGroup: AgeGroup = 'enfant',
+  exclusions?: string,
+): Promise<StudyFiche> {
+  const messages: ChatMessage[] = [
+    { role: 'system', content: summarySystem(ageGroup) },
+    { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions) },
+  ];
+  return completeStudyFiche(client, model, messages);
+}
+
+// Fiche de remédiation post-quiz : ré-explique uniquement les notions des
+// questions ratées (weakQuestions envoyées par le client, cf. routes/generate.ts
+// validateQuizReviewInputs). Même format weakConcepts que generateQuizReview.
+export async function generateRemediationSummary(
+  client: Mistral,
+  markdown: string,
+  weakQuestions: QuizQuestion[],
+  model = 'mistral-large-latest',
+  lang = 'fr',
+  ageGroup: AgeGroup = 'enfant',
+): Promise<StudyFiche> {
+  const weakConcepts = weakQuestions.map((q) => q.question).join('\n- ');
+  const messages: ChatMessage[] = [
+    { role: 'system', content: summaryRemediationSystem(ageGroup) },
+    { role: 'user', content: summaryRemediationUser(weakConcepts, markdown, lang) },
+  ];
+  return completeStudyFiche(client, model, messages);
 }
