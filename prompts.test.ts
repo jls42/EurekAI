@@ -10,6 +10,8 @@ import {
   quizUser,
   quizReviewSystem,
   quizReviewUser,
+  summaryRemediationSystem,
+  summaryRemediationUser,
   podcastSystem,
   podcastUser,
   pickPodcastNames,
@@ -118,6 +120,34 @@ describe('QUIZ_REVIEW', () => {
     const result = quizReviewUser('La photosynthese', 'a'.repeat(4000));
     expect(result).toContain('La photosynthese');
     expect(result.length).toBeGreaterThan(4000);
+  });
+});
+
+describe('SUMMARY_REMEDIATION', () => {
+  it('system : regle positive title + format objet plat', () => {
+    const result = summaryRemediationSystem('enfant');
+    expect(result).toContain('REGLE POUR LE CHAMP "title"');
+    expect(result).toContain('PAS de tableau "fiches"');
+    expect(result).toContain('notion ratee');
+  });
+
+  it('anti-leak : pas de combos meta interdits (cf. summarySystem title policy)', () => {
+    const lower = summaryRemediationSystem('enfant').toLowerCase();
+    expect(lower).not.toContain('cree une seule fiche de revision complete');
+    expect(lower).not.toContain('fiche de revision');
+    expect(lower).not.toContain('la fiche finale');
+    expect(lower).not.toContain('avec cette fiche');
+    expect(lower).not.toContain('resume complet du cours');
+    // Le persona "remediation" ne doit pas voisiner la regle title (recyclage).
+    expect(lower).not.toContain('title = fiche');
+  });
+
+  it('user : inclut questions ratees + markdown + langInstruction', () => {
+    const result = summaryRemediationUser('Q1 ratee\n- Q2 ratee', 'a'.repeat(3000), 'en');
+    expect(result).toContain('Q1 ratee');
+    expect(result).toContain('Q2 ratee');
+    expect(result.length).toBeGreaterThan(3000);
+    expect(result).toContain('English');
   });
 });
 

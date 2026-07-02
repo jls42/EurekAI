@@ -32,7 +32,7 @@ import type { ProfileStore } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
-import { generateSummary } from '../generators/summary.js';
+import { generateSummary, generateRemediationSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
 import { generatePodcastScript, createPodcastGeneration } from '../generators/podcast.js';
@@ -335,6 +335,9 @@ interface QuizReviewValidated {
 type ValidationResult<T> = { ok: true; data: T } | { ok: false; status: number; error: string };
 
 const reviewLabelForLang = (lang: string): string => (lang === 'en' ? 'Review' : 'Revision');
+
+// Préfixe titre de la fiche de remédiation — même précédent fr/en que reviewLabelForLang.
+const remediationLabelForLang = (lang: string): string => (lang === 'en' ? 'Recap' : 'Rappel');
 
 function validateQuizReviewInputs(
   store: ProjectStore,
@@ -1246,6 +1249,55 @@ const registerQuizReviewRoute = (
   });
 };
 
+// Remédiation post-quiz : mêmes inputs que quiz-review (generationId + weakQuestions,
+// validés par validateQuizReviewInputs AVANT addPendingEntry), mais produit une fiche
+// summary ciblée sur les notions ratées. Le client appelle les deux routes en parallèle
+// (cf. src/components/quiz.ts remediate).
+const registerRemediationSummaryRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
+  router.post('/:pid/generate/remediation-summary', async (req, res) => {
+    const resolved = resolveClient(req);
+    if (!resolved.ok) {
+      res.status(resolved.status).json({ error: resolved.error });
+      return;
+    }
+    const validation = validateQuizReviewInputs(store, req.params.pid, req.body);
+    if (!validation.ok) {
+      res.status(validation.status).json({ error: validation.error });
+      return;
+    }
+    const { originalGen, weakQuestions, markdown } = validation.data;
+    const remediationLabel = remediationLabelForLang(req.body.lang || 'fr');
+    await handleGeneration(
+      store,
+      profileStore,
+      async (ctx) => {
+        const data = await generateRemediationSummary(
+          ctx.client,
+          markdown,
+          weakQuestions,
+          ctx.config.models.summary,
+          ctx.lang,
+          ctx.ageGroup,
+        );
+        return {
+          id: randomUUID(),
+          title: `${remediationLabel} — ${originalGen.title}`,
+          createdAt: new Date().toISOString(),
+          sourceIds: originalGen.sourceIds,
+          type: 'summary' as const,
+          data,
+        };
+      },
+      'summary',
+      { skipContextCheck: true, agentName: 'remediation-summary', trackedType: 'summary' },
+    )(req, res);
+  });
+};
+
 const registerRouteAnalysisRoute = (router: Router, store: ProjectStore): void => {
   router.post('/:pid/generate/route', async (req, res) => {
     try {
@@ -1373,6 +1425,7 @@ export function generateRoutes(store: ProjectStore, profileStore: ProfileStore):
   const router = Router();
   registerCoreGenerationRoutes(router, store, profileStore);
   registerQuizReviewRoute(router, store, profileStore);
+  registerRemediationSummaryRoute(router, store, profileStore);
   registerMediaGenerationRoutes(router, store, profileStore);
   registerRouteAnalysisRoute(router, store);
   registerAutoRoute(router, store, profileStore);

@@ -168,11 +168,11 @@
                 <div class="flex gap-3 justify-center flex-wrap">
                   <button
                     x-show="score < items().length"
-                    @click="reviewErrors()"
+                    @click="remediate()"
                     :disabled="reviewing"
                     class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring disabled:opacity-50"
                   >
-                    <span x-show="!reviewing" x-text="t('quiz.reviewErrors')"></span>
+                    <span x-show="!reviewing" x-text="t('quiz.remediate')">S'entraîner</span>
                     <span x-show="reviewing" class="flex items-center gap-2"
                       ><i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i>
                       <span x-text="t('common.generating')"></span

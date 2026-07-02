@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { generateSummary } from './summary.js';
+import { generateSummary, generateRemediationSummary } from './summary.js';
 
 const validSummary = {
   title: 'Les volcans',
@@ -170,5 +170,74 @@ describe('generateSummary', () => {
     expect(result.title).toBe('Titre');
     expect(result.summary).toBe('Resume');
     expect(result.key_points).toEqual(['Point 1']);
+  });
+});
+
+describe('generateRemediationSummary', () => {
+  const weakQuestions = [
+    { question: 'Quelle est la couleur du ciel ?', choices: ['Rouge', 'Bleu'], correct: 1 },
+    { question: 'Combien font 2 + 2 ?', choices: ['3', '4'], correct: 1 },
+  ] as any[];
+
+  it('returns valid StudyFiche and injects weak questions into user prompt', async () => {
+    const client = mockClient(validSummary);
+    const result = await generateRemediationSummary(
+      client,
+      'Contenu du cours',
+      weakQuestions,
+      'custom-model',
+      'fr',
+      'enfant',
+    );
+
+    expect(result).toEqual(validSummary);
+    const call = client.chat.complete.mock.calls[0][0];
+    expect(call.model).toBe('custom-model');
+    expect(call.messages).toHaveLength(2);
+    expect(call.messages[1].content).toContain('Quelle est la couleur du ciel ?');
+    expect(call.messages[1].content).toContain('Combien font 2 + 2 ?');
+    expect(call.messages[1].content).toContain('Contenu du cours');
+    expect(call.responseFormat).toEqual({ type: 'json_object' });
+  });
+
+  it('anti-leak : le system prompt ne contient pas de token meta recyclable', async () => {
+    const client = mockClient(validSummary);
+    await generateRemediationSummary(client, 'content', weakQuestions);
+
+    const systemPrompt = client.chat.complete.mock.calls[0][0].messages[0].content.toLowerCase();
+    // Le mot "remediation" (persona) ne doit pas voisiner le champ title,
+    // et les combos historiques interdits restent absents (cf. prompts.test.ts).
+    expect(systemPrompt).not.toContain('une seule fiche complete');
+    expect(systemPrompt).not.toContain('fiche de revision');
+    expect(systemPrompt).not.toContain('resume complet du cours');
+  });
+
+  it('retries with the same discipline as generateSummary on invalid JSON', async () => {
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({
+        choices: [{ message: { content: JSON.stringify(validSummary) } }],
+      });
+
+    const result = await generateRemediationSummary(client, 'content', weakQuestions);
+    expect(result).toEqual(validSummary);
+    expect(client.chat.complete).toHaveBeenCalledTimes(2);
+
+    const retryCall = client.chat.complete.mock.calls[1][0];
+    const retryUserMessage = retryCall.messages[retryCall.messages.length - 1].content;
+    expect(retryUserMessage.toLowerCase()).not.toContain('une seule fiche complete');
+    expect(retryUserMessage).toContain('objet JSON unique');
+  });
+
+  it('throws SyntaxError when both attempts fail', async () => {
+    const client = mockClient({});
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{}' } }] });
+
+    await expect(
+      generateRemediationSummary(client, 'content', weakQuestions),
+    ).rejects.toBeInstanceOf(SyntaxError);
   });
 });
