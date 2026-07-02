@@ -32,6 +32,7 @@
   --color-gen-quizvocal: var(--color-gen-quizvocal);
   --color-gen-image: var(--color-gen-image);
   --color-gen-fillblank: var(--color-gen-fillblank);
+  --color-gen-dictation: var(--color-gen-dictation);
 
   --radius-card: 1.75rem;
   --radius-button: 1.25rem;
@@ -313,6 +314,10 @@ h6 {
 .icon-chip-fillblank {
   background: rgba(var(--color-gen-fillblank-rgb), 0.14);
   border: 1px solid rgba(var(--color-gen-fillblank-rgb), 0.28);
+}
+.icon-chip-dictation {
+  background: rgba(var(--color-gen-dictation-rgb), 0.14);
+  border: 1px solid rgba(var(--color-gen-dictation-rgb), 0.28);
 }
 .icon-chip-chat {
   background: rgba(var(--color-gen-summary-rgb), 0.14);

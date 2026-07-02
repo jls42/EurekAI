@@ -1,4 +1,19 @@
 export const fr: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'Dictée',
+  'gen.dictation': 'Dictée',
+  'a11y.dictationAnswer': 'Mot à écrire',
+  'dictation.heading': 'Dictée de la semaine',
+  'dictation.new': 'Nouvelle dictée',
+  'dictation.emptyTitle': 'Aucune dictée pour le moment',
+  'dictation.emptyWithSources': 'Importe ta liste de mots (photo ou texte) puis lance une dictée',
+  'dictation.playWord': 'Écouter le mot',
+  'dictation.replay': 'Réécouter',
+  'dictation.placeholder': 'Écris le mot entendu…',
+  'dictation.correctSpelling': 'La bonne orthographe est : {word}',
+  'dictation.perfect': 'Parfait ! Zéro faute !',
+  'dictation.keepGoing': 'Continue, tu progresses !',
+  'dictation.restart': 'Recommencer',
   // Skip link
   skipLink: 'Aller au contenu principal',
 

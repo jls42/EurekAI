@@ -176,9 +176,9 @@ describe('createState', () => {
     expect(keys).toContain('image');
   });
 
-  it('categories has 10 items', () => {
+  it('categories has 11 items', () => {
     const state = createState();
-    expect(state.categories).toHaveLength(10);
+    expect(state.categories).toHaveLength(11);
   });
 
   it('each category has key, labelKey, icon, and color', () => {

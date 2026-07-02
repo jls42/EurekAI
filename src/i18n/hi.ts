@@ -1,4 +1,19 @@
 export const hi: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'श्रुतलेख',
+  'gen.dictation': 'श्रुतलेख',
+  'a11y.dictationAnswer': 'लिखने के लिए शब्द',
+  'dictation.heading': 'सप्ताह का श्रुतलेख',
+  'dictation.new': 'नया श्रुतलेख',
+  'dictation.emptyTitle': 'अभी कोई श्रुतलेख नहीं',
+  'dictation.emptyWithSources': 'अपनी शब्द सूची आयात करें (फ़ोटो या टेक्स्ट) और श्रुतलेख शुरू करें',
+  'dictation.playWord': 'शब्द सुनें',
+  'dictation.replay': 'फिर से सुनें',
+  'dictation.placeholder': 'सुना हुआ शब्द लिखें…',
+  'dictation.correctSpelling': 'सही वर्तनी है: {word}',
+  'dictation.perfect': 'बहुत बढ़िया! कोई गलती नहीं!',
+  'dictation.keepGoing': 'जारी रखो, तुम आगे बढ़ रहे हो!',
+  'dictation.restart': 'फिर से शुरू करें',
   skipLink:
     '\u092E\u0941\u0916\u094D\u092F \u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u092A\u0930 \u091C\u093E\u090F\u0901',
 

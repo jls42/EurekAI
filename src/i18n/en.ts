@@ -1,4 +1,19 @@
 export const en: Record<string, string> = {
+  // Dictée
+  'nav.dictation': 'Dictation',
+  'gen.dictation': 'Dictation',
+  'a11y.dictationAnswer': 'Word to write',
+  'dictation.heading': 'Weekly dictation',
+  'dictation.new': 'New dictation',
+  'dictation.emptyTitle': 'No dictation yet',
+  'dictation.emptyWithSources': 'Import your word list (photo or text), then start a dictation',
+  'dictation.playWord': 'Listen to the word',
+  'dictation.replay': 'Play again',
+  'dictation.placeholder': 'Type the word you heard…',
+  'dictation.correctSpelling': 'The correct spelling is: {word}',
+  'dictation.perfect': 'Perfect! No mistakes!',
+  'dictation.keepGoing': 'Keep going, you are improving!',
+  'dictation.restart': 'Start over',
   skipLink: 'Skip to main content',
 
   'nav.dashboard': 'Dashboard',

@@ -25,6 +25,7 @@ import { app } from './app/index';
 import { quizComponent } from './components/quiz';
 import { quizVocalComponent } from './components/quiz-vocal';
 import { fillBlankComponent } from './components/fill-blank';
+import { dictationComponent } from './components/dictation';
 import { flashcardsComponent } from './components/flashcards';
 import { installCrossTabSync } from './app/cross-tab-sync';
 
@@ -44,6 +45,7 @@ Alpine.data('app', app);
 Alpine.data('quizComponent', quizComponent);
 Alpine.data('quizVocalComponent', quizVocalComponent);
 Alpine.data('fillBlankComponent', fillBlankComponent);
+Alpine.data('dictationComponent', dictationComponent);
 Alpine.data('flashcardsComponent', flashcardsComponent);
 
 Alpine.start();

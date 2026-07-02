@@ -56,6 +56,12 @@ const CATEGORIES_DEFAULT: ReadonlyArray<{
     icon: 'pencil-line',
     color: 'var(--color-gen-fillblank)',
   },
+  {
+    key: 'dictation',
+    labelKey: 'nav.dictation',
+    icon: 'spell-check',
+    color: 'var(--color-gen-dictation)',
+  },
   { key: 'image', labelKey: 'nav.image', icon: 'image', color: 'var(--color-gen-image)' },
 ];
 
@@ -161,6 +167,7 @@ const initGenerationState = () => ({
     'quiz-vocal': false,
     image: false,
     'fill-blank': false,
+    dictation: false,
     auto: false,
     all: false,
     voice: false,

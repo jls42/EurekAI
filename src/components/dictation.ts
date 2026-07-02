@@ -1,0 +1,217 @@
+import { stepByStep, type StepByStepBase } from './step-by-step';
+import { diffDictation, maskWordInSentence, type DictationDiff } from '@helpers/dictation-diff';
+import type { AppContext } from '../app/app-context';
+import type { DictationGeneration, DictationItem, DictationStats, Generation } from '../../types';
+
+// Pause avant la relecture automatique du mot (1 seule relecture — Voxtral TTS
+// n'a pas de voix lente, cf. plan vague 1 : l'app orchestre répétition + pause,
+// et l'enfant garde la main avec le bouton réécouter).
+const REPLAY_PAUSE_MS = 3000;
+
+interface DictationContext extends Omit<StepByStepBase<DictationItem>, 'feedback'>, AppContext {
+  typed: string;
+  answers: Record<number, string>;
+  results: Record<number, boolean>;
+  feedback: DictationDiff | null;
+  _replayTimer: ReturnType<typeof setTimeout> | null;
+  _replayedOnce: boolean;
+  currentWord(): DictationItem | undefined;
+  maskedSentence(): string | null;
+  audioUrl(): string | undefined;
+  wordAudio(): HTMLAudioElement | undefined;
+  playWord(): void;
+  stopWord(): void;
+  clearReplayTimer(): void;
+  onAudioEnded(): void;
+  isCurrentAnswered(): boolean;
+  checkAnswer(): void;
+  restoreState(): void;
+  submitFullAttempt(): Promise<void>;
+  retryWrongWords(): void;
+  resetDictation(): void;
+  handleKey(e: KeyboardEvent): void;
+}
+
+export function dictationComponent(gen: DictationGeneration) {
+  return {
+    ...stepByStep<DictationGeneration>(gen),
+    typed: '',
+    answers: {} as Record<number, string>,
+    results: {} as Record<number, boolean>,
+    _replayTimer: null as ReturnType<typeof setTimeout> | null,
+    _replayedOnce: false,
+
+    currentWord(this: DictationContext): DictationItem | undefined {
+      return this.currentItem();
+    },
+
+    // Phrase-exemple À TROU avant validation (sinon l'enfant recopie le mot).
+    // null si le mot n'est pas retrouvé dans la phrase → la vue n'affiche alors
+    // la phrase qu'après validation (fallback documenté du plan).
+    maskedSentence(this: DictationContext): string | null {
+      const item = this.currentWord();
+      if (!item) return null;
+      return maskWordInSentence(item.sentence, item.word);
+    },
+
+    audioUrl(this: DictationContext): string | undefined {
+      const idx = this.currentIndex();
+      // StepByStepBase type `gen` en Generation large — narrow vers la dictée.
+      return idx === undefined ? undefined : (this.gen as DictationGeneration).audioUrls?.[idx];
+    },
+
+    wordAudio(this: DictationContext): HTMLAudioElement | undefined {
+      return this.$refs.wordAudio as HTMLAudioElement | undefined;
+    },
+
+    clearReplayTimer(this: DictationContext) {
+      if (this._replayTimer) {
+        clearTimeout(this._replayTimer);
+        this._replayTimer = null;
+      }
+    },
+
+    playWord(this: DictationContext) {
+      this.clearReplayTimer();
+      this._replayedOnce = false;
+      const audio = this.wordAudio();
+      if (!audio) return;
+      audio.currentTime = 0;
+      void audio.play().catch(() => {});
+    },
+
+    stopWord(this: DictationContext) {
+      this.clearReplayTimer();
+      const audio = this.wordAudio();
+      if (!audio) return;
+      audio.pause();
+      audio.currentTime = 0;
+    },
+
+    // Une seule relecture automatique après une pause, jamais après validation.
+    // Le timer est SYSTÉMATIQUEMENT nettoyé sur next/prev/reset/retry/validation
+    // et fermeture de carte (sinon un replay différé part après navigation).
+    onAudioEnded(this: DictationContext) {
+      if (this.feedback || this._replayedOnce) return;
+      this._replayedOnce = true;
+      this.clearReplayTimer();
+      this._replayTimer = setTimeout(() => {
+        this._replayTimer = null;
+        const audio = this.wordAudio();
+        if (audio) {
+          audio.currentTime = 0;
+          void audio.play().catch(() => {});
+        }
+      }, REPLAY_PAUSE_MS);
+    },
+
+    isCurrentAnswered(this: DictationContext): boolean {
+      const idx = this.currentIndex();
+      return idx !== undefined && idx in this.results;
+    },
+
+    checkAnswer(this: DictationContext) {
+      if (this.isReviewing()) return;
+      const idx = this.currentIndex();
+      const item = this.currentWord();
+      if (idx === undefined || !item || !this.typed.trim()) return;
+      this.stopWord();
+      const diff = diffDictation(this.typed, item.word);
+      this.answers[idx] = this.typed;
+      this.results[idx] = diff.correct;
+      if (diff.correct) this.score++;
+      // L'input est verrouillé via :disabled="!!feedback" dans la vue.
+      this.feedback = diff;
+    },
+
+    onNextReady(this: DictationContext) {
+      this.stopWord();
+      this.restoreState();
+    },
+
+    onPrevReady(this: DictationContext) {
+      this.stopWord();
+      this.restoreState();
+    },
+
+    restoreState(this: DictationContext) {
+      const idx = this.currentIndex();
+      this._replayedOnce = false;
+      if (idx !== undefined && idx in this.answers) {
+        this.typed = this.answers[idx];
+        const item = this.items()[idx];
+        this.feedback = diffDictation(this.answers[idx], item?.word ?? '');
+      } else {
+        this.typed = '';
+        this.feedback = null;
+        this.$nextTick(() => {
+          (this.$refs.dictationInput as HTMLInputElement | undefined)?.focus();
+        });
+      }
+    },
+
+    onFinish(this: DictationContext) {
+      this.stopWord();
+      this.submitFullAttempt();
+    },
+
+    async submitFullAttempt(this: DictationContext) {
+      const pid = this.currentProjectId;
+      try {
+        const res = await fetch(
+          '/api/projects/' + pid + '/generations/' + this.gen.id + '/dictation-attempt',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ answers: this.answers }),
+          },
+        );
+        if (res.ok) {
+          const result = (await res.json()) as { stats: DictationStats };
+          (this.gen as Generation & { stats?: DictationStats }).stats = result.stats;
+          this.showToast(this.t('toast.scoreSaved'), 'success');
+        } else {
+          console.error('Dictation attempt failed:', res.status);
+          this.showToast(this.t('toast.scoreError'), 'error');
+        }
+      } catch {
+        this.showToast(this.t('toast.scoreError'), 'error');
+      }
+    },
+
+    retryWrongWords(this: DictationContext) {
+      this.stopWord();
+      const wrong = Object.entries(this.results)
+        .filter(([, v]) => !v)
+        .map(([k]) => Number(k));
+      this.answers = {};
+      this.results = {};
+      this.typed = '';
+      this.retryWrong(wrong);
+      this.$nextTick(() => {
+        (this.$refs.dictationInput as HTMLInputElement | undefined)?.focus();
+      });
+    },
+
+    resetDictation(this: DictationContext) {
+      this.stopWord();
+      this.answers = {};
+      this.results = {};
+      this.typed = '';
+      this.resetAll();
+      this.$nextTick(() => {
+        (this.$refs.dictationInput as HTMLInputElement | undefined)?.focus();
+      });
+    },
+
+    handleKey(this: DictationContext, e: KeyboardEvent) {
+      if (e.key !== 'Enter') return;
+      if (this.isReviewing()) return;
+      if (this.feedback) {
+        this.nextQuestion();
+      } else if (this.typed.trim()) {
+        this.checkAnswer();
+      }
+    },
+  };
+}
