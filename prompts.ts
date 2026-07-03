@@ -51,8 +51,10 @@ export function ageInstruction(ageGroup: AgeGroup = 'enfant'): string {
   return AGE_INSTRUCTIONS[ageGroup];
 }
 
-// Libellés d'audience courts pour les user prompts (routeur) — même source de
-// vérité que AGE_INSTRUCTIONS, repris verbatim de l'ex-table de generators/router.ts.
+// Libellés d'audience courts pour les user prompts (routeur) — table sœur
+// d'AGE_INSTRUCTIONS (PAS la même donnée : à maintenir en cohérence manuellement
+// si les buckets AgeGroup évoluent), reprise verbatim de l'ex-table de
+// generators/router.ts. La plage « 16-25 ans » ne figure que dans ce libellé.
 const AGE_LABELS: Record<AgeGroup, string> = {
   enfant: 'un enfant de 6-10 ans',
   ado: 'un adolescent de 11-15 ans',
@@ -591,7 +593,9 @@ ${content}`;
 
 // Marqueur du bloc documents injecté par generators/chat.ts — source unique :
 // chatSystem y fait référence, chat.ts l'écrit. Une divergence = le system pointe
-// un marqueur inexistant (bug historique en anglais).
+// un marqueur inexistant (bug historique en anglais). Délimiteur technique interne
+// (pas du contenu élève) : le défaut fr est la méta-langue de tous les prompts,
+// seul l'anglais a un marqueur dédié — choix volontaire, pas un oubli i18n.
 export function chatDocsLabel(lang = 'fr'): string {
   return lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
 }
