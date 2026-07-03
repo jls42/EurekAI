@@ -195,7 +195,7 @@ export function defaultReasonFor(agent: string, lang = 'fr'): string {
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
   return String.raw`Analyse les sources et produis UN SEUL objet JSON strict avec les champs ci-dessous.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
-IMPORTANT : meme si le contenu couvre plusieurs sujets, produis UN SEUL objet. Ne retourne PAS {"fiches": [...]}.
+Meme si le contenu couvre plusieurs sujets, produis un seul objet. Ne retourne PAS {"fiches": [...]}.
 
 REGLE POUR LE CHAMP "title" :
 - title = sujet du cours uniquement, court et descriptif.
@@ -260,7 +260,7 @@ export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): stri
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 
 EXEMPLE (1 item — la reponse doit etre auto-suffisante, comprehensible sans relire la question) :
-{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960 ; elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
+{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960. Elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
 
 Reponses courtes (1-2 phrases) mais auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
 ${sourceRefsInstruction('flashcard')}
@@ -286,7 +286,7 @@ ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 
-EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
+EXEMPLE de format (1 item — sourceRefs designe la source contenant l'explication/la reponse, pas seulement la question) :
 {"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
 
 ${jsonInstruction()}`;
@@ -303,7 +303,7 @@ ${jsonInstruction()}`;
 // La règle "pas de parenthèses + exception labels" est DANS quizVocalSystem (cf. #6),
 // pas ici, pour éviter l'injonction contradictoire.
 
-const VOCAL_REWRITE_COMMON = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
+const VOCAL_REWRITE_COMMON = `Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
 Ecris tout en "langage oral" lisible.`;
 
 const VOCAL_REWRITE_BY_LANG: Record<string, string> = {
@@ -421,14 +421,14 @@ export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie adaptative et en remediation.
 ${ageInstruction(ageGroup)}
 
-L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les MEMES concepts pour l'aider a progresser.
+L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les memes concepts pour l'aider a progresser.
 
 STRATEGIE DE REMEDIATION :
-- Commence par les questions les plus FACILES (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
-- Ne te contente pas de reformuler la question initiale : explique le concept sous un AUTRE ANGLE (definition, cas concret, contre-exemple).
+- Commence par les questions les plus faciles (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
+- Ne te contente pas de reformuler la question initiale : explique le concept sous un autre angle (definition, cas concret, contre-exemple).
 - Varie les types cognitifs : memorisation, comprehension, application a un cas nouveau.
 - Si plusieurs concepts sont rates, repartis les questions equitablement.
-- Les explications doivent etre PEDAGOGIQUES (montrer pourquoi la bonne reponse est correcte ET pourquoi les distracteurs sont faux), pas juste factuelles.
+- Les explications doivent etre pedagogiques (montrer pourquoi la bonne reponse est correcte et pourquoi les distracteurs sont faux), pas juste factuelles.
 
 ${jsonInstruction()}`;
 }
@@ -448,7 +448,7 @@ Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 }
 
 export function summaryRemediationSystem(ageGroup: AgeGroup = 'enfant'): string {
-  return String.raw`Tu es un expert en pedagogie adaptative. L'eleve a rate certaines questions : re-explique UNIQUEMENT les notions concernees, sous un autre angle que les questions d'origine (definition simple, cas concret, contre-exemple).
+  return String.raw`Tu es un expert en pedagogie adaptative. L'eleve a rate certaines questions : re-explique uniquement les notions concernees, sous un autre angle que les questions d'origine (definition simple, cas concret, contre-exemple).
 Produis UN SEUL objet JSON strict.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
 
@@ -458,7 +458,7 @@ REGLE POUR LE CHAMP "title" :
 - title ne doit pas contenir de qualificatif sur le format du document.
 
 REGLES DE CONTENU :
-- Couvre CHAQUE notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
+- Couvre chaque notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
 - summary : re-explication claire et progressive de chaque notion (3-6 phrases par notion), avec un exemple concret different de la question d'origine. Utilise des retours a la ligne (\n\n) entre les notions.
 - key_points : 3 a 6 points a retenir pour ne plus se tromper, au moins un par notion ratee, courts et formules autrement que dans les questions et le summary. key_points n'est jamais vide, meme si le summary est deja detaille.
 - vocabulary : les termes qui ont pu porter a confusion, definis simplement.
@@ -540,7 +540,7 @@ STRUCTURE :
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 ${sourceRefsInstruction('podcast')}
-ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
+ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages parlent comme s'ils connaissaient le sujet par eux-memes, sans evoquer leur documentation. Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
 ${jsonInstruction()}`;
 }
 
@@ -609,9 +609,9 @@ ${ageInstruction(ageGroup)}
 
 PERIMETRE :
 - Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- ${chatDocsLabel(lang)} ---").
-- Base TOUJOURS tes reponses pedagogiques sur ces documents quand le sujet y est traite.
+- Base toujours tes reponses pedagogiques sur ces documents quand le sujet y est traite.
 - Si l'eleve pose une question hors-sujet (qui n'a aucun rapport avec les cours fournis), redirige poliment : "Cette question sort du cadre de tes cours, mais voyons ce que tes documents disent sur [sujet adjacent]." Ne refuse pas seche, propose un pont.
-- Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
+- Si l'eleve pose une question sur un sujet du cours mais qui n'est pas couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
 
 APPROCHE PEDAGOGIQUE :
 - Par defaut, reponds clairement et directement a la question de l'eleve, avec un exemple concret si utile.
@@ -639,7 +639,7 @@ export function websearchInstructions(lang = 'fr', ageGroup: AgeGroup = 'enfant'
 ${ageInstruction(ageGroup)}
 
 REGLES DE FIABILITE DES SOURCES :
-- Privilegie les sources de reference : sites educatifs (.edu), gouvernementaux (.gov), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
+- Privilegie les sources de reference : sites educatifs et institutions gouvernementales officielles du pays de la langue demandee (par ex. .edu/.gov aux Etats-Unis, .gouv.fr en France), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
 - Evite les forums non moderes, les blogs personnels sans expertise visible, les sites a orientation commerciale.
 - Quand un fait est cite, mentionne sa source.
 
@@ -653,7 +653,7 @@ STRUCTURE DE LA SYNTHESE :
 - Developpe les points cles dans un ordre logique (utilise des paragraphes ou des listes a puces).
 - Mentionne les nuances importantes ou les controverses.
 - Termine par une conclusion ou une suggestion d'approfondissement.
-- Si la question concerne l'actualite, precise la date du fait ("En 2025, ...").
+- Si la question concerne l'actualite, precise l'annee ou la date exacte du fait.
 
 ${langInstruction(lang)}`;
 }
