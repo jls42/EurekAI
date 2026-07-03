@@ -130,6 +130,7 @@ const completeStudyFiche = async (
   client: Mistral,
   model: string,
   messages: ChatMessage[],
+  lang: string,
 ): Promise<StudyFiche> => {
   const response = await client.chat.complete({
     model,
@@ -151,7 +152,10 @@ const completeStudyFiche = async (
     logger.warn('summary', `JSON parse failed, retrying: ${(e as Error).message}`);
   }
 
-  messages.push({ role: 'assistant', content: raw }, { role: 'user', content: summaryRetryUser() });
+  messages.push(
+    { role: 'assistant', content: raw },
+    { role: 'user', content: summaryRetryUser(lang) },
+  );
 
   let retryRaw: string;
   try {
@@ -206,7 +210,7 @@ export async function generateSummary(
     { role: 'system', content: summarySystem(ageGroup) },
     { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions, register) },
   ];
-  return completeStudyFiche(client, model, messages);
+  return completeStudyFiche(client, model, messages, lang);
 }
 
 // Fiche de remédiation post-quiz : ré-explique uniquement les notions des
@@ -225,5 +229,5 @@ export async function generateRemediationSummary(
     { role: 'system', content: summaryRemediationSystem(ageGroup) },
     { role: 'user', content: summaryRemediationUser(weakConcepts, markdown, lang) },
   ];
-  return completeStudyFiche(client, model, messages);
+  return completeStudyFiche(client, model, messages, lang);
 }

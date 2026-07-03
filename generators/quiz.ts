@@ -94,11 +94,12 @@ export async function generateQuiz(
   count?: number,
   exclusions?: string,
 ): Promise<QuizQuestion[]> {
+  const effectiveCount = count ?? 15;
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),
-    quizUser(markdown, count, lang, exclusions),
-    quizRetryUser('quiz'),
+    quizUser(markdown, effectiveCount, lang, exclusions),
+    quizRetryUser({ kind: 'quiz', count: effectiveCount, lang }),
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
   );
@@ -113,11 +114,12 @@ export async function generateQuizVocal(
   count?: number,
   exclusions?: string,
 ): Promise<QuizQuestion[]> {
+  const effectiveCount = count ?? 15;
   return generateQuizWithRetry(
     client,
     quizVocalSystem(ageGroup, lang),
-    quizVocalUser(markdown, count, lang, exclusions),
-    quizRetryUser('quiz-vocal'),
+    quizVocalUser(markdown, effectiveCount, lang, exclusions),
+    quizRetryUser({ kind: 'quiz-vocal', count: effectiveCount, lang }),
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,
     'quiz-vocal',
@@ -137,7 +139,7 @@ export async function generateQuizReview(
     client,
     quizReviewSystem(ageGroup),
     quizReviewUser(weakConcepts, markdown, lang),
-    quizRetryUser('quiz-review'),
+    quizRetryUser({ kind: 'quiz-review', lang }),
     "Le modele n'a pas reussi a generer la revision quiz apres 2 tentatives",
     model,
   );

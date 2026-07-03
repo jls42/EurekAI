@@ -38,7 +38,9 @@ describe('generateFillBlank', () => {
     const result = await generateFillBlank(client, 'content');
     expect(result).toEqual(validFillBlank);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
-    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(fillBlankRetryUser());
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
+      fillBlankRetryUser(10, 'fr'),
+    );
   });
 
   it('throws when both fail', async () => {

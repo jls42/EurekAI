@@ -11,6 +11,18 @@ describe('verifyAnswerSystem', () => {
     expect(prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris')).toContain('1=A, 2=B, 3=C, 4=D');
   });
 
+  it('accepte la forme ordinale orale (« la deuxieme ») et son équivalent localisé', () => {
+    const result = prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris');
+    expect(result).toContain('la deuxieme');
+    expect(result).toContain("l'equivalent dans la langue de l'eleve");
+  });
+
+  it('les openers de feedback ont une clause d’équivalence dans la langue du feedback', () => {
+    // Les exemples ("Oui", "Non,"…) sont français ; le quiz vocal tourne en 9 langues.
+    const result = prompt('enfant', 'A) Paris', 'A) Paris');
+    expect(result).toContain('ou leur equivalent dans la langue du feedback');
+  });
+
   it('impose une règle binaire sans quasi-réussite', () => {
     const result = prompt('enfant', 'A) Paris', 'A) Paris');
     expect(result).toContain('binaire');

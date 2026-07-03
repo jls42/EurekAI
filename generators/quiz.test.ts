@@ -35,7 +35,9 @@ describe('generateQuiz', () => {
     const result = await generateQuiz(client, 'content');
     expect(result).toEqual(validQuiz);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
-    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(quizRetryUser('quiz'));
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
+      quizRetryUser({ kind: 'quiz', count: 15, lang: 'fr' }),
+    );
   });
 
   it('throws when both fail', async () => {
@@ -79,7 +81,7 @@ describe('generateQuizVocal', () => {
     expect(result).toEqual(validQuiz);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
     expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
-      quizRetryUser('quiz-vocal'),
+      quizRetryUser({ kind: 'quiz-vocal', count: 15, lang: 'fr' }),
     );
   });
 });

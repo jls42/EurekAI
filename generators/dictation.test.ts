@@ -50,7 +50,7 @@ describe('generateDictation', () => {
     const client = mockClient({ items: validItems });
     await generateDictation(client, 'liste', 'm', 'fr', 'enfant', 99);
     const userMsg = client.chat.complete.mock.calls[0][0].messages[1].content;
-    expect(userMsg).toContain(`au maximum ${DICTATION_MAX_WORDS}`);
+    expect(userMsg).toContain(`Choisis ${DICTATION_MAX_WORDS} mots`);
   });
 
   it("transmet l'historique d'exclusion au prompt user", async () => {
@@ -109,7 +109,9 @@ describe('generateDictation', () => {
     expect(result).toHaveLength(validItems.length);
     expect(result).toEqual(expect.arrayContaining(validItems));
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
-    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(dictationRetryUser());
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
+      dictationRetryUser(10, 'fr'),
+    );
   });
 
   it('throw après deux échecs', async () => {

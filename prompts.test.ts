@@ -16,6 +16,9 @@ import {
   summaryRetryUser,
   quizRetryUser,
   podcastRetryUser,
+  flashcardsRetryUser,
+  fillBlankRetryUser,
+  dictationRetryUser,
   summaryRemediationSystem,
   summaryRemediationUser,
   podcastSystem,
@@ -36,6 +39,8 @@ import {
   routerSystem,
   routerUser,
   consigneUser,
+  consigneMarkdownHeader,
+  chatNoSourcesNotice,
   verifyAnswerUser,
   feedbackAgeInstruction,
   vocalRewriteRules,
@@ -207,10 +212,11 @@ describe('DICTATION', () => {
     expect(lower).not.toContain('liste de mots');
   });
 
-  it('user : contenu + cap + langInstruction', () => {
+  it('user : contenu + cible ferme avec echappatoire contenu pauvre + langInstruction', () => {
     const result = dictationUser('toujours ecole', 'en', 10);
     expect(result).toContain('toujours ecole');
-    expect(result).toContain('au maximum 10');
+    expect(result).toContain('Choisis 10 mots');
+    expect(result).toContain('moins uniquement si');
     expect(result).toContain('English');
   });
 
@@ -243,10 +249,28 @@ describe('RETRY PROMPTS', () => {
     expect(podcastRetryUser()).not.toContain('podcast complet');
   });
 
-  it('quizRetryUser : 3 variantes distinctes', () => {
-    expect(quizRetryUser('quiz')).toContain('QCM');
-    expect(quizRetryUser('quiz-vocal')).toContain('oral');
-    expect(quizRetryUser('quiz-review')).toContain('NOUVELLES');
+  it('quizRetryUser : 3 variantes distinctes, champs du contrat rappeles', () => {
+    expect(quizRetryUser({ kind: 'quiz', count: 15 })).toContain('QCM');
+    expect(quizRetryUser({ kind: 'quiz', count: 15 })).toContain('les 15 questions');
+    expect(quizRetryUser({ kind: 'quiz-vocal' })).toContain('oral');
+    expect(quizRetryUser({ kind: 'quiz-vocal' })).toContain('choices (4)');
+    expect(quizRetryUser({ kind: 'quiz-review' })).toContain('NOUVELLES');
+    expect(quizRetryUser({ kind: 'quiz-review' })).toContain('choices (4)');
+  });
+
+  it('les retries portent langInstruction en dernier (invariant langue au 2e tour)', () => {
+    expect(summaryRetryUser('en')).toContain('English');
+    expect(quizRetryUser({ kind: 'quiz', lang: 'en' })).toContain('English');
+    expect(fillBlankRetryUser(10, 'en')).toContain('English');
+    expect(dictationRetryUser(10, 'en')).toContain('English');
+    expect(podcastRetryUser('en')).toContain('English');
+    expect(flashcardsRetryUser(5, 'en')).toContain('English');
+  });
+
+  it('dictationRetryUser : miroir du contrat dictationUser (echappatoire contenu pauvre)', () => {
+    const msg = dictationRetryUser(10);
+    expect(msg).toContain('10 items');
+    expect(msg).toContain('moins uniquement si');
   });
 });
 
@@ -291,6 +315,32 @@ describe('ORDRE DES BLOCS USER (langInstruction en dernier)', () => {
     expect(quiz.indexOf('English')).toBeGreaterThan(quiz.indexOf('- Q1'));
     const pod = podcastUser('contenu', 'en', 'bloc :\n- angle');
     expect(pod.indexOf('English')).toBeGreaterThan(pod.indexOf('- angle'));
+  });
+});
+
+describe('consigneMarkdownHeader', () => {
+  it('marqueur exact + liste + separateur (contrat lu par summarySystem/summaryUser)', () => {
+    const result = consigneMarkdownHeader('- les volcans\n- la lave');
+    expect(result).toContain('CONSIGNE DE REVISION DETECTEE');
+    expect(result).toContain('- les volcans');
+    expect(result).toContain('\n\n---\n\n');
+  });
+
+  it('anti-leak : plus de tokens candidats dictee/fill-blank du header historique', () => {
+    // Le header devient du « contenu fourni » pour tous les generateurs — chaque
+    // mot est un candidat de mot de dictee / reponse fill-blank.
+    const result = consigneMarkdownHeader('- x');
+    expect(result).not.toContain('PRIORITAIREMENT');
+    expect(result).not.toContain('doit reviser');
+    expect(result).not.toContain('hors-programme');
+  });
+});
+
+describe('chatNoSourcesNotice', () => {
+  it('placeholder localise fr/en (meme logique binaire que chatDocsLabel)', () => {
+    expect(chatNoSourcesNotice('en')).toBe('No sources added yet.');
+    expect(chatNoSourcesNotice()).toBe('Aucune source ajoutee pour le moment.');
+    expect(chatNoSourcesNotice('es')).toBe('Aucune source ajoutee pour le moment.');
   });
 });
 
@@ -451,6 +501,13 @@ describe('imageSystem', () => {
     expect(result).toContain('illustrateur');
     expect(result).toContain('professionnel');
     expect(result).toContain('English');
+  });
+
+  it("n'appende pas langInstruction (contradiction avec l'interdiction de texte)", () => {
+    // Exception documentée (.claude/rules/prompts.md) : « génère TOUT le contenu
+    // (textes, titres...) » en position finale contredirait ZERO texte.
+    expect(imageSystem('fr', 'enfant')).not.toContain('génère TOUT le contenu');
+    expect(imageSystem('fr', 'enfant')).toContain('purement visuelle');
   });
 });
 

@@ -49,7 +49,7 @@ export async function generateFillBlank(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content: fillBlankRetryUser(),
+      content: fillBlankRetryUser(count, lang),
     },
   );
 

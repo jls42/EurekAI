@@ -32,7 +32,13 @@ function parsePodcastResponse(raw: string): ParsedPodcastResponse {
   const sourceRefs = Array.isArray(parsed?.sourceRefs)
     ? (parsed.sourceRefs as string[])
     : undefined;
-  const script = unwrapJsonArray<PodcastLine>(parsed);
+  // Clé explicite du contrat d'abord : unwrapJsonArray retourne le PREMIER tableau
+  // trouvé — sur {"sourceRefs":[...],"script":[...]} (ordre légal en JSON), il
+  // prendrait sourceRefs pour le script → retry Mistral inutile. Fallback conservé
+  // pour les shapes dégradés (tableau nu, clé alternative).
+  const script = Array.isArray(parsed?.script)
+    ? (parsed.script as PodcastLine[])
+    : unwrapJsonArray<PodcastLine>(parsed);
   return { script, sourceRefs };
 }
 
@@ -71,7 +77,7 @@ export async function generatePodcastScript(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content: podcastRetryUser(),
+      content: podcastRetryUser(lang),
     },
   );
 

@@ -83,7 +83,7 @@ export async function generateDictation(
   console.warn('Dictation validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
   messages.push(
     { role: 'assistant', content: raw },
-    { role: 'user', content: dictationRetryUser() },
+    { role: 'user', content: dictationRetryUser(capped, lang) },
   );
 
   const retry = await client.chat.complete({

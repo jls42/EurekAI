@@ -34,6 +34,17 @@ describe('generatePodcastScript', () => {
     expect(result.sourceRefs).toEqual(['ref1']);
   });
 
+  it('accepte sourceRefs AVANT script (ordre des clés JSON non garanti) sans retry', async () => {
+    // Régression : unwrapJsonArray prend le premier tableau trouvé — sur cet ordre
+    // il retournait sourceRefs comme script → validation échouée → retry inutile.
+    const inverted = { sourceRefs: ['ref1'], script: validPodcast.script };
+    const client = mockClient(inverted);
+    const result = await generatePodcastScript(client, 'content');
+    expect(result.script).toEqual(validPodcast.script);
+    expect(result.sourceRefs).toEqual(['ref1']);
+    expect(client.chat.complete).toHaveBeenCalledTimes(1);
+  });
+
   it('retries on invalid response', async () => {
     const invalid = { script: [] };
     const client = mockClient(invalid);

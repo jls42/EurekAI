@@ -50,6 +50,7 @@ import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
 import { AUTO_AGENTS_SET, type AutoAgentType } from '../generators/auto-agents.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
+import { consigneMarkdownHeader } from '../prompts.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
@@ -107,8 +108,7 @@ export function getMarkdown(sources: Source[], sourceIds?: string[]): string {
 export function applyConsigne(markdown: string, consigne?: Consigne): string {
   if (!consigne?.found || consigne.keyTopics.length === 0) return markdown;
   const topicsList = consigne.keyTopics.map((t) => `- ${t}`).join('\n');
-  const header = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :\n${topicsList}\n\nConcentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.\n\n---\n\n`;
-  return header + markdown;
+  return consigneMarkdownHeader(topicsList) + markdown;
 }
 
 interface GenRequestBody {

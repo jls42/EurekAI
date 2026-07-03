@@ -49,7 +49,7 @@ export async function generateFlashcards(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content: flashcardsRetryUser(effectiveCount),
+      content: flashcardsRetryUser(effectiveCount, lang),
     },
   );
 
