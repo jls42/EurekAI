@@ -93,11 +93,14 @@ function jsonInstruction(): string {
 // l'appliquer au texte qu'il rédige (bug observé : mot masqué par « ______ »
 // dans sa propre phrase de dictée).
 const EXCLUSION_HEADERS: Record<string, string> = {
-  quiz: "Tu as deja genere les questions ci-dessous. Propose-en d'autres, sur de nouveaux points du contenu, avec de nouvelles formulations :",
+  // « differentes de celles-ci » (déclaratif) et PAS « propose-en d'autres » : le
+  // pronom de quantité se lit « proposes-en davantage » → le LLM dépasse le count
+  // demandé (13 items pour 10, mesuré en conditions réelles).
+  quiz: "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
   'quiz-vocal':
-    "Tu as deja genere les questions ci-dessous. Propose-en d'autres, sur de nouveaux points du contenu, avec de nouvelles formulations :",
+    "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
   flashcards:
-    "Tu as deja genere les cartes ci-dessous. Propose-en d'autres, sur d'autres notions du contenu :",
+    "Tu as deja genere les cartes ci-dessous. Les nouvelles cartes doivent etre differentes de celles-ci et porter sur d'autres notions du contenu :",
   'fill-blank':
     "Tu as deja utilise les mots ci-dessous. Choisis d'autres mots et d'autres phrases du contenu :",
   dictation: "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :",

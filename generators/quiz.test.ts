@@ -46,6 +46,17 @@ describe('generateQuiz', () => {
 
     await expect(generateQuiz(client, 'content')).rejects.toThrow(/quiz valide/);
   });
+
+  it('filtre un item de queue malformé (salvage) sans retry', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = mockClient([...validQuiz, { question: 'Incomplète ?', choices: ['A) x'] }]);
+
+    const result = await generateQuiz(client, 'content');
+    expect(result).toEqual(validQuiz);
+    expect(client.chat.complete).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 item'));
+    warnSpy.mockRestore();
+  });
 });
 
 describe('generateQuizVocal', () => {
