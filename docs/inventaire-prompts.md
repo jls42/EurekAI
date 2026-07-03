@@ -598,7 +598,7 @@ Les choix disponibles sont :
 La bonne reponse est : <correctAnswerLine>
 
 Regles strictes :
-- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisee "<spokenLabel> B" (que le TTS prononce avant chaque choix), par l'ordinal ("la premiere", "la deuxieme" - ou l'equivalent dans la langue de l'eleve), ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
+- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisee "<spokenLabel> B" (que le TTS prononce avant chaque choix), par l'ordinal - ou l'equivalent dans la langue de l'eleve -, ou par le texte de la reponse. Chacune de ces formes designe UN des choix, jamais un verdict : commence par identifier le choix designe, puis compare-le a la bonne reponse. Correspondance : 1=A, 2=B, 3=C, 4=D ; "la premiere"=A, "la deuxieme"=B, "la troisieme"=C, "la quatrieme"=D.
 - Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - La reponse est soit correcte, soit fausse - binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.
