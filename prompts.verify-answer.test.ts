@@ -17,6 +17,16 @@ describe('verifyAnswerSystem', () => {
     expect(result).toContain("l'equivalent dans la langue de l'eleve");
   });
 
+  it('mappe explicitement chaque ordinal sur sa lettre (bug mesuré : « la premiere » jugée correcte)', () => {
+    // Sans mapping explicite, mistral-large répondait correct=true à « la première »
+    // alors que la bonne réponse était B (mesuré 3/3 en conditions réelles). La forme
+    // désigne un choix, jamais un verdict.
+    const result = prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris');
+    expect(result).toContain('"la premiere"=A');
+    expect(result).toContain('"la deuxieme"=B');
+    expect(result).toContain('jamais un verdict');
+  });
+
   it('les openers de feedback ont une clause d’équivalence dans la langue du feedback', () => {
     // Les exemples ("Oui", "Non,"…) sont français ; le quiz vocal tourne en 9 langues.
     const result = prompt('enfant', 'A) Paris', 'A) Paris');
