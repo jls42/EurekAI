@@ -69,6 +69,17 @@ function sourceRefsInstruction(itemName: string): string {
 - En cas de doute, mieux vaut omettre le sourceRef que d'en inventer un.`;
 }
 
+// Citations summary/remediation — format propre à la fiche (`citations[].sourceRef`
+// "[Source 2]" + refs inline [Source 1][Source 3]) : ne PAS réutiliser
+// sourceRefsInstruction, conçu pour les tableaux `sourceRefs: ["Source 1"]`
+// des autres générateurs.
+function citationsInstruction(): string {
+  return `REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
+- Format canonique : un bracket par source, meme en multi-citation.
+- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+- Ne FABRIQUE JAMAIS de reference : cite uniquement des numeros de sources presentes dans le contenu fourni. En cas de doute, omets la reference.`;
+}
+
 // ── JSON instruction helper (DRY) ────────────────────────────────────
 
 function jsonInstruction(): string {
@@ -188,20 +199,18 @@ REGLE POUR LE CHAMP "title" :
 EXEMPLE de structure attendue (valeurs minimales — le document final doit etre bien plus detaille) :
 {"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre [Source 1][Source 3].","Une eruption peut etre effusive ou explosive [Source 2]."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
-TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec ce document. Ne laisse rien d'important de cote.
+Ton objectif : l'eleve doit pouvoir reviser tout son cours uniquement avec ce document. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
 
 REGLES DE COUVERTURE :
-- Si des CONSIGNES DE REVISION sont presentes, couvre CHAQUE point mentionne sans exception.
+- Si des CONSIGNES DE REVISION sont presentes, couvre chaque point mentionne sans exception.
 - Sinon, couvre chaque source en y extrayant toutes les notions essentielles.
 - summary : un resume approfondi du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
 - key_points : autant que necessaire pour tout couvrir (10-25 typiquement). Chaque point est une phrase complete, informative, avec les faits, dates et noms importants. Pas juste des titres.
-- vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
+- vocabulary : tous les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.
 
-REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
-- Format canonique : un bracket par source, meme en multi-citation.
-- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+${citationsInstruction()}
 
 ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
@@ -225,7 +234,7 @@ export function summaryUser(
   register?: SummaryRegister,
 ): string {
   const consigneBlock = hasConsigne
-    ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
+    ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu dois verifier que chaque point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
     : `Aucune consigne specifique n'est fournie. Couvre toutes les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec ce seul document.`;
 
   let prompt = `Remplis l'objet JSON attendu a partir des sources ci-dessous. Les sources sont numerotees (# Source 1, # Source 2, etc.).
@@ -449,9 +458,7 @@ REGLES DE CONTENU :
 - vocabulary : les termes qui ont pu porter a confusion, definis simplement.
 - citations : les extraits des sources qui eclairent chaque notion.
 
-REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
-- Format canonique : un bracket par source, meme en multi-citation.
-- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+${citationsInstruction()}
 
 ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
@@ -684,7 +691,7 @@ export function podcastRetryUser(): string {
 export function consigneSystem(lang = 'fr'): string {
   return `Tu es un assistant pedagogique expert. Analyse les documents fournis et determine s'ils contiennent des consignes de revision, un programme de controle, des objectifs d'apprentissage, ou des indications du type "Je sais ma lecon si je sais...".
 
-Reponds en JSON strict :
+Format attendu :
 {"found": true/false, "text": "resume des consignes detectees", "keyTopics": ["point 1", "point 2", ...]}
 
 Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTopics": []}
@@ -715,14 +722,14 @@ Agents disponibles:
 - "dictation": entraine l'orthographe (l'eleve ecrit sous la dictee les mots importants du contenu)
 
 REGLE DE CARDINAL :
-- Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
+- Choisis uniquement les agents reellement justifies par le contenu fourni.
 - Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-7 agents.
-- 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
+- 1-2 agents sont acceptables uniquement si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
 - Maximum 8 agents pour un contenu riche et varie.
-- Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
+- Privilegie la pertinence pedagogique sur la quantite : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
 
 CRITERES STRATEGIQUES :
-- Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
+- Contenu court ou simple : prefere summary + 1 agent, mais n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
 - Contenu pedagogique standard (cours, chapitre, lecon) : envisage un format audio si le contenu s'y prete (narratif, explicatif, facilement recitable a voix haute).
 - Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
 - Contenu avec des mots nouveaux, du vocabulaire specifique ou une orthographe a travailler : envisage dictation.
@@ -731,8 +738,9 @@ CRITERES STRATEGIQUES :
 - Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
 - Contenu argumentatif ou conceptuel : prioriser quiz, summary, podcast et quiz-vocal.
 
-Reponds en JSON strict:
-{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
+Format attendu :
+{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}
+${jsonInstruction()}${langInstruction(lang)}`;
 }
 
 export function routerUser(markdown: string, ageGroup: AgeGroup = 'enfant'): string {
@@ -799,7 +807,8 @@ EXEMPLE (correct=false, sans attenuation) :
 Question: "Quelle planete est la plus proche du Soleil ?" — eleve repond "Venus".
 Feedback attendu: {"correct": false, "feedback": "Non, la planete la plus proche du Soleil est Mercure."}
 
-Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
+Format attendu : {"correct": true/false, "feedback": "..."}
+${jsonInstruction()}${langInstruction(lang)}`;
 }
 
 export function verifyAnswerUser(question: string, studentAnswer: string): string {
@@ -841,7 +850,7 @@ export function fillBlankUser(
   let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
 
 Format JSON :
-{"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
+{"exercises": [{"sentence": "Une phrase du contenu avec ___ a completer.", "answer": "...", "hint": "...", "category": "...", "sourceRefs": ["Source 1"]}]}
 
 Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;

@@ -38,6 +38,11 @@ describe('verifyAnswerSystem', () => {
     expect(result).toMatch(/"feedback":\s*"Non,/);
   });
 
+  it('termine par le contrat JSON factorisé (jsonInstruction)', () => {
+    expect(prompt()).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(prompt()).not.toContain('Reponds en JSON strict');
+  });
+
   it('utilise un few-shot hors-domaine des quiz classiques', () => {
     const result = prompt('enfant', 'A) Mercure', 'A) Mercure');
     expect(result).toContain('Mercure');

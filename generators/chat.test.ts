@@ -20,6 +20,27 @@ describe('chatWithSources', () => {
     expect(client.chat.complete).toHaveBeenCalledTimes(1);
   });
 
+  it('envoie les 4 outils de génération avec une description non vide', async () => {
+    const client = {
+      chat: {
+        complete: vi.fn().mockResolvedValue({ choices: [{ message: { content: 'ok' } }] }),
+      },
+    } as any;
+
+    await chatWithSources(client, messages, sourceContext);
+
+    const tools = client.chat.complete.mock.calls[0][0].tools;
+    expect(tools.map((t: any) => t.function.name)).toEqual([
+      'generate_summary',
+      'generate_flashcards',
+      'generate_quiz',
+      'generate_fill-blank',
+    ]);
+    for (const t of tools) {
+      expect(t.function.description.length).toBeGreaterThan(10);
+    }
+  });
+
   it('returns reply with tool calls (first response has toolCalls, then final response)', async () => {
     const client = {
       chat: {

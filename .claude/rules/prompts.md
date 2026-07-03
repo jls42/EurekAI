@@ -6,6 +6,7 @@ Toutes les fonctions de prompt vivent dans `prompts.ts`. Les generators (`genera
 
 - Chaque prompt system/user doit accepter `ageGroup: AgeGroup` et `lang: string` en param et les propager.
 - Le prompt system applique `ageInstruction(ageGroup)` — sauf `verifyAnswer` qui utilise `feedbackAgeInstruction` (calibré pour feedback binaire court, pas pour génération longue).
+- Exception documentée : `consigneSystem(lang)` ne prend pas d'`ageGroup` — détection de consignes, pas génération de contenu destiné à l'élève (l'âge est hors-sujet).
 - Le prompt user (ou system selon le cas) concatène `langInstruction(lang)` en fin de string.
 - `quizVocalSystem` injecte aussi `vocalRewriteRules(lang)` (règles de réécriture TTS par langue).
 

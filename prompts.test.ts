@@ -24,6 +24,8 @@ import {
   PODCAST_NAME_POOL,
   fillBlankSystem,
   fillBlankUser,
+  consigneSystem,
+  quizVocalUser,
   chatSystem,
   chatDocsLabel,
   imageSystem,
@@ -292,6 +294,27 @@ describe('ORDRE DES BLOCS USER (langInstruction en dernier)', () => {
   });
 });
 
+describe('CONSIGNE SYSTEM', () => {
+  it('format, contrat JSON factorisé et langue', () => {
+    const result = consigneSystem('en');
+    expect(result).toContain('"found"');
+    expect(result).toContain('keyTopics');
+    expect(result).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(result).toContain('English');
+    expect(result).not.toContain('Reponds en JSON strict');
+  });
+});
+
+describe('QUIZ VOCAL USER', () => {
+  it('count + registre oral + markdown + exclusions avant langInstruction', () => {
+    const result = quizVocalUser('contenu du cours', 12, 'en', 'bloc :\n- Q1');
+    expect(result).toContain('12 questions');
+    expect(result).toContain('ORAL');
+    expect(result).toContain('contenu du cours');
+    expect(result.indexOf('English')).toBeGreaterThan(result.indexOf('- Q1'));
+  });
+});
+
 describe('PODCAST', () => {
   it('contient host, guest et les noms par defaut (Alex, Charlie)', () => {
     const podcast = podcastSystem('enfant');
@@ -463,6 +486,11 @@ describe('summarySystem source refs policy', () => {
     expect(result).toMatch(/\[Source \d+\]\[Source \d+\]/);
   });
 
+  it('porte le garde anti-fabrication sur les citations (summary + remediation)', () => {
+    expect(summarySystem('enfant')).toContain('FABRIQUE JAMAIS');
+    expect(summaryRemediationSystem('enfant')).toContain('FABRIQUE JAMAIS');
+  });
+
   it('ne mentionne jamais la forme dégradée ni aucun pattern similaire (anti-blacklist)', () => {
     const result = summarySystem('enfant');
     // Pas de chaîne exacte [Source 13, 20]
@@ -604,6 +632,12 @@ describe('defaultReasonFor', () => {
 // ── routerSystem invariants ─────────────────────────────────────────
 
 describe('routerSystem invariants', () => {
+  it('contrat JSON via instruction factorisée, sans wording divergent', () => {
+    const result = routerSystem('enfant', 'fr');
+    expect(result).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(result).not.toContain('Reponds en JSON strict');
+  });
+
   it('contient la règle de cardinal 4-7 agents et la liste des 8 agents', () => {
     const result = routerSystem('enfant', 'fr');
     expect(result).toContain('4-7 agents');
