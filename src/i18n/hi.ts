@@ -220,6 +220,7 @@ export const hi: Record<string, string> = {
   'sources.subtitle':
     '\u0905\u092A\u0928\u0947 \u0938\u094D\u0930\u094B\u0924 \u091C\u094B\u0921\u093C\u0947\u0902: \u092B\u093C\u094B\u091F\u094B, \u091F\u0947\u0915\u094D\u0938\u094D\u091F, \u0906\u0935\u093E\u091C\u093C \u092F\u093E \u0935\u0947\u092C \u0916\u094B\u091C',
   'sources.ready': '\u0938\u094D\u0930\u094B\u0924 \u0924\u0948\u092F\u093E\u0930!',
+  'sources.generateHint': 'अपने स्रोतों से यह सामग्री बनाने के लिए किसी बटन पर क्लिक करें।',
   'sources.selectedCount':
     '{count} \u0938\u094D\u0930\u094B\u0924 \u091A\u0941\u0928\u0947 \u0917\u090F',
   'sources.photo': '\u092B\u093C\u094B\u091F\u094B',

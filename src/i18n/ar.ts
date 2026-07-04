@@ -220,6 +220,7 @@ export const ar: Record<string, string> = {
   'sources.subtitle':
     '\u0623\u0636\u0641 \u0645\u0635\u0627\u062f\u0631\u0643: \u0635\u0648\u0631\u0629 \u0623\u0648 \u0646\u0635 \u0623\u0648 \u0635\u0648\u062a \u0623\u0648 \u0628\u062d\u062b \u0639\u0644\u0649 \u0627\u0644\u0648\u064a\u0628',
   'sources.ready': '\u0627\u0644\u0645\u0635\u0627\u062f\u0631 \u062c\u0627\u0647\u0632\u0629!',
+  'sources.generateHint': 'انقر على زر لإنشاء هذا المحتوى من مصادرك.',
   'sources.selectedCount':
     '{count} \u0645\u0635\u062f\u0631(\u0645\u0635\u0627\u062f\u0631) \u0645\u062e\u062a\u0627\u0631(\u0629)',
   'sources.photo': '\u0635\u0648\u0631\u0629',
