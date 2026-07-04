@@ -197,6 +197,7 @@ export const fr: Record<string, string> = {
   'sources.heading': "Qu'est-ce que tu veux apprendre ?",
   'sources.subtitle': 'Ajoute tes sources : photo, texte, voix ou recherche web',
   'sources.ready': 'Sources prêtes !',
+  'sources.generateHint': 'Clique sur un bouton pour créer ce contenu à partir de tes sources.',
   'sources.selectedCount': '{count} source(s) sélectionnée(s)',
   'sources.photo': 'Photo',
   'sources.import': 'Importer',

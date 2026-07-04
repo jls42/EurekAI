@@ -34,6 +34,10 @@
         ></p>
       </div>
     </div>
+    <div class="flex items-center gap-1.5 mb-3 text-xs font-medium text-primary-dark">
+      <i data-lucide="mouse-pointer-click" class="w-3.5 h-3.5 shrink-0"></i>
+      <span x-text="t('sources.generateHint')"></span>
+    </div>
     <div class="grid grid-cols-3 sm:grid-cols-3 gap-2 mb-3">
       <template
         x-for="cat in categories.filter(c => !['dashboard','sources','chat'].includes(c.key))"

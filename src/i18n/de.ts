@@ -187,6 +187,8 @@ export const de: Record<string, string> = {
   'sources.heading': 'Was m\u00f6chtest du lernen?',
   'sources.subtitle': 'F\u00fcge deine Quellen hinzu: Foto, Text, Stimme oder Websuche',
   'sources.ready': 'Quellen bereit!',
+  'sources.generateHint':
+    'Klicke auf einen Button, um diesen Inhalt aus deinen Quellen zu erstellen.',
   'sources.selectedCount': '{count} Quelle(n) ausgew\u00e4hlt',
   'sources.photo': 'Foto',
   'sources.import': 'Importieren',
