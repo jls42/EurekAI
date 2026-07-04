@@ -93,7 +93,8 @@ Type : fragment partage
 
 Contexte :
 - ajoute une contrainte de langue a la fin de nombreux prompts
-- utilise par les prompts `summaryUser`, `flashcardsUser`, `quizUser`, `quizVocalUser`, `quizReviewUser`, `podcastUser`, `imageSystem`, `chatSystem`, `websearchInstructions`, `websearchInput`, `consigneSystem`, `routerSystem`, `verifyAnswerSystem`, `fillBlankUser`
+- utilise par les prompts `summaryUser`, `flashcardsUser`, `quizUser`, `quizVocalUser`, `quizReviewUser`, `podcastUser`, `chatSystem`, `websearchInstructions`, `websearchInput`, `consigneSystem`, `routerSystem`, `verifyAnswerSystem`, `fillBlankUser`, `dictationUser`, ainsi que les retries factorises
+- `imageSystem` ne l'appelle **plus** : exception documentee (son enumeration « textes, titres... » contredirait l'interdiction ZERO texte) ; il termine par une ligne de langue dediee resolue via le helper interne partage `langName(lang)`
 
 Template :
 
@@ -140,7 +141,7 @@ Variantes exactes :
 
 ```txt
 enfant:
-Feedback court (1-2 phrases). Si juste, reponse clairement positive et enthousiaste (par ex. "Bravo !", "Super !" ou equivalent). Si faux, reponse claire et rassurante qui donne la bonne reponse, sans ambiguite.
+Feedback court (1-2 phrases). Si juste, reponse clairement positive et enthousiaste (par ex. "Bravo !", "Super !" ou equivalent). Si faux, correction nette d'abord qui donne la bonne reponse sans ambiguite, ton rassurant ensuite.
 
 ado:
 Feedback court et dynamique (1-2 phrases). Si juste, validation nette et positive (par ex. "Bien joue !", "C'est ca !" ou equivalent). Si faux, correction claire + indice court.
@@ -196,7 +197,7 @@ Contexte :
 Bloc commun :
 
 ```txt
-IMPORTANT - Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
+Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
 Ecris tout en "langage oral" lisible.
 ```
 
@@ -248,7 +249,7 @@ Template :
 ```txt
 Analyse les sources et produis UN SEUL objet JSON strict avec les champs ci-dessous.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
-IMPORTANT : meme si le contenu couvre plusieurs sujets, produis UN SEUL objet. Ne retourne PAS {"fiches": [...]}.
+Meme si le contenu couvre plusieurs sujets, produis un seul objet. Ne retourne PAS {"fiches": [...]}.
 
 REGLE POUR LE CHAMP "title" :
 - title = sujet du cours uniquement, court et descriptif.
@@ -258,20 +259,21 @@ REGLE POUR LE CHAMP "title" :
 EXEMPLE de structure attendue (valeurs minimales - le document final doit etre bien plus detaille) :
 {"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre [Source 1][Source 3].","Une eruption peut etre effusive ou explosive [Source 2]."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
-TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec ce document. Ne laisse rien d'important de cote.
+Ton objectif : l'eleve doit pouvoir reviser tout son cours uniquement avec ce document. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
 
 REGLES DE COUVERTURE :
-- Si des CONSIGNES DE REVISION sont presentes, couvre CHAQUE point mentionne sans exception.
+- Si des CONSIGNES DE REVISION sont presentes, couvre chaque point mentionne sans exception.
 - Sinon, couvre chaque source en y extrayant toutes les notions essentielles.
 - summary : un resume approfondi du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
 - key_points : autant que necessaire pour tout couvrir (10-25 typiquement). Chaque point est une phrase complete, informative, avec les faits, dates et noms importants. Pas juste des titres.
-- vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
+- vocabulary : tous les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.
 
 REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
 - Format canonique : un bracket par source, meme en multi-citation.
 - Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+- Ne FABRIQUE JAMAIS de reference : cite uniquement des numeros de sources presentes dans le contenu fourni. En cas de doute, omets la reference.
 
 <<AGE_INSTRUCTION>>
 <<JSON_ONLY>>
@@ -300,32 +302,33 @@ Rappel : le champ "title" nomme uniquement le sujet du cours.
 <<CONSIGNE_BLOCK>>
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
 Variantes de `CONSIGNE_BLOCK` :
 
 ```txt
 hasConsigne=true
-Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.
+Une CONSIGNE DE REVISION est presente au debut du contenu. Tu dois verifier que chaque point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.
 
 hasConsigne=false
 Aucune consigne specifique n'est fournie. Couvre toutes les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec ce seul document.
 ```
 
-### Retry inline de `generators/summary.ts`
+### `summaryRetryUser(lang)` — retry (factorise dans `prompts.ts`, invoque par `generators/summary.ts`)
 
 Type : `retry`
 
 Contexte :
 - envoye si le JSON initial est invalide ou schema-incomplet
 - pousse le modele vers un objet racine unique et rappelle la politique de titrage
+- contrat de couverture aligne sur le system prompt (pas de rabot « 5-7 ») ; suffixe `langInstruction(lang)` comme au premier tour
 
 Texte exact :
 
 ```txt
-Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (5-7), fun_fact, vocabulary. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.
+Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (autant que necessaire pour tout couvrir, jamais vide), fun_fact, vocabulary, citations. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide.<<LANG_INSTRUCTION>>
 ```
 
 ## Flashcards
@@ -348,11 +351,10 @@ Genere exactement <count> flashcards educatives en JSON strict.
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 
 EXEMPLE (1 item - la reponse doit etre auto-suffisante, comprehensible sans relire la question) :
-{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960 ; elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
+{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960. Elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
 
 Reponses courtes (1-2 phrases) mais auto-suffisantes. <<AGE_INSTRUCTION>> Questions variees (definition, fait, comparaison, cause/effet).
 <<SOURCE_REFS(flashcard)>>
-Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 <<JSON_ONLY>>
 ```
 
@@ -366,21 +368,21 @@ Contexte :
 Template :
 
 ```txt
-Genere exactement <count> flashcards a partir de ce contenu :
+Genere exactement <count> flashcards a partir de ce contenu. Repartis ces <count> flashcards sur des notions differentes du contenu.
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generators/flashcards.ts`
+### `flashcardsRetryUser(count, lang)` — retry (factorise dans `prompts.ts`, invoque par `generators/flashcards.ts`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere les <count> flashcards avec question et answer. Reponds en JSON valide.
+Ta reponse etait vide ou incomplete. Regenere les <count> flashcards avec question et answer. Reponds en JSON valide.<<LANG_INSTRUCTION>>
 ```
 
 ## Quiz ecrit
@@ -404,10 +406,9 @@ Tu es un expert en pedagogie specialise dans les quiz.
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 
-EXEMPLE de format (1 item - sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
+EXEMPLE de format (1 item - sourceRefs designe la source contenant l'explication/la reponse, pas seulement la question) :
 {"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 <<JSON_ONLY>>
 ```
 
@@ -418,9 +419,9 @@ Type : `user`
 Template :
 
 ```txt
-Genere exactement <count> questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+Genere exactement <count> questions de quiz QCM a partir de ce contenu. Repartis ces <count> questions sur des sujets differents du contenu. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 <<SOURCE_REFS(question)>>
-Ne mets PAS la source qui contient seulement la question - mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
+Ne mets pas la source qui contient seulement la question - mets celle qui contient l'explication/la reponse.
 
 Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
@@ -428,18 +429,18 @@ Format JSON :
 Contenu :
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generateQuiz()`
+### `quizRetryUser({ kind: 'quiz', count, lang })` — retry (factorise dans `prompts.ts`, invoque par `generateQuiz()`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.
+Ta reponse etait vide ou incomplete. Regenere les <count> questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.<<LANG_INSTRUCTION>>
 ```
 
 ## Quiz de remediation
@@ -461,14 +462,14 @@ Template :
 Tu es un expert en pedagogie adaptative et en remediation.
 <<AGE_INSTRUCTION>>
 
-L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les MEMES concepts pour l'aider a progresser.
+L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les memes concepts pour l'aider a progresser.
 
 STRATEGIE DE REMEDIATION :
-- Commence par les questions les plus FACILES (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
-- Ne te contente pas de reformuler la question initiale : explique le concept sous un AUTRE ANGLE (definition, cas concret, contre-exemple).
+- Commence par les questions les plus faciles (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
+- Ne te contente pas de reformuler la question initiale : explique le concept sous un autre angle (definition, cas concret, contre-exemple).
 - Varie les types cognitifs : memorisation, comprehension, application a un cas nouveau.
 - Si plusieurs concepts sont rates, repartis les questions equitablement.
-- Les explications doivent etre PEDAGOGIQUES (montrer pourquoi la bonne reponse est correcte ET pourquoi les distracteurs sont faux), pas juste factuelles.
+- Les explications doivent etre pedagogiques (montrer pourquoi la bonne reponse est correcte et pourquoi les distracteurs sont faux), pas juste factuelles.
 
 <<JSON_ONLY>>
 ```
@@ -485,10 +486,10 @@ L'eleve a rate ces questions :
 
 Genere entre 5 et 10 nouvelles questions QCM sur les memes concepts, mais formulees differemment.
 <<SOURCE_REFS(question)>>
-Ne mets PAS la source qui contient seulement la question - mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
+Ne mets pas la source qui contient seulement la question - mets celle qui contient l'explication/la reponse.
 
 Format JSON :
-{"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 2"]}]}
+{"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "...", "sourceRefs": ["Source 2"]}]}
 
 Contenu source :
 
@@ -496,14 +497,14 @@ Contenu source :
 <<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generateQuizReview()`
+### `quizRetryUser({ kind: 'quiz-review', lang })` — retry (factorise dans `prompts.ts`, invoque par `generateQuizReview()`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM. JSON valide uniquement.
+Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.<<LANG_INSTRUCTION>>
 ```
 
 ## Quiz vocal
@@ -534,7 +535,6 @@ REGLE DE PONCTUATION (quiz vocal) :
 - A l'interieur du texte de chaque choix (apres "A) "), AUCUNE parenthese, crochet ou artefact typographique n'est autorise. Reformule la phrase si besoin.
 - La question elle-meme ne doit contenir aucune parenthese.
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 <<VOCAL_REWRITE_RULES(lang)>>
 <<JSON_ONLY>>
 ```
@@ -546,9 +546,9 @@ Type : `user`
 Template :
 
 ```txt
-Genere exactement <count> questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+Genere exactement <count> questions de quiz QCM ORAL a partir de ce contenu. Repartis ces <count> questions sur des sujets differents du contenu. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 <<SOURCE_REFS(question)>>
-Ne mets PAS la source qui contient seulement la question - mets celle qui contient l'explication/la reponse.
+Ne mets pas la source qui contient seulement la question - mets celle qui contient l'explication/la reponse.
 
 RAPPEL : tout doit etre en langage oral lisible (pas de chiffres romains, pas d'abreviations, pas de symboles).
 
@@ -558,18 +558,18 @@ Format JSON :
 Contenu :
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generateQuizVocal()`
+### `quizRetryUser({ kind: 'quiz-vocal', count, lang })` — retry (factorise dans `prompts.ts`, invoque par `generateQuizVocal()`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.
+Ta reponse etait vide ou incomplete. Regenere les <count> questions QCM orales avec question, choices (4), correct, explanation. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.<<LANG_INSTRUCTION>>
 ```
 
 ## Correction du quiz vocal
@@ -598,21 +598,22 @@ Les choix disponibles sont :
 La bonne reponse est : <correctAnswerLine>
 
 Regles strictes :
-- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisee "<spokenLabel> B" (que le TTS prononce avant chaque choix), ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
+- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisee "<spokenLabel> B" (que le TTS prononce avant chaque choix), par l'ordinal - ou l'equivalent dans la langue de l'eleve -, ou par le texte de la reponse. Chacune de ces formes designe UN des choix, jamais un verdict : commence par identifier le choix designe, puis compare-le a la bonne reponse. Correspondance : 1=A, 2=B, 3=C, 4=D ; "la premiere"=A, "la deuxieme"=B, "la troisieme"=C, "la quatrieme"=D.
 - Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - La reponse est soit correcte, soit fausse - binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.
-- Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
+- Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont pas des erreurs.
 
 STRUCTURE OBLIGATOIRE du feedback :
-- Si correct=true : le feedback DOIT commencer par une validation directe (ex: "Oui", "Exact", "Bravo", "C'est ca", "Correct").
-- Si correct=false : le feedback DOIT commencer par une negation nette (ex: "Non,", "Mauvaise reponse,", "Faux,") suivie immediatement de la bonne reponse. AUCUN mot d'attenuation ou d'encouragement partiel avant la negation.
+- Si correct=true : le feedback DOIT commencer par une validation directe (ex: "Oui", "Exact", "Bravo", "C'est ca", "Correct"), ou leur equivalent dans la langue du feedback.
+- Si correct=false : le feedback DOIT commencer par une negation nette (ex: "Non,", "Mauvaise reponse,", "Faux,"), ou leur equivalent dans la langue du feedback, suivie immediatement de la bonne reponse. AUCUN mot d'attenuation ou d'encouragement partiel avant la negation.
 
 EXEMPLE (correct=false, sans attenuation) :
 Question: "Quelle planete est la plus proche du Soleil ?" - eleve repond "Venus".
 Feedback attendu: {"correct": false, "feedback": "Non, la planete la plus proche du Soleil est Mercure."}
 
-Reponds en JSON strict: {"correct": true/false, "feedback": "..."}<<LANG_INSTRUCTION>>
+Format attendu : {"correct": true/false, "feedback": "..."}
+<<JSON_ONLY>><<LANG_INSTRUCTION>>
 ```
 
 Parametres injectes :
@@ -671,8 +672,7 @@ STRUCTURE :
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 <<SOURCE_REFS(podcast)>>
-ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
-Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle completement different : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
+ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages parlent comme s'ils connaissaient le sujet par eux-memes, sans evoquer leur documentation. Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
 <<JSON_ONLY>>
 ```
 
@@ -686,18 +686,18 @@ Template :
 Ecris un script de mini-podcast a partir de ce contenu :
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generators/podcast.ts`
+### `podcastRetryUser(lang)` — retry (factorise dans `prompts.ts`, invoque par `generators/podcast.ts`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.
+Ta reponse etait vide ou incomplete. Regenere le script podcast avec speaker (host/guest) et text. JSON valide uniquement.<<LANG_INSTRUCTION>>
 ```
 
 ## Exercices a trous
@@ -719,23 +719,22 @@ Template :
 ```txt
 Tu es un expert en pedagogie specialise dans les exercices a trous.
 <<AGE_INSTRUCTION>>
-Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices completement differents : nouveaux mots cles, nouvelles phrases, nouveaux angles.
-Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
+Tu generes des phrases avec un mot ou une expression cle remplace par "___" (triple underscore).
 L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
 
 REGLES :
 - Chaque phrase doit etre auto-suffisante et comprehensible seule.
-- Le mot a trouver doit etre un terme CLE du cours (pas un mot vide ou generique).
+- Le mot a trouver doit etre un terme cle du cours (pas un mot vide ou generique).
 - UN SEUL trou par phrase.
 - La phrase doit donner suffisamment de contexte pour deviner la reponse.
-- IMPORTANT : si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et PAS "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
-- Le hint doit aider sans donner la reponse : premiere lettre, nombre de lettres, categorie ou indice contextuel.
+- Si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et pas "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
+- Le hint doit aider sans donner la reponse : premiere lettre, categorie ou indice contextuel.
 - category parmi : "vocabulaire", "date", "nom propre", "definition", "concept", "lieu", "nombre".
 - Varie les types de blanks : melange vocabulaire, dates, noms, definitions.
 - Ordonne du plus simple au plus difficile.
 
-EXEMPLE de format (1 item - l'article "un" est INCLUS dans le trou et la reponse, pas separe) :
-{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, 12 lettres avec l'article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
+EXEMPLE de format (1 item - l'article "un" est inclus dans le trou et la reponse, pas separe) :
+{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, avec son article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
 
 <<SOURCE_REFS(exercice)>>
 <<JSON_ONLY>>
@@ -748,26 +747,26 @@ Type : `user`
 Template :
 
 ```txt
-Genere exactement <count> exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
+Genere exactement <count> exercices a trous a partir de ce contenu. Repartis ces <count> exercices sur des sujets differents du contenu.
 
 Format JSON :
-{"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
+{"exercises": [{"sentence": "Une phrase du contenu avec ___ a completer.", "answer": "...", "hint": "...", "category": "...", "sourceRefs": ["Source 1"]}]}
 
 Contenu :
 
 <markdown>
-<<LANG_INSTRUCTION>>
 <<OPTIONAL_EXCLUSIONS>>
+<<LANG_INSTRUCTION>>
 ```
 
-### Retry inline de `generators/fill-blank.ts`
+### `fillBlankRetryUser(count, lang)` — retry (factorise dans `prompts.ts`, invoque par `generators/fill-blank.ts`)
 
 Type : `retry`
 
 Texte exact :
 
 ```txt
-Ta reponse etait vide ou incomplete. Regenere les exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.
+Ta reponse etait vide ou incomplete. Regenere les <count> exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.<<LANG_INSTRUCTION>>
 ```
 
 ## Image
@@ -783,6 +782,7 @@ Contexte :
 - cree un agent Mistral dedie a l'illustration
 - pas de message `system` classique ici : le texte est passe dans `instructions`
 - contrainte la plus forte du projet sur l'absence totale de texte dans l'image
+- n'appelle **plus** `langInstruction` (exception documentee) : son enumeration « textes, titres... » contredirait l'interdiction ZERO texte en position finale ; il termine par une ligne de langue dediee resolue via le helper `langName(lang)`
 
 Template :
 
@@ -797,7 +797,8 @@ INTERDICTION ABSOLUE DE TEXTE - C'est la regle la plus importante :
 
 Style : simple, colore, clair et engageant. Pas de texte dans l'image.
 <<AGE_INSTRUCTION>>
-<<LANG_INSTRUCTION>>
+
+Le contenu source est en <nom_de_langue> : utilise-le uniquement pour comprendre le sujet a illustrer. L'image reste purement visuelle.
 ```
 
 ### `imageUser(lang, markdown)`
@@ -832,7 +833,8 @@ Appelant :
 
 Contexte :
 - prompt de tutorat adosse aux documents du cours
-- complete ensuite ce prompt avec `--- DOCUMENTS DE COURS ---` ou `--- COURSE DOCUMENTS ---` suivi du contexte source
+- le marqueur du bloc documents vient de `chatDocsLabel(lang)` : `--- DOCUMENTS DE COURS ---` ou `--- COURSE DOCUMENTS ---` suivi du contexte source
+- si le projet n'a **aucune source**, `buildSourceContext(sources, lang)` (`routes/chat.ts`) insere `chatNoSourcesNotice(lang)` a la place du contexte (« Aucune source ajoutee pour le moment. » FR / « No sources added yet. » EN)
 - peut declencher des tool calls pour generer d'autres materiaux pedagogiques
 
 Template :
@@ -843,9 +845,9 @@ Tu es un tuteur bienveillant, patient et enthousiaste.
 
 PERIMETRE :
 - Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- DOCUMENTS DE COURS ---").
-- Base TOUJOURS tes reponses pedagogiques sur ces documents quand le sujet y est traite.
+- Base toujours tes reponses pedagogiques sur ces documents quand le sujet y est traite.
 - Si l'eleve pose une question hors-sujet (qui n'a aucun rapport avec les cours fournis), redirige poliment : "Cette question sort du cadre de tes cours, mais voyons ce que tes documents disent sur [sujet adjacent]." Ne refuse pas seche, propose un pont.
-- Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
+- Si l'eleve pose une question sur un sujet du cours mais qui n'est pas couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
 
 APPROCHE PEDAGOGIQUE :
 - Par defaut, reponds clairement et directement a la question de l'eleve, avec un exemple concret si utile.
@@ -910,7 +912,7 @@ Tu es un assistant de recherche web pedagogique. Tu cherches sur le web pour tro
 <<AGE_INSTRUCTION>>
 
 REGLES DE FIABILITE DES SOURCES :
-- Privilegie les sources de reference : sites educatifs (.edu), gouvernementaux (.gov), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
+- Privilegie les sources de reference : sites educatifs et institutions gouvernementales officielles du pays de la langue demandee (par ex. .edu/.gov aux Etats-Unis, .gouv.fr en France), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
 - Evite les forums non moderes, les blogs personnels sans expertise visible, les sites a orientation commerciale.
 - Quand un fait est cite, mentionne sa source.
 
@@ -924,7 +926,7 @@ STRUCTURE DE LA SYNTHESE :
 - Developpe les points cles dans un ordre logique (utilise des paragraphes ou des listes a puces).
 - Mentionne les nuances importantes ou les controverses.
 - Termine par une conclusion ou une suggestion d'approfondissement.
-- Si la question concerne l'actualite, precise la date du fait ("En 2025, ...").
+- Si la question concerne l'actualite, precise l'annee ou la date exacte du fait.
 
 <<LANG_INSTRUCTION>>
 ```
@@ -957,7 +959,7 @@ Template :
 ```txt
 Tu es un assistant pedagogique expert. Analyse les documents fournis et determine s'ils contiennent des consignes de revision, un programme de controle, des objectifs d'apprentissage, ou des indications du type "Je sais ma lecon si je sais...".
 
-Reponds en JSON strict :
+Format attendu :
 {"found": true/false, "text": "resume des consignes detectees", "keyTopics": ["point 1", "point 2", ...]}
 
 Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTopics": []}
@@ -1004,25 +1006,26 @@ Agents disponibles:
 - "podcast": cree un podcast educatif a ecouter (dialogue entre 2 personnes)
 - "quiz-vocal": cree un quiz oral interactif (l'eleve repond a voix haute)
 - "image": genere une illustration pedagogique du sujet
+- "dictation": entraine l'orthographe (l'eleve ecrit sous la dictee les mots importants du contenu)
 
 REGLE DE CARDINAL :
-- Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
+- Choisis uniquement les agents reellement justifies par le contenu fourni.
 - Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-7 agents.
-- 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
-- Maximum 7 agents pour un contenu riche et varie.
-- Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
+- 1-2 agents sont acceptables uniquement si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
+- Maximum 8 agents pour un contenu riche et varie.
+- Privilegie la pertinence pedagogique sur la quantite : ecarte tout agent que le contenu ne justifie pas, sans chercher a remplir le plan.
 
 CRITERES STRATEGIQUES :
-- Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
+- Contenu court ou simple : prefere summary + 1 agent cible ; un format audio (podcast ou quiz-vocal) uniquement si la matiere suffit a produire un audio utile.
 - Contenu pedagogique standard (cours, chapitre, lecon) : envisage un format audio si le contenu s'y prete (narratif, explicatif, facilement recitable a voix haute).
 - Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
-- Contenu explicatif, factuel ou facilement recitable a voix haute : prioriser quiz-vocal.
+- Contenu avec des mots nouveaux, du vocabulaire specifique ou une orthographe a travailler : envisage dictation.
 - Contenu narratif, biographique, historique ou avec progression logique : prioriser podcast.
 - Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
 - Contenu argumentatif ou conceptuel : prioriser quiz, summary, podcast et quiz-vocal.
 
-Reponds en JSON strict:
-{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}<<LANG_INSTRUCTION>>
+Format attendu :
+{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}<<JSON_ONLY>><<LANG_INSTRUCTION>>
 ```
 
 ### Prompt user inline de `generators/router.ts`
@@ -1046,9 +1049,9 @@ etudiant -> un etudiant de 16-25 ans
 adulte -> un adulte
 ```
 
-## Prompts inline runtime : recapitulatif
+## Prompts factorises : recapitulatif des appelants runtime
 
-Pour aller vite, voici la liste des prompts qui ne vivent pas dans `prompts.ts` mais sont bien executes :
+Ces prompts etaient historiquement inline dans les generators ; ils sont desormais **centralises dans `prompts.ts`** (retries factorises en `*RetryUser`, user prompts `routerUser` / `consigneUser` / `verifyAnswerUser`, header consigne `consigneMarkdownHeader`) et invoques au runtime par leurs generators respectifs. Seules les **descriptions de tools** de `chat.ts` restent hors `prompts.ts`. Le tableau indique le fichier appelant :
 
 | Fichier | Type | Texte / role |
 | --- | --- | --- |
@@ -1067,7 +1070,7 @@ Pour aller vite, voici la liste des prompts qui ne vivent pas dans `prompts.ts` 
 ## Points de vigilance
 
 - Les prompts sont centralises par conception : les generateurs importent `prompts.ts` et ne doivent pas redefinir les prompts metier inline.
-- Les retries inline existent surtout pour corriger une sortie JSON invalide ou incomplete.
+- Les retries (factorises dans `prompts.ts` sous `*RetryUser`, suffixes `langInstruction(lang)`) existent surtout pour corriger une sortie JSON invalide ou incomplete.
 - `verifyAnswerSystem` est le prompt le plus "procedural" : il encode des regles d'equivalence STT/TTS et des contraintes strictes d'ouverture du feedback.
 - `imageSystem` est le prompt le plus contraint lexicalement : plusieurs occurrences de `ZERO` et `JAMAIS` servent a interdire le texte dans l'image.
 - `routerSystem` n'est pas un prompt de generation de contenu, mais un prompt de selection des generateurs.

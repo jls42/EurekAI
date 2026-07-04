@@ -8,24 +8,36 @@ import {
   quizReviewUser,
   quizVocalSystem,
   quizVocalUser,
+  quizRetryUser,
 } from '../prompts.js';
 import type { QuizQuestion, AgeGroup } from '../types.js';
 
 const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
 
-function isValidQuiz(data: QuizQuestion[]): boolean {
+// Type guard : le JSON du LLM peut contenir null/objets incomplets (notamment un
+// item de queue cassé récupéré par le salvage de safeParseJson).
+const isValidQuizItem = (q: unknown): q is QuizQuestion => {
+  if (typeof q !== 'object' || q === null) return false;
+  const it = q as Partial<QuizQuestion>;
   return (
-    data.length > 0 &&
-    data.every(
-      (q) =>
-        typeof q.question === 'string' &&
-        q.question.length > 0 &&
-        Array.isArray(q.choices) &&
-        q.choices.length > 1 &&
-        typeof q.correct === 'number',
-    )
+    typeof it.question === 'string' &&
+    it.question.length > 0 &&
+    Array.isArray(it.choices) &&
+    it.choices.length > 1 &&
+    typeof it.correct === 'number'
   );
-}
+};
+
+// Filtre par item (miroir generators/dictation.ts) : un item de queue malformé ne
+// doit pas invalider tout un batch de questions correctes. Retry si zéro valide.
+const filterValidQuestions = (data: QuizQuestion[]): QuizQuestion[] => {
+  const valid = data.filter(isValidQuizItem);
+  const discarded = data.length - valid.length;
+  if (discarded > 0) {
+    console.warn(`Quiz: ${discarded} item(s) invalide(s) ecarte(s) sur ${data.length}`);
+  }
+  return valid;
+};
 
 async function generateQuizWithRetry(
   client: Mistral,
@@ -50,8 +62,9 @@ async function generateQuizWithRetry(
 
   const raw = getContent(response);
   const data = unwrapJsonArray<QuizQuestion>(safeParseJson(raw));
+  const valid = filterValidQuestions(data);
 
-  if (isValidQuiz(data)) return data;
+  if (valid.length > 0) return valid;
 
   console.warn('Quiz validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
   messages.push({ role: 'assistant', content: raw }, { role: 'user', content: retryMsg });
@@ -62,12 +75,14 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
     ...diversityParams(type),
   });
-  const retryData = unwrapJsonArray<QuizQuestion>(safeParseJson(getContent(retry)));
+  const retryValid = filterValidQuestions(
+    unwrapJsonArray<QuizQuestion>(safeParseJson(getContent(retry))),
+  );
 
-  if (!isValidQuiz(retryData)) {
+  if (retryValid.length === 0) {
     throw new Error(errorMsg);
   }
-  return retryData;
+  return retryValid;
 }
 
 export async function generateQuiz(
@@ -79,11 +94,12 @@ export async function generateQuiz(
   count?: number,
   exclusions?: string,
 ): Promise<QuizQuestion[]> {
+  const effectiveCount = count ?? 15;
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),
-    quizUser(markdown, count, lang, exclusions),
-    'Ta reponse etait vide ou incomplete. Regenere les questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.',
+    quizUser(markdown, effectiveCount, lang, exclusions),
+    quizRetryUser({ kind: 'quiz', count: effectiveCount, lang }),
     "Le modele n'a pas reussi a generer un quiz valide apres 2 tentatives",
     model,
   );
@@ -98,11 +114,12 @@ export async function generateQuizVocal(
   count?: number,
   exclusions?: string,
 ): Promise<QuizQuestion[]> {
+  const effectiveCount = count ?? 15;
   return generateQuizWithRetry(
     client,
     quizVocalSystem(ageGroup, lang),
-    quizVocalUser(markdown, count, lang, exclusions),
-    'Ta reponse etait vide ou incomplete. Regenere les questions QCM orales. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.',
+    quizVocalUser(markdown, effectiveCount, lang, exclusions),
+    quizRetryUser({ kind: 'quiz-vocal', count: effectiveCount, lang }),
     "Le modele n'a pas reussi a generer un quiz vocal valide apres 2 tentatives",
     model,
     'quiz-vocal',
@@ -122,7 +139,7 @@ export async function generateQuizReview(
     client,
     quizReviewSystem(ageGroup),
     quizReviewUser(weakConcepts, markdown, lang),
-    'Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM. JSON valide uniquement.',
+    quizRetryUser({ kind: 'quiz-review', lang }),
     "Le modele n'a pas reussi a generer la revision quiz apres 2 tentatives",
     model,
   );

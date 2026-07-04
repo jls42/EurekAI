@@ -13,6 +13,12 @@ import {
   registerInstruction,
   dictationSystem,
   dictationUser,
+  summaryRetryUser,
+  quizRetryUser,
+  podcastRetryUser,
+  flashcardsRetryUser,
+  fillBlankRetryUser,
+  dictationRetryUser,
   summaryRemediationSystem,
   summaryRemediationUser,
   podcastSystem,
@@ -21,13 +27,21 @@ import {
   PODCAST_NAME_POOL,
   fillBlankSystem,
   fillBlankUser,
+  consigneSystem,
+  quizVocalUser,
   chatSystem,
+  chatDocsLabel,
   imageSystem,
   imageUser,
   websearchInstructions,
   websearchInput,
   defaultReasonFor,
   routerSystem,
+  routerUser,
+  consigneUser,
+  consigneMarkdownHeader,
+  chatNoSourcesNotice,
+  verifyAnswerUser,
   feedbackAgeInstruction,
   vocalRewriteRules,
   quizVocalSystem,
@@ -198,11 +212,156 @@ describe('DICTATION', () => {
     expect(lower).not.toContain('liste de mots');
   });
 
-  it('user : contenu + cap + langInstruction', () => {
+  it('user : contenu + cible ferme avec echappatoire contenu pauvre + langInstruction', () => {
     const result = dictationUser('toujours ecole', 'en', 10);
     expect(result).toContain('toujours ecole');
-    expect(result).toContain('au maximum 10');
+    expect(result).toContain('Choisis 10 mots');
+    expect(result).toContain('moins uniquement si');
     expect(result).toContain('English');
+  });
+
+  it("system : plus de consigne d'ordre deterministe (figeait le 1er mot)", () => {
+    expect(dictationSystem('enfant')).not.toContain('plus simple au plus difficile');
+  });
+
+  it('user : exclusions appendees quand presentes', () => {
+    const result = dictationUser(
+      'contenu',
+      'fr',
+      10,
+      "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :\n- avion",
+    );
+    expect(result).toContain('deja travaille les mots');
+    expect(result).toContain('- avion');
+  });
+});
+
+describe('RETRY PROMPTS', () => {
+  it('summaryRetryUser : contrat aligne sur summarySystem (couverture non rabotee + citations)', () => {
+    const msg = summaryRetryUser();
+    expect(msg).toContain('autant que necessaire');
+    expect(msg).toContain('citations');
+    expect(msg).not.toContain('5-7');
+    expect(msg.toLowerCase()).not.toContain('fiche complete');
+  });
+
+  it('podcastRetryUser : pas de qualificatif de document pres du champ text', () => {
+    expect(podcastRetryUser()).not.toContain('podcast complet');
+  });
+
+  it('quizRetryUser : 3 variantes distinctes, champs du contrat rappeles', () => {
+    expect(quizRetryUser({ kind: 'quiz', count: 15 })).toContain('QCM');
+    expect(quizRetryUser({ kind: 'quiz', count: 15 })).toContain('les 15 questions');
+    expect(quizRetryUser({ kind: 'quiz-vocal' })).toContain('oral');
+    expect(quizRetryUser({ kind: 'quiz-vocal' })).toContain('choices (4)');
+    expect(quizRetryUser({ kind: 'quiz-review' })).toContain('NOUVELLES');
+    expect(quizRetryUser({ kind: 'quiz-review' })).toContain('choices (4)');
+  });
+
+  it('les retries portent langInstruction en dernier (invariant langue au 2e tour)', () => {
+    expect(summaryRetryUser('en')).toContain('English');
+    expect(quizRetryUser({ kind: 'quiz', lang: 'en' })).toContain('English');
+    expect(fillBlankRetryUser(10, 'en')).toContain('English');
+    expect(dictationRetryUser(10, 'en')).toContain('English');
+    expect(podcastRetryUser('en')).toContain('English');
+    expect(flashcardsRetryUser(5, 'en')).toContain('English');
+  });
+
+  it('dictationRetryUser : miroir du contrat dictationUser (echappatoire contenu pauvre)', () => {
+    const msg = dictationRetryUser(10);
+    expect(msg).toContain('10 items');
+    expect(msg).toContain('moins uniquement si');
+  });
+});
+
+describe('USER PROMPTS (router / consigne / verifyAnswer)', () => {
+  it('routerUser : audience + markdown', () => {
+    const result = routerUser('du contenu de cours', 'ado');
+    expect(result).toContain('un adolescent de 11-15 ans');
+    expect(result).toContain('du contenu de cours');
+  });
+
+  it('consigneUser : detection consignes + markdown', () => {
+    const result = consigneUser('mes documents');
+    expect(result).toContain('consignes de revision');
+    expect(result).toContain('mes documents');
+  });
+
+  it('verifyAnswerUser : question + reponse eleve + interrogation binaire', () => {
+    const result = verifyAnswerUser('Capitale de la France ?', 'Paris');
+    expect(result).toContain('Capitale de la France ?');
+    expect(result).toContain('Paris');
+    expect(result).toContain('correcte ou fausse');
+  });
+});
+
+describe('ORDRE DES BLOCS USER (langInstruction en dernier)', () => {
+  it('summaryUser : exclusions et registre avant langInstruction', () => {
+    const exclusions =
+      "Points deja couverts par d'autres documents du projet. Utilise d'autres exemples et d'autres formulations :\n- X";
+    const result = summaryUser('contenu', false, 'fr', exclusions, 'falc');
+    const langIdx = result.indexOf('Ne mélange pas les langues');
+    expect(langIdx).toBeGreaterThan(result.indexOf('- X'));
+    expect(langIdx).toBeGreaterThan(result.indexOf("STYLE D'ECRITURE"));
+  });
+
+  it('dictationUser : exclusions avant langInstruction', () => {
+    const result = dictationUser('contenu', 'en', 10, 'bloc :\n- mot');
+    expect(result.indexOf('English')).toBeGreaterThan(result.indexOf('- mot'));
+  });
+
+  it('quizUser et podcastUser : exclusions avant langInstruction', () => {
+    const quiz = quizUser('contenu', 15, 'en', 'bloc :\n- Q1');
+    expect(quiz.indexOf('English')).toBeGreaterThan(quiz.indexOf('- Q1'));
+    const pod = podcastUser('contenu', 'en', 'bloc :\n- angle');
+    expect(pod.indexOf('English')).toBeGreaterThan(pod.indexOf('- angle'));
+  });
+});
+
+describe('consigneMarkdownHeader', () => {
+  it('marqueur exact + liste + separateur (contrat lu par summarySystem/summaryUser)', () => {
+    const result = consigneMarkdownHeader('- les volcans\n- la lave');
+    expect(result).toContain('CONSIGNE DE REVISION DETECTEE');
+    expect(result).toContain('- les volcans');
+    expect(result).toContain('\n\n---\n\n');
+  });
+
+  it('anti-leak : plus de tokens candidats dictee/fill-blank du header historique', () => {
+    // Le header devient du « contenu fourni » pour tous les generateurs — chaque
+    // mot est un candidat de mot de dictee / reponse fill-blank.
+    const result = consigneMarkdownHeader('- x');
+    expect(result).not.toContain('PRIORITAIREMENT');
+    expect(result).not.toContain('doit reviser');
+    expect(result).not.toContain('hors-programme');
+  });
+});
+
+describe('chatNoSourcesNotice', () => {
+  it('placeholder localise fr/en (meme logique binaire que chatDocsLabel)', () => {
+    expect(chatNoSourcesNotice('en')).toBe('No sources added yet.');
+    expect(chatNoSourcesNotice()).toBe('Aucune source ajoutee pour le moment.');
+    expect(chatNoSourcesNotice('es')).toBe('Aucune source ajoutee pour le moment.');
+  });
+});
+
+describe('CONSIGNE SYSTEM', () => {
+  it('format, contrat JSON factorisé et langue', () => {
+    const result = consigneSystem('en');
+    expect(result).toContain('"found"');
+    expect(result).toContain('keyTopics');
+    expect(result).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(result).toContain('English');
+    expect(result).not.toContain('Reponds en JSON strict');
+  });
+});
+
+describe('QUIZ VOCAL USER', () => {
+  it('count + registre oral + markdown + exclusions avant langInstruction', () => {
+    const result = quizVocalUser('contenu du cours', 12, 'en', 'bloc :\n- Q1');
+    expect(result).toContain('12 questions');
+    expect(result).toContain('ORAL');
+    expect(result).toContain('contenu du cours');
+    expect(result.indexOf('English')).toBeGreaterThan(result.indexOf('- Q1'));
   });
 });
 
@@ -318,6 +477,13 @@ describe('chatSystem', () => {
   it("chatSystem('fr') contient une instruction explicite sur le français (explicite > implicite)", () => {
     expect(chatSystem('fr')).toContain('français');
   });
+
+  it('référence le même marqueur documents que celui injecté par generators/chat.ts', () => {
+    expect(chatSystem('fr')).toContain(`--- ${chatDocsLabel('fr')} ---`);
+    expect(chatSystem('en')).toContain(`--- ${chatDocsLabel('en')} ---`);
+    expect(chatDocsLabel('en')).toBe('COURSE DOCUMENTS');
+    expect(chatDocsLabel('es')).toBe('DOCUMENTS DE COURS');
+  });
 });
 
 // ── imageSystem / imageUser ────────────────────────────────────────────
@@ -335,6 +501,13 @@ describe('imageSystem', () => {
     expect(result).toContain('illustrateur');
     expect(result).toContain('professionnel');
     expect(result).toContain('English');
+  });
+
+  it("n'appende pas langInstruction (contradiction avec l'interdiction de texte)", () => {
+    // Exception documentée (.claude/rules/prompts.md) : « génère TOUT le contenu
+    // (textes, titres...) » en position finale contredirait ZERO texte.
+    expect(imageSystem('fr', 'enfant')).not.toContain('génère TOUT le contenu');
+    expect(imageSystem('fr', 'enfant')).toContain('purement visuelle');
   });
 });
 
@@ -368,6 +541,11 @@ describe('summarySystem source refs policy', () => {
   it('contient un exemple de multi-citation canonique [Source N][Source M]', () => {
     const result = summarySystem('enfant');
     expect(result).toMatch(/\[Source \d+\]\[Source \d+\]/);
+  });
+
+  it('porte le garde anti-fabrication sur les citations (summary + remediation)', () => {
+    expect(summarySystem('enfant')).toContain('FABRIQUE JAMAIS');
+    expect(summaryRemediationSystem('enfant')).toContain('FABRIQUE JAMAIS');
   });
 
   it('ne mentionne jamais la forme dégradée ni aucun pattern similaire (anti-blacklist)', () => {
@@ -511,6 +689,12 @@ describe('defaultReasonFor', () => {
 // ── routerSystem invariants ─────────────────────────────────────────
 
 describe('routerSystem invariants', () => {
+  it('contrat JSON via instruction factorisée, sans wording divergent', () => {
+    const result = routerSystem('enfant', 'fr');
+    expect(result).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(result).not.toContain('Reponds en JSON strict');
+  });
+
   it('contient la règle de cardinal 4-7 agents et la liste des 8 agents', () => {
     const result = routerSystem('enfant', 'fr');
     expect(result).toContain('4-7 agents');

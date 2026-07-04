@@ -2,7 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
-import { podcastSystem, podcastUser, pickPodcastNames } from '../prompts.js';
+import { podcastSystem, podcastUser, pickPodcastNames, podcastRetryUser } from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
 
 interface ParsedPodcastResponse {
@@ -32,7 +32,13 @@ function parsePodcastResponse(raw: string): ParsedPodcastResponse {
   const sourceRefs = Array.isArray(parsed?.sourceRefs)
     ? (parsed.sourceRefs as string[])
     : undefined;
-  const script = unwrapJsonArray<PodcastLine>(parsed);
+  // Clé explicite du contrat d'abord : unwrapJsonArray retourne le PREMIER tableau
+  // trouvé — sur {"sourceRefs":[...],"script":[...]} (ordre légal en JSON), il
+  // prendrait sourceRefs pour le script → retry Mistral inutile. Fallback conservé
+  // pour les shapes dégradés (tableau nu, clé alternative).
+  const script = Array.isArray(parsed?.script)
+    ? (parsed.script as PodcastLine[])
+    : unwrapJsonArray<PodcastLine>(parsed);
   return { script, sourceRefs };
 }
 
@@ -71,8 +77,7 @@ export async function generatePodcastScript(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content:
-        'Ta reponse etait vide ou incomplete. Regenere le script podcast complet avec speaker (host/guest) et text. JSON valide uniquement.',
+      content: podcastRetryUser(lang),
     },
   );
 

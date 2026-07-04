@@ -285,6 +285,29 @@ describe('POST /:pid/chat', () => {
     );
   });
 
+  it('projet sans source : le placeholder sourceContext suit la langue de la requete', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+
+    const project = store.createProject('Test'); // pas de addSource : projet vide
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { message: 'Hi', lang: 'en' },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(chatWithSources).toHaveBeenCalledWith(
+      client,
+      expect.any(Array),
+      'No sources added yet.',
+      'm',
+      'en',
+      'enfant',
+    );
+  });
+
   it('utilise lang=fr et ageGroup=enfant par defaut', async () => {
     const { chatWithSources } = await import('../generators/chat.js');
 

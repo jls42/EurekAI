@@ -1912,6 +1912,74 @@ describe('generateRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
       expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
     });
+
+    it("transmet l'historique d'exclusion au générateur (7e argument)", async () => {
+      const { generateDictation } = await import('../generators/dictation.js');
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'mots.txt',
+        markdown: 'toujours école',
+        uploadedAt: new Date().toISOString(),
+      });
+      // Une dictée existante : ses mots doivent partir en contexte d'exclusion.
+      store.addGeneration(pid, {
+        id: 'gen-dict-prev',
+        title: 'Dictée (2 mots)',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'dictation',
+        data: [
+          { word: 'toujours', sentence: 'Mon chat dort toujours ici.', rule: 'S muet final.' },
+          { word: 'école', sentence: "Je vais à l'école.", rule: 'Accent aigu.' },
+        ],
+        audioUrls: ['/output/projects/p/dictation-w0.mp3', '/output/projects/p/dictation-w1.mp3'],
+        lang: 'fr',
+        ageGroup: 'enfant',
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/dictation');
+      await handler(mockReq({ params: { pid }, body: {} }), mockRes());
+
+      expect(generateDictation).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        10,
+        expect.stringContaining('deja travaille les mots'),
+      );
+      const exclusions = vi.mocked(generateDictation).mock.calls[0][6];
+      expect(exclusions).toContain('- toujours');
+      expect(exclusions).toContain('- école');
+    });
+
+    it("exclusions vides ('') sans historique dictée", async () => {
+      const { generateDictation } = await import('../generators/dictation.js');
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'mots.txt',
+        markdown: 'toujours école',
+        uploadedAt: new Date().toISOString(),
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/dictation');
+      await handler(mockReq({ params: { pid }, body: {} }), mockRes());
+
+      expect(generateDictation).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        10,
+        '',
+      );
+    });
   });
 
   // --- Route analysis endpoint ---
@@ -2439,6 +2507,48 @@ describe('generateRoutes', () => {
 
       const updatedProject = store.getProject(pid);
       expect(updatedProject!.results.generations[0].type).toBe('dictation');
+    });
+
+    it("auto : l'historique d'exclusion dictée est transmis au générateur", async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateDictation } = await import('../generators/dictation.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'dictation', reason: 'orthographe à travailler' }],
+        context: 'Dictation context',
+      });
+
+      const project = store.createProject('Test');
+      const pid = project.meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Contenu avec du vocabulaire à travailler',
+        uploadedAt: new Date().toISOString(),
+      });
+      store.addGeneration(pid, {
+        id: 'gen-dict-prev',
+        title: 'Dictée (1 mot)',
+        createdAt: new Date().toISOString(),
+        sourceIds: ['src-1'],
+        type: 'dictation',
+        data: [{ word: 'vocabulaire', sentence: 'Le vocabulaire est riche.', rule: 'R.' }],
+        audioUrls: ['/output/projects/p/dictation-w0.mp3'],
+        lang: 'fr',
+        ageGroup: 'enfant',
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      await handler(mockReq({ params: { pid }, body: { lang: 'fr' } }), mockRes());
+
+      expect(generateDictation).toHaveBeenCalledWith(
+        mockClient,
+        expect.any(String),
+        'm',
+        'fr',
+        'enfant',
+        10,
+        expect.stringContaining('- vocabulaire'),
+      );
     });
   });
 

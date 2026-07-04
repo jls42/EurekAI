@@ -42,12 +42,16 @@ describe('detectConsigne', () => {
     expect(result.keyTopics).toEqual([]);
   });
 
-  it('passes lang parameter in system prompt', async () => {
+  it('system prompt : langue explicite + contrat de format', async () => {
     const data = { found: false, text: '', keyTopics: [] };
     const client = mockClient(data);
     await detectConsigne(client, 'content', 'mistral-large-latest', 'en');
 
     const call = client.chat.complete.mock.calls[0][0];
-    expect(call.messages[0].content).toContain('en');
+    const system = call.messages[0].content;
+    expect(system).toContain('English');
+    expect(system).toContain('"found"');
+    expect(system).toContain('keyTopics');
+    expect(call.messages[1].content).toContain('content');
   });
 });

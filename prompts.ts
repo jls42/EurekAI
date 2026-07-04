@@ -27,9 +27,12 @@ const LANG_NAMES = {
   sv: 'svenska',
 } as const;
 
+// Nom affichable d'une locale (fallback code brut) — partagé par langInstruction,
+// imageSystem et imageUser.
+const langName = (lang: string): string => (LANG_NAMES as Record<string, string>)[lang] || lang;
+
 export function langInstruction(lang = 'fr'): string {
-  const name = (LANG_NAMES as Record<string, string>)[lang] || lang;
-  return `\n\nIMPORTANT : génère TOUT le contenu en ${name} (textes, titres, explications, vocabulaire). Ne mélange pas les langues.`;
+  return `\n\nIMPORTANT : génère TOUT le contenu en ${langName(lang)} (textes, titres, explications, vocabulaire). Ne mélange pas les langues.`;
 }
 
 // ── Age group adaptation ─────────────────────────────────────────────
@@ -48,6 +51,17 @@ export function ageInstruction(ageGroup: AgeGroup = 'enfant'): string {
   return AGE_INSTRUCTIONS[ageGroup];
 }
 
+// Libellés d'audience courts pour les user prompts (routeur) — table sœur
+// d'AGE_INSTRUCTIONS (PAS la même donnée : à maintenir en cohérence manuellement
+// si les buckets AgeGroup évoluent), reprise verbatim de l'ex-table de
+// generators/router.ts. La plage « 16-25 ans » ne figure que dans ce libellé.
+const AGE_LABELS: Record<AgeGroup, string> = {
+  enfant: 'un enfant de 6-10 ans',
+  ado: 'un adolescent de 11-15 ans',
+  etudiant: 'un etudiant de 16-25 ans',
+  adulte: 'un adulte',
+};
+
 // ── Source refs helper (DRY) ────────────────────────────────────────
 
 function sourceRefsInstruction(itemName: string): string {
@@ -60,10 +74,50 @@ function sourceRefsInstruction(itemName: string): string {
 - En cas de doute, mieux vaut omettre le sourceRef que d'en inventer un.`;
 }
 
+// Citations summary/remediation — format propre à la fiche (`citations[].sourceRef`
+// "[Source 2]" + refs inline [Source 1][Source 3]) : ne PAS réutiliser
+// sourceRefsInstruction, conçu pour les tableaux `sourceRefs: ["Source 1"]`
+// des autres générateurs.
+function citationsInstruction(): string {
+  return `REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
+- Format canonique : un bracket par source, meme en multi-citation.
+- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+- Ne FABRIQUE JAMAIS de reference : cite uniquement des numeros de sources presentes dans le contenu fourni. En cas de doute, omets la reference.`;
+}
+
 // ── JSON instruction helper (DRY) ────────────────────────────────────
 
 function jsonInstruction(): string {
   return 'Reponds UNIQUEMENT en JSON valide.';
+}
+
+// ── Exclusions (diversité inter-générations) ─────────────────────────
+// Headers du bloc injecté par helpers/diversity.ts#buildExclusionContext dans
+// les user prompts, AVANT langInstruction. Règle positive scoped au CHOIX du
+// contenu : jamais d'impératif générique type « NE PAS REPETER » — le LLM peut
+// l'appliquer au texte qu'il rédige (bug observé : mot masqué par « ______ »
+// dans sa propre phrase de dictée).
+const EXCLUSION_HEADERS: Record<string, string> = {
+  // « differentes de celles-ci » (déclaratif) et PAS « propose-en d'autres » : le
+  // pronom de quantité se lit « proposes-en davantage » → le LLM dépasse le count
+  // demandé (13 items pour 10, mesuré en conditions réelles).
+  quiz: "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
+  'quiz-vocal':
+    "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
+  flashcards:
+    "Tu as deja genere les cartes ci-dessous. Les nouvelles cartes doivent etre differentes de celles-ci et porter sur d'autres notions du contenu :",
+  'fill-blank':
+    "Tu as deja utilise les mots ci-dessous. Choisis d'autres mots et d'autres phrases du contenu :",
+  dictation: "Tu as deja travaille les mots ci-dessous. Choisis d'autres mots du contenu :",
+  podcast: 'Tu as deja traite les angles ci-dessous. Choisis un angle et une accroche differents :',
+  summary:
+    "Points deja couverts par d'autres documents du projet. Utilise d'autres exemples et d'autres formulations :",
+};
+
+export function exclusionHeader(type: string): string {
+  return (
+    EXCLUSION_HEADERS[type] ?? 'Tu as deja genere le contenu ci-dessous. Propose autre chose :'
+  );
 }
 
 // Contrat `RoutePlan.plan` (cf. generators/router.ts) exige `reason: string`.
@@ -143,7 +197,7 @@ export function defaultReasonFor(agent: string, lang = 'fr'): string {
 export function summarySystem(ageGroup: AgeGroup = 'enfant'): string {
   return String.raw`Analyse les sources et produis UN SEUL objet JSON strict avec les champs ci-dessous.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
-IMPORTANT : meme si le contenu couvre plusieurs sujets, produis UN SEUL objet. Ne retourne PAS {"fiches": [...]}.
+Meme si le contenu couvre plusieurs sujets, produis un seul objet. Ne retourne PAS {"fiches": [...]}.
 
 REGLE POUR LE CHAMP "title" :
 - title = sujet du cours uniquement, court et descriptif.
@@ -153,27 +207,26 @@ REGLE POUR LE CHAMP "title" :
 EXEMPLE de structure attendue (valeurs minimales — le document final doit etre bien plus detaille) :
 {"title":"Les volcans","summary":"Un volcan est une ouverture dans la croute terrestre par laquelle s'echappent du magma, des cendres et des gaz.","key_points":["Le magma vient du manteau terrestre [Source 1][Source 3].","Une eruption peut etre effusive ou explosive [Source 2]."],"fun_fact":"Le mont Vesuve a enseveli Pompei en 79 ap. J.-C.","vocabulary":[{"word":"magma","definition":"Roche en fusion sous la croute terrestre."}],"citations":[{"text":"Le magma remonte par la cheminee volcanique.","sourceRef":"[Source 2]"}]}
 
-TON OBJECTIF : l'eleve doit pouvoir reviser TOUT son cours uniquement avec ce document. Ne laisse rien d'important de cote.
+Ton objectif : l'eleve doit pouvoir reviser tout son cours uniquement avec ce document. Ne laisse rien d'important de cote.
 Avant de rediger, identifie tous les themes et notions cles dans les sources.
 
 REGLES DE COUVERTURE :
-- Si des CONSIGNES DE REVISION sont presentes, couvre CHAQUE point mentionne sans exception.
+- Si des CONSIGNES DE REVISION sont presentes, couvre chaque point mentionne sans exception.
 - Sinon, couvre chaque source en y extrayant toutes les notions essentielles.
 - summary : un resume approfondi du cours (5-10 phrases couvrant tous les themes). Utilise des retours a la ligne (\n\n) pour separer les paragraphes par theme.
 - key_points : autant que necessaire pour tout couvrir (10-25 typiquement). Chaque point est une phrase complete, informative, avec les faits, dates et noms importants. Pas juste des titres.
-- vocabulary : TOUS les termes importants avec leur definition. Pas de limite.
+- vocabulary : tous les termes importants avec leur definition. Pas de limite.
 - citations : les faits et extraits cles qui illustrent les points importants.
 
-REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
-- Format canonique : un bracket par source, meme en multi-citation.
-- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+${citationsInstruction()}
 
 ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
 }
 
 // Bloc de style pour le registre 'falc' (facile a lire et a comprendre).
-// Regle positive uniquement, placee en FIN de prompt user, loin du champ "title"
+// Regle positive uniquement, placee apres le markdown (avant langInstruction,
+// qui reste dernier), loin du champ "title"
 // (anti-leak : aucun qualificatif de document du type "facile"/"simplifie" qui
 // pourrait etre recycle dans les sorties texte libre).
 export function registerInstruction(register?: SummaryRegister): string {
@@ -189,17 +242,17 @@ export function summaryUser(
   register?: SummaryRegister,
 ): string {
   const consigneBlock = hasConsigne
-    ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu DOIS verifier que CHAQUE point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
+    ? `Une CONSIGNE DE REVISION est presente au debut du contenu. Tu dois verifier que chaque point de la consigne apparait dans tes key_points. L'eleve prepare un controle : rien ne doit manquer.`
     : `Aucune consigne specifique n'est fournie. Couvre toutes les sources : extrais chaque notion, fait, date et definition importants. L'eleve doit pouvoir tout reviser avec ce seul document.`;
 
   let prompt = `Remplis l'objet JSON attendu a partir des sources ci-dessous. Les sources sont numerotees (# Source 1, # Source 2, etc.).
 Rappel : le champ "title" nomme uniquement le sujet du cours.
 ${consigneBlock}
 
-${markdown}${langInstruction(lang)}`;
+${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
   prompt += registerInstruction(register);
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Flashcards ───────────────────────────────────────────────────────
@@ -209,11 +262,10 @@ export function flashcardsSystem(ageGroup: AgeGroup = 'enfant', count = 5): stri
 Format : {"flashcards": [{"question": "...", "answer": "...", "sourceRefs": ["Source 2"]}]}
 
 EXEMPLE (1 item — la reponse doit etre auto-suffisante, comprehensible sans relire la question) :
-{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960 ; elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
+{"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960. Elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
 
 Reponses courtes (1-2 phrases) mais auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
 ${sourceRefsInstruction('flashcard')}
-Si une liste de contenu deja genere est fournie, tu DOIS proposer des flashcards completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${jsonInstruction()}`;
 }
 
@@ -223,9 +275,9 @@ export function flashcardsUser(
   lang = 'fr',
   exclusions?: string,
 ): string {
-  let prompt = `Genere exactement ${count} flashcards a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  let prompt = `Genere exactement ${count} flashcards a partir de ce contenu. Repartis ces ${count} flashcards sur des notions differentes du contenu.\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Quiz ─────────────────────────────────────────────────────────────
@@ -236,10 +288,9 @@ ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
 Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
 
-EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
+EXEMPLE de format (1 item — sourceRefs designe la source contenant l'explication/la reponse, pas seulement la question) :
 {"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations. Aucune question ne doit etre identique ou trop similaire a celles deja generees.
 ${jsonInstruction()}`;
 }
 
@@ -254,7 +305,7 @@ ${jsonInstruction()}`;
 // La règle "pas de parenthèses + exception labels" est DANS quizVocalSystem (cf. #6),
 // pas ici, pour éviter l'injonction contradictoire.
 
-const VOCAL_REWRITE_COMMON = `IMPORTANT — Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
+const VOCAL_REWRITE_COMMON = `Ces questions seront LUES A HAUTE VOIX par un moteur TTS puis l'eleve repondra a l'oral.
 Ecris tout en "langage oral" lisible.`;
 
 const VOCAL_REWRITE_BY_LANG: Record<string, string> = {
@@ -331,7 +382,6 @@ REGLE DE PONCTUATION (quiz vocal) :
 - A l'interieur du texte de chaque choix (apres "A) "), AUCUNE parenthese, crochet ou artefact typographique n'est autorise. Reformule la phrase si besoin.
 - La question elle-meme ne doit contenir aucune parenthese.
 
-Si une liste de questions deja generees est fournie, tu DOIS proposer des questions completement differentes : nouveaux angles, nouveaux exemples, nouvelles formulations.
 ${vocalRewriteRules(lang)}
 ${jsonInstruction()}`;
 }
@@ -342,45 +392,45 @@ export function quizVocalUser(
   lang = 'fr',
   exclusions?: string,
 ): string {
-  let prompt = `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+  let prompt = `Genere exactement ${count} questions de quiz QCM ORAL a partir de ce contenu. Repartis ces ${count} questions sur des sujets differents du contenu. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
-Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
+Ne mets pas la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
 
 RAPPEL : tout doit etre en langage oral lisible (pas de chiffres romains, pas d'abreviations, pas de symboles).
 
 Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 export function quizUser(markdown: string, count = 15, lang = 'fr', exclusions?: string): string {
-  let prompt = `Genere exactement ${count} questions de quiz QCM a partir de ce contenu. Couvre un maximum de sujets differents. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
+  let prompt = `Genere exactement ${count} questions de quiz QCM a partir de ce contenu. Repartis ces ${count} questions sur des sujets differents du contenu. Chaque question doit avoir 4 choix dont 1 seul correct. Les mauvaises reponses doivent etre plausibles.
 ${sourceRefsInstruction('question')}
-Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
+Ne mets pas la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
 
 Format JSON :
 {"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 3"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 export function quizReviewSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie adaptative et en remediation.
 ${ageInstruction(ageGroup)}
 
-L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les MEMES concepts pour l'aider a progresser.
+L'eleve a rate certaines questions. Genere entre 5 et 10 NOUVELLES questions sur les memes concepts pour l'aider a progresser.
 
 STRATEGIE DE REMEDIATION :
-- Commence par les questions les plus FACILES (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
-- Ne te contente pas de reformuler la question initiale : explique le concept sous un AUTRE ANGLE (definition, cas concret, contre-exemple).
+- Commence par les questions les plus faciles (rappel direct du concept), puis monte progressivement en difficulte (application, comparaison).
+- Ne te contente pas de reformuler la question initiale : explique le concept sous un autre angle (definition, cas concret, contre-exemple).
 - Varie les types cognitifs : memorisation, comprehension, application a un cas nouveau.
 - Si plusieurs concepts sont rates, repartis les questions equitablement.
-- Les explications doivent etre PEDAGOGIQUES (montrer pourquoi la bonne reponse est correcte ET pourquoi les distracteurs sont faux), pas juste factuelles.
+- Les explications doivent etre pedagogiques (montrer pourquoi la bonne reponse est correcte et pourquoi les distracteurs sont faux), pas juste factuelles.
 
 ${jsonInstruction()}`;
 }
@@ -391,16 +441,16 @@ export function quizReviewUser(weakConcepts: string, markdown: string, lang = 'f
 
 Genere entre 5 et 10 nouvelles questions QCM sur les memes concepts, mais formulees differemment.
 ${sourceRefsInstruction('question')}
-Ne mets PAS la source qui contient seulement la question — mets celle qui contient l'explication/la reponse. Si la reponse s'appuie sur plusieurs sources, liste-les toutes.
+Ne mets pas la source qui contient seulement la question — mets celle qui contient l'explication/la reponse.
 
 Format JSON :
-{"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "explication courte", "sourceRefs": ["Source 2"]}]}
+{"quiz": [{"question": "...", "choices": ["A) ...", "B) ...", "C) ...", "D) ..."], "correct": 0, "explanation": "...", "sourceRefs": ["Source 2"]}]}
 
 Contenu source :\n\n${markdown}${langInstruction(lang)}`;
 }
 
 export function summaryRemediationSystem(ageGroup: AgeGroup = 'enfant'): string {
-  return String.raw`Tu es un expert en pedagogie adaptative. L'eleve a rate certaines questions : re-explique UNIQUEMENT les notions concernees, sous un autre angle que les questions d'origine (definition simple, cas concret, contre-exemple).
+  return String.raw`Tu es un expert en pedagogie adaptative. L'eleve a rate certaines questions : re-explique uniquement les notions concernees, sous un autre angle que les questions d'origine (definition simple, cas concret, contre-exemple).
 Produis UN SEUL objet JSON strict.
 Format EXACT (objet plat, PAS de tableau "fiches") : {"title": "...", "summary": "...", "key_points": ["...", "..."], "fun_fact": "...", "vocabulary": [{"word": "...", "definition": "..."}], "citations": [{"text": "fait cite", "sourceRef": "[Source 2]"}]}
 
@@ -410,15 +460,13 @@ REGLE POUR LE CHAMP "title" :
 - title ne doit pas contenir de qualificatif sur le format du document.
 
 REGLES DE CONTENU :
-- Couvre CHAQUE notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
+- Couvre chaque notion ratee, et seulement celles-la : pas de rappel des notions deja maitrisees.
 - summary : re-explication claire et progressive de chaque notion (3-6 phrases par notion), avec un exemple concret different de la question d'origine. Utilise des retours a la ligne (\n\n) entre les notions.
 - key_points : 3 a 6 points a retenir pour ne plus se tromper, au moins un par notion ratee, courts et formules autrement que dans les questions et le summary. key_points n'est jamais vide, meme si le summary est deja detaille.
 - vocabulary : les termes qui ont pu porter a confusion, definis simplement.
 - citations : les extraits des sources qui eclairent chaque notion.
 
-REGLE POUR LES REFERENCES DE SOURCES INLINE (dans summary et key_points) :
-- Format canonique : un bracket par source, meme en multi-citation.
-- Exemple : "Le magma vient du manteau [Source 1][Source 3]."
+${citationsInstruction()}
 
 ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
@@ -494,15 +542,14 @@ STRUCTURE :
 - Conclusion : resume fun ou anecdote marquante a retenir.
 
 ${sourceRefsInstruction('podcast')}
-ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages ne doivent pas dire "Source 1" ou "selon le document". Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
-Si une liste de podcasts deja generes est fournie, tu DOIS choisir un angle completement different : nouvelle accroche, nouvelles anecdotes, nouveau fil conducteur.
+ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages parlent comme s'ils connaissaient le sujet par eux-memes, sans evoquer leur documentation. Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
 ${jsonInstruction()}`;
 }
 
 export function podcastUser(markdown: string, lang = 'fr', exclusions?: string): string {
-  let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}${langInstruction(lang)}`;
+  let prompt = `Ecris un script de mini-podcast a partir de ce contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Image ───────────────────────────────────────────────────────────
@@ -518,7 +565,13 @@ INTERDICTION ABSOLUE DE TEXTE — C'est la regle la plus importante :
 
 Style : simple, colore, clair et engageant. Pas de texte dans l'image.
 ${ageInstruction(ageGroup)}`;
-  return base + langInstruction(lang);
+  // Pas de langInstruction ici (exception documentée, cf. .claude/rules/prompts.md) :
+  // son énumération « textes, titres... » contredirait l'interdiction de texte
+  // ci-dessus, en position finale (biais de récence). Ligne de langue dédiée.
+  return (
+    base +
+    `\n\nLe contenu source est en ${langName(lang)} : utilise-le uniquement pour comprendre le sujet a illustrer. L'image reste purement visuelle.`
+  );
 }
 
 export function imageUser(lang: string, markdown: string): string {
@@ -527,9 +580,7 @@ export function imageUser(lang: string, markdown: string): string {
     .filter((l) => l.trim() && !l.startsWith('# Source '))
     .join('\n');
 
-  const langLabel =
-    lang === 'fr' ? 'français' : (LANG_NAMES as Record<string, string>)[lang] || lang;
-  return `Genere une illustration pedagogique a partir de ce contenu (contexte ${langLabel}).
+  return `Genere une illustration pedagogique a partir de ce contenu (contexte ${langName(lang)}).
 
 RAPPEL CRUCIAL — INTERDICTION TOTALE DE TEXTE :
 Ne mets AUCUN texte, lettre, chiffre, mot, label, legende, panneau, inscription ou annotation dans l'image.
@@ -540,15 +591,31 @@ ${content}`;
 
 // ── Chat ─────────────────────────────────────────────────────────────
 
+// Marqueur du bloc documents injecté par generators/chat.ts — source unique :
+// chatSystem y fait référence, chat.ts l'écrit. Une divergence = le system pointe
+// un marqueur inexistant (bug historique en anglais). Délimiteur technique interne
+// (pas du contenu élève) : le défaut fr est la méta-langue de tous les prompts,
+// seul l'anglais a un marqueur dédié — choix volontaire, pas un oubli i18n.
+export function chatDocsLabel(lang = 'fr'): string {
+  return lang === 'en' ? 'COURSE DOCUMENTS' : 'DOCUMENTS DE COURS';
+}
+
+// Placeholder du bloc documents quand le projet n'a pas de source — même logique
+// binaire fr/en que chatDocsLabel (le reste du system est FR par design, mais ce
+// texte occupe le slot CONTENU sous le marqueur localisé).
+export function chatNoSourcesNotice(lang = 'fr'): string {
+  return lang === 'en' ? 'No sources added yet.' : 'Aucune source ajoutee pour le moment.';
+}
+
 export function chatSystem(lang = 'fr', ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un tuteur bienveillant, patient et enthousiaste.
 ${ageInstruction(ageGroup)}
 
 PERIMETRE :
-- Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- DOCUMENTS DE COURS ---").
-- Base TOUJOURS tes reponses pedagogiques sur ces documents quand le sujet y est traite.
+- Tu as acces aux DOCUMENTS DE COURS de l'eleve (fournis en contexte plus bas, sous "--- ${chatDocsLabel(lang)} ---").
+- Base toujours tes reponses pedagogiques sur ces documents quand le sujet y est traite.
 - Si l'eleve pose une question hors-sujet (qui n'a aucun rapport avec les cours fournis), redirige poliment : "Cette question sort du cadre de tes cours, mais voyons ce que tes documents disent sur [sujet adjacent]." Ne refuse pas seche, propose un pont.
-- Si l'eleve pose une question sur un sujet du cours mais qui n'est PAS couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
+- Si l'eleve pose une question sur un sujet du cours mais qui n'est pas couvert par les documents, dis-le franchement ("Tes documents ne traitent pas precisement ce point, mais ils mentionnent...") plutot que d'inventer.
 
 APPROCHE PEDAGOGIQUE :
 - Par defaut, reponds clairement et directement a la question de l'eleve, avec un exemple concret si utile.
@@ -576,7 +643,7 @@ export function websearchInstructions(lang = 'fr', ageGroup: AgeGroup = 'enfant'
 ${ageInstruction(ageGroup)}
 
 REGLES DE FIABILITE DES SOURCES :
-- Privilegie les sources de reference : sites educatifs (.edu), gouvernementaux (.gov), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
+- Privilegie les sources de reference : sites educatifs et institutions gouvernementales officielles du pays de la langue demandee (par ex. .edu/.gov aux Etats-Unis, .gouv.fr en France), encyclopedies etablies (Wikipedia, Universalis), medias reconnus, publications scientifiques.
 - Evite les forums non moderes, les blogs personnels sans expertise visible, les sites a orientation commerciale.
 - Quand un fait est cite, mentionne sa source.
 
@@ -590,13 +657,66 @@ STRUCTURE DE LA SYNTHESE :
 - Developpe les points cles dans un ordre logique (utilise des paragraphes ou des listes a puces).
 - Mentionne les nuances importantes ou les controverses.
 - Termine par une conclusion ou une suggestion d'approfondissement.
-- Si la question concerne l'actualite, precise la date du fait ("En 2025, ...").
+- Si la question concerne l'actualite, precise l'annee ou la date exacte du fait.
 
 ${langInstruction(lang)}`;
 }
 
 export function websearchInput(query: string, lang = 'fr'): string {
   return `Recherche des informations sur : ${query}. Donne un resume structure avec les points cles.${langInstruction(lang)}`;
+}
+
+// ── Retry prompts (2e appel apres reponse invalide) ─────────────────
+// Meme discipline que les prompts initiaux (cf. .claude/rules/prompts.md §Retry) :
+// pas d'echo de formulations a risque, contrat aligne sur le system prompt.
+// Chaque retry porte `lang` et suffixe langInstruction(lang) — l'invariant
+// « langInstruction en dernier message user » vaut aussi au 2e tour. Le count
+// est rappele quand le contrat initial en a un (renforce l'adherence au retry).
+
+export function summaryRetryUser(lang = 'fr'): string {
+  return (
+    "Ta reponse precedente etait invalide. Regenere un objet JSON unique au premier niveau avec les champs title, summary, key_points (autant que necessaire pour tout couvrir, jamais vide), fun_fact, vocabulary, citations. Rappel : title = sujet du cours uniquement (ex: 'Les volcans'), pas de tableau 'fiches'. Reponds uniquement en JSON valide." +
+    langInstruction(lang)
+  );
+}
+
+export type QuizRetryKind = 'quiz' | 'quiz-vocal' | 'quiz-review';
+
+// Object-arg (pattern resolveVoices, cf. CLAUDE.md) : evite un call site fragile
+// `('quiz-review', undefined, lang)`. count absent pour 'quiz-review' (plage 5-10
+// portee par quizReviewSystem, pas de count au generator).
+export interface QuizRetryArgs {
+  kind: QuizRetryKind;
+  count?: number;
+  lang?: string;
+}
+
+export function quizRetryUser({ kind, count, lang = 'fr' }: QuizRetryArgs): string {
+  const target = count ? `les ${count} questions` : 'les questions';
+  const messages: Record<QuizRetryKind, string> = {
+    quiz: `Ta reponse etait vide ou incomplete. Regenere ${target} QCM avec question, choices (4), correct, explanation. JSON valide uniquement.`,
+    'quiz-vocal': `Ta reponse etait vide ou incomplete. Regenere ${target} QCM orales avec question, choices (4), correct, explanation. JSON valide uniquement. Rappel: langage oral, pas de chiffres romains ni abreviations.`,
+    'quiz-review': `Ta reponse etait vide ou incomplete. Regenere les NOUVELLES questions QCM avec question, choices (4), correct, explanation. JSON valide uniquement.`,
+  };
+  return messages[kind] + langInstruction(lang);
+}
+
+export function flashcardsRetryUser(count: number, lang = 'fr'): string {
+  return `Ta reponse etait vide ou incomplete. Regenere les ${count} flashcards avec question et answer. Reponds en JSON valide.${langInstruction(lang)}`;
+}
+
+export function fillBlankRetryUser(count: number, lang = 'fr'): string {
+  return `Ta reponse etait vide ou incomplete. Regenere les ${count} exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.${langInstruction(lang)}`;
+}
+
+// « moins uniquement si... » : miroir exact du contrat de dictationUser — un
+// « ${count} objets » ferme recreerait au retry la tension plafond/plancher.
+export function dictationRetryUser(count: number, lang = 'fr'): string {
+  return `Ta reponse etait vide ou incomplete. Regenere ${count} items (moins uniquement si le contenu ne contient pas assez de mots interessants). Chaque item doit avoir word, sentence (une phrase qui contient le mot ecrit en toutes lettres) et rule. JSON valide uniquement.${langInstruction(lang)}`;
+}
+
+export function podcastRetryUser(lang = 'fr'): string {
+  return `Ta reponse etait vide ou incomplete. Regenere le script podcast avec speaker (host/guest) et text. JSON valide uniquement.${langInstruction(lang)}`;
 }
 
 // ── Consigne (detection) ────────────────────────────────────────────
@@ -607,11 +727,26 @@ export function websearchInput(query: string, lang = 'fr'): string {
 export function consigneSystem(lang = 'fr'): string {
   return `Tu es un assistant pedagogique expert. Analyse les documents fournis et determine s'ils contiennent des consignes de revision, un programme de controle, des objectifs d'apprentissage, ou des indications du type "Je sais ma lecon si je sais...".
 
-Reponds en JSON strict :
+Format attendu :
 {"found": true/false, "text": "resume des consignes detectees", "keyTopics": ["point 1", "point 2", ...]}
 
 Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTopics": []}
 ${jsonInstruction()}${langInstruction(lang)}`;
+}
+
+export function consigneUser(markdown: string): string {
+  return `Analyse ces documents et detecte les consignes de revision, programmes de controle ou objectifs d'apprentissage :\n\n${markdown}`;
+}
+
+// Header prépendu au markdown de TOUS les générateurs quand une consigne est
+// détectée (routes/generate.ts applyConsigne). Même régime que exclusionHeader :
+// string LLM-facing = prompts.ts. Volontairement court — ce texte devient du
+// « contenu fourni » pour dictation/fill-blank, chaque mot est un candidat de
+// leak (l'ancien « PRIORITAIREMENT »/« doit reviser » l'était). Le marqueur
+// « CONSIGNE DE REVISION DETECTEE » est EXACT : summarySystem/summaryUser y font
+// référence, ne pas le renommer.
+export function consigneMarkdownHeader(topicsList: string): string {
+  return `CONSIGNE DE REVISION DETECTEE — traite en priorite :\n${topicsList}\n\n---\n\n`;
 }
 
 // ── Router (orchestrateur) ──────────────────────────────────────────
@@ -634,24 +769,28 @@ Agents disponibles:
 - "dictation": entraine l'orthographe (l'eleve ecrit sous la dictee les mots importants du contenu)
 
 REGLE DE CARDINAL :
-- Choisis UNIQUEMENT les agents reellement justifies par le contenu fourni.
+- Choisis uniquement les agents reellement justifies par le contenu fourni.
 - Pour un vrai cours, une lecon ou une matiere de revision non triviale, vise en pratique 4-7 agents.
-- 1-2 agents sont acceptables UNIQUEMENT si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
+- 1-2 agents sont acceptables uniquement si la matiere est vraiment tres courte, repetitive ou pauvre (ex: une seule definition isolee).
 - Maximum 8 agents pour un contenu riche et varie.
-- Privilegie la PERTINENCE pedagogique sur la QUANTITE : mieux vaut 2 agents bien choisis que 5 agents qui forcent.
+- Privilegie la pertinence pedagogique sur la quantite : ecarte tout agent que le contenu ne justifie pas, sans chercher a remplir le plan.
 
 CRITERES STRATEGIQUES :
-- Contenu court ou simple : prefere summary + 1 agent, MAIS n'exclus podcast et quiz-vocal que si la matiere est vraiment trop pauvre pour produire un audio utile.
+- Contenu court ou simple : prefere summary + 1 agent cible ; un format audio (podcast ou quiz-vocal) uniquement si la matiere suffit a produire un audio utile.
 - Contenu pedagogique standard (cours, chapitre, lecon) : envisage un format audio si le contenu s'y prete (narratif, explicatif, facilement recitable a voix haute).
 - Contenu riche en dates, noms propres, vocabulaire : prioriser fill-blank, flashcards et quiz-vocal.
 - Contenu avec des mots nouveaux, du vocabulaire specifique ou une orthographe a travailler : envisage dictation.
-- Contenu explicatif, factuel ou facilement recitable a voix haute : prioriser quiz-vocal.
 - Contenu narratif, biographique, historique ou avec progression logique : prioriser podcast.
 - Contenu visuel ou spatial (geographie, schema, anatomie) : prioriser image.
 - Contenu argumentatif ou conceptuel : prioriser quiz, summary, podcast et quiz-vocal.
 
-Reponds en JSON strict:
-{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}${langInstruction(lang)}`;
+Format attendu :
+{"plan": [{"agent": "...", "reason": "..."}], "context": "resume du contenu en 2-3 phrases"}
+${jsonInstruction()}${langInstruction(lang)}`;
+}
+
+export function routerUser(markdown: string, ageGroup: AgeGroup = 'enfant'): string {
+  return `Analyse ce contenu et decide quel materiel educatif generer pour ${AGE_LABELS[ageGroup]}:\n\n${markdown}`;
 }
 
 // ── Feedback age instruction (verifyAnswer-specific) ────────────────
@@ -662,7 +801,7 @@ Reponds en JSON strict:
 export function feedbackAgeInstruction(ageGroup: AgeGroup = 'enfant'): string {
   const byAge: Record<AgeGroup, string> = {
     enfant:
-      'Feedback court (1-2 phrases). Si juste, reponse clairement positive et enthousiaste (par ex. "Bravo !", "Super !" ou equivalent). Si faux, reponse claire et rassurante qui donne la bonne reponse, sans ambiguite.',
+      'Feedback court (1-2 phrases). Si juste, reponse clairement positive et enthousiaste (par ex. "Bravo !", "Super !" ou equivalent). Si faux, correction nette d\'abord qui donne la bonne reponse sans ambiguite, ton rassurant ensuite.',
     ado: 'Feedback court et dynamique (1-2 phrases). Si juste, validation nette et positive (par ex. "Bien joué !", "C\'est ça !" ou equivalent). Si faux, correction claire + indice court.',
     etudiant:
       'Feedback concis et informatif (1-2 phrases). Si juste, confirmation nette (par ex. "Correct.", "Exact." ou equivalent). Si faux, rectification + rappel de la bonne reponse.',
@@ -700,21 +839,26 @@ ${choicesList}
 La bonne reponse est : ${correctAnswerLine}
 
 Regles strictes :
-- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisée "${spokenLabel} B" (que le TTS prononce avant chaque choix), ou par le texte de la reponse. Toutes ces formes sont valides. Correspondance : 1=A, 2=B, 3=C, 4=D.
+- L'eleve peut repondre par la lettre (A, B, C, D), par le numero (1, 2, 3, 4 ou "reponse 2"), par "reponse B", par la forme orale localisée "${spokenLabel} B" (que le TTS prononce avant chaque choix), par l'ordinal — ou l'equivalent dans la langue de l'eleve —, ou par le texte de la reponse. Chacune de ces formes designe UN des choix, jamais un verdict : commence par identifier le choix designe, puis compare-le a la bonne reponse. Correspondance : 1=A, 2=B, 3=C, 4=D ; "la premiere"=A, "la deuxieme"=B, "la troisieme"=C, "la quatrieme"=D.
 - Si la reponse correspond a la bonne reponse (meme avec des fautes d'orthographe mineures ou une formulation legerement differente), reponds correct=true.
 - Si la reponse est fausse ou ne correspond pas, reponds correct=false avec un feedback qui explique la bonne reponse.
 - La reponse est soit correcte, soit fausse — binaire, pas d'entre-deux. N'utilise jamais de formulation qui suggere une quasi-reussite.
-- Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont PAS des erreurs.
+- Les variantes orthographiques d'un meme mot (ex: Wisigoths/Visigoths) ne sont pas des erreurs.
 
 STRUCTURE OBLIGATOIRE du feedback :
-- Si correct=true : le feedback DOIT commencer par une validation directe (ex: "Oui", "Exact", "Bravo", "C'est ça", "Correct").
-- Si correct=false : le feedback DOIT commencer par une negation nette (ex: "Non,", "Mauvaise reponse,", "Faux,") suivie immediatement de la bonne reponse. AUCUN mot d'attenuation ou d'encouragement partiel avant la negation.
+- Si correct=true : le feedback DOIT commencer par une validation directe (ex: "Oui", "Exact", "Bravo", "C'est ça", "Correct"), ou leur equivalent dans la langue du feedback.
+- Si correct=false : le feedback DOIT commencer par une negation nette (ex: "Non,", "Mauvaise reponse,", "Faux,"), ou leur equivalent dans la langue du feedback, suivie immediatement de la bonne reponse. AUCUN mot d'attenuation ou d'encouragement partiel avant la negation.
 
 EXEMPLE (correct=false, sans attenuation) :
 Question: "Quelle planete est la plus proche du Soleil ?" — eleve repond "Venus".
 Feedback attendu: {"correct": false, "feedback": "Non, la planete la plus proche du Soleil est Mercure."}
 
-Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruction(lang)}`;
+Format attendu : {"correct": true/false, "feedback": "..."}
+${jsonInstruction()}${langInstruction(lang)}`;
+}
+
+export function verifyAnswerUser(question: string, studentAnswer: string): string {
+  return `Question: ${question}\nReponse de l'eleve: ${studentAnswer}\n\nLa reponse est-elle correcte ou fausse ?`;
 }
 
 // ── Fill-in-the-blanks ────────────────────────────────────────────────
@@ -722,23 +866,22 @@ Reponds en JSON strict: {"correct": true/false, "feedback": "..."}${langInstruct
 export function fillBlankSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie specialise dans les exercices a trous.
 ${ageInstruction(ageGroup)}
-Si une liste de mots/concepts deja utilises est fournie, tu DOIS proposer des exercices completement differents : nouveaux mots cles, nouvelles phrases, nouveaux angles.
-Tu generes des phrases avec UN MOT OU EXPRESSION CLE remplace par "___" (triple underscore).
+Tu generes des phrases avec un mot ou une expression cle remplace par "___" (triple underscore).
 L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les dates et noms importants.
 
 REGLES :
 - Chaque phrase doit etre auto-suffisante et comprehensible seule.
-- Le mot a trouver doit etre un terme CLE du cours (pas un mot vide ou generique).
+- Le mot a trouver doit etre un terme cle du cours (pas un mot vide ou generique).
 - UN SEUL trou par phrase.
 - La phrase doit donner suffisamment de contexte pour deviner la reponse.
-- IMPORTANT : si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et PAS "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
-- Le hint doit aider sans donner la reponse : premiere lettre, nombre de lettres, categorie ou indice contextuel.
+- Si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et pas "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
+- Le hint doit aider sans donner la reponse : premiere lettre, categorie ou indice contextuel.
 - category parmi : "vocabulaire", "date", "nom propre", "definition", "concept", "lieu", "nombre".
 - Varie les types de blanks : melange vocabulaire, dates, noms, definitions.
 - Ordonne du plus simple au plus difficile.
 
-EXEMPLE de format (1 item — l'article "un" est INCLUS dans le trou et la reponse, pas separe) :
-{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, 12 lettres avec l'article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
+EXEMPLE de format (1 item — l'article "un" est inclus dans le trou et la reponse, pas separe) :
+{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, avec son article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
 
 ${sourceRefsInstruction('exercice')}
 ${jsonInstruction()}`;
@@ -750,14 +893,14 @@ export function fillBlankUser(
   lang = 'fr',
   exclusions?: string,
 ): string {
-  let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Couvre un maximum de sujets differents.
+  let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Repartis ces ${count} exercices sur des sujets differents du contenu.
 
 Format JSON :
-{"exercises": [{"sentence": "La capitale de la France est ___.", "answer": "Paris", "hint": "Commence par P, 5 lettres", "category": "lieu", "sourceRefs": ["Source 1"]}]}
+{"exercises": [{"sentence": "Une phrase du contenu avec ___ a completer.", "answer": "...", "hint": "...", "category": "...", "sourceRefs": ["Source 1"]}]}
 
-Contenu :\n\n${markdown}${langInstruction(lang)}`;
+Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;
-  return prompt;
+  return prompt + langInstruction(lang);
 }
 
 // ── Dictation (entrainement d'orthographe) ───────────────────────────
@@ -770,9 +913,9 @@ Format EXACT : {"items": [{"word": "...", "sentence": "...", "rule": "..."}]}
 
 REGLES :
 - word = un mot present dans le contenu fourni, recopie EXACTEMENT (orthographe, accents, majuscules identiques). N'invente aucun mot absent du contenu.
-- sentence = une phrase simple du quotidien qui contient le mot EXACTEMENT sous cette forme (meme orthographe, necessaire pour l'affichage a trou).
+- sentence = une phrase simple du quotidien qui contient le mot ecrit en toutes lettres, EXACTEMENT sous cette forme (meme orthographe, memes accents).
 - rule = ce qu'il faut retenir pour ecrire ce mot sans se tromper (accord, lettre muette, accent, homophone...), en une ou deux phrases.
-- Ordonne du plus simple au plus difficile.
+- Varie les types de difficulte d'un mot a l'autre (accords, lettres muettes, accents, homophones).
 
 EXEMPLE (1 item) :
 {"items":[{"word":"toujours","sentence":"Mon chat dort toujours sur le canape.","rule":"Ce mot se termine par un s muet, comme jamais et ailleurs."}]}
@@ -781,10 +924,12 @@ ${ageInstruction(ageGroup)}
 ${jsonInstruction()}`;
 }
 
-export function dictationUser(markdown: string, lang = 'fr', count = 10): string {
-  return `Voici le contenu :
+export function dictationUser(markdown: string, lang = 'fr', count = 10, exclusions = ''): string {
+  let prompt = `Voici le contenu :
 
 ${markdown}
 
-Choisis au maximum ${count} mots presents dans ce contenu (les plus utiles a travailler en premier) et produis un objet par mot choisi.${langInstruction(lang)}`;
+Choisis ${count} mots presents dans ce contenu (moins uniquement si le contenu ne contient pas assez de mots interessants) et produis un objet par mot choisi. Pioche dans des passages differents du contenu, pas seulement les plus evidents.`;
+  if (exclusions) prompt += `\n\n${exclusions}`;
+  return prompt + langInstruction(lang);
 }

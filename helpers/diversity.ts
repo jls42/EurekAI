@@ -1,4 +1,5 @@
 import { randomInt } from 'node:crypto';
+import { exclusionHeader } from '../prompts.js';
 import type { Generation } from '../types.js';
 
 const PARAMS: Record<string, { temperature: number; presencePenalty: number }> = {
@@ -8,6 +9,9 @@ const PARAMS: Record<string, { temperature: number; presencePenalty: number }> =
   'fill-blank': { temperature: 0.9, presencePenalty: 0.3 },
   podcast: { temperature: 1, presencePenalty: 0.2 },
   summary: { temperature: 0.4, presencePenalty: 0 },
+  // dictation : presencePenalty 0 volontaire — `sentence` doit re-contenir `word`
+  // EXACTEMENT (affichage à trou) ; une penalty décourage cette ré-émission.
+  dictation: { temperature: 0.9, presencePenalty: 0 },
 };
 
 export function diversityParams(type: string) {
@@ -27,6 +31,9 @@ interface QuestionItem {
 }
 interface AnswerItem {
   answer?: unknown;
+}
+interface WordItem {
+  word?: unknown;
 }
 interface PodcastLine {
   speaker?: unknown;
@@ -70,6 +77,13 @@ function extractFillBlankAnswers(gens: Generation[]): string[] {
   });
 }
 
+function extractDictationWords(gens: Generation[]): string[] {
+  return gens.flatMap((g) => {
+    const items: WordItem[] = Array.isArray(g.data) ? (g.data as WordItem[]) : [];
+    return items.map((item) => item.word).filter((w): w is string => Boolean(w));
+  });
+}
+
 function extractPodcastTopics(gens: Generation[]): string[] {
   return gens
     .map((g) => {
@@ -94,17 +108,9 @@ const EXTRACTORS: Record<string, (gens: Generation[]) => string[]> = {
   'quiz-vocal': extractQuizQuestions,
   flashcards: extractFlashcardQuestions,
   'fill-blank': extractFillBlankAnswers,
+  dictation: extractDictationWords,
   podcast: extractPodcastTopics,
   summary: extractSummaryKeyPoints,
-};
-
-const HEADERS: Record<string, string> = {
-  quiz: 'QUESTIONS DEJA GENEREES (NE PAS REPETER) :',
-  'quiz-vocal': 'QUESTIONS DEJA GENEREES (NE PAS REPETER) :',
-  flashcards: 'FLASHCARDS DEJA GENEREES (NE PAS REPETER) :',
-  'fill-blank': 'MOTS/CONCEPTS DEJA UTILISES (NE PAS REPETER) :',
-  podcast: 'PODCASTS DEJA GENERES (CHOISIS UN ANGLE DIFFERENT) :',
-  summary: 'POINTS DEJA COUVERTS (UTILISE DES EXEMPLES ET FORMULATIONS DIFFERENTS) :',
 };
 
 export function buildExclusionContext(
@@ -121,7 +127,8 @@ export function buildExclusionContext(
   const items = extractor(matching);
   if (items.length === 0) return '';
 
-  const header = HEADERS[type] || 'CONTENU DEJA GENERE (NE PAS REPETER) :';
+  // Texte centralisé dans prompts.ts (règle positive scoped au choix du contenu).
+  const header = exclusionHeader(type);
   let result = header;
   for (const item of items) {
     const line = `\n- ${item}`;

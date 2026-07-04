@@ -23,6 +23,12 @@ describe('diversityParams', () => {
     expect(p.presencePenalty).toBe(0);
   });
 
+  it('returns correct params for dictation (penalty 0 : la phrase doit re-contenir le mot)', () => {
+    const p = diversityParams('dictation');
+    expect(p.temperature).toBe(0.9);
+    expect(p.presencePenalty).toBe(0);
+  });
+
   it('returns default params for unknown type', () => {
     const p = diversityParams('unknown');
     expect(p.temperature).toBe(0.7);
@@ -55,7 +61,7 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'quiz');
-    expect(result).toContain('QUESTIONS DEJA GENEREES');
+    expect(result).toContain('deja genere les questions');
     expect(result).toContain('- Q1?');
     expect(result).toContain('- Q2?');
   });
@@ -79,7 +85,7 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'flashcards');
-    expect(result).toContain('FLASHCARDS DEJA GENEREES');
+    expect(result).toContain('deja genere les cartes');
     expect(result).toContain('- FC1?');
   });
 
@@ -91,9 +97,22 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'fill-blank');
-    expect(result).toContain('MOTS/CONCEPTS DEJA UTILISES');
+    expect(result).toContain('deja utilise les mots');
     expect(result).toContain('- alternateur');
     expect(result).toContain('- turbine');
+  });
+
+  it('extracts dictation words', () => {
+    const gens = [
+      {
+        type: 'dictation',
+        data: [{ word: 'toujours' }, { word: 'école' }],
+      },
+    ] as unknown as Generation[];
+    const result = buildExclusionContext(gens, 'dictation');
+    expect(result).toContain('deja travaille les mots');
+    expect(result).toContain('- toujours');
+    expect(result).toContain('- école');
   });
 
   it('extracts podcast first host lines', () => {
@@ -109,7 +128,7 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'podcast');
-    expect(result).toContain('PODCASTS DEJA GENERES');
+    expect(result).toContain('deja traite les angles');
     expect(result).toContain('- Bienvenue!');
   });
 
@@ -121,7 +140,7 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'summary');
-    expect(result).toContain('POINTS DEJA COUVERTS');
+    expect(result).toContain('Points deja couverts');
     expect(result).toContain('- Point A');
   });
 
@@ -160,7 +179,7 @@ describe('buildExclusionContext', () => {
       },
     ] as unknown as Generation[];
     const result = buildExclusionContext(gens, 'quiz-vocal');
-    expect(result).toContain('QUESTIONS DEJA GENEREES');
+    expect(result).toContain('deja genere les questions');
     expect(result).toContain('- QV1?');
     expect(result).toContain('- QV2?');
   });

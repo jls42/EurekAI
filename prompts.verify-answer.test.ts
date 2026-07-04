@@ -11,6 +11,28 @@ describe('verifyAnswerSystem', () => {
     expect(prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris')).toContain('1=A, 2=B, 3=C, 4=D');
   });
 
+  it('accepte la forme ordinale orale (« la deuxieme ») et son équivalent localisé', () => {
+    const result = prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris');
+    expect(result).toContain('la deuxieme');
+    expect(result).toContain("l'equivalent dans la langue de l'eleve");
+  });
+
+  it('mappe explicitement chaque ordinal sur sa lettre (bug mesuré : « la premiere » jugée correcte)', () => {
+    // Sans mapping explicite, mistral-large répondait correct=true à « la première »
+    // alors que la bonne réponse était B (mesuré 3/3 en conditions réelles). La forme
+    // désigne un choix, jamais un verdict.
+    const result = prompt('enfant', 'A) Paris\nB) Lyon', 'A) Paris');
+    expect(result).toContain('"la premiere"=A');
+    expect(result).toContain('"la deuxieme"=B');
+    expect(result).toContain('jamais un verdict');
+  });
+
+  it('les openers de feedback ont une clause d’équivalence dans la langue du feedback', () => {
+    // Les exemples ("Oui", "Non,"…) sont français ; le quiz vocal tourne en 9 langues.
+    const result = prompt('enfant', 'A) Paris', 'A) Paris');
+    expect(result).toContain('ou leur equivalent dans la langue du feedback');
+  });
+
   it('impose une règle binaire sans quasi-réussite', () => {
     const result = prompt('enfant', 'A) Paris', 'A) Paris');
     expect(result).toContain('binaire');
@@ -36,6 +58,11 @@ describe('verifyAnswerSystem', () => {
     expect(result).toMatch(/negation nette/);
     expect(result).toContain('"Non,"');
     expect(result).toMatch(/"feedback":\s*"Non,/);
+  });
+
+  it('termine par le contrat JSON factorisé (jsonInstruction)', () => {
+    expect(prompt()).toContain('Reponds UNIQUEMENT en JSON valide.');
+    expect(prompt()).not.toContain('Reponds en JSON strict');
   });
 
   it('utilise un few-shot hors-domaine des quiz classiques', () => {

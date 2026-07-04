@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { generateFlashcards } from './flashcards.js';
+import { flashcardsRetryUser } from '../prompts.js';
 
 const validFlashcards = [
   { question: 'Q1?', answer: 'A1' },
@@ -35,6 +36,7 @@ describe('generateFlashcards', () => {
     const result = await generateFlashcards(client, 'content');
     expect(result).toEqual(validFlashcards);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(flashcardsRetryUser(5));
   });
 
   it('throws when both attempts fail (empty array)', async () => {

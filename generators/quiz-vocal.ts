@@ -1,7 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
-import { verifyAnswerSystem } from '../prompts.js';
+import { verifyAnswerSystem, verifyAnswerUser } from '../prompts.js';
 import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
@@ -67,7 +67,7 @@ export async function verifyAnswer(
       },
       {
         role: 'user',
-        content: `Question: ${question}\nReponse de l'eleve: ${studentAnswer}\n\nLa reponse est-elle correcte ou fausse ?`,
+        content: verifyAnswerUser(question, studentAnswer),
       },
     ],
     responseFormat: { type: 'json_object' },

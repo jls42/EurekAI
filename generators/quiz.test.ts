@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { quizRetryUser } from '../prompts.js';
 import { generateQuiz, generateQuizVocal, generateQuizReview } from './quiz.js';
 
 const validQuiz = [
@@ -34,6 +35,9 @@ describe('generateQuiz', () => {
     const result = await generateQuiz(client, 'content');
     expect(result).toEqual(validQuiz);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
+      quizRetryUser({ kind: 'quiz', count: 15, lang: 'fr' }),
+    );
   });
 
   it('throws when both fail', async () => {
@@ -43,6 +47,17 @@ describe('generateQuiz', () => {
       .mockResolvedValueOnce({ choices: [{ message: { content: '[]' } }] });
 
     await expect(generateQuiz(client, 'content')).rejects.toThrow(/quiz valide/);
+  });
+
+  it('filtre un item de queue malformé (salvage) sans retry', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const client = mockClient([...validQuiz, { question: 'Incomplète ?', choices: ['A) x'] }]);
+
+    const result = await generateQuiz(client, 'content');
+    expect(result).toEqual(validQuiz);
+    expect(client.chat.complete).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 item'));
+    warnSpy.mockRestore();
   });
 });
 
@@ -65,6 +80,9 @@ describe('generateQuizVocal', () => {
     const result = await generateQuizVocal(client, 'content');
     expect(result).toEqual(validQuiz);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
+    expect(client.chat.complete.mock.calls[1][0].messages[3].content).toBe(
+      quizRetryUser({ kind: 'quiz-vocal', count: 15, lang: 'fr' }),
+    );
   });
 });
 

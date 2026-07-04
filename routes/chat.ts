@@ -16,6 +16,7 @@ import type { ChatMessage, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
 import { chatWithSources } from '../generators/chat.js';
 import { getMarkdown, applyConsigne } from './generate.js';
+import { chatNoSourcesNotice } from '../prompts.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz } from '../generators/quiz.js';
@@ -295,8 +296,10 @@ const appendUserAndBuildHistory = (
   return history;
 };
 
-const buildSourceContext = (sources: ChatProject['sources']): string =>
-  sources.length > 0 ? getMarkdown(sources) : 'Aucune source ajoutee pour le moment.';
+// `lang` obligatoire (pas de défaut) : le typechecker casse tout call site qui
+// oublierait de propager la langue du placeholder.
+const buildSourceContext = (sources: ChatProject['sources'], lang: string): string =>
+  sources.length > 0 ? getMarkdown(sources) : chatNoSourcesNotice(lang);
 
 type ToolPhaseResult = {
   generatedIds: string[];
@@ -406,7 +409,7 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
       }
       const { project, message, lang, ageGroup } = validated;
       const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
-      const sourceContext = buildSourceContext(project.sources);
+      const sourceContext = buildSourceContext(project.sources, lang);
       const config = getConfig();
 
       const { result, usage: chatUsage } = await runWithUsageTracking(() =>

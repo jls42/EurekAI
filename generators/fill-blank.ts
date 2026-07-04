@@ -1,7 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
-import { fillBlankSystem, fillBlankUser } from '../prompts.js';
+import { fillBlankSystem, fillBlankUser, fillBlankRetryUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
 
 function isValidFillBlank(data: FillBlankItem[]): boolean {
@@ -49,8 +49,7 @@ export async function generateFillBlank(
     { role: 'assistant', content: raw },
     {
       role: 'user',
-      content:
-        'Ta reponse etait vide ou incomplete. Regenere les exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.',
+      content: fillBlankRetryUser(count, lang),
     },
   );
 
