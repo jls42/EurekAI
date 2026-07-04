@@ -39,16 +39,24 @@ Tous les messages de retry (2e appel après réponse invalide) sont **factorisé
 
 ## Emphases MAJUSCULES
 
-Garder les MAJUSCULES **uniquement** pour les contraintes dures non négociables :
-- `PAS de tableau "fiches"` (garde-fou parser `extractSummary` dans `generators/summary.ts`)
+**Principe directeur (robustesse multi-modèles).** L'emphase (`IMPORTANT`, MAJUSCULES) **balise les contraintes dures** — elle n'est pas décorative. La cible n'est pas seulement un modèle fort : les prompts doivent rester fiables sur des modèles faibles ou non-anglophones (Mistral aujourd'hui, modèles chinois demain). Un modèle fort suit une contrainte sans balisage ; un modèle faible en a besoin. Recommandation officielle Mistral alignée : « écris pour quelqu'un sans contexte — il doit exécuter la tâche à la seule lecture du prompt ». **Dans le doute, GARDER l'emphase sur une contrainte porteuse.** Ne jamais « nettoyer » une emphase au motif esthétique ou d'un quota — c'est une régression de robustesse (leçon vécue : une passe « hygiène » qui a retiré des `IMPORTANT`/MAJUSCULES load-bearing, annulée).
+
+Emphases **load-bearing** à conserver (liste non exhaustive) :
+- `PAS de tableau "fiches"`, `IMPORTANT : … UN SEUL objet` (`summarySystem` — garde-fou parser `extractSummary`)
 - `AUCUNE parenthese`, `UNIQUE EXCEPTION`, `OBLIGATOIRES` (`quizVocalSystem` — critique pour TTS)
 - `INTERDICTION ABSOLUE DE TEXTE`, `ZERO` (`imageSystem` — critique pour génération image)
 - `FABRIQUE JAMAIS`, `LISTE-LES TOUTES` (`sourceRefsInstruction` — anti-hallucination sources)
-- `STRUCTURE OBLIGATOIRE`, `DOIT`, `AUCUN mot d'attenuation` (`verifyAnswerSystem` — fidélité du feedback binaire ; la règle « jamais de quasi-réussite » est formulée sans citer d'exemples d'atténuation)
+- `Ne mets PAS la source… liste-les toutes` (`quizUser`/`quizReviewUser` — réattribution + renfort volontaire, même si `sourceRefsInstruction` le dit déjà : la répétition aide un modèle faible)
+- `NOUVELLES`, `MEMES`, `FACILES`, `AUTRE ANGLE`, `PEDAGOGIQUES` (`quizReviewSystem` — stratégie de remédiation)
+- `Base TOUJOURS`, `n'est PAS couvert` (`chatSystem` — ancrage anti-hallucination)
+- `UN MOT/EXPRESSION CLE`, `terme CLE`, `IMPORTANT` article, `DANS`/`JAMAIS`, `INCLUS` (`fillBlankSystem` — règle de l'article, piège fréquent)
+- `UNIQUEMENT`, `CHAQUE` (`summaryRemediationSystem` — portée + complétude)
+- `IMPORTANT — … LUES A HAUTE VOIX` (`VOCAL_REWRITE_COMMON` — contexte TTS)
+- `STRUCTURE OBLIGATOIRE`, `DOIT`, `AUCUN mot d'attenuation` (`verifyAnswerSystem` — fidélité du feedback binaire)
 - `ne mentionne JAMAIS les sources` (`podcastSystem` — le dialogue parlé ne cite pas sa documentation)
 - `IMPORTANT : génère TOUT` (`langInstruction` — convention cross-prompt)
 
-Retirer les emphases **décoratives** (`MAIS`, `AUTONOME`, `CHAQUE replique`, `COMPLETEMENT DIFFERENTES`) qui érodent la sélectivité du modèle. Règle empirique : max 1-2 blocs MAJUSCULES par prompt.
+Ce qui reste légitimement retirable = l'emphase **réellement décorative** sur du texte qui n'est PAS une contrainte (ex. adjectifs de style, interjections). En cas de doute sur « décoratif vs porteur », trancher **porteur** (garder). Il n'y a pas de quota « max 1-2 blocs » : le critère est la nature de ce qui est emphasé, pas le compte.
 
 ## Few-shots EXEMPLE
 
@@ -63,11 +71,11 @@ Retirer les emphases **décoratives** (`MAIS`, `AUTONOME`, `CHAQUE replique`, `C
 - **Règle positive, scoped au CHOIX du contenu** (« Tu as déjà généré… propose-en d'autres ») — jamais d'impératif générique type « NE PAS RÉPÉTER » : le LLM peut l'appliquer au texte qu'il rédige. Bug observé en conditions réelles : mots masqués par `______` dans leurs propres phrases de dictée.
 - La consigne de diversité vit UNIQUEMENT dans ce bloc (présent seulement quand un historique existe) — pas de phrase « tu DOIS proposer… complètement différentes » dupliquée dans les system prompts.
 - Ordre des blocs user : markdown → exclusions → registre éventuel → `langInstruction` **toujours en dernier** (verrouillé par le describe `ORDRE DES BLOCS USER` de `prompts.test.ts`).
-- **Même régime pour le header consigne** : `consigneMarkdownHeader(topicsList)` vit dans `prompts.ts` (consommé par `routes/generate.ts#applyConsigne`). Il est prépendu au markdown de TOUS les générateurs et devient donc du « contenu fourni » — le garder minimal, chaque mot est un candidat de mot de dictée / réponse fill-blank (l'ancien « PRIORITAIREMENT »/« doit reviser » l'était). Le marqueur « CONSIGNE DE REVISION DETECTEE » est référencé par `summarySystem`/`summaryUser` : ne pas le renommer. Verrous d'absence dans `prompts.test.ts`.
+- **Même régime pour le header consigne** : `consigneMarkdownHeader(topicsList)` vit dans `prompts.ts` (consommé par `routes/generate.ts#applyConsigne`). Instruction **explicite et emphasée** (« Concentre-toi PRIORITAIREMENT… Le contenu hors-programme peut etre utilise en complement ») : un modèle faible doit prioriser les points de la consigne **sans ignorer le reste** — ne pas raccourcir au point de perdre le sens (leçon : une version « minimale » qui retirait la consigne de priorité était une régression). Le marqueur « CONSIGNE DE REVISION DETECTEE » est référencé par `summarySystem`/`summaryUser` : ne pas le renommer.
 
 ## Contrat JSON
 
-- `jsonInstruction()` fournit `"Reponds UNIQUEMENT en JSON valide."` → appeler en fin de system prompt.
+- `jsonInstruction()` fournit `"Reponds UNIQUEMENT en JSON valide."` **+ interdiction explicite de tout texte d'emballage et des balises de code** (`pas de ```) → appeler en fin de system prompt. Durci pour la robustesse multi-modèles : les modèles faibles / non-anglophones emballent souvent le JSON (préambule « Voici le JSON », fences markdown) → parse cassé. La phrase exacte `"Reponds UNIQUEMENT en JSON valide."` reste un substring stable (verrouillé par les tests) ; ne pas la modifier, seulement compléter.
 - Le `Format EXACT` doit être littéralement donné dans le prompt (pas une description). Si on attend `{"items": [...]}`, le montrer.
 - Invariants à protéger : `PAS de tableau "fiches"` dans summary (garde-fou contre `{"fiches":[...]}` qui casse `extractSummary`).
 - `responseFormat: { type: 'json_object' }` côté client Mistral complète (ne remplace pas) l'instruction dans le prompt.
