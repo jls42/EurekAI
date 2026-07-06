@@ -185,6 +185,7 @@ export const nl: Record<string, string> = {
   'sources.heading': 'Wat wil je leren?',
   'sources.subtitle': 'Voeg je bronnen toe: foto, tekst, stem of zoeken op internet',
   'sources.ready': 'Bronnen klaar!',
+  'sources.generateHint': 'Klik op een knop om die inhoud uit je bronnen te maken.',
   'sources.selectedCount': '{count} bron(nen) geselecteerd',
   'sources.photo': 'Foto',
   'sources.import': 'Importeren',

@@ -184,6 +184,7 @@ export const en: Record<string, string> = {
   'sources.heading': 'What do you want to learn?',
   'sources.subtitle': 'Add your sources: photo, text, voice or web search',
   'sources.ready': 'Sources ready!',
+  'sources.generateHint': 'Click a button to create that content from your sources.',
   'sources.selectedCount': '{count} source(s) selected',
   'sources.photo': 'Photo',
   'sources.import': 'Import',

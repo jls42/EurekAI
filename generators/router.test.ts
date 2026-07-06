@@ -223,12 +223,14 @@ describe('normalizePlan', () => {
   it('ignores long consigne preamble when underlying study material is short', () => {
     // Fixture synchronisée sur consigneMarkdownHeader (prompts.ts) — le test passe
     // par indexOf('# Source '), pas par matching textuel du header.
-    const markdown = `CONSIGNE DE REVISION DETECTEE — traite en priorite :
+    const markdown = `CONSIGNE DE REVISION DETECTEE : L'eleve doit reviser les points suivants :
 - date exacte
 - definition precise
 - personnage important
 - cause et consequence
 - exemple detaille
+
+Concentre-toi PRIORITAIREMENT sur ces sujets. Le contenu hors-programme peut etre utilise en complement.
 
 ---
 

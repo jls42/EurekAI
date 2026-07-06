@@ -326,13 +326,13 @@ describe('consigneMarkdownHeader', () => {
     expect(result).toContain('\n\n---\n\n');
   });
 
-  it('anti-leak : plus de tokens candidats dictee/fill-blank du header historique', () => {
-    // Le header devient du « contenu fourni » pour tous les generateurs — chaque
-    // mot est un candidat de mot de dictee / reponse fill-blank.
-    const result = consigneMarkdownHeader('- x');
-    expect(result).not.toContain('PRIORITAIREMENT');
-    expect(result).not.toContain('doit reviser');
-    expect(result).not.toContain('hors-programme');
+  it('porte une consigne de priorite explicite et emphasee (robustesse modeles faibles)', () => {
+    // Le header doit dire clairement de prioriser les points de la consigne SANS
+    // ignorer le reste — instruction explicite + emphase, pas une version raccourcie
+    // qui perd le sens (cf. philosophie prompts universels : baliser les contraintes).
+    const result = consigneMarkdownHeader('- les volcans');
+    expect(result).toContain('PRIORITAIREMENT');
+    expect(result).toContain('complement');
   });
 });
 

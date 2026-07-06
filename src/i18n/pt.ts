@@ -187,6 +187,7 @@ export const pt: Record<string, string> = {
   'sources.heading': 'O que voc\u00ea quer aprender?',
   'sources.subtitle': 'Adicione suas fontes: foto, texto, voz ou pesquisa na web',
   'sources.ready': 'Fontes prontas!',
+  'sources.generateHint': 'Clique num botão para criar esse conteúdo a partir das suas fontes.',
   'sources.selectedCount': '{count} fonte(s) selecionada(s)',
   'sources.photo': 'Foto',
   'sources.import': 'Importar',
