@@ -1,0 +1,80 @@
+name: Publish image
+# Build et push l'image container sur GitHub Container Registry (ghcr.io).
+# Déclenché automatiquement à chaque tag `v*` (release), avec un déclencheur
+# manuel de secours pour (re)publier un tag oublié.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag à (re)publier (ex: v1.7.0). Vide = ref courante.'
+        required: false
+        default: ''
+permissions:
+  contents: read
+  packages: write
+concurrency:
+  group: publish-image-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+jobs:
+  publish:
+    name: Build & push to ghcr.io
+    runs-on: ubuntu-latest
+    steps:
+      # Défense en profondeur : le déclencheur manuel n'est ouvert qu'aux
+      # collaborateurs (acteurs trustés), mais on valide quand même le format
+      # du tag AVANT de l'utiliser dans `checkout ref:` (anti ref-injection) et
+      # dans metadata. L'input passe par une variable d'env, jamais interpolé
+      # directement dans la commande shell.
+      - name: Validate manual tag input
+        if: ${{ inputs.tag != '' }}
+        env:
+          TAG_INPUT: ${{ inputs.tag }}
+        run: |
+          if ! printf '%s' "$TAG_INPUT" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$'; then
+            echo "::error::Tag manuel invalide: attendu vX.Y.Z"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@af1e73f918a031802d376d3c8bbc3fe56130a9b0 # v4.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive image tags
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ghcr.io/jls42/eurekai
+          # value= est vide sur push tag (metadata lit alors github.ref) ;
+          # renseigné par le déclencheur manuel pour rejouer un tag précis.
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.tag }}
+          # latest=auto : latest suit le dernier semver stable (pas les pre-releases)
+          flavor: |
+            latest=auto
+
+      - name: Build & push
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Containerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
