@@ -104,7 +104,7 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 EurekAI accepte 4 types de sources, modérées selon le profil (activé par défaut pour enfant et ado) :
 
-- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 3 (`mistral-ocr-2512`) par défaut**, **OCR 4 (`mistral-ocr-4-0`) en option** dans les Réglages (meilleure qualité, mais 2× le coût) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité.
+- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) par défaut** (meilleure qualité), **OCR 3 (`mistral-ocr-2512`) en option** dans les Réglages (moins cher, ~½ du coût) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
 - **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
@@ -146,7 +146,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-latest` avec 10 catégories disponibles, 5 bloquées par défaut pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Catégories personnalisables par profil dans les paramètres.
+- **Modération du contenu** : `mistral-moderation-2603` (Mistral Moderation 2) avec 10 catégories disponibles, 5 bloquées par défaut pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Catégories personnalisables par profil dans les paramètres. L'alias `-latest` est volontairement évité (il pointe encore sur une version dépréciée).
 - **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
@@ -166,9 +166,9 @@ Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté
 - **Unités supportées** : `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversion pilotée par `helpers/cost-calc.ts`
 - **Chaîne d'instrumentation** : `helpers/tracked-client.ts` (wrap client Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injection dans la réponse HTTP)
 - **UI** : badge coût par génération (`src/partials/cost-badge-gen.html`), par source (`cost-badge-src.html`), total cumulé dans le dashboard (`Project.totalCost`)
-- **Endpoints** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation / Source) avec `estimatedCost`, `usage` et `costBreakdown`. `POST /generate/auto/route` ajoute un champ `costDelta: number` pour le coût du routage seul. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + l'historique complet
+- **Endpoints** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation / Source) avec `estimatedCost`, `usage` et `costBreakdown`. `POST /generate/route` ajoute un champ `costDelta: number` pour le coût du routage seul. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + l'historique complet
 
-### TTS multi-provider & voix personnalisées
+### TTS (Mistral Voxtral) & voix personnalisées
 
 - **Mistral Voxtral TTS** : `voxtral-mini-tts-latest`, synthèse vocale 100% Mistral, pas de clé supplémentaire nécessaire
 - **Voix personnalisées** : les parents peuvent créer leurs propres voix via l'API Mistral Voices (à partir d'un échantillon audio) et les assigner aux rôles hôte/invité — les podcasts et quiz vocaux sont alors lus avec la voix d'un parent, rendant l'expérience encore plus immersive pour l'enfant
@@ -210,11 +210,11 @@ Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté
 | Modèle | Utilisation | Pourquoi |
 |---|---|---|
 | `mistral-large-latest` | Fiche, Flashcards, Podcast, Quiz, Textes à trous, Chat, Vérification quiz vocal, Agent Image, Agent Web Search, Détection consigne | Meilleur multilingual + suivi d'instructions |
-| `mistral-ocr-2512` (OCR 3, défaut) | OCR de documents | Texte imprimé, tableaux, écriture manuscrite ($2 / 1000 pages) |
-| `mistral-ocr-4-0` (OCR 4, option) | OCR de documents — qualité supérieure | Sélectionnable dans Réglages, 2× le coût ($4 / 1000 pages) |
+| `mistral-ocr-4-0` (OCR 4, défaut) | OCR de documents — qualité supérieure | Texte imprimé, tableaux, écriture manuscrite ($4 / 1000 pages) |
+| `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages) |
 | `voxtral-mini-latest` | Reconnaissance vocale (STT) | STT multilingue, optimisé avec `language="fr"` |
 | `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
-| `mistral-moderation-latest` | Modération de contenu | 5 catégories bloquées pour enfant/ado (+ jailbreaking) |
+| `mistral-moderation-2603` | Modération de contenu | 5 catégories bloquées pour enfant/ado (dont `jailbreaking`) |
 | `mistral-small-latest` | Routeur automatique | Analyse rapide du contenu pour décisions de routage |
 
 ---
@@ -266,7 +266,7 @@ npm run dev
 ### Tests, qualité de code et contribution
 
 ```bash
-npm test                # vitest (déclenche pretest : lint:complexity + lint:ci + lint:deadcode)
+npm test                # vitest (déclenche pretest : typecheck + lint:complexity + lint:ci + lint:deadcode)
 npm run test:coverage   # couverture vitest
 npm run lint            # ESLint + typescript-eslint + sonarjs
 npm run lint:fix        # auto-fix
@@ -324,7 +324,7 @@ podman build -t eurekai -f Containerfile .
 
 ```
 server.ts                 — Point d'entrée Express, monte les routes + config
-config.ts                 — Config runtime (modèles, voix, TTS provider), persistée dans output/config.json
+config.ts                 — Config runtime (modèles, voix, modèle TTS), persistée dans output/config.json
 store.ts                  — ProjectStore : CRUD projets/sources/générations, persistance JSON
 profiles.ts               — ProfileStore : gestion des profils, hachage PIN
 types.ts                  — Types TypeScript : Source, Generation (8 types), QuizStats, Profile
@@ -332,11 +332,13 @@ prompts.ts                — Tous les prompts IA centralisés (system + user te
 
 generators/
   auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (8 agents) + MAX_AUTO_PLAN_LENGTH
+  generation-types.ts     — Types générables individuellement (SINGLE_GENERATE_TYPES, coïncide avec les 8 agents auto)
   ocr.ts                  — OCR via Mistral (JPG, PNG, PDF) avec extraction interne des scores de confiance moyens par page
   summary.ts              — Génération de fiche de révision (JSON structuré)
-  flashcards.ts           — Flashcards Q/R (5-50, configurable)
-  quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
+  flashcards.ts           — Flashcards Q/R (nombre configurable)
+  quiz.ts                 — Quiz QCM (nombre configurable) + révision adaptative
   fill-blank.ts           — Exercices à trous avec validation tolérante
+  dictation.ts            — Dictée : mots + phrases-exemples + règles, 1 audio TTS par mot (8e agent auto)
   podcast.ts              — Script podcast 2 voix
   quiz-vocal.ts           — Quiz vocal : questions TTS + réponses STT + vérification IA
   image.ts                — Génération d'image via Agent Mistral (outil image_generation)
@@ -369,6 +371,9 @@ helpers/
   choice-labels.ts        — Labels localisés des choix (quiz, quiz-vocal) — 9 langues
   diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, `diversityParams` : temperature/presencePenalty/randomSeed)
   fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
+  dictation-diff.ts       — Comparaison stricte lettre à lettre pour la correction de dictée (local, zéro coût IA)
+  reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
+  ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
 
   # Codes d'erreur stables
   error-codes.ts              — Re-export mince de l'API publique
@@ -383,6 +388,17 @@ helpers/
   cost-middleware.ts      — Injection de costDelta dans la réponse HTTP
   tracked-client.ts       — Wrap du client Mistral (capture ApiUsage automatiquement)
   usage-context.ts        — AsyncLocalStorage pour propager l'usage dans les pipelines async
+
+  # Clé API Mistral & sécurité
+  mistral-client-factory.ts — Source UNIQUE de construction du client Mistral (buildTrackedClient, resolveClient, requireKeyMiddleware)
+  rate-limit.ts           — Rate-limiters Express (authLimiter, aiLimiter, generalLimiter)
+  security-headers.ts     — Options Helmet / CSP (createHelmetOptions)
+  redact.ts               — Redaction des secrets dans les logs (clé API, headers sensibles)
+  mistral-retry.ts        — Retry avec backoff sur erreurs transitoires Mistral (3 tentatives)
+
+  # Événements & notifications (SSE)
+  event-bus.ts            — Bus d'événements de génération en mémoire (dispatch SSE, filet anti-uncaughtException)
+  event-key.ts            — Clé d'événement typée partagée client/serveur (idempotence notifications)
 
   # Voix & profils
   voice-selection.ts      — selectVoices : rotation déterministe par profil + langue (host/guest)
@@ -400,7 +416,7 @@ src/                      — Frontend (Vite + Handlebars)
     generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
-    config.ts             — Interface de configuration (modèles, voix, TTS provider)
+    config.ts             — Interface de configuration (modèles, voix, modèle TTS)
     render.ts             — Helpers de rendu HTML
     i18n.ts               — Changement de langue
     ...
@@ -408,7 +424,9 @@ src/                      — Frontend (Vite + Handlebars)
     quiz.ts               — Composant quiz interactif
     quiz-vocal.ts         — Composant quiz vocal
     fill-blank.ts         — Composant textes à trous
+    fill-blank-validate.ts — Ré-export client de la validation textes à trous (validateAnswer)
     flashcards.ts         — Composant flashcards avec retournement
+    dictation.ts          — Composant dictée interactif
     step-by-step.ts       — Mixin navigation pas-à-pas (quiz, fill-blank, flashcards)
   i18n/
     fr.ts, en.ts, es.ts, — Dictionnaires par langue (9 langues)
@@ -442,6 +460,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/config/reset` | Réinitialiser la config par défaut |
 | `GET` | `/api/config/voices` | Lister les voix Mistral TTS (optionnel `?lang=fr`) |
 | `GET` | `/api/moderation-categories` | Catégories de modération disponibles + défauts par âge |
+| `POST` | `/api/providers/mistral/validate` | Valider une clé Mistral saisie par l'utilisateur — toujours 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), pas de fallback env |
 
 ### Profils
 | Méthode | Endpoint | Description |
@@ -459,6 +478,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `GET` | `/api/projects/:pid` | Détails du projet |
 | `PUT` | `/api/projects/:pid` | Renommer `{name}` |
 | `DELETE` | `/api/projects/:pid` | Supprimer le projet |
+| `GET` | `/api/projects/:pid/events` | Flux SSE temps réel (`event: generation`) des transitions de génération (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
 
 ### Sources
 | Méthode | Endpoint | Description |
@@ -497,6 +517,7 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 | `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Soumettre les réponses de dictée `{answers}` (score serveur strict) |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Vérifier une réponse orale (audio + questionIndex) |
 | `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Lecture TTS à voix haute (fiches/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/cancel` | Annuler une génération en cours (seul chemin d'annulation d'un pending) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Renommer `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | Supprimer la génération |
 

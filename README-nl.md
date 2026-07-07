@@ -5,7 +5,7 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Zet elke inhoud om in een interactieve leerervaring — aangedreven door <a href="https://mistral.ai">Mistral AI</a>.</strong>
+  <strong>Zet elke vorm van inhoud om in een interactieve leerervaring — mogelijk gemaakt door <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
@@ -20,7 +20,7 @@
 <h4 align="center">📊 Codekwaliteit</h4>
 
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="Kwaliteitsgate"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="Quality Gate"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="Beveiligingsscore"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="Betrouwbaarheidsscore"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="Onderhoudbaarheidsscore"></a>
@@ -40,140 +40,140 @@
 
 ## Het verhaal — Waarom EurekAI?
 
-**EurekAI** is ontstaan tijdens de [Mistral AI Wereldwijde Hackathon](https://luma.com/mistralhack-online) ([officiële site](https://worldwide-hackathon.mistral.ai/)) (maart 2026). Ik had een onderwerp nodig — en het idee kwam voort uit iets heel concreets: ik bereid regelmatig toetsen voor met mijn dochter, en ik dacht dat het toch mogelijk moest zijn om dat speelser en interactiever te maken met behulp van AI.
+**EurekAI** is ontstaan tijdens de [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([officiële site](https://worldwide-hackathon.mistral.ai/)) (maart 2026). Ik had een onderwerp nodig — en het idee kwam voort uit iets heel concreets: ik bereid regelmatig toetsen voor met mijn dochter, en ik dacht dat het mogelijk moest zijn om dat speelser en interactiever te maken met AI.
 
-Het doel: **elke invoer** nemen — een foto van de les, een gekopieerde tekst, een geluidsopname, een webzoekopdracht — en die omzetten in **samenvattingsfiches, flashcards, quizzen, podcasts, gap-teksten, illustraties en meer**. Alles aangedreven door de Franse modellen van Mistral AI, waardoor het van nature een oplossing is die geschikt is voor Franstalige leerlingen.
+Het doel: **elke invoer** nemen — een foto van de les, gekopieerde tekst, een spraakopname, een webzoekopdracht — en die omzetten in **samenvattingen, flashcards, quizzen, podcasts, invuloefeningen, illustraties en nog veel meer**. Alles aangedreven door de Franse modellen van Mistral AI, waardoor het een oplossing is die natuurlijk aansluit bij Nederlandstalige leerlingen.
 
-De [eerste prototype](https://github.com/jls42/worldwide-hackathon.mistral.ai) werd in 48 uur tijdens de hackathon ontworpen als proof of concept rond de Mistral-diensten — al functioneel, maar beperkt. Sindsdien is EurekAI uitgegroeid tot een echt project: gap-teksten, navigatie in oefeningen, webscraping, configureerbare ouderlijke moderatie, diepgaande code-review en nog veel meer. De volledige code wordt gegenereerd door AI — voornamelijk [Claude Code](https://code.claude.com/), met enkele bijdragen via [Codex](https://openai.com/codex/) en [Gemini CLI](https://geminicli.com/).
+Het [eerste prototype](https://github.com/jls42/worldwide-hackathon.mistral.ai) werd in 48 uur tijdens de hackathon gemaakt als proof of concept rond de diensten van Mistral — al functioneel, maar beperkt. Sindsdien is EurekAI uitgegroeid tot een echt project: invuloefeningen, navigatie in oefeningen, webscraping, configureerbare ouderlijke moderatie, uitgebreide codereview en nog veel meer. De volledige code wordt door AI gegenereerd — voornamelijk [Claude Code](https://code.claude.com/), met enkele bijdragen via [Codex](https://openai.com/codex/) en [Gemini CLI](https://geminicli.com/).
 
 ---
 
-## Functionaliteiten
+## Functies
 
-| | Functionaliteit | Beschrijving |
+| | Functie | Beschrijving |
 |---|---|---|
-| 📷 | **Bestanden importeren** | Importeer je lessen — foto, PDF (via Mistral OCR met gemiddeld vertrouwensscore, lagen `high`/`medium`/`low`) of tekstbestand (TXT, MD). Uploadsessies met retry per bestand en individuele voortgang |
+| 📷 | **Bestandsimport** | Importeer je lessen — foto, PDF (via Mistral OCR met gemiddeld vertrouwensscore, derde `high`/`medium`/`low`) of tekstbestand (TXT, MD). Uploadsessies met retry per bestand en individuele voortgang |
 | 📝 | **Tekstinvoer** | Typ of plak direct elke tekst |
 | 🎤 | **Spraakinvoer** | Neem jezelf op — Voxtral STT transcribeert je stem |
-| 🌐 | **Web / URL** | Plak een URL (rechtstreekse scraping via Readability + Lightpanda) of typ een zoekopdracht (Mistral web_search-agent) |
-| 📄 | **Samenvattingsfiches** | Gestructureerde notities met kernpunten, woordenschat, citaten, anekdotes |
-| 🃏 | **Flashcards** | Interactieve vraag/antwoord-kaarten, dialogische audio-afspeelmodus |
+| 🌐 | **Web / URL** | Plak een URL (directe scraping via Readability + Lightpanda) of typ een zoekopdracht (Mistral-agent web_search) |
+| 📄 | **Samenvattingen** | Gestructureerde notities met kernpunten, woordenschat, цитaten, anekdotes |
+| 🃏 | **Flashcards** | Interactieve Q/A-kaarten, dialogische audio-lezing |
 | ❓ | **Meerkeuzequiz** | Meerkeuzevragen met adaptieve herziening van fouten (aantal configureerbaar) |
-| ✏️ | **Gap-teksten** | Oefeningen om aan te vullen met aanwijzingen en tolerante validatie |
-| 🔤 | **Dictee** | Woorden gedicteerd in audio (Voxtral TTS) vanuit een geïmporteerde lijst, invoer via toetsenbord, strikte letter-voor-letter correctie met uitgelegde spellingsregel |
+| ✏️ | **Invuloefeningen** | Oefeningen om aan te vullen met hints en tolerante validatie |
+| 🔤 | **Dictee** | In audio gedicteerde woorden (Voxtral TTS) uit een geïmporteerde lijst, invoer via toetsenbord, strikte letter-voor-letter-correctie met uitgelegde spellingsregel |
 | 🎙️ | **Podcast** | Mini-podcast met 2 stemmen in audio — standaard Mistral-stem of aangepaste stemmen (ouders!) |
 | 🖼️ | **Illustraties** | Educatieve afbeeldingen gegenereerd door een Mistral-agent |
-| 🗣️ | **Vocale quiz** | Vragen hardop voorgelezen (aangepaste stem mogelijk), mondeling antwoord, AI-verificatie |
+| 🗣️ | **Spraakquiz** | Vragen hardop voorgelezen (aangepaste stem mogelijk), mondeling antwoord, AI-verificatie |
 | 💬 | **AI-tutor** | Contextuele chat met je lesdocumenten, met toolaanroepen |
-| 🧠 | **Automatische router** | Een op `mistral-small-latest` gebaseerde router analyseert de inhoud en stelt een combinatie van generatoren voor uit de 8 beschikbare typen |
+| 🧠 | **Automatische router** | Een router op basis van `mistral-small-latest` analyseert de inhoud en stelt een combinatie van generators voor uit de 8 beschikbare types |
 | 🔒 | **Ouderlijk toezicht** | Configureerbare moderatie per profiel (aanpasbare categorieën), ouderlijke pincode, chatbeperkingen |
-| 🌍 | **Meertalig** | Interface beschikbaar in 9 talen; AI-generatie aanstuurbaar in 15 talen via de prompts |
-| 🔊 | **Hardop voorlezen** | Luister naar de fiches en flashcards (vraag/antwoord-dialogen) via Mistral Voxtral TTS |
-| 💶 | **API-kosten volgen** | Transparante schatting van de €-kosten van elke generatie en bron (tokens / tekens / pagina's / seconden audio). Badge per kaart + totaal per project, zichtbaar in het dashboard |
-| 🎨 | **Thema per profiel** | Elk profiel kiest zijn thema `dark` of `light` — blijft behouden bij profielwissel |
+| 🌍 | **Meertalig** | Interface beschikbaar in 9 talen; AI-generatie bestuurbaar in 15 talen via prompts |
+| 🔊 | **Voorlezen** | Luister naar samenvattingen en flashcards (vraag/antwoorddialoog) via Mistral Voxtral TTS |
+| 💶 | **API-kosten volgen** | Transparante schatting van de €-kosten van elke generatie en bron (tokens / tekens / pagina's / audioseconden). Badge per kaart + totaal per project, zichtbaar in het dashboard |
+| 🎨 | **Thema per profiel** | Elk profiel kiest zijn `dark`- of `light`-thema — blijft behouden bij wisselen van profiel |
 
 ---
 
 ## Architectuuroverzicht
 
 <p align="center">
-  <img src="public/assets/architecture-overview.webp" alt="Architectuur-overzicht" width="800" />
+  <img src="public/assets/architecture-overview.webp" alt="Architectuuroverzicht" width="800" />
 </p>
 
 ---
 
-## Kaart van modelgebruik
+## Modelgebruikskaart
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="Koppeling van AI-modellen aan taken" width="800" />
+  <img src="public/assets/model-map.webp" alt="AI-model-naar-taak-mapping" width="800" />
 </p>
 
 ---
 
-## Gebruikerspad
+## Gebruikersreis
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="Leertraject van de student" width="800" />
+  <img src="public/assets/user-journey.webp" alt="Leertraject van de leerling" width="800" />
 </p>
 
 ---
 
-## Diepgaand — Functionaliteiten
+## Diepgaande duik — Functies
 
 ### Multimodale invoer
 
-EurekAI accepteert 4 soorten bronnen, gemodereerd volgens het profiel (standaard geactiveerd voor kind en tiener) :
+EurekAI accepteert 4 soorten bronnen, gemodereerd volgens het profiel (standaard ingeschakeld voor kind en tiener) :
 
-- **Bestanden importeren** — JPG-, PNG- of PDF-bestanden verwerkt via Mistral OCR — **OCR 3 (`mistral-ocr-2512`) standaard**, **OCR 4 (`mistral-ocr-4-0`) optioneel** in de Instellingen (betere kwaliteit, maar 2× de kosten) — voor gedrukt tekst, tabellen en handschrift; of tekstbestanden (TXT, MD) die rechtstreeks worden geïmporteerd. Multi-bestandsuploads gebruiken een systeem van **uploadsessies**: individuele voortgang per bestand, retry van het mislukte bestand zonder de andere opnieuw te verzenden, sessie sluiten wanneer klaar. De OCR geeft een **gemiddelde vertrouwensscore** (`average`, begrensd in `[0,1]`, berekend op basis van `averagePageConfidenceScore` teruggegeven door Mistral), weergegeven in de UI als badge tier `high` / `medium` / `low` (drempels ~0.9 / ~0.7) — waarschuwt zonder te blokkeren als de scan van slechte kwaliteit is.
-- **Vrije tekst** — Typ of plak elke inhoud. Gemodereerd vóór opslag als moderatie actief is.
-- **Spraakinvoer** — Neem audio op in de browser. Getranscribeerd door `voxtral-mini-latest`. De instelling `language="fr"` optimaliseert de herkenning.
-- **Web / URL** — Plak een of meerdere URL's om de inhoud rechtstreeks te scrapen (Readability + Lightpanda voor JS-pagina's), of typ trefwoorden voor een webzoekopdracht via een Mistral-agent. Het enkele veld accepteert beide — URL's en trefwoorden worden automatisch gescheiden, elk resultaat creëert een onafhankelijke bron.
+- **Bestandsimport** — JPG-, PNG- of PDF-bestanden verwerkt door Mistral OCR — **OCR 4 (`mistral-ocr-4-0`) standaard** (beste kwaliteit), **OCR 3 (`mistral-ocr-2512`) optioneel** in de Instellingen (goedkoper, ~½ van de kosten) — voor gedrukt tekst, tabellen en handschrift; of tekstbestanden (TXT, MD) direct geïmporteerd. Multi-bestandsuploads gebruiken een systeem van **uploadsessies**: individuele voortgang per bestand, retry van het mislukte bestand zonder de andere opnieuw in te dienen, sessie sluiten wanneer voltooid. De OCR geeft een gemiddeld **vertrouwensscore** terug (`average`, afgekapt in `[0,1]`, berekend op basis van `averagePageConfidenceScore` teruggegeven door Mistral), weergegeven in de UI als tier `high` / `medium` / `low`-badge (drempels ~0.9 / ~0.7) — waarschuwt zonder te blokkeren als de scan van slechte kwaliteit is.
+- **Vrije tekst** — Typ of plak elke inhoud. Wordt gemodereerd vóór opslag als moderatie actief is.
+- **Spraakinvoer** — Neem audio op in de browser. Getranscribeerd door `voxtral-mini-latest`. De parameter `language="fr"` optimaliseert de herkenning.
+- **Web / URL** — Plak een of meerdere URL's om de inhoud rechtstreeks te scrapen (Readability + Lightpanda voor JS-pagina's), of typ trefwoorden voor een webzoekopdracht via Mistral Agent. Het ene veld accepteert beide — URL's en trefwoorden worden automatisch gescheiden, elk resultaat maakt een onafhankelijke bron aan.
 
 ### AI-contentgeneratie
 
-Acht soorten gegenereerd leermateriaal:
+Acht types gegenereerd leermateriaal:
 
 | Generator | Model | Uitvoer |
 |---|---|---|
-| **Samenvattingsfiche** | `mistral-large-latest` | Titel, samenvatting, kernpunten, woordenschat, citaten, anekdote |
-| **Flashcards** | `mistral-large-latest` | Vraag/antwoord-kaarten met verwijzingen naar de bronnen (aantal configureerbaar) |
-| **Meerkeuzequiz** | `mistral-large-latest` | Meerkeuzevragen, uitleg, adaptieve herziening (aantal configureerbaar) |
-| **Gap-teksten** | `mistral-large-latest` | Zinnen om aan te vullen met aanwijzingen, tolerante validatie (Levenshtein) |
-| **Dictee** | `mistral-large-latest` + Voxtral TTS | Belangrijke woorden in audio gedicteerd (1 MP3/woord) → invoer via toetsenbord → strikte correctie (accenten) met uitgelegde regel |
+| **Samenvatting** | `mistral-large-latest` | Titel, samenvatting, kernpunten, woordenschat, citaten, anekdote |
+| **Flashcards** | `mistral-large-latest` | Q/A-kaarten met verwijzingen naar bronnen (aantal configureerbaar) |
+| **Meerkeuzequiz** | `mistral-large-latest` | Meerkeuzevragen, uitleg, adaptieve herhaling (aantal configureerbaar) |
+| **Invuloefeningen** | `mistral-large-latest` | Zinnen om aan te vullen met hints, tolerante validatie (Levenshtein) |
+| **Dictee** | `mistral-large-latest` + Voxtral TTS | In audio gedicteerde kernwoorden (1 MP3/woord) → invoer via toetsenbord → strikte correctie (accenten) met uitgelegde regel |
 | **Podcast** | `mistral-large-latest` + Voxtral TTS | Script met 2 stemmen → MP3-audio |
 | **Illustratie** | Agent `mistral-large-latest` | Educatieve afbeelding via de tool `image_generation` |
-| **Vocale quiz** | `mistral-large-latest` + Voxtral TTS + STT | Vragen TTS → antwoord STT → AI-verificatie |
+| **Spraakquiz** | `mistral-large-latest` + Voxtral TTS + STT | Vragen via TTS → antwoord via STT → AI-verificatie |
 
 ### AI-tutor via chat
 
-Een conversationele tutor met volledige toegang tot de lesdocumenten:
+Een conversatieve tutor met volledige toegang tot de lesdocumenten:
 
 - Gebruikt `mistral-large-latest`
-- **Toolaanroepen**: kan tijdens het gesprek fiches, flashcards, quizzen of gap-teksten genereren
-- Geschiedenis van 50 berichten per cursus
-- Moderatie van inhoud als die is geactiveerd voor het profiel
+- **Toolaanroepen**: kan tijdens het gesprek samenvattingen, flashcards, quizzen of invuloefeningen genereren
+- Geschiedenis van 50 berichten per les
+- Inhoudsmoderatie indien geactiveerd voor het profiel
 
 ### Automatische router
 
-De router gebruikt `mistral-small-latest` om de inhoud van de bronnen te analyseren en de meest relevante generatoren voor te stellen uit de 8 beschikbare. De interface toont de voortgang in realtime: eerst een analysefase, daarna de afzonderlijke generaties met mogelijkheid tot annuleren.
+De router gebruikt `mistral-small-latest` om de inhoud van de bronnen te analyseren en de meest relevante generators voor te stellen uit de 8 beschikbare. De interface toont de voortgang in realtime: eerst een analysefase, daarna de afzonderlijke generaties met mogelijkheid tot annuleren.
 
 ### Adaptief leren
 
-- **Quizstatistieken**: tracking van pogingen en nauwkeurigheid per vraag
-- **Quizherziening**: genereert 5-10 nieuwe vragen gericht op zwakke concepten
-- **Detectie van leerdoelen**: detecteert herzieningsinstructies ("Ik ken mijn les als ik weet...") en geeft daar prioriteit aan in compatibele tekstgeneratoren (fiche, flashcards, quiz, gap-teksten)
+- **Quizstatistieken**: opvolging van pogingen en nauwkeurigheid per vraag
+- **Quizherhaling**: genereert 5-10 nieuwe vragen die zich richten op zwakke concepten
+- **Instructiedetectie**: detecteert herzieningsinstructies ("Ik ken mijn les als ik weet...") en geeft ze prioriteit in de compatibele tekstgeneratoren (samenvatting, flashcards, quiz, invuloefeningen)
 
 ### Beveiliging & ouderlijk toezicht
 
 - **4 leeftijdsgroepen**: kind (≤10 jaar), tiener (11-15), student (16-25), volwassene (26+)
-- **Inhoudsmoderatie**: `mistral-moderation-latest` met 10 beschikbare categorieën, 5 standaard geblokkeerd voor kind/tiener (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Categorieën per profiel aanpasbaar in de instellingen.
-- **Ouderlijke pincode**: SHA-256-hash, vereist voor profielen jonger dan 15 jaar. Voor productie-implementatie: gebruik een trage hash met zout (Argon2id, bcrypt).
-- **Chatbeperkingen**: AI-chat standaard uitgeschakeld voor jonger dan 16 jaar, door ouders te activeren
+- **Inhoudsmoderatie**: `mistral-moderation-2603` (Mistral Moderation 2) met 10 beschikbare categorieën, 5 standaard geblokkeerd voor kind/tiener (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Aanpasbare categorieën per profiel in de instellingen. De alias `-latest` wordt bewust vermeden (wijst nog steeds naar een verouderde versie).
+- **Ouderlijke pincode**: SHA-256-hash, vereist voor profielen jonger dan 15 jaar. Voor een productie-implementatie: gebruik een trage hash met zout (Argon2id, bcrypt).
+- **Chatbeperkingen**: AI-chat standaard uitgeschakeld voor jongeren onder 16 jaar, door ouders in te schakelen
 
-### Multi-profielsysteem
+### Multiprofielsysteem
 
 - Meerdere profielen met naam, leeftijd, avatar, taalvoorkeuren
-- **Stem per profiel** (`Profile.mistralVoices?: { host, guest }`) — elk kind kan zijn eigen podcast-/vocale quiz-stemmenpaar hebben
-- **Thema per profiel** (`Profile.theme: 'dark' | 'light'`) — automatische wissel bij profielverandering, bewaard aan de backend-kant
+- **Stem per profiel** (`Profile.mistralVoices?: { host, guest }`) — elk kind kan zijn eigen podcast-/spraakquiz-stemmenpaar hebben
+- **Thema per profiel** (`Profile.theme: 'dark' | 'light'`) — automatische overschakeling bij profielwissel, blijvend aan de backendkant
 - Projecten gekoppeld aan profielen via `profileId`
-- Cascadeverwijdering: een profiel verwijderen verwijdert al zijn projecten
+- Cascaderende verwijdering: een profiel verwijderen verwijdert al zijn projecten
 
 ### API-kosten volgen
 
-Elke Mistral-aanroep (chat, OCR, STT, TTS, moderatie, agents) wordt geïnstrumenteerd om een **transparante** €-schatting aan de gebruiker te geven — geen verrassingen op de factuur.
+Elke Mistral-aanroep (chat, OCR, STT, TTS, moderatie, agents) wordt geïnstrumenteerd om de gebruiker een **transparante** €-schatting te geven — geen verrassingen op de factuur.
 
-- **Bron van waarheid**: `helpers/pricing.ts` — `MODEL_PRICING` per modelprefix (bijv. `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` met Mistral-doc-URL's voor periodieke her-scraping
-- **Ondersteunde eenheden**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversie aangestuurd door `helpers/cost-calc.ts`
-- **Instrumentatieketen**: `helpers/tracked-client.ts` (wrap Mistral-client) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injectie in de HTTP-respons)
-- **UI**: kostenbadge per generatie (`src/partials/cost-badge-gen.html`), per bron (`cost-badge-src.html`), cumulatief totaal in het dashboard (`Project.totalCost`)
-- **Endpoints**: de responses `/generate/*` en `/sources/*` decoreren het geretourneerde object (Generation / Source) met `estimatedCost`, `usage` en `costBreakdown`. `POST /generate/auto/route` voegt een veld `costDelta: number` toe voor de kosten van alleen de routering. `GET /projects/:pid` retourneert het verrijkte project met `totalCost` (som berekend vanaf `costLog[]`) + de volledige geschiedenis
+- **Enige bron van waarheid**: `helpers/pricing.ts` — `MODEL_PRICING` per modelprefix (bijv. `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` met Mistral-doc-URL's voor periodieke herscraping
+- **Ondersteunde eenheden**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversie gestuurd door `helpers/cost-calc.ts`
+- **Instrumentatieketen**: `helpers/tracked-client.ts` (wrap Mistral-client) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injectie in de HTTP-response)
+- **UI**: kostenbadge per generatie (`src/partials/cost-badge-gen.html`), per bron (`cost-badge-src.html`), gecumuleerd totaal in het dashboard (`Project.totalCost`)
+- **Endpoints**: de `/generate/*`- en `/sources/*`-responses decoreren het teruggegeven object (Generation / Source) met `estimatedCost`, `usage` en `costBreakdown`. `POST /generate/route` voegt een veld `costDelta: number` toe voor alleen de routeringskosten. `GET /projects/:pid` geeft het project terug, verrijkt met `totalCost` (som berekend vanaf `costLog[]`) + de volledige geschiedenis
 
-### Multi-provider TTS & aangepaste stemmen
+### TTS (Mistral Voxtral) & aangepaste stemmen
 
-- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100% Mistral-spraaksynthese, geen extra sleutel nodig
-- **Aangepaste stemmen**: ouders kunnen hun eigen stemmen maken via de Mistral Voices API (op basis van een audiofragment) en toewijzen aan de rollen host/gast — podcasts en vocale quizzen worden dan gelezen met de stem van een ouder, waardoor de ervaring voor het kind nog meeslepender wordt
+- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100% Mistral spraaksynthese, geen extra sleutel nodig
+- **Aangepaste stemmen**: ouders kunnen hun eigen stemmen maken via de Mistral Voices API (op basis van een audiofragment) en ze toewijzen aan de rollen host/gast — podcasts en spraakquizzen worden dan afgespeeld met de stem van een ouder, wat de ervaring nog meeslepender maakt voor het kind
 - Twee configureerbare stemrollen: **host** (hoofdnarrator) en **gast** (tweede podcaststem)
-- Volledige catalogus van Mistral-stemmen beschikbaar in de instellingen, filterbaar op taal
+- Volledige catalogus van Mistral-stemmen beschikbaar in de instellingen, filterbaar per taal
 
 ### Internationalisering
 
@@ -189,16 +189,16 @@ Elke Mistral-aanroep (chat, OCR, STT, TTS, moderatie, agents) wordt geïnstrumen
 |---|---|---|
 | **Runtime** | Node.js + TypeScript 6.x | Server en typeveiligheid |
 | **Backend** | Express 5.x | REST API |
-| **Ontwikkelserver** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars-partials, proxy |
-| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Responsieve interface, door Vite gecompileerde TypeScript |
-| **Templating** | vite-plugin-handlebars | HTML-compositie via partials |
+| **Devserver** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars-partials, proxy |
+| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Reactieve interface, TypeScript gecompileerd door Vite |
+| **Templating** | vite-plugin-handlebars | HTML-samenstelling via partials |
 | **AI** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Moderatie |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, geïntegreerde spraaksynthese |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, ingebouwde spraaksynthese |
 | **Iconen** | Lucide 1.x | SVG-icoonbibliotheek |
-| **Webscraping** | Readability + linkedom | Extractie van de hoofdinhoud van webpagina's (Firefox Reader View-technologie) |
-| **Headless browser** | Lightpanda | Ultra-lichte headless browser (Zig + V8) voor JS-/SPA-pagina's — fallback scraping |
+| **Webscraping** | Readability + linkedom | Extractie van de hoofdinhoud van webpagina's (technologie van Firefox Reader View) |
+| **Headless browser** | Lightpanda | Ultrichtgewicht headless browser (Zig + V8) voor JS-/SPA-pagina's — fallback scraping |
 | **Markdown** | Marked | Markdown-rendering in de chat |
-| **Bestandsupload** | Multer 2.x | Verwerking van multipart-formulieren |
+| **Bestandsupload** | Multer 2.x | Afhandeling van multipart-formulieren |
 | **Audio** | ffmpeg-static | Samenvoegen van audiosegmenten |
 | **Tests** | Vitest | Unit-tests — dekking gemeten door SonarCloud |
 | **Persistentie** | JSON-bestanden | Opslag zonder afhankelijkheden |
@@ -209,13 +209,13 @@ Elke Mistral-aanroep (chat, OCR, STT, TTS, moderatie, agents) wordt geïnstrumen
 
 | Model | Gebruik | Waarom |
 |---|---|---|
-| `mistral-large-latest` | Fiche, Flashcards, Podcast, Quiz, Gap-teksten, Chat, Controle vocale quiz, Beeld-agent, Web Search-agent, Detectie van instructies | Beste meertaligheid + instructievolging |
-| `mistral-ocr-2512` (OCR 3, standaard) | OCR van documenten | Gedrukte tekst, tabellen, handschrift ($2 / 1000 pagina's) |
-| `mistral-ocr-4-0` (OCR 4, optie) | OCR van documenten — superieure kwaliteit | Selecteerbaar in de Instellingen, 2× de kosten ($4 / 1000 pagina's) |
-| `voxtral-mini-latest` | Spraakherkenning (STT) | Meertalige STT, geoptimaliseerd met `language="fr"` |
-| `voxtral-mini-tts-latest` | Spraaksynthese (TTS) | Podcasts, vocale quiz, hardop voorlezen |
-| `mistral-moderation-latest` | Inhoudsmoderatie | 5 categorieën geblokkeerd voor kind/tiener (+ jailbreaking) |
-| `mistral-small-latest` | Automatische router | Snelle inhoudsanalyse voor routeringsbeslissingen |
+| `mistral-large-latest` | Samenvatting, Flashcards, Podcast, Quiz, Invuloefeningen, Chat, Verificatie spraakquiz, Afbeeldingsagent, Web Search-agent, Detectie van instructies | Beste multilinguale ondersteuning + instructievolging |
+| `mistral-ocr-4-0` (OCR 4, standaard) | OCR van documenten — superieure kwaliteit | Gedrukte tekst, tabellen, handschrift ($4 / 1000 pagina's) |
+| `mistral-ocr-2512` (OCR 3, optie) | OCR van documenten | Selecteerbaar in Instellingen, goedkoper ($2 / 1000 pagina's) |
+| `voxtral-mini-latest` | Spraakherkenning (STT) | Meertalig STT, geoptimaliseerd met `language="fr"` |
+| `voxtral-mini-tts-latest` | Spraaksynthese (TTS) | Podcasts, spraakquiz, voorlezen |
+| `mistral-moderation-2603` | Inhoudsmoderatie | 5 categorieën geblokkeerd voor kind/tiener (waaronder `jailbreaking`) |
+| `mistral-small-latest` | Automatische router | Snelle analyse van inhoud voor routeringsbeslissingen |
 
 ---
 ## Snel aan de slag
@@ -240,32 +240,32 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **Opmerking** : Mistral Voxtral TTS is de enige TTS-aanbieder — geen extra sleutel nodig bovenop `MISTRAL_API_KEY`.
+> **Opmerking**: Mistral Voxtral TTS is de enige TTS-provider — geen extra sleutel nodig naast `MISTRAL_API_KEY`.
 
-> **Door de gebruiker ingevoerde API-sleutel** : `MISTRAL_API_KEY` is voortaan **optioneel**. Als die ontbreekt, start de app alsnog en vraagt elke gebruiker om **zijn eigen Mistral-sleutel** in de interface in te voeren. De sleutel wordt **in de browser opgeslagen** (versleuteld via Web Crypto + IndexedDB in een veilige context) en per verzoek verzonden — **nooit op de server persistent opgeslagen**. Voorrang: profielsleutel > globale browsersleutel > `MISTRAL_API_KEY` (env). Het instellen van `EUREKAI_REQUIRE_USER_KEY=true` verplicht elke gebruiker om zijn sleutel op te geven (de env-sleutel dient dan alleen nog voor preloads).
+> **Door de gebruiker ingevoerde API-sleutel**: `MISTRAL_API_KEY` is voortaan **optioneel**. Als deze ontbreekt, start de app toch en vraagt elke gebruiker om **zijn eigen Mistral-sleutel** in de interface in te voeren. De sleutel wordt **in de browser opgeslagen** (versleuteld via Web Crypto + IndexedDB in een beveiligde context) en per verzoek verzonden — **nooit op de server bewaard**. Prioriteit: profielsleutel > globale browsersleutel > `MISTRAL_API_KEY` (env). Door `EUREKAI_REQUIRE_USER_KEY=true` in te stellen, moet elke gebruiker zijn sleutel opgeven (de env-sleutel dient dan alleen nog voor preloads).
 
-> **Lokale HTTPS (tablet/LAN)** : `localhost` is al een veilige context. Voor LAN-toegang (tablet) genereer je een lokaal certificaat en schakel je HTTPS in om browserversleuteling te ontgrendelen + de sleutel onderweg te versleutelen:
+> **Lokale HTTPS (tablet/LAN)**: `localhost` is al een beveiligde context. Voor LAN-toegang (tablet) genereer je een lokaal certificaat en activeer je HTTPS om browserversleuteling te ontgrendelen + de sleutel onderweg te versleutelen:
 > ```bash
 > ./scripts/gen-cert.sh 192.168.1.42   # mkcert indien beschikbaar, anders openssl self-signed
 > export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
-> npm run dev                          # Express + Vite via HTTPS
+> npm run dev                          # Express + Vite in HTTPS
 > ```
 
 ### Omgevingsvariabelen
 
 | Variabele | Vereist | Standaard | Rol |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | optioneel | — | Mistral API-sleutel (chat, OCR, STT, Voxtral TTS, agents, moderatie). Als die ontbreekt, voert de gebruiker zijn sleutel in in de app (opgeslagen in de browser, nooit op de server) |
-| `EUREKAI_REQUIRE_USER_KEY` | optioneel | `false` | `true` → schakelt de terugval op `MISTRAL_API_KEY` uit voor AI-verzoeken (elke gebruiker MOET zijn sleutel verstrekken). Nuttig op een publiek blootgestelde instantie |
-| `HTTPS_KEY` / `HTTPS_CERT` | optioneel | — | TLS-sleutel/certificaatpaden (zie `scripts/gen-cert.sh`) → Express en Vite serveren via HTTPS (veilige LAN/tablet-context) |
+| `MISTRAL_API_KEY` | optioneel | — | Mistral API-sleutel (chat, OCR, STT, Voxtral TTS, agents, moderatie). Als deze ontbreekt, voert de gebruiker zijn sleutel in in de app (opgeslagen in de browser, nooit op de server) |
+| `EUREKAI_REQUIRE_USER_KEY` | optioneel | `false` | `true` → schakelt de fallback naar `MISTRAL_API_KEY` uit voor AI-verzoeken (elke gebruiker MOET zijn sleutel opgeven). Handig op een blootgestelde instantie |
+| `HTTPS_KEY` / `HTTPS_CERT` | optioneel | — | TLS-sleutel-/certpaden (zie `scripts/gen-cert.sh`) → Express en Vite serveren via HTTPS (beveiligde context LAN/tablet) |
 | `PORT` | optioneel | `3000` | HTTP-poort van de Express-backend |
-| `NODE_ENV` | optioneel | `development` | Als `production` → serveert Express de frontend vanaf `dist/` (anders `public/`) |
+| `NODE_ENV` | optioneel | `development` | Als `production` → serveert Express de frontend vanuit `dist/` (anders `public/`) |
 | `SONAR_TOKEN` | optioneel CI | — | Wordt alleen gebruikt door de GitHub Actions SonarCloud-workflow |
 
 ### Tests, codekwaliteit en bijdragen
 
 ```bash
-npm test                # vitest (déclenche pretest : lint:complexity + lint:ci + lint:deadcode)
+npm test                # vitest (déclenche pretest : typecheck + lint:complexity + lint:ci + lint:deadcode)
 npm run test:coverage   # couverture vitest
 npm run lint            # ESLint + typescript-eslint + sonarjs
 npm run lint:fix        # auto-fix
@@ -273,9 +273,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git-hooks (Husky)** : `pre-commit` start `npm test`, `pre-push` start `npm run security`. Beide blokkeren de commit/push bij een mislukking.
+**Git-hooks (Husky)**: `pre-commit` voert `npm test` uit, `pre-push` voert `npm run security` uit. Beide blokkeren de commit/push bij een fout.
 
-**Vereiste externe tools (optioneel maar gebruikt door `pretest` / `npm run security`)** :
+**Vereiste externe tools (optioneel maar gebruikt door `pretest` / `npm run security`)**:
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -289,9 +289,9 @@ Zonder deze tools faalt `npm test` bij `pretest` (lizard ontbreekt) en faalt `np
 
 ---
 
-## Containerimplementatie
+## Implementatie met container
 
-De image is gepubliceerd op **GitHub Container Registry** :
+De image wordt gepubliceerd op **GitHub Container Registry**:
 
 ```bash
 # Télécharger l'image
@@ -307,7 +307,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`** is een Podman rootless-vlag die automatisch de volumemachtigingen aanpast.
+> **`:U`** is een rootless Podman-flag die automatisch de volumepermissies aanpast.
 
 ```bash
 # Build local
@@ -323,7 +323,7 @@ podman build -t eurekai -f Containerfile .
 
 ```
 server.ts                 — Point d'entrée Express, monte les routes + config
-config.ts                 — Config runtime (modèles, voix, TTS provider), persistée dans output/config.json
+config.ts                 — Config runtime (modèles, voix, modèle TTS), persistée dans output/config.json
 store.ts                  — ProjectStore : CRUD projets/sources/générations, persistance JSON
 profiles.ts               — ProfileStore : gestion des profils, hachage PIN
 types.ts                  — Types TypeScript : Source, Generation (8 types), QuizStats, Profile
@@ -331,11 +331,13 @@ prompts.ts                — Tous les prompts IA centralisés (system + user te
 
 generators/
   auto-agents.ts          — Source unique de vérité : AUTO_AGENTS_SET (8 agents) + MAX_AUTO_PLAN_LENGTH
+  generation-types.ts     — Types générables individuellement (SINGLE_GENERATE_TYPES, coïncide avec les 8 agents auto)
   ocr.ts                  — OCR via Mistral (JPG, PNG, PDF) avec extraction interne des scores de confiance moyens par page
   summary.ts              — Génération de fiche de révision (JSON structuré)
-  flashcards.ts           — Flashcards Q/R (5-50, configurable)
-  quiz.ts                 — Quiz QCM (5-50 questions, configurable) + révision adaptative
+  flashcards.ts           — Flashcards Q/R (nombre configurable)
+  quiz.ts                 — Quiz QCM (nombre configurable) + révision adaptative
   fill-blank.ts           — Exercices à trous avec validation tolérante
+  dictation.ts            — Dictée : mots + phrases-exemples + règles, 1 audio TTS par mot (8e agent auto)
   podcast.ts              — Script podcast 2 voix
   quiz-vocal.ts           — Quiz vocal : questions TTS + réponses STT + vérification IA
   image.ts                — Génération d'image via Agent Mistral (outil image_generation)
@@ -368,6 +370,9 @@ helpers/
   choice-labels.ts        — Labels localisés des choix (quiz, quiz-vocal) — 9 langues
   diversity.ts            — Diversité des générations (exclusion du contenu déjà produit, `diversityParams` : temperature/presencePenalty/randomSeed)
   fill-blank-validate.ts  — Validation tolérante des réponses (normalisation, Levenshtein)
+  dictation-diff.ts       — Comparaison stricte lettre à lettre pour la correction de dictée (local, zéro coût IA)
+  reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
+  ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
 
   # Codes d'erreur stables
   error-codes.ts              — Re-export mince de l'API publique
@@ -382,6 +387,17 @@ helpers/
   cost-middleware.ts      — Injection de costDelta dans la réponse HTTP
   tracked-client.ts       — Wrap du client Mistral (capture ApiUsage automatiquement)
   usage-context.ts        — AsyncLocalStorage pour propager l'usage dans les pipelines async
+
+  # Clé API Mistral & sécurité
+  mistral-client-factory.ts — Source UNIQUE de construction du client Mistral (buildTrackedClient, resolveClient, requireKeyMiddleware)
+  rate-limit.ts           — Rate-limiters Express (authLimiter, aiLimiter, generalLimiter)
+  security-headers.ts     — Options Helmet / CSP (createHelmetOptions)
+  redact.ts               — Redaction des secrets dans les logs (clé API, headers sensibles)
+  mistral-retry.ts        — Retry avec backoff sur erreurs transitoires Mistral (3 tentatives)
+
+  # Événements & notifications (SSE)
+  event-bus.ts            — Bus d'événements de génération en mémoire (dispatch SSE, filet anti-uncaughtException)
+  event-key.ts            — Clé d'événement typée partagée client/serveur (idempotence notifications)
 
   # Voix & profils
   voice-selection.ts      — selectVoices : rotation déterministe par profil + langue (host/guest)
@@ -399,7 +415,7 @@ src/                      — Frontend (Vite + Handlebars)
     generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
-    config.ts             — Interface de configuration (modèles, voix, TTS provider)
+    config.ts             — Interface de configuration (modèles, voix, modèle TTS)
     render.ts             — Helpers de rendu HTML
     i18n.ts               — Changement de langue
     ...
@@ -407,7 +423,9 @@ src/                      — Frontend (Vite + Handlebars)
     quiz.ts               — Composant quiz interactif
     quiz-vocal.ts         — Composant quiz vocal
     fill-blank.ts         — Composant textes à trous
+    fill-blank-validate.ts — Ré-export client de la validation textes à trous (validateAnswer)
     flashcards.ts         — Composant flashcards avec retournement
+    dictation.ts          — Composant dictée interactif
     step-by-step.ts       — Mixin navigation pas-à-pas (quiz, fill-blank, flashcards)
   i18n/
     fr.ts, en.ts, es.ts, — Dictionnaires par langue (9 langues)
@@ -426,7 +444,7 @@ scripts/                  — Tooling : check-deps, check-security, check-comple
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **Voor AI-bijdragers** : raadpleeg [`CLAUDE.md`](CLAUDE.md) voor de gedetailleerde architectuurcontext, de verplichte regels (anti-leak prompts, foutcodes, kostenregistratie) en de bekende valkuilen (Lizard CCN, Opengrep, Codacy/Semgrep-migratie).
+> **Voor AI-bijdragers**: raadpleeg [`CLAUDE.md`](CLAUDE.md) voor de gedetailleerde architectuurcontext, de verplichte regels (anti-leak prompts, foutcodes, cost tracking) en bekende valkuilen (Lizard CCN, Opengrep, Codacy/Semgrep-migratie).
 
 ---
 
@@ -436,28 +454,30 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
 | `GET` | `/api/config` | Huidige configuratie |
-| `PUT` | `/api/config` | Configuratie wijzigen (modellen, stem, TTS-model) |
-| `GET` | `/api/config/status` | API-status: `mistral` (Mistral-sleutel ingesteld), `ttsAvailable` (alias van `mistral`, Mistral Voxtral is de enige TTS-aanbieder) |
+| `PUT` | `/api/config` | Configuratie wijzigen (modellen, stemmen, TTS-model) |
+| `GET` | `/api/config/status` | API-status: `mistral` (Mistral-sleutel ingesteld), `ttsAvailable` (alias van `mistral`, Mistral Voxtral is de enige TTS-provider) |
 | `POST` | `/api/config/reset` | Standaardconfiguratie resetten |
-| `GET` | `/api/config/voices` | Mistral TTS-stemmen opsommen (optioneel `?lang=fr`) |
-| `GET` | `/api/moderation-categories` | Beschikbare moderatiecategorieën + standaardwaarden per leeftijd |
+| `GET` | `/api/config/voices` | Mistral TTS-stemmen weergeven (optioneel `?lang=fr`) |
+| `GET` | `/api/moderation-categories` | Beschikbare moderatiecategorieën + standaardinstellingen per leeftijd |
+| `POST` | `/api/providers/mistral/validate` | Een door de gebruiker ingevoerde Mistral-sleutel valideren — altijd 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), geen env-fallback |
 
 ### Profielen
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
-| `GET` | `/api/profiles` | Alle profielen opsommen |
+| `GET` | `/api/profiles` | Alle profielen weergeven |
 | `POST` | `/api/profiles` | Een profiel aanmaken |
 | `PUT` | `/api/profiles/:id` | Een profiel wijzigen (PIN vereist voor < 15 jaar) |
-| `DELETE` | `/api/profiles/:id` | Een profiel verwijderen + cascaderende projecten `{pin?}` → `{ok, deletedProjects}` |
+| `DELETE` | `/api/profiles/:id` | Een profiel verwijderen + cascade projecten `{pin?}` → `{ok, deletedProjects}` |
 
 ### Projecten
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
-| `GET` | `/api/projects` | Projecten opsommen (`?profileId=` optioneel) |
-| `POST` | `/api/projects` | Een project `{name, profileId}` aanmaken |
+| `GET` | `/api/projects` | Projecten weergeven (`?profileId=` optioneel) |
+| `POST` | `/api/projects` | Een `{name, profileId}`-project aanmaken |
 | `GET` | `/api/projects/:pid` | Projectdetails |
-| `PUT` | `/api/projects/:pid` | Hernoemen `{name}` |
+| `PUT` | `/api/projects/:pid` | `{name}` hernoemen |
 | `DELETE` | `/api/projects/:pid` | Het project verwijderen |
+| `GET` | `/api/projects/:pid/events` | Realtime SSE-stroom (`event: generation`) van generatietransities (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
 
 ### Bronnen
 | Methode | Endpoint | Beschrijving |
@@ -467,76 +487,77 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/sources/voice` | STT-stem (multipart-audio) |
 | `POST` | `/api/projects/:pid/sources/websearch` | URL-scraping of webzoekopdracht `{query}` — geeft een array van bronnen terug |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | Een bron verwijderen |
-| `POST` | `/api/projects/:pid/moderate` | Modereren `{text}` |
+| `POST` | `/api/projects/:pid/moderate` | `{text}` modereren |
 | `POST` | `/api/projects/:pid/detect-consigne` | Herzieningsinstructies detecteren |
 
 ### Generatie
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | Herhalingsfiche |
+| `POST` | `/api/projects/:pid/generate/summary` | Herzieningsfiche |
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
 | `POST` | `/api/projects/:pid/generate/quiz` | Meerkeuzequiz |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | Invulteksten |
-| `POST` | `/api/projects/:pid/generate/dictation` | Dictee (woorden + voorbeeldzinnen + regels, 1 TTS-audio per woord; ook voorgesteld door de auto-router) |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | Teksten met invulvakken |
+| `POST` | `/api/projects/:pid/generate/dictation` | Dictee (woorden + voorbeeldzinnen + regels, 1 TTS-audio per woord; ook aangeboden door de auto-router) |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustratie |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Spraakquiz |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptieve herziening `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/remediation-summary` | Gerichte herhalingsfiche op de fout beantwoorde vragen van een quiz `{generationId, weakQuestions}` — wordt parallel aan `quiz-review` aangeroepen via de knop « Oefen op mijn fouten » |
-| `POST` | `/api/projects/:pid/generate/route` | Routeringsanalyse (plan van de te starten generatoren) — geeft `{plan, costDelta}` terug (kosten van alleen de routering) |
-| `POST` | `/api/projects/:pid/generate/auto` | Automatische backend-generatie (routering + 8 types: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). Uitvoering parallel — veronderstelt een Mistral-tier met rate-limit ≥ 8 gelijktijdige verzoeken; anders kunnen meerdere 429's in `failedSteps` terugkomen. |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptieve herhaling `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/remediation-summary` | Herinneringsfiche gericht op de gemiste vragen van een quiz `{generationId, weakQuestions}` — parallel aangeroepen met `quiz-review` via de knop « Oefenen op mijn fouten » |
+| `POST` | `/api/projects/:pid/generate/route` | Routeringsanalyse (plan van de te starten generators) — geeft `{plan, costDelta}` terug (alleen routeringskosten) |
+| `POST` | `/api/projects/:pid/generate/auto` | Automatische backend-generatie (routing + 8 types: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). Parallel uitgevoerd — veronderstelt een Mistral-tier met rate-limit ≥ 8 gelijktijdige verzoeken; anders kunnen meerdere 429’s in `failedSteps` terugkomen. |
 
 Alle generatieroutes accepteren `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` en `remediation-summary` vereisen bovendien `{generationId, weakQuestions}`.
 
-### CRUD voor generaties
+### CRUD-generaties
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Quizantwoorden indienen `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Antwoorden op invulteksten indienen `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Antwoorden op teksten met invulvakken indienen `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Dictee-antwoorden indienen `{answers}` (strikte serverscore) |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Een mondeling antwoord verifiëren (audio + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS-hardop voorlezen (fiches/flashcards) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | Hernoemen `{title}` |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Een mondeling antwoord controleren (audio + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS-hardop afspelen (fiches/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/cancel` | Een lopende generatie annuleren (enige annuleringspad van een pending) |
+| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` hernoemen |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | De generatie verwijderen |
 
 ### Chat
 | Methode | Endpoint | Beschrijving |
 |---|---|---|
 | `GET` | `/api/projects/:pid/chat` | De chatgeschiedenis ophalen |
-| `POST` | `/api/projects/:pid/chat` | Een bericht verzenden `{message, lang, ageGroup}` |
+| `POST` | `/api/projects/:pid/chat` | Een bericht `{message, lang, ageGroup}` verzenden |
 | `DELETE` | `/api/projects/:pid/chat` | De chatgeschiedenis wissen |
 
 ---
 
-## Architectonische keuzes
+## Architecturale beslissingen
 
 | Beslissing | Motivatie |
 |---|---|
 | **Alpine.js in plaats van React/Vue** | Minimale footprint, lichte reactiviteit met TypeScript gecompileerd door Vite. Perfect voor een hackathon waar snelheid telt. |
-| **Persistentie in JSON-bestanden** | Geen afhankelijkheden, direct opstarten. Geen database om te configureren — je start op en gaat meteen aan de slag. |
+| **Persistentie in JSON-bestanden** | Geen afhankelijkheden, onmiddellijke start. Geen database om te configureren — je start gewoon en gaat aan de slag. |
 | **Vite + Handlebars** | Het beste van twee werelden: snelle HMR voor ontwikkeling, HTML-partials voor codeorganisatie, Tailwind JIT. |
-| **Gecentraliseerde prompts** | Alle AI-prompts in `prompts.ts` — makkelijk te itereren, testen en aanpassen per taal/leeftijdsgroep. |
-| **Multi-generatiesysteem** | Elke generatie is een onafhankelijk object met een eigen ID — maakt meerdere fiches, quizzen, enz. per les mogelijk. |
-| **Leeftijdsafhankelijke prompts** | 4 leeftijdsgroepen met verschillende woordenschat, complexiteit en toon — dezelfde inhoud wordt verschillend onderwezen naargelang de leerling. |
-| **Op Agents gebaseerde functies** | De beeldgeneratie en webzoekopdracht gebruiken tijdelijke Mistral Agents — een schone levenscyclus met automatische opruiming. |
-| **Slim URL-scraping** | Eén enkel veld accepteert gemengde URL's en trefwoorden — URL's worden gescrapet via Readability (statische pagina's) met fallback Lightpanda (JS/SPA-pagina's), trefwoorden activeren een Mistral web_search-Agent. Elk resultaat maakt een onafhankelijke bron aan. |
-| **100% Mistral TTS** | Mistral Voxtral TTS (geen extra sleutel bovenop `MISTRAL_API_KEY`) — spraaksynthese geïntegreerd in de kostenketen en de stemresolutie per taal. |
+| **Gecentraliseerde prompts** | Alle AI-prompts in `prompts.ts` — gemakkelijk itereren, testen en aanpassen per taal/leeftijdsgroep. |
+| **Multi-generatiesysteem** | Elke generatie is een zelfstandig object met een eigen ID — maakt meerdere fiches, quizzen, enz. per cursus mogelijk. |
+| **Op leeftijd aangepaste prompts** | 4 leeftijdsgroepen met verschillende woordenschat, complexiteit en toon — dezelfde inhoud leert anders afhankelijk van de leerling. |
+| **Op Agents gebaseerde functies** | De generatie van afbeeldingen en webzoekopdrachten gebruiken tijdelijke Mistral Agents — nette levenscyclus met automatische opschoning. |
+| **Slimme URL-scraping** | Eén enkel veld accepteert gemengde URLs en trefwoorden — de URLs worden gescrapet via Readability (statische pagina’s) met fallback Lightpanda (JS/SPA-pagina’s), de trefwoorden starten een Mistral web_search Agent. Elk resultaat maakt een onafhankelijke bron aan. |
+| **100% Mistral TTS** | Mistral Voxtral TTS (geen extra sleutel nodig naast `MISTRAL_API_KEY`) — spraaksynthese geïntegreerd in de kostenketen en de stemresolutie per taal. |
 
 ---
 
 ## Credits & dankbetuigingen
 
-- **[Mistral AI](https://mistral.ai)** — AI-modellen (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Mistral AI Worldwide Hackathon
+- **[Mistral AI](https://mistral.ai)** — AI-modellen (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
 - **[Alpine.js](https://alpinejs.dev)** — Lichtgewicht reactief framework
-- **[TailwindCSS](https://tailwindcss.com)** — Utility CSS-framework
+- **[TailwindCSS](https://tailwindcss.com)** — Utility-first CSS-framework
 - **[Vite](https://vitejs.dev)** — Frontend buildtool
 - **[Lucide](https://lucide.dev)** — Iconenbibliotheek
 - **[Marked](https://marked.js.org)** — Markdown-parser
-- **[Readability](https://github.com/mozilla/readability)** — Extractie van webinhoud (technologie achter Firefox Reader View)
-- **[Lightpanda](https://lightpanda.io)** — Ultra-lichte headless browser voor het scrapen van JS/SPA-pagina's
-- **[Luciole](https://luciole-vision.com)** — Lettertype ontworpen voor slechtziende lezers, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (optie « Leescomfort » van de profielen)
+- **[Readability](https://github.com/mozilla/readability)** — Extractie van webinhoud (technologie van Firefox Reader View)
+- **[Lightpanda](https://lightpanda.io)** — Ultralichte headless browser voor het scrapen van JS/SPA-pagina’s
+- **[Luciole](https://luciole-vision.com)** — Lettertype ontworpen voor slechtziende lezers, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (optie « Leescomfort » van profielen)
 
-Begonnen tijdens de Mistral AI Worldwide Hackathon (maart 2026), volledig ontwikkeld door AI met [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) en [Gemini CLI](https://geminicli.com/).
+Opgestart tijdens de Mistral AI Worldwide Hackathon (maart 2026), volledig ontwikkeld door AI met [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) en [Gemini CLI](https://geminicli.com/).
 
 ---
 
