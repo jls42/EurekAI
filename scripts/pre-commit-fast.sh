@@ -18,8 +18,11 @@ fi
 # 2. Fichiers staged > 500 ko (binaires accidentels : audio TTS, dumps, images IA).
 # Le projet génère beaucoup de gros fichiers en runtime — un `git add` distrait
 # peut les capturer. Plus tard ils sont durs à retirer de l'historique.
+# Exception : docs/screenshots/ = médias curés du README (GIFs de démo), gros par
+# nature et ajoutés volontairement — le garde anti-accident ne s'y applique pas.
 MAX_KB=500
 large_files=$(git diff --cached --name-only --diff-filter=A | while IFS= read -r f; do
+  case "$f" in docs/screenshots/*) continue ;; esac
   [ -f "$f" ] || continue
   size_kb=$(($(wc -c < "$f") / 1024))
   if [ "$size_kb" -gt "$MAX_KB" ]; then

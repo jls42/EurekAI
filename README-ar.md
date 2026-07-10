@@ -5,7 +5,7 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>حوّل أي محتوى إلى تجربة تعلّم تفاعلية — مدعومة بواسطة <a href="https://mistral.ai">Mistral AI</a>.</strong>
+  <strong>حوِّل أي محتوى إلى تجربة تعلّم تفاعلية — مدعومة بـ <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
@@ -17,7 +17,7 @@
   <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="عرض YouTube"></a>
 </p>
 
-<h4 align="center">📊 جودة الشفرة</h4>
+<h4 align="center">📊 جودة الكود</h4>
 
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="بوابة الجودة"></a>
@@ -27,9 +27,9 @@
 </p>
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="التغطية"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="الثغرات"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="روائح الشفرة"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="أسطر الشفرة"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="الثغرات الأمنية"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="روائح الكود"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="أسطر الكود"></a>
 </p>
 <p align="center">
   <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="شارة Codacy"></a>
@@ -40,11 +40,41 @@
 
 ## القصة — لماذا EurekAI؟
 
-وُلد **EurekAI** خلال [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([الموقع الرسمي](https://worldwide-hackathon.mistral.ai/)) (مارس 2026). كنت بحاجة إلى موضوع — وجاءت الفكرة من شيء عملي جدًا: أُحضّر الاختبارات بانتظام مع ابنتي، وقلت لنفسي إنه لا بد من إمكان جعل ذلك أكثر متعة وتفاعلية بفضل الذكاء الاصطناعي.
+وُلد **EurekAI** خلال [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([الموقع الرسمي](https://worldwide-hackathon.mistral.ai/)) (مارس 2026). كنت بحاجة إلى فكرة — وجاءت الفكرة من شيء ملموس جدًا: أنا أراجع الدروس بانتظام مع ابنتي، وفكّرت أنه لا بد من إمكانية جعل ذلك أكثر متعة وتفاعلية بفضل الذكاء الاصطناعي.
 
-الهدف: أخذ **أي مدخل** — صورة للدرس، نص منسوخ ولصقًا، تسجيل صوتي، بحث على الويب — وتحويله إلى **ملفات مراجعة، flashcards، اختبارات، بودكاست، نصوص ذات فراغات، رسومات توضيحية، والمزيد**. وكل ذلك مدعوم بنماذج Mistral AI الفرنسية، مما يجعله حلًا مناسبًا طبيعيًا للمتعلمين الناطقين بالفرنسية.
+الهدف: أخذ **أي مدخل** — صورة للدرس، نص منسوخ ولصق، تسجيل صوتي، بحث على الويب — وتحويله إلى **مذكرات مراجعة، بطاقات تعليمية، اختبارات قصيرة، بودكاست، نصوص ذات فراغات، رسومات توضيحية، وأكثر من ذلك**. وكل ذلك مدعوم بنماذج Mistral AI الفرنسية، مما يجعله حلًا مناسبًا طبيعيًا للطلاب الناطقين بالفرنسية.
 
-تم تصميم [النموذج الأولي](https://github.com/jls42/worldwide-hackathon.mistral.ai) خلال 48 ساعة أثناء الهاكاثون كإثبات للمفهوم حول خدمات Mistral — كان يعمل بالفعل، لكنه كان محدودًا. ومنذ ذلك الحين، أصبح EurekAI مشروعًا حقيقيًا: نصوص ذات فراغات، التنقّل داخل التمارين، استخراج من الويب، رقابة أبوية قابلة للتهيئة، مراجعة عميقة للشفرة، وغير ذلك الكثير. يتم توليد كامل الشفرة بواسطة الذكاء الاصطناعي — أساسًا عبر [Claude Code](https://code.claude.com/)، مع بعض المساهمات عبر [Codex](https://openai.com/codex/) و[Gemini CLI](https://geminicli.com/).
+تم تصميم [النموذج الأولي](https://github.com/jls42/worldwide-hackathon.mistral.ai) خلال 48 ساعة أثناء الهاكاثون كإثبات للفكرة حول خدمات Mistral — وكان يعمل بالفعل، لكنه محدود. ومنذ ذلك الحين، أصبح EurekAI مشروعًا حقيقيًا: نصوص ذات فراغات، والتنقّل داخل التمارين، وجلب المحتوى من الويب، وإشراف أبوي قابل للتخصيص، ومراجعة عميقة للكود، وأكثر من ذلك بكثير. يتم توليد كامل الكود بواسطة الذكاء الاصطناعي — بشكل أساسي [Claude Code](https://code.claude.com/)، مع بعض المساهمات عبر [Codex](https://openai.com/codex/) و[Gemini CLI](https://geminicli.com/).
+
+---
+
+## نظرة عامة
+
+<p align="center">
+  <img src="docs/screenshots/eurekai-tour.gif" alt="جولة إرشادية في EurekAI: المصادر، المذكرة، الاختبار، البطاقات التعليمية، الرسومات التوضيحية" width="820" />
+</p>
+
+| | |
+|---|---|
+| ![لوحة التحكم](docs/screenshots/dashboard.webp)<br>**لوحة التحكم** — أحدث عمليات التوليد، التكلفة المقدّرة لكل بطاقة والإجمالي للمشروع، زر «Auto — Magie !» | ![المصادر](docs/screenshots/sources.webp)<br>**المصادر** — استيراد صورة/PDF/نص/صوت/ويب، توليد بنقرة واحدة، اكتشاف التعليمات |
+| ![جدول المصادر](docs/screenshots/sources-list.webp)<br>**جدول المصادر** — مقياس الثقة في OCR، والإشراف، والتكلفة المقدرة | |
+
+### المكوّنات أثناء العمل
+
+| | |
+|---|---|
+| ![مذكرة مراجعة](docs/screenshots/notes.gif)<br>**مذكرة مراجعة** — النقاط الأساسية، المفردات، الاقتباسات الموثقة، قراءة صوتية حسب القسم | ![اختبار](docs/screenshots/quiz.gif)<br>**اختبار QCM** — تغذية راجعة فورية مع شرح، تنقّل خطوة بخطوة |
+| ![بطاقات تعليمية](docs/screenshots/flashcards.gif)<br>**بطاقات تعليمية** — بطاقة قابلة للقلب ثم تقييم ذاتي «كنت أعرف / لم أكن أعرف» | ![نصوص ذات فراغات](docs/screenshots/fillblank.gif)<br>**نصوص ذات فراغات** — تلميح عند الطلب، تحقق متسامح |
+| ![إملاء](docs/screenshots/dictation.gif)<br>**إملاء** — كلمة مملاة صوتيًا، تصحيح صارم حرفًا بحرف | ![اختبار صوتي](docs/screenshots/vocal-quiz.gif)<br>**اختبار صوتي** — سؤال مقروء بصوت عالٍ، إجابة عبر الميكروفون |
+| ![بودكاست](docs/screenshots/podcast.gif)<br>**بودكاست** — بودكاست قصير بصوتين، نص حواري قابل للاطلاع | ![رسومات توضيحية](docs/screenshots/illustrations.gif)<br>**رسومات توضيحية** — صور تعليمية مُولَّدة بواسطة Agent |
+| ![معلّم الذكاء الاصطناعي](docs/screenshots/chat.gif)<br>**معلّم الذكاء الاصطناعي** — دردشة مرتبطة بوثائق الدرس، بإجابات مشروحة، ويمكنه توليد اختبارات وبطاقات تعليمية | |
+
+### البدء السريع
+
+| | |
+|---|---|
+| ![اختيار الملف الشخصي](docs/screenshots/login.gif)<br>**اختيار الملف الشخصي** — لكل طفل مساحته، وأفاتاره، ولغته | ![إنشاء ملف شخصي](docs/screenshots/profile-create.gif)<br>**إنشاء ملف شخصي** — العمر، الأفاتار، ورمز PIN الأبوي لمن هم دون 15 عامًا |
+| ![إنشاء مقرر](docs/screenshots/course.gif)<br>**إنشاء مقرر** — مشروع لكل درس، جاهز لاستقبال المصادر | ![الإعدادات](docs/screenshots/settings.gif)<br>**الإعدادات** — حالة API، اختيار نماذج الذكاء الاصطناعي مع عرض الأسعار |
 
 ---
 
@@ -52,32 +82,32 @@
 
 | | الميزة | الوصف |
 |---|---|---|
-| 📷 | **استيراد الملفات** | استورد دروسك — صورة، PDF (عبر Mistral OCR مع متوسط درجة الثقة، الفئة `high`/`medium`/`low`) أو ملف نصي (TXT, MD). جلسات الرفع مع إعادة المحاولة لكل ملف وتقدّم فردي |
-| 📝 | **إدخال نصي** | اكتب أو الصق أي نص مباشرةً |
-| 🎤 | **إدخال صوتي** | سجّل صوتك — يقوم Voxtral STT بنسخ صوتك |
-| 🌐 | **الويب / URL** | الصق عنوان URL (استخلاص مباشر عبر Readability + Lightpanda) أو اكتب بحثًا (Agent Mistral web_search) |
-| 📄 | **ملفات مراجعة** | ملاحظات منظّمة مع النقاط الرئيسية، المفردات، الاقتباسات، والطرائف |
-| 🃏 | **flashcards** | بطاقات سؤال/جواب تفاعلية، قراءة صوتية حوارية |
-| ❓ | **اختبارات QCM** | أسئلة متعددة الخيارات مع مراجعة تكيفية للأخطاء (العدد قابل للتهيئة) |
-| ✏️ | **نصوص ذات فراغات** | تمارين لإكمالها مع تلميحات والتحقق المتسامح |
-| 🔤 | **الإملاء** | كلمات تُملَى صوتيًا (Voxtral TTS) من قائمة مستوردة، إدخال عبر لوحة المفاتيح، تصحيح صارم حرفًا بحرف مع قاعدة إملائية مفسَّرة |
-| 🎙️ | **بودكاست** | بودكاست مصغّر بصوتين — صوت Mistral افتراضيًا أو أصوات مخصّصة (للأهل!) |
-| 🖼️ | **رسومات توضيحية** | صور تعليمية مولّدة بواسطة Agent Mistral |
-| 🗣️ | **اختبار صوتي** | أسئلة تُقرأ بصوت عالٍ (مع إمكانية صوت مخصّص)، إجابة شفهية، تحقق بالذكاء الاصطناعي |
-| 💬 | **معلّم الذكاء الاصطناعي** | دردشة سياقية مع وثائق دروسك، مع استدعاء الأدوات |
-| 🧠 | **الموجّه التلقائي** | موجّه مبني على `mistral-small-latest` يحلل المحتوى ويقترح مزيجًا من المولّدات من بين 8 أنواع متاحة |
-| 🔒 | **الرقابة الأبوية** | رقابة قابلة للتهيئة حسب الملف الشخصي (فئات مخصّصة)، رقم PIN أبوي، وقيود على الدردشة |
-| 🌍 | **متعدد اللغات** | الواجهة متاحة بـ 9 لغات؛ ويمكن توجيه التوليد بالذكاء الاصطناعي عبر 15 لغة من خلال المطالبات |
-| 🔊 | **القراءة بصوت عالٍ** | استمع إلى ملفات المراجعة وflashcards (حوار سؤال/جواب) عبر Mistral Voxtral TTS |
-| 💶 | **تتبّع تكاليف API** | تقدير شفاف لتكلفة € كل عملية توليد ومصدرها (tokens / characters / pages / seconds audio). شارة لكل بطاقة + الإجمالي لكل مشروع، ظاهر في لوحة التحكم |
-| 🎨 | **سمة حسب الملف الشخصي** | يختار كل ملف شخصي سمة `dark` أو `light` — وتبقى محفوظة عند التبديل بين الملفات الشخصية |
+| 📷 | **استيراد الملفات** | استورد دروسك — صورة، PDF (عبر Mistral OCR مع متوسط درجة ثقة، مستويات `high`/`medium`/`low`) أو ملف نصي (TXT، MD). جلسات رفع مع إعادة المحاولة لكل ملف وتقدم فردي |
+| 📝 | **إدخال نصي** | اكتب أو الصق أي نص مباشرة |
+| 🎤 | **إدخال صوتي** | سجّل صوتك — Voxtral STT يفرّغ صوتك إلى نص |
+| 🌐 | **الويب / URL** | الصق URL (استخراج مباشر عبر Readability + Lightpanda) أو اكتب بحثًا (Agent Mistral web_search) |
+| 📄 | **مذكرات مراجعة** | ملاحظات منظمة تتضمن نقاطًا أساسية ومفردات واقتباسات وحكايات |
+| 🃏 | **بطاقات تعليمية** | بطاقات سؤال/جواب تفاعلية، مع قراءة صوتية حوارية |
+| ❓ | **اختبار QCM** | أسئلة متعددة الخيارات مع مراجعة تكيفية للأخطاء (عدد قابل للتخصيص) |
+| ✏️ | **نصوص ذات فراغات** | تمارين للإكمال مع تلميحات وتحقق متسامح |
+| 🔤 | **إملاء** | كلمات مملاة صوتيًا (Voxtral TTS) من قائمة مستوردة، إدخال عبر لوحة المفاتيح، تصحيح صارم حرفًا بحرف مع قاعدة إملائية مشروحة |
+| 🎙️ | **بودكاست** | بودكاست قصير بصوتين — صوت Mistral افتراضي أو أصوات مخصصة (للآباء !) |
+| 🖼️ | **رسومات توضيحية** | صور تعليمية مُولَّدة بواسطة Agent Mistral |
+| 🗣️ | **اختبار صوتي** | أسئلة تُقرأ بصوت عالٍ (صوت مخصص ممكن)، إجابة شفوية، تحقق بالذكاء الاصطناعي |
+| 💬 | **معلّم الذكاء الاصطناعي** | دردشة سياقية مع وثائق الدرس الخاصة بك، مع استدعاء الأدوات |
+| 🧠 | **موجّه تلقائي** | موجّه يعتمد على `mistral-small-latest` يحلل المحتوى ويقترح مزيجًا من المولّدات من بين 8 أنواع متاحة |
+| 🔒 | **رقابة أبوية** | إشراف قابل للتخصيص حسب الملف الشخصي (فئات قابلة للتخصيص)، رمز PIN أبوي، قيود على الدردشة |
+| 🌍 | **متعدد اللغات** | الواجهة متاحة بـ 9 لغات؛ والتوليد بالذكاء الاصطناعي قابل للتوجيه بـ 15 لغة عبر المطالبات |
+| 🔊 | **القراءة بصوت عالٍ** | استمع إلى المذكرات والبطاقات التعليمية (حوار سؤال/جواب) عبر Mistral Voxtral TTS |
+| 💶 | **تتبّع تكاليف API** | تقدير شفاف لتكلفة € لكل عملية توليد ولكل مصدر (tokens / characters / pages / seconds audio). شارة لكل بطاقة + إجمالي للمشروع، ظاهر في لوحة التحكم |
+| 🎨 | **سِمة لكل ملف شخصي** | يختار كل ملف شخصي السمة `dark` أو `light` — وتبقى محفوظة عند تغيير الملف الشخصي |
 
 ---
 
-## نظرة عامة على المعمارية
+## نظرة عامة على البنية المعمارية
 
 <p align="center">
-  <img src="public/assets/architecture-overview.webp" alt="نظرة عامة على المعمارية" width="800" />
+  <img src="public/assets/architecture-overview.webp" alt="نظرة عامة على البنية المعمارية" width="800" />
 </p>
 
 ---
@@ -85,7 +115,7 @@
 ## خريطة استخدام النماذج
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="ربط نماذج الذكاء الاصطناعي بالمهام" width="800" />
+  <img src="public/assets/model-map.webp" alt="تعيين النموذج إلى المهمة في الذكاء الاصطناعي" width="800" />
 </p>
 
 ---
@@ -93,115 +123,114 @@
 ## رحلة المستخدم
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="رحلة تعلّم الطالب" width="800" />
+  <img src="public/assets/user-journey.webp" alt="رحلة التعلّم لدى الطالب" width="800" />
 </p>
 
 ---
 
-## تعمّق في التفاصيل — الميزات
+## التعمّق — الميزات
 
 ### إدخال متعدد الوسائط
 
-يقبل EurekAI 4 أنواع من المصادر، مع رقابة حسب الملف الشخصي (مفعّلة افتراضيًا للطفل والمراهق) :
+يقبل EurekAI 4 أنواع من المصادر، مع إشراف بحسب الملف الشخصي (مفعّل افتراضيًا للطفل والمراهق) :
 
-- **استيراد الملفات** — ملفات JPG وPNG أو PDF تُعالج عبر OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) افتراضيًا** (أفضل جودة)، **OCR 3 (`mistral-ocr-2512`) اختياري** في الإعدادات (أرخص، بحوالي نصف التكلفة) — للنص المطبوع والجداول والكتابة اليدوية؛ أو ملفات نصية (TXT, MD) تُستورد مباشرةً. تستخدم عمليات الرفع متعددة الملفات نظام **جلسات رفع**: تقدّم فردي لكل ملف، إعادة محاولة الملف الذي فشل دون إعادة إرسال البقية، وإغلاق الجلسة عند الانتهاء. يوفّر OCR **درجة ثقة** متوسطة (`average`، مضبوطة ضمن `[0,1]`، محسوبة انطلاقًا من `averagePageConfidenceScore` المعادة من Mistral)، وتُعرض في الواجهة على شكل شارة فئة `high` / `medium` / `low` (العتبات ~0.9 / ~0.7) — تنبيه من دون حظر إذا كان المسح منخفض الجودة.
-- **نص حر** — اكتب أو الصق أي محتوى. يُراجع قبل التخزين إذا كانت الرقابة مفعّلة.
-- **إدخال صوتي** — سجّل صوتًا في المتصفح. يُنقل إلى نص بواسطة `voxtral-mini-latest`. يساهم المعامل `language="fr"` في تحسين التعرّف.
-- **الويب / URL** — الصق عنوان URL واحدًا أو أكثر لاستخلاص المحتوى مباشرةً (Readability + Lightpanda للصفحات التي تعتمد على JavaScript)، أو اكتب كلمات مفتاحية للبحث في الويب عبر Agent Mistral. الحقل الواحد يقبل الاثنين — تُفصل عناوين URL والكلمات المفتاحية تلقائيًا، ويُنشئ كل نتيجة مصدرًا مستقلًا.
+- **استيراد الملفات** — تُعالَج ملفات JPG وPNG وPDF عبر OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) افتراضيًا** (أفضل جودة)، **OCR 3 (`mistral-ocr-2512`) اختياريًا** في الإعدادات (أرخص، بحوالي نصف التكلفة) — للنص المطبوع والجداول والكتابة اليدوية؛ أو ملفات نصية (TXT، MD) تُستورد مباشرة. تستخدم عمليات الرفع متعددة الملفات نظام **جلسات الرفع**: تقدم فردي لكل ملف، إعادة المحاولة للملف الفاشل دون إعادة إرسال البقية، وإغلاق الجلسة عند الانتهاء. يعرض OCR **درجة الثقة** المتوسطة (`average`، مقيدة داخل `[0,1]`، محسوبة من `averagePageConfidenceScore` التي تعيدها Mistral)، وتُعرض في الواجهة على شكل شارة من المستوى `high` / `medium` / `low` (عتبات ~0.9 / ~0.7) — تنبّه دون حظر إذا كانت جودة المسح سيئة.
+- **نص حر** — اكتب أو الصق أي محتوى. تتم مراجعته قبل التخزين إذا كانت المراجعة مفعّلة.
+- **إدخال صوتي** — سجّل صوتًا في المتصفح. يُفرَّغ بواسطة `voxtral-mini-latest`. يتيح الإعداد `language="fr"` تحسين التعرف.
+- **الويب / URL** — الصق واحدًا أو أكثر من URLs لاستخراج المحتوى مباشرة (Readability + Lightpanda للصفحات التي تعتمد على JavaScript)، أو اكتب كلمات مفتاحية للبحث على الويب عبر Agent Mistral. الحقل الواحد يقبل كلا الأمرين — يتم فصل URLs والكلمات المفتاحية تلقائيًا، ويُنشئ كل نتيجة مصدرًا مستقلاً.
 
 ### توليد المحتوى بالذكاء الاصطناعي
 
-ثمانية أنواع من مواد التعلّم المولّدة:
+ثمانية أنواع من مواد التعلّم المُولَّدة:
 
 | المولّد | النموذج | المخرجات |
 |---|---|---|
-| **ملف مراجعة** | `mistral-large-latest` | عنوان، ملخص، نقاط رئيسية، مفردات، اقتباسات، طُرفة |
-| **flashcards** | `mistral-large-latest` | بطاقات سؤال/جواب مع مراجع للمصادر (العدد قابل للتهيئة) |
-| **اختبارات QCM** | `mistral-large-latest` | أسئلة متعددة الخيارات، تفسيرات، مراجعة تكيفية (العدد قابل للتهيئة) |
-| **نصوص ذات فراغات** | `mistral-large-latest` | جمل لإكمالها مع تلميحات، والتحقق المتسامح (Levenshtein) |
-| **الإملاء** | `mistral-large-latest` + Voxtral TTS | كلمات مفتاحية تُملَى صوتيًا (1 MP3/كلمة) → إدخال عبر لوحة المفاتيح → تصحيح صارم (الحركات) مع قاعدة مفسَّرة |
-| **بودكاست** | `mistral-large-latest` + Voxtral TTS | نص بصوتين → ملف MP3 صوتي |
+| **مذكرة مراجعة** | `mistral-large-latest` | عنوان، ملخص، نقاط أساسية، مفردات، اقتباسات، حكاية |
+| **بطاقات تعليمية** | `mistral-large-latest` | بطاقات سؤال/جواب مع مراجع إلى المصادر (عدد قابل للتخصيص) |
+| **اختبار QCM** | `mistral-large-latest` | أسئلة متعددة الخيارات، شروحات، مراجعة تكيفية (عدد قابل للتخصيص) |
+| **نصوص ذات فراغات** | `mistral-large-latest` | جمل للإكمال مع تلميحات، تحقق متسامح (Levenshtein) |
+| **إملاء** | `mistral-large-latest` + Voxtral TTS | كلمات رئيسية مملاة صوتيًا (1 MP3/كلمة) → إدخال عبر لوحة المفاتيح → تصحيح صارم (العلامات) مع قاعدة مشروحة |
+| **بودكاست** | `mistral-large-latest` + Voxtral TTS | نص بصوتين → صوت MP3 |
 | **رسمة توضيحية** | Agent `mistral-large-latest` | صورة تعليمية عبر الأداة `image_generation` |
 | **اختبار صوتي** | `mistral-large-latest` + Voxtral TTS + STT | أسئلة TTS → إجابة STT → تحقق بالذكاء الاصطناعي |
 
-### معلّم ذكاء اصطناعي عبر الدردشة
+### معلّم الذكاء الاصطناعي عبر الدردشة
 
-معلّم حواري مع وصول كامل إلى وثائق الدروس:
+معلّم حواري مع وصول كامل إلى وثائق الدرس:
 
 - يستخدم `mistral-large-latest`
-- **استدعاء الأدوات**: يمكنه توليد ملفات مراجعة أو flashcards أو اختبارات أو نصوص ذات فراغات أثناء المحادثة
-- سجل من 50 رسالة لكل درس
-- رقابة على المحتوى إذا كانت مفعّلة للملف الشخصي
+- **استدعاء الأدوات**: يمكنه توليد مذكرات، بطاقات تعليمية، اختبارات أو نصوص ذات فراغات أثناء المحادثة
+- سجل تاريخي من 50 رسالة لكل مقرر
+- مراجعة المحتوى إذا كانت مفعلة للملف الشخصي
 
 ### الموجّه التلقائي
 
-يستخدم الموجّه `mistral-small-latest` لتحليل محتوى المصادر واقتراح المولّدات الأنسب من بين 8 متاحة. تعرض الواجهة التقدّم في الوقت الحقيقي: أولًا مرحلة تحليل، ثم عمليات التوليد الفردية مع إمكانية الإلغاء.
+يستخدم الموجّه `mistral-small-latest` لتحليل محتوى المصادر واقتراح أكثر المولّدات ملاءمة من بين 8 متاحة. تعرض الواجهة التقدم في الوقت الحقيقي: أولًا مرحلة تحليل، ثم عمليات التوليد الفردية مع إمكانية الإلغاء.
 
 ### التعلّم التكيفي
 
-- **إحصاءات الاختبارات**: تتبّع المحاولات والدقة لكل سؤال
-- **مراجعة الاختبارات**: تولّد 5-10 أسئلة جديدة تستهدف المفاهيم الضعيفة
-- **اكتشاف التعليمات**: يكتشف تعليمات المراجعة ("Je sais ma leçon si je sais...") ويعطيها الأولوية في المولّدات النصية المتوافقة (ملف مراجعة، flashcards، اختبار، نصوص ذات فراغات)
+- **إحصاءات الاختبار**: تتبّع المحاولات والدقة لكل سؤال
+- **مراجعة الاختبار**: تولّد 5-10 أسئلة جديدة تستهدف المفاهيم الضعيفة
+- **اكتشاف التعليمات**: يكتشف تعليمات المراجعة ("Je sais ma leçon si je sais...") ويمنحها الأولوية في المولّدات النصية المتوافقة (مذكرة، بطاقات تعليمية، اختبار، نصوص ذات فراغات)
 
-### الأمان والرقابة الأبوية
+### الأمن والرقابة الأبوية
 
 - **4 فئات عمرية**: طفل (≤10 سنوات)، مراهق (11-15)، طالب (16-25)، بالغ (26+)
-- **رقابة المحتوى**: `mistral-moderation-2603` (Mistral Moderation 2) مع 10 فئات متاحة، 5 منها محجوبة افتراضيًا للطفل/المراهق (`sexual`، `hate_and_discrimination`، `violence_and_threats`، `selfharm`، `jailbreaking`). يمكن تخصيص الفئات لكل ملف شخصي في الإعدادات. يتم تجنّب الاسم المستعار `-latest` عمدًا (لأنه لا يزال يشير إلى نسخة متقادمة).
-- **PIN أبوي**: تجزئة SHA-256، مطلوبة للملفات الشخصية التي تقل أعمارها عن 15 عامًا. في النشر الإنتاجي، يُنصح باستخدام تجزئة بطيئة مع ملح (Argon2id، bcrypt).
-- **قيود الدردشة**: دردشة الذكاء الاصطناعي معطلة افتراضيًا لمن هم دون 16 عامًا، ويمكن تفعيلها من قبل الأهل
+- **مراجعة المحتوى**: `mistral-moderation-2603` (Mistral Moderation 2) مع 10 فئات متاحة، 5 منها محجوبة افتراضيًا للطفل/المراهق (`sexual`، `hate_and_discrimination`، `violence_and_threats`، `selfharm`، `jailbreaking`). الفئات قابلة للتخصيص لكل ملف شخصي في الإعدادات. يُتجنّب alias `-latest` عمدًا (لأنه لا يزال يشير إلى نسخة مهجورة).
+- **رمز PIN الأبوي**: تجزئة SHA-256، مطلوبة للملفات الشخصية دون 15 عامًا. في النشر الإنتاجي، يُنصح باستخدام تجزئة بطيئة مع ملح (Argon2id، bcrypt).
+- **قيود الدردشة**: دردشة الذكاء الاصطناعي معطّلة افتراضيًا لمن هم دون 16 عامًا، ويمكن للوالدين تفعيلها
 
 ### نظام متعدد الملفات الشخصية
 
-- ملفات شخصية متعددة مع الاسم، العمر، الصورة الرمزية، وتفضيلات اللغة
-- **أصوات حسب الملف الشخصي** (`Profile.mistralVoices?: { host, guest }`) — يمكن لكل طفل أن يملك زوجًا خاصًا من أصوات البودكاست/الاختبار الصوتي
-- **سمة حسب الملف الشخصي** (`Profile.theme: 'dark' | 'light'`) — تبديل تلقائي عند تغيير الملف الشخصي، ومُحافَظ عليها في الواجهة الخلفية
+- ملفات شخصية متعددة مع الاسم، العمر، الأفاتار، وتفضيلات اللغة
+- **صوت لكل ملف شخصي** (`Profile.mistralVoices?: { host?, guest? }` — كل دور اختياري) — يمكن لكل طفل أن يمتلك زوج أصوات خاص به للبودكاست/الاختبار الصوتي
+- **سِمة لكل ملف شخصي** (`Profile.theme: 'dark' | 'light'`) — تبديل تلقائي عند تغيير الملف الشخصي، ومحفوظة في جهة الخلفية
 - المشاريع مرتبطة بالملفات الشخصية عبر `profileId`
-- حذف متسلسل: حذف ملف شخصي يحذف كل مشاريعه
+- الحذف المتسلسل: حذف ملف شخصي يحذف جميع مشاريعه
 
 ### تتبّع تكاليف API
 
-كل استدعاء إلى Mistral (الدردشة، OCR، STT، TTS، الرقابة، الوكلاء) مُجهّز لتقديم تقدير € **شفاف** للمستخدم — من دون أي مفاجآت في الفاتورة.
+كل استدعاء لـ Mistral (الدردشة، OCR، STT، TTS، المراجعة، الوكلاء) مُراقَب لتقديم تقدير € **شفاف** للمستخدم — دون مفاجآت في الفوترة.
 
-- **مصدر الحقيقة**: `helpers/pricing.ts` — `MODEL_PRICING` حسب بادئة النموذج (مثال: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens)، `PRICING_SOURCES` مع روابط وثائق Mistral لإعادة الاستخلاص دوريًا
-- **الوحدات المدعومة**: `tokens`، `characters` (TTS)، `pages` (OCR)، `audio-seconds` (STT) — التحويل مُدار بواسطة `helpers/cost-calc.ts`
-- **سلسلة القياس**: `helpers/tracked-client.ts` (تغليف عميل Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (حقن في استجابة HTTP)
-- **الواجهة**: شارة التكلفة لكل عملية توليد (`src/partials/cost-badge-gen.html`)، لكل مصدر (`cost-badge-src.html`)، والإجمالي التراكمي في لوحة التحكم (`Project.totalCost`)
-- **نقاط النهاية**: الاستجابات `/generate/*` و`/sources/*` تُزيّن الكائن المُعاد (Generation / Source) بـ `estimatedCost` و`usage` و`costBreakdown`. يضيف `POST /generate/route` حقلًا `costDelta: number` لتكلفة التوجيه فقط. يعيد `GET /projects/:pid` المشروع معزّزًا بـ `totalCost` (المجموع المحسوب من `costLog[]`) + السجل الكامل
+- **مصدر الحقيقة**: `helpers/pricing.ts` — `MODEL_PRICING` حسب prefix النموذج (مثال: `mistral-large` → input 0.5 €/M tokens، output 1.5 €/M tokens)، `PRICING_SOURCES` مع URLs الخاصة بوثائق Mistral لإعادة الاستخراج الدوري
+- **الوحدات المدعومة**: `tokens`، `characters` (TTS)، `pages` (OCR)، `audio-seconds` (STT) — تحويل مُدار بواسطة `helpers/cost-calc.ts`
+- **سلسلة القياس**: `helpers/tracked-client.ts` (wrap client Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (إدراج في استجابة HTTP)
+- **الواجهة**: شارة تكلفة لكل عملية توليد (`src/partials/cost-badge-gen.html`)، ولكل مصدر (`cost-badge-src.html`)، وإجمالي متراكم في لوحة التحكم (`Project.totalCost`)
+- **نقاط النهاية**: الاستجابات `/generate/*` و`/sources/*` تزيّن الكائن المُعاد (Generation / Source) بـ `estimatedCost` و`usage` و`costBreakdown`. يضيف `POST /generate/route` حقلًا `costDelta: number` لتكلفة التوجيه فقط. يعيد `GET /projects/:pid` المشروع مُثريًا بـ `totalCost` (المجموع المحسوب من `costLog[]`) + السجل الكامل
 
-### TTS (Mistral Voxtral) والأصوات المخصّصة
+### TTS (Mistral Voxtral) والأصوات المخصصة
 
-- **Mistral Voxtral TTS** : `voxtral-mini-tts-latest`، توليد صوتي بنسبة 100% من Mistral، ولا حاجة إلى مفتاح إضافي
-- **أصوات مخصّصة**: يمكن للوالدين إنشاء أصواتهم الخاصة عبر API Mistral Voices (انطلاقًا من عينة صوتية) وإسنادها إلى دوري المضيف/الضيف — وعندها تُقرأ البودكاستات والاختبارات الصوتية بصوت أحد الوالدين، مما يجعل التجربة أكثر غمرًا للطفل
-- يمكن تهيئة دورين صوتيين: **المضيف** (الراوي الرئيسي) و**الضيف** (الصوت الثاني في البودكاست)
-- الكتالوج الكامل لأصوات Mistral متاح في الإعدادات، مع إمكانية التصفية حسب اللغة
+- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`، توليد صوتي 100% من Mistral، دون الحاجة إلى مفتاح إضافي
+- **أصوات مخصصة**: يمكن للوالدين إنشاء أصواتهم الخاصة عبر API Mistral Voices (انطلاقًا من عينة صوتية) وإسنادها إلى أدوار المضيف/الضيف — عندها تُقرأ البودكاستات والاختبارات الصوتية بصوت أحد الوالدين، مما يجعل التجربة أكثر انغماسًا للطفل
+- دوران صوتيان قابلان للتخصيص: **المضيف** (الراوي الرئيسي) و**الضيف** (الصوت الثاني في البودكاست)
+- الكتالوج الكامل لأصوات Mistral متاح في الإعدادات، مع فلترة بحسب اللغة
 
 ### التدويل
 
 - الواجهة متاحة بـ 9 لغات: fr, en, es, pt, it, nl, de, hi, ar
-- المطالبات بالذكاء الاصطناعي تدعم 15 لغة (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
-- اللغة قابلة للتهيئة حسب الملف الشخصي
+- المطالبات الذكية تدعم 15 لغة (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
+- اللغة قابلة للتخصيص لكل ملف شخصي
 
 ---
+## المكدس التقني
 
-## الحزمة التقنية
-
-| الطبقة | التقنية | الدور |
+| الطبقة | التكنولوجيا | الدور |
 |---|---|---|
 | **Runtime** | Node.js + TypeScript 6.x | الخادم وسلامة الأنواع |
 | **Backend** | Express 5.x | API REST |
-| **خادم التطوير** | Vite 8.x (Rolldown) + tsx | HMR، أجزاء Handlebars، proxy |
-| **الواجهة الأمامية** | HTML + TailwindCSS 4.x + Alpine.js 3.x | واجهة تفاعلية، TypeScript مُترجم بواسطة Vite |
+| **خادم التطوير** | Vite 8.x (Rolldown) + tsx | HMR، partials Handlebars، proxy |
+| **الواجهة الأمامية** | HTML + TailwindCSS 4.x + Alpine.js 3.x | واجهة تفاعلية، وTypeScript مُترجم بواسطة Vite |
 | **القوالب** | vite-plugin-handlebars | تركيب HTML عبر partials |
 | **الذكاء الاصطناعي** | Mistral AI SDK 2.x | Chat، OCR، STT، TTS، Agents، Moderation |
 | **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`، توليد صوتي مدمج |
 | **الأيقونات** | Lucide 1.x | مكتبة أيقونات SVG |
-| **استخلاص الويب** | Readability + linkedom | استخراج المحتوى الرئيسي لصفحات الويب (تقنية Firefox Reader View) |
-| **متصفح بلا واجهة** | Lightpanda | متصفح headless فائق الخفة (Zig + V8) للصفحات المعتمدة على JavaScript/SPA — fallback scraping |
+| **استخلاص الويب** | Readability + linkedom | استخراج المحتوى الرئيسي من صفحات الويب (تقنية Firefox Reader View) |
+| **متصفح headless** | Lightpanda | متصفح headless فائق الخفة (Zig + V8) لصفحات JS/SPA — fallback scraping |
 | **Markdown** | Marked | عرض markdown داخل الدردشة |
 | **رفع الملفات** | Multer 2.x | إدارة النماذج متعددة الأجزاء |
 | **الصوت** | ffmpeg-static | دمج المقاطع الصوتية |
-| **الاختبارات** | Vitest | اختبارات وحدات — التغطية مقاسة بواسطة SonarCloud |
-| **الاستمرارية** | ملفات JSON | تخزين بلا اعتماديات |
+| **الاختبارات** | Vitest | اختبارات وحدات — التغطية تُقاس بواسطة SonarCloud |
+| **الاستمرارية** | ملفات JSON | تخزين بلا تبعية |
 
 ---
 
@@ -209,15 +238,16 @@
 
 | النموذج | الاستخدام | لماذا |
 |---|---|---|
-| `mistral-large-latest` | ملف مراجعة، flashcards، بودكاست، اختبار، نصوص ذات فراغات، دردشة، التحقق من الاختبار الصوتي، وكيل الصور، وكيل البحث على الويب، اكتشاف التعليمات | أفضل أداء متعدد اللغات + تتبّع التعليمات |
-| `mistral-ocr-4-0` (OCR 4، افتراضي) | OCR للمستندات — جودة أعلى | النص المطبوع، الجداول، الكتابة اليدوية ($4 / 1000 pages) |
+| `mistral-large-latest` | بطاقة مراجعة، Flashcards، Podcast، Quiz، نصوص ذات فراغات، Chat، التحقق الصوتي من الاختبار، Agent Image، Agent Web Search، كشف التعليمات | أفضل دعم متعدد اللغات + تتبّع التعليمات |
+| `mistral-ocr-4-0` (OCR 4، افتراضي) | OCR للمستندات — جودة أعلى | نص مطبوع، جداول، كتابة يدوية ($4 / 1000 pages) |
 | `mistral-ocr-2512` (OCR 3، اختياري) | OCR للمستندات | قابل للاختيار في الإعدادات، أرخص ($2 / 1000 pages) |
-| `voxtral-mini-latest` | التعرّف الصوتي (STT) | STT متعدد اللغات، محسّن مع `language="fr"` |
-| `voxtral-mini-tts-latest` | التوليد الصوتي (TTS) | البودكاست، الاختبار الصوتي، القراءة بصوت عالٍ |
-| `mistral-moderation-2603` | رقابة المحتوى | 5 فئات محجوبة للأطفال/المراهقين (ومنها `jailbreaking`) |
-| `mistral-small-latest` | الموجّه التلقائي | تحليل سريع للمحتوى لاتخاذ قرارات التوجيه |
+| `voxtral-mini-latest` | التعرّف على الكلام (STT) | STT متعدد اللغات، مُحسّن مع `language="fr"` |
+| `voxtral-mini-tts-latest` | توليد الصوت (TTS) | Podcasts، quiz صوتي، القراءة بصوت عالٍ |
+| `mistral-moderation-2603` | Moderation للمحتوى | 5 فئات محجوبة للأطفال/المراهقين (بما فيها `jailbreaking`) |
+| `mistral-small-latest` | موجه تلقائي | تحليل سريع للمحتوى لاتخاذ قرارات التوجيه |
 
 ---
+
 ## بدء سريع
 
 ```bash
@@ -240,27 +270,27 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **ملاحظة** : Mistral Voxtral TTS هو مزود TTS الوحيد — لا حاجة إلى أي مفتاح إضافي بعد `MISTRAL_API_KEY`.
+> **ملاحظة**: Mistral Voxtral TTS هو مزوّد TTS الوحيد — لا حاجة إلى مفتاح إضافي بعد `MISTRAL_API_KEY`.
 
-> **مفتاح API الذي يدخله المستخدم** : `MISTRAL_API_KEY` أصبح الآن **اختياريًا**. إذا لم يكن موجودًا، يبدأ التطبيق على أي حال ويطلب من كل مستخدم إدخال **مفتاح Mistral الخاص به** في الواجهة. يتم **تخزين المفتاح في المتصفح** (مشفّرًا عبر Web Crypto + IndexedDB في سياق آمن) ويُرسل مع كل طلب — **ولا يُحفظ أبدًا على الخادم**. الأولوية: مفتاح الملف الشخصي > المفتاح العام في المتصفح > `MISTRAL_API_KEY` (env). يفرض ضبط `EUREKAI_REQUIRE_USER_KEY=true` على كل مستخدم تقديم مفتاحه (ويُستخدم مفتاح env فقط للتحميل المسبق).
+> **مفتاح API المُدخل من المستخدم**: أصبح `MISTRAL_API_KEY` الآن **اختياريًا**. إذا كان غير موجود، فسيبدأ التطبيق على أي حال ويطلب من كل مستخدم إدخال **مفتاح Mistral الخاص به** داخل الواجهة. يتم **تخزين المفتاح في المتصفح** (مشفرًا عبر Web Crypto + IndexedDB في سياق آمن) ويُرسل مع الطلب — **ولا يُحفَظ أبدًا على الخادم**. الأولوية: مفتاح الملف الشخصي > المفتاح العام للمتصفح > `MISTRAL_API_KEY` (env). تعيين `EUREKAI_REQUIRE_USER_KEY=true` يُجبر كل مستخدم على تقديم مفتاحه (ويصبح مفتاح env مفيدًا فقط للتحميلات المسبقة).
 
-> **HTTPS المحلي (اللوحي/LAN)** : `localhost` هو بالفعل سياق آمن. وللوصول عبر LAN (لوحي)، أنشئ شهادة محلية وفعّل HTTPS لفك قفل التشفير في المتصفح + تشفير المفتاح أثناء النقل:
+> **HTTPS المحلي (جهاز لوحي/LAN)**: يُعد `localhost` سياقًا آمنًا بالفعل. للوصول عبر LAN (جهاز لوحي)، أنشئ شهادة محلية وفعّل HTTPS لتمكين تشفير المتصفح + تشفير المفتاح أثناء النقل:
 > ```bash
-> ./scripts/gen-cert.sh 192.168.1.42   # mkcert si dispo, sinon openssl self-signed
+> ./scripts/gen-cert.sh 192.168.1.42   # mkcert إذا كان متوفرًا، وإلا self-signed عبر openssl
 > export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
-> npm run dev                          # Express + Vite en HTTPS
+> npm run dev                          # Express + Vite عبر HTTPS
 > ```
 
 ### متغيرات البيئة
 
 | المتغير | مطلوب | الافتراضي | الدور |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | اختياري | — | مفتاح API لـ Mistral (chat، OCR، STT، Voxtral TTS، agents، الإشراف). إذا كان غائبًا، يُدخل المستخدم مفتاحه في التطبيق (مخزّن في المتصفح، وليس على الخادم أبدًا) |
+| `MISTRAL_API_KEY` | اختياري | — | مفتاح Mistral API (chat، OCR، STT، TTS Voxtral، agents، moderation). إذا كان مفقودًا، يُدخل المستخدم مفتاحه داخل التطبيق (مخزن في المتصفح، وليس على الخادم أبدًا) |
 | `EUREKAI_REQUIRE_USER_KEY` | اختياري | `false` | `true` → يعطّل fallback على `MISTRAL_API_KEY` لطلبات الذكاء الاصطناعي (يجب على كل مستخدم تقديم مفتاحه). مفيد على نسخة مكشوفة للعامة |
-| `HTTPS_KEY` / `HTTPS_CERT` | اختياري | — | مسارات مفتاح/شهادة TLS (راجع `scripts/gen-cert.sh`) → يقدّم كلٌّ من Express وVite عبر HTTPS (secure context للـ LAN/اللوحي) |
+| `HTTPS_KEY` / `HTTPS_CERT` | اختياري | — | مسارات مفتاح/شهادة TLS (راجع `scripts/gen-cert.sh`) → يقدم Express وVite عبر HTTPS (secure context LAN/جهاز لوحي) |
 | `PORT` | اختياري | `3000` | منفذ HTTP للواجهة الخلفية Express |
-| `NODE_ENV` | اختياري | `development` | إذا كانت `production` → يقدّم Express الواجهة الأمامية من `dist/` (وإلا من `public/`) |
-| `SONAR_TOKEN` | اختياري في CI | — | يُستخدم فقط من قبل سير عمل GitHub Actions SonarCloud |
+| `NODE_ENV` | اختياري | `development` | إذا كان `production` → يقدّم Express الواجهة الأمامية من `dist/` (وإلا `public/`) |
+| `SONAR_TOKEN` | اختياري CI | — | يُستخدم فقط من قبل workflow الخاص بـ GitHub Actions SonarCloud |
 
 ### الاختبارات، جودة الشيفرة والمساهمة
 
@@ -273,9 +303,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git Hooks (Husky)** : يشغّل `pre-commit` `npm test`، ويشغّل `pre-push` `npm run security`. وكلاهما يمنع commit/push في حال الفشل.
+**خطافات Git (Husky)**: يُشغّل `pre-commit` بالتتابع `scripts/pre-commit-fast.sh` (التعارضات، الملفات الكبيرة، shellcheck)، ثم `lint-staged` ثم `npm test`؛ ويُشغّل `pre-push` أولًا بوابة `npm audit` (تحظر عند وجود ثغرة حرجة متعدية، راجع `scripts/audit-verdict.mjs`) ثم `npm run security`. جميعها تمنع commit/push عند الفشل.
 
-**الأدوات الخارجية المطلوبة (اختيارية لكن يستخدمها `pretest` / `npm run security`)** :
+**الأدوات الخارجية المطلوبة (اختيارية لكنها مستخدمة من قبل `pretest` / `npm run security`)**:
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -285,13 +315,13 @@ pipx install lizard          # ou : pipx run lizard
 ./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
 ```
 
-من دون هذه الأدوات، يفشل `npm test` في `pretest` (lizard غير موجود) ويفشل `npm run security` (opengrep غير موجود). عندها تمنع hooks الخاصة بـ husky commit/push.
+بدون هذه الأدوات، يفشل `npm test` عند `pretest` (لأن lizard غير موجود) ويفشل `npm run security` (لأن opengrep غير موجود). عندها تحظر خطافات husky عملية commit/push.
 
 ---
 
-## النشر باستخدام حاوية
+## النشر باستخدام الحاوية
 
-تُنشر الصورة على **GitHub Container Registry** :
+تُنشر الصورة على **GitHub Container Registry**:
 
 ```bash
 # Télécharger l'image
@@ -307,7 +337,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`** هو علم Podman rootless يضبط أذونات وحدة التخزين تلقائيًا.
+> **`:U`** هو flag في Podman rootless يضبط أذونات الحجم تلقائيًا.
 
 ```bash
 # Build local
@@ -439,91 +469,91 @@ src/                      — Frontend (Vite + Handlebars)
     theme.css             — Variables de thème personnalisées
 
 public/assets/            — Ressources statiques (logo, avatars, schémas architecture)
-docs/                     — Notes internes (inventaire prompts, audits)
-scripts/                  — Tooling : check-deps, check-security, check-complexity, install-opengrep, translate-readme, publish-ghcr, update-pricing
+docs/                     — Notes internes (inventaire prompts, audits, prompts des diagrammes) + screenshots du README
+scripts/                  — Tooling : check-deps, check-models, check-security, check-complexity, gen-cert, install-opengrep, translate-readme, publish-ghcr, update-pricing
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **للمساهمين من الذكاء الاصطناعي** : راجع [`CLAUDE.md`](CLAUDE.md) للحصول على سياق معماري مفصل، والقواعد الإلزامية (anti-leak prompts، رموز الأخطاء، تتبّع التكاليف) والمطبات المعروفة (Lizard CCN، Opengrep، Codacy/Semgrep migration).
+> **للمساهمين من الذكاء الاصطناعي**: راجع [`CLAUDE.md`](CLAUDE.md) للحصول على سياق معماري مفصّل، والقواعد الإلزامية (anti-leak prompts، أكواد الأخطاء، cost tracking) والمصائد المعروفة (Lizard CCN، Opengrep، ترحيل Codacy/Semgrep).
 
 ---
 
 ## مرجع API
 
-### الإعداد
-| الطريقة | نقطة النهاية | الوصف |
+### الإعدادات
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `GET` | `/api/config` | الإعداد الحالي |
-| `PUT` | `/api/config` | تعديل الإعداد (النماذج، الأصوات، نموذج TTS) |
-| `GET` | `/api/config/status` | حالة واجهات API: `mistral` (مفتاح Mistral محدد)، `ttsAvailable` (اسم بديل لـ `mistral`، وMistral Voxtral هو مزود TTS الوحيد) |
-| `POST` | `/api/config/reset` | إعادة تعيين الإعداد إلى الافتراضي |
-| `GET` | `/api/config/voices` | عرض أصوات Mistral TTS (اختياري `?lang=fr`) |
-| `GET` | `/api/moderation-categories` | فئات الإشراف المتاحة + الإعدادات الافتراضية حسب العمر |
-| `POST` | `/api/providers/mistral/validate` | التحقق من مفتاح Mistral الذي أدخله المستخدم — دائمًا 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`)، بلا fallback env |
+| `GET` | `/api/config` | الإعدادات الحالية |
+| `PUT` | `/api/config` | تعديل الإعدادات (النماذج، الصوت، نموذج TTS) |
+| `GET` | `/api/config/status` | حالة APIs: `mistral` (مفتاح Mistral مُعرّف)، `ttsAvailable` (اسم بديل لـ `mistral`، وMistral Voxtral هو مزوّد TTS الوحيد) |
+| `POST` | `/api/config/reset` | إعادة الإعدادات إلى الافتراضي |
+| `GET` | `/api/config/voices` | سرد أصوات Mistral TTS (اختياري `?lang=fr`) |
+| `GET` | `/api/moderation-categories` | فئات المراقبة المتاحة + الافتراضيات حسب العمر |
+| `POST` | `/api/providers/mistral/validate` | التحقق من مفتاح Mistral الذي أدخله المستخدم — دائمًا 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`)، بلا fallback من env |
 
 ### الملفات الشخصية
-| الطريقة | نقطة النهاية | الوصف |
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `GET` | `/api/profiles` | عرض جميع الملفات الشخصية |
+| `GET` | `/api/profiles` | سرد جميع الملفات الشخصية |
 | `POST` | `/api/profiles` | إنشاء ملف شخصي |
-| `PUT` | `/api/profiles/:id` | تعديل ملف شخصي (يُشترط PIN لمن هم دون 15 عامًا) |
-| `DELETE` | `/api/profiles/:id` | حذف ملف شخصي + cascade للمشاريع `{pin?}` → `{ok, deletedProjects}` |
+| `PUT` | `/api/profiles/:id` | تعديل ملف شخصي (مطلوب PIN لمن هم < 15 سنة) |
+| `DELETE` | `/api/profiles/:id` | حذف ملف شخصي + cascade المشاريع `{pin?}` → `{ok, deletedProjects}` |
 
 ### المشاريع
-| الطريقة | نقطة النهاية | الوصف |
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `GET` | `/api/projects` | عرض المشاريع (`?profileId=` اختياري) |
+| `GET` | `/api/projects` | سرد المشاريع (`?profileId=` اختياري) |
 | `POST` | `/api/projects` | إنشاء مشروع `{name, profileId}` |
 | `GET` | `/api/projects/:pid` | تفاصيل المشروع |
-| `PUT` | `/api/projects/:pid` | إعادة تسمية `{name}` |
+| `PUT` | `/api/projects/:pid` | إعادة التسمية `{name}` |
 | `DELETE` | `/api/projects/:pid` | حذف المشروع |
-| `GET` | `/api/projects/:pid/events` | تدفق SSE فوري (`event: generation`) لانتقالات التوليد (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
+| `GET` | `/api/projects/:pid/events` | تيار SSE في الوقت الحقيقي (`event: generation`) لانتقالات التوليد (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
 
 ### المصادر
-| الطريقة | نقطة النهاية | الوصف |
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | استيراد ملفات multipart (OCR لملفات JPG/PNG/PDF، وقراءة مباشرة لـ TXT/MD) |
+| `POST` | `/api/projects/:pid/sources/upload` | استيراد ملفات multipart (OCR لـ JPG/PNG/PDF، وقراءة مباشرة لـ TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | نص حر `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | صوت STT (audio multipart) |
-| `POST` | `/api/projects/:pid/sources/websearch` | Scraping لعنوان URL أو بحث ويب `{query}` — يُرجع مصفوفة من المصادر |
+| `POST` | `/api/projects/:pid/sources/websearch` | URL scraping أو البحث الويب `{query}` — يُرجع مصفوفة من المصادر |
 | `DELETE` | `/api/projects/:pid/sources/:sid` | حذف مصدر |
-| `POST` | `/api/projects/:pid/moderate` | إخضاع `{text}` للإشراف |
+| `POST` | `/api/projects/:pid/moderate` | Moderation `{text}` |
 | `POST` | `/api/projects/:pid/detect-consigne` | اكتشاف تعليمات المراجعة |
 
 ### التوليد
-| الطريقة | نقطة النهاية | الوصف |
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generate/summary` | بطاقة مراجعة |
-| `POST` | `/api/projects/:pid/generate/flashcards` | بطاقات تعليمية |
-| `POST` | `/api/projects/:pid/generate/quiz` | اختبار QCM |
+| `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
+| `POST` | `/api/projects/:pid/generate/quiz` | Quiz QCM |
 | `POST` | `/api/projects/:pid/generate/fill-blank` | نصوص ذات فراغات |
-| `POST` | `/api/projects/:pid/generate/dictation` | إملاء (كلمات + جمل-مثال + قواعد، ملف audio TTS واحد لكل كلمة؛ ويُقترح أيضًا من قِبل auto-router) |
-| `POST` | `/api/projects/:pid/generate/podcast` | بودكاست |
-| `POST` | `/api/projects/:pid/generate/image` | صورة توضيحية |
-| `POST` | `/api/projects/:pid/generate/quiz-vocal` | اختبار صوتي |
+| `POST` | `/api/projects/:pid/generate/dictation` | Dictée (كلمات + جمل أمثلة + قواعد، ملف صوتي TTS واحد لكل كلمة؛ وتُقترح أيضًا بواسطة auto-router) |
+| `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
+| `POST` | `/api/projects/:pid/generate/image` | Illustration |
+| `POST` | `/api/projects/:pid/generate/quiz-vocal` | Quiz صوتي |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | مراجعة تكيفية `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/remediation-summary` | بطاقة تذكير موجهة إلى الأسئلة التي أُخطئ فيها في اختبار `{generationId, weakQuestions}` — تُستدعى بالتوازي مع `quiz-review` بواسطة الزر «التدرّب على أخطائي» |
-| `POST` | `/api/projects/:pid/generate/route` | تحليل التوجيه (خطة المولّدات التي يجب تشغيلها) — يعيد `{plan, costDelta}` (تكلفة التوجيه فقط) |
-| `POST` | `/api/projects/:pid/generate/auto` | التوليد التلقائي في الخلفية (التوجيه + 8 أنواع: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). يُنفَّذ بالتوازي — يفترض tier من Mistral مع rate-limit ≥ 8 طلبات متزامنة؛ وإلا فقد تعود عدة 429 في `failedSteps`. |
+| `POST` | `/api/projects/:pid/generate/remediation-summary` | بطاقة تذكير موجهة إلى الأسئلة الخاطئة في quiz `{generationId, weakQuestions}` — تُستدعى بالتوازي مع `quiz-review` بواسطة زر «التدرب على أخطائي» |
+| `POST` | `/api/projects/:pid/generate/route` | تحليل التوجيه (خطة المولدات التي يجب تشغيلها) — يُرجع `{plan, costDelta}` (كلفة التوجيه وحده) |
+| `POST` | `/api/projects/:pid/generate/auto` | توليد تلقائي من الواجهة الخلفية (routing + 8 أنواع: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). التنفيذ متوازٍ — يفترض tier من Mistral بحدّ rate-limit ≥ 8 طلبات متزامنة؛ وإلا فقد تظهر عدة 429 داخل `failedSteps`. |
 
-جميع مسارات التوليد تقبل `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. كما يتطلب `quiz-review` و`remediation-summary` أيضًا `{generationId, weakQuestions}`.
+جميع مسارات التوليد تقبل `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. كما أن `quiz-review` و`remediation-summary` يتطلبان أيضًا `{generationId, weakQuestions}`.
 
-### CRUD التوليدات
-| الطريقة | نقطة النهاية | الوصف |
+### CRUD للتوليدات
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | إرسال إجابات الاختبار `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | إرسال إجابات quiz `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | إرسال إجابات النصوص ذات الفراغات `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | إرسال إجابات الإملاء `{answers}` (تصحيح صارم من الخادم) |
+| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | إرسال إجابات dictée `{answers}` (تقييم صارم على الخادم) |
 | `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | التحقق من إجابة شفهية (audio + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | قراءة TTS بصوت عالٍ (البطاقات/البطاقات التعليمية) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | قراءة TTS بصوت عالٍ (البطاقات/flashcards) |
 | `POST` | `/api/projects/:pid/generations/:gid/cancel` | إلغاء توليد جارٍ (المسار الوحيد لإلغاء pending) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | إعادة تسمية `{title}` |
+| `PUT` | `/api/projects/:pid/generations/:gid` | إعادة التسمية `{title}` |
 | `DELETE` | `/api/projects/:pid/generations/:gid` | حذف التوليد |
 
 ### الدردشة
-| الطريقة | نقطة النهاية | الوصف |
+| الطريقة | Endpoint | الوصف |
 |---|---|---|
-| `GET` | `/api/projects/:pid/chat` | استرجاع سجل الدردشة |
+| `GET` | `/api/projects/:pid/chat` | جلب سجل الدردشة |
 | `POST` | `/api/projects/:pid/chat` | إرسال رسالة `{message, lang, ageGroup}` |
 | `DELETE` | `/api/projects/:pid/chat` | مسح سجل الدردشة |
 
@@ -533,31 +563,31 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 | القرار | المبرر |
 |---|---|
-| **Alpine.js بدلًا من React/Vue** | بصمة صغيرة جدًا، وتفاعلية خفيفة مع TypeScript المُجمَّع بواسطة Vite. مثالي لـ hackathon حيث السرعة مهمة. |
-| **الاحتفاظ في ملفات JSON** | من دون أي تبعية، وبداية فورية. لا توجد قاعدة بيانات يجب إعدادها — نبدأ وانطلق. |
-| **Vite + Handlebars** | أفضل ما في العالمين: HMR سريع للتطوير، وHTML partials لتنظيم الشيفرة، وTailwind JIT. |
-| **Prompts مركزية** | جميع Prompts الذكاء الاصطناعي في `prompts.ts` — سهل التكرار والاختبار والتكييف حسب اللغة/الفئة العمرية. |
-| **نظام متعدد التوليدات** | كل توليد هو كائن مستقل مع معرّف خاص به — يتيح عدة بطاقات مراجعة، واختبارات، وغيرها لكل درس. |
-| **Prompts ملائمة للعمر** | 4 فئات عمرية بمفردات وتعقيد ونبرة مختلفة — المحتوى نفسه يعلّم بشكل مختلف حسب المتعلم. |
-| **وظائف قائمة على Agents** | توليد الصور والبحث على الويب يستخدمان Agents مؤقتة من Mistral — دورة حياة نظيفة مع تنظيف تلقائي. |
-| **Scraping ذكي لعناوين URL** | حقل واحد يقبل عناوين URL وكلمات مفتاحية مختلطة — تُستخرج عناوين URL عبر Readability (الصفحات الثابتة) مع fallback إلى Lightpanda (صفحات JS/SPA)، بينما تؤدي الكلمات المفتاحية إلى تشغيل Agent Mistral web_search. كل نتيجة تُنشئ مصدرًا مستقلًا. |
-| **TTS بنسبة 100% من Mistral** | Mistral Voxtral TTS (لا حاجة إلى مفتاح إضافي بعد `MISTRAL_API_KEY`) — تحويل كلام مدمج في سلسلة التكلفة وفي حل الصوت حسب اللغة. |
+| **Alpine.js بدل React/Vue** | بصمة صغيرة جدًا، وتفاعلية خفيفة مع TypeScript مُترجم بواسطة Vite. مثالي لـ hackathon حيث السرعة مهمة. |
+| **الاستمرارية عبر ملفات JSON** | بلا تبعيات، وبدء فوري. لا توجد قاعدة بيانات يجب إعدادها — نبدأ وننطلق. |
+| **Vite + Handlebars** | أفضل ما في العالمين: HMR سريع للتطوير، وpartials HTML لتنظيم الشيفرة، وTailwind JIT. |
+| **Prompts مركزية** | جميع prompts الخاصة بالذكاء الاصطناعي موجودة في `prompts.ts` — يسهل تكرارها واختبارها وتكييفها حسب اللغة/الفئة العمرية. |
+| **نظام متعدد التوليدات** | كل توليد كائن مستقل له ID خاص به — يتيح عدة بطاقات مراجعة، وquiz، إلخ، لكل درس. |
+| **Prompts مكيّفة حسب العمر** | 4 مجموعات عمرية بمفردات وتعقيد ونبرة مختلفة — المحتوى نفسه يعلّم بشكل مختلف حسب المتعلم. |
+| **ميزات مبنية على Agents** | توليد الصور والبحث الويب يستخدمان Agents Mistral مؤقتة — دورة حياة نظيفة مع تنظيف تلقائي. |
+| **استخلاص ذكي لـ URL** | حقل واحد يقبل URLs وكلمات مفتاحية مختلطة — تُستخلص URLs عبر Readability (الصفحات الثابتة) مع fallback Lightpanda (صفحات JS/SPA)، أما الكلمات المفتاحية فتفعّل Agent Mistral web_search. كل نتيجة تنشئ مصدرًا مستقلاً. |
+| **TTS 100% Mistral** | Mistral Voxtral TTS (لا حاجة إلى مفتاح إضافي بعد `MISTRAL_API_KEY`) — توليد صوت مدمج في سلسلة الكلفة وفي حلّ الصوت حسب اللغة. |
 
 ---
 
-## الاعتمادات والشكر
+## الشكر والتقدير
 
-- **[Mistral AI](https://mistral.ai)** — نماذج ذكاء اصطناعي (Large، OCR، Voxtral STT، Voxtral TTS، Moderation، Small) + Worldwide Hackathon
+- **[Mistral AI](https://mistral.ai)** — نماذج الذكاء الاصطناعي (Large، OCR، Voxtral STT، Voxtral TTS، Moderation، Small) + Worldwide Hackathon
 - **[Alpine.js](https://alpinejs.dev)** — إطار تفاعلي خفيف
-- **[TailwindCSS](https://tailwindcss.com)** — إطار CSS utility
+- **[TailwindCSS](https://tailwindcss.com)** — إطار CSS أدواتي
 - **[Vite](https://vitejs.dev)** — أداة بناء للواجهة الأمامية
 - **[Lucide](https://lucide.dev)** — مكتبة أيقونات
 - **[Marked](https://marked.js.org)** — محلل Markdown
 - **[Readability](https://github.com/mozilla/readability)** — استخراج محتوى الويب (تقنية Firefox Reader View)
 - **[Lightpanda](https://lightpanda.io)** — متصفح headless فائق الخفة لاستخلاص صفحات JS/SPA
-- **[Luciole](https://luciole-vision.com)** — خط مصمم للقراء ضعاف البصر، © Laurent Bourcellier & Jonathan Perez، [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (خيار «راحة القراءة» في الملفات الشخصية)
+- **[Luciole](https://luciole-vision.com)** — خطّ صُمّم للقرّاء ضعاف البصر، © Laurent Bourcellier & Jonathan Perez، [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (خيار «راحة القراءة» في الملفات الشخصية)
 
-أُطلق خلال Mistral AI Worldwide Hackathon (مارس 2026)، وطُوِّر بالكامل بواسطة الذكاء الاصطناعي باستخدام [Claude Code](https://code.claude.com/)، [Codex](https://openai.com/codex/) و[Gemini CLI](https://geminicli.com/).
+بدأ خلال Mistral AI Worldwide Hackathon (مارس 2026)، وطُوِّر بالكامل بواسطة الذكاء الاصطناعي مع [Claude Code](https://code.claude.com/)، [Codex](https://openai.com/codex/) و[Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -565,8 +595,8 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 **Julien LS** — [contact@jls42.org](mailto:contact@jls42.org)
 
-## الرخصة
+## الترخيص
 
-[AGPL-3.0](LICENSE) — حقوق النشر (C) 2026 Julien LS
+[AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**مقالة مترجمة من الفرنسية إلى العربية باستخدام gpt-5.4-mini.**
+**مقال مترجم من الفرنسية إلى العربية باستخدام gpt-5.4-mini.**

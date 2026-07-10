@@ -48,6 +48,37 @@ Le [prototype initial](https://github.com/jls42/worldwide-hackathon.mistral.ai) 
 
 ---
 
+## Aperçu
+
+<p align="center">
+  <img src="docs/screenshots/eurekai-tour.gif" alt="Tour guidé d'EurekAI : sources, fiche, quiz, flashcards, illustrations" width="820" />
+</p>
+
+| | |
+|---|---|
+| ![Tableau de bord](docs/screenshots/dashboard.webp)<br>**Tableau de bord** — générations récentes, coût estimé par carte et total projet, bouton « Auto — Magie ! » | ![Sources](docs/screenshots/sources.webp)<br>**Sources** — import photo/PDF/texte/voix/web, génération en un clic, détection de consigne |
+
+Chaque source importée affiche son [score de confiance OCR, sa modération et son coût estimé](docs/screenshots/sources-list.webp).
+
+### Les composants en action
+
+| | |
+|---|---|
+| ![Fiche de révision](docs/screenshots/notes.gif)<br>**Fiche de révision** — points clés, vocabulaire, citations sourcées, lecture audio par section | ![Quiz](docs/screenshots/quiz.gif)<br>**Quiz QCM** — feedback immédiat avec explication, navigation pas-à-pas |
+| ![Flashcards](docs/screenshots/flashcards.gif)<br>**Flashcards** — carte à retourner puis auto-évaluation « je savais / je ne savais pas » | ![Textes à trous](docs/screenshots/fillblank.gif)<br>**Textes à trous** — indice à la demande, validation tolérante |
+| ![Dictée](docs/screenshots/dictation.gif)<br>**Dictée** — mot dicté en audio, correction stricte lettre à lettre | ![Quiz vocal](docs/screenshots/vocal-quiz.gif)<br>**Quiz vocal** — question lue à voix haute, réponse au micro |
+| ![Podcast](docs/screenshots/podcast.gif)<br>**Podcast** — mini-podcast 2 voix, script dialogué consultable | ![Illustrations](docs/screenshots/illustrations.gif)<br>**Illustrations** — images éducatives générées par Agent |
+| ![Tuteur IA](docs/screenshots/chat.gif)<br>**Tuteur IA** — chat ancré dans les documents du cours, réponses expliquées, peut générer quiz et flashcards | |
+
+### Prise en main
+
+| | |
+|---|---|
+| ![Choix du profil](docs/screenshots/login.gif)<br>**Choix du profil** — chaque enfant a son espace, son avatar et sa langue | ![Création de profil](docs/screenshots/profile-create.gif)<br>**Création de profil** — âge, avatar, PIN parental pour les moins de 15 ans |
+| ![Création de cours](docs/screenshots/course.gif)<br>**Création de cours** — un projet par leçon, prêt à recevoir des sources | ![Réglages](docs/screenshots/settings.gif)<br>**Réglages** — statut API, choix des modèles IA avec tarifs affichés |
+
+---
+
 ## Fonctionnalités
 
 | | Fonctionnalité | Description |
@@ -153,7 +184,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Système multi-profils
 
 - Profils multiples avec nom, âge, avatar, préférences de langue
-- **Voix par profil** (`Profile.mistralVoices?: { host, guest }`) — chaque enfant peut avoir sa paire de voix podcast/quiz vocal
+- **Voix par profil** (`Profile.mistralVoices?: { host?, guest? }` — chaque rôle est optionnel) — chaque enfant peut avoir sa paire de voix podcast/quiz vocal
 - **Thème par profil** (`Profile.theme: 'dark' | 'light'`) — bascule automatique au changement de profil, persistée côté backend
 - Projets liés aux profils via `profileId`
 - Suppression en cascade : supprimer un profil supprime tous ses projets
@@ -274,7 +305,7 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Hooks Git (Husky)** : `pre-commit` lance `npm test`, `pre-push` lance `npm run security`. Les deux bloquent le commit/push en cas d'échec.
+**Hooks Git (Husky)** : `pre-commit` enchaîne `scripts/pre-commit-fast.sh` (conflits, gros fichiers, shellcheck), `lint-staged` puis `npm test` ; `pre-push` exécute d'abord un gate `npm audit` (bloque sur vulnérabilité critique transitive, cf. `scripts/audit-verdict.mjs`) puis `npm run security`. Tous bloquent le commit/push en cas d'échec.
 
 **Outils externes requis (optionnels mais utilisés par `pretest` / `npm run security`)** :
 
@@ -440,8 +471,8 @@ src/                      — Frontend (Vite + Handlebars)
     theme.css             — Variables de thème personnalisées
 
 public/assets/            — Ressources statiques (logo, avatars, schémas architecture)
-docs/                     — Notes internes (inventaire prompts, audits)
-scripts/                  — Tooling : check-deps, check-security, check-complexity, install-opengrep, translate-readme, publish-ghcr, update-pricing
+docs/                     — Notes internes (inventaire prompts, audits, prompts des diagrammes) + screenshots du README
+scripts/                  — Tooling : check-deps, check-models, check-security, check-complexity, gen-cert, install-opengrep, translate-readme, publish-ghcr, update-pricing
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
