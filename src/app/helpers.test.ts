@@ -1593,6 +1593,28 @@ describe('toggle popovers (tactile/clavier)', () => {
     expect(ctx._metaPopoverLines).toEqual(['nav.quiz · ~$0.0100']);
     expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.5100');
   });
+
+  it("showProjectCostPopover n'ouvre rien sans totalCost", () => {
+    const ctx = makeCtx();
+    ctx.currentProject = null;
+    callWith<void>(helpers.showProjectCostPopover, ctx, mockEl);
+    expect(ctx._metaPopoverPos ?? null).toBeNull();
+  });
+
+  it('toggleOcrPopover ouvre le popover de confiance OCR', () => {
+    const ctx = makeCtx();
+    const src = { ocrConfidence: { average: 0.95 } };
+    callWith<void>(helpers.toggleOcrPopover, ctx, mockEl, src);
+    expect(ctx._metaPopoverTitle).toBe('ocr.confidence');
+    expect(ctx._metaPopoverPos).not.toBeNull();
+  });
+
+  it('toggleModerationPopover ouvre le popover de modération', () => {
+    const ctx = makeCtx();
+    const src = { moderation: { status: 'safe', categories: {} } };
+    callWith<void>(helpers.toggleModerationPopover, ctx, mockEl, src);
+    expect(ctx._metaPopoverPos).not.toBeNull();
+  });
 });
 
 describe('costEntryLabel', () => {

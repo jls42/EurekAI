@@ -704,3 +704,41 @@ describe('clé Mistral navigateur (méthodes config)', () => {
     expect(ctx.keyTestStatus).toBe('network');
   });
 });
+
+// --- openSettings (gate PIN parental) ---
+
+describe('openSettings', () => {
+  const makeOpenCtx = (overrides: any = {}) =>
+    makeContext({
+      $refs: { settingsDialog: { showModal: vi.fn(), close: vi.fn() } },
+      refreshIcons: vi.fn(),
+      requireProfilePin: vi.fn((_id: string, cb: () => void) => cb()),
+      currentProfile: null,
+      ...overrides,
+    });
+
+  it('ouvre directement le dialog sans profil courant', () => {
+    const ctx = makeOpenCtx();
+    config.openSettings.call(ctx);
+    expect(ctx.requireProfilePin).not.toHaveBeenCalled();
+    expect(ctx.$refs.settingsDialog.showModal).toHaveBeenCalled();
+    expect(ctx.refreshIcons).toHaveBeenCalled();
+  });
+
+  it('passe par requireProfilePin quand un profil est actif', () => {
+    const ctx = makeOpenCtx({ currentProfile: { id: 'p1' } });
+    config.openSettings.call(ctx);
+    expect(ctx.requireProfilePin).toHaveBeenCalledWith('p1', expect.any(Function));
+    // requireProfilePin mocké exécute le callback → le dialog s'ouvre
+    expect(ctx.$refs.settingsDialog.showModal).toHaveBeenCalled();
+  });
+
+  it("n'ouvre pas le dialog si le PIN n'est pas validé", () => {
+    const ctx = makeOpenCtx({
+      currentProfile: { id: 'p1' },
+      requireProfilePin: vi.fn(), // n'appelle jamais le callback (PIN refusé)
+    });
+    config.openSettings.call(ctx);
+    expect(ctx.$refs.settingsDialog.showModal).not.toHaveBeenCalled();
+  });
+});
