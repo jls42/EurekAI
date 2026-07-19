@@ -1,6 +1,6 @@
 <dialog
   x-ref="consigneDialog"
-  class="rounded-dialog p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] shadow-float glass overflow-hidden"
+  class="rounded-dialog p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] shadow-float bg-surface overflow-hidden"
 >
   <template x-if="consigne && consigne.found">
     <div class="flex flex-col max-h-[calc(80vh-3rem)]">
@@ -22,7 +22,7 @@
       <p
         x-show="consigne.text"
         class="text-body-sm text-text-primary mb-3 shrink-0"
-        x-text="consigne.text"
+        x-text="stripMarkdown(consigne.text)"
       ></p>
       <!-- Key topics — only this part scrolls -->
       <div class="overflow-y-auto mb-4 min-h-0">
@@ -54,7 +54,7 @@
         </button>
         <button
           @click="$refs.consigneDialog?.close()"
-          class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-success-dark text-white hover:bg-success-dark/90 card-lift btn-press focus-ring"
+          class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-success-dark text-text-inverted hover:bg-success-dark/90 card-lift btn-press focus-ring"
           x-text="t('consigne.understood')"
         ></button>
       </div>

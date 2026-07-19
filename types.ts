@@ -454,6 +454,8 @@ export interface ProjectData {
   consigne?: Consigne;
   chat?: ChatHistory;
   costLog?: CostEntry[];
+  /** Somme du costLog calculée par GET /projects/:pid — jamais persistée sur disque. */
+  totalCost?: number;
 }
 
 // --- Chat ---

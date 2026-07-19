@@ -6,9 +6,9 @@
     <div
       class="pointer-events-auto rounded-card px-4 py-3 shadow-float flex items-start gap-3 text-body-sm animate-toast-in"
       :class="{
-        'bg-danger-dark text-white': toast.type === 'error',
-        'bg-success-dark text-white': toast.type === 'success',
-        'bg-primary-dark text-white': toast.type === 'info',
+        'bg-danger-dark text-text-inverted': toast.type === 'error',
+        'bg-success-dark text-text-inverted': toast.type === 'success',
+        'bg-primary-dark text-text-inverted': toast.type === 'info',
         'bg-warning text-text-primary': toast.type === 'warning'
       }"
       :role="toast.type === 'error' ? 'alert' : 'status'"

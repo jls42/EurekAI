@@ -58,6 +58,11 @@ typography:
     fontSize: "16px"
     fontWeight: 600
     lineHeight: 1.6
+  accessibility:
+    fontFamily: "Luciole, Manrope, sans-serif"
+    fontSize: "18px"
+    fontWeight: 400
+    lineHeight: 1.7
 rounded:
   button: "1.25rem"
   card: "1.75rem"

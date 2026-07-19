@@ -17,18 +17,20 @@
   /* Primary */
   --color-primary-light: #d6f0ff;
   --color-primary: #1cb0f6;
-  --color-primary-dark: #0a8ad0;
+  --color-primary-dark: #076da6;
 
-  /* Semantic */
+  /* Semantic — contrainte AA : chaque -dark sert de texte sur son fond -light ET
+     de fond sous text-inverted → la valeur light doit tenir 4.5:1 dans les deux
+     rôles (Règle de l'Aplat Vif, DESIGN.md). */
   --color-success-light: #d7ffb8;
   --color-success: #58cc02;
-  --color-success-dark: #3ea300;
+  --color-success-dark: #2e7d0a;
   --color-warning-light: #fff4cc;
   --color-warning: #ffc800;
-  --color-warning-dark: #e5b400;
+  --color-warning-dark: #7a6000;
   --color-danger-light: #ffd6d6;
   --color-danger: #ff4b4b;
-  --color-danger-dark: #cc3333;
+  --color-danger-dark: #b32424;
   --color-accent-light: #e8d5f5;
   --color-accent: #8549ba;
   --color-accent-dark: #6b3a96;
@@ -51,6 +53,21 @@
   --color-gen-dictation: #0284c7;
   --color-gen-dictation-rgb: 2, 132, 199;
 
+  /* Gen -deep : variante AA de chaque catégorie — sert de fond sous
+     text-inverted ET de texte sur les fonds pâles /10-/15 (≥4.5:1 mesuré
+     dans les deux rôles ; en dark elles reprennent la valeur claire). */
+  --color-gen-summary-deep: #005f92;
+  --color-gen-flashcards-deep: #b8450c;
+  --color-gen-quiz-deep: #8549ba;
+  --color-gen-podcast-deep: #1b6b61;
+  --color-gen-quizvocal-deep: #b5432a;
+  --color-gen-image-deep: #c2185b;
+  --color-gen-fillblank-deep: #266e28;
+  --color-gen-dictation-deep: #0369a1;
+
+  /* Texte des chips de navigation inactives (AA sur canvas et category-bg) */
+  --color-chip-text: #595959;
+
   /* Confort de lecture (surchargées par profil via setProperty — cf.
      src/app/profiles.ts applyReadingComfortVars ; défauts = rendu actuel) */
   --reading-font: 'Manrope', sans-serif;
@@ -61,7 +78,7 @@
   /* Glass */
   --glass-bg: rgba(255, 255, 255, 0.72);
   --glass-border: rgba(229, 231, 235, 0.55);
-  --glass-dark-bg: rgba(10, 138, 208, 0.85);
+  --glass-dark-bg: rgba(7, 109, 166, 0.85);
 
   /* Shadows */
   --shadow-card: 0 2px 8px rgba(15, 24, 38, 0.06), 0 1px 2px rgba(15, 24, 38, 0.04);
@@ -136,6 +153,17 @@
   --color-gen-fillblank-rgb: 129, 199, 132;
   --color-gen-dictation: #38bdf8;
   --color-gen-dictation-rgb: 56, 189, 248;
+
+  --color-gen-summary-deep: #4fc3f7;
+  --color-gen-flashcards-deep: #ff9a5c;
+  --color-gen-quiz-deep: #b388d9;
+  --color-gen-podcast-deep: #5ec6b8;
+  --color-gen-quizvocal-deep: #ff9580;
+  --color-gen-image-deep: #f48fb1;
+  --color-gen-fillblank-deep: #81c784;
+  --color-gen-dictation-deep: #38bdf8;
+
+  --color-chip-text: #a8b3c7;
 
   --glass-bg: rgba(15, 26, 46, 0.75);
   --glass-border: rgba(61, 100, 160, 0.3);

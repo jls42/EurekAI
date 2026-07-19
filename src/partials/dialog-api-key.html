@@ -19,7 +19,7 @@
       <button
         type="button"
         @click="apiKeyScope = 'global'"
-        :class="apiKeyScope === 'global' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary'"
+        :class="apiKeyScope === 'global' ? 'bg-primary-dark text-text-inverted' : 'bg-gray-100 text-text-secondary'"
         class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors btn-press focus-ring"
         x-text="t('apiKey.scopeGlobal')"
       >
@@ -28,7 +28,7 @@
       <button
         type="button"
         @click="apiKeyScope = 'profile'"
-        :class="apiKeyScope === 'profile' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary'"
+        :class="apiKeyScope === 'profile' ? 'bg-primary-dark text-text-inverted' : 'bg-gray-100 text-text-secondary'"
         class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors btn-press focus-ring"
         x-text="t('apiKey.scopeProfile')"
       >
@@ -92,7 +92,7 @@
       <button
         @click="saveApiKey()"
         :disabled="!apiKeyInput.trim() || (keyStorageDegraded && !apiKeyConsentClear)"
-        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
         x-text="t('common.save')"
       ></button>
     </div>

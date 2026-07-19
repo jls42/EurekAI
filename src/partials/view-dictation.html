@@ -8,7 +8,7 @@
     <button
       @click="generate('dictation')"
       :disabled="sources.length === 0"
-      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-dictation/10 text-gen-dictation hover:bg-gen-dictation/20 disabled:opacity-50"
+      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-dictation/10 text-gen-dictation-deep hover:bg-gen-dictation/20 disabled:opacity-50"
     >
       <i data-lucide="plus" class="w-4 h-4"></i>
       <span x-text="t('dictation.new')"></span>
@@ -21,9 +21,9 @@
     class="text-center py-12"
   >
     <div
-      class="w-16 h-16 mx-auto mb-3 bg-sky-50 rounded-[1rem] border border-gen-dictation/20 flex items-center justify-center"
+      class="w-16 h-16 mx-auto mb-3 bg-gen-dictation/10 rounded-[1rem] border border-gen-dictation/20 flex items-center justify-center"
     >
-      <i data-lucide="spell-check" class="w-8 h-8 text-gen-dictation"></i>
+      <i data-lucide="spell-check" class="w-8 h-8 text-gen-dictation-deep"></i>
     </div>
     <p class="text-text-primary font-semibold mb-1" x-text="t('dictation.emptyTitle')"></p>
     <p
@@ -33,7 +33,7 @@
     <button
       x-show="sources.length === 0"
       @click="goToView('sources')"
-      class="bg-accent text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+      class="bg-accent text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
       x-text="t('common.addSources')"
     ></button>
   </div>
@@ -41,7 +41,7 @@
   <!-- Generation list -->
   <div class="space-y-3">
     <template x-for="gen in generationsByType('dictation')" :key="gen.id">
-      <div class="gen-card border-l-4 border-l-gen-dictation animate-slide-up">
+      <div class="gen-card animate-slide-up">
         {{> gen-card-header icon="spell-check" chipClass="icon-chip-dictation"
         colorClass="gen-dictation" hasScore=true}}
 
@@ -100,7 +100,7 @@
                   <div class="flex flex-wrap items-center gap-2 mb-4">
                     <button
                       @click="playWord()"
-                      class="bg-gen-dictation text-white px-4 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
+                      class="bg-gen-dictation-deep text-text-inverted px-4 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
                     >
                       <i data-lucide="volume-2" class="w-4 h-4"></i>
                       <span
@@ -143,7 +143,7 @@
                   <button
                     @click="checkAnswer()"
                     :disabled="!typed.trim()"
-                    class="bg-gen-dictation text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2 disabled:opacity-50"
+                    class="bg-gen-dictation-deep text-text-inverted px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2 disabled:opacity-50"
                   >
                     <i data-lucide="check-circle" class="w-5 h-5"></i>
                     <span x-text="t('step.check')"></span>
@@ -191,7 +191,7 @@
                   <div x-show="!isReviewing()" class="text-center mt-3">
                     <button
                       @click="nextQuestion()"
-                      class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
+                      class="bg-primary-dark text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
                     >
                       <span x-text="t('step.next')"></span>
                       <i data-lucide="arrow-right" class="w-4 h-4"></i>
@@ -223,7 +223,7 @@
                   <button
                     x-show="score < items().length"
                     @click="retryWrongWords()"
-                    class="bg-warning-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+                    class="bg-warning-dark text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
                     x-text="t('step.retryWrong')"
                   ></button>
                   <button

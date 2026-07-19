@@ -50,6 +50,12 @@ export const fr: Record<string, string> = {
   'gen.costTooltipSource': 'Estimation \u2014 {detail} \u00b7 Tarifs officiels Mistral',
   'gen.costTooltipFree': 'Estimation \u2014 Aucun appel API',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Audio',
+  'cost.route': 'Routage auto',
+  'cost.batch': 'Génération auto',
+  'cost.moderation': 'Modération',
+  'cost.consigne': 'Détection de consigne',
+  'cost.vocalAnswer': 'Réponse vocale',
   'gen.all': 'Tout générer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',
@@ -59,9 +65,9 @@ export const fr: Record<string, string> = {
   'a11y.selectSource': 'Sélectionner cette source',
   'a11y.editTitle': 'Modifier le titre',
   'gen.questionCount': 'Nombre :',
-  'gen.needsTts': 'Nécessite MISTRAL_API_KEY pour activer le TTS Voxtral',
+  'gen.needsTts': "Le son n'est pas activé — demande à un adulte de l'activer dans les Réglages",
   'gen.contextTooLarge':
-    'Contenu trop volumineux ({pct}% de la capacité du modèle). Sélectionnez moins de sources.',
+    'Contenu trop volumineux ({pct}% de la capacité du modèle). Sélectionne moins de sources.',
 
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
@@ -84,7 +90,7 @@ export const fr: Record<string, string> = {
   'notif.generationCancelled': '{type} annulé(e)',
   'notif.crossTabSyncInactive': 'Sync cross-onglets inactive',
   'errorCode.no_sources': 'Aucune source disponible',
-  'errorCode.auth_required': 'Cle API Mistral manquante ou invalide',
+  'errorCode.auth_required': 'Clé API Mistral manquante ou invalide',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
   'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',
@@ -150,6 +156,8 @@ export const fr: Record<string, string> = {
 
   // Settings
   'settings.title': 'Paramètres',
+  'settings.resetConfirm':
+    'Remettre tous les réglages par défaut ? Les modèles choisis et les préférences seront remplacés.',
   'settings.apiStatus': 'Statut API',
   'settings.aiModels': 'Moteurs IA',
   'settings.aiModel': 'Génération',
@@ -314,7 +322,7 @@ export const fr: Record<string, string> = {
   'quiz.incorrect': 'Mauvaise réponse',
   'quiz.youSaid': 'Tu as dit : {text}',
   'quiz.nextQuestion': 'Question suivante',
-  'quiz.verificationError': 'Erreur de vérification',
+  'quiz.verificationError': "Oups, je n'ai pas réussi à écouter ta réponse. On réessaie ?",
 
   // Chat view
   'chat.heading': 'Chat avec tes cours',
@@ -345,9 +353,8 @@ export const fr: Record<string, string> = {
   'podcast.emptyWithSources': 'Clique sur Nouveau podcast pour commencer',
   'podcast.script': 'Script',
   'podcast.lines': '({count} répliques)',
-  'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
-    'Configurez MISTRAL_API_KEY dans le fichier .env pour activer les podcasts audio',
+    "Le son n'est pas encore activé. Demande à un adulte de l'activer dans les Réglages !",
   'podcast.speakerHost': 'Animateur',
   'podcast.speakerGuest': 'Invité',
 
@@ -356,7 +363,6 @@ export const fr: Record<string, string> = {
   'image.new': 'Illustrer',
   'image.emptyTitle': "Pas encore d'illustration",
   'image.emptyWithSources': 'Génère une illustration éducative à partir de tes sources',
-  'image.prompt': 'Prompt utilisé',
 
   // Fill-in-the-blanks
   'fillBlank.heading': 'Textes à trous',
@@ -455,7 +461,7 @@ export const fr: Record<string, string> = {
   'toast.audioDone': 'Audio généré !',
   'toast.audioPartial': 'Audio partiel : certaines sections ont échoué',
   'toast.audioAuthRequired': 'Clé API Mistral invalide ou manquante',
-  'toast.audioQuotaExceeded': 'Quota TTS atteint, réessayez plus tard',
+  'toast.audioQuotaExceeded': 'Quota audio atteint — réessaie un peu plus tard',
   'toast.audioError': 'Erreur génération audio',
   'toast.genDeleted': 'Génération supprimée',
   'toast.settingsSaved': 'Paramètres sauvegardés',
@@ -467,7 +473,7 @@ export const fr: Record<string, string> = {
   'toast.cancelledGeneration': 'Génération annulée',
   'toast.cancelledOne': '{type} annulé(e)',
   'toast.cancelFailed': "Échec de l'annulation de {type}",
-  'toast.confirmActionFailed': "L'action a échoué — vérifiez la console pour le détail.",
+  'toast.confirmActionFailed': "Ça n'a pas marché. Réessaie !",
   'toast.scoreSaved': 'Score enregistré !',
   'toast.scoreError': 'Erreur enregistrement du score',
   'toast.remediationGenerated': "Fiche de rappel et quiz d'entraînement prêts !",
@@ -509,7 +515,9 @@ export const fr: Record<string, string> = {
   'profile.moderationOn': 'Contenu filtré (recommandé pour les enfants)',
   'profile.moderationOff': 'Modération désactivée',
   'profile.moderationCategories': 'Catégories de modération',
-  'profile.moderationCategoriesHint': 'Sélectionnez les catégories à bloquer',
+  'profile.moderationCategoriesHint': 'Choisis les catégories à bloquer',
+  'profile.parentSection': 'Espace parent',
+  'profile.parentSectionHint': 'Modération, chat IA et catégories — protégés par le code parent',
   'profile.moderationResetDefaults': 'Réinitialiser les défauts',
   'profile.chatToggle': 'Autoriser le chat IA',
   'profile.chatOn': 'Chat actif',

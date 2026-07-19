@@ -48,6 +48,12 @@ export const pt: Record<string, string> = {
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Áudio',
+  'cost.route': 'Roteamento automático',
+  'cost.batch': 'Geração automática',
+  'cost.moderation': 'Moderação',
+  'cost.consigne': 'Detecção de instruções',
+  'cost.vocalAnswer': 'Resposta por voz',
   'gen.all': 'Gerar tudo',
   'gen.voice': 'Ler em voz alta',
   'gen.websearch': 'Pesquisa na web',
@@ -57,7 +63,7 @@ export const pt: Record<string, string> = {
   'a11y.selectSource': 'Selecionar esta fonte',
   'a11y.editTitle': 'Editar o título',
   'gen.questionCount': 'Quantidade:',
-  'gen.needsTts': 'Requer MISTRAL_API_KEY para habilitar TTS Voxtral',
+  'gen.needsTts': 'O som não está ligado — peça a um adulto para ativá-lo nas Configurações',
   'gen.contextTooLarge':
     'Conteudo muito longo ({pct}% da capacidade do modelo). Selecione menos fontes.',
 
@@ -142,6 +148,8 @@ export const pt: Record<string, string> = {
   'confirm.generation': 'esta gera\u00e7\u00e3o',
 
   'settings.title': 'Configura\u00e7\u00f5es',
+  'settings.resetConfirm':
+    'Redefinir todas as configura\u00e7\u00f5es para o padr\u00e3o? Os modelos escolhidos e as prefer\u00eancias ser\u00e3o substitu\u00eddos.',
   'settings.apiStatus': 'Status da API',
   'settings.aiModels': 'Motores de IA',
   'settings.aiModel': 'Geração',
@@ -301,7 +309,7 @@ export const pt: Record<string, string> = {
   'quiz.incorrect': 'Incorreto',
   'quiz.youSaid': 'Voc\u00ea disse: {text}',
   'quiz.nextQuestion': 'Pr\u00f3xima quest\u00e3o',
-  'quiz.verificationError': 'Erro de verifica\u00e7\u00e3o',
+  'quiz.verificationError': 'Ops, n\u00e3o consegui ouvir sua resposta. Vamos tentar de novo?',
 
   'chat.heading': 'Converse sobre seus cursos',
   'chat.clear': 'Limpar',
@@ -330,9 +338,8 @@ export const pt: Record<string, string> = {
   'podcast.emptyWithSources': 'Clique em Novo podcast para come\u00e7ar',
   'podcast.script': 'Roteiro',
   'podcast.lines': '({count} falas)',
-  'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
-    'Configure MISTRAL_API_KEY no arquivo .env para habilitar podcasts com \u00e1udio',
+    'O som ainda n\u00e3o est\u00e1 ligado. Pe\u00e7a a um adulto para ativ\u00e1-lo nas Configura\u00e7\u00f5es!',
   'podcast.speakerHost': 'Apresentador',
   'podcast.speakerGuest': 'Convidado',
 
@@ -340,7 +347,6 @@ export const pt: Record<string, string> = {
   'image.new': 'Ilustrar',
   'image.emptyTitle': 'Nenhuma ilustra\u00e7\u00e3o ainda',
   'image.emptyWithSources': 'Gere uma ilustra\u00e7\u00e3o educativa a partir de suas fontes',
-  'image.prompt': 'Prompt utilizado',
 
   'fillBlank.heading': 'Preencher Lacunas',
   'fillBlank.new': 'Novo exerc\u00edcio de lacunas',
@@ -436,7 +442,7 @@ export const pt: Record<string, string> = {
   'toast.audioPartial': '\u00c1udio parcial: algumas se\u00e7\u00f5es falharam',
   'toast.audioError': 'Erro na gera\u00e7\u00e3o de \u00e1udio',
   'toast.audioAuthRequired': 'Chave da API Mistral inv\u00e1lida ou ausente',
-  'toast.audioQuotaExceeded': 'Quota TTS atingida, tente novamente mais tarde',
+  'toast.audioQuotaExceeded': 'Quota de áudio atingida — tente novamente daqui a pouco',
   'toast.genDeleted': 'Gera\u00e7\u00e3o exclu\u00edda',
   'toast.settingsSaved': 'Configura\u00e7\u00f5es salvas',
   'toast.settingsError': 'Erro ao salvar configura\u00e7\u00f5es',
@@ -447,7 +453,7 @@ export const pt: Record<string, string> = {
   'toast.cancelledGeneration': 'Gera\u00e7\u00e3o cancelada',
   'toast.cancelledOne': '{type} cancelado',
   'toast.cancelFailed': 'Falha ao cancelar {type}',
-  'toast.confirmActionFailed': 'A ação falhou — verifique a consola para detalhes.',
+  'toast.confirmActionFailed': 'Não deu certo. Tente de novo!',
   'toast.scoreSaved': 'Pontua\u00e7\u00e3o salva!',
   'toast.scoreError': 'Erro ao salvar pontua\u00e7\u00e3o',
   'toast.remediationGenerated': 'Ficha de revis\u00e3o e quiz de treino prontos!',
@@ -490,6 +496,9 @@ export const pt: Record<string, string> = {
   'profile.moderationOff': 'Modera\u00e7\u00e3o desabilitada',
   'profile.moderationCategories': 'Categorias de moderacao',
   'profile.moderationCategoriesHint': 'Selecione as categorias a bloquear',
+  'profile.parentSection': 'Área dos pais',
+  'profile.parentSectionHint':
+    'Moderação, chat de IA e categorias — protegidos pelo código dos pais',
   'profile.moderationResetDefaults': 'Restaurar padroes',
   'profile.chatToggle': 'Permitir chat com IA',
   'profile.chatOn': 'Chat habilitado',

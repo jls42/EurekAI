@@ -405,6 +405,8 @@ const moderationToneClass = function (this: AppContext, src: Source) {
 
 const showMetaPopover = function (this: AppContext, el: HTMLElement, config: MetaPopoverConfig) {
   this._metaPopoverPos = el.getBoundingClientRect();
+  this._metaPopoverAnchor = el;
+  this._metaPopoverShownAt = Date.now();
   this._metaPopoverTitle = config?.title || '';
   this._metaPopoverLines = config?.lines || [];
   this._metaPopoverLineClass = config?.lineClass || TEXT_TEXT_SECONDARY;
@@ -414,6 +416,7 @@ const showMetaPopover = function (this: AppContext, el: HTMLElement, config: Met
 
 const hideMetaPopover = function (this: AppContext) {
   this._metaPopoverPos = null;
+  this._metaPopoverAnchor = null;
   this._metaPopoverTitle = '';
   this._metaPopoverLines = [];
   this._metaPopoverLineClass = TEXT_TEXT_SECONDARY;
@@ -430,6 +433,56 @@ const metaPopoverStyle = function (this: AppContext) {
       : 'top:' + (pos.bottom + 4) + 'px';
   return vertical + ';left:' + pos.left + 'px';
 };
+
+/* Segment de route du costLog → clé i18n (jamais de clé technique brute
+   type "batch"/"key_points" dans le popover — principe « magie sans jargon »). */
+const COST_ROUTE_LABEL_KEYS: Record<string, string> = {
+  summary: 'nav.summary',
+  flashcards: 'nav.flashcards',
+  quiz: 'nav.quiz',
+  'quiz-vocal': 'nav.quiz-vocal',
+  podcast: 'nav.podcast',
+  'fill-blank': 'nav.fill-blank',
+  dictation: 'nav.dictation',
+  image: 'nav.image',
+  chat: 'nav.chat',
+  upload: 'nav.sources',
+  voice: 'sources.voice',
+  web: 'sources.web',
+  text: 'sources.text',
+  route: 'cost.route',
+  batch: 'cost.batch',
+  auto: 'cost.batch',
+  moderate: 'cost.moderation',
+  'detect-consigne': 'cost.consigne',
+  'vocal-answer': 'cost.vocalAnswer',
+};
+
+const COST_AUDIO_SECTION_KEYS: Record<string, string> = {
+  all: 'summary.audioAll',
+  intro: 'summary.audioIntro',
+  key_points: 'summary.audioKeyPoints',
+  fun_fact: 'summary.audioFunFact',
+  vocabulary: 'summary.audioVocabulary',
+};
+
+const costEntryLabel = function (this: AppContext, route: string): string {
+  const seg = route.split('/').pop() ?? route;
+  const audioKey = COST_AUDIO_SECTION_KEYS[seg];
+  if (audioKey) return this.t('cost.audio') + ' — ' + this.t(audioKey);
+  const labelKey = COST_ROUTE_LABEL_KEYS[seg];
+  return labelKey ? this.t(labelKey) : seg;
+};
+
+/* Nettoyage cosmétique du markdown produit par le LLM (texte affiché en x-text,
+   déjà échappé par Alpine — aucun rôle de sécurité ici). */
+const stripMarkdown = (text: string): string =>
+  text
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/`([^`]+)`/g, '$1');
 
 const showCostPopover = function (this: AppContext, el: HTMLElement, item: CostPopoverItem) {
   let lines: string[] = [];
@@ -465,6 +518,47 @@ const showModerationPopover = function (this: AppContext, el: HTMLElement, src: 
     lines: labels ? [labels] : [],
     lineClass: labels ? TEXT_TEXT_SECONDARY : this.moderationToneClass(src) + ' font-semibold',
   });
+};
+
+const showProjectCostPopover = function (this: AppContext, el: HTMLElement) {
+  const proj = this.currentProject;
+  if (!proj?.totalCost) return;
+  const entries = (proj.costLog ?? []).slice(-10).reverse();
+  this.showMetaPopover(el, {
+    title: this.t('gen.estimatedCost'),
+    lines: entries.map((e) => this.costEntryLabel(e.route) + ' · ~$' + e.cost.toFixed(4)),
+    lineClass: 'text-text-secondary font-mono',
+    footer: this.t('dashboard.totalCost') + ' ~$' + proj.totalCost.toFixed(4),
+    footerClass: 'text-accent',
+  });
+};
+
+/* Toggle tactile/clavier des popovers méta : le tap iOS émet mouseenter puis
+   click sur le même geste — on ne referme que si l'ouverture date de plus de
+   250 ms, sinon le popover s'ouvrirait et se refermerait instantanément. */
+const isPopoverOpenPastGrace = (ctx: AppContext, el: HTMLElement): boolean =>
+  ctx._metaPopoverAnchor === el &&
+  !!ctx._metaPopoverPos &&
+  Date.now() - ctx._metaPopoverShownAt > 250;
+
+const toggleCostPopover = function (this: AppContext, el: HTMLElement, item: CostPopoverItem) {
+  if (isPopoverOpenPastGrace(this, el)) this.hideMetaPopover();
+  else this.showCostPopover(el, item);
+};
+
+const toggleOcrPopover = function (this: AppContext, el: HTMLElement, src: Source) {
+  if (isPopoverOpenPastGrace(this, el)) this.hideMetaPopover();
+  else this.showOcrPopover(el, src);
+};
+
+const toggleModerationPopover = function (this: AppContext, el: HTMLElement, src: Source) {
+  if (isPopoverOpenPastGrace(this, el)) this.hideMetaPopover();
+  else this.showModerationPopover(el, src);
+};
+
+const toggleProjectCostPopover = function (this: AppContext, el: HTMLElement) {
+  if (isPopoverOpenPastGrace(this, el)) this.hideMetaPopover();
+  else this.showProjectCostPopover(el);
 };
 
 const SOURCE_REF_NUM_RE = /source\s*(\d+)/i;
@@ -899,12 +993,11 @@ const activeGenerations = function (this: AppContext): GenerationChip[] {
   return result;
 };
 
-const getQuizScores = function (this: AppContext) {
+/* Agrège TOUTES les activités scorées (quiz, dictée, texte à trous, quiz vocal…) :
+   l'écran Scores doit refléter tout le travail de l'enfant, pas le seul quiz. */
+const getActivityScores = function (this: AppContext) {
   return this.generations
-    .filter(
-      (g: Generation) =>
-        g.type === 'quiz' && 'stats' in g && g.stats && g.stats.attempts.length > 0,
-    )
+    .filter((g: Generation) => 'stats' in g && g.stats && g.stats.attempts.length > 0)
     .map((g: Generation) => {
       const stats = (g as { stats: { attempts: Array<{ score: number; total: number }> } }).stats;
       const last = stats.attempts.at(-1)!;
@@ -1055,6 +1148,13 @@ const POPOVER_HELPERS = {
   showCostPopover,
   showOcrPopover,
   showModerationPopover,
+  showProjectCostPopover,
+  toggleCostPopover,
+  toggleOcrPopover,
+  toggleModerationPopover,
+  toggleProjectCostPopover,
+  costEntryLabel,
+  stripMarkdown,
 };
 
 const PODCAST_HELPERS = {
@@ -1089,7 +1189,7 @@ const NOTIFICATION_HELPERS = {
 };
 
 const MISC_HELPERS = {
-  getQuizScores,
+  getActivityScores,
   resolveError,
   refreshIcons,
   formatDuration,

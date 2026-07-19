@@ -255,7 +255,8 @@ describe('quizVocalComponent', () => {
       expect(comp.score).toBe(0);
       expect(comp.feedback).toMatchObject({
         correct: false,
-        feedback: 'toast.error',
+        kind: 'error',
+        feedback: 'quiz.verificationError',
       });
     });
   });

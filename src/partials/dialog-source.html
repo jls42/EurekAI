@@ -3,7 +3,7 @@
 <!-- ================================================================ -->
 <dialog
   x-ref="sourceDialog"
-  class="rounded-dialog p-0 w-full max-h-[85vh] shadow-float glass"
+  class="rounded-dialog p-0 w-full max-h-[85vh] shadow-float bg-surface"
   :class="(viewSourceMode === 'compare' && !viewSourceCompareVertical) || viewSourceZoom > 1 ? 'max-w-5xl' : 'max-w-2xl'"
 >
   <template x-if="viewSource">
@@ -56,7 +56,7 @@
         <button
           @click="viewSourceMode = 'ocr'"
           class="px-3.5 py-1.5 rounded-badge text-sm font-semibold transition-colors focus-ring"
-          :class="viewSourceMode === 'ocr' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-gray-200'"
+          :class="viewSourceMode === 'ocr' ? 'bg-primary-dark text-text-inverted' : 'text-text-secondary hover:bg-gray-200'"
         >
           <span class="flex items-center gap-1.5"
             ><i data-lucide="file-text" class="w-3.5 h-3.5"></i>
@@ -67,7 +67,7 @@
           x-show="getOriginalFileUrl(viewSource)"
           @click="viewSourceMode = 'original'"
           class="px-3.5 py-1.5 rounded-badge text-sm font-semibold transition-colors focus-ring"
-          :class="viewSourceMode === 'original' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-gray-200'"
+          :class="viewSourceMode === 'original' ? 'bg-primary-dark text-text-inverted' : 'text-text-secondary hover:bg-gray-200'"
         >
           <span class="flex items-center gap-1.5"
             ><i data-lucide="image" class="w-3.5 h-3.5"></i>
@@ -78,7 +78,7 @@
           x-show="getOriginalFileUrl(viewSource) && !isMobile"
           @click="viewSourceMode = 'compare'"
           class="hidden sm:inline-flex px-3.5 py-1.5 rounded-badge text-sm font-semibold transition-colors focus-ring"
-          :class="viewSourceMode === 'compare' ? 'bg-primary text-white' : 'text-text-secondary hover:bg-gray-200'"
+          :class="viewSourceMode === 'compare' ? 'bg-primary-dark text-text-inverted' : 'text-text-secondary hover:bg-gray-200'"
         >
           <span class="flex items-center gap-1.5"
             ><i data-lucide="columns" class="w-3.5 h-3.5"></i>

@@ -50,7 +50,7 @@
       <div class="flex gap-2">
         <button
           @click="openApiKeyDialog('global')"
-          class="rounded-button px-3 py-1.5 text-body-sm font-semibold bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring"
+          class="rounded-button px-3 py-1.5 text-body-sm font-semibold bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors btn-press focus-ring"
           x-text="hasMistralKey ? t('apiKey.change') : t('apiKey.configure')"
         ></button>
         <button
@@ -142,18 +142,19 @@
         </div>
       </div>
     </div>
-    <div class="flex gap-3">
-      <button
-        @click="resetSettings()"
-        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors focus-ring border"
-        style="border-color: var(--color-input-border); color: var(--color-text-secondary)"
-        x-text="t('common.reset')"
-      ></button>
-      <button
-        @click="saveSettings()"
-        class="flex-1 bg-primary-dark text-white hover:bg-primary-dark/90 min-h-touch rounded-button font-semibold text-body-sm transition-colors card-lift btn-press focus-ring"
-        x-text="t('common.save')"
-      ></button>
-    </div>
+  </div>
+  <!-- Footer hors zone scrollable : Sauvegarder/Réinitialiser toujours atteignables -->
+  <div class="flex gap-3 mt-4">
+    <button
+      @click="confirmAction(t('settings.resetConfirm'), t('common.reset'), () => resetSettings())"
+      class="flex-1 min-h-touch rounded-button font-semibold text-body-sm transition-colors focus-ring border"
+      style="border-color: var(--color-input-border); color: var(--color-text-secondary)"
+      x-text="t('common.reset')"
+    ></button>
+    <button
+      @click="saveSettings()"
+      class="flex-1 bg-primary-dark text-text-inverted hover:bg-primary-dark/90 min-h-touch rounded-button font-semibold text-body-sm transition-colors card-lift btn-press focus-ring"
+      x-text="t('common.save')"
+    ></button>
   </div>
 </dialog>

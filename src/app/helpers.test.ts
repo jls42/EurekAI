@@ -886,8 +886,8 @@ describe('refreshIcons', () => {
   });
 });
 
-describe('getQuizScores', () => {
-  it('returns scores for quizzes with attempts', () => {
+describe('getActivityScores', () => {
+  it('agrège toutes les activités scorées, pas seulement le quiz', () => {
     const ctx = {
       generations: [
         {
@@ -904,21 +904,23 @@ describe('getQuizScores', () => {
           stats: { attempts: [] },
         },
         {
-          type: 'summary',
-          stats: { attempts: [{ score: 1, total: 1 }] },
+          type: 'dictation',
+          stats: { attempts: [{ score: 6, total: 9 }] },
         },
       ],
     };
-    const result = callWith<any[]>(helpers.getQuizScores, ctx);
-    expect(result).toHaveLength(1);
+    const result = callWith<any[]>(helpers.getActivityScores, ctx);
+    expect(result).toHaveLength(2);
     expect(result[0].lastScore).toBe(4);
     expect(result[0].total).toBe(5);
     expect(result[0].attempts).toBe(2);
+    expect(result[1].gen.type).toBe('dictation');
+    expect(result[1].lastScore).toBe(6);
   });
 
-  it('returns empty array when no quiz generations', () => {
+  it('returns empty array when no scored generations', () => {
     const ctx = { generations: [] };
-    expect(callWith<any[]>(helpers.getQuizScores, ctx)).toEqual([]);
+    expect(callWith<any[]>(helpers.getActivityScores, ctx)).toEqual([]);
   });
 });
 
@@ -1541,6 +1543,100 @@ describe('showCostPopover', () => {
     callWith<void>(helpers.showCostPopover, ctx, mockEl, {});
     expect(ctx._metaPopoverLines).toEqual([]);
     expect(ctx._metaPopoverFooter).toBe('');
+  });
+});
+
+describe('toggle popovers (tactile/clavier)', () => {
+  const t = (key: string) => key;
+  const makeCtx = (): any => ({ ...helpers, t });
+
+  it('ne referme pas pendant la période de grâce (tap iOS = mouseenter + click)', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const ctx = makeCtx();
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, { costBreakdown: ['l'] });
+    now.mockReturnValue(1100); // 100ms plus tard, sous les 250ms
+    callWith<void>(helpers.toggleCostPopover, ctx, mockEl, { costBreakdown: ['l'] });
+    expect(ctx._metaPopoverPos).not.toBeNull();
+    now.mockRestore();
+  });
+
+  it('referme après la période de grâce sur la même ancre', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const ctx = makeCtx();
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, { costBreakdown: ['l'] });
+    now.mockReturnValue(1500);
+    callWith<void>(helpers.toggleCostPopover, ctx, mockEl, { costBreakdown: ['l'] });
+    expect(ctx._metaPopoverPos).toBeNull();
+    expect(ctx._metaPopoverAnchor).toBeNull();
+    now.mockRestore();
+  });
+
+  it('ouvre pour une ancre différente même si un popover est déjà affiché', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    const ctx = makeCtx();
+    callWith<void>(helpers.showCostPopover, ctx, mockEl, { costBreakdown: ['l'] });
+    now.mockReturnValue(2000);
+    const otherEl = { getBoundingClientRect: () => ({ top: 300, bottom: 320, left: 40 }) } as any;
+    callWith<void>(helpers.toggleCostPopover, ctx, otherEl, { costBreakdown: ['m'] });
+    expect(ctx._metaPopoverPos).not.toBeNull();
+    expect(ctx._metaPopoverAnchor).toBe(otherEl);
+    now.mockRestore();
+  });
+
+  it('toggleProjectCostPopover construit les lignes depuis le costLog du projet', () => {
+    const ctx = makeCtx();
+    ctx.currentProject = {
+      totalCost: 0.51,
+      costLog: [{ route: '/api/p/x/generate/quiz', cost: 0.01, timestamp: 't1' }],
+    };
+    callWith<void>(helpers.toggleProjectCostPopover, ctx, mockEl);
+    expect(ctx._metaPopoverLines).toEqual(['nav.quiz · ~$0.0100']);
+    expect(ctx._metaPopoverFooter).toBe('dashboard.totalCost ~$0.5100');
+  });
+});
+
+describe('costEntryLabel', () => {
+  const t = (key: string) => key;
+  const label = (route: string) =>
+    callWith<string>(helpers.costEntryLabel, { t } as any, route as any);
+
+  it('maps generation routes to nav labels', () => {
+    expect(label('/api/projects/p1/generate/quiz-vocal')).toBe('nav.quiz-vocal');
+    expect(label('/api/projects/p1/generate/summary')).toBe('nav.summary');
+  });
+
+  it('maps source and pipeline routes to friendly labels', () => {
+    expect(label('/api/projects/p1/sources/upload')).toBe('nav.sources');
+    expect(label('/api/projects/p1/generate/route')).toBe('cost.route');
+    expect(label('/api/projects/p1/generate/batch')).toBe('cost.batch');
+  });
+
+  it('labels per-section audio routes with the audio prefix', () => {
+    expect(label('/api/projects/p1/generations/g1/tts/key_points')).toBe(
+      'cost.audio — summary.audioKeyPoints',
+    );
+    expect(label('/tts/vocabulary')).toBe('cost.audio — summary.audioVocabulary');
+  });
+
+  it('falls back to the raw segment for unknown routes', () => {
+    expect(label('/api/whatever/unknown-thing')).toBe('unknown-thing');
+  });
+});
+
+describe('stripMarkdown', () => {
+  it('strips bold, italic, headers and inline code', () => {
+    expect(helpers.stripMarkdown('**Programme de contrôle** (Source 1)')).toBe(
+      'Programme de contrôle (Source 1)',
+    );
+    expect(helpers.stripMarkdown('## Titre\n*important* et `code` et __gras__')).toBe(
+      'Titre\nimportant et code et gras',
+    );
+  });
+
+  it('leaves plain text untouched', () => {
+    expect(helpers.stripMarkdown('Révise les fleuves de France.')).toBe(
+      'Révise les fleuves de France.',
+    );
   });
 });
 

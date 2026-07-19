@@ -210,6 +210,18 @@ export function createConfig() {
       }
     },
 
+    /* Ouverture des Réglages gatée par le PIN du profil courant (mineur protégé) :
+       modèles IA, clé API et Reset ne doivent pas être à un tap de l'enfant. */
+    openSettings(this: AppContext) {
+      const open = () => {
+        (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.showModal();
+        this.refreshIcons();
+      };
+      const pid = this.currentProfile?.id;
+      if (pid) this.requireProfilePin(pid, open);
+      else open();
+    },
+
     async resetSettings(this: AppContext) {
       try {
         const res = await fetch('/api/config/reset', { method: 'POST' });

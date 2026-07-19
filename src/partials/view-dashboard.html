@@ -44,7 +44,7 @@
     <p class="text-text-secondary text-body-sm mb-4" x-text="t('dashboard.photoTextVoiceWeb')"></p>
     <button
       @click="goToView('sources')"
-      class="bg-accent text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-lift focus-ring flex items-center gap-2 mx-auto"
+      class="bg-accent text-text-inverted px-6 min-h-touch rounded-button font-semibold text-body-sm btn-lift focus-ring flex items-center gap-2 mx-auto"
     >
       <i data-lucide="plus" class="w-5 h-5"></i>
       <span x-text="t('common.addSources')"></span>
@@ -84,7 +84,7 @@
     <button
       @click="generateAuto()"
       :disabled="isGenerating()"
-      class="w-full max-w-md mx-auto min-h-[56px] bg-gradient-to-r from-primary to-accent text-white rounded-button font-bold text-lg flex items-center justify-center gap-3 shadow-card btn-lift focus-ring disabled:opacity-50"
+      class="w-full max-w-md mx-auto min-h-[56px] bg-gradient-to-r from-primary-dark to-accent text-text-inverted rounded-button font-bold text-lg flex items-center justify-center gap-3 shadow-card btn-lift focus-ring disabled:opacity-50"
     >
       <i data-lucide="sparkles" class="w-6 h-6"></i>
       <span x-text="t('dashboard.autoMagic')"></span>
@@ -98,48 +98,29 @@
       <h3 class="font-heading font-semibold text-sm text-text-primary flex items-center gap-2">
         <span x-text="t('dashboard.recentGenerations')">Recent</span>
         <template x-if="currentProject?.totalCost > 0">
-          <span
-            class="relative"
-            x-data="{ hover: false }"
-            @mouseenter="hover = true"
-            @mouseleave="hover = false"
+          <button
+            type="button"
+            class="focus-ring rounded-badge"
+            @click.stop="toggleProjectCostPopover($el)"
+            @mouseenter="showProjectCostPopover($el)"
+            @mouseleave="hideMetaPopover()"
+            @blur="hideMetaPopover()"
+            :aria-expanded="_metaPopoverAnchor === $el && !!_metaPopoverPos ? 'true' : 'false'"
+            aria-describedby="meta-popover"
+            :aria-label="t('gen.estimatedCost')"
           >
             <span
-              class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-help"
+              class="px-2 py-0.5 rounded-badge bg-accent/15 text-accent font-semibold text-sm cursor-pointer"
               x-text="t('gen.costPrefix') + ' ' + t('dashboard.totalCost') + ' ~$' + currentProject.totalCost.toFixed(4)"
               >Total</span
             >
-            <div
-              x-show="hover"
-              x-transition.opacity
-              class="absolute left-0 top-full mt-1 z-50 bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap"
-            >
-              <div class="font-semibold text-text-primary mb-1" x-text="t('gen.estimatedCost')">
-                Estimation
-              </div>
-              <template
-                x-for="entry in (currentProject?.costLog || []).slice(-10).reverse()"
-                :key="entry.timestamp"
-              >
-                <div class="text-text-secondary flex justify-between gap-4">
-                  <span class="truncate max-w-[180px]" x-text="entry.route.split('/').pop()"></span>
-                  <span class="font-mono" x-text="'~$' + entry.cost.toFixed(4)"></span>
-                </div>
-              </template>
-              <div
-                class="border-t border-gray-600 mt-1 pt-1 font-semibold text-accent flex justify-between gap-4"
-              >
-                <span>Total</span>
-                <span x-text="'~$' + currentProject.totalCost.toFixed(4)"></span>
-              </div>
-            </div>
-          </span>
+          </button>
         </template>
       </h3>
       <button
         @click="generateAuto()"
         :disabled="isGenerating()"
-        class="px-4 py-2 bg-gradient-to-r from-primary to-accent text-white rounded-button font-semibold text-sm flex items-center gap-2 btn-lift focus-ring disabled:opacity-50"
+        class="px-4 py-2 bg-gradient-to-r from-primary-dark to-accent text-text-inverted rounded-button font-semibold text-sm flex items-center gap-2 btn-lift focus-ring disabled:opacity-50"
       >
         <i data-lucide="sparkles" class="w-4 h-4"></i>
         <span x-text="t('dashboard.autoMagicShort')"></span>
@@ -202,5 +183,15 @@
         </div>
       </template>
     </div>
+  </div>
+
+  <!-- Scores agrégés — accès desktop (en mobile, l'onglet Scores de la nav-bottom fait ce travail) -->
+  <div class="hidden lg:block mt-8" x-show="getActivityScores().length > 0">
+    <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+    <h3 class="font-heading font-semibold text-sm text-text-primary mb-3 flex items-center gap-2">
+      <i data-lucide="trophy" class="w-4 h-4 text-warning-dark"></i>
+      <span x-text="t('scores.heading')">Scores</span>
+    </h3>
+    <div class="max-w-xl">{{> scores-list}}</div>
   </div>
 </div>

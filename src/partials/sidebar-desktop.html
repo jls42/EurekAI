@@ -7,7 +7,7 @@
     <button
       x-show="!sidebarCollapsed"
       @click="showNewProject = true"
-      class="w-full mb-3 min-h-touch bg-gradient-to-r from-primary to-primary-dark text-white rounded-button font-semibold text-body-sm flex items-center justify-center gap-2 btn-lift focus-ring"
+      class="w-full mb-3 min-h-touch bg-primary-dark text-text-inverted rounded-button font-semibold text-body-sm flex items-center justify-center gap-2 btn-lift focus-ring"
     >
       <i data-lucide="plus-circle" class="w-5 h-5"></i>
       <span x-text="t('sidebar.newCourse')"></span>
@@ -15,7 +15,7 @@
     <button
       x-show="sidebarCollapsed"
       @click="sidebarCollapsed = false; showNewProject = true"
-      class="w-full mb-3 min-h-touch bg-gradient-to-r from-primary to-primary-dark text-white rounded-full flex items-center justify-center btn-press focus-ring"
+      class="w-full mb-3 min-h-touch bg-primary-dark text-text-inverted rounded-full flex items-center justify-center btn-press focus-ring"
       :aria-label="t('sidebar.newCourse')"
     >
       <i data-lucide="plus" class="w-5 h-5"></i>
@@ -35,7 +35,7 @@
         <button
           @click="createProject()"
           :disabled="!newProjectName.trim()"
-          class="shrink-0 bg-primary-dark text-white px-3 rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
+          class="shrink-0 bg-primary-dark text-text-inverted px-3 rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
         >
           OK
         </button>
@@ -61,7 +61,7 @@
               <span class="truncate flex-1 text-body-sm" x-text="p.name"></span>
               <button
                 @click.stop="confirmDelete('projet', () => deleteProject(p.id))"
-                class="min-w-[28px] min-h-[28px] flex items-center justify-center text-text-secondary hover:text-danger opacity-0 group-hover:opacity-100 transition-opacity focus-ring rounded"
+                class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger opacity-60 group-hover:opacity-100 focus:opacity-100 transition-opacity focus-ring rounded"
                 :aria-label="t('sidebar.delete')"
               >
                 <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>

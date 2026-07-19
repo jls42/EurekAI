@@ -49,14 +49,14 @@
   {{/if}}
   <button
     @click.stop="startEditTitle(gen)"
-    class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded shrink-0"
+    class="min-w-[32px] min-h-[32px] pointer-coarse:min-w-touch pointer-coarse:min-h-touch flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded shrink-0"
     :aria-label="t('common.rename')"
   >
     <i data-lucide="pencil" class="w-4 h-4"></i>
   </button>
   <button
     @click.stop="confirmDelete('generation', () => deleteGen(gen))"
-    class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded shrink-0"
+    class="min-w-[32px] min-h-[32px] pointer-coarse:min-w-touch pointer-coarse:min-h-touch flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded shrink-0"
     :aria-label="t('common.delete')"
   >
     <i data-lucide="trash-2" class="w-4 h-4"></i>

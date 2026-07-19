@@ -47,6 +47,12 @@ export const nl: Record<string, string> = {
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Audio',
+  'cost.route': 'Automatische routering',
+  'cost.batch': 'Automatische generatie',
+  'cost.moderation': 'Moderatie',
+  'cost.consigne': 'Instructiedetectie',
+  'cost.vocalAnswer': 'Gesproken antwoord',
   'gen.all': 'Alles genereren',
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
@@ -56,7 +62,8 @@ export const nl: Record<string, string> = {
   'a11y.selectSource': 'Deze bron selecteren',
   'a11y.editTitle': 'Titel bewerken',
   'gen.questionCount': 'Aantal:',
-  'gen.needsTts': 'Vereist MISTRAL_API_KEY om Voxtral TTS in te schakelen',
+  'gen.needsTts':
+    'Het geluid staat niet aan — vraag een volwassene om het aan te zetten in Instellingen',
   'gen.contextTooLarge':
     'Inhoud te groot ({pct}% van de modelcapaciteit). Selecteer minder bronnen.',
 
@@ -140,6 +147,8 @@ export const nl: Record<string, string> = {
   'confirm.generation': 'deze generatie',
 
   'settings.title': 'Instellingen',
+  'settings.resetConfirm':
+    'Alle instellingen terugzetten naar de standaard? De gekozen modellen en voorkeuren worden vervangen.',
   'settings.apiStatus': 'API-status',
   'settings.aiModels': 'AI-engines',
   'settings.aiModel': 'Generatie',
@@ -297,7 +306,7 @@ export const nl: Record<string, string> = {
   'quiz.incorrect': 'Fout',
   'quiz.youSaid': 'Je zei: {text}',
   'quiz.nextQuestion': 'Volgende vraag',
-  'quiz.verificationError': 'Verificatiefout',
+  'quiz.verificationError': 'Oeps, ik kon je antwoord niet horen. Zullen we het opnieuw proberen?',
 
   'chat.heading': 'Chat met je cursussen',
   'chat.clear': 'Wissen',
@@ -326,9 +335,8 @@ export const nl: Record<string, string> = {
   'podcast.emptyWithSources': 'Klik op Nieuwe podcast om te beginnen',
   'podcast.script': 'Script',
   'podcast.lines': '({count} regels)',
-  'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
-    'Configureer MISTRAL_API_KEY in je .env-bestand om audiopodcasts in te schakelen',
+    'Het geluid staat nog niet aan. Vraag een volwassene om het aan te zetten in Instellingen!',
   'podcast.speakerHost': 'Presentator',
   'podcast.speakerGuest': 'Gast',
 
@@ -336,7 +344,6 @@ export const nl: Record<string, string> = {
   'image.new': 'Illustreren',
   'image.emptyTitle': 'Nog geen illustraties',
   'image.emptyWithSources': 'Genereer een educatieve illustratie op basis van je bronnen',
-  'image.prompt': 'Gebruikte prompt',
 
   'fillBlank.heading': 'Invuloefeningen',
   'fillBlank.new': 'Nieuwe invuloefening',
@@ -428,7 +435,7 @@ export const nl: Record<string, string> = {
   'toast.audioDone': 'Audio gegenereerd!',
   'toast.audioPartial': 'Gedeeltelijke audio: sommige secties mislukt',
   'toast.audioAuthRequired': 'Ongeldige of ontbrekende Mistral API-sleutel',
-  'toast.audioQuotaExceeded': 'TTS-quotum bereikt, probeer het later opnieuw',
+  'toast.audioQuotaExceeded': 'Audioquotum bereikt — probeer het straks opnieuw',
   'toast.audioError': 'Fout bij het genereren van audio',
   'toast.genDeleted': 'Generatie verwijderd',
   'toast.settingsSaved': 'Instellingen opgeslagen',
@@ -440,7 +447,7 @@ export const nl: Record<string, string> = {
   'toast.cancelledGeneration': 'Generatie geannuleerd',
   'toast.cancelledOne': '{type} geannuleerd',
   'toast.cancelFailed': 'Annuleren van {type} mislukt',
-  'toast.confirmActionFailed': 'Actie mislukt — zie de console voor details.',
+  'toast.confirmActionFailed': 'Het lukte niet. Probeer opnieuw!',
   'toast.scoreSaved': 'Score opgeslagen!',
   'toast.scoreError': 'Fout bij opslaan van score',
   'toast.remediationGenerated': 'Herhalingskaart en oefenquiz klaar!',
@@ -480,7 +487,9 @@ export const nl: Record<string, string> = {
   'profile.moderationOn': 'Inhoud gefilterd (aanbevolen voor kinderen)',
   'profile.moderationOff': 'Moderatie uitgeschakeld',
   'profile.moderationCategories': 'Moderatiecategorieen',
-  'profile.moderationCategoriesHint': 'Selecteer de te blokkeren categorieen',
+  'profile.moderationCategoriesHint': 'Kies welke categorieën je wilt blokkeren',
+  'profile.parentSection': 'Oudergedeelte',
+  'profile.parentSectionHint': 'Moderatie, AI-chat en categorieën — beschermd door de oudercode',
   'profile.moderationResetDefaults': 'Standaardwaarden herstellen',
   'profile.chatToggle': 'AI-chat toestaan',
   'profile.chatOn': 'Chat ingeschakeld',

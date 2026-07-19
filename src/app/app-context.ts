@@ -73,6 +73,8 @@ export interface AppContext extends AppState {
   // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- noms de params documentaires (Codacy n'honore pas argsIgnorePattern)
   requireProfilePin(profileId: string, callback: () => void): void;
   confirmDelete(message: string, callback: () => void | Promise<void>): void;
+  confirmAction(message: string, cta: string, callback: () => void | Promise<void>): void;
+  openSettings(): void;
   setLocale(lang: string, skipProfileSync?: boolean): void;
   resetState(): void;
   loadProjects(): Promise<void>;
@@ -84,7 +86,6 @@ export interface AppContext extends AppState {
   applyReadingComfortLive(): void;
   closePinDialog(): void;
   requireParentalAccess(callback: () => void): void;
-  _toggleProfileProp(id: string, prop: string): Promise<void>;
 
   goToView(view: string): void;
 
@@ -209,6 +210,13 @@ export interface AppContext extends AppState {
   showCostPopover(el: HTMLElement, item: CostPopoverItem): void;
   showOcrPopover(el: HTMLElement, src: Source): void;
   showModerationPopover(el: HTMLElement, src: Source): void;
+  showProjectCostPopover(el: HTMLElement): void;
+  toggleCostPopover(el: HTMLElement, item: CostPopoverItem): void;
+  toggleOcrPopover(el: HTMLElement, src: Source): void;
+  toggleModerationPopover(el: HTMLElement, src: Source): void;
+  toggleProjectCostPopover(el: HTMLElement): void;
+  costEntryLabel(route: string): string;
+  stripMarkdown(text: string): string;
   resolveSourceRef(ref: string, allSources: Source[]): Source | undefined;
   itemSources(gen: Generation, item: ItemWithRefs): Source[];
   questionSources(gen: Generation, q: ItemWithRefs): Source[];
@@ -251,7 +259,7 @@ export interface AppContext extends AppState {
   ): void;
   startPendingsStream(projectId: string): Promise<void>;
   stopPendingsStream(): void;
-  getQuizScores(): Array<{
+  getActivityScores(): Array<{
     gen: Generation;
     lastScore: number;
     total: number;
