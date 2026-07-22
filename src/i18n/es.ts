@@ -47,6 +47,12 @@ export const es: Record<string, string> = {
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Audio',
+  'cost.route': 'Enrutamiento automático',
+  'cost.batch': 'Generación automática',
+  'cost.moderation': 'Moderación',
+  'cost.consigne': 'Detección de instrucciones',
+  'cost.vocalAnswer': 'Respuesta por voz',
   'gen.all': 'Generar todo',
   'gen.voice': 'Leer en voz alta',
   'gen.websearch': 'B\u00fasqueda web',
@@ -56,7 +62,7 @@ export const es: Record<string, string> = {
   'a11y.selectSource': 'Seleccionar esta fuente',
   'a11y.editTitle': 'Editar el título',
   'gen.questionCount': 'Cantidad:',
-  'gen.needsTts': 'Requiere MISTRAL_API_KEY para habilitar TTS Voxtral',
+  'gen.needsTts': 'El sonido no está activado: pídele a un adulto que lo active en Configuración',
   'gen.contextTooLarge':
     'Contenido demasiado largo ({pct}% de la capacidad del modelo). Selecciona menos fuentes.',
 
@@ -140,6 +146,8 @@ export const es: Record<string, string> = {
   'confirm.generation': 'esta generaci\u00f3n',
 
   'settings.title': 'Configuraci\u00f3n',
+  'settings.resetConfirm':
+    '\u00bfRestablecer toda la configuraci\u00f3n a los valores predeterminados? Los modelos elegidos y las preferencias se reemplazar\u00e1n.',
   'settings.apiStatus': 'Estado de la API',
   'settings.aiModels': 'Motores de IA',
   'settings.aiModel': 'Generación',
@@ -297,7 +305,7 @@ export const es: Record<string, string> = {
   'quiz.incorrect': '\u00a1Incorrecto!',
   'quiz.youSaid': 'Dijiste: {text}',
   'quiz.nextQuestion': 'Siguiente pregunta',
-  'quiz.verificationError': 'Error de verificaci\u00f3n',
+  'quiz.verificationError': 'Ups, no pude escuchar tu respuesta. \u00bfVolvemos a intentarlo?',
 
   'chat.heading': 'Chat con tus cursos',
   'chat.clear': 'Borrar',
@@ -326,8 +334,8 @@ export const es: Record<string, string> = {
   'podcast.emptyWithSources': 'Haz clic en Nuevo podcast para empezar',
   'podcast.script': 'Guion',
   'podcast.lines': '({count} l\u00edneas)',
-  'podcast.prompt': 'Prompt: {text}',
-  'podcast.noTts': 'Configura MISTRAL_API_KEY en tu archivo .env para habilitar podcasts con audio',
+  'podcast.noTts':
+    'El sonido aún no está activado. ¡Pídele a un adulto que lo active en Configuración!',
   'podcast.speakerHost': 'Presentador',
   'podcast.speakerGuest': 'Invitado',
 
@@ -335,7 +343,6 @@ export const es: Record<string, string> = {
   'image.new': 'Ilustrar',
   'image.emptyTitle': 'A\u00fan no hay ilustraciones',
   'image.emptyWithSources': 'Genera una ilustraci\u00f3n educativa a partir de tus fuentes',
-  'image.prompt': 'Prompt utilizado',
 
   'fillBlank.heading': 'Completar espacios',
   'fillBlank.new': 'Nuevo completar espacios',
@@ -428,7 +435,7 @@ export const es: Record<string, string> = {
   'toast.audioDone': '\u00a1Audio generado!',
   'toast.audioPartial': 'Audio parcial: algunas secciones fallaron',
   'toast.audioAuthRequired': 'Clave API de Mistral inválida o ausente',
-  'toast.audioQuotaExceeded': 'Cuota TTS alcanzada, inténtalo más tarde',
+  'toast.audioQuotaExceeded': 'Cuota de audio alcanzada — inténtalo un poco más tarde',
   'toast.audioError': 'Error al generar audio',
   'toast.genDeleted': 'Generaci\u00f3n eliminada',
   'toast.settingsSaved': 'Configuraci\u00f3n guardada',
@@ -440,7 +447,7 @@ export const es: Record<string, string> = {
   'toast.cancelledGeneration': 'Generaci\u00f3n cancelada',
   'toast.cancelledOne': '{type} cancelado',
   'toast.cancelFailed': 'Error al cancelar {type}',
-  'toast.confirmActionFailed': 'La acción falló — consulta la consola para más detalles.',
+  'toast.confirmActionFailed': 'No funcionó. ¡Inténtalo de nuevo!',
   'toast.scoreSaved': '\u00a1Puntaje guardado!',
   'toast.scoreError': 'Error al guardar puntaje',
   'toast.remediationGenerated': '\u00a1Ficha de repaso y quiz de pr\u00e1ctica listos!',
@@ -481,7 +488,10 @@ export const es: Record<string, string> = {
   'profile.moderationOn': 'Contenido filtrado (recomendado para ni\u00f1os)',
   'profile.moderationOff': 'Moderaci\u00f3n deshabilitada',
   'profile.moderationCategories': 'Categorias de moderacion',
-  'profile.moderationCategoriesHint': 'Seleccione las categorias a bloquear',
+  'profile.moderationCategoriesHint': 'Selecciona las categorías a bloquear',
+  'profile.parentSection': 'Espacio para padres',
+  'profile.parentSectionHint':
+    'Moderación, chat de IA y categorías — protegidos por el código de los padres',
   'profile.moderationResetDefaults': 'Restablecer valores predeterminados',
   'profile.chatToggle': 'Permitir chat con IA',
   'profile.chatOn': 'Chat habilitado',

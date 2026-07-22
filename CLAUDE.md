@@ -230,6 +230,12 @@ Garde-fou local actuel : `npm test` déclenche `pretest` → enchaîne **`typech
 - **`??=` pèse 2 dans le comptage Lizard** (nullish check + assignment) — à retenir lors de l'application du fix `prefer-nullish-coalescing`.
 - **`function foo()` top-level consécutives agglomérées** — le parseur Lizard TS peut agglomérer des `function` déclarations consécutives en une seule fonction pour compter le CCN. Fix standard : convertir un des helpers adjacents en `const foo = (): T => { ... }` arrow — Lizard ne les agglomère pas. `export function` délimite aussi correctement. À retenir quand on ajoute un helper privé à côté d'un existant.
 
+## Design Context
+
+- **`PRODUCT.md`** (racine) : contexte strategique design — registre **produit**, plateforme web, personnalite « ludique, magique, encourageant », positionnement « une photo de lecon → kit de revision complet », cible **WCAG AA**. 5 principes : l'enfant d'abord (les concepts d'adulte — couts, cle API — ne dominent jamais la hierarchie) ; la magie sans le jargon (jamais `MISTRAL_API_KEY` ni « console » dans un texte lisible par l'enfant) ; encourager, jamais culpabiliser ; identite a soi (s'emanciper du decalque Duolingo vers l'univers du logo bleu→violet) ; accessible par defaut.
+- **`DESIGN.md`** (racine) : systeme visuel « L'Etincelle » (+ sidecar `.impeccable/design.json`). Regles cles pour toute modif UI : couleurs UNIQUEMENT via les tokens `--color-*` de `theme.css` (jamais de classes Tailwind brutes type `bg-gray-100` — elles cassent le dark mode) ; degrade signature bleu→violet reserve au wordmark/titres de vues/CTA « Auto » ; texte sur aplat vif via la variante `-dark` du hue (AA) ; radii et ombres depuis l'echelle tokenisee, pas de valeur ad hoc.
+- Ces deux fichiers sont la source de verite des commandes `/impeccable` — les tenir a jour quand l'identite visuelle evolue.
+
 ## Conventions detaillees
 
 Voir `.claude/rules/` pour :

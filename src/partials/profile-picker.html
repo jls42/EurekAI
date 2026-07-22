@@ -92,44 +92,49 @@
             <span
               class="block text-xs mt-1.5 px-2 py-0.5 rounded-full inline-block"
               :class="{
-              'bg-green-100 text-green-700': p.ageGroup === 'enfant',
-              'bg-blue-100 text-blue-700': p.ageGroup === 'ado',
-              'bg-purple-100 text-purple-700': p.ageGroup === 'etudiant',
-              'bg-orange-100 text-orange-700': p.ageGroup === 'adulte'
+              'bg-success-light text-success-dark': p.ageGroup === 'enfant',
+              'bg-primary-light text-primary-dark': p.ageGroup === 'ado',
+              'bg-accent-light text-accent-dark': p.ageGroup === 'etudiant',
+              'bg-warning-light text-warning-dark': p.ageGroup === 'adulte'
             }"
               x-text="t('profile.group.' + p.ageGroup)"
             ></span>
-            <!-- Moderation badge -->
-            <button
-              @click.stop="toggleModeration(p.id)"
-              class="mt-1.5 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors"
-              :class="p.useModeration ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+            <!-- Badges informatifs (le réglage se fait dans l'Espace parent de l'édition,
+                 jamais en un tap depuis l'écran d'entrée de l'enfant) -->
+            <span
+              role="img"
+              class="mt-1.5 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+              :class="p.useModeration ? 'bg-success-light text-success-dark' : 'bg-gray-100 text-text-secondary'"
               :title="p.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
+              :aria-label="p.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
             >
               <i :data-lucide="p.useModeration ? 'shield-check' : 'shield-off'" class="w-3 h-3"></i>
-            </button>
-            <!-- Chat badge -->
-            <button
-              @click.stop="toggleChat(p.id)"
-              class="mt-1 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full transition-colors"
-              :class="p.chatEnabled ? 'bg-blue-50 text-blue-600 hover:bg-blue-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'"
+            </span>
+            <span
+              role="img"
+              class="mt-1 inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full"
+              :class="p.chatEnabled ? 'bg-primary-light text-primary-dark' : 'bg-gray-100 text-text-secondary'"
               :title="p.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"
+              :aria-label="p.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"
             >
-              <i data-lucide="message-circle" class="w-3 h-3"></i>
-            </button>
+              <i
+                :data-lucide="p.chatEnabled ? 'message-circle' : 'message-circle-off'"
+                class="w-3 h-3"
+              ></i>
+            </span>
             <div
-              class="absolute top-1.5 right-1.5 flex gap-0.5 opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity"
+              class="absolute top-1.5 right-1.5 flex gap-1 opacity-60 group-hover:opacity-100 focus-within:opacity-100 hover:!opacity-100 transition-opacity"
             >
               <button
                 @click.stop="startEditProfile(p.id)"
-                class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-primary/10 hover:text-primary transition-colors focus-ring"
+                class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-primary/10 hover:text-primary transition-colors focus-ring"
                 :aria-label="t('profile.editProfile')"
               >
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
               </button>
               <button
                 @click.stop="deleteProfile(p.id)"
-                class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-danger/10 hover:text-danger transition-colors focus-ring"
+                class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-danger/10 hover:text-danger transition-colors focus-ring"
                 :aria-label="t('common.delete')"
               >
                 <i data-lucide="x" class="w-4 h-4"></i>
@@ -143,10 +148,10 @@
       <div x-show="!showProfileForm && !editingProfile" class="text-center">
         <button
           @click="showProfileForm = true; $nextTick(() => refreshIcons())"
-          class="bg-primary text-white px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
+          class="bg-primary-dark text-text-inverted px-6 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
         >
           <i data-lucide="plus" class="w-4 h-4"></i>
-          <span x-text="t('profile.addProfile')">Add profile</span>
+          <span x-text="t('profile.addProfile')">Ajouter un profil</span>
         </button>
       </div>
 
@@ -298,7 +303,7 @@
           <button
             @click="createProfile()"
             :disabled="!newProfileName.trim() || !newProfileAge || (Number(newProfileAge) < 15 && (!/^\d{4}$/.test(newProfilePin) || newProfilePin !== newProfilePinConfirm))"
-            class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring disabled:opacity-50"
+            class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors btn-press focus-ring disabled:opacity-50"
             x-text="t('common.add')"
           ></button>
         </div>
@@ -581,93 +586,119 @@
             </div>
           </div>
 
-          <!-- Section: Safety — moderation + chat side by side toggles -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            <!-- Moderation toggle -->
-            <div class="p-3 bg-gray-50 rounded-card">
-              <div class="flex items-center justify-between">
-                <div>
-                  <span class="text-body-sm font-medium" x-text="t('profile.moderationToggle')"
-                    >Content moderation</span
-                  >
-                  <p
-                    class="text-xs text-text-secondary"
-                    x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
-                  ></p>
-                </div>
-                <button
-                  @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration; autoSaveParental() })"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
-                  :class="editingProfile?.useModeration ? 'bg-green-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                    :class="editingProfile?.useModeration ? 'translate-x-6' : 'translate-x-1'"
-                  ></span>
-                </button>
-              </div>
-            </div>
-            <!-- Chat toggle -->
-            <div class="p-3 bg-gray-50 rounded-card">
-              <div class="flex items-center justify-between">
-                <div>
-                  <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')"
-                    >Chat</span
-                  >
-                  <p
-                    class="text-xs text-text-secondary"
-                    x-text="editingProfile?.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"
-                  ></p>
-                </div>
-                <button
-                  @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled; autoSaveParental() })"
-                  class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
-                  :class="editingProfile?.chatEnabled ? 'bg-blue-500' : 'bg-gray-300'"
-                >
-                  <span
-                    class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                    :class="editingProfile?.chatEnabled ? 'translate-x-6' : 'translate-x-1'"
-                  ></span>
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Moderation categories (when moderation is enabled) -->
-          <div
-            x-show="editingProfile?.useModeration && allModerationCategories.length > 0"
-            x-transition
-            class="mb-4 p-3 bg-gray-50 rounded-card"
-          >
-            <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"
-              >Moderation categories</span
-            >
-            <p
-              class="text-xs text-text-secondary mb-2"
-              x-text="t('profile.moderationCategoriesHint')"
-            >
-              Select categories to moderate
-            </p>
-            <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
-              <template x-for="cat in allModerationCategories" :key="cat">
-                <label class="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    :aria-label="t('moderation.cat.' + cat)"
-                    :checked="(editingProfile.moderationCategories || []).includes(cat)"
-                    @click.prevent="toggleModerationCategory(cat)"
-                    class="w-4 h-4 rounded text-primary accent-primary focus-ring"
-                  />
-                  <span x-text="t('moderation.cat.' + cat)"></span>
-                </label>
-              </template>
-            </div>
+          <!-- Espace parent : la LECTURE même (catégories de modération au vocabulaire
+               adulte) est gatée par le PIN — x-if garde le contenu hors du DOM. -->
+          <template x-if="editingProfile?.hasPin && !editingProfile?._verifiedPin">
             <button
-              @click="requireParentalAccess(() => { editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup); autoSaveParental() })"
-              class="text-xs text-primary mt-2 hover:underline"
-              x-text="t('profile.moderationResetDefaults')"
-            ></button>
-          </div>
+              @click="requireParentalAccess(() => {})"
+              class="w-full mb-4 p-3 bg-gray-50 rounded-card flex items-center gap-2 text-left hover:bg-gray-100 transition-colors focus-ring"
+            >
+              <i data-lucide="lock" class="w-4 h-4 text-text-secondary shrink-0"></i>
+              <span class="flex-1">
+                <span
+                  class="block text-body-sm font-medium text-text-primary"
+                  x-text="t('profile.parentSection')"
+                  >Espace parent</span
+                >
+                <span
+                  class="block text-xs text-text-secondary"
+                  x-text="t('profile.parentSectionHint')"
+                ></span>
+              </span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-text-secondary shrink-0"></i>
+            </button>
+          </template>
+          <template x-if="!editingProfile?.hasPin || editingProfile?._verifiedPin">
+            <div>
+              <!-- Section: Safety — moderation + chat side by side toggles -->
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+                <!-- Moderation toggle -->
+                <div class="p-3 bg-gray-50 rounded-card">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-body-sm font-medium" x-text="t('profile.moderationToggle')"
+                        >Content moderation</span
+                      >
+                      <p
+                        class="text-xs text-text-secondary"
+                        x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
+                      ></p>
+                    </div>
+                    <button
+                      @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration; autoSaveParental() })"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
+                      :class="editingProfile?.useModeration ? 'bg-success' : 'bg-gray-300'"
+                    >
+                      <span
+                        class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        :class="editingProfile?.useModeration ? 'translate-x-6' : 'translate-x-1'"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+                <!-- Chat toggle -->
+                <div class="p-3 bg-gray-50 rounded-card">
+                  <div class="flex items-center justify-between">
+                    <div>
+                      <span class="text-body-sm font-medium" x-text="t('profile.chatToggle')"
+                        >Chat</span
+                      >
+                      <p
+                        class="text-xs text-text-secondary"
+                        x-text="editingProfile?.chatEnabled ? t('profile.chatOn') : t('profile.chatOff')"
+                      ></p>
+                    </div>
+                    <button
+                      @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled; autoSaveParental() })"
+                      class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
+                      :class="editingProfile?.chatEnabled ? 'bg-primary' : 'bg-gray-300'"
+                    >
+                      <span
+                        class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                        :class="editingProfile?.chatEnabled ? 'translate-x-6' : 'translate-x-1'"
+                      ></span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Moderation categories (when moderation is enabled) -->
+              <div
+                x-show="editingProfile?.useModeration && allModerationCategories.length > 0"
+                x-transition
+                class="mb-4 p-3 bg-gray-50 rounded-card"
+              >
+                <span class="text-body-sm font-medium" x-text="t('profile.moderationCategories')"
+                  >Moderation categories</span
+                >
+                <p
+                  class="text-xs text-text-secondary mb-2"
+                  x-text="t('profile.moderationCategoriesHint')"
+                >
+                  Select categories to moderate
+                </p>
+                <div class="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1.5">
+                  <template x-for="cat in allModerationCategories" :key="cat">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                      <input
+                        type="checkbox"
+                        :aria-label="t('moderation.cat.' + cat)"
+                        :checked="(editingProfile.moderationCategories || []).includes(cat)"
+                        @click.prevent="toggleModerationCategory(cat)"
+                        class="w-4 h-4 rounded text-primary accent-primary focus-ring"
+                      />
+                      <span x-text="t('moderation.cat.' + cat)"></span>
+                    </label>
+                  </template>
+                </div>
+                <button
+                  @click="requireParentalAccess(() => { editingProfile.moderationCategories = defaultModerationCategories(editingProfile.ageGroup); autoSaveParental() })"
+                  class="text-xs text-primary mt-2 hover:underline"
+                  x-text="t('profile.moderationResetDefaults')"
+                ></button>
+              </div>
+            </div>
+          </template>
 
           <!-- Actions -->
           <div class="flex gap-2">
@@ -678,10 +709,10 @@
             ></button>
             <button
               @click="closeEditProfile()"
-              class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors btn-press focus-ring inline-flex items-center justify-center gap-2"
+              class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors btn-press focus-ring inline-flex items-center justify-center gap-2"
             >
               <i data-lucide="arrow-left" class="w-4 h-4"></i>
-              <span x-text="t('profile.backToProfiles')">Back to profiles</span>
+              <span x-text="t('profile.backToProfiles')">Retour aux profils</span>
             </button>
           </div>
         </div>

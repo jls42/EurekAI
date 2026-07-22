@@ -5,7 +5,7 @@
   </h2>
   <button
     @click="showNewProject = true"
-    class="w-full mb-4 min-h-touch bg-primary text-white rounded-button font-semibold text-body-sm flex items-center justify-center gap-2 btn-lift focus-ring"
+    class="w-full mb-4 min-h-touch bg-primary-dark text-text-inverted rounded-button font-semibold text-body-sm flex items-center justify-center gap-2 btn-lift focus-ring"
   >
     <i data-lucide="plus-circle" class="w-5 h-5"></i>
     <span x-text="t('sidebar.newCourse')"></span>
@@ -24,7 +24,7 @@
       <button
         @click="createProject()"
         :disabled="!newProjectName.trim()"
-        class="shrink-0 bg-primary-dark text-white px-4 rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
+        class="shrink-0 bg-primary-dark text-text-inverted px-4 rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
       >
         OK
       </button>
@@ -32,10 +32,14 @@
   </div>
   <div class="space-y-2">
     <template x-for="(p, pi) in sortedProjects()" :key="p.id">
-      <button
-        class="w-full flex items-center gap-3 p-4 bg-surface rounded-card shadow-card text-left card-lift focus-ring"
+      <!-- div role=button (pas <button>) : contient le bouton suppression enfant -->
+      <div
+        role="button"
+        tabindex="0"
+        class="w-full flex items-center gap-3 p-4 bg-surface rounded-card shadow-card text-left card-lift focus-ring cursor-pointer"
         :class="currentProjectId === p.id && 'ring-2 ring-primary'"
         @click="selectProject(p.id); mobileTab = 'magic'"
+        @keydown.enter="selectProject(p.id); mobileTab = 'magic'"
       >
         <span
           class="project-initial text-lg"
@@ -49,8 +53,16 @@
             x-text="new Date(p.updatedAt || p.createdAt).toLocaleDateString(dateLocale())"
           ></p>
         </div>
+        <button
+          @click.stop="confirmDelete('projet', () => deleteProject(p.id))"
+          @keydown.enter.stop.prevent="confirmDelete('projet', () => deleteProject(p.id))"
+          class="min-w-[44px] min-h-[44px] flex items-center justify-center text-text-secondary hover:text-danger transition-colors focus-ring rounded shrink-0"
+          :aria-label="t('sidebar.deleteProject')"
+        >
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
         <i data-lucide="chevron-right" class="w-5 h-5 text-text-secondary shrink-0"></i>
-      </button>
+      </div>
     </template>
   </div>
   <div x-show="projects.length === 0" class="mt-8 text-center py-12">

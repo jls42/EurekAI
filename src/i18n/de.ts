@@ -47,6 +47,12 @@ export const de: Record<string, string> = {
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Audio',
+  'cost.route': 'Automatisches Routing',
+  'cost.batch': 'Automatische Generierung',
+  'cost.moderation': 'Moderation',
+  'cost.consigne': 'Anweisungserkennung',
+  'cost.vocalAnswer': 'Sprachantwort',
   'gen.all': 'Alles generieren',
   'gen.voice': 'Vorlesen',
   'gen.websearch': 'Websuche',
@@ -56,9 +62,10 @@ export const de: Record<string, string> = {
   'a11y.selectSource': 'Diese Quelle auswählen',
   'a11y.editTitle': 'Titel bearbeiten',
   'gen.questionCount': 'Anzahl:',
-  'gen.needsTts': 'Erfordert MISTRAL_API_KEY zum Aktivieren von Voxtral TTS',
+  'gen.needsTts':
+    'Der Ton ist nicht an — bitte einen Erwachsenen, ihn in den Einstellungen einzuschalten',
   'gen.contextTooLarge':
-    'Inhalt zu umfangreich ({pct}% der Modellkapazitaet). Waehle weniger Quellen aus.',
+    'Inhalt zu umfangreich ({pct}% der Modellkapazität). Wähle weniger Quellen aus.',
 
   'errorCode.internal_error': 'Interner Serverfehler',
   'errorCode.cancelled': 'Generierung abgebrochen',
@@ -141,6 +148,8 @@ export const de: Record<string, string> = {
   'confirm.generation': 'diese Generierung',
 
   'settings.title': 'Einstellungen',
+  'settings.resetConfirm':
+    'Alle Einstellungen auf die Standardwerte zurücksetzen? Die gewählten Modelle und Einstellungen werden ersetzt.',
   'settings.apiStatus': 'API-Status',
   'settings.aiModels': 'KI-Engines',
   'settings.aiModel': 'Generierung',
@@ -301,7 +310,8 @@ export const de: Record<string, string> = {
   'quiz.incorrect': 'Falsch',
   'quiz.youSaid': 'Du hast gesagt: {text}',
   'quiz.nextQuestion': 'N\u00e4chste Frage',
-  'quiz.verificationError': 'Pr\u00fcfungsfehler',
+  'quiz.verificationError':
+    'Ups, ich konnte deine Antwort nicht h\u00f6ren. Versuchen wir es noch mal?',
 
   'chat.heading': 'Chat mit deinen Kursen',
   'chat.clear': 'Leeren',
@@ -330,9 +340,8 @@ export const de: Record<string, string> = {
   'podcast.emptyWithSources': 'Klicke auf Neuer Podcast um loszulegen',
   'podcast.script': 'Skript',
   'podcast.lines': '({count} Zeilen)',
-  'podcast.prompt': 'Prompt: {text}',
   'podcast.noTts':
-    'Konfiguriere MISTRAL_API_KEY in deiner .env-Datei um Audio-Podcasts zu aktivieren',
+    'Der Ton ist noch nicht an. Bitte einen Erwachsenen, ihn in den Einstellungen einzuschalten!',
   'podcast.speakerHost': 'Moderator',
   'podcast.speakerGuest': 'Gast',
 
@@ -340,7 +349,6 @@ export const de: Record<string, string> = {
   'image.new': 'Illustrieren',
   'image.emptyTitle': 'Noch keine Illustrationen',
   'image.emptyWithSources': 'Erstelle eine Lernillustration aus deinen Quellen',
-  'image.prompt': 'Verwendeter Prompt',
 
   'fillBlank.heading': 'L\u00fcckentext',
   'fillBlank.new': 'Neuer L\u00fcckentext',
@@ -434,7 +442,7 @@ export const de: Record<string, string> = {
   'toast.audioDone': 'Audio generiert!',
   'toast.audioPartial': 'Teilweises Audio: einige Abschnitte fehlgeschlagen',
   'toast.audioAuthRequired': 'Ungültiger oder fehlender Mistral-API-Schlüssel',
-  'toast.audioQuotaExceeded': 'TTS-Kontingent erreicht, später erneut versuchen',
+  'toast.audioQuotaExceeded': 'Audiokontingent erreicht — versuch es gleich noch mal',
   'toast.audioError': 'Fehler bei der Audiogenerierung',
   'toast.genDeleted': 'Generierung gel\u00f6scht',
   'toast.settingsSaved': 'Einstellungen gespeichert',
@@ -446,7 +454,7 @@ export const de: Record<string, string> = {
   'toast.cancelledGeneration': 'Generierung abgebrochen',
   'toast.cancelledOne': '{type} abgebrochen',
   'toast.cancelFailed': 'Abbruch von {type} fehlgeschlagen',
-  'toast.confirmActionFailed': 'Aktion fehlgeschlagen — Details siehe Konsole.',
+  'toast.confirmActionFailed': 'Hat nicht geklappt. Versuch es noch mal!',
   'toast.scoreSaved': 'Punkte gespeichert!',
   'toast.scoreError': 'Fehler beim Speichern der Punkte',
   'toast.remediationGenerated': 'Merkblatt und Übungsquiz sind fertig!',
@@ -487,7 +495,10 @@ export const de: Record<string, string> = {
   'profile.moderationOn': 'Inhalte gefiltert (empfohlen f\u00fcr Kinder)',
   'profile.moderationOff': 'Moderation deaktiviert',
   'profile.moderationCategories': 'Moderationskategorien',
-  'profile.moderationCategoriesHint': 'Wahlen Sie die zu blockierenden Kategorien',
+  'profile.moderationCategoriesHint': 'Wähle die Kategorien aus, die blockiert werden sollen',
+  'profile.parentSection': 'Elternbereich',
+  'profile.parentSectionHint':
+    'Moderation, KI-Chat und Kategorien — durch den Elterncode geschützt',
   'profile.moderationResetDefaults': 'Standardwerte wiederherstellen',
   'profile.chatToggle': 'KI-Chat erlauben',
   'profile.chatOn': 'Chat aktiviert',

@@ -63,7 +63,7 @@
           @click="generateCount = n"
           class="px-2.5 py-1 rounded-badge text-xs font-semibold transition-colors btn-press"
           :class="generateCount === n
-            ? 'bg-primary text-white'
+            ? 'bg-primary-dark text-text-inverted'
             : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
           x-text="'~' + n"
         ></button>
@@ -72,7 +72,7 @@
     <button
       @click="generateAuto()"
       :disabled="isGenerating()"
-      class="w-full min-h-[48px] bg-gradient-to-r from-primary to-accent text-white rounded-button font-bold text-body-sm flex items-center justify-center gap-2 shadow-card btn-lift focus-ring disabled:opacity-50"
+      class="w-full min-h-[48px] bg-gradient-to-r from-primary-dark to-accent text-text-inverted rounded-button font-bold text-body-sm flex items-center justify-center gap-2 shadow-card btn-lift focus-ring disabled:opacity-50"
     >
       <i data-lucide="sparkles" class="w-5 h-5"></i>
       <span x-text="t('sources.autoMagic')"></span>
@@ -103,23 +103,23 @@
 
     <button
       @click="showTextInput = !showTextInput"
-      class="flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-summary hover:bg-blue-50 transition-all card-lift focus-ring"
-      :class="showTextInput && 'border-gen-summary bg-blue-50'"
+      class="flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-summary hover:bg-gen-summary/10 transition-all card-lift focus-ring"
+      :class="showTextInput && 'border-gen-summary bg-gen-summary/10'"
     >
-      <i data-lucide="pencil" class="w-8 h-8 text-gen-summary"></i>
+      <i data-lucide="pencil" class="w-8 h-8 text-gen-summary-deep"></i>
       <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.text')"></span>
     </button>
 
     <button
       @click="toggleRecording()"
       :disabled="isLoading('voice')"
-      class="flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-quizvocal hover:bg-orange-50 transition-all card-lift focus-ring"
+      class="flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-quizvocal hover:bg-gen-quizvocal/10 transition-all card-lift focus-ring"
       :class="recording && 'border-danger bg-danger-light animate-pulse'"
     >
       <i
         data-lucide="mic"
         class="w-8 h-8"
-        :class="recording ? 'text-danger' : 'text-gen-quizvocal'"
+        :class="recording ? 'text-danger' : 'text-gen-quizvocal-deep'"
       ></i>
       <span
         class="font-semibold text-body-sm text-text-primary"
@@ -129,10 +129,10 @@
 
     <button
       @click="showWebInput = true"
-      class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-podcast hover:bg-teal-50 transition-all card-lift focus-ring"
-      :class="showWebInput && 'border-gen-podcast bg-teal-50'"
+      class="relative flex flex-col items-center justify-center gap-2 min-h-[100px] bg-surface rounded-card shadow-card border-2 border-transparent hover:border-gen-podcast hover:bg-gen-podcast/10 transition-all card-lift focus-ring"
+      :class="showWebInput && 'border-gen-podcast bg-gen-podcast/10'"
     >
-      <i data-lucide="globe" class="w-8 h-8 text-gen-podcast"></i>
+      <i data-lucide="globe" class="w-8 h-8 text-gen-podcast-deep"></i>
       <span class="font-semibold text-body-sm text-text-primary" x-text="t('sources.web')"></span>
     </button>
   </div>
@@ -156,7 +156,7 @@
         <button
           @click="addText()"
           :disabled="!textInput.trim() || uploading"
-          class="bg-primary-dark text-white px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
+          class="bg-primary-dark text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
           x-text="t('common.add')"
         ></button>
       </div>
@@ -177,7 +177,7 @@
         <button
           @click="searchWeb()"
           :disabled="!webQuery.trim() || isLoading('websearch')"
-          class="bg-gen-podcast text-white px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring flex items-center gap-2"
+          class="bg-gen-podcast-deep text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring flex items-center gap-2"
         >
           <i data-lucide="search" class="w-4 h-4"></i>
           <span
@@ -190,7 +190,7 @@
         <span class="text-text-secondary mr-1" x-text="t('sources.scrapeEngine')"></span>
         <button
           @click="scrapeMode = 'auto'"
-          :class="scrapeMode === 'auto' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          :class="scrapeMode === 'auto' ? 'bg-primary-dark text-text-inverted' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
           class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
           :title="t('sources.scrapeAutoTip')"
         >
@@ -199,7 +199,7 @@
         </button>
         <button
           @click="scrapeMode = 'readability'"
-          :class="scrapeMode === 'readability' ? 'bg-success text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          :class="scrapeMode === 'readability' ? 'bg-success-dark text-text-inverted' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
           class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
           :title="t('sources.scrapeReadabilityTip')"
         >
@@ -208,7 +208,7 @@
         </button>
         <button
           @click="scrapeMode = 'lightpanda'"
-          :class="scrapeMode === 'lightpanda' ? 'bg-primary text-white' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
+          :class="scrapeMode === 'lightpanda' ? 'bg-primary-dark text-text-inverted' : 'bg-gray-100 text-text-secondary hover:bg-gray-200'"
           class="px-2.5 py-1 rounded-full font-medium transition-colors flex items-center gap-1"
           :title="t('sources.scrapeLightpandaTip')"
         >
@@ -424,7 +424,7 @@
             >
             <span
               x-show="src.scrapeEngine === 'mistral'"
-              class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700"
+              class="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-accent-light text-accent-dark"
               title="Mistral web_search"
               >AI</span
             >

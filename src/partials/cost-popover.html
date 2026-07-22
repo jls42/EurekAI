@@ -1,8 +1,13 @@
-<!-- Single global badge popover — rendered once in the layout. -->
+<!-- Single global badge popover — rendered once in the layout.
+     Escape et clic/tap hors badge ferment le popover (les badges togglent en @click.stop). -->
 <div
+  id="meta-popover"
+  role="tooltip"
   x-show="_metaPopoverPos && _metaPopoverTitle"
   x-transition.opacity.duration.150ms
-  class="fixed z-[9999] bg-surface border border-gray-600 rounded-card shadow-lg px-3 py-2 text-xs whitespace-nowrap pointer-events-none"
+  @keydown.escape.window="hideMetaPopover()"
+  @click.window="hideMetaPopover()"
+  class="fixed z-[9999] bg-surface border border-border-default rounded-card shadow-float px-3 py-2 text-xs whitespace-nowrap pointer-events-none"
   :style="metaPopoverStyle()"
 >
   <div class="font-semibold text-text-primary mb-1" x-text="_metaPopoverTitle">Details</div>
@@ -11,7 +16,7 @@
   </template>
   <template x-if="_metaPopoverFooter">
     <div
-      class="border-t border-gray-600 mt-1 pt-1 font-semibold"
+      class="border-t border-border-default mt-1 pt-1 font-semibold"
       :class="_metaPopoverFooterClass"
       x-text="_metaPopoverFooter"
     >

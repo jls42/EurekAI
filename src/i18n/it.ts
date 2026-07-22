@@ -47,6 +47,12 @@ export const it: Record<string, string> = {
   'gen.costTooltipSource': 'Estimate — {detail} · Official Mistral pricing',
   'gen.costTooltipFree': 'Estimate — No API call',
   'gen.costPrefix': 'Est.',
+  'cost.audio': 'Audio',
+  'cost.route': 'Instradamento automatico',
+  'cost.batch': 'Generazione automatica',
+  'cost.moderation': 'Moderazione',
+  'cost.consigne': 'Rilevamento istruzioni',
+  'cost.vocalAnswer': 'Risposta vocale',
   'gen.all': 'Genera tutto',
   'gen.voice': 'Lettura vocale',
   'gen.websearch': 'Ricerca web',
@@ -56,7 +62,7 @@ export const it: Record<string, string> = {
   'a11y.selectSource': 'Seleziona questa fonte',
   'a11y.editTitle': 'Modifica il titolo',
   'gen.questionCount': 'Numero:',
-  'gen.needsTts': 'Richiede MISTRAL_API_KEY per abilitare il TTS Voxtral',
+  'gen.needsTts': 'Il suono non è attivo — chiedi a un adulto di attivarlo nelle Impostazioni',
   'gen.contextTooLarge':
     'Contenuto troppo lungo ({pct}% della capacita del modello). Seleziona meno fonti.',
 
@@ -140,6 +146,8 @@ export const it: Record<string, string> = {
   'confirm.generation': 'questa generazione',
 
   'settings.title': 'Impostazioni',
+  'settings.resetConfirm':
+    'Ripristinare tutte le impostazioni ai valori predefiniti? I modelli scelti e le preferenze verranno sostituiti.',
   'settings.apiStatus': 'Stato API',
   'settings.aiModels': 'Motori IA',
   'settings.aiModel': 'Generazione',
@@ -297,7 +305,7 @@ export const it: Record<string, string> = {
   'quiz.incorrect': 'Sbagliato',
   'quiz.youSaid': 'Hai detto: {text}',
   'quiz.nextQuestion': 'Domanda successiva',
-  'quiz.verificationError': 'Errore di verifica',
+  'quiz.verificationError': 'Ops, non sono riuscito ad ascoltare la tua risposta. Riproviamo?',
 
   'chat.heading': 'Chatta con i tuoi corsi',
   'chat.clear': 'Cancella',
@@ -326,8 +334,8 @@ export const it: Record<string, string> = {
   'podcast.emptyWithSources': 'Clicca su Nuovo podcast per iniziare',
   'podcast.script': 'Copione',
   'podcast.lines': '({count} battute)',
-  'podcast.prompt': 'Prompt: {text}',
-  'podcast.noTts': 'Configura MISTRAL_API_KEY nel file .env per abilitare i podcast audio',
+  'podcast.noTts':
+    'Il suono non è ancora attivo. Chiedi a un adulto di attivarlo nelle Impostazioni!',
   'podcast.speakerHost': 'Conduttore',
   'podcast.speakerGuest': 'Ospite',
 
@@ -335,7 +343,6 @@ export const it: Record<string, string> = {
   'image.new': 'Illustra',
   'image.emptyTitle': 'Nessuna illustrazione ancora',
   'image.emptyWithSources': "Genera un'illustrazione educativa dalle tue fonti",
-  'image.prompt': 'Prompt utilizzato',
 
   'fillBlank.heading': 'Testi a buchi',
   'fillBlank.new': 'Nuovo testo a buchi',
@@ -427,7 +434,7 @@ export const it: Record<string, string> = {
   'toast.audioDone': 'Audio generato!',
   'toast.audioPartial': 'Audio parziale: alcune sezioni non riuscite',
   'toast.audioAuthRequired': 'Chiave API Mistral non valida o mancante',
-  'toast.audioQuotaExceeded': 'Quota TTS raggiunta, riprova più tardi',
+  'toast.audioQuotaExceeded': 'Quota audio raggiunta — riprova tra poco',
   'toast.audioError': 'Errore nella generazione audio',
   'toast.genDeleted': 'Generazione eliminata',
   'toast.settingsSaved': 'Impostazioni salvate',
@@ -439,7 +446,7 @@ export const it: Record<string, string> = {
   'toast.cancelledGeneration': 'Generazione annullata',
   'toast.cancelledOne': '{type} annullato',
   'toast.cancelFailed': 'Annullamento di {type} non riuscito',
-  'toast.confirmActionFailed': "L'azione non è riuscita — controlla la console per i dettagli.",
+  'toast.confirmActionFailed': 'Non ha funzionato. Riprova!',
   'toast.scoreSaved': 'Punteggio salvato!',
   'toast.scoreError': 'Errore nel salvataggio del punteggio',
   'toast.remediationGenerated': 'Scheda di ripasso e quiz di allenamento pronti!',
@@ -481,6 +488,8 @@ export const it: Record<string, string> = {
   'profile.moderationOff': 'Moderazione disattivata',
   'profile.moderationCategories': 'Categorie di moderazione',
   'profile.moderationCategoriesHint': 'Seleziona le categorie da bloccare',
+  'profile.parentSection': 'Area genitori',
+  'profile.parentSectionHint': 'Moderazione, chat IA e categorie — protetti dal codice genitori',
   'profile.moderationResetDefaults': 'Ripristina predefiniti',
   'profile.chatToggle': 'Autorizza la chat IA',
   'profile.chatOn': 'Chat attiva',

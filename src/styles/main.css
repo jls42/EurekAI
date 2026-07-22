@@ -33,6 +33,18 @@
   --color-gen-image: var(--color-gen-image);
   --color-gen-fillblank: var(--color-gen-fillblank);
   --color-gen-dictation: var(--color-gen-dictation);
+  --color-gen-summary-deep: var(--color-gen-summary-deep);
+  --color-gen-flashcards-deep: var(--color-gen-flashcards-deep);
+  --color-gen-quiz-deep: var(--color-gen-quiz-deep);
+  --color-gen-podcast-deep: var(--color-gen-podcast-deep);
+  --color-gen-quizvocal-deep: var(--color-gen-quizvocal-deep);
+  --color-gen-image-deep: var(--color-gen-image-deep);
+  --color-gen-fillblank-deep: var(--color-gen-fillblank-deep);
+  --color-gen-dictation-deep: var(--color-gen-dictation-deep);
+  --color-text-inverted: var(--color-text-inverted);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border-light: var(--color-border-light);
+  --color-border-default: var(--color-border-default);
 
   --radius-card: 1.75rem;
   --radius-button: 1.25rem;
@@ -637,6 +649,22 @@ dialog[open] {
   justify-content: center;
   gap: 0.375rem;
   padding: 0.25rem;
+}
+/* Mobile : rangée scrollable à cibles 44px, labels toujours visibles —
+   11 pictos sans texte sont illisibles pour une lectrice débutante. */
+@media (max-width: 639px) {
+  .category-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .category-chip {
+    min-height: 44px;
+    padding: 0.5rem 0.75rem;
+    flex: none;
+  }
 }
 
 .category-chip {

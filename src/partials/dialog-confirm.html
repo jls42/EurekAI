@@ -11,7 +11,7 @@
     </h2>
     <p
       class="text-body-sm text-text-secondary mb-4"
-      x-text="t('confirm.message', { target: confirmTarget })"
+      x-text="confirmMessage || t('confirm.message', { target: confirmTarget })"
     ></p>
     <div class="flex gap-2">
       <button
@@ -21,8 +21,8 @@
       ></button>
       <button
         @click="executeConfirm()"
-        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-danger-dark text-white hover:bg-danger-dark/90 transition-colors card-lift btn-press focus-ring"
-        x-text="t('common.delete')"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-danger-dark text-text-inverted hover:bg-danger-dark/90 transition-colors card-lift btn-press focus-ring"
+        x-text="confirmCta || t('common.delete')"
       ></button>
     </div>
   </div>

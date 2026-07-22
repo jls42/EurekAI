@@ -193,10 +193,10 @@ describe('app', () => {
     expect(typeof a.renderMarkdown).toBe('function');
   });
 
-  it('includes moderation and toggle methods from createProfiles', () => {
+  it('includes parental access methods from createProfiles', () => {
     const a = app();
-    expect(typeof a.toggleModeration).toBe('function');
-    expect(typeof a.toggleChat).toBe('function');
+    expect(typeof a.requireParentalAccess).toBe('function');
+    expect(typeof a.requireProfilePin).toBe('function');
   });
 });
 

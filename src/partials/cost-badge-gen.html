@@ -1,14 +1,22 @@
-<!-- Cost estimation badge for generations — popover rendered by global cost-popover.html -->
+<!-- Cost estimation badge for generations — popover rendered by global cost-popover.html.
+     Bouton focusable : toggle au clic/Enter (tactile + clavier), hover conservé (souris). -->
 <template x-if="gen.estimatedCost">
-  <span
-    class="inline-block"
+  <button
+    type="button"
+    class="inline-block focus-ring rounded-badge"
+    @click.stop="toggleCostPopover($el, gen)"
+    @keydown.enter.stop.prevent="toggleCostPopover($el, gen)"
     @mouseenter="showCostPopover($el, gen)"
     @mouseleave="hideMetaPopover()"
+    @blur="hideMetaPopover()"
+    :aria-expanded="_metaPopoverAnchor === $el && !!_metaPopoverPos ? 'true' : 'false'"
+    aria-describedby="meta-popover"
+    :aria-label="t('gen.estimatedCost')"
   >
     <span
       class="source-meta-pill {{badgeClass}} bg-accent/15 text-accent font-semibold cursor-pointer"
       x-text="t('gen.costPrefix') + ' ~$' + gen.estimatedCost.toFixed(4)"
       >Est.</span
     >
-  </span>
+  </button>
 </template>

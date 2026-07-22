@@ -1,11 +1,19 @@
 <!-- Moderation badge for sources -->
 <!-- Params: sourceRef, badgeClass, wrapperClass, iconClass -->
 <!-- Uses separate <i> per state to avoid Lucide + Alpine :data-lucide desync -->
+<!-- Bouton focusable : toggle au clic/Enter (tactile + clavier), hover conservé (souris). -->
 <template x-if="{{sourceRef}}.moderation?.status">
-  <span
-    class="inline-block {{wrapperClass}}"
+  <button
+    type="button"
+    class="inline-block {{wrapperClass}} focus-ring rounded-badge"
+    @click.stop="toggleModerationPopover($el, {{sourceRef}})"
+    @keydown.enter.stop.prevent="toggleModerationPopover($el, {{sourceRef}})"
     @mouseenter="showModerationPopover($el, {{sourceRef}})"
     @mouseleave="hideMetaPopover()"
+    @blur="hideMetaPopover()"
+    :aria-expanded="_metaPopoverAnchor === $el && !!_metaPopoverPos ? 'true' : 'false'"
+    aria-describedby="meta-popover"
+    :aria-label="moderationBadgeTitle({{sourceRef}})"
   >
     <span
       class="source-meta-pill {{badgeClass}} cursor-pointer"
@@ -32,5 +40,5 @@
         class="{{iconClass}}"
       ></i>
     </span>
-  </span>
+  </button>
 </template>

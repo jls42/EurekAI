@@ -8,7 +8,7 @@
     <button
       @click="generate('summary')"
       :disabled="sources.length === 0"
-      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 disabled:opacity-50"
+      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-summary/10 text-gen-summary-deep hover:bg-gen-summary/20 disabled:opacity-50"
     >
       <i data-lucide="plus" class="w-4 h-4"></i>
       <span x-text="t('summary.new')"></span>
@@ -21,9 +21,9 @@
     class="text-center py-12"
   >
     <div
-      class="w-16 h-16 mx-auto mb-3 bg-blue-50 rounded-[1rem] border border-gen-summary/20 flex items-center justify-center"
+      class="w-16 h-16 mx-auto mb-3 bg-gen-summary/10 rounded-[1rem] border border-gen-summary/20 flex items-center justify-center"
     >
-      <i data-lucide="file-text" class="w-8 h-8 text-gen-summary"></i>
+      <i data-lucide="file-text" class="w-8 h-8 text-gen-summary-deep"></i>
     </div>
     <p class="text-text-primary font-semibold mb-1" x-text="t('summary.emptyTitle')"></p>
     <p
@@ -33,7 +33,7 @@
     <button
       x-show="sources.length === 0"
       @click="goToView('sources')"
-      class="bg-accent text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+      class="bg-accent text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
       x-text="t('common.addSources')"
     ></button>
   </div>
@@ -41,10 +41,7 @@
   <!-- Summary cards -->
   <div class="space-y-3">
     <template x-for="gen in generationsByType('summary')" :key="gen.id">
-      <div
-        class="gen-card border-l-4 border-l-gen-summary animate-slide-up"
-        x-init="initSummaryAudio(gen)"
-      >
+      <div class="gen-card animate-slide-up" x-init="initSummaryAudio(gen)">
         {{> gen-card-header icon="file-text" chipClass="icon-chip-summary"
         colorClass="gen-summary"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
@@ -60,7 +57,7 @@
                 :disabled="gen._generatingVoice_all === true || !ttsReady()"
                 :title="!ttsReady() ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary' : isBatchComplete(gen) ? (gen._playlistMode ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
+                :class="gen._generatingVoice_all === true ? 'border-gen-summary/30 text-gen-summary-deep' : isBatchComplete(gen) ? (gen._playlistMode ? 'bg-gen-summary-deep text-text-inverted border-gen-summary' : 'bg-gen-summary/15 text-gen-summary-deep border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary-deep'"
               >
                 <i
                   x-show="gen._generatingVoice_all !== true"
@@ -79,7 +76,7 @@
                 :disabled="gen._generatingVoice_intro === true || !ttsReady()"
                 :title="!ttsReady() ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_intro === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_intro ? (gen._activeAudioSection === 'intro' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
+                :class="gen._generatingVoice_intro === true ? 'border-gen-summary/30 text-gen-summary-deep' : gen._audioUrl_intro ? (gen._activeAudioSection === 'intro' ? 'bg-gen-summary-deep text-text-inverted border-gen-summary' : 'bg-gen-summary/15 text-gen-summary-deep border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary-deep'"
               >
                 <i
                   x-show="gen._generatingVoice_intro !== true"
@@ -98,7 +95,7 @@
                 :disabled="gen._generatingVoice_key_points === true || !ttsReady()"
                 :title="!ttsReady() ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_key_points === true ? 'border-gen-summary/30 text-gen-summary' : gen._audioUrl_key_points ? (gen._activeAudioSection === 'key_points' ? 'bg-gen-summary text-white border-gen-summary' : 'bg-gen-summary/15 text-gen-summary border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary'"
+                :class="gen._generatingVoice_key_points === true ? 'border-gen-summary/30 text-gen-summary-deep' : gen._audioUrl_key_points ? (gen._activeAudioSection === 'key_points' ? 'bg-gen-summary-deep text-text-inverted border-gen-summary' : 'bg-gen-summary/15 text-gen-summary-deep border-gen-summary/30 hover:bg-gen-summary/25') : 'border-gray-300 text-text-secondary hover:border-gen-summary hover:text-gen-summary-deep'"
               >
                 <i
                   x-show="gen._generatingVoice_key_points !== true"
@@ -118,7 +115,7 @@
                 :disabled="gen._generatingVoice_fun_fact === true || !ttsReady()"
                 :title="!ttsReady() ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_fun_fact === true ? 'border-warning/30 text-warning-dark' : gen._audioUrl_fun_fact ? (gen._activeAudioSection === 'fun_fact' ? 'bg-warning-dark text-white border-warning-dark' : 'bg-warning/15 text-warning-dark border-warning/30 hover:bg-warning/25') : 'border-gray-300 text-text-secondary hover:border-warning hover:text-warning-dark'"
+                :class="gen._generatingVoice_fun_fact === true ? 'border-warning/30 text-warning-dark' : gen._audioUrl_fun_fact ? (gen._activeAudioSection === 'fun_fact' ? 'bg-warning-dark text-text-inverted border-warning-dark' : 'bg-warning/15 text-warning-dark border-warning/30 hover:bg-warning/25') : 'border-gray-300 text-text-secondary hover:border-warning hover:text-warning-dark'"
               >
                 <i
                   x-show="gen._generatingVoice_fun_fact !== true"
@@ -138,7 +135,7 @@
                 :disabled="gen._generatingVoice_vocabulary === true || !ttsReady()"
                 :title="!ttsReady() ? t('gen.needsTts') : ''"
                 class="px-2.5 py-1 rounded-full text-xs font-semibold flex items-center gap-1 border transition-colors btn-press focus-ring disabled:opacity-50"
-                :class="gen._generatingVoice_vocabulary === true ? 'border-accent/30 text-accent-dark' : gen._audioUrl_vocabulary ? (gen._activeAudioSection === 'vocabulary' ? 'bg-accent-dark text-white border-accent-dark' : 'bg-accent/15 text-accent-dark border-accent/30 hover:bg-accent/25') : 'border-gray-300 text-text-secondary hover:border-accent hover:text-accent-dark'"
+                :class="gen._generatingVoice_vocabulary === true ? 'border-accent/30 text-accent-dark' : gen._audioUrl_vocabulary ? (gen._activeAudioSection === 'vocabulary' ? 'bg-accent-dark text-text-inverted border-accent-dark' : 'bg-accent/15 text-accent-dark border-accent/30 hover:bg-accent/25') : 'border-gray-300 text-text-secondary hover:border-accent hover:text-accent-dark'"
               >
                 <i
                   x-show="gen._generatingVoice_vocabulary !== true"
@@ -167,7 +164,7 @@
           <!-- Version FALC : régénère la même fiche en registre « très facile à lire » -->
           <button
             @click="generateSimplified(gen)"
-            class="mb-4 px-3 min-h-touch rounded-button text-body-sm font-semibold bg-gen-summary/10 text-gen-summary hover:bg-gen-summary/20 btn-press focus-ring flex items-center gap-1.5"
+            class="mb-4 px-3 min-h-touch rounded-button text-body-sm font-semibold bg-gen-summary/10 text-gen-summary-deep hover:bg-gen-summary/20 btn-press focus-ring flex items-center gap-1.5"
           >
             <i data-lucide="sparkles" class="w-4 h-4"></i>
             <span x-text="t('summary.simplify')">Version très facile à lire</span>
@@ -200,7 +197,7 @@
                 class="flex items-start gap-3 bg-gray-50 text-text-primary px-4 py-2.5 rounded-card text-body-sm chat-markdown border border-gray-200"
               >
                 <span
-                  class="shrink-0 w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center text-xs font-bold mt-0.5"
+                  class="shrink-0 w-6 h-6 rounded-full bg-primary-dark text-text-inverted flex items-center justify-center text-xs font-bold mt-0.5"
                   x-text="ptIdx + 1"
                 ></span>
                 <span class="flex-1" x-html="renderWithSources(pt, gen)"></span>

@@ -8,7 +8,7 @@
     <button
       @click="generate('podcast')"
       :disabled="sources.length === 0 || !ttsReady()"
-      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-podcast/10 text-gen-podcast hover:bg-gen-podcast/20 disabled:opacity-50"
+      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-podcast/10 text-gen-podcast-deep hover:bg-gen-podcast/20 disabled:opacity-50"
     >
       <i data-lucide="plus" class="w-4 h-4"></i>
       <span x-text="t('podcast.new')"></span>
@@ -20,9 +20,9 @@
     class="text-center py-12"
   >
     <div
-      class="w-16 h-16 mx-auto mb-3 bg-teal-50 rounded-[1rem] border border-gen-podcast/20 flex items-center justify-center"
+      class="w-16 h-16 mx-auto mb-3 bg-gen-podcast/10 rounded-[1rem] border border-gen-podcast/20 flex items-center justify-center"
     >
-      <i data-lucide="headphones" class="w-8 h-8 text-gen-podcast"></i>
+      <i data-lucide="headphones" class="w-8 h-8 text-gen-podcast-deep"></i>
     </div>
     <p class="text-text-primary font-semibold mb-1" x-text="t('podcast.emptyTitle')"></p>
     <p
@@ -32,7 +32,7 @@
     <button
       x-show="sources.length === 0"
       @click="goToView('sources')"
-      class="bg-accent text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+      class="bg-accent text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
       x-text="t('common.addSources')"
     ></button>
     <p
@@ -44,7 +44,7 @@
 
   <div class="space-y-3">
     <template x-for="gen in generationsByType('podcast')" :key="gen.id">
-      <div class="gen-card border-l-4 border-l-gen-podcast animate-slide-up">
+      <div class="gen-card animate-slide-up">
         {{> gen-card-header icon="headphones" chipClass="icon-chip-podcast"
         colorClass="gen-podcast"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
@@ -68,7 +68,7 @@
             ></i>
             <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
             <h4
-              class="font-heading font-semibold text-sm text-text-primary group-hover:text-gen-podcast transition-colors"
+              class="font-heading font-semibold text-sm text-text-primary group-hover:text-gen-podcast-deep transition-colors"
               x-text="t('podcast.script')"
             >
               Script
@@ -82,8 +82,8 @@
             <template x-for="(line, li) in gen.data.script || []" :key="li">
               <div class="flex gap-3 items-start">
                 <span
-                  class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  :class="line.speaker === 'host' ? 'bg-gen-podcast' : 'bg-accent'"
+                  class="shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-text-inverted text-xs font-bold"
+                  :class="line.speaker === 'host' ? 'bg-gen-podcast-deep' : 'bg-accent'"
                   :title="podcastSpeakerTitle(gen, line)"
                   x-text="podcastSpeakerInitial(gen, line)"
                   >&nbsp;</span

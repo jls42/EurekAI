@@ -6,6 +6,9 @@ import type { Generation, QuizQuestion, QuizVocalGeneration } from '../../types'
 
 interface VocalFeedback {
   correct: boolean;
+  /* 'error' = panne système (réseau, vérification) — rendue en boîte NEUTRE avec
+     bouton Réessayer, jamais comme une mauvaise réponse de l'élève. */
+  kind?: 'error';
   feedback?: string;
   transcription?: string;
   loading?: boolean;
@@ -13,9 +16,13 @@ interface VocalFeedback {
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
-function buildVocalErrorFeedback(t: TFn, key: string, error?: string): VocalFeedback {
-  const msg = error ? t(key, { error }) : t(key);
-  return { correct: false, feedback: msg, transcription: '' };
+function buildVocalErrorFeedback(t: TFn): VocalFeedback {
+  return {
+    correct: false,
+    kind: 'error',
+    feedback: t('quiz.verificationError'),
+    transcription: '',
+  };
 }
 
 function buildVocalFormData(idx: number, blob: Blob): FormData {
@@ -141,7 +148,7 @@ const submitVocalAnswer = async function (this: QuizVocalContext, blob: Blob) {
       withAiHeaders({ method: 'POST', body: buildVocalFormData(idx, blob) }),
     );
     if (!res.ok) {
-      this.feedback = buildVocalErrorFeedback(this.t, 'quiz.verificationError');
+      this.feedback = buildVocalErrorFeedback(this.t);
       return;
     }
     const result = (await res.json()) as VocalFeedback;
@@ -149,8 +156,8 @@ const submitVocalAnswer = async function (this: QuizVocalContext, blob: Blob) {
     this.storedFeedback[idx] = this.feedback;
     if (result.correct) this.score++;
   } catch (e) {
-    const error = e instanceof Error ? e.message : String(e);
-    this.feedback = buildVocalErrorFeedback(this.t, 'toast.error', error);
+    console.error('vocal answer verification failed:', e);
+    this.feedback = buildVocalErrorFeedback(this.t);
   }
 };
 

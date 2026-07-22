@@ -8,7 +8,7 @@
     <button
       @click="generate('image')"
       :disabled="sources.length === 0"
-      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-image/10 text-gen-image hover:bg-gen-image/20 disabled:opacity-50"
+      class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-gen-image/10 text-gen-image-deep hover:bg-gen-image/20 disabled:opacity-50"
     >
       <i data-lucide="plus" class="w-4 h-4"></i>
       <span x-text="t('image.new')"></span>
@@ -21,9 +21,9 @@
     class="text-center py-12"
   >
     <div
-      class="w-16 h-16 mx-auto mb-3 bg-pink-50 rounded-[1rem] border border-gen-image/20 flex items-center justify-center"
+      class="w-16 h-16 mx-auto mb-3 bg-gen-image/10 rounded-[1rem] border border-gen-image/20 flex items-center justify-center"
     >
-      <i data-lucide="image" class="w-8 h-8 text-gen-image"></i>
+      <i data-lucide="image" class="w-8 h-8 text-gen-image-deep"></i>
     </div>
     <p class="text-text-primary font-semibold mb-1" x-text="t('image.emptyTitle')"></p>
     <p
@@ -33,7 +33,7 @@
     <button
       x-show="sources.length === 0"
       @click="goToView('sources')"
-      class="bg-accent text-white px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
+      class="bg-accent text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring"
       x-text="t('common.addSources')"
     ></button>
   </div>
@@ -41,7 +41,7 @@
   <!-- Image cards — flat layout, no accordion -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <template x-for="gen in generationsByType('image')" :key="gen.id">
-      <div class="gen-card border-l-4 border-l-gen-image animate-slide-up overflow-hidden">
+      <div class="gen-card animate-slide-up overflow-hidden">
         <!-- Image (click to lightbox) -->
         <img
           :src="gen.data.imageUrl"
@@ -53,7 +53,7 @@
         <div class="px-4 py-3">
           <div class="flex items-center gap-3">
             <span class="icon-chip icon-chip-image shrink-0">
-              <i data-lucide="image" class="w-4 h-4 text-gen-image"></i>
+              <i data-lucide="image" class="w-4 h-4 text-gen-image-deep"></i>
             </span>
             <div class="flex-1 min-w-0">
               <template x-if="editingTitle !== gen.id">
@@ -84,29 +84,19 @@
             <!-- Actions -->
             <button
               @click.stop="startEditTitle(gen)"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded"
+              class="min-w-[32px] min-h-[32px] pointer-coarse:min-w-touch pointer-coarse:min-h-touch flex items-center justify-center text-text-secondary hover:text-primary focus-ring rounded"
               :aria-label="t('common.rename')"
             >
               <i data-lucide="pencil" class="w-4 h-4"></i>
             </button>
             <button
               @click.stop="confirmDelete('generation', () => deleteGen(gen))"
-              class="min-w-[32px] min-h-[32px] flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded"
+              class="min-w-[32px] min-h-[32px] pointer-coarse:min-w-touch pointer-coarse:min-h-touch flex items-center justify-center text-text-secondary hover:text-danger focus-ring rounded"
               :aria-label="t('common.delete')"
             >
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
-          <!-- Prompt (collapsed by default) -->
-          <details class="mt-3 bg-surface rounded-card border border-gray-100">
-            <summary
-              class="px-3 py-2 text-sm text-text-secondary cursor-pointer flex items-center gap-2 hover:bg-gray-50 rounded-card"
-            >
-              <i data-lucide="message-square" class="w-4 h-4 shrink-0"></i>
-              <span x-text="t('image.prompt')"></span>
-            </summary>
-            <p class="px-3 pb-3 text-sm text-text-secondary italic" x-text="gen.data.prompt"></p>
-          </details>
           <!-- Ref. sources -->
           <div
             x-show="gen.sourceIds && gen.sourceIds.length > 0"

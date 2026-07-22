@@ -606,33 +606,6 @@ const saveEditProfile = async function (this: AppContext) {
   this.editingProfile = null;
 };
 
-const _toggleProfileProp = async function (this: AppContext, id: string, prop: string) {
-  const profile = this.profiles.find((p: Profile) => p.id === id);
-  if (!profile) return;
-  const doToggle = async (pin?: string) => {
-    const updates: Record<string, unknown> = {
-      [prop]: !(profile as unknown as Record<string, unknown>)[prop],
-    };
-    if (pin) updates.pin = pin;
-    await this.updateProfile(id, updates);
-  };
-  if (profile.hasPin) {
-    this.requirePin(async (pin: string) => {
-      await doToggle(pin);
-    });
-    return;
-  }
-  await doToggle();
-};
-
-const toggleModeration = async function (this: AppContext, id: string) {
-  await this._toggleProfileProp(id, 'useModeration');
-};
-
-const toggleChat = async function (this: AppContext, id: string) {
-  await this._toggleProfileProp(id, 'chatEnabled');
-};
-
 const openProfilePicker = function (this: AppContext) {
   this.showProfilePicker = true;
 };
@@ -684,9 +657,6 @@ export function createProfiles() {
     closeEditProfile,
     resetProfileDefaults,
     saveEditProfile,
-    _toggleProfileProp,
-    toggleModeration,
-    toggleChat,
     openProfilePicker,
     requirePin,
     submitPinVerify,

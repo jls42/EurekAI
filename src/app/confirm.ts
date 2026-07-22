@@ -128,6 +128,24 @@ const confirmDelete = function (
   callback: () => void | Promise<void>,
 ) {
   this.confirmTarget = CONFIRM_LABELS[target] ? this.t(CONFIRM_LABELS[target]) : target;
+  this.confirmMessage = '';
+  this.confirmCta = '';
+  this.confirmCallback = callback;
+  this.confirmTrigger = document.activeElement as HTMLElement;
+  (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.showModal();
+};
+
+/* Variante générique du dialog de confirmation pour les actions non-suppression
+   (ex. reset des réglages) : message et libellé du CTA fournis directement. */
+const confirmAction = function (
+  this: AppContext,
+  message: string,
+  cta: string,
+  callback: () => void | Promise<void>,
+) {
+  this.confirmTarget = '';
+  this.confirmMessage = message;
+  this.confirmCta = cta;
   this.confirmCallback = callback;
   this.confirmTrigger = document.activeElement as HTMLElement;
   (this.$refs.confirmDialog as HTMLDialogElement | undefined)?.showModal();
@@ -229,6 +247,7 @@ const cancelGeneration = function (this: AppContext) {
 export function createConfirm() {
   return {
     confirmDelete,
+    confirmAction,
     executeConfirm,
     closeConfirmDialog,
     cancelOne,

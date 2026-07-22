@@ -77,6 +77,33 @@ describe('createConfirm', () => {
 
       expect(ctx.confirmTrigger).toBe(fakeElement);
     });
+
+    it('réinitialise message et CTA custom (retour au wording suppression)', () => {
+      ctx.confirmMessage = 'ancien message';
+      ctx.confirmCta = 'ancien CTA';
+
+      confirm.confirmDelete.call(ctx, 'projet', vi.fn());
+
+      expect(ctx.confirmMessage).toBe('');
+      expect(ctx.confirmCta).toBe('');
+    });
+  });
+
+  describe('confirmAction', () => {
+    it('porte message + CTA custom, vide le target, ouvre le dialog', () => {
+      const callback = vi.fn();
+      const fakeElement = { focus: vi.fn() };
+      (globalThis as any).document.activeElement = fakeElement;
+
+      confirm.confirmAction.call(ctx, 'Tout réinitialiser ?', 'Réinitialiser', callback);
+
+      expect(ctx.confirmTarget).toBe('');
+      expect(ctx.confirmMessage).toBe('Tout réinitialiser ?');
+      expect(ctx.confirmCta).toBe('Réinitialiser');
+      expect(ctx.confirmCallback).toBe(callback);
+      expect(ctx.confirmTrigger).toBe(fakeElement);
+      expect(ctx.$refs.confirmDialog.showModal).toHaveBeenCalled();
+    });
   });
 
   describe('executeConfirm', () => {

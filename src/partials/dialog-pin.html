@@ -33,7 +33,7 @@
       <button
         @click="submitPinVerify()"
         :disabled="!/^\d{4}$/.test(pinVerifyInput)"
-        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary text-white hover:bg-primary/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
+        class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
         x-text="t('common.save')"
       ></button>
     </div>

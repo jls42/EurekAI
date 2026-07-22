@@ -1,0 +1,28 @@
+<!-- Liste des scores agrégés (toutes activités : quiz, dictée, texte à trous, quiz vocal…).
+     Partagé entre l'onglet Scores mobile (tab-scores) et la section Scores du dashboard desktop. -->
+<div class="space-y-3">
+  <template x-for="qs in getActivityScores()" :key="qs.gen.id">
+    <div class="bg-surface rounded-card shadow-card p-4 card-lift animate-slide-up">
+      <div class="flex items-center gap-3 mb-2">
+        <i
+          :data-lucide="genIcon(qs.gen.type)"
+          class="w-5 h-5"
+          :style="'color:' + genColor(qs.gen.type)"
+        ></i>
+        <span
+          class="font-semibold text-body-sm text-text-primary flex-1 truncate"
+          x-text="qs.gen.title"
+        ></span>
+        <span
+          class="text-sm px-2.5 py-1 rounded-badge font-bold"
+          :class="qs.lastScore === qs.total ? 'bg-success-light text-success-dark' : 'bg-warning-light text-warning-dark'"
+          x-text="qs.lastScore + '/' + qs.total"
+        ></span>
+      </div>
+      <p
+        class="text-sm text-text-secondary"
+        x-text="t('scores.attempts', { count: qs.attempts })"
+      ></p>
+    </div>
+  </template>
+</div>
