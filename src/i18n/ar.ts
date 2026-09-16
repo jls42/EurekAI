@@ -104,6 +104,8 @@ export const ar: Record<string, string> = {
   'errorCode.context_length_exceeded': 'المحتوى طويل جدا بالنسبة للنموذج',
   'errorCode.llm_invalid_json': 'استجابة غير صالحة من الذكاء الاصطناعي',
   'errorCode.upload_failed': 'فشل التحميل',
+  'errorCode.file_too_large':
+    '\u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0643\u0628\u064a\u0631 \u062c\u062f\u0627. \u0627\u062e\u062a\u0631 \u0645\u0644\u0641\u0627 \u0623\u0635\u063a\u0631.',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
   'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
 

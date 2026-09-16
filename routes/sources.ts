@@ -36,6 +36,7 @@ import type { ApiUsage } from '../helpers/pricing.js';
 import { getConfig } from '../config.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
+import { withUploadErrors } from '../helpers/upload-errors.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -712,7 +713,7 @@ const registerUploadRoute = (
   router.post(
     '/:pid/sources/upload',
     requireKeyMiddleware,
-    dynamicUpload.array('files'),
+    withUploadErrors(dynamicUpload.array('files')),
     async (req, res) => {
       const resolved = resolveOr4xx(req, res);
       if (!resolved) return;
@@ -803,7 +804,7 @@ const registerVoiceRoute = (
   router.post(
     '/:pid/sources/voice',
     requireKeyMiddleware,
-    memoryUpload.single('audio'),
+    withUploadErrors(memoryUpload.single('audio')),
     async (req, res) => {
       const resolved = resolveOr4xx(req, res);
       if (!resolved) return;

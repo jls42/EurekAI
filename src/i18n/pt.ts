@@ -95,6 +95,7 @@ export const pt: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Conte\u00fado demasiado longo para o modelo',
   'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
   'errorCode.upload_failed': 'Falha no envio',
+  'errorCode.file_too_large': 'Este ficheiro \u00e9 demasiado grande. Tenta com um mais pequeno.',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',

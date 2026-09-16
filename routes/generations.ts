@@ -43,6 +43,7 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 import { aiLimiter } from '../helpers/rate-limit.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
+import { withUploadErrors } from '../helpers/upload-errors.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -507,7 +508,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   router.post(
     '/:pid/generations/:gid/vocal-answer',
     requireKeyMiddleware,
-    upload.single('audio'),
+    withUploadErrors(upload.single('audio')),
     async (req, res) => {
       const client = resolveOr4xx(req, res);
       if (!client) return;

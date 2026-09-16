@@ -100,6 +100,8 @@ export const hi: Record<string, string> = {
   'errorCode.context_length_exceeded': 'मॉडल के लिए सामग्री बहुत लंबी है',
   'errorCode.llm_invalid_json': 'AI से अमान्य प्रतिक्रिया',
   'errorCode.upload_failed': 'अपलोड विफल',
+  'errorCode.file_too_large':
+    '\u092F\u0939 \u092B\u093C\u093E\u0907\u0932 \u092C\u0939\u0941\u0924 \u092C\u0921\u093C\u0940 \u0939\u0948\u0964 \u0915\u094B\u0908 \u091B\u094B\u091F\u0940 \u092B\u093C\u093E\u0907\u0932 \u091A\u0941\u0928\u094B\u0964',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
   'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
 
