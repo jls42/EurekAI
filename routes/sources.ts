@@ -35,6 +35,7 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { getConfig } from '../config.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
+import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -261,13 +262,13 @@ const createDynamicUpload = (store: ProjectStore) =>
         cb(null, `${randomUUID()}-${file.originalname}`);
       },
     }),
-    limits: { fileSize: 20 * 1024 * 1024, files: 10 }, // NOSONAR(S5693) — limite bornée volontaire (20 Mo, 10 fichiers) : c'est le garde-fou anti-DoS upload
+    limits: { fileSize: 20 * 1024 * 1024, files: 10, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (20 Mo, 10 fichiers) : c'est le garde-fou anti-DoS upload
   });
 
 const createMemoryUpload = () =>
   multer({
     storage: multer.memoryStorage(),
-    limits: { fileSize: 25 * 1024 * 1024, files: 1 }, // NOSONAR(S5693) — limite bornée volontaire (25 Mo, 1 fichier) : c'est le garde-fou anti-DoS upload
+    limits: { fileSize: 25 * 1024 * 1024, files: 1, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (25 Mo, 1 fichier) : c'est le garde-fou anti-DoS upload
   });
 
 const uploadedFileExt = (file: Express.Multer.File): string => {

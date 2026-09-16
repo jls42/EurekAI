@@ -42,8 +42,12 @@ import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { aiLimiter } from '../helpers/rate-limit.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
+import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } }); // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
+});
 
 const FILL_BLANK = 'fill-blank';
 const DICTATION = 'dictation';
