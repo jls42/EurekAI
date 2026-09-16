@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock Alpine.js
 const mockAlpine = {
@@ -48,7 +48,10 @@ const mockDocument = {
 vi.stubGlobal('document', mockDocument);
 
 describe('main.ts', () => {
-  beforeAll(async () => {
+  // Vitest 5 clears mock history before each test (clearMocks defaults to true), so the
+  // import-time calls must happen inside each test: re-run main.ts on a fresh module registry.
+  beforeEach(async () => {
+    vi.resetModules();
     await import('./main');
   });
 

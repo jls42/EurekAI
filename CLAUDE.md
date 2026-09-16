@@ -148,6 +148,7 @@ Cycle de vie des générations en cours :
 - Les composants interactifs (quiz, fill-blank, flashcards) utilisent le mixin `step-by-step.ts`
 - **Lint** : `npm run lint` (ESLint + typescript-eslint + sonarjs, config `eslint.config.js`) — `lint:fix` pour les auto-fixables. Actif en `pretest` via `lint:ci = eslint . --max-warnings 0` (verrou strict, 0 warning toléré), en complément de `lint:complexity` (Lizard CCN 8 full-repo) et `lint:deadcode` (knip). Règles `no-explicit-any`, `cognitive-complexity`, `no-duplicate-string`, `todo-tag` encore configurées en `warn` mais baseline à 0 — toute nouvelle occurrence bloque `npm test`.
 - **Autres scripts utiles** : `format` / `format:check` (prettier), `test:coverage` / `test:watch` (vitest), `build` / `preview` / `start` (vite + prod), `dev:server` / `dev:web` (splits isolés du `dev` combiné).
+- **Tests (Vitest 5)** : `clearMocks` vaut `true` par défaut — l'historique des mocks est effacé avant chaque test. Ne jamais asserter dans un test des appels déclenchés dans un `beforeAll` : déclencher l'action dans le test ou dans un `beforeEach` (cf. `src/main.test.ts`, `vi.resetModules()` + import dynamique). `coverage.include`/`exclude` sont résolus depuis la racine du projet (plus de correspondance partielle : `types.ts` n'exclut plus que `./types.ts`).
 
 ## Workflow
 
