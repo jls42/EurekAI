@@ -97,6 +97,7 @@ export const fr: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Contenu trop volumineux pour le modèle',
   'errorCode.llm_invalid_json': "Réponse invalide de l'IA",
   'errorCode.upload_failed': "Échec de l'envoi",
+  'errorCode.file_too_large': 'Ce fichier est trop gros. Essaie avec un fichier plus léger.',
   'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
   'errorCode.profile_delete_partial':
     "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",

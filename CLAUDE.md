@@ -51,6 +51,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - Codes : `llm_invalid_json`, `quota_exceeded`, `upstream_unavailable` (503/529 panne backend), `auth_required` (401/403 OU clé API locale non définie), `tts_upstream_error`, `context_length_exceeded`, `internal_error`
 - Status 502 quand tous les steps échouent (réponse inclut `error: 'all_steps_failed'`), 200 sinon
 - **Tous les endpoints** qui renvoient une erreur HTTP doivent utiliser `extractErrorCode(e, '<agent>')` plutôt que `err.message`/`String(e)` (cf. `helpers/error-codes.ts`) — ne pas en créer de nouveaux sans cette pratique.
+- **Uploads multipart** : tout middleware multer DOIT être enveloppé par `withUploadErrors` (`helpers/upload-errors.ts`) → `file_too_large` (413), `upload_failed` (400 : multipart invalide ou garde-fou), `internal_error` (500 : panne du stockage). Sans lui, une erreur multer part dans le handler Express par défaut (500 + page HTML avec stack hors production) et l'UI affiche « Internal Server Error ». Verrou : `routes/upload-guards.test.ts`.
 - Le détail complet (stack, message) reste dans `logger.error` côté serveur
 - **Architecture interne** : `helpers/error-codes.ts` est un re-export mince. La logique vit dans `helpers/error-code-resolution.ts` (orchestration), `helpers/error-code-rules.ts` (règles par agent), `helpers/error-matchers.ts` (matchers par pattern d'erreur — chaque matcher délimité `export function` pour contourner le parseur Lizard TS qui agglomère sinon les `function foo()` top-level consécutives).
 
