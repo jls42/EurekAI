@@ -59,9 +59,12 @@
     <ul class="flex-1 overflow-y-auto" x-show="profileNotifications().length > 0">
       <template x-for="notif in profileNotifications().slice().reverse()" :key="notif.eventKey">
         <li
-          class="px-3 py-2 border-b border-text-secondary/10 last:border-b-0 hover:bg-primary/5 transition-colors cursor-pointer"
+          role="button"
+          tabindex="0"
+          class="px-3 py-2 border-b border-text-secondary/10 last:border-b-0 hover:bg-primary/5 transition-colors cursor-pointer focus-ring"
           :class="!notif.read && 'bg-primary/5 font-medium'"
           @click="navigateToNotification(notif); notifOpen = false"
+          @keydown.enter="navigateToNotification(notif); notifOpen = false"
         >
           <p class="text-body-sm" x-text="notificationMessage(notif)"></p>
           <p

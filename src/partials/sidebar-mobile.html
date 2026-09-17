@@ -1,7 +1,9 @@
 <div x-show="sidebarOpen" class="fixed inset-0 z-50 lg:hidden" x-cloak>
+  <!-- Fond sombre : clic pour fermer, Échap au clavier (écoute globale, le fond n'est pas focusable) -->
   <div
     class="absolute inset-0 bg-black/40"
     @click="sidebarOpen = false"
+    @keydown.escape.window="sidebarOpen = false"
     x-transition:enter="transition ease-out duration-200"
     x-transition:enter-start="opacity-0"
     x-transition:enter-end="opacity-100"
@@ -67,10 +69,14 @@
 
       <div class="space-y-1">
         <template x-for="(p, pi) in sortedProjects()" :key="p.id">
+          <!-- div role=button (pas <button>) : contient le bouton suppression enfant -->
           <div
-            class="flex items-center gap-3 px-2 py-2 rounded-button cursor-pointer text-body-sm transition-colors group"
+            role="button"
+            tabindex="0"
+            class="flex items-center gap-3 px-2 py-2 rounded-button cursor-pointer text-body-sm transition-colors group focus-ring"
             :class="currentProjectId === p.id ? 'bg-primary-light text-primary-dark font-semibold' : 'hover:bg-gray-50 text-text-primary'"
             @click="selectProject(p.id); sidebarOpen = false; mobileTab = 'magic'"
+            @keydown.enter="selectProject(p.id); sidebarOpen = false; mobileTab = 'magic'"
           >
             <span
               class="project-initial"

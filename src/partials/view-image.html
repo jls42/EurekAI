@@ -42,12 +42,15 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <template x-for="gen in generationsByType('image')" :key="gen.id">
       <div class="gen-card animate-slide-up overflow-hidden">
-        <!-- Image (click to lightbox) -->
+        <!-- Image (clic ou Entrée pour agrandir) -->
         <img
+          role="button"
+          tabindex="0"
           :src="gen.data.imageUrl"
           :alt="gen.title"
-          class="w-full rounded-t-card cursor-pointer hover:opacity-90 transition-opacity"
+          class="w-full rounded-t-card cursor-pointer hover:opacity-90 transition-opacity focus-ring"
           @click="openLightbox(gen.data.imageUrl)"
+          @keydown.enter="openLightbox(gen.data.imageUrl)"
         />
         <!-- Info bar -->
         <div class="px-4 py-3">

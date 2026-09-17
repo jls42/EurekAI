@@ -44,10 +44,14 @@
 
     <div class="space-y-1">
       <template x-for="(p, pi) in sortedProjects()" :key="p.id">
+        <!-- div role=button (pas <button>) : contient le bouton suppression enfant -->
         <div
-          class="relative flex items-center gap-2 rounded-button cursor-pointer transition-colors group"
+          role="button"
+          tabindex="0"
+          class="relative flex items-center gap-2 rounded-button cursor-pointer transition-colors group focus-ring"
           :class="[currentProjectId === p.id ? 'bg-primary/10 font-semibold' : 'hover:bg-white/60 text-text-primary', sidebarCollapsed ? 'px-2 py-2 justify-center' : 'px-2.5 py-2']"
           @click="selectProject(p.id)"
+          @keydown.enter="selectProject(p.id)"
           :title="sidebarCollapsed ? p.name : ''"
         >
           <span
