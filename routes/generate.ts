@@ -618,16 +618,14 @@ const buildSummaryGeneration = async (ctx: GenContext): Promise<Generation> => {
   const exclusions = isFalc
     ? ''
     : buildExclusionContext(ctx.project.results.generations, 'summary');
-  const data = await generateSummary(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.summary,
-    ctx.hasConsigne,
-    ctx.lang,
-    ctx.ageGroup,
+  const data = await generateSummary(ctx.client, ctx.markdown, {
+    model: ctx.config.models.summary,
+    hasConsigne: ctx.hasConsigne,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
     exclusions,
-    ctx.register,
-  );
+    register: ctx.register,
+  });
   logger.info(
     'summary',
     `result keys: [${Object.keys(data)}], title: "${data.title?.slice(0, 60)}", key_points: ${data.key_points?.length}`,
@@ -868,15 +866,13 @@ const AUTO_EXECUTORS = new Map<string, AutoExecutor>([
 ]);
 
 const buildAutoSummary = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateSummary(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.summary,
-    ctx.hasConsigne,
-    ctx.lang,
-    ctx.ageGroup,
-    buildExclusionContext(ctx.generations, 'summary'),
-  );
+  const data = await generateSummary(ctx.client, ctx.markdown, {
+    model: ctx.config.models.summary,
+    hasConsigne: ctx.hasConsigne,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+    exclusions: buildExclusionContext(ctx.generations, 'summary'),
+  });
   return makeGen('summary', data, ctx);
 };
 

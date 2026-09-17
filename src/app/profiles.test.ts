@@ -218,23 +218,13 @@ describe('createProfiles', () => {
       expect(ctx.showProfileForm).toBe(false);
     });
 
-    it('returns early with invalid name', async () => {
+    it.each([
+      ['invalid name', { newProfileName: '', newProfileAge: '10' }],
+      ['age too young', { newProfileName: 'Test', newProfileAge: '2' }],
+      ['age too old', { newProfileName: 'Test', newProfileAge: '121' }],
+    ])('returns early with %s', async (_label, fields) => {
       vi.stubGlobal('fetch', vi.fn());
-      const ctx = makeCtx({ newProfileName: '', newProfileAge: '10' });
-      await callMethod('createProfile', ctx);
-      expect(fetch).not.toHaveBeenCalled();
-    });
-
-    it('returns early with invalid age (too young)', async () => {
-      vi.stubGlobal('fetch', vi.fn());
-      const ctx = makeCtx({ newProfileName: 'Test', newProfileAge: '2' });
-      await callMethod('createProfile', ctx);
-      expect(fetch).not.toHaveBeenCalled();
-    });
-
-    it('returns early with invalid age (too old)', async () => {
-      vi.stubGlobal('fetch', vi.fn());
-      const ctx = makeCtx({ newProfileName: 'Test', newProfileAge: '121' });
+      const ctx = makeCtx(fields);
       await callMethod('createProfile', ctx);
       expect(fetch).not.toHaveBeenCalled();
     });

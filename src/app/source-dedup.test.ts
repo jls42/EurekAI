@@ -48,8 +48,8 @@ describe('hashFile', () => {
     }
   });
 
-  it('computes a stable lowercase-hex sha256 when subtle is available', async () => {
-    if (!globalThis.crypto?.subtle) return; // skip si l'environnement de test n'expose pas subtle
+  it('computes a stable lowercase-hex sha256 when subtle is available', async ({ skip }) => {
+    skip(!globalThis.crypto?.subtle, "l'environnement de test n'expose pas crypto.subtle");
     const h = await hashFile(new File(['hello'], 'a.txt'));
     expect(h).toMatch(/^[0-9a-f]{64}$/);
     expect(await hashFile(new File(['hello'], 'b.txt'))).toBe(h); // déterministe (contenu identique)

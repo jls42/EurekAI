@@ -186,7 +186,12 @@ describe('generateSummary', () => {
 
   it('passes correct model, system prompt, user prompt to client', async () => {
     const client = mockClient(validSummary);
-    await generateSummary(client, 'My markdown', 'custom-model', true, 'en', 'ado');
+    await generateSummary(client, 'My markdown', {
+      model: 'custom-model',
+      hasConsigne: true,
+      lang: 'en',
+      ageGroup: 'ado',
+    });
 
     const call = client.chat.complete.mock.calls[0][0];
     expect(call.model).toBe('custom-model');
@@ -212,12 +217,12 @@ describe('generateSummary', () => {
 
   it("registre falc : le bloc STYLE D'ECRITURE atteint le prompt user, absent sinon", async () => {
     const client = mockClient(validSummary);
-    await generateSummary(client, 'contenu', 'm', false, 'fr', 'enfant', undefined, 'falc');
+    await generateSummary(client, 'contenu', { model: 'm', register: 'falc' });
     const falcUser = client.chat.complete.mock.calls[0][0].messages[1].content;
     expect(falcUser).toContain("STYLE D'ECRITURE");
 
     const client2 = mockClient(validSummary);
-    await generateSummary(client2, 'contenu', 'm', false, 'fr', 'enfant');
+    await generateSummary(client2, 'contenu', { model: 'm' });
     const stdUser = client2.chat.complete.mock.calls[0][0].messages[1].content;
     expect(stdUser).not.toContain("STYLE D'ECRITURE");
   });

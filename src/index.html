@@ -239,16 +239,18 @@
     {{> dialog-settings}} {{> dialog-api-key}}
 
     <!-- Image lightbox -->
+    <!-- Clic n'importe où pour fermer ; Échap ferme aussi (natif <dialog>, rendu explicite ici).
+         L'image ne porte pas de handler : le clic remonte au dialog, qui ferme. -->
     <dialog
       x-ref="imageLightbox"
       @click="$refs.imageLightbox?.close()"
+      @keydown.escape="$refs.imageLightbox?.close()"
       class="bg-transparent p-0 max-w-[95vw] max-h-[95vh] backdrop:bg-black/70 rounded-card"
     >
       <img
         :src="lightboxUrl"
         alt=""
         class="max-w-full max-h-[90vh] object-contain rounded-card cursor-pointer"
-        @click.stop="$refs.imageLightbox?.close()"
       />
     </dialog>
 

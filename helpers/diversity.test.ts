@@ -17,21 +17,15 @@ describe('diversityParams', () => {
     expect(p.presencePenalty).toBe(0.2);
   });
 
-  it('returns correct params for summary', () => {
-    const p = diversityParams('summary');
-    expect(p.temperature).toBe(0.4);
-    expect(p.presencePenalty).toBe(0);
-  });
-
-  it('returns correct params for dictation (penalty 0 : la phrase doit re-contenir le mot)', () => {
-    const p = diversityParams('dictation');
-    expect(p.temperature).toBe(0.9);
-    expect(p.presencePenalty).toBe(0);
-  });
-
-  it('returns default params for unknown type', () => {
-    const p = diversityParams('unknown');
-    expect(p.temperature).toBe(0.7);
+  // dictation : presencePenalty 0 VOLONTAIRE (la phrase doit re-contenir le mot, cf. CLAUDE.md).
+  // 'unknown' = type inconnu → valeurs par défaut.
+  it.each([
+    ['summary', 0.4],
+    ['dictation', 0.9],
+    ['unknown', 0.7],
+  ])('returns temperature %s for %s with presencePenalty 0', (type, temperature) => {
+    const p = diversityParams(type);
+    expect(p.temperature).toBe(temperature);
     expect(p.presencePenalty).toBe(0);
   });
 

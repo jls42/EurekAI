@@ -139,14 +139,12 @@ const CHAT_TOOL_EXECUTORS = new Map<string, ChatToolExecutor>([
   [
     'summary',
     async (ctx) => {
-      const data = await generateSummary(
-        ctx.client,
-        ctx.markdown,
-        ctx.config.models.summary,
-        ctx.hasConsigne,
-        ctx.lang,
-        ctx.ageGroup,
-      );
+      const data = await generateSummary(ctx.client, ctx.markdown, {
+        model: ctx.config.models.summary,
+        hasConsigne: ctx.hasConsigne,
+        lang: ctx.lang,
+        ageGroup: ctx.ageGroup,
+      });
       return {
         id: randomUUID(),
         title: autoTitle('summary', data, ctx.lang),

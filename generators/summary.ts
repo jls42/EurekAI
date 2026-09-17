@@ -196,16 +196,32 @@ const completeStudyFiche = async (
   throw new SyntaxError("Le modele n'a pas reussi a generer une fiche valide apres 2 tentatives");
 };
 
+/**
+ * Options de génération d'une fiche. Arg objet (pattern `resolveVoices`, cf. CLAUDE.md) : la
+ * signature positionnelle atteignait 8 paramètres, illisible au call site et flaggée S107.
+ */
+export interface SummaryOptions {
+  model?: string;
+  hasConsigne?: boolean;
+  lang?: string;
+  ageGroup?: AgeGroup;
+  exclusions?: string;
+  register?: SummaryRegister;
+}
+
 export async function generateSummary(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
-  hasConsigne = false,
-  lang = 'fr',
-  ageGroup: AgeGroup = 'enfant',
-  exclusions?: string,
-  register?: SummaryRegister,
+  options: SummaryOptions = {},
 ): Promise<StudyFiche> {
+  const {
+    model = 'mistral-large-latest',
+    hasConsigne = false,
+    lang = 'fr',
+    ageGroup = 'enfant',
+    exclusions,
+    register,
+  } = options;
   const messages: ChatMessage[] = [
     { role: 'system', content: summarySystem(ageGroup) },
     { role: 'user', content: summaryUser(markdown, hasConsigne, lang, exclusions, register) },

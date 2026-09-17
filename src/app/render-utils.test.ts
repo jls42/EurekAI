@@ -23,18 +23,14 @@ describe('sanitizeRenderedHtml', () => {
     );
   });
 
-  it('bloque javascript: encode en entites HTML', () => {
-    const html = '<a href="java&#x09;script:alert(1)">x</a>';
-    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
-  });
-
-  it('bloque le protocole data:', () => {
-    const html = '<a href="data:text/html,<script>alert(1)</script>">x</a>';
-    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
-  });
-
-  it('bloque le protocole vbscript:', () => {
-    const html = '<a href="vbscript:MsgBox(1)">x</a>';
+  // href dangereux, quel que soit l'encodage ou le style de quotes : l'attribut doit disparaître.
+  it.each([
+    ['javascript: encode en entites HTML', '<a href="java&#x09;script:alert(1)">x</a>'],
+    ['protocole data:', '<a href="data:text/html,<script>alert(1)</script>">x</a>'],
+    ['protocole vbscript:', '<a href="vbscript:MsgBox(1)">x</a>'],
+    ['attribut URL avec simple quotes', "<a href='javascript:alert(1)'>x</a>"],
+    ['attribut URL sans quotes', '<a href=javascript:alert(1)>x</a>'],
+  ])('bloque %s', (_label, html) => {
     expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
   });
 
@@ -53,16 +49,6 @@ describe('sanitizeRenderedHtml', () => {
   it('sanitise src avec javascript: sur img', () => {
     const html = '<img src="javascript:alert(1)">';
     expect(sanitizeRenderedHtml(html)).toBe('<img>');
-  });
-
-  it('sanitise les attributs URL avec simple quotes', () => {
-    const html = "<a href='javascript:alert(1)'>x</a>";
-    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
-  });
-
-  it('sanitise les attributs URL sans quotes', () => {
-    const html = '<a href=javascript:alert(1)>x</a>';
-    expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
   });
 
   it('protege un rendu markdown complet contre le HTML brut', () => {
