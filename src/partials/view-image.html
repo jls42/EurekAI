@@ -42,16 +42,19 @@
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
     <template x-for="gen in generationsByType('image')" :key="gen.id">
       <div class="gen-card animate-slide-up overflow-hidden">
-        <!-- Image (clic ou Entrée pour agrandir) -->
-        <img
-          role="button"
-          tabindex="0"
-          :src="gen.data.imageUrl"
-          :alt="gen.title"
-          class="w-full rounded-t-card cursor-pointer hover:opacity-90 transition-opacity focus-ring"
+        <!-- Bouton natif (pas role="button" sur l'<img> : rôle interactif sur élément non
+             interactif, cf. Web:S6842) → clavier et focus gérés nativement. -->
+        <button
+          type="button"
+          class="block w-full focus-ring"
           @click="openLightbox(gen.data.imageUrl)"
-          @keydown.enter="openLightbox(gen.data.imageUrl)"
-        />
+        >
+          <img
+            :src="gen.data.imageUrl"
+            :alt="gen.title"
+            class="w-full rounded-t-card cursor-pointer hover:opacity-90 transition-opacity"
+          />
+        </button>
         <!-- Info bar -->
         <div class="px-4 py-3">
           <div class="flex items-center gap-3">
