@@ -108,6 +108,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 ### HTML interactif
 - Ne JAMAIS imbriquer de `<button>` dans un `<button>` (HTML invalide, casse le layout)
 - Utiliser `<div role="button" tabindex="0" @click @keydown.enter>` quand le conteneur cliquable contient des boutons enfants
+- **Tout `@click` doit avoir son équivalent clavier** (`@keydown.enter`, ou `@keydown.escape[.window]` pour un fond de surcouche / une fermeture) : sans lui, l'élément est inatteignable au clavier ET SonarQube le remonte en **bug** `Web:MouseEventWithoutKeyboardEquivalentCheck` (rating fiabilité B → quality gate rouge). Sonar reconnaît la syntaxe Alpine `@keydown` : pas besoin d'exclusion, le vrai correctif suffit. Ajouter `focus-ring` pour que le focus reste visible.
 - Les boutons de generation dans view-sources sont dynamiques via `x-for` sur `categories` — ne pas hardcoder
 
 ### Pending generations & notifications
