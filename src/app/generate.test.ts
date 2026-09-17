@@ -182,22 +182,15 @@ describe('blockedModerationStatus', () => {
 // --- moderationBlockedMessage ---
 
 describe('moderationBlockedMessage', () => {
-  it('returns pending key for pending status', () => {
+  // 'unsafe' représente les autres statuts : ils retombent tous sur la clé « blocked ».
+  it.each([
+    ['pending', 'moderation.pending'],
+    ['error', 'moderation.error'],
+    ['unsafe', 'moderation.blocked'],
+  ])('returns %s key for %s status', (status, key) => {
     const ctx = makeContext();
-    gen.moderationBlockedMessage.call(ctx, 'pending');
-    expect(ctx.t).toHaveBeenCalledWith('moderation.pending');
-  });
-
-  it('returns error key for error status', () => {
-    const ctx = makeContext();
-    gen.moderationBlockedMessage.call(ctx, 'error');
-    expect(ctx.t).toHaveBeenCalledWith('moderation.error');
-  });
-
-  it('returns blocked key for other statuses', () => {
-    const ctx = makeContext();
-    gen.moderationBlockedMessage.call(ctx, 'unsafe');
-    expect(ctx.t).toHaveBeenCalledWith('moderation.blocked');
+    gen.moderationBlockedMessage.call(ctx, status);
+    expect(ctx.t).toHaveBeenCalledWith(key);
   });
 });
 

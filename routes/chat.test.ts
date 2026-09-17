@@ -418,10 +418,7 @@ describe('POST /:pid/chat', () => {
     expect(generateSummary).toHaveBeenCalledWith(
       expect.anything(),
       expect.stringContaining('CONSIGNE DE REVISION'),
-      expect.anything(),
-      true, // hasConsigne = true
-      'fr',
-      'enfant',
+      expect.objectContaining({ hasConsigne: true, lang: 'fr', ageGroup: 'enfant' }),
     );
   });
 
@@ -449,10 +446,7 @@ describe('POST /:pid/chat', () => {
     expect(generateSummary).toHaveBeenCalledWith(
       expect.anything(),
       expect.not.stringContaining('CONSIGNE DE REVISION'),
-      expect.anything(),
-      false, // hasConsigne = false
-      'fr',
-      'enfant',
+      expect.objectContaining({ hasConsigne: false, lang: 'fr', ageGroup: 'enfant' }),
     );
   });
 

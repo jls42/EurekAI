@@ -175,31 +175,13 @@ describe('profileRoutes', () => {
   // ===== POST / =====
 
   describe('POST /', () => {
-    it('rejects empty name with 400', async () => {
+    it.each([
+      ['empty', { name: '', age: 10 }],
+      ['missing', { age: 10 }],
+      ['non-string', { name: 123, age: 10 }],
+    ])('rejects %s name with 400', async (_label, body) => {
       const handler = getHandler(router, 'post', '/');
-      const req = mockReq({ body: { name: '', age: 10 } });
-      const res = mockRes();
-
-      await handler(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
-    });
-
-    it('rejects missing name with 400', async () => {
-      const handler = getHandler(router, 'post', '/');
-      const req = mockReq({ body: { age: 10 } });
-      const res = mockRes();
-
-      await handler(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
-    });
-
-    it('rejects non-string name with 400', async () => {
-      const handler = getHandler(router, 'post', '/');
-      const req = mockReq({ body: { name: 123, age: 10 } });
+      const req = mockReq({ body });
       const res = mockRes();
 
       await handler(req, res);

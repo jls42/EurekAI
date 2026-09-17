@@ -16,32 +16,15 @@ describe('callWithRetry', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('retries on HTTP 429 then succeeds', async () => {
+  // Statuts transitoires : un seul échec puis succès au 2e appel.
+  it.each([
+    [429, 'rate limited'],
+    [408, 'request timeout'],
+    [503, 'service unavail'],
+  ])('retries on HTTP %i then succeeds', async (status, message) => {
     const fn = vi
       .fn()
-      .mockRejectedValueOnce(Object.assign(new Error('rate limited'), { status: 429 }))
-      .mockResolvedValueOnce('ok');
-    const p = callWithRetry('test', fn);
-    await vi.runAllTimersAsync();
-    await expect(p).resolves.toBe('ok');
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
-
-  it('retries on HTTP 408 Request Timeout then succeeds', async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(Object.assign(new Error('request timeout'), { status: 408 }))
-      .mockResolvedValueOnce('ok');
-    const p = callWithRetry('test', fn);
-    await vi.runAllTimersAsync();
-    await expect(p).resolves.toBe('ok');
-    expect(fn).toHaveBeenCalledTimes(2);
-  });
-
-  it('retries on HTTP 503 then succeeds', async () => {
-    const fn = vi
-      .fn()
-      .mockRejectedValueOnce(Object.assign(new Error('service unavail'), { status: 503 }))
+      .mockRejectedValueOnce(Object.assign(new Error(message), { status }))
       .mockResolvedValueOnce('ok');
     const p = callWithRetry('test', fn);
     await vi.runAllTimersAsync();
@@ -60,32 +43,14 @@ describe('callWithRetry', () => {
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  it('fails fast on HTTP 400 (deterministic)', async () => {
-    const err = Object.assign(new Error('bad request'), { status: 400 });
-    const fn = vi.fn().mockRejectedValue(err);
-    const p = callWithRetry('test', fn);
-    await expect(p).rejects.toBe(err);
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails fast on HTTP 401 auth error', async () => {
-    const err = Object.assign(new Error('unauthorized'), { status: 401 });
-    const fn = vi.fn().mockRejectedValue(err);
-    const p = callWithRetry('test', fn);
-    await expect(p).rejects.toBe(err);
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails fast on HTTP 403 auth error', async () => {
-    const err = Object.assign(new Error('forbidden'), { status: 403 });
-    const fn = vi.fn().mockRejectedValue(err);
-    const p = callWithRetry('test', fn);
-    await expect(p).rejects.toBe(err);
-    expect(fn).toHaveBeenCalledTimes(1);
-  });
-
-  it('fails fast on HTTP 422 validation error', async () => {
-    const err = Object.assign(new Error('invalid'), { status: 422 });
+  // Erreurs déterministes (client) : aucun retry, l'erreur remonte telle quelle.
+  it.each([
+    [400, 'bad request'],
+    [401, 'unauthorized'],
+    [403, 'forbidden'],
+    [422, 'invalid'],
+  ])('fails fast on HTTP %i', async (status, message) => {
+    const err = Object.assign(new Error(message), { status });
     const fn = vi.fn().mockRejectedValue(err);
     const p = callWithRetry('test', fn);
     await expect(p).rejects.toBe(err);

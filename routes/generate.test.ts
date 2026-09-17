@@ -282,32 +282,16 @@ describe('generateRoutes', () => {
       expect(store.getProject(pid)!.results.generations).toHaveLength(0);
     });
 
-    it('quiz-review → 401 AVANT validateQuizReviewInputs', async () => {
+    // body volontairement invalide : le 401 doit primer sur la validation (400) et sur
+    // prepareRouteRequest — la clé est résolue AVANT toute validation/IO (cf. CLAUDE.md).
+    it.each([
+      '/:pid/generate/quiz-review',
+      '/:pid/generate/remediation-summary',
+      '/:pid/generate/route',
+    ])('%s → 401 avant validation', async (path) => {
       forceAuthFail();
       const pid = store.createProject('Test').meta.id;
-      const handler = getHandler(router, 'post', '/:pid/generate/quiz-review');
-      const res = mockRes();
-      // body volontairement invalide : le 401 doit primer sur le 400 de validation.
-      await handler(mockReq({ params: { pid }, body: {} }), res);
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
-    });
-
-    it('remediation-summary → 401 AVANT validateQuizReviewInputs', async () => {
-      forceAuthFail();
-      const pid = store.createProject('Test').meta.id;
-      const handler = getHandler(router, 'post', '/:pid/generate/remediation-summary');
-      const res = mockRes();
-      // body volontairement invalide : le 401 doit primer sur le 400 de validation.
-      await handler(mockReq({ params: { pid }, body: {} }), res);
-      expect(res.status).toHaveBeenCalledWith(401);
-      expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
-    });
-
-    it('route → 401 avant prepareRouteRequest', async () => {
-      forceAuthFail();
-      const pid = store.createProject('Test').meta.id;
-      const handler = getHandler(router, 'post', '/:pid/generate/route');
+      const handler = getHandler(router, 'post', path);
       const res = mockRes();
       await handler(mockReq({ params: { pid }, body: {} }), res);
       expect(res.status).toHaveBeenCalledWith(401);
@@ -514,16 +498,14 @@ describe('generateRoutes', () => {
 
       await handler(req, res);
 
-      expect(generateSummary).toHaveBeenCalledWith(
-        mockClient,
-        expect.any(String),
-        'm', // model
-        false, // hasConsigne
-        'fr', // default lang
-        'enfant', // default ageGroup
-        '', // exclusions (no previous generations)
-        undefined, // register
-      );
+      expect(generateSummary).toHaveBeenCalledWith(mockClient, expect.any(String), {
+        model: 'm',
+        hasConsigne: false,
+        lang: 'fr', // défaut
+        ageGroup: 'enfant', // défaut
+        exclusions: '', // aucune génération précédente
+        register: undefined,
+      });
     });
 
     it('passes custom lang and ageGroup to generator', async () => {
@@ -547,16 +529,14 @@ describe('generateRoutes', () => {
 
       await handler(req, res);
 
-      expect(generateSummary).toHaveBeenCalledWith(
-        mockClient,
-        expect.any(String),
-        'm',
-        false,
-        'en',
-        'ado',
-        '', // exclusions
-        undefined, // register
-      );
+      expect(generateSummary).toHaveBeenCalledWith(mockClient, expect.any(String), {
+        model: 'm',
+        hasConsigne: false,
+        lang: 'en',
+        ageGroup: 'ado',
+        exclusions: '',
+        register: undefined,
+      });
     });
 
     it('rejette un register invalide avec 400 invalid_input', async () => {
@@ -606,16 +586,14 @@ describe('generateRoutes', () => {
 
       await handler(req, res);
 
-      expect(generateSummary).toHaveBeenCalledWith(
-        mockClient,
-        expect.any(String),
-        'm',
-        false,
-        'fr',
-        'enfant',
-        '', // exclusions forcées vides en falc (on simplifie le MÊME contenu)
-        'falc',
-      );
+      expect(generateSummary).toHaveBeenCalledWith(mockClient, expect.any(String), {
+        model: 'm',
+        hasConsigne: false,
+        lang: 'fr',
+        ageGroup: 'enfant',
+        exclusions: '', // forcées vides en falc (on simplifie le MÊME contenu)
+        register: 'falc',
+      });
       const gen = res.json.mock.calls[0][0];
       expect(gen.title).toBe('Version facile — Test Summary');
     });
@@ -647,12 +625,14 @@ describe('generateRoutes', () => {
       expect(generateSummary).toHaveBeenCalledWith(
         mockClient,
         expect.stringContaining('CONSIGNE DE REVISION'),
-        'm',
-        true, // hasConsigne = true
-        'fr',
-        'enfant',
-        '', // exclusions
-        undefined, // register
+        {
+          model: 'm',
+          hasConsigne: true,
+          lang: 'fr',
+          ageGroup: 'enfant',
+          exclusions: '',
+          register: undefined,
+        },
       );
     });
 
@@ -678,12 +658,14 @@ describe('generateRoutes', () => {
       expect(generateSummary).toHaveBeenCalledWith(
         mockClient,
         expect.not.stringContaining('CONSIGNE DE REVISION'),
-        'm',
-        false,
-        'fr',
-        'enfant',
-        '', // exclusions
-        undefined, // register
+        {
+          model: 'm',
+          hasConsigne: false,
+          lang: 'fr',
+          ageGroup: 'enfant',
+          exclusions: '',
+          register: undefined,
+        },
       );
     });
 
@@ -789,12 +771,14 @@ describe('generateRoutes', () => {
       expect(generateSummary).toHaveBeenCalledWith(
         mockClient,
         expect.stringContaining('Beta content'),
-        'm',
-        false,
-        'fr',
-        'enfant',
-        '', // exclusions
-        undefined, // register
+        {
+          model: 'm',
+          hasConsigne: false,
+          lang: 'fr',
+          ageGroup: 'enfant',
+          exclusions: '',
+          register: undefined,
+        },
       );
       // Markdown should not contain source 1
       const calledMarkdown = (generateSummary as any).mock.calls[0][1] as string;
