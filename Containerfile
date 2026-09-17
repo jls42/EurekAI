@@ -23,14 +23,16 @@ LABEL org.opencontainers.image.licenses=AGPL-3.0-only
 
 WORKDIR /app
 
-# Install production dependencies + tsx (needed by "npm start" = "tsx server.ts")
+# Install production dependencies (tsx en fait partie : `npm start` = `tsx server.ts`).
 # --ignore-scripts: skip husky prepare hook (not needed in container)
-# Then rebuild ffmpeg-static to download the ffmpeg binary (skipped by --ignore-scripts)
+# Un `npm install --no-save tsx` séparé ré-résolvait tout le package.json et réinstallait les
+# devDependencies écartées juste avant (vitest, vite, eslint… = 395 paquets au lieu de ~140).
+# Then rebuild ffmpeg-static (ffmpeg binary) and esbuild (binaire de tsx), dont les scripts
+# d'installation ont été sautés par --ignore-scripts.
 COPY package.json package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm \
     npm ci --omit=dev --ignore-scripts && \
-    npm install --no-save tsx && \
-    npm rebuild ffmpeg-static
+    npm rebuild ffmpeg-static esbuild
 
 # Copy built frontend from builder stage
 COPY --from=builder /app/dist ./dist
