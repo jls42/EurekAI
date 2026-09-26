@@ -1,12 +1,13 @@
 /**
  * Statut de modération EFFECTIF côté front, pour le profil courant. Module dédié, hors du
  * vi.mock('./helpers') des tests (cf. pending-utils.ts) : partagé par helpers.ts (badge,
- * consigneVisible), generate.ts (pré-contrôle des générations) et consigne.ts. Même calcul que le
- * serveur, via le helper partagé @helpers/moderation-http.
+ * consigneVisible, masquage du contenu des sources), generate.ts (pré-contrôle des générations)
+ * et consigne.ts. Même calcul que le serveur, via le helper partagé @helpers/moderation-http.
  */
 import {
   consigneUsable,
   gateModerationStatus,
+  moderationRejection,
   profileBlockedCategories,
 } from '@helpers/moderation-http';
 import type { Consigne, ModerationStatus, Profile, Source } from '../../types';
@@ -19,6 +20,10 @@ interface ModerationViewState {
 interface ConsigneViewState extends ModerationViewState {
   consigne: Consigne | null;
   sources: Source[];
+}
+
+interface SourceMaskState extends ModerationViewState {
+  revealedSourceIds?: readonly string[];
 }
 
 /** Catégories bloquées du profil courant : sa liste, sinon les défauts de son âge (API). */
@@ -38,6 +43,22 @@ export const displayedModerationStatus = (
   if (!src) return undefined;
   if (!state.currentProfile?.useModeration) return src.moderation?.status;
   return gateModerationStatus(src.moderation, currentBlockedCategories(state));
+};
+
+/**
+ * Contenu d'une source masqué pour le profil courant (aperçu de la carte ; texte OCR, original et
+ * comparaison du dialogue source) : profil modéré et statut AFFICHÉ qui bloquerait une génération
+ * (moderationRejection : `unsafe`, `error`, `pending`, source jamais vérifiée, statut inattendu).
+ * Faux pour une source révélée par un parent (revealedSourceIds, vidé à la fermeture du dialogue
+ * et par resetSession). Protection d'interface seulement : l'API et /output restent lisibles.
+ */
+export const sourceContentMasked = (
+  state: SourceMaskState,
+  src: Source | null | undefined,
+): boolean => {
+  if (!src || !state.currentProfile?.useModeration) return false;
+  if (state.revealedSourceIds?.includes(src.id)) return false;
+  return moderationRejection(displayedModerationStatus(state, src)) !== null;
 };
 
 /**

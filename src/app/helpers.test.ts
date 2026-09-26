@@ -1412,6 +1412,51 @@ describe('badge de modération : statut effectif', () => {
   });
 });
 
+// Contenu d'une source non sûre masqué pour un profil modéré (aperçu de la carte, dialogue) :
+// méthodes des gabarits, sur le statut AFFICHÉ et la liste des sources révélées.
+describe('contenu masqué : sourceContentMasked / sourceMaskMessage', () => {
+  const t = (key: string) => key;
+  const ctxFor = (profile: Record<string, unknown> | null, revealedSourceIds: string[] = []) => ({
+    ...helpers,
+    t,
+    currentProfile: profile,
+    moderationDefaults: { enfant: ['sexual'] },
+    revealedSourceIds,
+  });
+  const moderated = ctxFor({ useModeration: true, ageGroup: 'enfant' });
+  const src = (status?: string) => ({
+    id: 's1',
+    markdown: 'texte',
+    ...(status ? { moderation: { status, categories: {} } } : {}),
+  });
+
+  it('profil modéré : signalée, en erreur, en attente ou jamais vérifiée → masquée', () => {
+    for (const s of [src('unsafe'), src('error'), src('pending'), src()]) {
+      expect(callWith(helpers.sourceContentMasked, moderated, s)).toBe(true);
+    }
+    expect(callWith(helpers.sourceContentMasked, moderated, src('safe'))).toBe(false);
+  });
+
+  it('révélée par un parent ou profil non modéré → affichée', () => {
+    const revealed = ctxFor({ useModeration: true, ageGroup: 'enfant' }, ['s1']);
+    expect(callWith(helpers.sourceContentMasked, revealed, src('unsafe'))).toBe(false);
+    const free = ctxFor({ useModeration: false });
+    expect(callWith(helpers.sourceContentMasked, free, src('unsafe'))).toBe(false);
+  });
+
+  it('encart : « vérification en cours » en attente (ou jamais vérifiée), sinon « masqué »', () => {
+    expect(callWith(helpers.sourceMaskMessage, moderated, src('pending'))).toBe(
+      'sources.contentChecking',
+    );
+    expect(callWith(helpers.sourceMaskMessage, moderated, src())).toBe('sources.contentChecking');
+    for (const status of ['unsafe', 'error', 'blocked']) {
+      expect(callWith(helpers.sourceMaskMessage, moderated, src(status))).toBe(
+        'sources.contentMasked',
+      );
+    }
+  });
+});
+
 // Consigne montrée à l'enfant (dialogue, bandeaux) : même garde que le serveur (consigneUsable),
 // pour le profil courant ; les gabarits ne testent jamais `consigne.found` seul.
 describe('consigneVisible', () => {

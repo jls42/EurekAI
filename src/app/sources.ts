@@ -383,6 +383,8 @@ export function createSources() {
 
     openSourceDialog(this: AppContext, src: Source) {
       this.viewSource = src;
+      // Chaque ouverture repart masquée (profil modéré, source non sûre) : révélation à refaire.
+      this.revealedSourceIds = [];
       this.viewSourceMode = 'ocr';
       this.viewSourceZoom = 1;
       this.viewSourceRotation = this.viewSourceRotations[src.id] || 0;
@@ -446,9 +448,16 @@ export function createSources() {
       this.viewSourceDragging = false;
     },
 
+    // Appelé aussi par l'événement `close` du <dialog> (Échap) : toute fermeture remasque le
+    // contenu révélé, aperçu de la carte compris.
     closeSourceDialog(this: AppContext) {
       (this.$refs.sourceDialog as HTMLDialogElement | undefined)?.close();
       this.viewSource = null;
+      this.revealedSourceIds = [];
+    },
+
+    revealSourceContent(this: AppContext, src: Source) {
+      runRevealSourceContent(this, src);
     },
 
     async refreshModeration(this: AppContext, retries = 3) {
@@ -495,6 +504,20 @@ const canRecheckModeration = function (this: AppContext, src: Source): boolean {
   if (!this.currentProfile?.useModeration) return false;
   const status = this.moderationStatus(src);
   return status === 'pending' || status === 'error';
+};
+
+// « Afficher (parent) » dans l'encart d'une source masquée : PIN du profil COURANT via
+// requireProfilePin (requireParentalAccess dépend d'editingProfile, null hors de l'Espace parent :
+// il laisserait passer sans PIN) ; profil sans PIN → révélation directe. La source n'est révélée
+// que si le dialogue la montre encore une fois le PIN vérifié (fermé entre-temps : rien).
+const runRevealSourceContent = (state: AppContext, src: Source): void => {
+  const profileId = state.currentProfile?.id;
+  if (!profileId) return;
+  state.requireProfilePin(profileId, () => {
+    if (state.viewSource?.id !== src.id || state.revealedSourceIds.includes(src.id)) return;
+    state.revealedSourceIds.push(src.id);
+    state.$nextTick(() => state.refreshIcons());
+  });
 };
 
 // Même route que le pré-contrôle des générations, pour cette seule source ; bouton désactivé

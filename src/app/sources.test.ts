@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSources } from './sources';
+import { createProfiles } from './profiles';
 import type { Source } from '../../types';
 
 // Mock document.querySelector for openSourceDialog
@@ -263,6 +264,13 @@ describe('createSources', () => {
 
       expect(ctx.viewSourceRotation).toBe(180);
     });
+
+    it('repart masqué : une révélation ne survit pas à une nouvelle ouverture', () => {
+      (ctx as any).revealedSourceIds = ['s1'];
+      src.openSourceDialog.call(ctx, { id: 's1' } as unknown as Source);
+
+      expect((ctx as any).revealedSourceIds).toEqual([]);
+    });
   });
 
   describe('zoomIn / zoomOut / resetZoom', () => {
@@ -341,6 +349,123 @@ describe('createSources', () => {
 
       expect(ctx.$refs.sourceDialog.close).toHaveBeenCalled();
       expect(ctx.viewSource).toBeNull();
+    });
+
+    it('remasque le contenu révélé (dialogue et aperçu de la carte) à la fermeture', () => {
+      ctx.viewSource = { id: 's1' };
+      (ctx as any).revealedSourceIds = ['s1'];
+      src.closeSourceDialog.call(ctx);
+
+      expect((ctx as any).revealedSourceIds).toEqual([]);
+    });
+  });
+
+  // « Afficher (parent) » : révélation par le PIN du profil COURANT (requireProfilePin), pour
+  // l'ouverture en cours du dialogue seulement.
+  describe('revealSourceContent', () => {
+    const shown = { id: 's1' } as unknown as Source;
+    const revealCtx = (overrides: Record<string, any> = {}) =>
+      Object.assign(ctx, {
+        currentProfile: { id: 'p1', useModeration: true },
+        viewSource: shown,
+        revealedSourceIds: [] as string[],
+        requireProfilePin: vi.fn(),
+        ...overrides,
+      }) as any;
+
+    it('passe par requireProfilePin avec le profil courant, rien de révélé avant le PIN', () => {
+      const c = revealCtx();
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.requireProfilePin).toHaveBeenCalledWith('p1', expect.any(Function));
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    it('PIN vérifié : la source est révélée une seule fois, icônes rafraîchies', () => {
+      const c = revealCtx({ requireProfilePin: vi.fn((_id: string, cb: () => void) => cb()) });
+      src.revealSourceContent.call(c, shown);
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.revealedSourceIds).toEqual(['s1']);
+      expect(c.refreshIcons).toHaveBeenCalled();
+    });
+
+    it('dialogue fermé (ou autre source) avant la fin de la vérification : rien de révélé', () => {
+      let verified: (() => void) | undefined;
+      const c = revealCtx({
+        requireProfilePin: vi.fn((_id: string, cb: () => void) => {
+          verified = cb;
+        }),
+      });
+      src.revealSourceContent.call(c, shown);
+      src.closeSourceDialog.call(c);
+      verified?.();
+
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    it('aucun profil courant : aucune garde lancée, rien de révélé', () => {
+      const c = revealCtx({ currentProfile: null });
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.requireProfilePin).not.toHaveBeenCalled();
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    // Avec la VRAIE garde (createProfiles().requireProfilePin) : PIN demandé puis vérifié par
+    // PUT /api/profiles/:id ; profil sans PIN (≥ 15 ans) → révélation directe.
+    describe('avec la vraie garde PIN', () => {
+      const guard = createProfiles().requireProfilePin;
+
+      const pinCtx = (hasPin: boolean) => {
+        const captured: { verification?: Promise<unknown> } = {};
+        const c = revealCtx({
+          profiles: [{ id: 'p1', hasPin }],
+          requireProfilePin: guard,
+          requirePin: vi.fn((fn: (pin: string) => unknown) => {
+            captured.verification = Promise.resolve(fn('1234'));
+          }),
+        });
+        return { c, captured };
+      };
+
+      it('PIN correct → requête de vérification puis révélation', async () => {
+        vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+        const { c, captured } = pinCtx(true);
+        src.revealSourceContent.call(c, shown);
+        expect(c.requirePin).toHaveBeenCalled();
+        expect(c.revealedSourceIds).toEqual([]);
+        await captured.verification;
+
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          '/api/profiles/p1',
+          expect.objectContaining({ method: 'PUT', body: JSON.stringify({ pin: '1234' }) }),
+        );
+        expect(c.revealedSourceIds).toEqual(['s1']);
+      });
+
+      it('PIN refusé (403) → contenu toujours masqué', async () => {
+        vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          headers: new Headers(),
+        } as any);
+        const { c, captured } = pinCtx(true);
+        src.revealSourceContent.call(c, shown);
+        await captured.verification;
+
+        expect(c.revealedSourceIds).toEqual([]);
+        expect(c.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
+      });
+
+      it('profil sans PIN → révélation directe, sans dialogue PIN ni requête', () => {
+        const { c } = pinCtx(false);
+        src.revealSourceContent.call(c, shown);
+
+        expect(c.requirePin).not.toHaveBeenCalled();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(c.revealedSourceIds).toEqual(['s1']);
+      });
     });
   });
 

@@ -446,10 +446,22 @@
               Revérifier
             </button>
           </div>
-          <p
-            class="text-sm text-text-secondary line-clamp-1"
-            x-text="src.markdown.slice(0, 100)"
-          ></p>
+          <!-- Aperçu du texte : jamais rendu quand le contenu est masqué (profil modéré, source
+               non sûre, cf. sourceContentMasked) ; nom, type et badges restent visibles. -->
+          <template x-if="!sourceContentMasked(src)">
+            <p
+              class="text-sm text-text-secondary line-clamp-1"
+              x-text="src.markdown.slice(0, 100)"
+            ></p>
+          </template>
+          <template x-if="sourceContentMasked(src)">
+            <p
+              class="text-sm text-text-secondary italic line-clamp-1"
+              x-text="sourceMaskMessage(src)"
+            >
+              Ce contenu est masqué
+            </p>
+          </template>
         </div>
         <button
           @click="openSourceDialog(src)"

@@ -285,6 +285,9 @@ export const ar: Record<string, string> = {
   'sources.viewText': '\u0639\u0631\u0636 \u0627\u0644\u0646\u0635',
   'sources.deleteSource': '\u062d\u0630\u0641 \u0627\u0644\u0645\u0635\u062f\u0631',
   'sources.recheckModeration': 'إعادة التحقق',
+  'sources.contentMasked': 'هذا المحتوى مخفي',
+  'sources.contentChecking': 'جارٍ التحقق…',
+  'sources.revealContent': 'إظهار (وليّ الأمر)',
   'sources.emptyTitle':
     '\u0623\u0636\u0641 \u0635\u0648\u0631\u0629 \u0623\u0648 \u0646\u0635\u0627\u064b',
   'sources.emptySubtitle':

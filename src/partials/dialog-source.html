@@ -1,8 +1,11 @@
 <!-- ================================================================ -->
 <!-- DIALOG: Source viewer -->
 <!-- ================================================================ -->
+<!-- @close : toute fermeture (bouton, Échap) passe par closeSourceDialog, qui remasque le contenu
+     révélé par le PIN parental (revealedSourceIds). -->
 <dialog
   x-ref="sourceDialog"
+  @close="closeSourceDialog()"
   class="rounded-dialog p-0 w-full max-h-[85vh] shadow-float bg-surface"
   :class="(viewSourceMode === 'compare' && !viewSourceCompareVertical) || viewSourceZoom > 1 ? 'max-w-5xl' : 'max-w-2xl'"
 >
@@ -48,9 +51,9 @@
         </button>
       </div>
 
-      <!-- Mode bar (OCR sources only) -->
+      <!-- Mode bar (OCR sources only, hidden while the content is masked) -->
       <div
-        x-show="isOcrSource(viewSource)"
+        x-show="isOcrSource(viewSource) && !sourceContentMasked(viewSource)"
         class="flex items-center gap-1 px-5 py-2.5 border-b border-gray-100 bg-gray-50 shrink-0"
       >
         <button
@@ -95,9 +98,9 @@
         </button>
       </div>
 
-      <!-- Zoom/Rotation toolbar (images only, in original or compare mode) -->
+      <!-- Zoom/Rotation toolbar (images only, in original or compare mode, content not masked) -->
       <div
-        x-show="isOcrSource(viewSource) && isImageFile(viewSource.filename) && (viewSourceMode === 'original' || viewSourceMode === 'compare')"
+        x-show="!sourceContentMasked(viewSource) && isOcrSource(viewSource) && isImageFile(viewSource.filename) && (viewSourceMode === 'original' || viewSourceMode === 'compare')"
         class="flex items-center justify-center gap-1 px-5 py-2 border-b border-gray-100 bg-gray-50/30 shrink-0"
       >
         <button
@@ -144,130 +147,177 @@
 
       <!-- Body -->
       <div class="overflow-y-auto flex-1 min-h-0 p-5">
-        <!-- Mode: OCR text (default for all types) -->
-        <div x-show="viewSourceMode === 'ocr' || !isOcrSource(viewSource)">
-          <div class="bg-gray-50 rounded-card p-4">
-            <div
-              class="prose prose-sm max-w-none text-body-sm text-text-primary whitespace-pre-wrap leading-relaxed"
-              x-text="viewSource.markdown"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Mode: Original document -->
-        <div
-          x-show="viewSourceMode === 'original' && isOcrSource(viewSource) && getOriginalFileUrl(viewSource)"
-        >
-          <template x-if="isImageFile(viewSource.filename)">
-            <div
-              class="relative overflow-hidden rounded-card bg-gray-100"
-              @mousedown="startDrag($event)"
-              @mousemove="onDrag($event)"
-              @mouseup="stopDrag()"
-              @mouseleave="stopDrag()"
-              @touchstart="startDrag($event)"
-              @touchmove="onDrag($event)"
-              @touchend="stopDrag()"
-            >
-              <img
-                :src="getOriginalFileUrl(viewSource)"
-                :alt="viewSource.filename"
-                class="shadow-card mx-auto max-w-full max-h-[60vh] select-none"
-                :class="[(viewSourceZoom > 1 || viewSourceRotation % 360 !== 0) ? (viewSourceDragging ? 'cursor-grabbing' : 'cursor-grab') : '', viewSourceDragging ? '' : 'transition-transform duration-300']"
-                :style="'transform: translate(' + viewSourcePanX + 'px, ' + viewSourcePanY + 'px) scale(' + viewSourceZoom + ') rotate(' + viewSourceRotation + 'deg); transform-origin: center'"
-                draggable="false"
-              />
-            </div>
-          </template>
-          <template x-if="isPdfFile(viewSource.filename)">
-            <iframe
-              :src="getOriginalFileUrl(viewSource)"
-              title="Document"
-              class="w-full rounded-card shadow-card border-0"
-              style="min-height: 60vh"
-            ></iframe>
-          </template>
-        </div>
-
-        <!-- Mode: Compare (desktop only) -->
-        <div
-          x-show="viewSourceMode === 'compare' && isOcrSource(viewSource) && getOriginalFileUrl(viewSource)"
-        >
+        <!-- Contenu masqué (profil modéré, source non sûre, cf. sourceContentMasked) : encart neutre
+             à la place des 3 modes. Rien n'est rendu derrière (x-if) : ni texte, ni <img>/<iframe>,
+             l'URL de l'original n'est même pas demandée. Révélation par le PIN parental du profil
+             courant (revealSourceContent), pour cette ouverture seulement. -->
+        <template x-if="sourceContentMasked(viewSource)">
           <div
-            :class="viewSourceCompareVertical ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-4'"
+            class="flex flex-col items-center gap-3 text-center py-8 px-4 bg-surface-hover rounded-card"
           >
-            <div>
-              <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-              <h4
-                class="font-heading font-semibold text-sm text-text-secondary mb-2 flex items-center gap-1.5"
-              >
-                <i data-lucide="image" class="w-4 h-4"></i>
-                <span x-text="t('sourceDialog.originalDoc')">Original</span>
-              </h4>
-              <div
-                class="bg-gray-50 rounded-card p-2 relative overflow-hidden"
-                @mousedown="startDrag($event)"
-                @mousemove="onDrag($event)"
-                @mouseup="stopDrag()"
-                @mouseleave="stopDrag()"
-                @touchstart="startDrag($event)"
-                @touchmove="onDrag($event)"
-                @touchend="stopDrag()"
-              >
-                <template x-if="isImageFile(viewSource.filename)">
-                  <img
-                    :src="getOriginalFileUrl(viewSource)"
-                    :alt="viewSource.filename"
-                    class="max-w-full max-h-[40vh] select-none"
-                    :class="[(viewSourceZoom > 1 || viewSourceRotation % 360 !== 0) ? (viewSourceDragging ? 'cursor-grabbing' : 'cursor-grab') : '', viewSourceDragging ? '' : 'transition-transform duration-300']"
-                    :style="'transform: translate(' + viewSourcePanX + 'px, ' + viewSourcePanY + 'px) scale(' + viewSourceZoom + ') rotate(' + viewSourceRotation + 'deg); transform-origin: center'"
-                    draggable="false"
-                  />
-                </template>
-                <template x-if="isPdfFile(viewSource.filename)">
-                  <iframe
-                    :src="getOriginalFileUrl(viewSource)"
-                    title="Document"
-                    class="w-full rounded-card border-0"
-                    style="min-height: 50vh"
-                  ></iframe>
-                </template>
-              </div>
-            </div>
-            <div>
-              <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
-              <h4
-                class="font-heading font-semibold text-sm text-text-secondary mb-2 flex items-center gap-1.5"
-              >
-                <i data-lucide="file-text" class="w-4 h-4"></i>
-                <span x-text="t('sourceDialog.extractedText')">Extracted text</span>
-              </h4>
-              <div class="bg-gray-50 rounded-card p-4 overflow-y-auto max-h-[40vh]">
+            <span
+              class="w-14 h-14 rounded-badge bg-primary-light text-primary-dark flex items-center justify-center"
+            >
+              <i
+                x-show="moderationStatus(viewSource) === 'pending'"
+                data-lucide="hourglass"
+                class="w-7 h-7"
+                aria-hidden="true"
+              ></i>
+              <i
+                x-show="moderationStatus(viewSource) !== 'pending'"
+                data-lucide="eye-off"
+                class="w-7 h-7"
+                aria-hidden="true"
+              ></i>
+            </span>
+            <p
+              role="status"
+              class="text-body-sm font-semibold text-text-primary"
+              x-text="sourceMaskMessage(viewSource)"
+            >
+              Ce contenu est masqué
+            </p>
+            <button
+              type="button"
+              @click="revealSourceContent(viewSource)"
+              class="inline-flex items-center gap-2 min-h-touch px-4 rounded-button bg-surface border border-border-default text-sm font-semibold text-primary-dark hover:bg-primary-light transition-colors focus-ring btn-press"
+            >
+              <i data-lucide="lock-keyhole" class="w-4 h-4" aria-hidden="true"></i>
+              <span x-text="t('sources.revealContent')">Afficher (parent)</span>
+            </button>
+          </div>
+        </template>
+
+        <!-- Contenu affiché : 3 modes + cas legacy, rendus seulement hors masquage (x-if). -->
+        <template x-if="!sourceContentMasked(viewSource)">
+          <div>
+            <!-- Mode: OCR text (default for all types) -->
+            <div x-show="viewSourceMode === 'ocr' || !isOcrSource(viewSource)">
+              <div class="bg-gray-50 rounded-card p-4">
                 <div
                   class="prose prose-sm max-w-none text-body-sm text-text-primary whitespace-pre-wrap leading-relaxed"
                   x-text="viewSource.markdown"
                 ></div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Legacy: no filePath for OCR sources -->
-        <div
-          x-show="isOcrSource(viewSource) && !getOriginalFileUrl(viewSource) && viewSourceMode !== 'ocr'"
-          class="text-center py-8"
-        >
-          <div
-            class="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-[1rem] flex items-center justify-center"
-          >
-            <i data-lucide="image-off" class="w-7 h-7 text-text-secondary"></i>
+            <!-- Mode: Original document -->
+            <div
+              x-show="viewSourceMode === 'original' && isOcrSource(viewSource) && getOriginalFileUrl(viewSource)"
+            >
+              <template x-if="isImageFile(viewSource.filename)">
+                <div
+                  class="relative overflow-hidden rounded-card bg-gray-100"
+                  @mousedown="startDrag($event)"
+                  @mousemove="onDrag($event)"
+                  @mouseup="stopDrag()"
+                  @mouseleave="stopDrag()"
+                  @touchstart="startDrag($event)"
+                  @touchmove="onDrag($event)"
+                  @touchend="stopDrag()"
+                >
+                  <img
+                    :src="getOriginalFileUrl(viewSource)"
+                    :alt="viewSource.filename"
+                    class="shadow-card mx-auto max-w-full max-h-[60vh] select-none"
+                    :class="[(viewSourceZoom > 1 || viewSourceRotation % 360 !== 0) ? (viewSourceDragging ? 'cursor-grabbing' : 'cursor-grab') : '', viewSourceDragging ? '' : 'transition-transform duration-300']"
+                    :style="'transform: translate(' + viewSourcePanX + 'px, ' + viewSourcePanY + 'px) scale(' + viewSourceZoom + ') rotate(' + viewSourceRotation + 'deg); transform-origin: center'"
+                    draggable="false"
+                  />
+                </div>
+              </template>
+              <template x-if="isPdfFile(viewSource.filename)">
+                <iframe
+                  :src="getOriginalFileUrl(viewSource)"
+                  title="Document"
+                  class="w-full rounded-card shadow-card border-0"
+                  style="min-height: 60vh"
+                ></iframe>
+              </template>
+            </div>
+
+            <!-- Mode: Compare (desktop only) -->
+            <div
+              x-show="viewSourceMode === 'compare' && isOcrSource(viewSource) && getOriginalFileUrl(viewSource)"
+            >
+              <div
+                :class="viewSourceCompareVertical ? 'flex flex-col gap-4' : 'grid grid-cols-2 gap-4'"
+              >
+                <div>
+                  <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+                  <h4
+                    class="font-heading font-semibold text-sm text-text-secondary mb-2 flex items-center gap-1.5"
+                  >
+                    <i data-lucide="image" class="w-4 h-4"></i>
+                    <span x-text="t('sourceDialog.originalDoc')">Original</span>
+                  </h4>
+                  <div
+                    class="bg-gray-50 rounded-card p-2 relative overflow-hidden"
+                    @mousedown="startDrag($event)"
+                    @mousemove="onDrag($event)"
+                    @mouseup="stopDrag()"
+                    @mouseleave="stopDrag()"
+                    @touchstart="startDrag($event)"
+                    @touchmove="onDrag($event)"
+                    @touchend="stopDrag()"
+                  >
+                    <template x-if="isImageFile(viewSource.filename)">
+                      <img
+                        :src="getOriginalFileUrl(viewSource)"
+                        :alt="viewSource.filename"
+                        class="max-w-full max-h-[40vh] select-none"
+                        :class="[(viewSourceZoom > 1 || viewSourceRotation % 360 !== 0) ? (viewSourceDragging ? 'cursor-grabbing' : 'cursor-grab') : '', viewSourceDragging ? '' : 'transition-transform duration-300']"
+                        :style="'transform: translate(' + viewSourcePanX + 'px, ' + viewSourcePanY + 'px) scale(' + viewSourceZoom + ') rotate(' + viewSourceRotation + 'deg); transform-origin: center'"
+                        draggable="false"
+                      />
+                    </template>
+                    <template x-if="isPdfFile(viewSource.filename)">
+                      <iframe
+                        :src="getOriginalFileUrl(viewSource)"
+                        title="Document"
+                        class="w-full rounded-card border-0"
+                        style="min-height: 50vh"
+                      ></iframe>
+                    </template>
+                  </div>
+                </div>
+                <div>
+                  <!-- NOSONAR(S5254) — Alpine.js x-text fills heading content at runtime -->
+                  <h4
+                    class="font-heading font-semibold text-sm text-text-secondary mb-2 flex items-center gap-1.5"
+                  >
+                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                    <span x-text="t('sourceDialog.extractedText')">Extracted text</span>
+                  </h4>
+                  <div class="bg-gray-50 rounded-card p-4 overflow-y-auto max-h-[40vh]">
+                    <div
+                      class="prose prose-sm max-w-none text-body-sm text-text-primary whitespace-pre-wrap leading-relaxed"
+                      x-text="viewSource.markdown"
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Legacy: no filePath for OCR sources -->
+            <div
+              x-show="isOcrSource(viewSource) && !getOriginalFileUrl(viewSource) && viewSourceMode !== 'ocr'"
+              class="text-center py-8"
+            >
+              <div
+                class="w-14 h-14 mx-auto mb-3 bg-gray-100 rounded-[1rem] flex items-center justify-center"
+              >
+                <i data-lucide="image-off" class="w-7 h-7 text-text-secondary"></i>
+              </div>
+              <p
+                class="text-text-secondary text-body-sm"
+                x-text="t('sourceDialog.legacyNotAvailable')"
+              ></p>
+              <p class="text-text-secondary text-sm mt-1" x-text="t('sourceDialog.legacyHint')"></p>
+            </div>
           </div>
-          <p
-            class="text-text-secondary text-body-sm"
-            x-text="t('sourceDialog.legacyNotAvailable')"
-          ></p>
-          <p class="text-text-secondary text-sm mt-1" x-text="t('sourceDialog.legacyHint')"></p>
-        </div>
+        </template>
       </div>
     </div>
   </template>

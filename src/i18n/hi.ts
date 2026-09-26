@@ -287,6 +287,9 @@ export const hi: Record<string, string> = {
   'sources.viewText': '\u091F\u0947\u0915\u094D\u0938\u094D\u091F \u0926\u0947\u0916\u0947\u0902',
   'sources.deleteSource': '\u0938\u094D\u0930\u094B\u0924 \u0939\u091F\u093E\u090F\u0901',
   'sources.recheckModeration': 'फिर से जाँचें',
+  'sources.contentMasked': 'यह सामग्री छिपी हुई है',
+  'sources.contentChecking': 'जाँच हो रही है…',
+  'sources.revealContent': 'दिखाएँ (अभिभावक)',
   'sources.emptyTitle':
     '\u092B\u093C\u094B\u091F\u094B \u092F\u093E \u091F\u0947\u0915\u094D\u0938\u094D\u091F \u091C\u094B\u0921\u093C\u0947\u0902',
   'sources.emptySubtitle':

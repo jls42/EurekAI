@@ -114,6 +114,7 @@ export interface AppContext extends AppState {
   checkMobile(): void;
   toggleTheme(): void;
   openSourceDialog(src: Source): void;
+  revealSourceContent(src: Source): void;
 
   loadProfiles(): Promise<void>;
   loadConfig(): Promise<void>;
@@ -213,6 +214,8 @@ export interface AppContext extends AppState {
   ocrConfidenceIcon(src: Source): string;
   ocrConfidenceToneClass(src: Source): string;
   moderationStatus(src: Source): string | null;
+  sourceContentMasked(src: Source): boolean;
+  sourceMaskMessage(src: Source): string;
   moderationBadgeColor(src: Source): string;
   moderationBadgeIcon(src: Source): string;
   moderationBadgeIconClass(src: Source): string;

@@ -1,7 +1,11 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import { pendingOfTypeExists } from './pending-utils';
-import { consigneVisibleFor, displayedModerationStatus } from './effective-moderation';
+import {
+  consigneVisibleFor,
+  displayedModerationStatus,
+  sourceContentMasked as contentMaskedFor,
+} from './effective-moderation';
 import { openingProfileQuery } from './project-snapshot';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
@@ -349,6 +353,19 @@ const ocrConfidenceToneClass = function (this: AppContext, src: Source) {
 // modéré, persisté sinon (cf. displayedModerationStatus).
 const moderationStatus = function (this: AppContext, src: Source): string | null {
   return displayedModerationStatus(this, src) ?? null;
+};
+
+// Contenu de la source masqué pour le profil courant (cf. sourceContentMasked) : les gabarits
+// n'affichent alors ni texte, ni original, ni comparaison, seulement l'encart neutre.
+const sourceContentMasked = function (this: AppContext, src: Source): boolean {
+  return contentMaskedFor(this, src);
+};
+
+// Texte de l'encart : vérification en cours pour une source en attente (ou jamais vérifiée),
+// sinon « contenu masqué » (signalée, modération en erreur, statut inattendu).
+const sourceMaskMessage = function (this: AppContext, src: Source): string {
+  const pending = this.moderationStatus(src) === 'pending';
+  return this.t(pending ? 'sources.contentChecking' : 'sources.contentMasked');
 };
 
 const podcastSpeakerName = function (gen: PodcastGeneration, line: PodcastLine): string {
@@ -1146,6 +1163,8 @@ const OCR_MODERATION_HELPERS = {
   ocrConfidenceIcon,
   ocrConfidenceToneClass,
   moderationStatus,
+  sourceContentMasked,
+  sourceMaskMessage,
   moderationBadgeColor,
   moderationBadgeIcon,
   moderationBadgeIconClass,
