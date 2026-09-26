@@ -40,6 +40,7 @@ describe('ocrFile', () => {
       model: 'mistral-ocr-4-0',
       document: { fileId: 'file-123', type: 'file' },
       confidenceScoresGranularity: 'page',
+      includeBlocks: false,
     });
     expect(result.markdown).toBe('# Page 1');
     expect(typeof result.elapsed).toBe('number');
@@ -62,6 +63,18 @@ describe('ocrFile', () => {
     expect(client.ocr.process).toHaveBeenCalledWith(
       expect.objectContaining({ model: 'mistral-ocr-2512' }),
     );
+  });
+
+  it('pins includeBlocks: false for every model (API and SDK >= 2.6.1 default to true)', async () => {
+    const client = createClient();
+    await ocrFile(client, '/tmp/test.pdf', 'test.pdf', 'mistral-ocr-2512');
+
+    expect(client.ocr.process).toHaveBeenCalledWith({
+      model: 'mistral-ocr-2512',
+      document: { fileId: 'file-123', type: 'file' },
+      confidenceScoresGranularity: 'page',
+      includeBlocks: false,
+    });
   });
 
   it('combines multiple pages into single markdown', async () => {

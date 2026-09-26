@@ -20,11 +20,14 @@ export async function ocrFile(
     purpose: 'ocr',
   });
 
-  // OCR avec scores de confiance au niveau page
+  // OCR avec scores de confiance au niveau page. `includeBlocks: false` épinglé : le SDK 2.3.0
+  // l'envoie déjà, mais le défaut passe à true côté API et dans le SDK ≥ 2.6.1 — sans cette ligne,
+  // un bump du SDK ferait renvoyer les blocs (payload ~×3,6 mesuré), inutilisés ici.
   const ocrResult = await client.ocr.process({
     model,
     document: { fileId: uploaded.id, type: 'file' },
     confidenceScoresGranularity: 'page',
+    includeBlocks: false,
   });
 
   const elapsed = stop();
