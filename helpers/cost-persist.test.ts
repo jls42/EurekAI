@@ -70,4 +70,41 @@ describe('persistUsage', () => {
     expect(result!.usage.inputCharacters).toBe(3000);
     expect(store.appendCostEntry).toHaveBeenCalledOnce();
   });
+
+  it("agent image : frais d'outil persistés (coût, usage, détail, costLog)", () => {
+    const store = makeStore();
+    // Usage réel d'une génération d'image capturé le 2026-09-26.
+    const entries: ApiUsage[] = [
+      {
+        promptTokens: 187,
+        completionTokens: 464,
+        totalTokens: 943,
+        connectorTokens: 292,
+        toolCalls: { image_generation: 1 },
+        model: 'mistral-large-latest',
+      },
+    ];
+
+    const result = persistUsage(store, 'p1', 'POST /generate/image', entries);
+
+    expect(result).not.toBeNull();
+    // (187 + 292) × 0,5/M + 464 × 1,5/M + 0,10 = 0,1009355 (arrondi au millionième)
+    expect(result!.cost).toBeCloseTo(0.1009355, 5);
+    expect(result!.usage.toolCalls).toEqual({ image_generation: 1 });
+    expect(result!.usage.connectorTokens).toBe(292);
+    expect(result!.costBreakdown).toContain('1 × image_generation × $0.10/call = $0.1000');
+    const [, entry] = store.appendCostEntry.mock.calls[0];
+    expect(entry.cost).toBe(result!.cost);
+    expect(entry.usage.toolCalls).toEqual({ image_generation: 1 });
+  });
+
+  it("frais d'outil seuls (modèle sans tarif) : coût > 0 persisté", () => {
+    const store = makeStore();
+    const entries: ApiUsage[] = [{ toolCalls: { web_search: 2 }, model: 'unknown-agent-model' }];
+
+    const result = persistUsage(store, 'p1', 'POST /sources/websearch', entries);
+
+    expect(result!.cost).toBeCloseTo(0.06, 6);
+    expect(store.appendCostEntry).toHaveBeenCalledOnce();
+  });
 });

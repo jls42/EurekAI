@@ -7,6 +7,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { buildTrackedClient } from './mistral-client-factory.js';
 import { runWithUsageTracking } from './usage-context.js';
+import { calculateTotalCost } from './cost-calc.js';
 
 interface SentRequest {
   method: string;
@@ -262,7 +263,7 @@ describe('client suivi — contrat du SDK installé', () => {
     expect(usage).toEqual([{ inputCharacters: input.length, model: 'voxtral-mini-tts-latest' }]);
   });
 
-  it('beta.conversations.start (agent web_search) : usage capté, connecteurs exposés par le SDK', async () => {
+  it("beta.conversations.start (agent web_search) : usage et frais d'outil captés", async () => {
     stubFetch({ '/v1/conversations': WEB_SEARCH_RESPONSE });
     const client = newClient();
     const { result, usage } = await runWithUsageTracking(() =>
@@ -273,11 +274,20 @@ describe('client suivi — contrat du SDK installé', () => {
     expect(result.usage.connectorTokens).toBe(7217);
     expect(result.usage.connectors).toEqual({ web_search: 1 });
     expect(usage).toEqual([
-      { promptTokens: 789, completionTokens: 94, totalTokens: 8100, model: 'mistral-large-latest' },
+      {
+        promptTokens: 789,
+        completionTokens: 94,
+        totalTokens: 8100,
+        toolCalls: { web_search: 1 },
+        connectorTokens: 7217,
+        model: 'mistral-large-latest',
+      },
     ]);
+    // ((789 + 7217) × 0,5 + 94 × 1,5)/M + 0,03 $
+    expect(calculateTotalCost(usage)).toBeCloseTo(0.034144, 5);
   });
 
-  it('beta.conversations.start (agent image_generation) : usage capté, fichier outil parsé', async () => {
+  it("beta.conversations.start (agent image_generation) : frais d'outil captés, fichier parsé", async () => {
     stubFetch({ '/v1/conversations': IMAGE_RESPONSE });
     const client = newClient();
     const { result, usage } = await runWithUsageTracking(() =>
@@ -290,7 +300,16 @@ describe('client suivi — contrat du SDK installé', () => {
     expect(result.usage.connectorTokens).toBe(292);
     expect(result.usage.connectors).toEqual({ image_generation: 1 });
     expect(usage).toEqual([
-      { promptTokens: 187, completionTokens: 464, totalTokens: 943, model: 'mistral-large-latest' },
+      {
+        promptTokens: 187,
+        completionTokens: 464,
+        totalTokens: 943,
+        toolCalls: { image_generation: 1 },
+        connectorTokens: 292,
+        model: 'mistral-large-latest',
+      },
     ]);
+    // (187 + 292) × 0,5/M + 464 × 1,5/M = 0,0009355 $ de tokens, + 0,10 $ pour l'image.
+    expect(calculateTotalCost(usage)).toBeCloseTo(0.1009355, 5);
   });
 });

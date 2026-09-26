@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { resolvePricing, MODEL_PRICING, PRICING_SOURCES } from './pricing.js';
+import {
+  resolvePricing,
+  resolveToolPricing,
+  MODEL_PRICING,
+  PRICING_SOURCES,
+  TOOL_PRICING,
+} from './pricing.js';
 import {
   calculateCost,
   aggregateUsage,
@@ -152,6 +158,8 @@ describe('aggregateUsage', () => {
     expect(agg.promptAudioSeconds).toBeUndefined();
     expect(agg.pagesProcessed).toBeUndefined();
     expect(agg.inputCharacters).toBeUndefined();
+    expect(agg.toolCalls).toBeUndefined();
+    expect(agg.connectorTokens).toBeUndefined();
   });
 });
 
@@ -230,5 +238,131 @@ describe('PRICING_SOURCES', () => {
 
   it('points OCR 4 at the card of the model actually sent (OCR 4.0)', () => {
     expect(PRICING_SOURCES['mistral-ocr-4']).toBe('https://docs.mistral.ai/models/ocr-4-0');
+  });
+});
+
+describe('TOOL_PRICING / resolveToolPricing', () => {
+  it('tarifs par appel de mistral.ai/pricing/api (2026-09-26)', () => {
+    expect(TOOL_PRICING).toEqual({
+      web_search: { perCall: 0.03 },
+      image_generation: { perCall: 0.1 },
+    });
+  });
+
+  it("résout un outil par son nom exact d'API", () => {
+    expect(resolveToolPricing('web_search')).toEqual({ perCall: 0.03 });
+    expect(resolveToolPricing('image_generation')).toEqual({ perCall: 0.1 });
+  });
+
+  it("null pour un outil inconnu, y compris un nom hérité d'Object.prototype", () => {
+    for (const tool of ['code_interpreter', 'web_search_premium', 'constructor', '__proto__']) {
+      expect(resolveToolPricing(tool)).toBeNull();
+    }
+  });
+});
+
+describe("frais d'outils des agents (cost-calc)", () => {
+  // Usages réels des agents capturés le 2026-09-26 (modèle de l'agent : mistral-large-latest).
+  const IMAGE: ApiUsage = {
+    promptTokens: 187,
+    completionTokens: 464,
+    totalTokens: 943,
+    connectorTokens: 292,
+    toolCalls: { image_generation: 1 },
+    model: 'mistral-large-latest',
+  };
+  const WEB_SEARCH: ApiUsage = {
+    promptTokens: 789,
+    completionTokens: 94,
+    totalTokens: 8100,
+    connectorTokens: 7217,
+    toolCalls: { web_search: 1 },
+    model: 'mistral-large-latest',
+  };
+
+  it('image : +0,10 $ par rapport au seul coût du modèle', () => {
+    const modelOnly: ApiUsage = { ...IMAGE, toolCalls: undefined };
+    expect(calculateCost(IMAGE) - calculateCost(modelOnly)).toBeCloseTo(0.1, 10);
+    // (187 + 292) × 0,5/M + 464 × 1,5/M + 0,10
+    expect(calculateCost(IMAGE)).toBeCloseTo(0.1009355, 10);
+  });
+
+  it('deux recherches web : +0,06 $', () => {
+    const usage: ApiUsage = {
+      promptTokens: 1000,
+      completionTokens: 100,
+      toolCalls: { web_search: 2 },
+      model: 'mistral-large-latest',
+    };
+    // (1000 × 0,5 + 100 × 1,5)/M = 0,00065, + 2 × 0,03
+    expect(calculateCost(usage)).toBeCloseTo(0.06065, 10);
+  });
+
+  it('outil inconnu : 0 $, seul le modèle est facturé', () => {
+    const usage: ApiUsage = {
+      promptTokens: 1000,
+      completionTokens: 100,
+      toolCalls: { code_interpreter: 3 },
+      model: 'mistral-large-latest',
+    };
+    expect(calculateCost(usage)).toBeCloseTo(0.00065, 10);
+  });
+
+  it("connectorTokens facturés au tarif d'entrée du modèle de l'agent", () => {
+    // 7217 × 0,5/M (large) ; 7217 × 1,5/M (medium)
+    expect(calculateCost({ connectorTokens: 7217, model: 'mistral-large-latest' })).toBeCloseTo(
+      0.0036085,
+      10,
+    );
+    expect(calculateCost({ connectorTokens: 7217, model: 'mistral-medium-latest' })).toBeCloseTo(
+      0.0108255,
+      10,
+    );
+  });
+
+  it("frais d'outil dus même sans tarif connu pour le modèle de l'agent", () => {
+    const usage: ApiUsage = { toolCalls: { image_generation: 1 }, model: 'unknown-agent-model' };
+    expect(calculateCost(usage)).toBeCloseTo(0.1, 10);
+  });
+
+  it('calculateTotalCost additionne modèle et outils de plusieurs appels', () => {
+    // image 0,1009355 + recherche web ((789 + 7217) × 0,5 + 94 × 1,5)/M + 0,03 = 0,034144
+    expect(calculateTotalCost([IMAGE, WEB_SEARCH])).toBeCloseTo(0.1350795, 5);
+  });
+
+  it('aggregateUsage fusionne toolCalls (par outil) et connectorTokens', () => {
+    const chat: ApiUsage = {
+      promptTokens: 10,
+      completionTokens: 5,
+      totalTokens: 15,
+      model: 'mistral-small-latest',
+    };
+    const agg = aggregateUsage([IMAGE, WEB_SEARCH, { ...WEB_SEARCH, connectorTokens: 100 }, chat]);
+    expect(agg.toolCalls).toEqual({ image_generation: 1, web_search: 2 });
+    expect(agg.connectorTokens).toBe(292 + 7217 + 100);
+    expect(agg.totalTokens).toBe(943 + 8100 + 8100 + 15);
+    expect(agg.callCount).toBe(4);
+  });
+
+  it("buildCostBreakdown : tokens, tokens d'outil et une ligne par outil", () => {
+    expect(buildCostBreakdown([IMAGE])).toEqual([
+      '187 tokens in × $0.5/M = $0',
+      '292 tool tokens in × $0.5/M = $0.0001',
+      '464 tokens out × $1.5/M = $0.0007',
+      '1 × image_generation × $0.10/call = $0.1000',
+    ]);
+    const twoSearches: ApiUsage = { toolCalls: { web_search: 2 }, model: 'mistral-large-latest' };
+    expect(buildCostBreakdown([twoSearches])).toEqual(['2 × web_search × $0.03/call = $0.0600']);
+  });
+
+  it("buildCostBreakdown : ligne d'outil même sans tarif modèle, aucune pour un outil inconnu ou à 0 appel", () => {
+    expect(
+      buildCostBreakdown([{ toolCalls: { web_search: 1 }, model: 'unknown-agent-model' }]),
+    ).toEqual(['1 × web_search × $0.03/call = $0.0300']);
+    expect(
+      buildCostBreakdown([
+        { toolCalls: { code_interpreter: 1, image_generation: 0 }, model: 'mistral-large-latest' },
+      ]),
+    ).toEqual([]);
   });
 });

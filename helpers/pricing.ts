@@ -6,6 +6,9 @@ export interface ModelPricing {
   unit: BillingUnit;
 }
 
+/** Nombre d'appels par outil serveur d'un agent (`web_search`, `image_generation`…). */
+export type ToolCalls = Record<string, number>;
+
 export interface ApiUsage {
   promptTokens?: number;
   completionTokens?: number;
@@ -13,6 +16,10 @@ export interface ApiUsage {
   promptAudioSeconds?: number;
   pagesProcessed?: number;
   inputCharacters?: number;
+  /** Agents : appels d'outils serveur par nom d'outil (ex. `{ image_generation: 1 }`). */
+  toolCalls?: ToolCalls;
+  /** Agents : tokens produits par les outils (`usage.connector_tokens`), HORS `promptTokens`. */
+  connectorTokens?: number;
   model: string;
 }
 
@@ -23,7 +30,14 @@ export interface GenerationUsage {
   promptAudioSeconds?: number;
   pagesProcessed?: number;
   inputCharacters?: number;
+  toolCalls?: ToolCalls;
+  connectorTokens?: number;
   callCount: number;
+}
+
+export interface ToolPricing {
+  /** Frais fixes par appel de l'outil, en USD. */
+  perCall: number;
 }
 
 /** Model pricing keyed by prefix — `mistral-large-2512` matches `mistral-large`. */
@@ -75,4 +89,26 @@ function findMatchingPrefix(modelId: string): string | undefined {
 export function resolvePricing(modelId: string): ModelPricing | null {
   const match = findMatchingPrefix(modelId);
   return match ? MODEL_PRICING[match] : null;
+}
+
+/**
+ * Frais par appel des outils serveur des agents (`beta.conversations.start`), facturés EN PLUS des
+ * tokens du modèle de l'agent (« Model cost per M token + tool call »). Tarifs de
+ * https://mistral.ai/pricing/api vérifiés le 2026-09-26 : `web_search` 30 $/1000 appels,
+ * `image_generation` 100 $/1000 images. Clés = noms exacts renvoyés par l'API (`usage.connectors`,
+ * sorties `tool.execution`). Hors `MODEL_PRICING` (unité « appel », pas un préfixe de modèle) et
+ * NON surveillés par `scripts/update-pricing.ts` (fiches modèles seulement) : re-vérifier à la main.
+ */
+export const TOOL_PRICING: Record<string, ToolPricing> = {
+  web_search: { perCall: 0.03 },
+  image_generation: { perCall: 0.1 },
+};
+
+// Map : un nom d'outil venu de l'API (`constructor`, `__proto__`…) ne résout jamais un membre
+// hérité d'Object.prototype.
+const TOOL_PRICING_BY_NAME = new Map(Object.entries(TOOL_PRICING));
+
+/** Tarif d'un outil d'agent par son nom exact, ou null s'il est inconnu. */
+export function resolveToolPricing(tool: string): ToolPricing | null {
+  return TOOL_PRICING_BY_NAME.get(tool) ?? null;
 }

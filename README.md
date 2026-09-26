@@ -191,7 +191,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 
 ### Suivi des coûts API
 
-Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur. La modération, gratuite, n'est pas comptée. Limite connue : les frais d'outils des agents (recherche web 30 $/1000 appels, génération d'image 100 $/1000 images) ne sont pas encore comptés — le coût affiché d'une illustration est sous-estimé.
+Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur. La modération, gratuite, n'est pas comptée. Les frais d'outils des agents sont inclus : 0,03 $ par recherche web et 0,10 $ par image générée (tarifs Mistral), plus les tokens produits par ces outils, comptés au tarif d'entrée du modèle de l'agent.
 
 - **Source de vérité** : `helpers/pricing.ts` — `MODEL_PRICING` par prefix de modèle (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` avec URLs doc Mistral pour re-scraping périodique
 - **Unités supportées** : `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversion pilotée par `helpers/cost-calc.ts`
