@@ -254,6 +254,28 @@ describe('server bootstrap', () => {
     expect(nextError).toHaveBeenCalledWith(otherError);
   });
 
+  it('ne sert sous /output que les médias des projets', async () => {
+    await importServer();
+
+    const mount = state.app.use.mock.calls.find(([path]) => path === '/output');
+    expect(mount).toBeDefined();
+    expect(state.expressStatic).toHaveBeenCalledWith(expect.stringMatching(/output$/), {
+      dotfiles: 'deny',
+      index: false,
+      redirect: false,
+    });
+    const guard = mount?.[1] as RequestHandler;
+    const denied = { status: vi.fn(), end: vi.fn() };
+    denied.status.mockReturnValue(denied);
+    const next = vi.fn();
+    guard(requestForPath('/profiles.json'), denied as unknown as Response, next);
+    expect(denied.status).toHaveBeenCalledWith(404);
+    expect(next).not.toHaveBeenCalled();
+
+    guard(requestForPath('/projects/p1/podcast-1.mp3'), responseMock(), next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
   it('limite les routes API couteuses uniquement', async () => {
     await importServer();
 

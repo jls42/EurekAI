@@ -83,6 +83,19 @@ for h in "X-Frame-Options" "X-Content-Type-Options" "Strict-Transport-Security" 
   fi
 done
 
+# --- 2bis. /output ne sert que les medias ---
+# profiles.json contient les hash des PIN parentaux (sha256 sans sel d'un code a 4 chiffres) :
+# le servir contournerait tout le controle parental. Idem config.json et les project.json.
+section "Static /output (medias seulement)"
+for p in "profiles.json" "config.json" "projects.json" "projects/$PROJECT_ID/project.json" "projects/%2e%2e/profiles.json"; do
+  CODE=$(curl -s -o /dev/null -w '%{http_code}' "$BASE/output/$p")
+  if [ "$CODE" = "404" ]; then
+    check_pass "/output/$p -> 404"
+  else
+    check_fail "/output/$p -> HTTP $CODE (attendu 404 : fichier de donnees expose)"
+  fi
+done
+
 # --- 3. Validation types ---
 section "Input type validation"
 RESP=$(curl -s -X POST "$BASE/api/projects/$PROJECT_ID/generate/summary" -H 'content-type: application/json' -d '{"lang":12345,"ageGroup":[],"profileId":null}' -w '__HTTP_%{http_code}')

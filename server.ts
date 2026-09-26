@@ -44,6 +44,7 @@ import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore, ALL_MODERATION_CATEGORIES, MODERATION_CATEGORIES } from './profiles.js';
 import { aiLimiter, generalLimiter } from './helpers/rate-limit.js';
 import { createHelmetOptions } from './helpers/security-headers.js';
+import { outputStaticGuard } from './helpers/output-static.js';
 
 dotenv.config({ override: true, quiet: true });
 
@@ -98,7 +99,13 @@ if (process.env.NODE_ENV === 'production') {
 } else {
   app.use(express.static(join(__dirname, 'public')));
 }
-app.use('/output', express.static(join(__dirname, 'output')));
+// Médias des projets seulement (cf. helpers/output-static.ts) : profiles.json (hash des PIN),
+// config.json et les project.json ne doivent jamais être servis.
+app.use(
+  '/output',
+  outputStaticGuard,
+  express.static(join(__dirname, 'output'), { dotfiles: 'deny', index: false, redirect: false }),
+);
 
 // --- Init ---
 const outputDir = join(__dirname, 'output');
