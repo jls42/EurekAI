@@ -685,7 +685,7 @@
                         :aria-label="t('moderation.cat.' + cat)"
                         :checked="(editingProfile.moderationCategories || []).includes(cat)"
                         @click.prevent="toggleModerationCategory(cat)"
-                        class="w-4 h-4 rounded text-primary accent-primary focus-ring"
+                        class="w-4 h-4 shrink-0 rounded text-primary accent-primary focus-ring"
                       />
                       <span x-text="t('moderation.cat.' + cat)"></span>
                     </label>
