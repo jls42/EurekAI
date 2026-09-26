@@ -283,7 +283,7 @@ describe('generateRoutes', () => {
     });
 
     // body volontairement invalide : le 401 doit primer sur la validation (400) et sur
-    // prepareRouteRequest — la clé est résolue AVANT toute validation/IO (cf. CLAUDE.md).
+    // buildGenContext — la clé est résolue AVANT toute validation/IO (cf. CLAUDE.md).
     it.each([
       '/:pid/generate/quiz-review',
       '/:pid/generate/remediation-summary',
@@ -2267,6 +2267,114 @@ describe('generateRoutes', () => {
         expect(res.status).toHaveBeenCalledWith(400);
         expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
       });
+    });
+
+    // Contrat de la préparation partagée avec buildGenContext : ce que reçoit le routeur LLM
+    // (markdown avec consigne sauf useConsigne:false, modèle routeur, lang/ageGroup), limite de
+    // contexte mesurée sur le markdown AVEC consigne, tracker des générations jamais touché.
+    describe('préparation du routeur (même contexte que buildGenContext)', () => {
+      // Projet neuf (une source + une consigne détectée), puis analyse de route avec `body`.
+      const postWithConsigne = async (body: Record<string, unknown> = {}, markdown = 'Content') => {
+        const pid = store.createProject('Test').meta.id;
+        store.addSource(pid, {
+          id: 'src-1',
+          filename: 'test.txt',
+          markdown,
+          uploadedAt: new Date().toISOString(),
+        });
+        store.setConsigne(pid, { found: true, text: 'Focus on dates', keyTopics: ['dates'] });
+        const handler = getHandler(router, 'post', '/:pid/generate/route');
+        const res = mockRes();
+        await handler(mockReq({ params: { pid }, body }), res);
+        return { pid, res };
+      };
+
+      it('consigne appliquée, modèle routeur, lang et ageGroup par défaut', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+
+        await postWithConsigne();
+
+        expect(routeRequest).toHaveBeenCalledWith(
+          mockClient,
+          expect.stringContaining('CONSIGNE DE REVISION'),
+          'mistral-small-latest',
+          'fr',
+          'enfant',
+        );
+      });
+
+      it('useConsigne:false → markdown brut ; lang et ageGroup du corps transmis', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+
+        await postWithConsigne({ useConsigne: false, lang: 'en', ageGroup: 'ado' });
+
+        expect(routeRequest).toHaveBeenCalledWith(
+          mockClient,
+          expect.not.stringContaining('CONSIGNE DE REVISION'),
+          'mistral-small-latest',
+          'en',
+          'ado',
+        );
+      });
+
+      it('limite de contexte mesurée sur le markdown AVEC consigne', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+        const { getModelLimits } = await import('../config.js');
+        // 400 caractères : ~212 tokens sans consigne (≤ 80 % de 320), ~309 avec (> 256).
+        vi.mocked(getModelLimits).mockReturnValue({ 'mistral-small-latest': 320 });
+        try {
+          const raw = await postWithConsigne({ useConsigne: false }, 'x'.repeat(400));
+          expect(raw.res.status).not.toHaveBeenCalled();
+          expect(routeRequest).toHaveBeenCalledTimes(1);
+
+          const { res } = await postWithConsigne({}, 'x'.repeat(400));
+          expect(res.status).toHaveBeenCalledWith(400);
+          expect(res.json.mock.calls[0][0].error).toMatch(/^context_too_large:\d+$/);
+          expect(routeRequest).toHaveBeenCalledTimes(1);
+        } finally {
+          vi.mocked(getModelLimits).mockReturnValue({});
+        }
+      });
+
+      it("n'inscrit rien dans le tracker des générations en cours", async () => {
+        const { pid, res } = await postWithConsigne();
+
+        expect(res.json.mock.calls[0][0].plan).toHaveLength(2);
+        expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
+      });
+    });
+  });
+
+  // Un cas par contrôle de validateGenRequestBody : 400 invalid_input AVANT tout appel LLM et
+  // sans entrée dans le tracker des générations en cours.
+  describe('validation du corps (un contrôle par champ)', () => {
+    it.each([
+      ['lang', { lang: '' }],
+      ['ageGroup', { ageGroup: 'bebe' }],
+      ['profileId', { profileId: 42 }],
+      ['useConsigne', { useConsigne: 'false' }],
+      ['sourceIds', { sourceIds: 'src-1' }],
+      ['count', { count: 'beaucoup' }],
+      ['register', { register: 'shakespeare' }],
+      ['gid', { gid: 123 }],
+    ] as const)('%s invalide → 400 invalid_input, ni générateur ni tracker', async (_f, body) => {
+      const { generateSummary } = await import('../generators/summary.js');
+      const pid = store.createProject('Test').meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'test.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+      });
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const res = mockRes();
+
+      await handler(mockReq({ params: { pid }, body }), res);
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
+      expect(generateSummary).not.toHaveBeenCalled();
+      expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
     });
   });
 

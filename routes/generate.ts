@@ -171,11 +171,13 @@ const checkModeration = (
   return blockingModerationStatus(selectModeratedSources(project, sourceIds), blocked);
 };
 
+type LoadedProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
+
 interface GenContext {
   // Client Mistral résolu par requête (header `X-EurekAI-AI-Key` > env). Injecté
   // dans le handler après `resolveClient` (auth-first), jamais un singleton global.
   client: Mistral;
-  project: ReturnType<ProjectStore['getProject']> & {};
+  project: LoadedProject;
   markdown: string;
   rawMarkdown: string;
   lang: string;
@@ -216,6 +218,22 @@ const isOptionalFiniteNumberish = (v: unknown): boolean =>
   v === undefined || v === null || Number.isFinite(Number(v));
 const isOptionalRegister = (v: unknown): boolean =>
   v === undefined || v === 'standard' || v === 'falc';
+const isOptionalString = (v: unknown): boolean => v === undefined || typeof v === 'string';
+
+type BodyCheck = (b: Record<string, unknown>) => boolean; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+// Un contrôle par champ, dans l'ordre historique ; `every` s'arrête au premier échec comme
+// la chaîne de && qu'il remplace (Lizard ne mesurait pas ce corps d'expression multi-lignes).
+const BODY_CHECKS: readonly BodyCheck[] = [
+  (b) => isOptionalNonEmptyString(b.lang),
+  (b) => isOptionalAgeGroup(b.ageGroup),
+  (b) => isOptionalNullableString(b.profileId),
+  (b) => isOptionalBoolean(b.useConsigne),
+  (b) => isOptionalStringArray(b.sourceIds),
+  (b) => isOptionalFiniteNumberish(b.count),
+  (b) => isOptionalRegister(b.register),
+  (b) => isOptionalString(b.gid),
+];
 
 type ModelConfig = ReturnType<typeof getConfig>['models'];
 type ModelSelector = (models: ModelConfig) => string; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
@@ -245,17 +263,9 @@ const OK: ValidateResult = { ok: true };
 // avec types incorrects (lang: 12345, ageGroup: [], profileId: null) etait
 // silencieusement accepte et fallback sur les defaults — consommation Mistral
 // sans validation, et impossible de distinguer un bug client d'une vraie demande.
-// Appele EN AMONT de buildGenContext / addPendingEntry pour rejet 400 propre
+// Appele en tete de buildGenContext, donc EN AMONT de addPendingEntry, pour rejet 400 propre
 // (cf. CLAUDE.md "Validations early extraites des generators").
-const allChecksPass = (b: Record<string, unknown>): boolean =>
-  isOptionalNonEmptyString(b.lang) &&
-  isOptionalAgeGroup(b.ageGroup) &&
-  isOptionalNullableString(b.profileId) &&
-  isOptionalBoolean(b.useConsigne) &&
-  isOptionalStringArray(b.sourceIds) &&
-  isOptionalFiniteNumberish(b.count) &&
-  isOptionalRegister(b.register) &&
-  (b.gid === undefined || typeof b.gid === 'string');
+const allChecksPass = (b: Record<string, unknown>): boolean => BODY_CHECKS.every((c) => c(b));
 
 const validateGenRequestBody = (body: unknown): ValidateResult => {
   if (!body || typeof body !== 'object') return INVALID;
@@ -283,60 +293,130 @@ const splitByAutoExecutable = <T extends { agent: string }>(
   return { executable, skipped };
 };
 
-function buildGenContext(
+type GenContextBase = Omit<GenContext, 'req' | 'res' | 'client'>;
+type GenFailure = { ok: false; status: number; error: string };
+// Alias plutôt qu'une union écrite sur plusieurs lignes en type de retour : Lizard ne
+// mesurerait que la signature (cf. CLAUDE.md « Type de retour union multi-lignes »).
+type GenContextResult = { ok: true; ctx: GenContextBase } | GenFailure;
+type ProjectLoad = { ok: true; project: LoadedProject } | GenFailure;
+type ContextCheckOptions = { skipContextCheck?: boolean; checkRawMarkdown?: boolean };
+
+// Gardes d'entrée, dans cet ordre : corps (400 invalid_input), projet (404), puis modération
+// des sources sélectionnées : 400 moderation.blocked (signalée) / 503 moderation.error (panne)
+// / 409 moderation.pending.
+const loadGenProject = (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  pid: string,
+  body: GenRequestBody,
+): ProjectLoad => {
+  const validation = validateGenRequestBody(body);
+  if (!validation.ok) return { ok: false, status: 400, error: validation.error };
+  const project = store.getProject(pid);
+  if (!project) return { ok: false, status: 404, error: ERR_PROJECT_NOT_FOUND };
+  const rejection = moderationRejection(checkModeration(project, profileStore, body.sourceIds));
+  if (rejection) return { ok: false, status: rejection.status, error: rejection.error };
+  return { ok: true, project };
+};
+
+// Point UNIQUE d'application de la consigne dans ce fichier (routes dédiées, auto et analyse
+// de route) : toute garde future sur la consigne s'ajoute ici. Hors de ce point, seuls les
+// outils du chat l'appliquent (routes/chat.ts, via applyConsigne) : à couvrir aussi.
+const resolveConsigne = (
+  rawMarkdown: string,
+  project: LoadedProject,
+  useConsigne: boolean,
+): { markdown: string; hasConsigne: boolean } => {
+  if (!useConsigne) return { markdown: rawMarkdown, hasConsigne: false };
+  const { consigne } = project;
+  return {
+    markdown: applyConsigne(rawMarkdown, consigne),
+    hasConsigne: !!consigne?.found && consigne.keyTopics.length > 0,
+  };
+};
+
+// Limite de contexte du modèle résolu (400 context_too_large:<pct>) : ignorée si
+// skipContextCheck, mesurée sur le markdown brut si checkRawMarkdown (image), sinon sur le
+// markdown avec consigne.
+const contextErrorFor = (
+  rawMarkdown: string,
+  markdown: string,
+  model: string,
+  options?: ContextCheckOptions,
+): string | null => {
+  if (options?.skipContextCheck) return null;
+  return checkContextLimit(options?.checkRawMarkdown ? rawMarkdown : markdown, model);
+};
+
+interface AssembleGenContextArgs {
+  profileStore: ProfileStore;
+  pid: string;
+  body: GenRequestBody;
+  project: LoadedProject;
+  markdown: string;
+  rawMarkdown: string;
+  hasConsigne: boolean;
+  config: ReturnType<typeof getConfig>;
+}
+
+// Contexte final, sans aucun contrôle (tous les refus sont en amont) : défauts lang/ageGroup,
+// sources retenues, count borné, voix et identifiant du profil du projet.
+const assembleGenContext = (args: AssembleGenContextArgs): GenContextBase => {
+  const { profileStore, pid, body, project, markdown, rawMarkdown, hasConsigne, config } = args;
+  const profileId = project.meta?.profileId;
+  const profile = profileId ? profileStore.get(profileId) : null;
+  return {
+    project,
+    markdown,
+    rawMarkdown,
+    lang: body.lang || 'fr',
+    ageGroup: body.ageGroup || 'enfant',
+    config,
+    hasConsigne,
+    sourceIds: resolveSourceIds(body, project.sources),
+    count: parseCount(body.count),
+    register: body.register,
+    pid,
+    profileVoices: profile?.mistralVoices,
+    profileId: profileId || undefined,
+  };
+};
+
+// Contexte commun à toutes les générations ET à l'analyse de route. Ordre des refus : gardes
+// d'entrée (loadGenProject), sources (400 no_sources), limite de contexte. N'écrit ni dans le
+// projet ni dans le tracker : appelé AVANT addPendingEntry, un refus ne laisse aucune entrée
+// orpheline.
+const buildGenContext = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
   body: GenRequestBody,
   modelId?: string,
-  options?: { skipContextCheck?: boolean; checkRawMarkdown?: boolean },
-):
-  | { ok: true; ctx: Omit<GenContext, 'req' | 'res' | 'client'> }
-  | { ok: false; error: string; status: number } {
-  const validation = validateGenRequestBody(body);
-  if (!validation.ok) return { ok: false, error: validation.error, status: 400 };
-
-  const project = store.getProject(pid);
-  if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
-
-  // 400 moderation.blocked (signalée) / 503 moderation.error (panne) / 409 moderation.pending.
-  const rejection = moderationRejection(checkModeration(project, profileStore, body.sourceIds));
-  if (rejection) return { ok: false, error: rejection.error, status: rejection.status };
-
+  options?: ContextCheckOptions,
+): GenContextResult => {
+  const loaded = loadGenProject(store, profileStore, pid, body);
+  if (!loaded.ok) return loaded;
+  const { project } = loaded;
   const rawMarkdown = getMarkdownOrNull(project.sources, body.sourceIds);
-  if (rawMarkdown === null) return { ok: false, error: 'no_sources', status: 400 };
+  if (rawMarkdown === null) return { ok: false, status: 400, error: 'no_sources' };
   const useConsigne = body.useConsigne !== false;
-  const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-  const hasConsigne =
-    useConsigne && !!project.consigne?.found && project.consigne.keyTopics.length > 0;
+  const { markdown, hasConsigne } = resolveConsigne(rawMarkdown, project, useConsigne);
   const config = getConfig();
-  const resolvedModel = configuredModel(config.models, modelId);
-  const ctxMarkdown = options?.checkRawMarkdown ? rawMarkdown : markdown;
-  const ctxError = options?.skipContextCheck ? null : checkContextLimit(ctxMarkdown, resolvedModel);
-  if (ctxError) return { ok: false, error: ctxError, status: 400 };
-
-  const profileId = project.meta?.profileId;
-  const profile = profileId ? profileStore.get(profileId) : null;
-
-  return {
-    ok: true as const,
-    ctx: {
-      project,
-      markdown,
-      rawMarkdown,
-      lang: body.lang || 'fr',
-      ageGroup: body.ageGroup || 'enfant',
-      config,
-      hasConsigne,
-      sourceIds: resolveSourceIds(body, project.sources),
-      count: parseCount(body.count),
-      register: body.register,
-      pid,
-      profileVoices: profile?.mistralVoices,
-      profileId: profileId || undefined,
-    },
-  };
-}
+  const model = configuredModel(config.models, modelId);
+  const ctxError = contextErrorFor(rawMarkdown, markdown, model, options);
+  if (ctxError) return { ok: false, status: 400, error: ctxError };
+  const ctx = assembleGenContext({
+    profileStore,
+    pid,
+    body,
+    project,
+    markdown,
+    rawMarkdown,
+    hasConsigne,
+    config,
+  });
+  return { ok: true, ctx };
+};
 
 // Pré-validation des inputs de quiz-review. Sortie en amont de handleGeneration
 // pour éviter qu'un pending tracker entry (ajouté au commit pending lifecycle)
@@ -421,16 +501,16 @@ const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[
 // randomUUID. Le client génère son propre gid avant le fetch pour avoir
 // abortControllersByGid[gid] immédiatement opérationnel + identifiant stable
 // utilisable au moment du payload 200 fallback ou de l'event SSE.
-function readClientGid(req: Request): string {
+const readClientGid = (req: Request): string => {
   const candidate = (req.body as { gid?: unknown })?.gid;
   return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate) ? candidate : randomUUID();
-}
+};
 
-function makeTrackerEntry(
+const makeTrackerEntry = (
   type: TrackedGenerationType,
   gid: string,
   sourceIds: string[],
-): PendingTrackerEntry {
+): PendingTrackerEntry => {
   return {
     id: gid,
     type,
@@ -438,7 +518,7 @@ function makeTrackerEntry(
     startedAt: new Date().toISOString(),
     sourceIds,
   };
-}
+};
 
 interface PersistedCostFields {
   usage?: NonNullable<Generation['usage']>;
@@ -446,11 +526,11 @@ interface PersistedCostFields {
   costBreakdown?: string[];
 }
 
-function buildFinalGeneration(
+const buildFinalGeneration = (
   gid: string,
   gen: Generation,
   persisted: PersistedCostFields | null,
-): Generation {
+): Generation => {
   const final: Generation = { ...gen, id: gid };
   if (persisted) {
     final.usage = persisted.usage;
@@ -458,17 +538,40 @@ function buildFinalGeneration(
     final.costBreakdown = persisted.costBreakdown;
   }
   return final;
-}
+};
 
-async function runGeneratorAndPersist(
+// Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
+// 200 fantôme — le client refresh le projet pour voir l'état réel.
+const respondNotPromoted = (
+  res: Response,
+  pid: string,
+  gid: string,
+  result: Exclude<PromoteResult, { kind: 'promoted' }>,
+): void => {
+  const { outcome, isMissing } = classifyPromoteFailure(result);
+  if (isMissing) {
+    // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
+    // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
+    logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
+  }
+  const body: PromoteErrorResponse = { error: outcome, gid };
+  res.status(409).json(body);
+};
+
+// Alias plutôt qu'un type fonction en ligne dans une signature : Lizard y coupe la fonction
+// (signature seule mesurée, corps perdu ou détaché en anonyme) — runGeneratorAndPersist et
+// handleGeneration échappaient ainsi au plafond CCN.
+type GeneratorFn = (ctx: GenContext) => Promise<Generation | null>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+const runGeneratorAndPersist = async (
   store: ProjectStore,
-  generatorFn: (ctx: GenContext) => Promise<Generation | null>,
+  generatorFn: GeneratorFn,
   ctx: GenContext,
   pid: string,
   gid: string,
   options: HandleGenerationOptions | undefined,
   res: Response,
-): Promise<void> {
+): Promise<void> => {
   const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
   if (!gen) {
     // Defense en profondeur : aucune closure ne devrait return null après le commit
@@ -495,30 +598,21 @@ async function runGeneratorAndPersist(
       res.json(promoteResult.generation);
       return;
     }
-    // Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
-    // 200 fantôme — le client refresh le projet pour voir l'état réel.
-    const { outcome, isMissing } = classifyPromoteFailure(promoteResult);
-    if (isMissing) {
-      // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
-      // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
-      logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
-    }
-    const body: PromoteErrorResponse = { error: outcome, gid };
-    res.status(409).json(body);
+    respondNotPromoted(res, pid, gid, promoteResult);
     return;
   }
   store.addGeneration(pid, finalGen);
   res.json(finalGen);
-}
+};
 
-function handleGenerationFailure(
+const handleGenerationFailure = (
   store: ProjectStore,
   pid: string,
   gid: string,
   e: unknown,
   options: HandleGenerationOptions | undefined,
   res: Response,
-): void {
+): void => {
   const code = extractErrorCode(e, options?.agentName);
   if (options?.trackedType) store.markPendingFailed(pid, gid, code);
   const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
@@ -527,15 +621,15 @@ function handleGenerationFailure(
   }
   logger.error('generate', 'error:', e);
   res.status(500).json({ error: code });
-}
+};
 
-function handleGeneration(
+const handleGeneration = (
   store: ProjectStore,
   profileStore: ProfileStore,
-  generatorFn: (ctx: GenContext) => Promise<Generation | null>,
+  generatorFn: GeneratorFn,
   modelId?: string,
   options?: HandleGenerationOptions,
-) {
+) => {
   return async (req: Request, res: Response) => {
     const pid = req.params.pid as string;
     // Auth-first : résoudre la clé AVANT toute validation/IO (et donc avant
@@ -575,7 +669,7 @@ function handleGeneration(
       handleGenerationFailure(store, pid, gid, e, options, res);
     }
   };
-}
+};
 
 interface AutoCtx {
   client: Mistral;
@@ -1005,57 +1099,6 @@ const buildAutoImage = async (ctx: AutoCtx): Promise<Generation> => {
   return makeGen('image', data, ctx);
 };
 
-// Validation, projet, puis MÊME garde de modération que buildGenContext, dans le même ordre
-// (source bloquante par priorité → 400/503/409), AVANT l'appel au routeur LLM : sinon l'analyse
-// est facturée et ses `reason` sont rédigées sur du contenu non vérifié. Extrait de
-// prepareRouteRequest pour la garder sous CCN 8. Null = refus, réponse déjà envoyée.
-const loadRouteProject = (
-  store: ProjectStore,
-  profileStore: ProfileStore,
-  req: Request,
-  res: Response,
-): NonNullable<ReturnType<ProjectStore['getProject']>> | null => {
-  const validation = validateGenRequestBody(req.body);
-  if (!validation.ok) {
-    res.status(400).json({ error: validation.error });
-    return null;
-  }
-  const project = store.getProject(String(req.params.pid));
-  if (!project) {
-    res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-    return null;
-  }
-  const rejection = moderationRejection(checkModeration(project, profileStore, req.body.sourceIds));
-  if (rejection) {
-    res.status(rejection.status).json({ error: rejection.error });
-    return null;
-  }
-  return project;
-};
-
-const prepareRouteRequest = (
-  store: ProjectStore,
-  profileStore: ProfileStore,
-  req: Request,
-  res: Response,
-): { markdown: string; lang: string; ageGroup: AgeGroup } | null => {
-  const project = loadRouteProject(store, profileStore, req, res);
-  if (!project) return null;
-  const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
-  if (rawMarkdown === null) {
-    res.status(400).json({ error: 'no_sources' });
-    return null;
-  }
-  const useConsigne = req.body.useConsigne !== false;
-  const markdown = useConsigne ? applyConsigne(rawMarkdown, project.consigne) : rawMarkdown;
-  const ctxError = checkContextLimit(markdown, ROUTER_MODEL);
-  if (ctxError) {
-    res.status(400).json({ error: ctxError });
-    return null;
-  }
-  return { markdown, lang: req.body.lang || 'fr', ageGroup: req.body.ageGroup || 'enfant' };
-};
-
 const pickAutoStepFailureCode = (
   result: Exclude<PromoteResult, { kind: 'promoted' }>,
 ): FailedStepCode => {
@@ -1247,11 +1290,7 @@ const runAutoRouting = async (
   return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
 };
 
-const toAutoCtx = (
-  store: ProjectStore,
-  baseCtx: Omit<GenContext, 'req' | 'res' | 'client'>,
-  client: Mistral,
-): AutoCtx => ({
+const toAutoCtx = (store: ProjectStore, baseCtx: GenContextBase, client: Mistral): AutoCtx => ({
   client,
   markdown: baseCtx.markdown,
   rawMarkdown: baseCtx.rawMarkdown,
@@ -1454,17 +1493,18 @@ const registerRouteAnalysisRoute = (
         res.status(resolved.status).json({ error: resolved.error });
         return;
       }
-      const prepared = prepareRouteRequest(store, profileStore, req, res);
-      if (!prepared) return;
+      // Même contexte que les générations (modèle routeur) : validation, projet, garde de
+      // modération, sources, consigne et limite de contexte AVANT l'appel au routeur LLM —
+      // sinon l'analyse est facturée et ses `reason` rédigées sur du contenu non vérifié.
       const pid = String(req.params.pid);
+      const built = buildGenContext(store, profileStore, pid, req.body, ROUTER_MODEL);
+      if (!built.ok) {
+        res.status(built.status).json({ error: built.error });
+        return;
+      }
+      const { ctx } = built;
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
-        routeRequest(
-          resolved.client,
-          prepared.markdown,
-          ROUTER_MODEL,
-          prepared.lang,
-          prepared.ageGroup,
-        ),
+        routeRequest(resolved.client, ctx.markdown, ROUTER_MODEL, ctx.lang, ctx.ageGroup),
       );
       const routeCost = persistUsage(
         store,
