@@ -17,6 +17,9 @@ import { tmpdir } from 'os';
 import { ProjectStore } from '../store.js';
 import { ProfileStore } from '../profiles.js';
 import { chatRoutes } from './chat.js';
+import { chatNoSourcesNotice } from '../prompts.js';
+import { logger } from '../helpers/logger.js';
+import type { ModerationStatus } from '../types.js';
 
 // --- Mocks ---
 
@@ -786,5 +789,155 @@ describe('DELETE /:pid/chat', () => {
     handler(req, res);
 
     expect(res.json).toHaveBeenCalledWith({ ok: true });
+  });
+});
+
+// ============================================================
+// Sources exclues par la modération (contexte du LLM ET outils)
+// ============================================================
+
+describe('POST /:pid/chat — sources exclues par la modération', () => {
+  // Une source par cas, id repris dans le nom de fichier et le markdown : un id absent du texte
+  // prouve que ni le contenu ni le nom de la source ne sont transmis. 'blocked' = statut
+  // inattendu (donnée disque corrompue), exclu comme les statuts bloquants (fail-closed).
+  const SOURCES = [
+    { id: 'src-safe', status: 'safe' },
+    { id: 'src-unsafe', status: 'unsafe' },
+    { id: 'src-error', status: 'error' },
+    { id: 'src-pending', status: 'pending' },
+    { id: 'src-none', status: undefined },
+    { id: 'src-weird', status: 'blocked' },
+  ];
+  const KEPT = ['src-safe', 'src-none'];
+  const EXCLUDED = ['src-unsafe', 'src-error', 'src-pending', 'src-weird'];
+
+  const addModeratedSources = (pid: string, ids = SOURCES.map((s) => s.id)) => {
+    for (const { id, status } of SOURCES.filter((s) => ids.includes(s.id))) {
+      store.addSource(pid, {
+        id,
+        filename: `${id}.txt`,
+        markdown: `MD-${id}`,
+        uploadedAt: new Date().toISOString(),
+        sourceType: 'text',
+        ...(status && { moderation: { status: status as ModerationStatus, categories: {} } }),
+      });
+    }
+  };
+
+  const createChatProject = (useModeration: boolean): string => {
+    const profile = profileStore.create('Teen', 14, '0', 'fr');
+    profileStore.update(profile.id, { chatEnabled: true, useModeration });
+    return store.createProject('Test', profile.id).meta.id;
+  };
+
+  const sendMessage = async (pid: string) => {
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+    await handler(mockReq({ params: { pid }, body: { message: 'Fais-moi une fiche' } }), res);
+    return res;
+  };
+
+  it('modération active : le LLM et les outils ne reçoivent que les sources safe et sans statut', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'Voici ta fiche !',
+      toolCalls: ['generate_summary'],
+    });
+    const pid = createChatProject(true);
+    addModeratedSources(pid);
+
+    const res = await sendMessage(pid);
+
+    const context: string = (chatWithSources as any).mock.calls[0][2];
+    const toolMarkdown: string = (generateSummary as any).mock.calls[0][1];
+    for (const text of [context, toolMarkdown]) {
+      for (const id of KEPT) expect(text).toContain(`MD-${id}`);
+      for (const id of EXCLUDED) expect(text).not.toContain(id);
+    }
+    const body = res.json.mock.calls[0][0];
+    expect(body.generations[0].sourceIds).toEqual(KEPT);
+    expect(store.getProject(pid)!.results.generations[0].sourceIds).toEqual(KEPT);
+  });
+
+  it('modération active, toutes exclues : notice « pas de sources », aucun outil, 200', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateQuiz } = await import('../generators/quiz.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'Ajoute une source pour commencer.',
+      toolCalls: ['generate_quiz'],
+    });
+    const pid = createChatProject(true);
+    addModeratedSources(pid, EXCLUDED);
+
+    const res = await sendMessage(pid);
+
+    expect(chatWithSources).toHaveBeenCalledWith(
+      client,
+      expect.any(Array),
+      chatNoSourcesNotice('fr'),
+      'm',
+      'fr',
+      'enfant',
+    );
+    expect(generateQuiz).not.toHaveBeenCalled();
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reply: 'Ajoute une source pour commencer.',
+        generatedIds: [],
+        generations: [],
+      }),
+    );
+  });
+
+  it('modération inactive : toutes les sources, statut compris (inchangé)', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'ok',
+      toolCalls: ['generate_summary'],
+    });
+    const pid = createChatProject(false);
+    addModeratedSources(pid);
+
+    const res = await sendMessage(pid);
+
+    const context: string = (chatWithSources as any).mock.calls[0][2];
+    const toolMarkdown: string = (generateSummary as any).mock.calls[0][1];
+    for (const { id } of SOURCES) {
+      expect(context).toContain(`MD-${id}`);
+      expect(toolMarkdown).toContain(`MD-${id}`);
+    }
+    expect(res.json.mock.calls[0][0].generations[0].sourceIds).toEqual(SOURCES.map((s) => s.id));
+  });
+
+  it('journalise le seul nombre de sources exclues, jamais leur nom ni leur contenu', async () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const pid = createChatProject(true);
+    addModeratedSources(pid);
+
+    await sendMessage(pid);
+
+    const chatLogs = infoSpy.mock.calls
+      .filter((c) => c[0] === 'chat')
+      .map((c) => c.slice(1).join(' '));
+    expect(chatLogs).toContain('moderation: 4 source(s) excluded from chat context and tools');
+    for (const { id } of SOURCES) expect(chatLogs.join('\n')).not.toContain(id);
+    infoSpy.mockRestore();
+  });
+
+  it("aucune source exclue : pas de journal d'exclusion", async () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const pid = createChatProject(true);
+    addModeratedSources(pid, KEPT);
+
+    await sendMessage(pid);
+
+    const exclusionLogs = infoSpy.mock.calls.filter(
+      (c) => c[0] === 'chat' && typeof c[1] === 'string' && c[1].includes('excluded'),
+    );
+    expect(exclusionLogs).toHaveLength(0);
+    infoSpy.mockRestore();
   });
 });

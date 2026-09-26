@@ -35,6 +35,7 @@ const CHAT_ROUTE_PATH = '/:pid/chat';
 const FILL_BLANK = 'fill-blank';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
+import { selectChatSources } from '../helpers/chat-sources.js';
 
 type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
 
@@ -297,6 +298,21 @@ const appendUserAndBuildHistory = (
   return history;
 };
 
+// Sources du chat (contexte ET outils), calculées une fois par message : sans ce filtre, une source
+// que la génération refuse (unsafe/error/pending) partait quand même au LLM et dans les générations
+// par outil. Seul le NOMBRE de sources exclues est journalisé, jamais leur contenu ni leur nom.
+const resolveChatSources = (
+  project: ChatProject,
+  profile: ChatRequestContext['profile'],
+): ChatProject['sources'] => {
+  const sources = selectChatSources(project.sources, profile);
+  const excluded = project.sources.length - sources.length;
+  if (excluded > 0) {
+    logger.info('chat', `moderation: ${excluded} source(s) excluded from chat context and tools`);
+  }
+  return sources;
+};
+
 // `lang` obligatoire (pas de défaut) : le typechecker casse tout call site qui
 // oublierait de propager la langue du placeholder.
 const buildSourceContext = (sources: ChatProject['sources'], lang: string): string =>
@@ -319,6 +335,9 @@ const EMPTY_TOOL_PHASE: ToolPhaseResult = {
 interface RunToolCallPhaseArgs {
   toolCalls: string[];
   project: ChatProject;
+  // Sources autorisées (resolveChatSources) : jamais project.sources, qui contient aussi les
+  // sources que la modération exclut.
+  sources: ChatProject['sources'];
   lang: string;
   ageGroup: AgeGroup;
   config: ReturnType<typeof getConfig>;
@@ -328,12 +347,12 @@ interface RunToolCallPhaseArgs {
 }
 
 const runToolCallPhase = async (args: RunToolCallPhaseArgs): Promise<ToolPhaseResult> => {
-  const { toolCalls, project, lang, ageGroup, config, client, store, pid } = args;
-  if (toolCalls.length === 0 || project.sources.length === 0) return EMPTY_TOOL_PHASE;
-  const rawMarkdown = getMarkdown(project.sources);
+  const { toolCalls, project, sources, lang, ageGroup, config, client, store, pid } = args;
+  if (toolCalls.length === 0 || sources.length === 0) return EMPTY_TOOL_PHASE;
+  const rawMarkdown = getMarkdown(sources);
   const markdown = applyConsigne(rawMarkdown, project.consigne);
   const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
-  const sourceIds = project.sources.map((s) => s.id);
+  const sourceIds = sources.map((s) => s.id);
   return processChatToolCalls(
     toolCalls,
     { client, markdown, config, lang, ageGroup, sourceIds, hasConsigne },
@@ -408,9 +427,10 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
         res.status(validated.status).json({ error: validated.error });
         return;
       }
-      const { project, message, lang, ageGroup } = validated;
+      const { project, profile, message, lang, ageGroup } = validated;
+      const sources = resolveChatSources(project, profile);
       const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
-      const sourceContext = buildSourceContext(project.sources, lang);
+      const sourceContext = buildSourceContext(sources, lang);
       const config = getConfig();
 
       const { result, usage: chatUsage } = await runWithUsageTracking(() =>
@@ -421,6 +441,7 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
       const tools = await runToolCallPhase({
         toolCalls: result.toolCalls,
         project,
+        sources,
         lang,
         ageGroup,
         config,
