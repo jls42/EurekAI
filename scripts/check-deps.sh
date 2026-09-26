@@ -80,15 +80,28 @@ if [ -n "${MISTRAL_API_KEY:-}" ]; then export MISTRAL_API_KEY; fi
 # execSync (boucle Node bloquée, aucun timer interne ne peut l'interrompre ; run mesuré 1 à 2 s).
 # timeout tue tout le groupe de processus (npx → tsx → node → navigateur) ; -k 10 = SIGKILL si
 # SIGTERM est ignoré. 124/137 = délai dépassé : le dire, sinon la section resterait muette.
+# Ctrl-C : timeout se place dans son propre groupe, qu'un Ctrl-C du terminal n'atteint plus. On le
+# lance donc en arrière-plan et on relaie un TERM à son groupe (un job d'arrière-plan de script
+# ignore SIGINT), puis on ré-émet le signal pour arrêter le script (vérifié : aucun survivant).
 run_bounded() {
-  local status=0
+  local status=0 bin=""
   if command -v timeout >/dev/null 2>&1; then
-    timeout -k 10 120 "$@" || status=$?
+    bin=timeout
   elif command -v gtimeout >/dev/null 2>&1; then
-    gtimeout -k 10 120 "$@" || status=$?
-  else
-    "$@" || status=$?
+    bin=gtimeout
   fi
+  if [ -z "$bin" ]; then
+    "$@" || status=$?
+    return "$status"
+  fi
+  "$bin" -k 10 120 "$@" &
+  local pid=$!
+  # shellcheck disable=SC2064 # $pid est figé à la pose du trap, volontairement
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - INT; kill -INT \$\$" INT
+  # shellcheck disable=SC2064
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - TERM; kill -TERM \$\$" TERM
+  wait "$pid" || status=$?
+  trap - INT TERM
   if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
     echo "  ⚠ interrompu après 120 s (délai dépassé) — non bloquant"
   fi

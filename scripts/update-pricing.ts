@@ -2,14 +2,14 @@
 /**
  * Compare les prix configurés (`helpers/pricing.ts`) aux prix RÉELS des model-cards Mistral.
  *
- * Les pages de tarifs sont JS-rendered (Next.js RSC) : un simple `fetch()` ne voit PAS les prix
- * (ils sont injectés à l'hydratation). On rend donc chaque page via **Lightpanda**
- * (`@lightpanda/browser`, le même moteur headless que le scraping de sources de l'app, cf.
- * `helpers/index.ts` `fetchWithLightpanda`) et on extrait les `$prix` (ou « Free » = $0) du
- * markdown rendu.
+ * Les prix figurent dans le HTML SSR des pages (vérifié le 2026-09-26 : `$ 4 /1000 Pages`, payload
+ * `"pricing":{…}`), mais valeur et unité y sont dispersées : on rend donc chaque page en markdown via
+ * **Lightpanda** (`@lightpanda/browser`, le même moteur headless que le scraping de sources de
+ * l'app, cf. `helpers/index.ts` `fetchWithLightpanda`) et on extrait les `$prix` (ou « Free » = $0)
+ * avec leurs lignes voisines.
  *
  * Informatif (mise à jour manuelle) : affiche `Current` (configuré) vs `Found` (rendu, avec son
- * contexte d'unité). Lightpanda lance un navigateur par page → exécution **séquentielle** et lente.
+ * contexte d'unité). Lightpanda lance un navigateur par page → exécution **séquentielle**.
  *
  * Usage : `npx tsx scripts/update-pricing.ts [filtre-prefix]`
  *   ex. `npx tsx scripts/update-pricing.ts mistral-ocr` (un seul modèle, rapide).

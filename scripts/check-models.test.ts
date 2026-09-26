@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-return -- Codacy lance ESLint sans resolution des types vitest (faux positifs) ; couvert par lint:ci local type-aware */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 
-// Mock Lightpanda : `main()` rend l'overview via le navigateur headless (~40 s/page). Le neutraliser
-// garde les tests rapides et hors réseau ; markdown vide → table Legacy `{}` → diagnostic API-seul.
-// vi.fn (hoisté) : un test simule la panne de l'overview (dégradation gracieuse).
+// Mock Lightpanda : `main()` rend l'overview via le navigateur headless (réseau réel). Le neutraliser
+// garde les tests rapides et hors réseau ; les tests de `main` lui font rendre LEGACY_MD (overview
+// saine), certains simulent une panne ou une page sans table (dégradation gracieuse).
 const { lightpandaFetch } = vi.hoisted(() => ({
   lightpandaFetch: vi.fn(() => Promise.resolve('')),
 }));
@@ -638,6 +638,10 @@ describe('fetchModels', () => {
 
 describe('main (orchestration, non bloquant)', () => {
   const origKey = process.env.MISTRAL_API_KEY;
+  // Overview saine par défaut : 2 lignes Legacy étrangères aux modèles surveillés.
+  beforeEach(() => {
+    lightpandaFetch.mockResolvedValue(LEGACY_MD);
+  });
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -694,6 +698,16 @@ describe('main (orchestration, non bloquant)', () => {
     const lines = await run({ data: watchedData() });
     expect(lines[0]).toBe(
       'check-models: overview indisponible (lightpanda down) — diagnostic API seul.',
+    );
+    expect(lines[1]).toContain('modèles surveillés OK');
+  });
+
+  it('signals a degraded diagnosis when the overview renders without a Legacy table', async () => {
+    // Page déplacée ou format changé : jamais « rien de retiré » en silence.
+    lightpandaFetch.mockResolvedValueOnce('# Overview\nno table here');
+    const lines = await run({ data: watchedData() });
+    expect(lines[0]).toBe(
+      'check-models: overview indisponible (table Legacy introuvable (0 ligne)) — diagnostic API seul.',
     );
     expect(lines[1]).toContain('modèles surveillés OK');
   });

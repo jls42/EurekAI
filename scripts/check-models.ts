@@ -4,7 +4,8 @@
  * (PAS de table de dates manuelle qui dérive — leçon OCR 3) :
  *   1. API `/v1/models` : chaque nom y est sa PROPRE entrée, qui porte ses frères dans `aliases` →
  *      groupe (alias ↔ versions) résolu indépendamment de l'ordre + champ `deprecation`.
- *   2. Page overview (https://docs.mistral.ai/models/overview, rendue via Lightpanda car JS-rendered) :
+ *   2. Page overview (https://docs.mistral.ai/models/overview, rendue en markdown via Lightpanda — la
+ *      table figure aussi dans le HTML SSR, le markdown est simplement plus facile à parser) :
  *      la table « Legacy/Deprecated » expose les dates de RETRAIT + le modèle de remplacement, que
  *      l'API n'expose pas (et corrige les `deprecation: null` incomplets côté API).
  *
@@ -470,12 +471,17 @@ export async function fetchModels(key: string): Promise<ModelEntry[]> {
   return data.data ?? [];
 }
 
-// I/O Lightpanda (non testée : navigateur headless ~40 s/page). Rend l'overview JS et parse la table.
+// I/O Lightpanda (non testée : navigateur headless, ~0,5-2 s mesuré le 2026-09-26). Rend l'overview
+// en markdown et parse la table. Table vide = rendu ou format inattendu (page déplacée, colonnes
+// renommées) : on le signale via le catch de loadLegacyTable plutôt que de conclure « rien de
+// retiré » — sinon le diagnostic API seul passerait pour un contrôle complet.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy ESLint ne résout pas les types @lightpanda/browser (faux positifs) ; couvert par lint:ci local type-aware */
 const fetchLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
   const r = await lightpanda.fetch(OVERVIEW_URL, { dump: true, dumpOptions: { type: 'markdown' } });
   const md = typeof r === 'string' ? r : r.toString('utf-8');
-  return parseLegacyTable(md);
+  const table = parseLegacyTable(md);
+  if (table.size === 0) throw new Error('table Legacy introuvable (0 ligne)');
+  return table;
 };
 /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 
