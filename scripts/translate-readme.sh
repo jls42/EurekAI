@@ -35,17 +35,20 @@ else
 fi
 # Fournisseur : Codex sur l'abonnement ChatGPT (aucune facturation à l'usage), comme le
 # regen_translations.sh du traducteur — l'outil n'auto-détecte plus de clé d'API payante.
-# TRANSLATE_FLAGS REMPLACE ce défaut (ex. "--use_grok_cli --eco" si le quota Codex est épuisé).
-# Sans --use_codex ni --use_grok_cli, aipmt retombe sur l'API OpenAI FACTURÉE ; --use_opencode
-# passe par le fournisseur configuré dans OpenCode (local, gratuit, abonnement ou CLÉ facturée,
-# selon --model) : refusés sauf dérogation explicite TRANSLATE_ALLOW_PAID_API=1.
+# TRANSLATE_FLAGS REMPLACE ce défaut : "--use_antigravity" (abonnement Google AI Pro ou Ultra par
+# le CLI agy, aipmt ≥ 1.15 : aucune clé d'API transmise à agy, et toute réponse qui ne prouve pas
+# la voie abonnement est refusée) ou "--use_grok_cli --eco" si le quota Codex est épuisé.
+# Sans --use_codex, --use_antigravity ni --use_grok_cli, aipmt retombe sur l'API OpenAI FACTURÉE ;
+# --use_gemini est l'API Gemini facturée au token ; --use_opencode passe par le fournisseur
+# configuré dans OpenCode (local, gratuit, abonnement ou CLÉ facturée, selon --model) : refusés
+# sauf dérogation explicite TRANSLATE_ALLOW_PAID_API=1.
 read -r -a PROVIDER_FLAGS <<< "${TRANSLATE_FLAGS:---use_codex}"
 case " ${PROVIDER_FLAGS[*]} " in
-  *" --use_codex "* | *" --use_grok_cli "*) ;;
+  *" --use_codex "* | *" --use_antigravity "* | *" --use_grok_cli "*) ;;
   *)
     if [ "${TRANSLATE_ALLOW_PAID_API:-}" != "1" ]; then
       echo "ERROR: TRANSLATE_FLAGS='${TRANSLATE_FLAGS:-}' ne choisit aucun fournisseur sur abonnement" >&2
-      echo "(--use_codex, --use_grok_cli) : API potentiellement facturée à l'usage refusée" >&2
+      echo "(--use_codex, --use_antigravity, --use_grok_cli) : API potentiellement facturée à l'usage refusée" >&2
       echo "(OpenCode compris : son fournisseur peut être une clé facturée)." >&2
       echo "Dérogation explicite : TRANSLATE_ALLOW_PAID_API=1." >&2
       exit 2
