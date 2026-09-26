@@ -246,7 +246,7 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 | `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages) |
 | `voxtral-mini-latest` | Reconnaissance vocale (STT) | STT multilingue, optimisé avec `language="fr"` |
 | `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
-| `mistral-moderation-2603` | Modération de contenu | 5 catégories bloquées pour enfant/ado (dont `jailbreaking`) |
+| `mistral-moderation-2603` | Modération de contenu | 6 catégories bloquées pour enfant/ado (dont `jailbreaking`) |
 | `mistral-small-latest` | Routeur automatique | Analyse rapide du contenu pour décisions de routage |
 
 ---
