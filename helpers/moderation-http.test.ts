@@ -183,6 +183,6 @@ describe('blockingModerationStatus', () => {
   it('undefined quand rien ne bloque', () => {
     expect(
       blockingModerationStatus([src('s', 'safe', { criminal: true }), src('n')], ['sexual']),
-    ).toBe(undefined);
+    ).toBeUndefined();
   });
 });

@@ -86,9 +86,9 @@ if [ -n "${MISTRAL_API_KEY:-}" ]; then export MISTRAL_API_KEY; fi
 run_bounded() {
   local status=0 bin=""
   if command -v timeout >/dev/null 2>&1; then
-    bin=timeout
+    bin="timeout"
   elif command -v gtimeout >/dev/null 2>&1; then
-    bin=gtimeout
+    bin="gtimeout"
   fi
   if [ -z "$bin" ]; then
     "$@" || status=$?

@@ -6,7 +6,6 @@ import type { VoiceId } from './helpers/voice-types.js';
 import { normalizeReadingComfort } from './helpers/reading-comfort.js';
 import { logger } from './helpers/logger.js';
 import {
-  MODERATION_MODEL_CATEGORIES,
   type ModerationCategory,
   expandLegacyModerationCategories,
   isModerationCategory,
@@ -22,7 +21,7 @@ export function ageToGroup(age: number): AgeGroup {
 
 // Taxonomie du modèle de modération épinglé — source unique : helpers/moderation-model.ts.
 // Ré-exportée ici : server.ts (/api/moderation-categories) et les tests l'importent depuis profiles.
-export const ALL_MODERATION_CATEGORIES = MODERATION_MODEL_CATEGORIES;
+export { MODERATION_MODEL_CATEGORIES as ALL_MODERATION_CATEGORIES } from './helpers/moderation-model.js';
 
 // `dangerous` et `criminal` (scission 2603 de `dangerous_and_criminal_content`) NON bloqués par
 // défaut : faux positifs sur du contenu éducatif (électricité, chimie, énergie) constatés en 2411.
