@@ -66,7 +66,11 @@ describe('generateImage', () => {
 
     expect(client.files.download).toHaveBeenCalledWith({ fileId: 'file-abc' });
     expect(writeFileSync).toHaveBeenCalled();
-    expect(result.imageUrl).toContain('/output/projects/pid-2/');
+    // Nom unique (horodatage + suffixe aléatoire) : deux illustrations de la même ms ne
+    // s'écrasent plus.
+    expect(result.imageUrl).toMatch(
+      /^\/output\/projects\/pid-2\/illustration-\d+-[0-9a-f]{8}\.png$/,
+    );
   });
 
   it('throws when no image found in outputs', async () => {

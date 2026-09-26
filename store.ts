@@ -308,17 +308,18 @@ export class ProjectStore {
     return source;
   }
 
-  deleteGeneration(projectId: string, generationId: string): boolean {
-    // Retourne true uniquement si la generation a effectivement été retirée :
-    // route delete renvoie 404 sinon (cf. CLAUDE.md : double-delete entre 2
-    // onglets ne doit pas masquer un toast "supprimé" trompeur).
+  deleteGeneration(projectId: string, generationId: string): Generation | null {
+    // Retourne la génération effectivement retirée, null sinon : la route delete
+    // renvoie 404 sur null (cf. CLAUDE.md : double-delete entre 2 onglets ne doit
+    // pas masquer un toast "supprimé" trompeur) et supprime les médias de la
+    // génération retirée (helpers/generation-media.ts).
     const data = this.getProject(projectId);
-    if (!data) return false;
-    const before = data.results.generations.length;
+    if (!data) return null;
+    const removed = data.results.generations.find((g) => g.id === generationId);
+    if (!removed) return null;
     data.results.generations = data.results.generations.filter((g) => g.id !== generationId);
-    if (data.results.generations.length === before) return false;
     this.saveProject(projectId, data);
-    return true;
+    return removed;
   }
 
   updateGeneration(

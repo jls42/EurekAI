@@ -163,6 +163,24 @@ describe('addGeneration / deleteGeneration', () => {
     const found = store.getProject(p.meta.id);
     expect(found!.results.generations).toHaveLength(0);
   });
+
+  it('renvoie la generation retiree (ses medias sont nettoyes par la route), null sinon', () => {
+    const p = store.createProject('Gen test 3');
+    const gen: Generation = {
+      id: 'g3',
+      title: 'Quiz vocal',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'quiz-vocal',
+      data: [],
+      audioUrls: ['/output/projects/x/q0.mp3'],
+    };
+    store.addGeneration(p.meta.id, gen);
+
+    expect(store.deleteGeneration(p.meta.id, 'g3')).toEqual(gen);
+    expect(store.deleteGeneration(p.meta.id, 'g3')).toBeNull();
+    expect(store.deleteGeneration('nope', 'g3')).toBeNull();
+  });
 });
 
 describe('getUploadDir', () => {

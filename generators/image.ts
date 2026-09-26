@@ -2,6 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
+import { mediaUrl, uniqueMediaName } from '../helpers/generation-media.js';
 import { logger } from '../helpers/logger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
@@ -40,20 +41,23 @@ export function extractImageRef(outputs: unknown[]): ImageResult | null {
   return null;
 }
 
-async function downloadAndSaveImage(
+// Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec extractImageRef et ne
+// la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
+const downloadAndSaveImage = async (
   client: Mistral,
   fileId: string,
   projectDir: string,
   pid: string,
-): Promise<string> {
+): Promise<string> => {
   console.log(`    Image fileId: ${fileId}, downloading...`);
   const fileStream = await client.files.download({ fileId });
   const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
-  const imageFilename = `illustration-${Date.now()}.png`;
+  // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
+  const imageFilename = uniqueMediaName('illustration', 'png');
   writeFileSync(join(projectDir, imageFilename), imageBuffer);
   console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-  return `/output/projects/${pid}/${imageFilename}`;
-}
+  return mediaUrl(pid, imageFilename);
+};
 
 // Arrow function (pas `function` declaration) pour contourner un crash du
 // plugin Codacy `eslint-plugin-security-node` (rule `detect-unhandled-async-errors`)

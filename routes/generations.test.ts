@@ -11,7 +11,7 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ProjectStore } from '../store.js';
@@ -603,6 +603,86 @@ describe('DELETE /:pid/generations/:gid', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
+  });
+
+  describe('médias de la génération supprimée', () => {
+    const projectDir = () => join(tempDir, 'projects', pid);
+    const deleteGen = (gid: string) => {
+      const res = mockRes();
+      getHandler(
+        router,
+        'delete',
+        '/:pid/generations/:gid',
+      )(mockReq({ params: { pid, gid } }), res);
+      return res;
+    };
+    // Écrit de vrais fichiers dans le dossier du projet et renvoie leurs URLs publiques.
+    const writeMedia = (...names: string[]) =>
+      names.map((name) => {
+        writeFileSync(join(projectDir(), name), 'audio');
+        return `/output/projects/${pid}/${name}`;
+      });
+
+    it('supprime les MP3 du quiz vocal avec la génération', () => {
+      const audioUrls = writeMedia('quiz-vocal-q0-1-aaaaaaaa.mp3', 'quiz-vocal-q1-1-bbbbbbbb.mp3');
+      store.addGeneration(pid, {
+        id: 'qv-media',
+        title: 'Quiz vocal',
+        createdAt: new Date().toISOString(),
+        sourceIds: [],
+        type: 'quiz-vocal',
+        data: [],
+        audioUrls,
+      });
+
+      const res = deleteGen('qv-media');
+
+      expect(res.json).toHaveBeenCalledWith({ ok: true });
+      expect(existsSync(join(projectDir(), 'quiz-vocal-q0-1-aaaaaaaa.mp3'))).toBe(false);
+      expect(existsSync(join(projectDir(), 'quiz-vocal-q1-1-bbbbbbbb.mp3'))).toBe(false);
+    });
+
+    it('garde un fichier encore référencé par une autre génération', () => {
+      const [shared] = writeMedia('podcast-1700000000000.mp3');
+      const podcast = (id: string) => ({
+        id,
+        title: 'Podcast',
+        createdAt: new Date().toISOString(),
+        sourceIds: [],
+        type: 'podcast' as const,
+        data: { script: [], audioUrl: shared },
+      });
+      store.addGeneration(pid, podcast('podcast-a'));
+      store.addGeneration(pid, podcast('podcast-b'));
+
+      deleteGen('podcast-a');
+
+      expect(existsSync(join(projectDir(), 'podcast-1700000000000.mp3'))).toBe(true);
+    });
+
+    it('balaie la lecture à voix haute des flashcards (jamais référencée par la génération)', async () => {
+      const readAloud = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+      const readRes = mockRes();
+      await readAloud(mockReq({ params: { pid, gid: flashcardsGid }, body: {} }), readRes);
+      const { audioUrl } = readRes.json.mock.calls[0][0];
+      const name = audioUrl.split('/').pop();
+      expect(existsSync(join(projectDir(), name))).toBe(true);
+
+      deleteGen(flashcardsGid);
+
+      expect(existsSync(join(projectDir(), name))).toBe(false);
+    });
+
+    it('supprime les sections lues à voix haute du summary', async () => {
+      const readAloud = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+      await readAloud(mockReq({ params: { pid, gid: summaryGid }, body: {} }), mockRes());
+      const before = readdirSync(projectDir()).filter((f) => f.startsWith('read-aloud-'));
+      expect(before).toHaveLength(4);
+
+      deleteGen(summaryGid);
+
+      expect(readdirSync(projectDir()).filter((f) => f.startsWith('read-aloud-'))).toEqual([]);
+    });
   });
 });
 

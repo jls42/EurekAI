@@ -34,6 +34,7 @@ import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { diffDictation } from '../helpers/dictation-diff.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
+import { cleanupDeletedGeneration, readAloudPrefix } from '../helpers/generation-media.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
@@ -182,13 +183,13 @@ const generateBatchAudio = async (
   const d = gen.data;
   const audioUrls: Record<string, string> = {};
   const failedSections: FailedSection[] = [];
-  const baseId = gen.id.slice(0, 8);
+  const audioPrefix = readAloudPrefix(gen.id);
   for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
     if (!txt) continue;
     try {
       const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
-      audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
+      audioUrls[s] = saveAudioFile(buf, projectDir, pid, `${audioPrefix}${s}`);
     } catch (err) {
       logger.error('tts', `section ${s} failed:`, err);
       failedSections.push({ section: s, code: extractErrorCode(err, 'tts') });
@@ -255,13 +256,13 @@ interface SectionAudioCtx {
   ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;
-  baseId: string;
+  audioPrefix: string;
   store: ProjectStore;
   gid: string;
 }
 
 async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promise<string | null> {
-  const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
+  const { gen, section, voiceId, ttsOpts, projectDir, pid, audioPrefix, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
     res.status(400).json({ error: 'Type non supporte pour la lecture' });
@@ -273,7 +274,7 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promis
   }
 
   const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
-  const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
+  const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `${audioPrefix}${section}`);
 
   if (gen.type === 'summary') {
     const d = gen.data;
@@ -452,11 +453,14 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     // 404 si aucune génération n'a effectivement été retirée (project missing
     // OU gid inconnu). Sinon double-delete (race entre 2 onglets) renvoie 200
     // sur la 2e tentative et le user voit un toast "supprimé" trompeur.
-    const ok = store.deleteGeneration(req.params.pid, req.params.gid);
-    if (!ok) {
+    const removed = store.deleteGeneration(req.params.pid, req.params.gid);
+    if (!removed) {
       res.status(404).json({ error: 'generation_not_found' });
       return;
     }
+    // Médias (MP3, PNG) de la génération retirée : sans ce nettoyage, orphelins sur le disque.
+    // Best-effort, ne lève jamais (la suppression de la génération est déjà persistée).
+    cleanupDeletedGeneration(store, req.params.pid, removed);
     res.json({ ok: true });
   });
 
@@ -585,7 +589,9 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     voices: { host: VoiceId; guest: VoiceId };
     ttsOpts: TtsOptions;
     projectDir: string;
-    baseId: string;
+    // Préfixe des fichiers read-aloud de la génération (readAloudPrefix) : le balayage de
+    // cleanupDeletedGeneration retrouve ainsi ceux qu'aucune génération ne référence.
+    audioPrefix: string;
   };
 
   // Sous-helper : pipeline batch summary all-sections.
@@ -627,12 +633,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       `POST /api/projects/${ctx.pid}/read-aloud/flashcards`,
       fcUsage,
     );
-    const audioUrl = saveAudioFile(
-      audioBuffer,
-      ctx.projectDir,
-      ctx.pid,
-      `read-aloud-${ctx.baseId}-all`,
-    );
+    const audioUrl = saveAudioFile(audioBuffer, ctx.projectDir, ctx.pid, `${ctx.audioPrefix}all`);
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
   }
 
@@ -651,7 +652,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
           ttsOpts: ctx.ttsOpts,
           projectDir: ctx.projectDir,
           pid: ctx.pid,
-          baseId: ctx.baseId,
+          audioPrefix: ctx.audioPrefix,
           store,
           gid: ctx.gid,
         },
@@ -701,8 +702,17 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
         pid,
         req.body.lang,
       );
-      const baseId = gen.id.slice(0, 8);
-      const ctx: ReadAloudCtx = { pid, gid, gen, voiceId, voices, ttsOpts, projectDir, baseId };
+      const audioPrefix = readAloudPrefix(gen.id);
+      const ctx: ReadAloudCtx = {
+        pid,
+        gid,
+        gen,
+        voiceId,
+        voices,
+        ttsOpts,
+        projectDir,
+        audioPrefix,
+      };
       await runReadAloudPipeline(ctx, section, res);
     } catch (e) {
       const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;

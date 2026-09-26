@@ -116,6 +116,11 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Contrat réponse `/sources/upload`** : **array nu** en full success (historique préservé) ; objet `{ sources, failures?, duplicates? }` dès qu'il y a un échec ou un doublon ; **200** (pas 500) quand le lot ne contient que des doublons. `req.body.allowDuplicates === 'true'` **strict** (jamais `Boolean("false")`).
 - **UX** : décision **par fichier** dans la liste d'upload (statuts `'hashing'`/`'duplicate'` ; le getter `uploading` inclut `'hashing'` mais PAS `'duplicate'`) — `retryFile`/`dismissFailedFile` acceptent `'duplicate'` (« Importer quand même » = re-upload avec `allowDuplicates`, « Ignorer » = dismiss).
 
+### Médias des générations (MP3/PNG sous `output/projects/<pid>/`)
+- **Source unique** : `helpers/generation-media.ts`. Tout média écrit prend son nom de `uniqueMediaName(prefix, ext)` (`<prefix>-<Date.now()>-<8 hex>`) et son URL de `mediaUrl` — **jamais `Date.now()` seul** : deux générations parallèles du même type écrivaient le même fichier dans la même milliseconde et s'écrasaient.
+- **Suppression d'une génération** : `store.deleteGeneration` renvoie la génération retirée (`null` → 404), puis la route appelle `cleanupDeletedGeneration` (best-effort, ne lève jamais) : médias listés par `generationMediaUrls` (table d'extracteurs exhaustive par type : un nouveau champ média s'y déclare, sinon il reste orphelin) **sauf** ceux qu'une autre génération du projet référence encore (collisions d'avant les noms uniques), + balayage de `read-aloud-<id8>-*.mp3` (`readAloudPrefix`, aussi utilisé par l'écriture) : la lecture des flashcards n'est jamais référencée, une section relue remplace son URL sans supprimer l'ancien fichier. Pas de balayage si une autre génération partage le préfixe.
+- **Garde de chemin** : toute suppression passe par `mediaFileName(url, pid)` — uniquement `/output/projects/<pid>/<nom simple>.(mp3|png)` du projet visé ; URL externe (image hébergée par Mistral), autre projet, `uploads/` ou traversée → ignorée.
+
 ### HTML interactif
 - Ne JAMAIS imbriquer de `<button>` dans un `<button>` (HTML invalide, casse le layout)
 - Utiliser `<div role="button" tabindex="0" @click @keydown.enter>` quand le conteneur cliquable contient des boutons enfants
