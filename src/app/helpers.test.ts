@@ -1412,6 +1412,71 @@ describe('badge de modération : statut effectif', () => {
   });
 });
 
+// Consigne montrée à l'enfant (dialogue, bandeaux) : même garde que le serveur (consigneUsable),
+// pour le profil courant ; les gabarits ne testent jamais `consigne.found` seul.
+describe('consigneVisible', () => {
+  const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['dates'], sourceIds: ['a'] };
+  const safe = (id: string) => ({ id, moderation: { status: 'safe', categories: {} } });
+  const ctxFor = (overrides: Record<string, unknown>) => ({
+    ...helpers,
+    currentProfile: { useModeration: true, ageGroup: 'enfant', moderationCategories: ['criminal'] },
+    moderationDefaults: {},
+    sources: [safe('a')],
+    consigne: CONSIGNE,
+    ...overrides,
+  });
+  const visible = (ctx: unknown) => callWith<boolean>(helpers.consigneVisible, ctx);
+
+  it('profil modéré, provenance sûre → visible', () => {
+    expect(visible(ctxFor({}))).toBe(true);
+  });
+
+  it.each([
+    ['signalée', { id: 'a', moderation: { status: 'unsafe', categories: {} } }],
+    ['en attente', { id: 'a', moderation: { status: 'pending', categories: {} } }],
+    ['jamais vérifiée', { id: 'a' }],
+    [
+      'promue unsafe (catégorie bloquée)',
+      { id: 'a', moderation: { status: 'safe', categories: { criminal: true } } },
+    ],
+  ])('profil modéré, source de la provenance %s → cachée', (_label, source) => {
+    expect(visible(ctxFor({ sources: [source] }))).toBe(false);
+  });
+
+  it('source de la provenance supprimée → cachée', () => {
+    expect(visible(ctxFor({ sources: [safe('b')] }))).toBe(false);
+  });
+
+  it("profil non modéré (ou aucun profil) : visible dès qu'elle a des points", () => {
+    const unverified = [{ id: 'a' }];
+    expect(visible(ctxFor({ currentProfile: { useModeration: false }, sources: unverified }))).toBe(
+      true,
+    );
+    expect(visible(ctxFor({ currentProfile: null, sources: unverified }))).toBe(true);
+  });
+
+  it('absente, non trouvée ou sans point → cachée', () => {
+    expect(visible(ctxFor({ consigne: null }))).toBe(false);
+    expect(visible(ctxFor({ consigne: { ...CONSIGNE, found: false } }))).toBe(false);
+    expect(visible(ctxFor({ consigne: { ...CONSIGNE, keyTopics: [] } }))).toBe(false);
+  });
+
+  it('gabarits : dialogue et bandeaux sur consigneVisible(), bouton de détection sinon', () => {
+    const read = (name: string) =>
+      readFileSync(new URL(`../partials/${name}`, import.meta.url), 'utf-8');
+    const dialog = read('dialog-consigne.html');
+    const view = read('view-sources.html');
+    expect(dialog).toContain('<template x-if="consigneVisible()">');
+    expect(view).toContain('x-show="consigneVisible() && useConsigne"');
+    expect(view).toContain('x-show="consigneVisible() && !useConsigne"');
+    expect(view).toContain('x-show="sources.length > 0 && !consigneVisible()"');
+    for (const html of [dialog, view]) {
+      expect(html).not.toContain('consigne && consigne.found');
+      expect(html).not.toContain('!consigne.found');
+    }
+  });
+});
+
 describe('moderationBadgeColor', () => {
   it('returns correct classes for each status', () => {
     expect(

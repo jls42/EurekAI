@@ -23,17 +23,23 @@ import type {
   AgeGroup,
   DuplicateUpload,
   ModerationResult,
+  Consigne,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
 import { normalizeOcrModel } from '../helpers/ocr-models.js';
 import { moderateContent } from '../generators/moderation.js';
-import { moderationRejection } from '../helpers/moderation-http.js';
+import {
+  blockingModerationStatus,
+  moderationRejection,
+  type ModerationRejection,
+} from '../helpers/moderation-http.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
+import { selectChatSources } from '../helpers/chat-sources.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
-import { detectConsigne } from '../generators/consigne.js';
+import { detectConsigne, type ConsigneResult } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
 import { parseWebInput, fetchPageContent, timer as startTimer } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
@@ -146,26 +152,135 @@ const validateWebsearchBody = (req: Request, res: Response): WebSearchParams | n
   return { ...locale, query: body.query as string, scrapeMode: body.scrapeMode ?? 'auto' };
 };
 
-const runConsigneDetection = async (
+// Dépendances de la détection de consigne : store et profils complets (écritures de la consigne et
+// du coût), compatibles avec SettleDeps (reprise des modérations).
+interface ConsigneDeps {
+  store: ProjectStore;
+  profileStore: ProfileStore;
+  client: Mistral;
+}
+
+type LoadedProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
+
+// Issue d'une détection : projet disparu ; aucune source utilisable (aucun appel LLM) ; détection
+// faite, avec la consigne PERSISTÉE après l'opération (la nouvelle, ou celle restée en place si
+// une source de la provenance a été supprimée pendant la détection) et son coût.
+type ConsigneOutcome =
+  | { kind: 'missing' }
+  | { kind: 'unusable'; project: LoadedProject }
+  | { kind: 'done'; consigne: Consigne | null; costDelta: number };
+
+type TrackedDetection = { result: ConsigneResult; costDelta: number };
+
+// Libellé du costLog : son dernier segment `detect-consigne` donne « Détection de consigne »
+// (COST_ROUTE_LABEL_KEYS, src/app/helpers.ts), pour la route comme pour la détection de fond.
+const consigneCostRoute = (pid: string): string => `POST /api/projects/${pid}/detect-consigne`;
+
+// Appel LLM sous suivi de coût : persisté en cas de succès, et en cas d'échec avec l'usage déjà
+// capté (motif `apiUsage` des autres routes) avant de relancer l'exception.
+const runTrackedDetection = async (
+  deps: ConsigneDeps,
+  pid: string,
+  sources: Source[],
+  lang: string,
+): Promise<TrackedDetection> => {
+  try {
+    const { result, usage } = await runWithUsageTracking(() =>
+      detectConsigne(deps.client, getMarkdown(sources), undefined, lang),
+    );
+    const persisted = persistUsage(deps.store, pid, consigneCostRoute(pid), usage);
+    return { result, costDelta: persisted?.cost ?? 0 };
+  } catch (e) {
+    const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+    if (failedUsage?.length) {
+      persistUsage(deps.store, pid, `${consigneCostRoute(pid)}/failed`, failedUsage);
+    }
+    throw e;
+  }
+};
+
+type DetectedConsigne = Consigne & { sourceIds: string[] };
+
+const MISSING_PROJECT: ConsigneOutcome = { kind: 'missing' };
+
+// Toutes les sources de la provenance existent encore dans le projet relu.
+const provenanceStillPresent = (project: LoadedProject, provenance: readonly string[]): boolean => {
+  const ids = new Set(project.sources.map((s) => s.id));
+  return provenance.every((id) => ids.has(id));
+};
+
+// Écriture de la consigne détectée, relecture et écriture synchrones (aucune requête ne s'intercale
+// entre les deux) : si une source de sa provenance a été supprimée PENDANT la détection, rien n'est
+// écrit (la consigne viendrait d'un document supprimé) et l'issue porte la consigne restée en place.
+const saveDetectedConsigne = (
   store: ProjectStore,
-  client: Mistral,
+  pid: string,
+  consigne: DetectedConsigne,
+  costDelta: number,
+): ConsigneOutcome => {
+  const project = store.getProject(pid);
+  if (!project) return MISSING_PROJECT;
+  if (!provenanceStillPresent(project, consigne.sourceIds)) {
+    logger.info('consigne', 'detection discarded: a source was deleted during detection');
+    return { kind: 'done', consigne: project.consigne ?? null, costDelta };
+  }
+  const saved = store.setConsigne(pid, consigne);
+  return saved ? { kind: 'done', consigne: saved, costDelta } : MISSING_PROJECT;
+};
+
+/**
+ * Détection de la consigne sur les seules sources SÛRES pour le profil propriétaire, source unique
+ * de la route et de la tâche de fond : modérations des sources reprises et attendues au plus
+ * `waitMs` (settleSourceModeration), projet relu, puis sources utilisables = celles que le chat
+ * accepterait (selectChatSources : statut de garde `safe` si le profil est modéré, toutes sinon).
+ * Aucune source utilisable : aucun appel LLM. Sinon appel suivi en coût, consigne écrite avec sa
+ * provenance (`sourceIds`). Les exceptions de l'appel LLM se propagent.
+ */
+const detectProjectConsigne = async (
+  deps: ConsigneDeps,
+  pid: string,
+  lang: string,
+  waitMs: number,
+): Promise<ConsigneOutcome> => {
+  await settleSourceModeration(deps, pid, { waitMs });
+  const project = deps.store.getProject(pid);
+  if (!project) return MISSING_PROJECT;
+  const usable = selectChatSources(
+    project.sources,
+    moderationProfileOf(project, deps.profileStore),
+  );
+  if (usable.length === 0) return { kind: 'unusable', project };
+  const { result, costDelta } = await runTrackedDetection(deps, pid, usable, lang);
+  const consigne: DetectedConsigne = { ...result, sourceIds: usable.map((s) => s.id) };
+  return saveDetectedConsigne(deps.store, pid, consigne, costDelta);
+};
+
+// Journal de la tâche de fond : jamais le contenu de la consigne, seulement son nombre de points.
+// Tolère une consigne ancienne illisible (restée en place) : une exception ici passerait la
+// consigne en échec (catch de runConsigneDetection).
+const logConsigneOutcome = (outcome: ConsigneOutcome): void => {
+  if (outcome.kind === 'unusable') {
+    logger.info('consigne', 'detection skipped: no usable source');
+    return;
+  }
+  if (outcome.kind !== 'done') return;
+  const topics = outcome.consigne?.found ? outcome.consigne.keyTopics?.length : 0;
+  logger.info('consigne', `detection: ${topics ? topics + ' topics' : 'aucune'}`);
+};
+
+// Tâche de fond (après un import) : attente longue des modérations (MODERATION_WAIT_MS.consigne),
+// les sources encore en attente au-delà sont écartées de la détection. Ne lève jamais.
+const runConsigneDetection = async (
+  deps: ConsigneDeps,
   pid: string,
   lang: string,
 ): Promise<void> => {
   try {
-    const project = store.getProject(pid);
-    if (!project || project.sources.length === 0) return;
-    const markdown = getMarkdown(project.sources);
-    const result = await detectConsigne(client, markdown, undefined, lang);
-    if (!store.setConsigne(pid, result)) return;
-    logger.info(
-      'consigne',
-      `detection: ${result.found ? result.keyTopics.length + ' topics' : 'aucune'}`,
-    );
+    logConsigneOutcome(await detectProjectConsigne(deps, pid, lang, MODERATION_WAIT_MS.consigne));
   } catch (e) {
     logger.error('consigne', 'detection error:', e);
     const code = extractErrorCode(e, 'consigne');
-    store.setConsigneError(pid, code);
+    deps.store.setConsigneError(pid, code);
   }
 };
 
@@ -180,9 +295,11 @@ const runConsigneDetection = async (
 const inFlight = new Set<string>();
 const pendingLang = new Map<string, string>();
 
+// Appelée APRÈS le lancement des modérations des sources importées (startSourceModeration) : la
+// détection rejoint alors ces modérations en vol au lieu d'en relancer (plafond de 10 par appel de
+// settleSourceModeration).
 const triggerConsigneDetection = (
-  store: ProjectStore,
-  client: Mistral,
+  deps: ConsigneDeps,
   fingerprint: string,
   pid: string,
   lang = 'fr',
@@ -198,7 +315,7 @@ const triggerConsigneDetection = (
   inFlight.add(ck);
   void (async () => {
     try {
-      await runConsigneDetection(store, client, pid, lang);
+      await runConsigneDetection(deps, pid, lang);
     } catch (e) {
       // runConsigneDetection gère déjà ses propres erreurs, mais on se protège
       // ici contre une régression (exception inattendue, crash du code de
@@ -210,7 +327,7 @@ const triggerConsigneDetection = (
       const nextLang = pendingLang.get(ck);
       if (nextLang !== undefined) {
         pendingLang.delete(ck);
-        triggerConsigneDetection(store, client, fingerprint, pid, nextLang);
+        triggerConsigneDetection(deps, fingerprint, pid, nextLang);
       }
     }
   })();
@@ -419,18 +536,20 @@ const attemptFileUpload = async (
   }
 };
 
-const triggerUploadDownstream = (
-  store: ProjectStore,
-  client: Mistral,
+// Modérations des sources importées enregistrées AVANT la détection de consigne, qui les rejoint
+// (cf. triggerConsigneDetection). Profil non modéré : aucune modération, détection directe.
+const startModerationsThenDetect = (
+  deps: ConsigneDeps,
   fingerprint: string,
   pid: string,
   lang: string,
   modCats: string[] | null,
-  results: Source[],
+  sources: Source[],
 ): void => {
-  triggerConsigneDetection(store, client, fingerprint, pid, lang);
-  if (!modCats) return;
-  for (const src of results) startSourceModeration(store, client, pid, src, modCats);
+  if (modCats) {
+    for (const src of sources) startSourceModeration(deps.store, deps.client, pid, src, modCats);
+  }
+  triggerConsigneDetection(deps, fingerprint, pid, lang);
 };
 
 const sendUploadResponse = (
@@ -534,20 +653,17 @@ const runSttPipeline = async (
 };
 
 const persistAndDispatchVoiceSource = (
-  store: ProjectStore,
-  profileStore: ProfileStore,
-  client: Mistral,
+  deps: ConsigneDeps,
   fingerprint: string,
   pid: string,
   stt: SttPipelineResult,
   lang: string,
 ): Source => {
-  const modCats = getModerationCategories(store, profileStore, pid);
+  const modCats = getModerationCategories(deps.store, deps.profileStore, pid);
   const source = buildVoiceSource(stt.text, stt.persisted, modCats);
-  store.addSource(pid, source);
+  deps.store.addSource(pid, source);
   logger.info('sources', `STT OK: ${stt.text.length} chars (${stt.elapsed.toFixed(1)}s)`);
-  triggerConsigneDetection(store, client, fingerprint, pid, lang);
-  if (modCats) startSourceModeration(store, client, pid, source, modCats);
+  startModerationsThenDetect(deps, fingerprint, pid, lang, modCats, [source]);
   return source;
 };
 
@@ -739,19 +855,15 @@ const respondWebsearchSources = (
 };
 
 const persistWebsearchSources = (
-  store: ProjectStore,
-  client: Mistral,
+  deps: ConsigneDeps,
   fingerprint: string,
   pid: string,
   sources: Source[],
   modCats: string[] | null,
   lang: string,
 ): void => {
-  for (const s of sources) store.addSource(pid, s);
-  triggerConsigneDetection(store, client, fingerprint, pid, lang);
-  for (const s of sources) {
-    if (modCats) startSourceModeration(store, client, pid, s, modCats);
-  }
+  for (const s of sources) deps.store.addSource(pid, s);
+  startModerationsThenDetect(deps, fingerprint, pid, lang, modCats, sources);
 };
 
 type UploadRequest = { files: Express.Multer.File[]; lang: string; allowDuplicates: boolean };
@@ -808,7 +920,8 @@ const registerUploadRoute = (
         upload.allowDuplicates,
       );
       if (results.length > 0) {
-        triggerUploadDownstream(store, client, fingerprint, pid, upload.lang, modCats, results);
+        const deps = { store, profileStore, client };
+        startModerationsThenDetect(deps, fingerprint, pid, upload.lang, modCats, results);
       }
       sendUploadResponse(res, results, failures, duplicates);
     },
@@ -849,7 +962,8 @@ const registerTextRoute = (
     };
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
-    triggerConsigneDetection(store, client, fingerprint, req.params.pid, lang);
+    // Texte modéré AVANT sa création (moderateUserInput) : aucune modération à lancer.
+    triggerConsigneDetection({ store, profileStore, client }, fingerprint, req.params.pid, lang);
     res.json(source);
   });
 };
@@ -883,9 +997,8 @@ const registerVoiceRoute = (
       try {
         const stt = await runSttPipeline(store, client, pid, file, lang, res);
         if (!stt) return;
-        res.json(
-          persistAndDispatchVoiceSource(store, profileStore, client, fingerprint, pid, stt, lang),
-        );
+        const deps = { store, profileStore, client };
+        res.json(persistAndDispatchVoiceSource(deps, fingerprint, pid, stt, lang));
       } catch (e) {
         persistFailedUsage(store, pid, e);
         logger.error('sources', 'STT error:', e);
@@ -919,7 +1032,8 @@ const registerWebsearchRoute = (
         res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
-      persistWebsearchSources(store, client, fingerprint, pid, sources, modCats, params.lang);
+      const deps = { store, profileStore, client };
+      persistWebsearchSources(deps, fingerprint, pid, sources, modCats, params.lang);
       respondWebsearchSources(res, sources, failures);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
@@ -929,40 +1043,73 @@ const registerWebsearchRoute = (
 };
 
 const registerDeleteRoute = (router: Router, store: ProjectStore): void => {
+  // `consigne` : consigne restante (store.deleteSource efface celle qui dépendait de la source),
+  // null sinon ; le front s'y resynchronise.
   router.delete('/:pid/sources/:sid', (req, res) => {
     const result = store.deleteSource(req.params.pid, req.params.sid);
     if (!result) {
       res.status(404).json({ error: 'Projet ou source introuvable' });
       return;
     }
-    res.json({ ok: true });
+    res.json({ ok: true, consigne: result.consigne ?? null });
   });
 };
 
-const registerConsigneRoute = (router: Router, store: ProjectStore): void => {
+const NO_SOURCES_REJECTION: ModerationRejection = { status: 400, error: 'no_sources' };
+
+// Aucune source utilisable pour la détection : refus selon le statut de garde des sources, comme
+// une génération (400 moderation.blocked, 503 moderation.error, 409 moderation.pending) ; projet
+// sans source (ou profil non modéré) : 400 no_sources.
+const unusableSourcesRejection = (
+  project: LoadedProject,
+  profileStore: ProfileStore,
+): ModerationRejection => {
+  const blocked = activeModerationCategories(moderationProfileOf(project, profileStore));
+  const status = blocked ? blockingModerationStatus(project.sources, blocked) : undefined;
+  return moderationRejection(status) ?? NO_SOURCES_REJECTION;
+};
+
+// Réponse : 200 `{ consigne, costDelta }` — `consigne` = consigne persistée (null si aucune),
+// `costDelta` = coût de CET appel (0 sans usage facturable), à ajouter au total du projet.
+const sendConsigneOutcome = (
+  res: Response,
+  outcome: ConsigneOutcome,
+  profileStore: ProfileStore,
+): void => {
+  if (outcome.kind === 'missing') {
+    res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+    return;
+  }
+  if (outcome.kind === 'unusable') {
+    const rejection = unusableSourcesRejection(outcome.project, profileStore);
+    res.status(rejection.status).json({ error: rejection.error });
+    return;
+  }
+  res.json({ consigne: outcome.consigne, costDelta: outcome.costDelta });
+};
+
+// Détection à la demande (« Détecter la consigne », « Ré-analyser ») : auth-first, 404, `lang`
+// validé (400 invalid_input) AVANT toute modération et tout appel LLM, puis même détection que la
+// tâche de fond avec l'attente d'une requête (MODERATION_WAIT_MS.request).
+const registerConsigneRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/detect-consigne', async (req, res) => {
     const resolved = resolveOr4xx(req, res);
     if (!resolved) return;
-    const { client } = resolved;
     const pid = String(req.params.pid);
-    const project = store.getProject(pid);
-    if (!project) {
+    if (!projectExists(store, pid)) {
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-      return;
-    }
-    if (project.sources.length === 0) {
-      res.status(400).json({ error: 'Aucune source' });
       return;
     }
     const lang = readBodyLang(req, res);
     if (lang === null) return;
     try {
-      const result = await detectConsigne(client, getMarkdown(project.sources), undefined, lang);
-      if (!store.setConsigne(pid, result)) {
-        res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
-        return;
-      }
-      res.json(result);
+      const deps = { store, profileStore, client: resolved.client };
+      const outcome = await detectProjectConsigne(deps, pid, lang, MODERATION_WAIT_MS.request);
+      sendConsigneOutcome(res, outcome, profileStore);
     } catch (e) {
       logger.error('consigne', 'detection error:', e);
       res.status(500).json({ error: extractErrorCode(e) });
@@ -1055,7 +1202,7 @@ export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): R
   registerWebsearchRoute(router, store, profileStore);
   registerSourceModerationRoute(router, store, profileStore);
   registerDeleteRoute(router, store);
-  registerConsigneRoute(router, store);
+  registerConsigneRoute(router, store, profileStore);
   registerModerateRoute(router);
   return router;
 }

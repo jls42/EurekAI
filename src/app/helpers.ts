@@ -1,7 +1,7 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import { pendingOfTypeExists } from './pending-utils';
-import { displayedModerationStatus } from './effective-moderation';
+import { consigneVisibleFor, displayedModerationStatus } from './effective-moderation';
 import { openingProfileQuery } from './project-snapshot';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
@@ -299,6 +299,12 @@ const consigneStatus = function (consigne: Consigne | null | undefined): 'failed
   if (!consigne) return null;
   if (consigne.status === 'failed') return 'failed';
   return 'ok';
+};
+
+// Consigne montrée à l'enfant (dialogue, bandeaux) : garde partagée avec le serveur, pour le profil
+// courant (cf. consigneVisibleFor). Les gabarits ne testent jamais `consigne.found` directement.
+const consigneVisible = function (this: AppContext): boolean {
+  return consigneVisibleFor(this);
 };
 
 const ocrConfidenceTier = function (src: Source): string | null {
@@ -1124,6 +1130,7 @@ const SOURCE_HELPERS = {
   sourceTypeBadge,
   sourceTypeBadgeColor,
   consigneStatus,
+  consigneVisible,
   resolveSourceRef,
   itemSources,
   questionSources,

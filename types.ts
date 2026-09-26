@@ -441,6 +441,10 @@ export interface Consigne {
   found: boolean;
   text: string;
   keyTopics: string[];
+  // Provenance : ids des sources réellement envoyées au LLM de détection (les seules sources sûres
+  // pour le profil propriétaire). Absent = consigne ancienne (legacy), qui vaut pour toutes les
+  // sources actuelles. Lue par consigneUsable (helpers/moderation-http.ts) et store.deleteSource.
+  sourceIds?: string[];
   // `status` absent = legacy record (considéré OK). `'failed'` = détection erreur
   // surface un badge UI sans bloquer la génération (cf. CLAUDE.md OCR tier).
   status?: 'ok' | 'failed';

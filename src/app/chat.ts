@@ -65,7 +65,8 @@ const loadChatHistory = async function (this: AppContext) {
   try {
     const res = await fetch(this.apiBase() + '/chat');
     if (res.ok) {
-      const data = (await res.json()) as { messages?: AppContext['chatMessages'] };
+      const body: unknown = await res.json();
+      const data = body as { messages?: AppContext['chatMessages'] };
       this.chatMessages = data.messages || [];
     }
   } catch {
@@ -74,13 +75,15 @@ const loadChatHistory = async function (this: AppContext) {
 };
 
 // Sous-helper extrait : la branche succès/erreur du POST chat (cf.
-// handleChatSuccess / handleChatError) pour réduire le CCN de sendChatMessage.
+// handleChatSuccess / handleChatError) pour réduire le CCN de sendChatMessage. Corps typé par une
+// variable : `(await res.json()) as …` coupait la mesure Lizard (sendChatMessage disparaissait).
 const dispatchChatResponse = async function (state: AppContext, res: Response): Promise<void> {
+  const body: unknown = await res.json();
   if (res.ok) {
-    handleChatSuccess(state, (await res.json()) as ChatSuccessPayload);
+    handleChatSuccess(state, body as ChatSuccessPayload);
     return;
   }
-  handleChatError(state, (await res.json()) as ChatErrorPayload);
+  handleChatError(state, body as ChatErrorPayload);
 };
 
 const sendChatMessage = async function (this: AppContext) {
@@ -98,10 +101,13 @@ const sendChatMessage = async function (this: AppContext) {
       withAiHeaders({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        // useConsigne : bascule du projet (consigne écartée par l'enfant), respectée par les
+        // générations que le chat lance par outil, comme par les boutons de génération.
         body: JSON.stringify({
           message: msg,
           lang: getLocale(),
           ageGroup: this.currentProfile.ageGroup,
+          useConsigne: this.useConsigne,
         }),
       }),
     );

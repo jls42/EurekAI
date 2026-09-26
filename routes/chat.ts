@@ -12,7 +12,7 @@ import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
 import type { Request, Response } from 'express';
 import type { ProjectStore } from '../store.js';
-import type { ChatMessage, Generation, AgeGroup } from '../types.js';
+import type { ChatMessage, Consigne, Generation, AgeGroup } from '../types.js';
 import { getConfig } from '../config.js';
 import { chatWithSources } from '../generators/chat.js';
 import { getMarkdown, applyConsigne } from './generate.js';
@@ -23,7 +23,7 @@ import { generateQuiz } from '../generators/quiz.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
-import { moderationRejection } from '../helpers/moderation-http.js';
+import { consigneUsable, moderationRejection } from '../helpers/moderation-http.js';
 import {
   activeModerationCategories,
   moderationProfileOf,
@@ -57,6 +57,7 @@ interface ChatRequestContext {
   message: string;
   lang: string;
   ageGroup: AgeGroup;
+  useConsigne: boolean;
 }
 
 class ChatValidationError {
@@ -85,23 +86,34 @@ const resolveProjectAndProfile = (
   return { pid, project, profile };
 };
 
-type ChatBody = { message: string; lang: string; ageGroup: AgeGroup };
+type ChatBody = { message: string; lang: string; ageGroup: AgeGroup; useConsigne: boolean };
 
 interface RawChatBody {
   message?: unknown;
   lang?: unknown;
   ageGroup?: unknown;
+  useConsigne?: unknown;
 }
 
-// lang/ageGroup partent dans le prompt système du chat et des outils : validés ici (400
-// invalid_input), AVANT la modération, qui ne lit que le message.
+// Bascule « consigne » du projet (écartée par l'enfant, cf. front `useConsigne`) : absente = true
+// (appelants antérieurs), booléen accepté tel quel, autre type → null (400 invalid_input, comme
+// en génération).
+const readUseConsigne = (value: unknown): boolean | null => {
+  if (value === undefined) return true;
+  return typeof value === 'boolean' ? value : null;
+};
+
+// lang/ageGroup partent dans le prompt système du chat et des outils, useConsigne décide de la
+// consigne des outils : validés ici (400 invalid_input), AVANT la modération, qui ne lit que le
+// message.
 const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidationError => {
   const { message, lang, ageGroup } = body ?? {};
   if (!message || typeof message !== 'string')
     return new ChatValidationError(400, 'message requis');
   const locale = readLocaleFields(lang, ageGroup);
-  if (!locale) return new ChatValidationError(400, INVALID_INPUT);
-  return { message, ...locale };
+  const useConsigne = readUseConsigne(body?.useConsigne);
+  if (!locale || useConsigne === null) return new ChatValidationError(400, INVALID_INPUT);
+  return { message, ...locale, useConsigne };
 };
 
 // unsafe → 400 chat.moderationBlocked ; error (contrat rompu) → 503 moderation.error. Les
@@ -356,12 +368,28 @@ const EMPTY_TOOL_PHASE: ToolPhaseResult = {
   failedCost: 0,
 };
 
+// Consigne des générations par outil : celle du projet si l'enfant ne l'a pas écartée
+// (useConsigne) et si elle est utilisable pour le profil propriétaire (consigneUsable, même
+// garde que la génération) ; null sinon. Le prompt système du chat ne la reçoit jamais (seules
+// les sources autorisées y entrent) : ce point est le seul usage de la consigne dans le chat.
+const resolveChatConsigne = (
+  project: ChatProject,
+  profile: ChatRequestContext['profile'],
+  useConsigne: boolean,
+): Consigne | null => {
+  const { consigne } = project;
+  if (!useConsigne || !consigne) return null;
+  const blocked = activeModerationCategories(profile);
+  return consigneUsable(consigne, project.sources, blocked) ? consigne : null;
+};
+
 interface RunToolCallPhaseArgs {
   toolCalls: string[];
-  project: ChatProject;
   // Sources autorisées (resolveChatSources) : jamais project.sources, qui contient aussi les
   // sources que la modération exclut.
   sources: ChatProject['sources'];
+  // Consigne déjà gardée (resolveChatConsigne), null = aucune.
+  consigne: Consigne | null;
   lang: string;
   ageGroup: AgeGroup;
   config: ReturnType<typeof getConfig>;
@@ -371,11 +399,11 @@ interface RunToolCallPhaseArgs {
 }
 
 const runToolCallPhase = async (args: RunToolCallPhaseArgs): Promise<ToolPhaseResult> => {
-  const { toolCalls, project, sources, lang, ageGroup, config, client, store, pid } = args;
+  const { toolCalls, sources, consigne, lang, ageGroup, config, client, store, pid } = args;
   if (toolCalls.length === 0 || sources.length === 0) return EMPTY_TOOL_PHASE;
   const rawMarkdown = getMarkdown(sources);
-  const markdown = applyConsigne(rawMarkdown, project.consigne);
-  const hasConsigne = !!project.consigne?.found && (project.consigne.keyTopics?.length ?? 0) > 0;
+  const markdown = consigne ? applyConsigne(rawMarkdown, consigne) : rawMarkdown;
+  const hasConsigne = consigne !== null;
   const sourceIds = sources.map((s) => s.id);
   return processChatToolCalls(
     toolCalls,
@@ -455,6 +483,7 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
       const deps = { store, profileStore, client };
       const project = await settleChatProject(deps, pid, validated.project);
       const sources = resolveChatSources(project, profile);
+      const consigne = resolveChatConsigne(project, profile, validated.useConsigne);
       const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
       const sourceContext = buildSourceContext(sources, lang);
       const config = getConfig();
@@ -466,8 +495,8 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
 
       const tools = await runToolCallPhase({
         toolCalls: result.toolCalls,
-        project,
         sources,
+        consigne,
         lang,
         ageGroup,
         config,

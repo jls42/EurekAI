@@ -2,7 +2,8 @@
   x-ref="consigneDialog"
   class="rounded-dialog p-4 sm:p-6 max-w-2xl w-full max-h-[80vh] shadow-float bg-surface overflow-hidden"
 >
-  <template x-if="consigne && consigne.found">
+  <!-- Garde partagée avec le serveur (consigneUsable), jamais le seul champ found -->
+  <template x-if="consigneVisible()">
     <div class="flex flex-col max-h-[calc(80vh-3rem)]">
       <!-- Header — always visible -->
       <div class="flex items-center gap-3 mb-4 shrink-0">

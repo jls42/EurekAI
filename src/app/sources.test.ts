@@ -53,6 +53,8 @@ function makeContext(overrides: any = {}) {
     showToast: vi.fn(),
     refreshIcons: vi.fn(),
     refreshConsigne: vi.fn(),
+    followConsigneDetection: vi.fn(),
+    consigne: null as any,
     refreshModeration: vi.fn(),
     resolveError: vi.fn((e: string) => e),
     $nextTick: vi.fn((cb: () => void) => cb()),
@@ -164,6 +166,42 @@ describe('createSources', () => {
       expect(ctx.sources).toEqual([{ id: 's2', text: 'b' }]);
       expect(ctx.selectedIds).toEqual(['s2']);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.sourceDeleted', 'info');
+    });
+
+    // Le serveur efface la consigne tirée de la source supprimée : la réponse porte la consigne
+    // restante, le front s'y resynchronise (sinon le bandeau montrerait une consigne effacée).
+    it('resynchronise la consigne sur celle que renvoie le serveur', async () => {
+      ctx.sources = [{ id: 's1' }];
+      ctx.consigne = { found: true, text: 'tirée de s1', keyTopics: ['k'], sourceIds: ['s1'] };
+      mockFetchOk({ ok: true, consigne: null });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toBeNull();
+    });
+
+    it('consigne restante renvoyée → gardée', async () => {
+      const remaining = { found: true, text: 'autre', keyTopics: ['k'], sourceIds: ['s2'] };
+      ctx.sources = [{ id: 's1' }, { id: 's2' }];
+      ctx.consigne = remaining;
+      mockFetchOk({ ok: true, consigne: remaining });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toEqual(remaining);
+    });
+
+    it('projet changé pendant la suppression : consigne du nouveau projet intacte', async () => {
+      const other = { found: true, text: 'projet 2', keyTopics: ['k'] };
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.consigne = other;
+        return { ok: true, json: async () => ({ ok: true, consigne: null }) } as any;
+      });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toBe(other);
     });
   });
 
@@ -305,6 +343,45 @@ describe('createSources', () => {
       vi.mocked(globalThis.fetch).mockClear();
       await src.refreshModeration.call(ctx);
       expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    // Consigne relue quand il ne reste plus de source en attente : la détection de fond attend la
+    // modération, une consigne détectée APRÈS n'apparaîtrait jamais sinon.
+    it('plus aucune source en attente → relecture de la consigne lancée', async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      mockFetchOk({ sources: [{ id: 's1', moderation: { status: 'safe', categories: {} } }] });
+
+      await src.refreshModeration.call(ctx);
+
+      expect(ctx.followConsigneDetection).toHaveBeenCalledWith('pid-1');
+    });
+
+    it('source encore en attente → nouvelle relecture des modérations, pas de la consigne', async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      mockFetchOk({ sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }] });
+      ctx.refreshModeration = vi.fn();
+
+      await src.refreshModeration.call(ctx, 2);
+      expect(ctx.followConsigneDetection).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(3000);
+
+      expect(ctx.refreshModeration).toHaveBeenCalledWith(1);
+    });
+
+    it("projet changé pendant la relecture : rien n'est fusionné ni relu", async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        return {
+          ok: true,
+          json: async () => ({ sources: [{ id: 's1', moderation: { status: 'safe' } }] }),
+        } as any;
+      });
+
+      await src.refreshModeration.call(ctx);
+
+      expect(ctx.sources[0].moderation.status).toBe('pending');
+      expect(ctx.followConsigneDetection).not.toHaveBeenCalled();
     });
   });
 

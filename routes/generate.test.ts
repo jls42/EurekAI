@@ -755,6 +755,119 @@ describe('generateRoutes', () => {
       );
     });
 
+    // Consigne gardée par consigneUsable, profil PROPRIÉTAIRE modéré : jamais tirée d'une source
+    // signalée, en attente, jamais vérifiée ou supprimée, même quand la génération vise une
+    // autre source (sûre) du projet.
+    describe('consigne gardée (consigneUsable)', () => {
+      const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['topic1'] };
+      const moderatedProjectWith = (sources: ReadonlyArray<[string, ModerationStatus | null]>) => {
+        const pid = store.createProject('Test', profileStore.create('Kid', 9).id).meta.id;
+        for (const [id, status] of sources) {
+          store.addSource(pid, {
+            id,
+            filename: `${id}.txt`,
+            markdown: `Content ${id}`,
+            uploadedAt: new Date().toISOString(),
+            ...(status && { moderation: { status, categories: {} } }),
+          });
+        }
+        return pid;
+      };
+      const generateOn = async (pid: string, body: Record<string, unknown>) => {
+        const { generateSummary } = await import('../generators/summary.js');
+        const res = mockRes();
+        await getHandler(
+          router,
+          'post',
+          '/:pid/generate/summary',
+        )(mockReq({ params: { pid }, body }), res);
+        const call = vi.mocked(generateSummary).mock.calls.at(-1);
+        return { res, markdown: call?.[1] as string, options: call?.[2] };
+      };
+
+      it('provenance sûre → appliquée', async () => {
+        const pid = moderatedProjectWith([
+          ['a', 'safe'],
+          ['b', 'safe'],
+        ]);
+        store.setConsigne(pid, { ...CONSIGNE, sourceIds: ['a'] });
+
+        const { markdown, options } = await generateOn(pid, { sourceIds: ['b'] });
+
+        expect(markdown).toContain('CONSIGNE DE REVISION');
+        expect(options).toEqual(expect.objectContaining({ hasConsigne: true }));
+      });
+
+      it.each([
+        ['signalée', 'unsafe'],
+        ['en attente', 'pending'],
+        ['jamais vérifiée', null],
+      ] as const)(
+        'provenance %s (génération sur une AUTRE source sûre) → non appliquée',
+        async (_label, status) => {
+          const pid = moderatedProjectWith([
+            ['a', status],
+            ['b', 'safe'],
+          ]);
+          store.setConsigne(pid, { ...CONSIGNE, sourceIds: ['a'] });
+
+          // Génération sur `b` : seule `b` est vérifiée avant la génération, `a` garde son statut.
+          const { res, markdown, options } = await generateOn(pid, { sourceIds: ['b'] });
+
+          expect(moderateContent).not.toHaveBeenCalled();
+          expect(res.status).not.toHaveBeenCalled();
+          expect(markdown).not.toContain('CONSIGNE DE REVISION');
+          expect(options).toEqual(expect.objectContaining({ hasConsigne: false }));
+        },
+      );
+
+      it('source de la provenance disparue → non appliquée', async () => {
+        const pid = moderatedProjectWith([['b', 'safe']]);
+        store.setConsigne(pid, { ...CONSIGNE, sourceIds: ['supprimee'] });
+
+        const { markdown } = await generateOn(pid, {});
+
+        expect(markdown).not.toContain('CONSIGNE DE REVISION');
+      });
+
+      it('consigne legacy : appliquée si toutes les sources sont sûres, sinon non', async () => {
+        const pid = moderatedProjectWith([
+          ['a', 'safe'],
+          ['b', 'safe'],
+        ]);
+        store.setConsigne(pid, CONSIGNE);
+        expect((await generateOn(pid, { sourceIds: ['a'] })).markdown).toContain(
+          'CONSIGNE DE REVISION',
+        );
+
+        store.setSourceModeration(pid, 'b', { status: 'unsafe', categories: { sexual: true } });
+        expect((await generateOn(pid, { sourceIds: ['a'] })).markdown).not.toContain(
+          'CONSIGNE DE REVISION',
+        );
+      });
+
+      it('analyse de route : même garde', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+        const pid = moderatedProjectWith([
+          ['a', 'unsafe'],
+          ['b', 'safe'],
+        ]);
+        store.setConsigne(pid, { ...CONSIGNE, sourceIds: ['a'] });
+
+        const res = mockRes();
+        await getHandler(
+          router,
+          'post',
+          '/:pid/generate/route',
+        )(mockReq({ params: { pid }, body: { sourceIds: ['b'] } }), res);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(vi.mocked(routeRequest).mock.calls.at(-1)?.[1]).not.toContain(
+          'CONSIGNE DE REVISION',
+        );
+      });
+    });
+
     it('clamps count between 1 and 50', async () => {
       const { generateFlashcards } = await import('../generators/flashcards.js');
 

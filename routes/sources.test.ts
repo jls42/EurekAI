@@ -80,6 +80,8 @@ import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
 import { fetchPageContent } from '../helpers/index.js';
+import { recordUsage } from '../helpers/usage-context.js';
+import { getMarkdown } from './generate.js';
 import { MODERATION_WAIT_MS } from '../helpers/source-moderation.js';
 import type { ModerationStatus } from '../types.js';
 
@@ -127,6 +129,18 @@ afterEach(() => {
 // --- Helper: create a project with optional moderation-enabled profile ---
 
 const AGE_BY_GROUP: Record<string, number> = { adulte: 30, etudiant: 20, ado: 14 };
+
+// Source texte `MD-<id>`, avec un statut de modération persisté (absent : jamais vérifiée).
+function addStatusSource(pid: string, id: string, status?: ModerationStatus) {
+  return store.addSource(pid, {
+    id,
+    filename: `${id}.txt`,
+    markdown: `MD-${id}`,
+    uploadedAt: new Date().toISOString(),
+    sourceType: 'text',
+    ...(status && { moderation: { status, categories: {} } }),
+  });
+}
 
 function createProjectWithProfile(opts: { useModeration?: boolean; ageGroup?: string } = {}) {
   const age = AGE_BY_GROUP[opts.ageGroup ?? ''] ?? 9;
@@ -407,8 +421,8 @@ describe('DELETE /:pid/sources/:sid', () => {
     // Looking at store.deleteSource: it always returns ProjectData if project exists.
     // So even with a non-existent sid, it returns the project (sources unchanged).
     // The route handler checks `if (!result)` — which only happens when project is null.
-    // So a non-existent source ID on an existing project returns { ok: true }.
-    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    // So a non-existent source ID on an existing project returns { ok: true } (+ consigne).
+    expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: null });
   });
 
   it('supprime la source avec succes', () => {
@@ -427,7 +441,7 @@ describe('DELETE /:pid/sources/:sid', () => {
 
     handler(req, res);
 
-    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: null });
 
     // Verify deleted from store
     const updated = store.getProject(project.meta.id);
@@ -455,8 +469,75 @@ describe('DELETE /:pid/sources/:sid', () => {
       '/:pid/sources/:sid',
     )(mockReq({ params: { pid, sid: 'src-photo' } }), res);
 
-    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: null });
     expect(existsSync(uploadPath)).toBe(false);
+  });
+
+  // La consigne ne survit pas au document dont elle vient (provenance ou consigne legacy) ; la
+  // réponse porte la consigne restante, à laquelle le front se resynchronise.
+  describe('consigne tirée de la source supprimée', () => {
+    const addTextSource = (pid: string, id: string) =>
+      store.addSource(pid, {
+        id,
+        filename: `${id}.txt`,
+        markdown: 'contenu',
+        uploadedAt: new Date().toISOString(),
+        sourceType: 'text',
+      });
+    const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['dates'] };
+    const deleteVia = (pid: string, sid: string) => {
+      const res = mockRes();
+      getHandler(router, 'delete', '/:pid/sources/:sid')(mockReq({ params: { pid, sid } }), res);
+      return res;
+    };
+
+    it('source de la provenance supprimée → consigne effacée, réponse consigne: null', () => {
+      const pid = store.createProject('P1').meta.id;
+      addTextSource(pid, 'a');
+      addTextSource(pid, 'b');
+      store.setConsigne(pid, { ...CONSIGNE, sourceIds: ['a', 'b'] });
+
+      const res = deleteVia(pid, 'a');
+
+      expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: null });
+      expect(store.getProject(pid)!.consigne).toBeUndefined();
+    });
+
+    it('source hors provenance supprimée → consigne gardée et renvoyée', () => {
+      const pid = store.createProject('P1').meta.id;
+      addTextSource(pid, 'a');
+      addTextSource(pid, 'b');
+      const consigne = { ...CONSIGNE, sourceIds: ['a'] };
+      store.setConsigne(pid, consigne);
+
+      const res = deleteVia(pid, 'b');
+
+      expect(res.json).toHaveBeenCalledWith({ ok: true, consigne });
+      expect(store.getProject(pid)!.consigne).toEqual(consigne);
+    });
+
+    it('consigne legacy (sans provenance) → effacée à toute suppression', () => {
+      const pid = store.createProject('P1').meta.id;
+      addTextSource(pid, 'a');
+      addTextSource(pid, 'b');
+      store.setConsigne(pid, CONSIGNE);
+
+      const res = deleteVia(pid, 'b');
+
+      expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: null });
+      expect(store.getProject(pid)!.consigne).toBeUndefined();
+    });
+
+    it('id inconnu → consigne legacy intacte (aucune source retirée)', () => {
+      const pid = store.createProject('P1').meta.id;
+      addTextSource(pid, 'a');
+      store.setConsigne(pid, CONSIGNE);
+
+      const res = deleteVia(pid, 'inconnu');
+
+      expect(res.json).toHaveBeenCalledWith({ ok: true, consigne: CONSIGNE });
+      expect(store.getProject(pid)!.sources).toHaveLength(1);
+    });
   });
 });
 
@@ -476,7 +557,7 @@ describe('POST /:pid/detect-consigne', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
   });
 
-  it('retourne 400 quand le projet n a aucune source', async () => {
+  it('retourne 400 no_sources quand le projet n a aucune source (aucun appel LLM)', async () => {
     const project = store.createProject('P1');
     const handler = getHandler(router, 'post', '/:pid/detect-consigne');
     const req = mockReq({ params: { pid: project.meta.id }, body: {} });
@@ -485,7 +566,8 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Aucune source' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+    expect(detectConsigne).not.toHaveBeenCalled();
   });
 
   it('retourne le resultat de detection de consigne', async () => {
@@ -505,19 +587,19 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(detectConsigne).toHaveBeenCalledWith(client, '# Combined markdown', undefined, 'fr');
-    expect(res.json).toHaveBeenCalledWith({
+    // Consigne persistée avec sa provenance (sources envoyées au LLM) + coût de l'appel (aucun
+    // usage facturable avec le générateur mocké : 0).
+    const saved = {
       found: true,
       text: 'Reviser les dates',
       keyTopics: ['dates'],
-    });
+      sourceIds: ['src-1'],
+    };
+    expect(res.json).toHaveBeenCalledWith({ consigne: saved, costDelta: 0 });
 
     // Verify consigne saved in store
     const updated = store.getProject(project.meta.id);
-    expect(updated!.consigne).toEqual({
-      found: true,
-      text: 'Reviser les dates',
-      keyTopics: ['dates'],
-    });
+    expect(updated!.consigne).toEqual(saved);
   });
 
   it('utilise lang par defaut "fr" si non fourni', async () => {
@@ -610,6 +692,187 @@ describe('POST /:pid/detect-consigne', () => {
     const serialized = JSON.stringify(res.json.mock.calls[0][0]);
     expect(serialized).not.toContain('sk-1234');
     expect(serialized).not.toContain('api.internal');
+  });
+});
+
+// =============================================================================
+// POST /:pid/detect-consigne : sources sûres seulement, coût suivi
+// =============================================================================
+
+describe('POST /:pid/detect-consigne — sources sûres seulement, coût suivi', () => {
+  const PATH = '/:pid/detect-consigne';
+  const addSource = addStatusSource;
+
+  const detect = async (pid: string) => {
+    const res = mockRes();
+    await getHandler(router, 'post', PATH)(mockReq({ params: { pid }, body: { lang: 'fr' } }), res);
+    return res;
+  };
+
+  // Usage facturable enregistré par le générateur mocké (le client suivi le ferait) :
+  // mistral-large à 0,5 $/M tokens d'entrée → 0,5 $.
+  const recordLargeUsage = () =>
+    recordUsage({
+      model: 'mistral-large-latest',
+      promptTokens: 1_000_000,
+      completionTokens: 0,
+      totalTokens: 1_000_000,
+    });
+
+  it('profil modéré : les sources signalées ne partent pas au LLM, provenance = sources sûres', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true });
+    const pid = project.meta.id;
+    addSource(pid, 'sure', 'safe');
+    addSource(pid, 'signalee', 'unsafe');
+
+    const res = await detect(pid);
+
+    expect(getMarkdown).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(getMarkdown).mock.calls[0][0].map((s: { id: string }) => s.id)).toEqual([
+      'sure',
+    ]);
+    expect(res.json).toHaveBeenCalledWith({
+      consigne: expect.objectContaining({ found: true, sourceIds: ['sure'] }),
+      costDelta: 0,
+    });
+    expect(store.getProject(pid)!.consigne?.sourceIds).toEqual(['sure']);
+  });
+
+  it('source jamais vérifiée : modération attendue PUIS détection, source incluse', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true });
+    const pid = project.meta.id;
+    addSource(pid, 'neuve');
+
+    const res = await detect(pid);
+
+    expect(moderateContent).toHaveBeenCalledWith(client, 'MD-neuve', MODERATION_CATEGORIES.enfant);
+    const moderatedAt = vi.mocked(moderateContent).mock.invocationCallOrder[0];
+    expect(moderatedAt).toBeLessThan(vi.mocked(detectConsigne).mock.invocationCallOrder[0]);
+    expect(res.json).toHaveBeenCalledWith({
+      consigne: expect.objectContaining({ sourceIds: ['neuve'] }),
+      costDelta: 0,
+    });
+  });
+
+  it.each([
+    ['signalée', 'unsafe', null, 400, 'moderation.blocked'],
+    ['en erreur (reprise en erreur)', 'error', 'error', 503, 'moderation.error'],
+  ] as const)(
+    'seule source %s → %s sans appel LLM, consigne inchangée',
+    async (_label, persisted, retried, status, error) => {
+      const { project } = createProjectWithProfile({ useModeration: true });
+      const pid = project.meta.id;
+      addSource(pid, 's1', persisted);
+      if (retried)
+        vi.mocked(moderateContent).mockResolvedValueOnce({ status: retried, categories: {} });
+
+      const res = await detect(pid);
+
+      expect(res.status).toHaveBeenCalledWith(status);
+      expect(res.json).toHaveBeenCalledWith({ error });
+      expect(detectConsigne).not.toHaveBeenCalled();
+      expect(store.getProject(pid)!.consigne).toBeUndefined();
+    },
+  );
+
+  it('modération plus longue que MODERATION_WAIT_MS.request → 409 moderation.pending, sans appel LLM', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true });
+    const pid = project.meta.id;
+    addSource(pid, 's1', 'pending');
+    vi.mocked(moderateContent).mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const res = mockRes();
+      const sending = getHandler(
+        router,
+        'post',
+        PATH,
+      )(mockReq({ params: { pid }, body: { lang: 'fr' } }), res);
+      await vi.advanceTimersByTimeAsync(MODERATION_WAIT_MS.request);
+      await sending;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.pending' });
+      expect(detectConsigne).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('profil modéré sans source → 400 no_sources', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true });
+
+    const res = await detect(project.meta.id);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'no_sources' });
+  });
+
+  it('profil non modéré : toutes les sources, statut ignoré', async () => {
+    const { project } = createProjectWithProfile({ useModeration: false });
+    const pid = project.meta.id;
+    addSource(pid, 'a', 'unsafe');
+    addSource(pid, 'b');
+
+    const res = await detect(pid);
+
+    expect(moderateContent).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      consigne: expect.objectContaining({ sourceIds: ['a', 'b'] }),
+      costDelta: 0,
+    });
+  });
+
+  it('coût persisté dans le costLog (libellé detect-consigne) et rendu en costDelta', async () => {
+    const pid = store.createProject('P1').meta.id;
+    addSource(pid, 's1');
+    vi.mocked(detectConsigne).mockImplementationOnce(async () => {
+      recordLargeUsage();
+      return { found: true, text: 'T', keyTopics: ['k'] };
+    });
+
+    const res = await detect(pid);
+
+    const costLog = store.getProject(pid)!.costLog ?? [];
+    expect(costLog).toHaveLength(1);
+    expect(costLog[0].route).toBe(`POST /api/projects/${pid}/detect-consigne`);
+    expect(costLog[0].cost).toBeCloseTo(0.5, 5);
+    expect(res.json.mock.calls[0][0].costDelta).toBe(costLog[0].cost);
+  });
+
+  it('échec de la détection : usage capté persisté (/failed), 500 au code stable', async () => {
+    const pid = store.createProject('P1').meta.id;
+    addSource(pid, 's1');
+    vi.mocked(detectConsigne).mockImplementationOnce(async () => {
+      recordLargeUsage();
+      throw new Error('upstream down');
+    });
+
+    const res = await detect(pid);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+    const costLog = store.getProject(pid)!.costLog ?? [];
+    expect(costLog.map((e) => e.route)).toEqual([
+      `POST /api/projects/${pid}/detect-consigne/failed`,
+    ]);
+  });
+
+  it("source supprimée PENDANT la détection : rien n'est écrit, réponse = consigne restée en place", async () => {
+    const pid = store.createProject('P1').meta.id;
+    addSource(pid, 'a');
+    addSource(pid, 'b');
+    const kept = { found: true, text: 'avant', keyTopics: ['b'], sourceIds: ['b'] };
+    store.setConsigne(pid, kept);
+    vi.mocked(detectConsigne).mockImplementationOnce(async () => {
+      store.deleteSource(pid, 'a');
+      return { found: true, text: 'tirée de a', keyTopics: ['a'] };
+    });
+
+    const res = await detect(pid);
+
+    expect(res.json).toHaveBeenCalledWith({ consigne: kept, costDelta: 0 });
+    expect(store.getProject(pid)!.consigne).toEqual(kept);
   });
 });
 
@@ -716,16 +979,7 @@ describe('POST /:pid/moderate', () => {
 
 describe('POST /:pid/sources/moderate', () => {
   const PATH = '/:pid/sources/moderate';
-
-  const addModeratedSource = (pid: string, id: string, status?: ModerationStatus) =>
-    store.addSource(pid, {
-      id,
-      filename: `${id}.txt`,
-      markdown: `MD-${id}`,
-      uploadedAt: new Date().toISOString(),
-      sourceType: 'text',
-      ...(status && { moderation: { status, categories: {} } }),
-    });
+  const addModeratedSource = addStatusSource;
 
   const post = async (pid: string, body: unknown = {}) => {
     const res = mockRes();
@@ -2087,6 +2341,133 @@ describe('Background triggers after source addition', () => {
       undefined,
       'en',
     );
+  });
+
+  // Détection de fond (C17) : sur les seules sources sûres du profil propriétaire, APRÈS leur
+  // modération (lancée avant la détection), coût suivi sous le libellé detect-consigne.
+  describe('détection de fond sur les sources sûres', () => {
+    const deferred = () => {
+      let resolve!: (value: {
+        status: ModerationStatus;
+        categories: Record<string, boolean>;
+      }) => void;
+      const promise = new Promise<{
+        status: ModerationStatus;
+        categories: Record<string, boolean>;
+      }>((r) => {
+        resolve = r;
+      });
+      return { promise, resolve };
+    };
+
+    const uploadOne = async (pid: string) => {
+      const res = mockRes();
+      await getHandler(
+        router,
+        'post',
+        '/:pid/sources/upload',
+      )(
+        mockReq({
+          params: { pid },
+          body: { lang: 'fr' },
+          files: [{ path: join(tempDir, 'f.jpg'), originalname: 'f.jpg', filename: 'uuid-f.jpg' }],
+        }),
+        res,
+      );
+      return res;
+    };
+
+    const recordVoice = async (pid: string) => {
+      const res = mockRes();
+      await getHandler(
+        router,
+        'post',
+        '/:pid/sources/voice',
+      )(
+        mockReq({
+          params: { pid },
+          body: { lang: 'fr' },
+          file: { buffer: Buffer.from('audio'), originalname: 'voice.webm' },
+        }),
+        res,
+      );
+      return res;
+    };
+
+    it.each([
+      ['import', uploadOne],
+      ['enregistrement vocal', recordVoice],
+    ] as const)(
+      '%s (profil modéré) : la détection attend la modération de la nouvelle source',
+      async (_label, addVia) => {
+        const { project } = createProjectWithProfile({ useModeration: true });
+        const pid = project.meta.id;
+        const moderation = deferred();
+        vi.mocked(moderateContent).mockReturnValueOnce(moderation.promise);
+
+        const res = await addVia(pid);
+        const added = res.json.mock.calls[0][0];
+        const sourceId = (Array.isArray(added) ? added[0] : added).id;
+        await flushPromises();
+        expect(moderateContent).toHaveBeenCalledTimes(1);
+        expect(detectConsigne).not.toHaveBeenCalled();
+
+        moderation.resolve({ status: 'safe', categories: {} });
+        await flushPromises();
+        await flushPromises();
+
+        expect(detectConsigne).toHaveBeenCalledTimes(1);
+        expect(store.getProject(pid)!.consigne?.sourceIds).toEqual([sourceId]);
+      },
+    );
+
+    it('source importée signalée : aucune détection (aucune source sûre), consigne absente', async () => {
+      const { project } = createProjectWithProfile({ useModeration: true });
+      const pid = project.meta.id;
+      vi.mocked(moderateContent).mockResolvedValueOnce({
+        status: 'unsafe',
+        categories: { sexual: true },
+      });
+      const infoSpy = vi.spyOn(logger, 'info');
+
+      await uploadOne(pid);
+      await flushPromises();
+      await flushPromises();
+
+      expect(moderateContent).toHaveBeenCalledTimes(1);
+      expect(detectConsigne).not.toHaveBeenCalled();
+      expect(store.getProject(pid)!.consigne).toBeUndefined();
+      expect(infoSpy).toHaveBeenCalledWith('consigne', 'detection skipped: no usable source');
+      infoSpy.mockRestore();
+    });
+
+    it('texte libre (modéré avant création) : détection immédiate, coût persisté', async () => {
+      const { project } = createProjectWithProfile({ useModeration: true });
+      const pid = project.meta.id;
+      vi.mocked(detectConsigne).mockImplementationOnce(async () => {
+        recordUsage({
+          model: 'mistral-large-latest',
+          promptTokens: 1_000_000,
+          totalTokens: 1_000_000,
+        });
+        return { found: true, text: 'T', keyTopics: ['k'] };
+      });
+
+      const res = mockRes();
+      await getHandler(
+        router,
+        'post',
+        '/:pid/sources/text',
+      )(mockReq({ params: { pid }, body: { text: 'Je sais ma lecon si...', lang: 'fr' } }), res);
+      await flushPromises();
+      await flushPromises();
+
+      const source = res.json.mock.calls[0][0];
+      expect(store.getProject(pid)!.consigne?.sourceIds).toEqual([source.id]);
+      const costLog = store.getProject(pid)!.costLog ?? [];
+      expect(costLog.map((e) => e.route)).toEqual([`POST /api/projects/${pid}/detect-consigne`]);
+      expect(costLog[0].cost).toBeGreaterThan(0);
+    });
   });
 
   it('moderation error does not crash the route and sets error status', async () => {

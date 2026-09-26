@@ -70,6 +70,8 @@ export interface AppContext extends AppState {
   dismissToast(id: number): void;
 
   refreshConsigne(): Promise<void>;
+  detectConsigne(): Promise<void>;
+  followConsigneDetection(projectId: string): void;
 
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
@@ -204,6 +206,7 @@ export interface AppContext extends AppState {
   sourceTypeBadge(src: Source): string;
   sourceTypeBadgeColor(src: Source): string;
   consigneStatus(consigne: Consigne | null | undefined): 'failed' | 'ok' | null;
+  consigneVisible(): boolean;
   ocrConfidenceTier(src: Source): string | null;
   ocrConfidenceColor(src: Source): string;
   ocrConfidencePercent(src: Source): string;

@@ -2,6 +2,7 @@ import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { hashFile, findExistingDuplicate } from './source-dedup';
 import { mergeSourceModerations, requestSourceModeration } from './moderation-gate';
+import { syncConsigneAfterDelete } from './consigne';
 import type { AppContext, AppState } from './app-context';
 import type { Source } from '../../types';
 
@@ -377,10 +378,7 @@ export function createSources() {
     },
 
     async deleteSource(this: AppContext, id: string) {
-      await fetch(this.apiBase() + '/sources/' + id, { method: 'DELETE' });
-      this.sources = this.sources.filter((s: Source) => s.id !== id);
-      this.selectedIds = this.selectedIds.filter((sid: string) => sid !== id);
-      this.showToast(this.t('toast.sourceDeleted'), 'info');
+      await runDeleteSource(this, id);
     },
 
     openSourceDialog(this: AppContext, src: Source) {
@@ -465,6 +463,17 @@ export function createSources() {
   };
 }
 
+// Suppression d'une source, puis consigne resynchronisée sur la réponse (le serveur efface celle
+// qui dépendait de la source), sauf si le projet a changé entre-temps.
+const runDeleteSource = async function (state: AppContext, id: string): Promise<void> {
+  const projectId = state.currentProjectId;
+  const res = await fetch(state.apiBase() + '/sources/' + id, { method: 'DELETE' });
+  state.sources = state.sources.filter((s: Source) => s.id !== id);
+  state.selectedIds = state.selectedIds.filter((sid: string) => sid !== id);
+  if (state.currentProjectId === projectId) await syncConsigneAfterDelete(state, res);
+  state.showToast(state.t('toast.sourceDeleted'), 'info');
+};
+
 // « Revérifier » : proposé pour une source en attente ou en erreur (statut affiché), profil modéré
 // seulement — sans modération, aucune source ne bloque.
 const canRecheckModeration = function (this: AppContext, src: Source): boolean {
@@ -490,23 +499,37 @@ const runRecheckSourceModeration = async function (state: AppContext, src: Sourc
   }
 };
 
+// Suite du suivi une fois les modérations relues : source encore en attente → nouvelle relecture
+// (retries), plus aucune → relecture de la consigne (la détection de fond attend la vérification
+// des sources, elle aboutit donc après : followConsigneDetection).
+const continueModerationFollowUp = (
+  state: AppContext,
+  projectId: string,
+  retries: number,
+): void => {
+  const hasPending = state.sources.some((s: Source) => s.moderation?.status === 'pending');
+  if (!hasPending) {
+    state.followConsigneDetection(projectId);
+    return;
+  }
+  if (retries > 0) setTimeout(() => state.refreshModeration(retries - 1), 3000);
+};
+
 const runRefreshModeration = async function (state: AppContext, retries: number): Promise<void> {
-  if (!state.currentProjectId) return;
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
   try {
     // projectId vient de currentProjectId (state interne), pas d'input user direct.
     // Pas de whitelist applicable (set d'IDs dynamique). Pattern préexistant à
     // l'extraction de runRefreshModeration ; le taint analysis Codacy re-flag
     // après refactor (cf. CLAUDE.md effet secondaire taint sur cleanup).
     // nosemgrep
-    const res = await fetch('/api/projects/' + state.currentProjectId);
-    if (!res.ok) return;
-    const project = await res.json();
-    mergeSourceModerations(state, project.sources as Source[]);
+    const res = await fetch('/api/projects/' + projectId);
+    if (!res.ok || state.currentProjectId !== projectId) return;
+    const project: unknown = await res.json();
+    mergeSourceModerations(state, (project as { sources: Source[] }).sources);
     state.$nextTick(() => state.refreshIcons());
-    const hasPending = state.sources.some((s: Source) => s.moderation?.status === 'pending');
-    if (hasPending && retries > 0) {
-      setTimeout(() => state.refreshModeration(retries - 1), 3000);
-    }
+    continueModerationFollowUp(state, projectId, retries);
   } catch (e) {
     console.error('[sources] refreshModeration failed:', e);
   }

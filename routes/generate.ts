@@ -63,7 +63,11 @@ import {
   isOptionalAgeGroup,
   isOptionalLangCode,
 } from '../helpers/request-validation.js';
-import { blockingModerationStatus, moderationRejection } from '../helpers/moderation-http.js';
+import {
+  blockingModerationStatus,
+  consigneUsable,
+  moderationRejection,
+} from '../helpers/moderation-http.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 import { MODERATION_WAIT_MS, settleSourceModeration } from '../helpers/source-moderation.js';
 
@@ -321,18 +325,22 @@ const loadGenProject = (
 
 // Point UNIQUE d'application de la consigne dans ce fichier (routes dédiées, auto et analyse
 // de route) : toute garde future sur la consigne s'ajoute ici. Hors de ce point, seuls les
-// outils du chat l'appliquent (routes/chat.ts, via applyConsigne) : à couvrir aussi.
+// outils du chat l'appliquent (routes/chat.ts, via applyConsigne), avec la même garde.
+// Appliquée seulement si elle est utilisable pour le profil PROPRIÉTAIRE (consigneUsable) : une
+// consigne tirée d'une source signalée, en attente, en erreur, jamais vérifiée ou supprimée
+// n'entre dans aucun prompt.
 const resolveConsigne = (
   rawMarkdown: string,
   project: LoadedProject,
   useConsigne: boolean,
+  profileStore: ProfileStore,
 ): { markdown: string; hasConsigne: boolean } => {
-  if (!useConsigne) return { markdown: rawMarkdown, hasConsigne: false };
   const { consigne } = project;
-  return {
-    markdown: applyConsigne(rawMarkdown, consigne),
-    hasConsigne: !!consigne?.found && consigne.keyTopics.length > 0,
-  };
+  const blocked = activeModerationCategories(moderationProfileOf(project, profileStore));
+  if (!useConsigne || !consigneUsable(consigne, project.sources, blocked)) {
+    return { markdown: rawMarkdown, hasConsigne: false };
+  }
+  return { markdown: applyConsigne(rawMarkdown, consigne), hasConsigne: true };
 };
 
 // Limite de contexte du modèle résolu (400 context_too_large:<pct>) : ignorée si
@@ -418,7 +426,12 @@ const buildGenContext = (
   const rawMarkdown = getMarkdownOrNull(project.sources, body.sourceIds);
   if (rawMarkdown === null) return { ok: false, status: 400, error: 'no_sources' };
   const useConsigne = body.useConsigne !== false;
-  const { markdown, hasConsigne } = resolveConsigne(rawMarkdown, project, useConsigne);
+  const { markdown, hasConsigne } = resolveConsigne(
+    rawMarkdown,
+    project,
+    useConsigne,
+    profileStore,
+  );
   const config = getConfig();
   const model = configuredModel(config.models, modelId);
   const ctxError = contextErrorFor(rawMarkdown, markdown, model, options);

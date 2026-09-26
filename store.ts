@@ -46,6 +46,15 @@ const isSimpleFileName = (name: string): boolean => {
   return name !== '' && name !== '.' && name !== '..' && basename(name) === name;
 };
 
+// Consigne tirée (au moins en partie) de la source supprimée : la source figure dans sa
+// provenance, ou la consigne est legacy (sans provenance : elle a pu venir de n'importe quelle
+// source). Elle ne doit pas survivre au document dont elle vient.
+const consigneDependsOn = (consigne: ProjectData['consigne'], sourceId: string): boolean => {
+  if (!consigne) return false;
+  const provenance = consigne.sourceIds;
+  return !Array.isArray(provenance) || provenance.includes(sourceId);
+};
+
 export class ProjectStore {
   private readonly indexPath: string;
   private readonly projectsDir: string;
@@ -244,11 +253,14 @@ export class ProjectStore {
     return data;
   }
 
+  // Consigne effacée avec la source dont elle dépend (consigneDependsOn), dans la même écriture ;
+  // gardée sinon, et intacte si l'id ne désigne aucune source. La route renvoie la consigne restante.
   deleteSource(projectId: string, sourceId: string): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
     const removed = data.sources.find((s) => s.id === sourceId);
     data.sources = data.sources.filter((s) => s.id !== sourceId);
+    if (removed && consigneDependsOn(data.consigne, sourceId)) delete data.consigne;
     this.saveProject(projectId, data);
     // Fichier importé (photo, PDF, texte) : orphelin sinon. Gardé s'il sert encore à une source.
     const filePath = removed?.filePath;

@@ -3,6 +3,7 @@ import { describe, it, expect } from 'vitest';
 import {
   awaitsModeration,
   blockingModerationStatus,
+  consigneUsable,
   effectiveModerationStatus,
   gateModerationStatus,
   moderationRejection,
@@ -263,5 +264,67 @@ describe('awaitsModeration', () => {
     ['unsafe', mod('unsafe'), false],
   ])('%s → %s', (_label, moderation, expected) => {
     expect(awaitsModeration(moderation)).toBe(expected);
+  });
+});
+
+describe('consigneUsable', () => {
+  const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['dates'] };
+  const withProvenance = (...sourceIds: string[]) => ({ ...CONSIGNE, sourceIds });
+  const BLOCKED = ['criminal'];
+
+  it.each([
+    ['absente', null],
+    ['non trouvée', { ...CONSIGNE, found: false }],
+    ['sans point', { ...CONSIGNE, keyTopics: [] }],
+    ['points illisibles', { ...CONSIGNE, keyTopics: 'dates' as unknown as string[] }],
+    ['en échec de détection', { found: false, text: '', keyTopics: [], status: 'failed' }],
+  ])('%s → false, même pour un profil non modéré', (_label, consigne) => {
+    expect(consigneUsable(consigne, [src('a', 'safe')], null)).toBe(false);
+    expect(consigneUsable(consigne, [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it("profil non modéré (null) : vraie dès qu'elle a des points, statuts et provenance ignorés", () => {
+    expect(consigneUsable(CONSIGNE, [src('a', 'unsafe')], null)).toBe(true);
+    expect(consigneUsable(withProvenance('disparue'), [], null)).toBe(true);
+  });
+
+  it('provenance entièrement sûre → true, sources hors provenance ignorées', () => {
+    const sources = [src('a', 'safe'), src('b', 'safe'), src('hors', 'unsafe')];
+    expect(consigneUsable(withProvenance('a', 'b'), sources, BLOCKED)).toBe(true);
+  });
+
+  it.each([
+    ['signalée', src('a', 'unsafe')],
+    ['en attente', src('a', 'pending')],
+    ['en erreur', src('a', 'error')],
+    ['jamais vérifiée', src('a')],
+    ['statut effectif unsafe (catégorie bloquée à true)', src('a', 'safe', { criminal: true })],
+  ])('une source de la provenance %s → false', (_label, source) => {
+    expect(consigneUsable(withProvenance('a'), [source, src('b', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('source de la provenance disparue → false (fail-closed)', () => {
+    expect(consigneUsable(withProvenance('a', 'b'), [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('provenance vide ou illisible → false', () => {
+    expect(consigneUsable(withProvenance(), [src('a', 'safe')], BLOCKED)).toBe(false);
+    const corrupted = { ...CONSIGNE, sourceIds: 'a' as unknown as string[] };
+    expect(consigneUsable(corrupted, [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('consigne legacy (sans provenance) : toutes les sources actuelles doivent être sûres', () => {
+    expect(consigneUsable(CONSIGNE, [src('a', 'safe'), src('b', 'safe')], BLOCKED)).toBe(true);
+    expect(consigneUsable(CONSIGNE, [src('a', 'safe'), src('b', 'pending')], BLOCKED)).toBe(false);
+    // Plus aucune source : la consigne vient de sources disparues.
+    expect(consigneUsable(CONSIGNE, [], BLOCKED)).toBe(false);
+  });
+
+  it('profil modéré sans catégorie bloquée ([]) : la provenance doit quand même être vérifiée', () => {
+    expect(consigneUsable(withProvenance('a'), [src('a', 'safe', { criminal: true })], [])).toBe(
+      true,
+    );
+    expect(consigneUsable(withProvenance('a'), [src('a')], [])).toBe(false);
+    expect(consigneUsable(withProvenance('a'), [src('a', 'unsafe')], [])).toBe(false);
   });
 });

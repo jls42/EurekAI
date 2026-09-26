@@ -3,7 +3,8 @@
  * partagées par les routes (sources, chat, generate), la reprise des modérations
  * (helpers/source-moderation.ts) ET le front (src/app/generate.ts, src/app/moderation-gate.ts,
  * src/app/effective-moderation.ts), pour que la priorité entre sources bloquantes, le statut
- * effectif et le statut de garde soient les mêmes des deux côtés.
+ * effectif, le statut de garde et la garde de la consigne (consigneUsable) soient les mêmes des
+ * deux côtés.
  */
 import type { ModerationStatus } from '../types.js';
 import { expandLegacyModerationCategories } from './moderation-model.js';
@@ -145,4 +146,59 @@ export const blockingModerationStatus = (
 ): ModerationStatus | undefined => {
   const picked = pickBlockingSource(sources, blockedCategories);
   return picked ? gateModerationStatus(picked.moderation, blockedCategories) : undefined;
+};
+
+/** Champs d'une consigne lus par la garde (types.ts `Consigne`, champs optionnels : legacy). */
+interface ConsigneProvenance {
+  found?: boolean;
+  keyTopics?: readonly string[];
+  sourceIds?: readonly string[];
+}
+
+interface IdentifiedSource extends ModeratedSource {
+  id: string;
+}
+
+// Consigne porteuse de points à réviser : trouvée, avec au moins un point.
+const hasConsigneTopics = (consigne: ConsigneProvenance | null | undefined): boolean => {
+  const topics = consigne?.keyTopics;
+  return Boolean(consigne?.found) && Array.isArray(topics) && topics.length > 0;
+};
+
+// Chaque source de la provenance existe encore et a le statut de garde `safe`. Provenance vide ou
+// illisible : rien ne garantit son contenu (fail-closed).
+const provenanceIsSafe = (
+  provenance: unknown,
+  sources: readonly IdentifiedSource[],
+  blockedCategories: readonly string[],
+): boolean => {
+  if (!Array.isArray(provenance) || provenance.length === 0) return false;
+  return provenance.every((id) => {
+    const source = sources.find((s) => s.id === id);
+    return (
+      source !== undefined && gateModerationStatus(source.moderation, blockedCategories) === 'safe'
+    );
+  });
+};
+
+/**
+ * Consigne utilisable : affichée à l'enfant (dialogue, bandeaux), appliquée aux prompts de la
+ * génération et des outils du chat. Garde unique, serveur (routes/generate.ts, routes/chat.ts) et
+ * front (src/app/effective-moderation.ts). `blockedCategories` null = profil non modéré.
+ * - faux sans `found` ou sans point (`keyTopics` vide) ;
+ * - vrai si le profil n'est pas modéré ;
+ * - sinon chaque source de sa provenance (`sourceIds` ; toutes les sources actuelles pour une
+ *   consigne legacy) doit exister et avoir le statut de garde `safe` : une source signalée, en
+ *   attente, en erreur ou jamais vérifiée, ou une source disparue, la rend inutilisable
+ *   (fail-closed : la consigne a pu être tirée de ce contenu).
+ */
+export const consigneUsable = (
+  consigne: ConsigneProvenance | null | undefined,
+  sources: readonly IdentifiedSource[],
+  blockedCategories: readonly string[] | null,
+): boolean => {
+  if (!hasConsigneTopics(consigne)) return false;
+  if (blockedCategories === null) return true;
+  const provenance = consigne?.sourceIds ?? sources.map((s) => s.id);
+  return provenanceIsSafe(provenance, sources, blockedCategories);
 };

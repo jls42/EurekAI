@@ -27,6 +27,7 @@ function makeContext(overrides: any = {}) {
     chatMessages: [] as any[],
     chatInput: '',
     chatLoading: false,
+    useConsigne: true,
     t: vi.fn((key: string) => key),
     resolveError: vi.fn((code: string) => `resolved:${code}`),
     showToast: vi.fn(),
@@ -121,15 +122,32 @@ describe('sendChatMessage', () => {
     expect(ctx.chatLoading).toBe(false);
   });
 
-  it('sends correct request body with locale and ageGroup', async () => {
+  it('sends correct request body with locale, ageGroup and useConsigne', async () => {
     mockFetchOk({ reply: 'ok' });
     const ctx = makeContext({ chatInput: 'test msg' });
     await chat.sendChatMessage.call(ctx);
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'test msg', lang: 'fr', ageGroup: 'enfant' }),
+      body: JSON.stringify({
+        message: 'test msg',
+        lang: 'fr',
+        ageGroup: 'enfant',
+        useConsigne: true,
+      }),
     });
+  });
+
+  // Consigne écartée par l'enfant (bandeau « Ignorer ») : les générations par outil du chat la
+  // respectent, comme les boutons de génération.
+  it('consigne écartée → useConsigne: false envoyé', async () => {
+    mockFetchOk({ reply: 'ok' });
+    const ctx = makeContext({ chatInput: 'test msg', useConsigne: false });
+    await chat.sendChatMessage.call(ctx);
+    const init = vi.mocked(globalThis.fetch).mock.calls.at(-1)![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual(
+      expect.objectContaining({ useConsigne: false }),
+    );
   });
 
   it('adds generations from response', async () => {
