@@ -37,6 +37,7 @@ import {
 } from '../helpers/moderation-http.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 import { selectChatSources } from '../helpers/chat-sources.js';
+import { screenUserText, type TextScreening } from '../helpers/input-moderation.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne, type ConsigneResult } from '../generators/consigne.js';
@@ -347,32 +348,31 @@ const getModerationCategories = (
 type InputModeration = { ok: true; moderation?: ModerationResult } | { ok: false };
 
 // Sous-helper texte libre / websearch : modère la saisie AVANT tout traitement (aucune source
-// créée, aucune collecte lancée si refus). `ok: false` = réponse déjà envoyée : 400/503/409 selon
-// le statut (moderationRejection), 500 JSON sur exception de l'API — sans ce catch, l'exception
-// partait dans le handler Express par défaut (500 HTML). `moderation` absent = modération
-// inactive. Module-scope (n'utilise que des params) — cf. SonarQube S7721 ; arrow pour éviter
-// l'agglomération Lizard.
+// créée, aucune collecte lancée si refus), via screenUserText (helpers/input-moderation.ts,
+// partagé avec la réponse orale du quiz vocal). `ok: false` = réponse déjà envoyée : 400/503/409
+// selon le statut (moderationRejection), 500 JSON sur exception de l'API — sans ce catch,
+// l'exception partait dans le handler Express par défaut (500 HTML). `moderation` absent =
+// modération inactive. Module-scope (n'utilise que des params) — cf. SonarQube S7721 ; arrow pour
+// éviter l'agglomération Lizard.
 const moderateUserInput = async (
   client: Mistral,
   res: Response,
   text: string,
   modCats: string[] | null,
 ): Promise<InputModeration> => {
-  if (!modCats) return { ok: true };
-  let moderation: ModerationResult;
+  let screening: TextScreening;
   try {
-    moderation = await moderateContent(client, text.trim(), modCats);
+    screening = await screenUserText(client, text, modCats);
   } catch (e) {
     logger.error('moderation', 'input moderation error:', e);
     res.status(500).json({ error: extractErrorCode(e, 'moderation') });
     return { ok: false };
   }
-  const rejection = moderationRejection(moderation.status);
-  if (rejection) {
-    res.status(rejection.status).json({ error: rejection.error });
+  if (!screening.ok) {
+    res.status(screening.rejection.status).json({ error: screening.rejection.error });
     return { ok: false };
   }
-  return { ok: true, moderation };
+  return { ok: true, moderation: screening.moderation };
 };
 
 type ResolvedClient = { client: Mistral; fingerprint: string };

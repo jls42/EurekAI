@@ -46,6 +46,8 @@ import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-f
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
 import { rejectInvalidLang } from '../helpers/request-validation.js';
+import { screenUserText } from '../helpers/input-moderation.js';
+import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -54,6 +56,7 @@ const upload = multer({
 
 const FILL_BLANK = 'fill-blank';
 const DICTATION = 'dictation';
+const QUIZ_VOCAL = 'quiz-vocal';
 const ERR_ANSWERS_REQUIRED = 'answers requis';
 const LOG_ATTEMPT_ERROR = 'attempt error';
 
@@ -73,6 +76,120 @@ function resolveVocalAnswerLocale(
     ageGroup: quizGen.ageGroup ?? 'enfant',
   };
 }
+
+// Réponse orale refusée par la modération (transcription signalée) : clé i18n du front, message
+// bienveillant ; la question reste rejouable.
+const ANSWER_BLOCKED = 'quiz.answerBlocked';
+
+type VocalQuestion = QuizVocalGeneration['data'][number];
+
+interface VocalAnswerInput {
+  client: Mistral;
+  audio: Buffer;
+  question: VocalQuestion;
+  lang: string;
+  ageGroup: AgeGroup;
+  // Catégories vérifiées sur la transcription (vocalAnswerCategories) ; null = aucune vérification.
+  categories: string[] | null;
+}
+
+// Issue du pipeline : réponse vérifiée, ou refus AVANT la vérification (modération : 400
+// quiz.answerBlocked, 503 moderation.error ; exception de la modération : 500) — ni verifyAnswer
+// ni transcription dans la réponse, rien de stocké.
+type VocalAnswerOutcome =
+  | { kind: 'verified'; correct: boolean; feedback: string; transcription: string }
+  | { kind: 'refused'; status: number; error: string };
+
+// Catégories vérifiées sur la réponse orale : celles du profil PROPRIÉTAIRE du projet
+// (activeModerationCategories). null si la modération est inactive ou sans catégorie cochée
+// (`[]`) : rien à bloquer, pas d'appel, comme pour le message du chat.
+const vocalAnswerCategories = (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  pid: string,
+): string[] | null => {
+  const project = store.getProject(pid);
+  const categories = project
+    ? activeModerationCategories(moderationProfileOf(project, profileStore))
+    : null;
+  return categories && categories.length > 0 ? categories : null;
+};
+
+// Modération de la transcription AVANT sa vérification (screenUserText, partagé avec le texte
+// libre des sources). Transcription vide : rien à vérifier. null = acceptée. Une exception de
+// l'API devient un refus 500 au code stable : le pipeline se termine normalement, l'usage de la
+// transcription déjà faite est donc persisté par l'appelant.
+const screenTranscription = async (
+  input: VocalAnswerInput,
+  transcription: string,
+): Promise<VocalAnswerOutcome | null> => {
+  if (!transcription.trim()) return null;
+  try {
+    const screening = await screenUserText(
+      input.client,
+      transcription,
+      input.categories,
+      ANSWER_BLOCKED,
+    );
+    if (screening.ok) return null;
+    logger.info(QUIZ_VOCAL, `vocal answer refused by moderation (${screening.rejection.error})`);
+    return { kind: 'refused', ...screening.rejection };
+  } catch (e) {
+    logger.error('moderation', 'vocal answer moderation error:', e);
+    return { kind: 'refused', status: 500, error: extractErrorCode(e, 'moderation') };
+  }
+};
+
+/**
+ * Réponse orale d'un quiz vocal : transcription (STT), modération de la transcription avec les
+ * catégories du profil propriétaire, puis vérification par le LLM. Appelé sous
+ * runWithUsageTracking : STT et vérification sont facturés et persistés, y compris quand la
+ * réponse est refusée après la transcription. Jamais la transcription dans les journaux.
+ */
+const runVocalAnswer = async (input: VocalAnswerInput): Promise<VocalAnswerOutcome> => {
+  const { client, question, lang, ageGroup } = input;
+  const transcription = await transcribeAudio(client, input.audio, 'answer.webm', lang);
+  const refusal = await screenTranscription(input, transcription);
+  if (refusal) return refusal;
+  const { correct, feedback } = await verifyAnswer(
+    client,
+    question.question,
+    question.choices,
+    question.correct,
+    transcription,
+    { model: getConfig().models.quizVerify, lang, ageGroup },
+  );
+  return { kind: 'verified', correct, feedback, transcription };
+};
+
+// Libellé du costLog : dernier segment `vocal-answer` → « Réponse vocale » (COST_ROUTE_LABEL_KEYS,
+// src/app/helpers.ts), comme `read-aloud` pour la lecture à voix haute.
+const vocalAnswerCostRoute = (pid: string): string => `POST /api/projects/${pid}/vocal-answer`;
+
+// Réponse HTTP : 200 { correct, feedback, transcription } ou refus { error } (statut du refus),
+// avec `costDelta` (coût de CET appel, STT compris) dès qu'il est non nul : le front l'ajoute au
+// total du projet, refus compris.
+const sendVocalAnswer = (
+  res: Response,
+  outcome: VocalAnswerOutcome,
+  cost: number | undefined,
+): void => {
+  const costField = cost ? { costDelta: cost } : {};
+  if (outcome.kind === 'refused') {
+    res.status(outcome.status).json({ error: outcome.error, ...costField });
+    return;
+  }
+  const { correct, feedback, transcription } = outcome;
+  res.json({ correct, feedback, transcription, ...costField });
+};
+
+// Usage capté avant une exception (STT faite, vérification en échec) : persisté sous /failed.
+const persistFailedVocalUsage = (store: ProjectStore, pid: string, e: unknown): void => {
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `${vocalAnswerCostRoute(pid)}/failed`, failedUsage);
+  }
+};
 
 const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
   stats[qi] ??= { correct: 0, wrong: 0 };
@@ -490,7 +607,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     const pid = String(req.params.pid);
     const gid = String(req.params.gid);
     const gen = store.getGeneration(pid, gid);
-    if (gen?.type !== 'quiz-vocal') {
+    if (gen?.type !== QUIZ_VOCAL) {
       res.status(404).json({ error: 'Quiz vocal introuvable' });
       return null;
     }
@@ -512,7 +629,9 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   }
 
   // --- Quiz vocal: verify spoken answer ---
-  // requireKeyMiddleware AVANT multer → pas d'upload audio écrit en mémoire sans clé.
+  // requireKeyMiddleware AVANT multer → pas d'upload audio écrit en mémoire sans clé. Ordre :
+  // clé, cible et `lang` validés (4xx avant tout appel), puis runVocalAnswer (STT, modération de
+  // la transcription, vérification), coût persisté quelle que soit l'issue.
   router.post(
     '/:pid/generations/:gid/vocal-answer',
     requireKeyMiddleware,
@@ -520,25 +639,23 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     async (req, res) => {
       const client = resolveOr4xx(req, res);
       if (!client) return;
+      const pid = String(req.params.pid);
       try {
         const target = validateVocalAnswerTarget(req, res);
         if (!target) return;
-        const { quizGen, question } = target;
-        const { lang, ageGroup } = resolveVocalAnswerLocale(quizGen, req);
-        const config = getConfig();
-        const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
-        const result = await verifyAnswer(
+        const input: VocalAnswerInput = {
           client,
-          question.question,
-          question.choices,
-          question.correct,
-          transcription,
-          { model: config.models.quizVerify, lang, ageGroup },
-        );
-
-        res.json({ correct: result.correct, feedback: result.feedback, transcription });
+          audio: req.file!.buffer, // NOSONAR(S4325) — validateVocalAnswerTarget garantit req.file
+          question: target.question,
+          ...resolveVocalAnswerLocale(target.quizGen, req),
+          categories: vocalAnswerCategories(store, profileStore, pid),
+        };
+        const { result, usage } = await runWithUsageTracking(() => runVocalAnswer(input));
+        const persisted = persistUsage(store, pid, vocalAnswerCostRoute(pid), usage);
+        sendVocalAnswer(res, result, persisted?.cost);
       } catch (e) {
-        logger.error('quiz-vocal', 'vocal answer error:', e);
+        persistFailedVocalUsage(store, pid, e);
+        logger.error(QUIZ_VOCAL, 'vocal answer error:', e);
         // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
         // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
         res.status(500).json({ error: extractErrorCode(e, 'stt') });

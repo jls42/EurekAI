@@ -308,6 +308,7 @@ export const en: Record<string, string> = {
   'quiz.youSaid': 'You said: {text}',
   'quiz.nextQuestion': 'Next question',
   'quiz.verificationError': "Oops, I couldn't hear your answer. Shall we try again?",
+  'quiz.answerBlocked': "I can't accept that answer. Try saying it with different words!",
 
   'chat.heading': 'Chat with your courses',
   'chat.clear': 'Clear',

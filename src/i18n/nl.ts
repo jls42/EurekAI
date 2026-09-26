@@ -310,6 +310,8 @@ export const nl: Record<string, string> = {
   'quiz.youSaid': 'Je zei: {text}',
   'quiz.nextQuestion': 'Volgende vraag',
   'quiz.verificationError': 'Oeps, ik kon je antwoord niet horen. Zullen we het opnieuw proberen?',
+  'quiz.answerBlocked':
+    'Dit antwoord kan ik niet aannemen. Probeer het met andere woorden te zeggen!',
 
   'chat.heading': 'Chat met je cursussen',
   'chat.clear': 'Wissen',

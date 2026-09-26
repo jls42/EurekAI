@@ -21,8 +21,10 @@ function createVocalQuiz(questions: any[], audioUrls: string[] = []) {
   };
   const comp = quizVocalComponent(gen) as any;
   comp.currentProjectId = 'proj-1';
+  comp.currentProject = { totalCost: 0, costLog: [] };
   comp.showToast = vi.fn();
   comp.t = vi.fn((key: string) => key);
+  comp.resolveError = vi.fn((code: string) => `resolved:${code}`);
   comp.$nextTick = vi.fn((cb: () => void) => cb());
   comp.$refs = {
     questionAudio: {
@@ -243,6 +245,93 @@ describe('quizVocalComponent', () => {
         correct: false,
         feedback: 'quiz.verificationError',
       });
+    });
+
+    // Réponse orale refusée par la modération : message bienveillant dans la boîte neutre,
+    // jamais comptée (score inchangé, rien de mémorisé), question rejouable, sans toast.
+    it('refus quiz.answerBlocked : feedback bienveillant, non compté, question rejouable', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        json: () => Promise.resolve({ error: 'quiz.answerBlocked' }),
+      } as any);
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+
+      await comp.submitVocalAnswer(new Blob(['audio'], { type: 'audio/webm' }));
+
+      expect(comp.feedback).toEqual({
+        correct: false,
+        kind: 'error',
+        feedback: 'quiz.answerBlocked',
+        transcription: '',
+      });
+      expect(comp.score).toBe(0);
+      expect(comp.isCurrentAnswered()).toBe(false);
+      expect(comp.showToast).not.toHaveBeenCalled();
+      // « Réessayer » (feedback = null) : le bouton micro réapparaît pour la même question.
+      comp.feedback = null;
+      expect(comp.currentIndex()).toBe(0);
+      expect(!comp.feedback && !comp.isCurrentAnswered()).toBe(true);
+    });
+
+    it('autre code (moderation.error) : feedback de panne + toast traduit par resolveError', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        json: () => Promise.resolve({ error: 'moderation.error' }),
+      } as any);
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+
+      await comp.submitVocalAnswer(new Blob(['audio'], { type: 'audio/webm' }));
+
+      expect(comp.feedback).toMatchObject({ kind: 'error', feedback: 'quiz.verificationError' });
+      expect(comp.resolveError).toHaveBeenCalledWith('moderation.error');
+      expect(comp.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(comp.t).toHaveBeenCalledWith('toast.error', { error: 'resolved:moderation.error' });
+      expect(comp.score).toBe(0);
+    });
+
+    it('costDelta ajouté au total du projet, refus compris (transcription facturée)', async () => {
+      vi.mocked(globalThis.fetch)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: () => Promise.resolve({ correct: true, feedback: 'Bravo', costDelta: 0.002 }),
+        } as any)
+        .mockResolvedValueOnce({
+          ok: false,
+          status: 400,
+          json: () => Promise.resolve({ error: 'quiz.answerBlocked', costDelta: 0.001 }),
+        } as any);
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      const blob = new Blob(['audio'], { type: 'audio/webm' });
+
+      await comp.submitVocalAnswer(blob);
+      comp.nextQuestion();
+      await comp.submitVocalAnswer(blob);
+
+      expect(comp.currentProject.totalCost).toBeCloseTo(0.003, 6);
+      expect(comp.currentProject.costLog.map((e: any) => e.route)).toEqual([
+        'vocal-answer',
+        'vocal-answer',
+      ]);
+      expect(comp.feedback).not.toHaveProperty('costDelta');
+      expect(comp.score).toBe(1);
+    });
+
+    it('projet changé pendant la vérification : réponse ignorée', async () => {
+      const comp = createVocalQuiz(sampleQuestions, sampleUrls);
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        comp.currentProjectId = 'proj-2';
+        return {
+          ok: true,
+          json: () => Promise.resolve({ correct: true, feedback: 'Bravo', costDelta: 0.5 }),
+        } as any;
+      });
+
+      await comp.submitVocalAnswer(new Blob(['audio'], { type: 'audio/webm' }));
+
+      expect(comp.score).toBe(0);
+      expect(comp.currentProject.totalCost).toBe(0);
     });
 
     it('sets error feedback on exception', async () => {

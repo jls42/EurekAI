@@ -326,6 +326,8 @@ export const fr: Record<string, string> = {
   'quiz.youSaid': 'Tu as dit : {text}',
   'quiz.nextQuestion': 'Question suivante',
   'quiz.verificationError': "Oups, je n'ai pas réussi à écouter ta réponse. On réessaie ?",
+  'quiz.answerBlocked':
+    "Je ne peux pas accepter cette réponse. Essaie de la redire avec d'autres mots !",
 
   // Chat view
   'chat.heading': 'Chat avec tes cours',

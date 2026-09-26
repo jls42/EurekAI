@@ -315,6 +315,8 @@ export const de: Record<string, string> = {
   'quiz.nextQuestion': 'N\u00e4chste Frage',
   'quiz.verificationError':
     'Ups, ich konnte deine Antwort nicht h\u00f6ren. Versuchen wir es noch mal?',
+  'quiz.answerBlocked':
+    'Diese Antwort kann ich nicht annehmen. Versuch, sie mit anderen Worten zu sagen!',
 
   'chat.heading': 'Chat mit deinen Kursen',
   'chat.clear': 'Leeren',

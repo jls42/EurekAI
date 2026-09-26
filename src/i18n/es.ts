@@ -310,6 +310,7 @@ export const es: Record<string, string> = {
   'quiz.youSaid': 'Dijiste: {text}',
   'quiz.nextQuestion': 'Siguiente pregunta',
   'quiz.verificationError': 'Ups, no pude escuchar tu respuesta. \u00bfVolvemos a intentarlo?',
+  'quiz.answerBlocked': 'No puedo aceptar esta respuesta. ¡Intenta decirla con otras palabras!',
 
   'chat.heading': 'Chat con tus cursos',
   'chat.clear': 'Borrar',

@@ -1,37 +1,52 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import { withAiHeaders } from '../app/ai-fetch';
+import { addCostDelta } from '../app/cost-utils';
 import type { AppContext } from '../app/app-context';
 import type { Generation, QuizQuestion, QuizVocalGeneration } from '../../types';
 
 interface VocalFeedback {
   correct: boolean;
-  /* 'error' = panne système (réseau, vérification) — rendue en boîte NEUTRE avec
-     bouton Réessayer, jamais comme une mauvaise réponse de l'élève. */
+  /* 'error' = panne système (réseau, vérification) ou réponse refusée par la modération —
+     rendue en boîte NEUTRE avec bouton Réessayer, jamais comme une mauvaise réponse de l'élève. */
   kind?: 'error';
   feedback?: string;
   transcription?: string;
   loading?: boolean;
 }
 
+// Corps de POST /vocal-answer : réponse vérifiée (200) ou refus `{ error }`, avec `costDelta`
+// (coût de l'appel, transcription comprise) dans les deux cas.
+interface VocalAnswerPayload {
+  correct?: unknown;
+  feedback?: string;
+  transcription?: string;
+  error?: unknown;
+  costDelta?: number;
+}
+
 type TFn = (key: string, params?: Record<string, string | number>) => string;
 
-function buildVocalErrorFeedback(t: TFn): VocalFeedback {
+// Réponse orale refusée par la modération (transcription signalée) : message bienveillant, la
+// question reste rejouable ; réessayer n'est pas vain (l'enfant peut la dire autrement).
+const ANSWER_BLOCKED = 'quiz.answerBlocked';
+
+const buildVocalErrorFeedback = (t: TFn, messageKey = 'quiz.verificationError'): VocalFeedback => {
   return {
     correct: false,
     kind: 'error',
-    feedback: t('quiz.verificationError'),
+    feedback: t(messageKey),
     transcription: '',
   };
-}
+};
 
-function buildVocalFormData(idx: number, blob: Blob): FormData {
+const buildVocalFormData = (idx: number, blob: Blob): FormData => {
   const fd = new FormData();
   fd.append('audio', blob, 'answer.webm');
   fd.append('questionIndex', String(idx));
   fd.append('lang', document.documentElement.lang || 'fr');
   return fd;
-}
+};
 
 interface QuizVocalContext extends Omit<StepByStepBase<QuizQuestion>, 'feedback'>, AppContext {
   audioPlaying: boolean;
@@ -135,26 +150,63 @@ const isCurrentAnswered = function (this: QuizVocalContext): boolean {
   return idx !== undefined && idx in this.storedFeedback;
 };
 
+// Corps JSON de la réponse, vide s'il est illisible (page HTML d'un proxy, corps absent).
+const readVocalPayload = async (res: Response): Promise<VocalAnswerPayload> => {
+  try {
+    const body: unknown = await res.json();
+    return (body ?? {}) as VocalAnswerPayload;
+  } catch {
+    return {};
+  }
+};
+
+// Refus du serveur, jamais compté comme une réponse (score inchangé, question rejouable via
+// « Réessayer ») : réponse refusée par la modération → message bienveillant, sans toast ; autre
+// code → message neutre de panne + toast traduit (resolveError).
+const refusalFeedback = (ctx: QuizVocalContext, code: unknown): VocalFeedback => {
+  if (code === ANSWER_BLOCKED) return buildVocalErrorFeedback(ctx.t, ANSWER_BLOCKED);
+  if (typeof code === 'string' && code) {
+    ctx.showToast(ctx.t('toast.error', { error: ctx.resolveError(code) }), 'error');
+  }
+  return buildVocalErrorFeedback(ctx.t);
+};
+
+// Coût ajouté au total du projet (refus compris : la transcription est facturée), puis réponse
+// vérifiée (comptée et mémorisée) ou refus (non compté).
+const applyVocalResponse = (
+  ctx: QuizVocalContext,
+  idx: number,
+  ok: boolean,
+  payload: VocalAnswerPayload,
+): void => {
+  addCostDelta(ctx, payload.costDelta, 'vocal-answer');
+  if (!ok) {
+    ctx.feedback = refusalFeedback(ctx, payload.error);
+    return;
+  }
+  const { feedback, transcription } = payload;
+  ctx.feedback = { correct: payload.correct === true, feedback, transcription };
+  ctx.storedFeedback[idx] = ctx.feedback;
+  if (ctx.feedback.correct) ctx.score++;
+};
+
 const submitVocalAnswer = async function (this: QuizVocalContext, blob: Blob) {
   if (this.isReviewing()) return;
   const idx = this.currentIndex();
-  if (idx === undefined || !this.currentProjectId) return;
+  const projectId = this.currentProjectId;
+  if (idx === undefined || !projectId) return;
   // fetch inline (pas extrait dans un helper) pour préserver l'analyse taint
   // Codacy `rule-node-ssrf`. Cf. CLAUDE.md section Sécurité.
   this.feedback = { loading: true, correct: false };
   try {
     const res = await fetch(
-      '/api/projects/' + this.currentProjectId + '/generations/' + this.gen.id + '/vocal-answer',
+      '/api/projects/' + projectId + '/generations/' + this.gen.id + '/vocal-answer',
       withAiHeaders({ method: 'POST', body: buildVocalFormData(idx, blob) }),
     );
-    if (!res.ok) {
-      this.feedback = buildVocalErrorFeedback(this.t);
-      return;
-    }
-    const result = (await res.json()) as VocalFeedback;
-    this.feedback = { ...result, correct: result.correct };
-    this.storedFeedback[idx] = this.feedback;
-    if (result.correct) this.score++;
+    const payload = await readVocalPayload(res);
+    // Projet changé pendant la vérification : réponse ignorée (coût compris, relu du serveur).
+    if (this.currentProjectId !== projectId) return;
+    applyVocalResponse(this, idx, res.ok, payload);
   } catch (e) {
     console.error('vocal answer verification failed:', e);
     this.feedback = buildVocalErrorFeedback(this.t);

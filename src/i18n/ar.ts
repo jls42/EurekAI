@@ -380,6 +380,7 @@ export const ar: Record<string, string> = {
   'quiz.nextQuestion': '\u0627\u0644\u0633\u0624\u0627\u0644 \u0627\u0644\u062a\u0627\u0644\u064a',
   'quiz.verificationError':
     '\u0639\u0630\u0631\u0627\u064b\u060c \u0644\u0645 \u0623\u062a\u0645\u0643\u0651\u0646 \u0645\u0646 \u0633\u0645\u0627\u0639 \u0625\u062c\u0627\u0628\u062a\u0643. \u0646\u0639\u064a\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629\u061f',
+  'quiz.answerBlocked': 'لا يمكنني قبول هذه الإجابة. لنجرّب قولها بكلمات أخرى!',
 
   'chat.heading': '\u062a\u062d\u062f\u0651\u062b \u0645\u0639 \u062f\u0631\u0648\u0633\u0643',
   'chat.clear': '\u0645\u0633\u062d',
