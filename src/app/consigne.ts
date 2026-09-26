@@ -1,5 +1,6 @@
 import type { AppContext } from './app-context';
 import { withAiHeaders } from './ai-fetch';
+import { openingProfileQuery } from './project-snapshot';
 import type { Consigne, ProjectData } from '../../types';
 
 export function createConsigne() {
@@ -7,9 +8,13 @@ export function createConsigne() {
     async refreshConsigne(this: AppContext) {
       if (!this.currentProjectId) return;
       try {
-        const res = await fetch('/api/projects/' + this.currentProjectId);
+        const res = await fetch(
+          '/api/projects/' + this.currentProjectId + openingProfileQuery(this.currentProfile?.id),
+        );
         if (res.ok) {
-          const project = (await res.json()) as ProjectData;
+          // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+          const snapshot: unknown = await res.json();
+          const project = snapshot as ProjectData;
           if (project.consigne) {
             this.consigne = project.consigne;
             this.$nextTick(() => this.refreshIcons());

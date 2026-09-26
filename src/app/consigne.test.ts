@@ -49,6 +49,18 @@ describe('createConsigne', () => {
       expect(ctx.consigne).toEqual(projectConsigne);
     });
 
+    it('rafraîchit avec le profil courant qui ouvre le projet', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({}),
+      } as any);
+      const withProfile = makeContext({ currentProfile: { id: 'profile-A' } });
+
+      await consigne.refreshConsigne.call(withProfile);
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1?profileId=profile-A');
+    });
+
     it('returns early if no projectId', async () => {
       ctx.currentProjectId = '';
       await consigne.refreshConsigne.call(ctx);

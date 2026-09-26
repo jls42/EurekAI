@@ -289,6 +289,21 @@ describe('selectProject', () => {
     );
   });
 
+  // Le profil courant accompagne l'ouverture : le serveur y rattache un projet orphelin.
+  it('envoie le profil courant qui ouvre le projet (profileId encodé)', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ currentProfile: { id: 'profil 1&x', ageGroup: 'enfant' } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1?profileId=profil%201%26x');
+  });
+
+  it('sans profil courant : ouverture sans profileId', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ currentProfile: null });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1');
+  });
+
   it('sets activeView to sources when no sources', async () => {
     mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
     const ctx = makeContext();

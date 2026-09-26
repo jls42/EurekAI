@@ -2110,6 +2110,10 @@ describe('reconcilePendings', () => {
 
     await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
 
+    // Snapshot demandé au nom du profil courant (rattachement d'un projet orphelin).
+    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+      '/api/projects/pid-1?profileId=profile-A',
+    );
     expect(ctx.pendingById['p1']).toBeDefined();
     expect(ctx.generations).toHaveLength(1);
     expect(ctx.generations[0].id).toBe('g-completed');

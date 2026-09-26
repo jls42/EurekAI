@@ -2,6 +2,7 @@ import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import { pendingOfTypeExists } from './pending-utils';
 import { displayedModerationStatus } from './effective-moderation';
+import { openingProfileQuery } from './project-snapshot';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
@@ -478,14 +479,16 @@ const costEntryLabel = function (this: AppContext, route: string): string {
 };
 
 /* Nettoyage cosmétique du markdown produit par le LLM (texte affiché en x-text,
-   déjà échappé par Alpine — aucun rôle de sécurité ici). */
+   déjà échappé par Alpine — aucun rôle de sécurité ici). Accent grave écrit \x60 dans la
+   regex : un accent grave littéral ouvrait un gabarit pour Lizard, qui ne mesurait plus rien
+   dans la suite du fichier (cf. CLAUDE.md, pièges Lizard). */
 const stripMarkdown = (text: string): string =>
   text
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
-    .replace(/`([^`]+)`/g, '$1');
+    .replace(/\x60([^\x60]+)\x60/g, '$1');
 
 const showCostPopover = function (this: AppContext, el: HTMLElement, item: CostPopoverItem) {
   let lines: string[] = [];
@@ -822,9 +825,11 @@ const reconcilePendings = async function (
   // 1. Fetch + parse snapshot — offline / 5xx / non-JSON = acceptable.
   let project: ProjectData;
   try {
-    const res = await fetch('/api/projects/' + projectId);
+    const res = await fetch('/api/projects/' + projectId + openingProfileQuery(profileId));
     if (!res.ok) return;
-    project = (await res.json()) as ProjectData;
+    // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+    const snapshot: unknown = await res.json();
+    project = snapshot as ProjectData;
   } catch (err) {
     console.warn('[reconcile] snapshot fetch failed for project', projectId, err);
     return;

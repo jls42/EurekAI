@@ -3,9 +3,11 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from '../store.js';
+import { ProfileStore } from '../profiles.js';
 import { projectRoutes } from './projects.js';
 
 let store: ProjectStore;
+let profileStore: ProfileStore;
 let tempDir: string;
 let router: any;
 
@@ -32,7 +34,8 @@ function mockRes() {
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-projects-route-'));
   store = new ProjectStore(tempDir);
-  router = projectRoutes(store);
+  profileStore = new ProfileStore(tempDir);
+  router = projectRoutes(store, profileStore);
 });
 
 afterEach(() => {
@@ -194,6 +197,86 @@ describe('GET /:pid', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+  });
+
+  // Projet orphelin (sans profil, listé pour tous les profils) : rattaché DÉFINITIVEMENT au
+  // premier profil existant qui l'ouvre, pour que sa modération s'applique côté serveur.
+  describe('rattachement du projet orphelin au profil qui l’ouvre', () => {
+    const open = (pid: string, profileId?: unknown) => {
+      const res = mockRes();
+      getHandler(
+        router,
+        'get',
+        '/:pid',
+      )(mockReq({ params: { pid }, query: profileId === undefined ? {} : { profileId } }), res);
+      return res;
+    };
+    const listFor = (profileId: string): string[] => {
+      const res = mockRes();
+      getHandler(router, 'get', '/')(mockReq({ query: { profileId } }), res);
+      return res.json.mock.calls[0][0].map((p: { id: string }) => p.id);
+    };
+
+    it('profil existant : rattaché sur disque et dans l’index, réponse à jour', () => {
+      const kid = profileStore.create('Kid', 9, '0', 'fr');
+      const pid = store.createProject('Orphelin').meta.id;
+
+      const res = open(pid, kid.id);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].meta.profileId).toBe(kid.id);
+      expect(store.getProject(pid)!.meta.profileId).toBe(kid.id);
+      expect(store.listProjects().find((p) => p.id === pid)?.profileId).toBe(kid.id);
+    });
+
+    it('après rattachement : absent de la liste des autres profils, présent chez le sien', () => {
+      const kid = profileStore.create('Kid', 9, '0', 'fr');
+      const other = profileStore.create('Autre', 12, '0', 'fr');
+      const pid = store.createProject('Orphelin').meta.id;
+      expect(listFor(other.id)).toContain(pid);
+
+      open(pid, kid.id);
+
+      expect(listFor(other.id)).not.toContain(pid);
+      expect(listFor(kid.id)).toContain(pid);
+    });
+
+    it.each([
+      ['profil inexistant', 'profil-inconnu'],
+      ['profileId vide', ''],
+      ['profileId en tableau (paramètre répété)', ['a', 'b']],
+      ['profileId absent', undefined],
+    ])('%s : réponse normale, aucun rattachement', (_label, profileId) => {
+      const pid = store.createProject('Orphelin').meta.id;
+
+      const res = open(pid, profileId);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].meta.profileId).toBeUndefined();
+      expect(store.getProject(pid)!.meta.profileId).toBeUndefined();
+      expect(store.listProjects().find((p) => p.id === pid)?.profileId).toBeUndefined();
+    });
+
+    it('projet déjà rattaché : jamais réattribué à un autre profil', () => {
+      const owner = profileStore.create('Kid', 9, '0', 'fr');
+      const other = profileStore.create('Autre', 12, '0', 'fr');
+      const pid = store.createProject('Projet', owner.id).meta.id;
+
+      const res = open(pid, other.id);
+
+      expect(res.json.mock.calls[0][0].meta.profileId).toBe(owner.id);
+      expect(store.getProject(pid)!.meta.profileId).toBe(owner.id);
+      expect(listFor(other.id)).not.toContain(pid);
+    });
+
+    it('projet inconnu : 404 inchangé, même avec un profil existant', () => {
+      const kid = profileStore.create('Kid', 9, '0', 'fr');
+
+      const res = open('inexistant', kid.id);
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    });
   });
 
   it('computes totalCost from costLog only (not from entity estimatedCost)', () => {

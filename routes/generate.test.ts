@@ -382,6 +382,31 @@ describe('generateRoutes', () => {
       expect(results.pendingTracker ?? []).toHaveLength(0);
     });
 
+    // Projet orphelin : aucun profil propriétaire, donc aucune modération côté serveur ; une fois
+    // rattaché au profil qui l'ouvre (GET /api/projects/:pid?profileId=), celle du profil s'applique.
+    it('projet orphelin non modéré, puis modéré une fois rattaché à un profil', async () => {
+      const kid = profileStore.create('Kid', 9, '0', 'fr');
+      const pid = store.createProject('Orphelin').meta.id;
+      store.addSource(pid, {
+        id: 'unsafe-src',
+        filename: 'bad.txt',
+        markdown: 'Unsafe content',
+        uploadedAt: new Date().toISOString(),
+        moderation: { status: 'unsafe', categories: { violence_and_threats: true } },
+      });
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+
+      const orphanRes = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), orphanRes);
+      expect(orphanRes.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
+
+      store.adoptProject(pid, kid.id);
+      const adoptedRes = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), adoptedRes);
+      expect(adoptedRes.status).toHaveBeenCalledWith(400);
+      expect(adoptedRes.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
+
     it('does not block when profile has useModeration=false', async () => {
       const profile = profileStore.create('Adult', 30, '0', 'fr');
       // Adults have useModeration=false by default

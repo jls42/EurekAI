@@ -222,6 +222,20 @@ export class ProjectStore {
     this.saveProject(id, data);
   }
 
+  // Rattache DÉFINITIVEMENT un projet orphelin (sans meta.profileId, listé pour tous les profils)
+  // au profil qui l'ouvre : project.json ET index (saveProject → touchIndex). Un projet déjà
+  // rattaché n'est jamais réattribué. Rend le projet (à jour ou inchangé), null s'il n'existe
+  // pas. Lecture et écriture synchrones : deux ouvertures concurrentes ne s'entrelacent pas, la
+  // seconde voit le rattachement de la première. Le profil est validé par l'appelant.
+  adoptProject(id: string, profileId: string): ProjectData | null {
+    const data = this.getProject(id);
+    if (!data || data.meta.profileId) return data;
+    data.meta.profileId = profileId;
+    this.saveProject(id, data);
+    logger.info('store', 'orphan project adopted', id, profileId);
+    return data;
+  }
+
   addSource(projectId: string, source: Source): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;

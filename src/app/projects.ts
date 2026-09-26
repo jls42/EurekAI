@@ -1,4 +1,5 @@
 import { normalizeSummaryData } from './helpers';
+import { openingProfileQuery } from './project-snapshot';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
@@ -200,7 +201,8 @@ const selectProject = async function (this: AppContext, id: string) {
   this.resetSession();
   this.resetState();
   try {
-    const res = await fetch('/api/projects/' + id);
+    // profileId : un projet encore orphelin est rattaché au profil qui l'ouvre (côté serveur).
+    const res = await fetch('/api/projects/' + id + openingProfileQuery(profileId));
     if (!res.ok) {
       // Sans toast + reset, l'UI reste sur un projet partiellement sélectionné
       // (currentProjectId muté + state vidé via resetState) → sources vides,
@@ -210,8 +212,9 @@ const selectProject = async function (this: AppContext, id: string) {
       this.showToast(this.t('toast.projectLoadError'), 'error', () => this.selectProject(id));
       return;
     }
-    const project = (await res.json()) as ProjectData;
-    applyProjectSnapshot(this, project, id);
+    // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+    const snapshot: unknown = await res.json();
+    applyProjectSnapshot(this, snapshot as ProjectData, id);
   } catch (err) {
     console.warn('[selectProject] failed', err);
     this.currentProjectId = null;

@@ -226,7 +226,7 @@ app.use((req, res, next) => {
 });
 
 app.use('/api/profiles', profileRoutes(outputDir, store));
-app.use(API_PROJECTS, projectRoutes(store));
+app.use(API_PROJECTS, projectRoutes(store, profileStore));
 app.use(API_PROJECTS, sourceRoutes(store, profileStore));
 app.use(API_PROJECTS, generateRoutes(store, profileStore));
 app.use(API_PROJECTS, generationCrudRoutes(store, profileStore));

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from './store.js';
-import type { Source, Generation } from './types.js';
+import type { Source, Generation, ProjectData, ProjectMeta } from './types.js';
 
 let store: ProjectStore;
 let tempDir: string;
@@ -527,6 +527,64 @@ describe('listProjects with profileId filter', () => {
 
     const allProjects = store.listProjects();
     expect(allProjects).toHaveLength(3);
+  });
+});
+
+describe('adoptProject (projet orphelin rattaché au profil qui l’ouvre)', () => {
+  const projectFile = (pid: string): string => join(tempDir, 'projects', pid, 'project.json');
+  const readProjectFile = (pid: string): ProjectData => {
+    const raw = readFileSync(projectFile(pid), 'utf-8');
+    return JSON.parse(raw) as ProjectData;
+  };
+  const indexEntry = (pid: string): ProjectMeta | undefined => {
+    const index = JSON.parse(
+      readFileSync(join(tempDir, 'projects.json'), 'utf-8'),
+    ) as ProjectMeta[];
+    return index.find((p) => p.id === pid);
+  };
+
+  it('écrit meta.profileId dans project.json ET dans l’index, puis rend le projet à jour', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+
+    const adopted = store.adoptProject(pid, 'profile-alice');
+
+    expect(adopted?.meta.profileId).toBe('profile-alice');
+    expect(readProjectFile(pid).meta.profileId).toBe('profile-alice');
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('le projet quitte la liste des autres profils, reste dans celle du profil adoptant', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+    expect(store.listProjects('profile-bob').map((p) => p.id)).toContain(pid);
+
+    store.adoptProject(pid, 'profile-alice');
+
+    expect(store.listProjects('profile-bob').map((p) => p.id)).not.toContain(pid);
+    expect(store.listProjects('profile-alice').map((p) => p.id)).toContain(pid);
+  });
+
+  it('projet déjà rattaché : jamais réattribué, rien n’est réécrit', () => {
+    const pid = store.createProject('Projet Alice', 'profile-alice').meta.id;
+    const before = readFileSync(projectFile(pid), 'utf-8');
+
+    const result = store.adoptProject(pid, 'profile-bob');
+
+    expect(result?.meta.profileId).toBe('profile-alice');
+    expect(readFileSync(projectFile(pid), 'utf-8')).toBe(before);
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('seconde ouverture par un autre profil : le premier rattachement reste', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+    store.adoptProject(pid, 'profile-alice');
+
+    expect(store.adoptProject(pid, 'profile-bob')?.meta.profileId).toBe('profile-alice');
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('projet inexistant : null, aucune écriture', () => {
+    expect(store.adoptProject('nope', 'profile-alice')).toBeNull();
+    expect(existsSync(join(tempDir, 'projects', 'nope'))).toBe(false);
   });
 });
 
