@@ -620,7 +620,10 @@ export const ar: Record<string, string> = {
   'moderation.cat.violence_and_threats':
     '\u0639\u0646\u0641 \u0648\u062a\u0647\u062f\u064a\u062f\u0627\u062a',
   'moderation.cat.dangerous_and_criminal_content':
-    '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631',
+    '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631 \u0623\u0648 \u063a\u064a\u0631 \u0642\u0627\u0646\u0648\u0646\u064a',
+  'moderation.cat.dangerous': '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631',
+  'moderation.cat.criminal':
+    '\u0623\u0646\u0634\u0637\u0629 \u063a\u064a\u0631 \u0642\u0627\u0646\u0648\u0646\u064a\u0629',
   'moderation.cat.selfharm': '\u0625\u064a\u0630\u0627\u0621 \u0627\u0644\u0646\u0641\u0633',
   'moderation.cat.health': '\u0635\u062d\u0629',
   'moderation.cat.financial': '\u0645\u0627\u0644\u064a',

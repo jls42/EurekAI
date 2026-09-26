@@ -627,7 +627,11 @@ export const hi: Record<string, string> = {
   'moderation.cat.violence_and_threats':
     '\u0939\u093F\u0902\u0938\u093E \u0914\u0930 \u0927\u092E\u0915\u0940',
   'moderation.cat.dangerous_and_criminal_content':
+    '\u0916\u0924\u0930\u0928\u093E\u0915 \u092F\u093E \u0905\u0935\u0948\u0927 \u0938\u093E\u092E\u0917\u094D\u0930\u0940',
+  'moderation.cat.dangerous':
     '\u0916\u0924\u0930\u0928\u093E\u0915 \u0938\u093E\u092E\u0917\u094D\u0930\u0940',
+  'moderation.cat.criminal':
+    '\u0905\u0935\u0948\u0927 \u0917\u0924\u093F\u0935\u093F\u0927\u093F\u092F\u093E\u0901',
   'moderation.cat.selfharm': '\u0906\u0924\u094D\u092E\u0939\u093E\u0928\u093F',
   'moderation.cat.health': '\u0938\u094D\u0935\u093E\u0938\u094D\u0925\u094D\u092F',
   'moderation.cat.financial': '\u0935\u093F\u0924\u094D\u0924\u0940\u092F',

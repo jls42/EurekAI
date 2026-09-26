@@ -489,7 +489,11 @@ export const fr: Record<string, string> = {
   'moderation.cat.sexual': 'Contenu sexuel',
   'moderation.cat.hate_and_discrimination': 'Haine et discrimination',
   'moderation.cat.violence_and_threats': 'Violence et menaces',
-  'moderation.cat.dangerous_and_criminal_content': 'Contenu dangereux',
+  // Clé du modèle 2411 (scindée en dangerous + criminal par 2603) : plus proposée aux parents,
+  // conservée pour l'historique (affichage des sources modérées avant la migration).
+  'moderation.cat.dangerous_and_criminal_content': 'Contenu dangereux ou illégal',
+  'moderation.cat.dangerous': 'Contenu dangereux',
+  'moderation.cat.criminal': 'Activités illégales',
   'moderation.cat.selfharm': 'Automutilation',
   'moderation.cat.health': 'Santé',
   'moderation.cat.financial': 'Finance',

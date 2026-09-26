@@ -16,6 +16,21 @@ import {
 import type { Profile } from './types.js';
 import { asVoiceId, type VoiceId } from './helpers/voice-types.js';
 import { logger } from './helpers/logger.js';
+import { moderateContent } from './generators/moderation.js';
+// fr.ts = donnée pure : importable ici (src/tsconfig.json a `types: []`, pas de vitest côté src).
+import { fr } from './src/i18n/fr.js';
+
+// Clé du modèle 2411, scindée en `dangerous` + `criminal` par Moderation 2 (2603).
+const LEGACY_KEY = 'dangerous_and_criminal_content';
+
+// Appel de logger (préfixe `profiles`) dont le message contient toutes les sous-chaînes.
+const loggedWith = (spy: { mock: { calls: unknown[][] } }, ...parts: string[]): boolean =>
+  spy.mock.calls.some(
+    (c) =>
+      c[0] === 'profiles' &&
+      typeof c[1] === 'string' &&
+      parts.every((p) => (c[1] as string).includes(p)),
+  );
 
 // =============================================================================
 // Pure functions (no mocks needed)
@@ -168,6 +183,22 @@ describe('MODERATION_CATEGORIES', () => {
   it('etudiant and adulte have empty arrays', () => {
     expect(MODERATION_CATEGORIES.etudiant).toEqual([]);
     expect(MODERATION_CATEGORIES.adulte).toEqual([]);
+  });
+
+  // Décision produit : faux positifs éducatifs constatés en 2411 sur le volet dangereux/criminel.
+  it('enfant/ado : défauts inchangés, sans dangerous ni criminal', () => {
+    const expected = [
+      'sexual',
+      'hate_and_discrimination',
+      'violence_and_threats',
+      'selfharm',
+      'jailbreaking',
+    ];
+    for (const group of ['enfant', 'ado'] as const) {
+      expect(MODERATION_CATEGORIES[group]).toEqual(expected);
+      expect(MODERATION_CATEGORIES[group]).not.toContain('dangerous');
+      expect(MODERATION_CATEGORIES[group]).not.toContain('criminal');
+    }
   });
 });
 
@@ -818,8 +849,24 @@ describe('ProfileStore legacy migration', () => {
 });
 
 describe('ALL_MODERATION_CATEGORIES', () => {
-  it('contains 10 categories', () => {
-    expect(ALL_MODERATION_CATEGORIES).toHaveLength(10);
+  it("liste exacte des 11 catégories de Moderation 2 (2603), dans l'ordre de la réponse", () => {
+    expect(ALL_MODERATION_CATEGORIES).toEqual([
+      'sexual',
+      'hate_and_discrimination',
+      'violence_and_threats',
+      'dangerous',
+      'criminal',
+      'selfharm',
+      'health',
+      'financial',
+      'law',
+      'pii',
+      'jailbreaking',
+    ]);
+  });
+
+  it('ne propose plus la clé 2411 dangerous_and_criminal_content', () => {
+    expect(ALL_MODERATION_CATEGORIES).not.toContain(LEGACY_KEY);
   });
 
   it('includes all default enfant categories', () => {
@@ -874,5 +921,247 @@ describe('ProfileStore.update moderationCategories', () => {
     const p = store.create('Test3', 9);
     const updated = store.update(p.id, { moderationCategories: [] });
     expect(updated!.moderationCategories).toEqual([]);
+  });
+
+  // Onglet ouvert avant la mise à jour : sa liste locale contient encore la clé 2411 et la renvoie
+  // à chaque sauvegarde parentale. La rejeter effacerait dangerous/criminal déjà migrés.
+  it('client stale : clé legacy convertie (warn « mapped legacy »), inconnue toujours rejetée', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('Stale', 9);
+
+    const updated = store.update(p.id, { moderationCategories: ['sexual', LEGACY_KEY, 'TYPO'] });
+
+    expect(updated!.moderationCategories).toEqual(['sexual', 'dangerous', 'criminal']);
+    expect(loggedWith(warnSpy, 'mapped legacy moderation categories', LEGACY_KEY)).toBe(true);
+    expect(loggedWith(warnSpy, 'rejected unknown moderation categories', 'TYPO')).toBe(true);
+    expect(loggedWith(warnSpy, 'rejected unknown moderation categories', LEGACY_KEY)).toBe(false);
+    warnSpy.mockRestore();
+  });
+
+  it('accepte dangerous et criminal tels quels, sans warn', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = store.create('New', 9);
+
+    const updated = store.update(p.id, { moderationCategories: ['dangerous', 'criminal'] });
+
+    expect(updated!.moderationCategories).toEqual(['dangerous', 'criminal']);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+});
+
+// =============================================================================
+// Migration taxonomie Moderation 2 (2411 → 2603) au chargement
+// =============================================================================
+
+const PROFILES_FILE = 'profiles.json';
+const UPDATED_AT = '2026-03-02T00:00:00.000Z';
+
+// Profil disque complet : aucune autre migration ne s'applique, seule celle testée peut écrire.
+const diskProfile = (overrides: Record<string, unknown> = {}) => ({
+  id: 'p-legacy',
+  name: 'Alice',
+  age: 9,
+  ageGroup: 'enfant',
+  avatar: '0',
+  locale: 'fr',
+  useModeration: true,
+  moderationCategories: ['sexual'],
+  useConsigne: true,
+  chatEnabled: false,
+  createdAt: '2026-03-01T00:00:00.000Z',
+  updatedAt: UPDATED_AT,
+  ...overrides,
+});
+
+// JSON compact : toute réécriture par le store (indentée) change le contenu brut du fichier.
+const writeProfilesFile = (profiles: unknown[]): void => {
+  writeFileSync(join(tempDir, PROFILES_FILE), JSON.stringify(profiles));
+};
+
+const readProfilesRaw = (): string => readFileSync(join(tempDir, PROFILES_FILE), 'utf-8');
+
+describe('ProfileStore migration taxonomie Moderation 2', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('remplace la clé legacy par dangerous + criminal à la même position et persiste', () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ moderationCategories: ['sexual', LEGACY_KEY, 'selfharm'] })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    const expected = ['sexual', 'dangerous', 'criminal', 'selfharm'];
+    expect(p.moderationCategories).toEqual(expected);
+    expect(JSON.parse(readProfilesRaw())[0].moderationCategories).toEqual(expected);
+    expect(
+      loggedWith(infoSpy, 'migration: profile p-legacy', `${LEGACY_KEY} -> dangerous, criminal`),
+    ).toBe(true);
+  });
+
+  it('dédoublonne quand un successeur est déjà présent (1re occurrence gagne)', () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ moderationCategories: ['criminal', LEGACY_KEY] })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.moderationCategories).toEqual(['criminal', 'dangerous']);
+  });
+
+  it('idempotente : un 2e chargement ne relogue ni ne réécrit', () => {
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ moderationCategories: [LEGACY_KEY] })]);
+
+    new ProfileStore(tempDir).list();
+    const afterFirstLoad = readProfilesRaw();
+    new ProfileStore(tempDir).list();
+
+    expect(readProfilesRaw()).toBe(afterFirstLoad);
+    const migrationLogs = infoSpy.mock.calls.filter(
+      (c) => typeof c[1] === 'string' && c[1].includes('migration: profile'),
+    );
+    expect(migrationLogs).toHaveLength(1);
+  });
+
+  it('ne bumpe pas updatedAt (sinon 409 stale sur chaque onglet ouvert)', () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ moderationCategories: [LEGACY_KEY] })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.updatedAt).toBe(UPDATED_AT);
+    expect(JSON.parse(readProfilesRaw())[0].updatedAt).toBe(UPDATED_AT);
+  });
+
+  it('[] reste [] sans écriture disque (étudiant/adulte)', () => {
+    writeProfilesFile([diskProfile({ age: 30, ageGroup: 'adulte', moderationCategories: [] })]);
+    const before = readProfilesRaw();
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.moderationCategories).toEqual([]);
+    expect(readProfilesRaw()).toBe(before);
+  });
+
+  it('liste sans clé legacy : ni écriture ni filtrage des clés inconnues au chargement', () => {
+    writeProfilesFile([diskProfile({ moderationCategories: ['sexual', 'TYPO'] })]);
+    const before = readProfilesRaw();
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.moderationCategories).toEqual(['sexual', 'TYPO']);
+    expect(readProfilesRaw()).toBe(before);
+  });
+
+  it.each<[unknown, string]>([
+    ['sexual', 'string'],
+    [42, 'number'],
+    [{ sexual: true }, 'object'],
+    [true, 'boolean'],
+  ])("non-tableau %j → défauts de l'âge persistés + warn (type=%s)", (value, type) => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ age: 12, ageGroup: 'ado', moderationCategories: value })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.moderationCategories).toEqual(MODERATION_CATEGORIES.ado);
+    expect(JSON.parse(readProfilesRaw())[0].moderationCategories).toEqual(
+      MODERATION_CATEGORIES.ado,
+    );
+    expect(loggedWith(warnSpy, 'migration: profile p-legacy', `type=${type}`)).toBe(true);
+    // Identifiant du profil seulement, jamais le prénom de l'enfant.
+    expect(loggedWith(warnSpy, 'Alice')).toBe(false);
+  });
+
+  it.each<[unknown]>([['unknown-group'], ['constructor'], ['__proto__'], [undefined]])(
+    'non-tableau + ageGroup illisible (%s) → défauts enfant, sans exception ni profil masqué',
+    (ageGroup) => {
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      writeProfilesFile([diskProfile({ ageGroup, moderationCategories: 'sexual' })]);
+      const freshStore = new ProfileStore(tempDir);
+
+      const list = freshStore.list();
+
+      expect(list).toHaveLength(1);
+      expect(list[0].moderationCategories).toEqual(MODERATION_CATEGORIES.enfant);
+      expect(freshStore.getLastDroppedCount()).toBe(0);
+    },
+  );
+
+  it("null (falsy) → backfill des défauts de l'âge, sans warn « not an array »", () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ age: 12, ageGroup: 'ado', moderationCategories: null })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+
+    expect(p.moderationCategories).toEqual(MODERATION_CATEGORIES.ado);
+    expect(loggedWith(warnSpy, 'not an array')).toBe(false);
+  });
+});
+
+describe('i18n des catégories de modération', () => {
+  // Le test i18n-sync propage ensuite l'exigence aux 8 autres langues (symétrie avec fr.ts).
+  it('fr.ts a un libellé moderation.cat.* pour chaque catégorie ET pour la clé legacy 2411', () => {
+    const missing = [...ALL_MODERATION_CATEGORIES, LEGACY_KEY].filter(
+      (cat) => !Object.hasOwn(fr, `moderation.cat.${cat}`),
+    );
+    expect(missing).toEqual([]);
+  });
+});
+
+// Non-régression du bug de #41 (case « Contenu dangereux » inopérante de v1.5.4 à v1.7.1) : du
+// profil persisté jusqu'au verdict de modération, tests appariés sur la même réponse 2603.
+describe('bout en bout : profil persisté → moderateContent', () => {
+  // Forme réelle d'une réponse 2603 (clés verrouillées par le contrat de generators/moderation.test.ts).
+  const clientFlagging = (flags: Record<string, boolean>) =>
+    ({
+      classifiers: {
+        moderate: vi.fn().mockResolvedValue({
+          id: 'mod-e2e',
+          model: 'mistral-moderation-2603',
+          results: [
+            {
+              categories: {
+                ...Object.fromEntries(ALL_MODERATION_CATEGORIES.map((c) => [c, false])),
+                ...flags,
+              },
+              categoryScores: {},
+            },
+          ],
+        }),
+      },
+    }) as any;
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('clé legacy cochée par le parent : criminal signalé → unsafe', async () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    writeProfilesFile([diskProfile({ moderationCategories: [LEGACY_KEY] })]);
+
+    const [p] = new ProfileStore(tempDir).list();
+    const result = await moderateContent(
+      clientFlagging({ criminal: true }),
+      'texte',
+      p.moderationCategories,
+    );
+
+    expect(p.moderationCategories).toEqual(['dangerous', 'criminal']);
+    expect(result.status).toBe('unsafe');
+  });
+
+  it('profil enfant par défaut (dangerous/criminal non bloqués) : même réponse → safe', async () => {
+    const created = store.create('Kid', 9);
+
+    const p = new ProfileStore(tempDir).get(created.id)!;
+    const result = await moderateContent(
+      clientFlagging({ criminal: true }),
+      'texte',
+      p.moderationCategories,
+    );
+
+    expect(result.status).toBe('safe');
   });
 });
