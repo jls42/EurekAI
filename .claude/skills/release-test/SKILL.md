@@ -309,6 +309,42 @@ Profil de test avec moderation active et `criminal` coche : `POST /api/projects/
 
 (Unit deja couvert : fail-closed `error` sur contrat rompu, 400/503/409 + priorite, statut effectif (source persistee `safe` dont une categorie bloquee vaut `true` → refusee en generation et au chat, badge rouge), chat sans sources non verifiees, garde `/generate/route`, garde de la consigne `consigneUsable` (generation, outils du chat, dialogue) et detection sur les sources sures (`/detect-consigne` 400/503/409/`no_sources` sans appel LLM), reponse orale du quiz vocal moderee avant `verifyAnswer` (400 `quiz.answerBlocked`, 503, cout de la STT persiste meme sur refus), contenu d'une source non sure masque pour un profil modere (apercu de la carte, texte OCR, original et comparaison du dialogue rendus par `x-if` ; revelation par le PIN du profil courant, remasque a la fermeture du dialogue et au changement de projet ou de profil) — ne pas redupliquer ici.)
 
+## Phase 2septies — Correctifs v1.7.2 (moderation, medias, securite, a11y)
+
+Couvre les correctifs de la PR #76. Tout se joue sur le profil et le projet de test, en suivant l'ordre ci-dessous, puisque certaines etapes mutent le projet. Cout Mistral : quelques centimes (une illustration, une detection de consigne, un quiz vocal court, deux reponses orales).
+
+### A — Reprise d'une moderation interrompue (serveur arrete, cout nul)
+Arreter le serveur de dev (par PID, jamais `pkill -f` large), passer dans `output/projects/<pid de test>/project.json` la `moderation` d'une source du projet de test a `{"status":"pending","categories":{}}`, relancer. Avec une cle d'env : log `[moderation] ... SAFE (source xxxxxxxx)` puis `boot: resumed moderation of 1 source(s)`. Sans cle d'env, ou avec `EUREKAI_REQUIRE_USER_KEY=true` : log `no background key` ; la reprise part a l'ouverture du projet (`POST /sources/moderate`, corps `{}`) et le badge passe du sablier au vert.
+
+### B — Source jamais verifiee et bouton « Revérifier » (cout nul)
+Retirer l'objet `moderation` d'une source du projet de test (serveur arrete), relancer, ouvrir le projet : badge « en attente » puis vert, sans rechargement. Passer ensuite une source en `{"status":"error"}` : badge « Moderation indisponible » + bouton « Revérifier » (natif, focus visible) ; clic → toast « Vérification des sources… » puis badge vert. Une generation lancee pendant qu'une source est en attente affiche d'abord le toast de verification, SANS chip de pending avant le retour de `/sources/moderate`.
+
+### C — Masquage du contenu et revelation par PIN (Chrome, cout nul)
+Passer une source du projet de test a `{"status":"safe","categories":{"criminal":true}}` avec `criminal` coche dans le profil de test. Carte : badge rouge + « Ce contenu est masqué », aucun extrait. Dialogue : pas de barre de modes ni de zoom, encart « Ce contenu est masqué » + « Afficher (parent) » ; onglet Reseau : AUCUNE requete `/output/projects/<pid>/uploads/`. PIN faux → contenu toujours masque ; bon PIN → texte et modes. Fermer (croix ou Echap) → carte de nouveau masquee, PIN redemande a la reouverture. Verifier aussi en AR et en mode sombre.
+
+### D — Consigne sur les seules sources sures (1 detection facturee)
+Ajouter un texte neutre contenant « Je sais ma leçon si je sais… » : bandeau de consigne sans rechargement ; `GET /api/projects/<pid>` → `consigne.sourceIds` contient l'id du texte, `costLog` contient `detect-consigne`. « Ré-analyser » → 200 `{consigne, costDelta}`, la source signalee (etape C) absente de `sourceIds`. Supprimer le texte → `{ok:true, consigne:null}`, bandeau retire, « Détecter la consigne » reapparait.
+
+### E — Remediation en anglais (1 quiz court + 2 generations)
+UI en EN (voir le piege « Changer la langue »), quiz avec au moins une erreur, « Practice my mistakes » : les deux `POST` (`quiz-review`, `remediation-summary`) portent `lang: "en"` et l'`ageGroup` du profil ; contenus produits en anglais.
+
+### F — Reponse orale refusee (quiz vocal, 2 STT + 1 verification)
+Sans micro sous automatisation : produire deux MP3 avec Voxtral TTS (une reponse normale, une phrase de menace), puis `curl -F audio=@... -F questionIndex=0 -F lang=fr` sur `POST /generations/<gid quiz-vocal>/vocal-answer` avec l'en-tete de cle si besoin. Normale → 200 `{correct, feedback, transcription, costDelta}`. Menace → 400 `{"error":"quiz.answerBlocked", "costDelta": ...}`, sans `transcription` ni verification. `costLog` : une ligne `vocal-answer` par appel.
+
+### G — Medias supprimes avec leur generation (1 podcast ou 1 illustration)
+Noter les fichiers `output/projects/<pid>/*.mp3|*.png` d'une generation, `DELETE /generations/<gid>` → fichiers supprimes (`ls`), ceux d'une autre generation intacts. Annuler un podcast en cours → aucun MP3 orphelin une fois la generation terminee cote serveur.
+
+### H — Cout d'une illustration (frais d'outil)
+Apres une illustration : `estimatedCost` ≈ 0.10 USD de frais d'outil + tokens (environ 0.105 USD au total), `costBreakdown` contient une ligne `1 × image_generation`.
+
+### I — Projet orphelin rattache (API, cout nul)
+Creer un projet sans `profileId` (serveur arrete : retirer `profileId` de l'entree de `projects.json` et du `project.json` d'un projet de test), relancer, `GET /api/projects/<pid>?profileId=<profil de test>` → `meta.profileId` renseigne sur disque et dans l'index ; un second `GET` avec un autre profil ne le reattribue pas.
+
+### J — Interrupteurs de l'Espace parent en FR et en AR (Chrome, cout nul)
+`role="switch"` + `aria-checked` qui suit le clic ; curseur dans la piste, a gauche desactive en FR et a droite en AR ; piste desactivee lisible en clair et en sombre. Bandeau de 2 generations en cours : bouton ✕ « Annuler : X », « Tout annuler » cale en fin de ligne (a gauche en AR).
+
+(Unit deja couvert : registre des moderations en vol, delais, reprise au boot conditionnee a la cle, `gateModerationStatus`, `consigneUsable`, `pinLimiter`, 422/502 de la recherche web, `legacyTableProblem`, SIGHUP de check-deps — ne pas redupliquer ici.)
+
 ## Phase 3 — Audit securite
 
 Lancer le script securite dedie :
@@ -382,6 +418,18 @@ Compiler dans la reponse a l'user :
 - Categories parentales (11, libelles traduits FR/EN/AR, mobile) : ✓/✗
 - Conversion legacy dangerous_and_criminal_content → dangerous + criminal : ✓/✗/skip
 - Blocage reel (400 moderation.blocked, jamais de HTML) : ✓/✗/skip
+
+### Correctifs v1.7.2 (Phase 2septies)
+- Reprise d'une moderation interrompue (boot ou ouverture) : ✓/✗
+- Source jamais verifiee + « Revérifier » + pre-controle avant pending : ✓/✗
+- Masquage + revelation par PIN (FR, AR, sombre), aucune requete uploads masquee : ✓/✗
+- Consigne sur sources sures, provenance, suppression, costDelta : ✓/✗
+- Remediation en anglais (lang + ageGroup) : ✓/✗
+- Reponse orale refusee (quiz.answerBlocked, cout trace) : ✓/✗
+- Medias supprimes avec la generation / apres annulation : ✓/✗
+- Cout d'une illustration (frais d'outil) : ✓/✗
+- Projet orphelin rattache : ✓/✗
+- Interrupteurs FR/AR + chips d'annulation : ✓/✗
 
 ### Securite (output script)
 - JSON malformed : ✓/✗

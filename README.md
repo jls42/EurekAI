@@ -135,7 +135,7 @@ Chaque source importée affiche son [score de confiance OCR, sa modération et s
 
 EurekAI accepte 4 types de sources, modérées selon le profil (activé par défaut pour enfant et ado) :
 
-- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) par défaut** (meilleure qualité), **OCR 3 (`mistral-ocr-2512`) en option** dans les Réglages (moins cher, ~½ du coût) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité.
+- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) par défaut** (meilleure qualité), **OCR 3 (`mistral-ocr-2512`) en option** dans les Réglages (moins cher, ~½ du coût) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité. La copie du document envoyée à Mistral pour l'OCR est supprimée dès la fin du traitement, même en cas d'échec.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
 - **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
@@ -162,7 +162,7 @@ Un tuteur conversationnel avec accès complet aux documents de cours :
 - Utilise `mistral-large-latest`
 - **Appel d'outils** : peut générer des fiches, flashcards, quiz ou textes à trous pendant la conversation
 - Historique de 50 messages par cours
-- Modération du contenu si activée pour le profil
+- Modération si activée pour le profil : le message est vérifié, et les sources signalées, en erreur ou pas encore vérifiées sont écartées du contexte comme des outils (leur vérification est d'abord relancée, 5 s au plus)
 
 ### Routeur automatique
 
@@ -171,14 +171,15 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Apprentissage adaptatif
 
 - **Statistiques de quiz** : suivi des tentatives et de la précision par question
-- **Révision de quiz** : génère 5-10 nouvelles questions ciblant les concepts faibles
-- **Détection de consigne** : détecte les instructions de révision ("Je sais ma leçon si je sais...") et les priorise dans les générateurs textuels compatibles (fiche, flashcards, quiz, textes à trous)
+- **Révision de quiz** : génère 5-10 nouvelles questions ciblant les concepts faibles, à partir des sources du quiz d'origine (la garde de modération porte sur ces mêmes sources)
+- **Détection de consigne** : détecte les instructions de révision ("Je sais ma leçon si je sais...") et les priorise dans les générateurs textuels compatibles (fiche, flashcards, quiz, textes à trous). Avec la modération active, la détection attend la vérification des sources et ne lit que celles jugées sûres ; la consigne garde la liste de ses sources d'origine, n'est ni affichée ni appliquée si l'une d'elles devient signalée, et disparaît avec elle. Son coût est compté
 
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-2603` (Mistral Moderation 2) avec 11 catégories disponibles, 6 bloquées par défaut pour les nouveaux profils enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `criminal`, `selfharm`, `jailbreaking` ; `criminal` ajouté après une mesure sur 50 leçons, histoire comprise, sans aucun faux positif). Catégories personnalisables par profil dans les paramètres ; Moderation 2 a scindé l'ancienne catégorie « contenu dangereux » en `dangerous` + `criminal` (les profils existants sont migrés automatiquement, et les catégories bloquées s'appliquent aussi aux sources déjà importées). Sécurité par défaut : si la réponse du modèle ne permet pas de vérifier une catégorie bloquée, le contenu est refusé (« Modération indisponible ») ; avec la modération active, la génération comme le chat écartent les sources signalées, en erreur ou en cours de vérification (une source importée modération désactivée n'est pas re-vérifiée). Id daté épinglé dans `helpers/moderation-model.ts` : l'alias `-latest`, déprécié, n'est plus listé par l'API.
-- **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
+- **Modération du contenu** : `mistral-moderation-2603` (Mistral Moderation 2) avec 11 catégories disponibles, 6 bloquées par défaut pour les nouveaux profils enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `criminal`, `selfharm`, `jailbreaking` ; `criminal` ajouté après une mesure sur 50 leçons, histoire comprise, sans aucun faux positif). Catégories personnalisables par profil dans les paramètres ; Moderation 2 a scindé l'ancienne catégorie « contenu dangereux » en `dangerous` + `criminal` (les profils existants sont migrés automatiquement, et les catégories bloquées s'appliquent aussi aux sources déjà importées). Sécurité par défaut : si la réponse du modèle ne permet pas de vérifier une catégorie bloquée, le contenu est refusé (« Modération indisponible ») ; avec la modération active, la génération comme le chat écartent les sources signalées, en erreur ou en cours de vérification. Une source jamais vérifiée (importée modération désactivée, ancien projet rattaché) est vérifiée avant usage ; une modération interrompue par un redémarrage ou tombée en erreur est reprise automatiquement (au démarrage si la clé du serveur le permet, sinon à l'ouverture du projet ou à la génération suivante), et un bouton « Revérifier » la relance à la demande. Le contenu d'une source signalée ou en cours de vérification est masqué à l'enfant (aperçu, texte, document original) ; un parent peut l'afficher avec son PIN, le temps d'une consultation. La réponse orale du quiz vocal est modérée avant d'être vérifiée. Id daté épinglé dans `helpers/moderation-model.ts` : l'alias `-latest`, déprécié, n'est plus listé par l'API.
+- **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans ; 10 codes faux au plus par quart d'heure et par adresse IP (429 `rate_limited`). Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
+- **Données du serveur** : `/output` ne publie que les médias des projets (audio, images, fichiers importés) ; `profiles.json`, `config.json` et les fichiers des projets ne sont jamais servis
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
 ### Système multi-profils
@@ -186,18 +187,18 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 - Profils multiples avec nom, âge, avatar, préférences de langue
 - **Voix par profil** (`Profile.mistralVoices?: { host?, guest? }` — chaque rôle est optionnel) — chaque enfant peut avoir sa paire de voix podcast/quiz vocal
 - **Thème par profil** (`Profile.theme: 'dark' | 'light'`) — bascule automatique au changement de profil, persistée côté backend
-- Projets liés aux profils via `profileId`
+- Projets liés aux profils via `profileId` ; un ancien projet sans profil est rattaché au premier profil qui l'ouvre, puis modéré selon ce profil
 - Suppression en cascade : supprimer un profil supprime tous ses projets
 
 ### Suivi des coûts API
 
-Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur. La modération, gratuite, n'est pas comptée. Les frais d'outils des agents sont inclus : 0,03 $ par recherche web et 0,10 $ par image générée (tarifs Mistral), plus les tokens produits par ces outils, comptés au tarif d'entrée du modèle de l'agent.
+Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de consigne et réponses orales du quiz vocal comprises, est instrumenté pour fournir une estimation € **transparente** à l'utilisateur. La modération, gratuite, n'est pas comptée. Les frais d'outils des agents sont inclus : 0,03 $ par recherche web et 0,10 $ par image générée (tarifs Mistral), plus les tokens produits par ces outils, comptés au tarif d'entrée du modèle de l'agent.
 
 - **Source de vérité** : `helpers/pricing.ts` — `MODEL_PRICING` par prefix de modèle (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` avec URLs doc Mistral pour re-scraping périodique
 - **Unités supportées** : `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversion pilotée par `helpers/cost-calc.ts`
 - **Chaîne d'instrumentation** : `helpers/tracked-client.ts` (wrap client Mistral) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (injection dans la réponse HTTP)
 - **UI** : badge coût par génération (`src/partials/cost-badge-gen.html`), par source (`cost-badge-src.html`), total cumulé dans le dashboard (`Project.totalCost`)
-- **Endpoints** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation / Source) avec `estimatedCost`, `usage` et `costBreakdown`. `POST /generate/route` ajoute un champ `costDelta: number` pour le coût du routage seul. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + l'historique complet
+- **Endpoints** : les réponses `/generate/*` et `/sources/*` décorent l'objet retourné (Generation / Source) avec `estimatedCost`, `usage` et `costBreakdown`. `POST /generate/route` ajoute un champ `costDelta: number` pour le coût du routage seul ; `POST /detect-consigne` (`{consigne, costDelta}`) et la vérification d'une réponse orale renvoient aussi leur `costDelta`. `GET /projects/:pid` retourne le projet enrichi de `totalCost` (somme calculée depuis `costLog[]`) + l'historique complet
 
 ### TTS (Mistral Voxtral) & voix personnalisées
 
@@ -392,9 +393,12 @@ routes/
 
 helpers/
   # IO & parsing
-  index.ts                — getContent, stripJsonMarkdown, safeParseJson, unwrapJsonArray, extractAllText, timer
+  index.ts                — getContent, stripJsonMarkdown, safeParseJson, tryParseJson, retryTurns, unwrapJsonArray, extractAllText, timer
   audio.ts                — collectStream (ReadableStream → Buffer)
   audio-files.ts          — Persistance et lecture des fichiers audio générés (podcast, flashcards)
+  generation-media.ts     — Noms uniques des médias (MP3/PNG) et suppression avec leur génération
+  media-ledger.ts         — Médias écrits pendant une génération, supprimés si elle échoue ou est annulée
+  keyed-lock.ts           — File d'attente par clé (OCR sérialisé par contenu)
   logger.ts               — Logger structuré (niveaux, contexte JSON)
 
   # Génération & UX
@@ -406,7 +410,10 @@ helpers/
   reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
   ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
   moderation-model.ts     — Modèle de modération épinglé + ses 11 catégories + migration des catégories legacy
-  moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours)
+  moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours), statut effectif, garde de la consigne
+  moderation-profile.ts   — Profil propriétaire du projet et catégories actives (source unique des routes)
+  source-moderation.ts    — Modérations en vol et reprise (démarrage, génération, chat, « Revérifier »)
+  input-moderation.ts     — Modération d'un texte saisi ou dicté (texte libre, recherche web, réponse orale)
   chat-sources.ts         — Sources accessibles au chat (sans les sources non vérifiées si la modération est active)
 
   # Codes d'erreur stables
@@ -425,7 +432,9 @@ helpers/
 
   # Clé API Mistral & sécurité
   mistral-client-factory.ts — Source UNIQUE de construction du client Mistral (buildTrackedClient, resolveClient, requireKeyMiddleware)
-  rate-limit.ts           — Rate-limiters Express (authLimiter, aiLimiter, generalLimiter)
+  rate-limit.ts           — Rate-limiters Express (authLimiter, pinLimiter, aiLimiter / aiPathLimiter, generalLimiter), 429 `rate_limited`
+  request-validation.ts   — Validation de lang / ageGroup sur toutes les routes IA (400 invalid_input)
+  output-static.ts        — Liste blanche du montage statique /output (médias des projets seulement)
   security-headers.ts     — Options Helmet / CSP (createHelmetOptions)
   redact.ts               — Redaction des secrets dans les logs (clé API, headers sensibles)
   mistral-retry.ts        — Retry avec backoff sur erreurs transitoires Mistral (3 tentatives)
@@ -448,6 +457,8 @@ src/                      — Frontend (Vite + Handlebars)
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
     generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
+    moderation-gate.ts    — Pré-contrôle de modération des générations (vérifie d'abord les sources en attente)
+    effective-moderation.ts — Statut de modération affiché et masquage du contenu des sources
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
     config.ts             — Interface de configuration (modèles, voix, modèle TTS)
@@ -501,7 +512,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/profiles` | Lister tous les profils |
 | `POST` | `/api/profiles` | Créer un profil |
-| `PUT` | `/api/profiles/:id` | Modifier un profil (PIN requis pour < 15 ans) |
+| `PUT` | `/api/profiles/:id` | Modifier un profil (PIN requis pour < 15 ans ; 10 PIN faux / 15 min → 429 `rate_limited`) |
 | `DELETE` | `/api/profiles/:id` | Supprimer un profil + cascade projets `{pin?}` → `{ok, deletedProjects}` |
 
 ### Projets
@@ -509,7 +520,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 |---|---|---|
 | `GET` | `/api/projects` | Lister les projets (`?profileId=` optionnel) |
 | `POST` | `/api/projects` | Créer un projet `{name, profileId}` |
-| `GET` | `/api/projects/:pid` | Détails du projet |
+| `GET` | `/api/projects/:pid` | Détails du projet ; `?profileId=` rattache un projet sans profil au profil qui l'ouvre |
 | `PUT` | `/api/projects/:pid` | Renommer `{name}` |
 | `DELETE` | `/api/projects/:pid` | Supprimer le projet |
 | `GET` | `/api/projects/:pid/events` | Flux SSE temps réel (`event: generation`) des transitions de génération (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
@@ -520,10 +531,11 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/sources/upload` | Import fichiers multipart (OCR pour JPG/PNG/PDF, lecture directe pour TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | Texte libre `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | Voix STT (audio multipart) |
-| `POST` | `/api/projects/:pid/sources/websearch` | Scraping URL ou recherche web `{query}` — retourne un tableau de sources |
-| `DELETE` | `/api/projects/:pid/sources/:sid` | Supprimer une source |
+| `POST` | `/api/projects/:pid/sources/websearch` | Scraping URL ou recherche web `{query}` — retourne un tableau de sources ; 422 `url_blocked` si toutes les adresses sont refusées (réseau interne), 502 `all_sources_failed` si aucune source n'a pu être créée |
+| `POST` | `/api/projects/:pid/sources/moderate` | Reprendre les modérations en attente ou en erreur `{sourceIds?}` (10 au plus par appel, attente ≤ 10 s) → `{sources: [{id, moderation}]}` |
+| `DELETE` | `/api/projects/:pid/sources/:sid` | Supprimer une source, son fichier importé et la consigne qui en dépend → `{ok, consigne}` |
 | `POST` | `/api/projects/:pid/moderate` | Modérer `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | Détecter les consignes de révision |
+| `POST` | `/api/projects/:pid/detect-consigne` | Détecter les consignes de révision (sources vérifiées seulement) → `{consigne, costDelta}` |
 
 ### Génération
 | Méthode | Endpoint | Description |
@@ -541,7 +553,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) — renvoie `{plan, costDelta}` (coût du routage seul) |
 | `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 8 types : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 8 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
 
-Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`. `quiz-review` et `remediation-summary` exigent en plus `{generationId, weakQuestions}`.
+Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` ; un `lang` qui n'est pas un code de langue (ex. `pt-BR`) ou un `ageGroup` inconnu → 400 `invalid_input`, avant tout appel IA. `quiz-review` et `remediation-summary` exigent en plus `{generationId, weakQuestions}` et portent sur les sources du quiz d'origine.
 
 ### CRUD Générations
 | Méthode | Endpoint | Description |
@@ -549,17 +561,17 @@ Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, coun
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Soumettre les réponses quiz `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Soumettre les réponses textes à trous `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Soumettre les réponses de dictée `{answers}` (score serveur strict) |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Vérifier une réponse orale (audio + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Vérifier une réponse orale (audio + questionIndex) ; réponse modérée (400 `quiz.answerBlocked`), coût renvoyé en `costDelta` |
 | `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | Lecture TTS à voix haute (fiches/flashcards) |
 | `POST` | `/api/projects/:pid/generations/:gid/cancel` | Annuler une génération en cours (seul chemin d'annulation d'un pending) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Renommer `{title}` |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | Supprimer la génération |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | Supprimer la génération et ses médias (audio, image) |
 
 ### Chat
 | Méthode | Endpoint | Description |
 |---|---|---|
 | `GET` | `/api/projects/:pid/chat` | Récupérer l'historique du chat |
-| `POST` | `/api/projects/:pid/chat` | Envoyer un message `{message, lang, ageGroup}` |
+| `POST` | `/api/projects/:pid/chat` | Envoyer un message `{message, lang, ageGroup, useConsigne?}` |
 | `DELETE` | `/api/projects/:pid/chat` | Effacer l'historique du chat |
 
 ---
