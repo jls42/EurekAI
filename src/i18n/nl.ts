@@ -99,6 +99,7 @@ export const nl: Record<string, string> = {
   'errorCode.invalid_input': 'Ongeldig verzoek',
   'errorCode.profile_delete_partial':
     'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
+  'errorCode.rate_limited': 'Te veel verzoeken tegelijk. Wacht even en probeer het dan opnieuw.',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
@@ -489,6 +490,8 @@ export const nl: Record<string, string> = {
   'profile.pinMismatch': 'PIN-codes komen niet overeen',
   'profile.pinVerify': 'Ouderlijke verificatie',
   'profile.pinWrong': 'Onjuiste PIN-code',
+  'profile.pinRateLimited':
+    'Te veel pogingen met de pincode. Probeer het over {minutes} min opnieuw.',
   'profile.pinInfo':
     'Een ouderlijke PIN-code beschermt dit profiel. Deze wordt gevraagd om het profiel te bewerken of te verwijderen.',
   'profile.moderationToggle': 'Inhoudmoderatie',

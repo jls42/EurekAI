@@ -41,7 +41,6 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
-import { aiLimiter } from '../helpers/rate-limit.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
@@ -438,7 +437,9 @@ function resolveReadAloudContext(
 export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 
-  router.use(aiLimiter);
+  // Pas de limiteur ici : aiLimiter est monté une seule fois par server.ts (aiPathLimiter), sur
+  // les seules routes IA de ce routeur (vocal-answer, read-aloud). Un `router.use` le comptait
+  // sur toute requête /api/projects/* qui traversait ce routeur (chat compté deux fois).
 
   // Auth-first : résout le client (header > env) ou répond 4xx stable.
   const resolveOr4xx = (req: Request, res: Response): Mistral | null => {

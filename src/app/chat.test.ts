@@ -279,6 +279,25 @@ describe('clearChat', () => {
     await chat.clearChat.call(ctx);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
+
+  // Refus du serveur (429 de aiLimiter) : historique gardé, code traduit, pas de faux succès.
+  it('refus du serveur (429 rate_limited) → historique gardé, erreur traduite', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      json: async () => ({ error: 'rate_limited' }),
+    } as any);
+    const messages = [{ role: 'user', content: 'hi' }];
+    const ctx = makeContext({ chatMessages: messages });
+
+    await chat.clearChat.call(ctx);
+
+    expect(ctx.chatMessages).toEqual(messages);
+    expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.chatErrorMsg', 'error');
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.chatCleared', 'info');
+  });
 });
 
 // --- scrollChatBottom ---

@@ -109,6 +109,7 @@ export const ar: Record<string, string> = {
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
   'errorCode.invalid_input': 'طلب غير صالح',
   'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
+  'errorCode.rate_limited': 'طلبات كثيرة في وقت واحد. انتظر قليلا ثم أعد المحاولة.',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',
@@ -652,6 +653,7 @@ export const ar: Record<string, string> = {
   'profile.pinVerify':
     '\u0627\u0644\u062a\u062d\u0642\u0651\u0642 \u0627\u0644\u0648\u0627\u0644\u062f\u064a',
   'profile.pinWrong': '\u0631\u0645\u0632 PIN \u063a\u064a\u0631 \u0635\u062d\u064a\u062d',
+  'profile.pinRateLimited': 'محاولات كثيرة لرمز PIN. أعد المحاولة بعد {minutes} دقيقة.',
   'profile.pinInfo':
     '\u0631\u0645\u0632 PIN \u0627\u0644\u0648\u0627\u0644\u062f\u064a \u064a\u062d\u0645\u064a \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a. \u0633\u064a\u064f\u0637\u0644\u0628 \u0639\u0646\u062f \u0627\u0644\u062a\u0639\u062f\u064a\u0644 \u0623\u0648 \u0627\u0644\u062d\u0630\u0641.',
   'profile.moderationToggle':

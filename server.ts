@@ -44,7 +44,7 @@ import { generationCrudRoutes } from './routes/generations.js';
 import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
 import { ProfileStore, ALL_MODERATION_CATEGORIES, MODERATION_CATEGORIES } from './profiles.js';
-import { aiLimiter, generalLimiter } from './helpers/rate-limit.js';
+import { aiLimiter, aiPathLimiter, generalLimiter } from './helpers/rate-limit.js';
 import { createHelmetOptions } from './helpers/security-headers.js';
 import { outputStaticGuard } from './helpers/output-static.js';
 
@@ -145,6 +145,11 @@ if (backgroundClient) {
   );
 }
 
+// Rate-limit general anti-flood sur TOUTES les routes /api, monté AVANT la première route /api :
+// monté plus bas, les routes de config (lecture, écriture, reset) lui échappaient. aiLimiter
+// (routes IA), authLimiter (création de profil) et pinLimiter (PIN parental) s'empilent dessus.
+app.use('/api', generalLimiter);
+
 // --- Config API ---
 app.get('/api/config', (_req, res) => res.json(getConfig()));
 app.put('/api/config', (req, res) => {
@@ -219,27 +224,14 @@ app.get('/api/moderation-categories', (_req, res) =>
 const API_PROJECTS = '/api/projects';
 const NON_CONFIGURE = 'NON CONFIGURE';
 
-// Rate-limit general anti-flood sur toutes les routes /api. authLimiter
-// (sur /profiles) et aiLimiter (sur paths cher) s'empilent par-dessus.
-app.use('/api', generalLimiter);
-
-// aiLimiter sur les paths qui declenchent un appel LLM/TTS/OCR (generate,
-// sources scrape/upload, chat). Empile sur generalLimiter ci-dessus. Le
-// regex match les sous-paths sous /api/projects/:pid/{generate|sources|chat}.
-// /events (SSE) n'est pas dans ces prefix donc reste non-affecte.
-// detect-consigne + moderate sont sous /:pid/ (PAS sous /sources/) et appellent
-// aussi Mistral → inclus dans la couverture aiLimiter (sinon oracle + appels facturants
-// non protégés). /api/config/voices et /api/providers/* reçoivent aiLimiter en direct
-// (cf. routes ci-dessus, définies avant ce middleware).
-const AI_PATH_RE =
-  /^\/api\/projects\/[^/]+\/(generate|sources|chat|detect-consigne|moderate)(\/|$)/;
-app.use((req, res, next) => {
-  if (AI_PATH_RE.test(req.path)) {
-    aiLimiter(req, res, next);
-    return;
-  }
-  next();
-});
+// aiLimiter sur les routes qui appellent l'IA (AI_PATH_RE, helpers/rate-limit.ts) : generate,
+// sources, chat, detect-consigne, moderate et, sous generations/:gid/, vocal-answer et
+// read-aloud. Monté UNE fois, au niveau de l'app et avant les routeurs : aucun routeur ne le
+// remonte (generationCrudRoutes le faisait sur tout /api/projects/* : chat compté deux fois,
+// tentatives, renommage, suppression et annulation comptés à tort), et il passe avant la
+// résolution de la clé et multer. /events (SSE) reste hors limite IA. /api/config/voices et
+// /api/providers/* reçoivent aiLimiter en direct (routes ci-dessus).
+app.use(aiPathLimiter);
 
 app.use('/api/profiles', profileRoutes(outputDir, store));
 app.use(API_PROJECTS, projectRoutes(store, profileStore));

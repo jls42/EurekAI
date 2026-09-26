@@ -128,10 +128,23 @@ const sendChatMessage = async function (this: AppContext) {
   }
 };
 
+// Code d'erreur du corps (`{ error }`), sinon le statut HTTP, traduit par resolveError.
+const handleChatClearError = (state: AppContext, res: Response, body: unknown): void => {
+  const code = (body as ChatErrorPayload | null)?.error || res.statusText;
+  state.showToast(state.t('toast.chatErrorMsg', { error: state.resolveError(code) }), 'error');
+};
+
+// Refus du serveur (ex. 429 rate_limited) : historique gardé, code traduit ; jamais un faux
+// « Conversation effacée » alors que le serveur la garde.
 const clearChat = async function (this: AppContext) {
   if (!this.currentProjectId) return;
   try {
-    await fetch(this.apiBase() + '/chat', { method: 'DELETE' });
+    const res = await fetch(this.apiBase() + '/chat', { method: 'DELETE' });
+    if (!res.ok) {
+      const body: unknown = await res.json().catch(() => null);
+      handleChatClearError(this, res, body);
+      return;
+    }
     this.chatMessages = [];
     this.showToast(this.t('toast.chatCleared'), 'info');
   } catch {

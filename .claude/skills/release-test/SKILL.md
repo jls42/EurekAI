@@ -22,8 +22,8 @@ Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent qu
 
 ### Pieges d'automatisation connus (mesures 2026-09-26)
 
-- **`authLimiter` = 30 requetes / 15 min sur TOUTES les routes `/api/profiles`** (lecture comprise, saisies de PIN, `PUT`, `DELETE`). Economiser ces appels (lire `updatedAt` une seule fois, peu de saisies de PIN) : sinon le `DELETE` de nettoyage recoit un 429. Lire alors `Retry-After` (`curl -i`) et reessayer apres ce delai.
-- **Le script securite (phase 3) sature `generalLimiter`** (rafales de 350 requetes) : lancer la phase 3 APRES les phases UI, et attendre environ 60 s avant de nouveaux appels.
+- **`pinLimiter` = 10 PIN FAUX / 15 min par IP** sur `PUT` et `DELETE /api/profiles/:id` (seuls les refus 403 comptent : un bon PIN et une requete sans `pin` ne comptent pas). Au-dela, TOUT PIN de cette IP recoit 429 `rate_limited` jusqu'a la fin de la fenetre, bon PIN compris : le `DELETE` de nettoyage aussi. Ne jamais taper de PIN faux en dehors d'un test voulu. `authLimiter` (30 / 15 min) ne couvre plus que la creation (`POST /api/profiles`) ; la lecture et les enregistrements sans PIN n'ont que `generalLimiter`. Apres un 429 : lire `Retry-After` (`curl -i`) et attendre, ou redemarrer le serveur de dev, qui remet tous les compteurs a zero (stockage memoire) : c'est le moyen de nettoyer tout de suite apres une rafale de PIN.
+- **Le script securite (phase 3) sature `aiLimiter` puis `generalLimiter`** (rafales de 75 puis 350 requetes, la generale en dernier) : lancer la phase 3 APRES les phases UI, et attendre environ 60 s avant de nouveaux appels. Sa rafale de PIN faux est desactivee par defaut (`PIN_BURST=1`, sur un profil qui a un PIN : `PIN_PROFILE_ID`) : elle bloque les PIN de l'IP 15 min, nettoyage compris (redemarrer le serveur de dev ensuite).
 - **Onglet Chrome en arriere-plan** : les transitions Alpine n'avancent qu'a chaque capture, et une vue parait « estompee ». Enchainer 2 captures (la premiere en `scale` 0.2) avant de juger un rendu.
 - **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-locale` dans le `localStorage`, puis recharger.
 - **Champs PIN** : une extension de gestion de mots de passe peut bloquer `javascript_tool` quand le focus est sur le champ (erreur `chrome-extension://`) : utiliser clic + frappe, pas de JS sur ce champ.
@@ -323,9 +323,11 @@ Le script teste (cf. son entete) :
 - **Helmet headers** : `curl -I /api/projects` → doit contenir `X-Frame-Options`, `X-Content-Type-Options: nosniff`, `Strict-Transport-Security`, `Referrer-Policy`
 - **Validation types** : `POST /generate/summary` avec `{lang:12345, ageGroup:[], profileId:null}` → doit retourner `{"error":"invalid_input"}` 400 sans creer de generation
 - **SSRF** : `POST /sources/websearch` avec URL `127.0.0.1`, `169.254.169.254`, `[::ffff:7f00:0001]`, `198.18.0.1` → doit retourner `failures[]` SANS creer de source ni appeler Mistral (verif cote `costLog`)
-- **Rate-limit general** : burst 350 GET `/api/projects` → doit voir des 429 apparaitre au-dela de 300/min
-- **Rate-limit AI** : burst 75 POST `/generate/summary` avec body invalide (`{lang:12345}`) → 400 invalid_input (gratuit, rejete AVANT le LLM) ou 429 au-dela de 60/min. **Jamais `/generate/route`** : cette route est lenient (`lang || 'fr'`) et EXECUTE le routeur LLM (cout) au lieu de rejeter — un burst non throttle facturerait le run.
-- **Pas de fuite secrets** : grep des reponses d'erreur pour `MISTRAL_API_KEY|sk-|api_key|password|/mnt/|/home/` → doit etre vide
+- **Pas de fuite secrets** : grep des reponses d'erreur pour `MISTRAL_API_KEY|sk-|api_key|password|/mnt/|/home/` → doit etre vide (lance AVANT les rafales : apres elles, `generalLimiter` repond a la place des routes testees)
+- **Refus des limiteurs** (toutes les rafales) : 429 `{"error":"rate_limited"}` (code stable, plus aucun texte libre), en-tete `Retry-After` (secondes) et en-tete `RateLimit` du limiteur attendu (`limit=10` PIN, `limit=60` IA, `limit=300` general)
+- **Rate-limit PIN (optionnel, `PIN_BURST=1`)** : PIN faux en `PUT /api/profiles/:id` (corps `{pin}` seul : rien n'est modifie) → au plus 10 refus 403 puis 429 `rate_limited`. Bloque les PIN de l'IP 15 min (redemarrer le serveur de dev pour nettoyer)
+- **Rate-limit AI** : burst 75 POST `/generate/summary` avec body invalide (`{lang:12345}`) → 400 invalid_input (gratuit, rejete AVANT le LLM) ou 429 au-dela de 60/min, lance AVANT la rafale generale. **Jamais `/generate/route`** : cette route est lenient (`lang || 'fr'`) et EXECUTE le routeur LLM (cout) au lieu de rejeter — un burst non throttle facturerait le run.
+- **Rate-limit general** : burst 350 GET `/api/projects` (jamais `/api/profiles`) → 429 au-dela de 300/min ; derniere rafale du script
 
 Lire la sortie du script. Tout `[FAIL]` est un finding bloquant. Tout `[WARN]` est a discuter.
 
@@ -387,6 +389,7 @@ Compiler dans la reponse a l'user :
 - SSRF (4 vecteurs) : ✓/✗
 - Rate-limit general : ✓/✗
 - Rate-limit AI : ✓/✗
+- Rate-limit PIN (optionnel) : ✓/✗/skip
 - Fuite secrets : ✓/✗
 
 ### Cost tracking
@@ -411,7 +414,7 @@ Pour que ce skill reste valable dans le temps :
 1. **Jamais de UUID hardcode** — toujours decouvrir via `/api/projects` et `/api/profiles`.
 2. **Jamais de coordonnees Chrome hardcodees** — utiliser `find` natural language, ou query JS sur les `aria-label` (qui sont stables car i18n-aware).
 3. **Lire les listes dynamiques** (`categories[]`, `AUTO_AGENTS_SET`) depuis le code/DOM, jamais redupliquer ici. Ce skill **ne doit pas connaitre la liste exhaustive des generateurs** — il l'observe.
-4. **Tests securite : noms des cles d'erreur stables** (`invalid_json`, `invalid_input`, `upstream_unavailable`, `internal_error`) — cf. `types.ts:FailedStepCode`. Si ces codes changent, mettre a jour ce skill ET `helpers/error-code-resolution.ts`.
+4. **Tests securite : noms des cles d'erreur stables** (`invalid_json`, `invalid_input`, `upstream_unavailable`, `internal_error`, `rate_limited`) — cf. `types.ts:FailedStepCode` et `helpers/rate-limit.ts`. Si ces codes changent, mettre a jour ce skill ET `helpers/error-code-resolution.ts`.
 5. **Budgets de timeout** : podcast/quiz-vocal peuvent prendre 60-90s. Ne pas timeout < 120s.
 6. **Cost-conscious** : tester 1× chaque generateur par run (pas en boucle). Le script securite ne fait QUE des requetes qui doivent etre rejetees en amont (pas d'appel Mistral). Budget run complet ≈ 0.30-0.50 USD (mesure 2026-09-26 : 0.28 USD suivis + ~0.10 USD de frais d'outil par illustration, non suivis par le cost tracking).
 7. **Pas de destructive** : ne JAMAIS faire `rm -rf output/`, `DELETE /api/projects/*`, ou modifier `config.json` sans confirmation explicite. Seul le mode "reset" requiert l'action de l'user (commande affichee, mais executee par lui).

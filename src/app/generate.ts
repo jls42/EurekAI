@@ -810,8 +810,10 @@ export function createGenerate() {
         if (res.ok) {
           applyVoiceResult(this, gen, await res.json(), section);
         } else {
+          // Code stable traduit (rate_limited, auth_required, tts_upstream_error…), jamais brut.
           const err = await res.json().catch(() => ({}));
-          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error', () =>
+          const error = this.resolveError(err.error || res.statusText);
+          this.showToast(this.t(TOAST_ERROR, { error }), 'error', () =>
             this.generateVoice(gen, section),
           );
         }

@@ -97,6 +97,7 @@ export const en: Record<string, string> = {
   'errorCode.invalid_input': 'Invalid request',
   'errorCode.profile_delete_partial':
     'Profile deletion incomplete: some projects could not be deleted',
+  'errorCode.rate_limited': 'Too many requests at once. Wait a moment, then try again.',
 
   'header.menuProjects': 'Projects menu',
   'header.switchToLight': 'Switch to light mode',
@@ -490,6 +491,7 @@ export const en: Record<string, string> = {
   'profile.pinMismatch': 'PIN codes do not match',
   'profile.pinVerify': 'Parental verification',
   'profile.pinWrong': 'Incorrect PIN code',
+  'profile.pinRateLimited': 'Too many PIN attempts. Try again in {minutes} min.',
   'profile.pinInfo':
     'A parental PIN code protects this profile. It will be required to edit or delete the profile.',
   'profile.moderationToggle': 'Content moderation',

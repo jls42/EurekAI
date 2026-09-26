@@ -1329,6 +1329,27 @@ describe('generateVoice', () => {
     expect(genObj._generatingVoice_all).toBe(false);
   });
 
+  // Code stable traduit (resolveError), jamais le code brut : 429 de aiLimiter compris.
+  it('refus HTTP : code traduit par resolveError (rate_limited)', async () => {
+    mockFetchFail(429, { error: 'rate_limited' });
+    const ctx = makeContext({
+      resolveError: vi.fn((code: string) => `<${code}>`),
+      t: vi.fn((key: string, params?: Record<string, string>) =>
+        params?.error ? `${key}:${params.error}` : key,
+      ),
+    });
+    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+
+    await gen.generateVoice.call(ctx, genObj);
+
+    expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.error:<rate_limited>',
+      'error',
+      expect.any(Function),
+    );
+  });
+
   it('handles network exception', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();

@@ -54,6 +54,7 @@ const state = vi.hoisted(() => {
       const next = args[2];
       if (typeof next === 'function') next();
     }),
+    aiPathLimiter: makeMiddleware(),
     dotenvConfig: vi.fn(),
     expressJson: vi.fn(() => jsonMiddleware),
     expressStatic: vi.fn(() => staticMiddleware),
@@ -99,6 +100,7 @@ vi.mock('./helpers/logger.js', () => ({ logger: state.logger }));
 vi.mock('./helpers/usage-context.js', () => ({ recordUsage: vi.fn() }));
 vi.mock('./helpers/rate-limit.js', () => ({
   aiLimiter: state.aiLimiter,
+  aiPathLimiter: state.aiPathLimiter,
   generalLimiter: state.generalLimiter,
 }));
 vi.mock('./config.js', () => ({
@@ -183,11 +185,11 @@ function getJsonErrorHandler() {
   return handler as ErrorRequestHandler;
 }
 
-function getAiMiddleware() {
-  const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
-  const handler = state.app.use.mock.calls[generalLimiterIndex + 1]?.[0];
-  if (typeof handler !== 'function') throw new TypeError('Missing AI rate-limit middleware');
-  return handler as RequestHandler;
+// Rang d'appel (invocationCallOrder) du premier `app.use` qui vérifie `match`.
+function useCallOrder(match: (args: unknown[]) => boolean): number {
+  const index = state.app.use.mock.calls.findIndex((args) => match(args));
+  if (index === -1) throw new TypeError('Missing app.use call');
+  return state.app.use.mock.invocationCallOrder[index];
 }
 
 function requestForPath(path: string): Request {
@@ -280,16 +282,25 @@ describe('server bootstrap', () => {
     expect(next).toHaveBeenCalledOnce();
   });
 
-  it('limite les routes API couteuses uniquement', async () => {
+  // generalLimiter avant la 1re route /api (les routes de config lui échappaient) ; aiPathLimiter
+  // une seule fois, avant les routeurs (les chemins IA sont testés dans helpers/rate-limit.test.ts).
+  it('monte generalLimiter avant toute route /api et aiPathLimiter avant les routeurs', async () => {
     await importServer();
 
-    const aiMiddleware = getAiMiddleware();
-    aiMiddleware(requestForPath('/api/projects/p1/generate'), responseMock(), vi.fn());
-    expect(state.aiLimiter).toHaveBeenCalled();
+    const generalOrder = useCallOrder(
+      ([path, mw]) => path === '/api' && mw === state.generalLimiter,
+    );
+    const [firstApiRoute] = state.app.get.mock.calls[0] as [string];
+    expect(firstApiRoute).toBe('/api/config');
+    expect(generalOrder).toBeLessThan(state.app.get.mock.invocationCallOrder[0]);
+    expect(generalOrder).toBeLessThan(state.app.put.mock.invocationCallOrder[0]);
+    expect(generalOrder).toBeLessThan(state.app.post.mock.invocationCallOrder[0]);
 
-    const next = vi.fn();
-    aiMiddleware(requestForPath('/api/projects/p1/events'), responseMock(), next);
-    expect(next).toHaveBeenCalled();
+    const aiUses = state.app.use.mock.calls.filter(([mw]) => mw === state.aiPathLimiter);
+    expect(aiUses).toHaveLength(1);
+    const aiOrder = useCallOrder(([mw]) => mw === state.aiPathLimiter);
+    expect(aiOrder).toBeLessThan(useCallOrder(([path]) => path === '/api/profiles'));
+    expect(aiOrder).toBeLessThan(useCallOrder(([path]) => path === '/api/projects'));
   });
 
   // Reprise des modérations interrompues : clé d'env seulement, jamais une clé utilisateur.

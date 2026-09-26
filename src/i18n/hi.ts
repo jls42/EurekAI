@@ -105,6 +105,7 @@ export const hi: Record<string, string> = {
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
   'errorCode.invalid_input': 'अमान्य अनुरोध',
   'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
+  'errorCode.rate_limited': 'एक साथ बहुत सारे अनुरोध। थोड़ा रुको, फिर दोबारा कोशिश करो।',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
@@ -663,6 +664,7 @@ export const hi: Record<string, string> = {
   'profile.pinVerify':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E \u0938\u0924\u094D\u092F\u093E\u092A\u0928',
   'profile.pinWrong': '\u0917\u0932\u0924 PIN \u0915\u094B\u0921',
+  'profile.pinRateLimited': 'PIN के बहुत सारे प्रयास हो गए। {minutes} मिनट बाद फिर कोशिश करो।',
   'profile.pinInfo':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E PIN \u0915\u094B\u0921 \u0907\u0938 \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u0915\u0940 \u0938\u0941\u0930\u0915\u094D\u0937\u093E \u0915\u0930\u0924\u093E \u0939\u0948\u0964 \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u092C\u0926\u0932\u0928\u0947 \u092F\u093E \u0939\u091F\u093E\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0907\u0938\u0915\u0940 \u091C\u093C\u0930\u0942\u0930\u0924 \u0939\u094B\u0917\u0940\u0964',
   'profile.moderationToggle': '\u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0938\u0902\u092F\u092E',

@@ -99,6 +99,7 @@ export const it: Record<string, string> = {
   'errorCode.invalid_input': 'Richiesta non valida',
   'errorCode.profile_delete_partial':
     'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',
+  'errorCode.rate_limited': "Troppe richieste in una volta. Aspetta un po' e riprova.",
 
   'header.menuProjects': 'Menu progetti',
   'header.switchToLight': 'Passa alla modalit\u00e0 chiara',
@@ -489,6 +490,7 @@ export const it: Record<string, string> = {
   'profile.pinMismatch': 'I codici PIN non corrispondono',
   'profile.pinVerify': 'Verifica genitoriale',
   'profile.pinWrong': 'Codice PIN errato',
+  'profile.pinRateLimited': 'Troppi tentativi di PIN. Riprova tra {minutes} min.',
   'profile.pinInfo':
     'Un codice PIN genitoriale protegge questo profilo. Sar\u00e0 richiesto per modificare o eliminare il profilo.',
   'profile.moderationToggle': 'Moderazione dei contenuti',

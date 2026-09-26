@@ -463,11 +463,26 @@ export function createSources() {
   };
 }
 
+// Refus d'une suppression : code du corps (`{ error }`, ex. rate_limited), sinon le statut HTTP,
+// traduit par resolveError.
+const reportDeleteSourceError = async (state: AppContext, res: Response): Promise<void> => {
+  const body: unknown = await res.json().catch(() => null);
+  const code = (body as { error?: unknown } | null)?.error;
+  const error = state.resolveError(typeof code === 'string' && code ? code : res.statusText);
+  state.showToast(state.t(TOAST_ERROR, { error }), 'error');
+};
+
 // Suppression d'une source, puis consigne resynchronisée sur la réponse (le serveur efface celle
-// qui dépendait de la source), sauf si le projet a changé entre-temps.
+// qui dépendait de la source), sauf si le projet a changé entre-temps. Refus du serveur (ex. 429) :
+// source gardée et erreur traduite, jamais un faux « Source supprimée » ; 404 = déjà supprimée
+// (autre onglet), retirée comme un succès.
 const runDeleteSource = async function (state: AppContext, id: string): Promise<void> {
   const projectId = state.currentProjectId;
   const res = await fetch(state.apiBase() + '/sources/' + id, { method: 'DELETE' });
+  if (!res.ok && res.status !== 404) {
+    await reportDeleteSourceError(state, res);
+    return;
+  }
   state.sources = state.sources.filter((s: Source) => s.id !== id);
   state.selectedIds = state.selectedIds.filter((sid: string) => sid !== id);
   if (state.currentProjectId === projectId) await syncConsigneAfterDelete(state, res);

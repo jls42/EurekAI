@@ -100,6 +100,8 @@ export const de: Record<string, string> = {
   'errorCode.invalid_input': 'Ungültige Anfrage',
   'errorCode.profile_delete_partial':
     'Profil loeschen unvollstaendig: einige Projekte konnten nicht geloescht werden',
+  'errorCode.rate_limited':
+    'Zu viele Anfragen auf einmal. Warte kurz und versuch es dann noch einmal.',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',
@@ -497,6 +499,7 @@ export const de: Record<string, string> = {
   'profile.pinMismatch': 'PIN-Codes stimmen nicht \u00fcberein',
   'profile.pinVerify': 'Eltern-Verifizierung',
   'profile.pinWrong': 'Falscher PIN-Code',
+  'profile.pinRateLimited': 'Zu viele PIN-Versuche. Versuch es in {minutes} Min. noch einmal.',
   'profile.pinInfo':
     'Ein Eltern-PIN-Code sch\u00fctzt dieses Profil. Er wird zum Bearbeiten oder L\u00f6schen des Profils ben\u00f6tigt.',
   'profile.moderationToggle': 'Inhaltsmoderation',

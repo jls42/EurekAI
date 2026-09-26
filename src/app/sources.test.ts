@@ -191,6 +191,43 @@ describe('createSources', () => {
       expect(ctx.consigne).toEqual(remaining);
     });
 
+    // Refus du serveur (429 de aiLimiter) : source gardée, erreur traduite, pas de faux succès.
+    it('refus du serveur (429 rate_limited) → source gardée, erreur traduite', async () => {
+      ctx.sources = [{ id: 's1', text: 'a' }];
+      ctx.selectedIds = ['s1'];
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: async () => ({ error: 'rate_limited' }),
+      } as any);
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.sources).toEqual([{ id: 's1', text: 'a' }]);
+      expect(ctx.selectedIds).toEqual(['s1']);
+      expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.sourceDeleted', 'info');
+    });
+
+    it('404 (déjà supprimée ailleurs) → retirée comme un succès', async () => {
+      ctx.sources = [{ id: 's1', text: 'a' }];
+      ctx.selectedIds = ['s1'];
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({ error: 'Source introuvable' }),
+      } as any);
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.selectedIds).toEqual([]);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.sourceDeleted', 'info');
+    });
+
     it('projet changé pendant la suppression : consigne du nouveau projet intacte', async () => {
       const other = { found: true, text: 'projet 2', keyTopics: ['k'] };
       vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {

@@ -6,6 +6,11 @@
 #
 # Si PROJECT_ID/PROFILE_ID non fournis, lit l'API pour les decouvrir.
 #
+# Rafale de PIN faux (section 7) desactivee par defaut : PIN_BURST=1 l'active, sur
+# PIN_PROFILE_ID (sinon PROFILE_ID), qui doit avoir un PIN. Elle bloque les PIN de cette IP
+# pendant 15 min (DELETE de nettoyage compris) : redemarrer le serveur de dev remet les
+# compteurs des limiteurs a zero (stockage memoire).
+#
 # Exit code : 0 si tous les checks passent, 1 sinon.
 #
 # Conventions :
@@ -140,34 +145,109 @@ else
   check_fail "Cote serveur : sources count a augmente ! $SOURCES_BEFORE -> $SOURCES_AFTER (SSRF a cree des sources)"
 fi
 
-# Snapshot du cost AVANT les tests rate-limit (qui pourraient throttle les GET
-# suivants et fausser la lecture finale). Si la valeur n'est pas lisible (JSON
-# vide / rate-limited / projet supprime), on saute le check cost en warn pour
-# eviter un faux positif bloquant.
+# Snapshot du cost AVANT les rafales rate-limit (qui throttlent ensuite les GET
+# jusqu'a 60 s). Si la valeur n'est pas lisible (JSON vide / rate-limited / projet
+# supprime), on saute le check cost en warn pour eviter un faux positif bloquant.
 COST_AFTER_SAFE=$(echo "$SNAPSHOT" | python3 -c 'import json,sys; print(json.load(sys.stdin).get("totalCost",0))' 2>/dev/null)
 
-# --- 5. Rate-limit general ---
-section "Rate-limit general (300/min sur /api)"
-# Burst 350 GET rapides
-codes=""
-for _ in $(seq 1 350); do
-  c=$(curl -s -o /dev/null -w '%{http_code}\n' --max-time 2 "$BASE/api/profiles")
-  codes="$codes$c\n"
-done
-n200=$(printf '%b' "$codes" | grep -c '^200$' || true)
-n429=$(printf '%b' "$codes" | grep -c '^429$' || true)
-if [ "$n429" -gt 0 ]; then
-  check_pass "Rate-limit declenche : $n200 OK + $n429 throttled (>0 attendu)"
+# --- 5. Pas de fuite secrets ---
+# AVANT les rafales : apres elles, generalLimiter repond 429 a la place des routes testees.
+section "Pas de fuite secrets dans les reponses d'erreur"
+# Concatene quelques reponses d'erreur connues
+errs=""
+errs="$errs $(curl -s -X POST "$BASE/api/projects/$PROJECT_ID/generate/summary" -H 'content-type: application/json' -d 'NOT_JSON')"
+errs="$errs $(curl -s -X POST "$BASE/api/projects/non-existent-pid/generate/summary" -H 'content-type: application/json' -d '{}')"
+errs="$errs $(curl -s "$BASE/api/projects/non-existent-pid")"
+if echo "$errs" | grep -qEi 'MISTRAL_API_KEY|sk-[a-zA-Z0-9_-]{20,}|"password"|api[_-]?key.*:.+|/mnt/|/home/|node_modules'; then
+  check_fail "Fuite suspecte dans une reponse d'erreur : $(echo "$errs" | grep -oEi 'MISTRAL_API_KEY|sk-[a-zA-Z0-9_-]{20,}|/mnt/|/home/' | head -3)"
 else
-  check_fail "Aucun 429 sur burst 350 GET — rate-limit /api inactif ?"
+  check_pass "Aucun secret ou path serveur fuite dans les reponses d'erreur testees"
 fi
 
-# --- 6. Rate-limit AI ---
-section "Rate-limit AI (60/min sur /generate)"
-# On burst /generate/summary avec un body invalide (lang non-string) : rejete en
+# --- 6. Cost tracking inchange par les tests securite ---
+# Note : on utilise COST_AFTER_SAFE capture juste apres SSRF (avant les rafales
+# rate-limit qui throttlent les GET suivants et fausseraient la lecture).
+section "Cost tracking : les tests securite ne consomment pas Mistral"
+if [ -z "${COST_AFTER_SAFE:-}" ]; then
+  check_warn "Snapshot cost post-SSRF illisible — check cost skip"
+else
+  DELTA=$(python3 -c "print(round($COST_AFTER_SAFE - $COST_BEFORE, 6))")
+  if python3 -c "exit(0 if abs($DELTA) < 0.001 else 1)"; then
+    check_pass "Cost delta during security tests : \$$DELTA (< \$0.001 tolere)"
+  else
+    check_fail "Cost delta during security tests : \$$DELTA (> \$0.001 — un test securite a leak un appel Mistral)"
+  fi
+fi
+
+# Refus d'un limiteur : 429, corps {"error":"rate_limited"} (code stable, jamais de texte
+# libre), en-tete Retry-After et en-tete RateLimit du limiteur attendu (limit=N : 10 PIN,
+# 60 IA, 300 general). Arguments : libelle, limite attendue, puis les arguments curl.
+check_rate_limited() {
+  local label="$1" limit="$2"
+  shift 2
+  local hdrs body http
+  hdrs=$(mktemp)
+  body=$(mktemp)
+  http=$(curl -s -D "$hdrs" -o "$body" -w '%{http_code}' --max-time 5 "$@")
+  if [ "$http" = "429" ] && grep -q '"error":"rate_limited"' "$body" \
+    && grep -qiE '^retry-after: *[0-9]+' "$hdrs" \
+    && grep -qiE "^ratelimit: *limit=$limit," "$hdrs"; then
+    check_pass "$label : 429 rate_limited + Retry-After (limit=$limit)"
+  else
+    check_fail "$label : HTTP $http body=$(cat "$body") (attendu 429 rate_limited + Retry-After + RateLimit limit=$limit)"
+  fi
+  rm -f "$hdrs" "$body"
+}
+
+# --- 7. Rate-limit PIN (optionnel : PIN_BURST=1) ---
+# pinLimiter : 10 PIN faux / 15 min par IP sur PUT/DELETE /api/profiles/:id, seuls les 403
+# comptent. Le PUT ne porte que le PIN (aucun champ) : rien n'est modifie. Au-dela, TOUT PIN de
+# cette IP (bon compris) recoit 429 pendant la fenetre : section desactivee par defaut, a lancer
+# en dernier recours ou suivie d'un redemarrage du serveur de dev.
+section "Rate-limit PIN (10 PIN faux / 15 min, optionnel)"
+if [ "${PIN_BURST:-0}" != "1" ]; then
+  echo "  (saute : PIN_BURST=1 pour l'activer — bloque les PIN de cette IP 15 min)"
+else
+  PIN_TARGET="${PIN_PROFILE_ID:-$PROFILE_ID}"
+  HAS_PIN=$(curl -s "$BASE/api/profiles" | PIN_TARGET="$PIN_TARGET" python3 -c 'import json,os,sys; t=os.environ["PIN_TARGET"]; print(next((str(p.get("hasPin")).lower() for p in json.load(sys.stdin) if p.get("id")==t), "absent"))' 2>/dev/null)
+  if [ "$HAS_PIN" != "true" ]; then
+    check_warn "Rate-limit PIN saute : profil $PIN_TARGET sans PIN (fournir PIN_PROFILE_ID)"
+  else
+    put_pin() {
+      curl -s -o /dev/null -w '%{http_code}' --max-time 5 -X PUT "$BASE/api/profiles/$PIN_TARGET" \
+        -H 'content-type: application/json' -d "{\"pin\":\"$1\"}"
+    }
+    # PIN faux : 0000, sauf si c'est le bon PIN (200 : non compte) → 1111.
+    WRONG_PIN="0000"
+    probe=$(put_pin "$WRONG_PIN")
+    if [ "$probe" = "200" ]; then
+      WRONG_PIN="1111"
+      probe=$(put_pin "$WRONG_PIN")
+    fi
+    codes="$probe"
+    last="$probe"
+    while [ "$last" = "403" ] && [ "$(echo "$codes" | wc -w)" -le 11 ]; do
+      last=$(put_pin "$WRONG_PIN")
+      codes="$codes $last"
+    done
+    n403=$(echo "$codes" | tr ' ' '\n' | grep -c '^403$' || true)
+    if [ "$last" = "429" ] && [ "$n403" -le 10 ]; then
+      check_pass "PIN faux : $n403 refus 403 puis 429 (<= 10 attendu)"
+    else
+      check_fail "PIN faux : codes=$codes (attendu au plus 10 x 403 puis 429)"
+    fi
+    check_rate_limited "PUT PIN faux au-dela de 10" 10 -X PUT "$BASE/api/profiles/$PIN_TARGET" \
+      -H 'content-type: application/json' -d "{\"pin\":\"$WRONG_PIN\"}"
+  fi
+fi
+
+# --- 8. Rate-limit AI ---
+section "Rate-limit AI (60/min sur les routes IA)"
+# AVANT la rafale generale : apres elle, generalLimiter (300/min) repond 429 a la place de
+# aiLimiter. On burst /generate/summary avec un body invalide (lang non-string) : rejete en
 # 400 invalid_input par validateGenRequestBody AVANT tout appel LLM (cf. section 3)
 # ET avant addPendingEntry (pas de pending orphelin), tout en passant par le MEME
-# aiLimiter (regex /generate|sources|chat dans server.ts) → on observe les 429.
+# aiLimiter (AI_PATH_RE, helpers/rate-limit.ts) → on observe les 429.
 # IMPORTANT : NE PAS utiliser /generate/route ici. Cette route est lenient
 # (`lang = req.body.lang || 'fr'`) et EXECUTE le routeur LLM (cout ~$0.0009/appel)
 # au lieu de rejeter — un burst non throttle facturerait le run et fausserait le
@@ -184,36 +264,30 @@ n429=$(printf '%b' "$codes" | grep -c '^429$' || true)
 if [ "$n429" -gt 0 ]; then
   check_pass "AI rate-limit declenche : $n429 / 75 throttled"
 else
-  check_warn "Aucun 429 sur burst 75 POST /generate/route — verifier que aiLimiter est branche"
+  check_fail "Aucun 429 sur burst 75 POST /generate/summary — verifier que aiPathLimiter est branche"
 fi
+check_rate_limited "POST /generate/summary au-dela de 60/min" 60 -X POST \
+  "$BASE/api/projects/$PROJECT_ID/generate/summary" \
+  -H 'content-type: application/json' -d '{"lang":12345}'
 
-# --- 7. Pas de fuite secrets ---
-section "Pas de fuite secrets dans les reponses d'erreur"
-# Concatene quelques reponses d'erreur connues
-errs=""
-errs="$errs $(curl -s -X POST "$BASE/api/projects/$PROJECT_ID/generate/summary" -H 'content-type: application/json' -d 'NOT_JSON')"
-errs="$errs $(curl -s -X POST "$BASE/api/projects/non-existent-pid/generate/summary" -H 'content-type: application/json' -d '{}')"
-errs="$errs $(curl -s "$BASE/api/projects/non-existent-pid")"
-if echo "$errs" | grep -qEi 'MISTRAL_API_KEY|sk-[a-zA-Z0-9_-]{20,}|"password"|api[_-]?key.*:.+|/mnt/|/home/|node_modules'; then
-  check_fail "Fuite suspecte dans une reponse d'erreur : $(echo "$errs" | grep -oEi 'MISTRAL_API_KEY|sk-[a-zA-Z0-9_-]{20,}|/mnt/|/home/' | head -3)"
+# --- 9. Rate-limit general ---
+section "Rate-limit general (300/min sur /api)"
+# Cible /api/projects (generalLimiter seul). JAMAIS /api/profiles : le PIN a son propre
+# limiteur, et une rafale sur les profils y bloquerait le nettoyage du profil de test.
+# Derniere rafale du script : generalLimiter reste sature jusqu'a 60 s ensuite.
+codes=""
+for _ in $(seq 1 350); do
+  c=$(curl -s -o /dev/null -w '%{http_code}\n' --max-time 2 "$BASE/api/projects")
+  codes="$codes$c\n"
+done
+n200=$(printf '%b' "$codes" | grep -c '^200$' || true)
+n429=$(printf '%b' "$codes" | grep -c '^429$' || true)
+if [ "$n429" -gt 0 ]; then
+  check_pass "Rate-limit declenche : $n200 OK + $n429 throttled (>0 attendu)"
 else
-  check_pass "Aucun secret ou path serveur fuite dans les reponses d'erreur testees"
+  check_fail "Aucun 429 sur burst 350 GET /api/projects — rate-limit /api inactif ?"
 fi
-
-# --- 8. Cost tracking inchange par les tests securite ---
-# Note : on utilise COST_AFTER_SAFE capture juste apres SSRF (avant les bursts
-# rate-limit qui pourraient throttle les GET suivants et fausser la lecture).
-section "Cost tracking : les tests securite ne consomment pas Mistral"
-if [ -z "${COST_AFTER_SAFE:-}" ]; then
-  check_warn "Snapshot cost post-SSRF illisible — check cost skip"
-else
-  DELTA=$(python3 -c "print(round($COST_AFTER_SAFE - $COST_BEFORE, 6))")
-  if python3 -c "exit(0 if abs($DELTA) < 0.001 else 1)"; then
-    check_pass "Cost delta during security tests : \$$DELTA (< \$0.001 tolere)"
-  else
-    check_fail "Cost delta during security tests : \$$DELTA (> \$0.001 — un test securite a leak un appel Mistral)"
-  fi
-fi
+check_rate_limited "GET /api/projects au-dela de 300/min" 300 "$BASE/api/projects"
 
 # --- Rapport final ---
 echo ""

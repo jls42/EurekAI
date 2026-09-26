@@ -100,6 +100,7 @@ export const pt: Record<string, string> = {
   'errorCode.invalid_input': 'Pedido inválido',
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
+  'errorCode.rate_limited': 'Demasiados pedidos de uma vez. Espera um pouco e tenta de novo.',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
@@ -496,6 +497,7 @@ export const pt: Record<string, string> = {
   'profile.pinMismatch': 'Os c\u00f3digos PIN n\u00e3o coincidem',
   'profile.pinVerify': 'Verifica\u00e7\u00e3o dos pais',
   'profile.pinWrong': 'C\u00f3digo PIN incorreto',
+  'profile.pinRateLimited': 'Demasiadas tentativas de PIN. Tenta de novo daqui a {minutes} min.',
   'profile.pinInfo':
     'Um c\u00f3digo PIN dos pais protege este perfil. Ele ser\u00e1 solicitado para editar ou excluir o perfil.',
   'profile.moderationToggle': 'Modera\u00e7\u00e3o de conte\u00fado',

@@ -102,6 +102,7 @@ export const fr: Record<string, string> = {
   'errorCode.invalid_input': 'Demande invalide',
   'errorCode.profile_delete_partial':
     "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",
+  'errorCode.rate_limited': "Trop de demandes d'un coup. Patiente un peu, puis réessaie.",
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -519,6 +520,7 @@ export const fr: Record<string, string> = {
   'profile.pinMismatch': 'Les codes PIN ne correspondent pas',
   'profile.pinVerify': 'Vérification parentale',
   'profile.pinWrong': 'Code PIN incorrect',
+  'profile.pinRateLimited': "Trop d'essais de code PIN. Réessaie dans {minutes} min.",
   'profile.pinInfo':
     'Un code PIN parental protège ce profil. Il sera demandé pour modifier ou supprimer le profil.',
   'profile.moderationToggle': 'Modération du contenu',

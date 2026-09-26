@@ -53,12 +53,57 @@ const I18N_KNOWN_ERROR_CODES = new Set([
   'context_length_exceeded',
   'llm_invalid_json',
   'profile_delete_partial',
+  'rate_limited',
 ]);
 
 export function mapServerErrorCode(state: AppContext, raw: unknown): string {
   if (typeof raw !== 'string' || !raw) return '';
   return I18N_KNOWN_ERROR_CODES.has(raw) ? state.t('errorCode.' + raw) : raw;
 }
+
+// Fenêtre de pinLimiter (helpers/rate-limit.ts) : délai affiché quand Retry-After manque ou est
+// illisible. Refus d'un PIN envoyé : PIN faux (403) ou trop d'essais (429).
+const PIN_LOCK_DEFAULT_MINUTES = 15;
+const RETRY_AFTER_SECONDS_RE = /^\d+$/;
+const PIN_REFUSAL_STATUSES = new Set([403, 429]);
+
+// Délai avant un nouvel essai, en minutes arrondies au-dessus (1 au minimum), lu dans Retry-After
+// en secondes (seule forme qu'envoie express-rate-limit).
+export const retryAfterMinutes = (res: Response): number => {
+  const header = res.headers.get('Retry-After') ?? '';
+  const raw = header.trim();
+  if (!RETRY_AFTER_SECONDS_RE.test(raw)) return PIN_LOCK_DEFAULT_MINUTES;
+  return Math.max(1, Math.ceil(Number(raw) / 60));
+};
+
+// Refus d'une vérification de PIN parental : trop d'essais (429) avec le délai d'attente, sinon
+// PIN faux (403 ; tout autre refus garde ce message, comme avant).
+const reportPinCheckFailure = (state: AppContext, res: Response): void => {
+  if (res.status === 429) {
+    const minutes = retryAfterMinutes(res);
+    state.showToast(state.t('profile.pinRateLimited', { minutes }), 'error');
+    return;
+  }
+  state.showToast(state.t('profile.pinWrong'), 'error');
+};
+
+// Échec d'une suppression : refus du PIN envoyé (PIN faux, trop d'essais), sinon erreur du
+// serveur traduite (profile_delete_partial, rate_limited…).
+const reportDeleteFailure = async (
+  state: AppContext,
+  res: Response,
+  pin?: string,
+): Promise<void> => {
+  if (pin && PIN_REFUSAL_STATUSES.has(res.status)) {
+    reportPinCheckFailure(state, res);
+    return;
+  }
+  const err = await res.json().catch(() => ({}));
+  state.showToast(
+    state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
+    'error',
+  );
+};
 
 export function buildDeleteOpts(pin?: string): RequestInit {
   const opts: RequestInit = { method: 'DELETE' };
@@ -97,11 +142,7 @@ export async function executeDeleteProfile(
     // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline
     const res = await fetch('/api/profiles/' + id, buildDeleteOpts(pin));
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      state.showToast(
-        state.t(TOAST_ERROR, { error: mapServerErrorCode(state, err.error) || res.statusText }),
-        'error',
-      );
+      await reportDeleteFailure(state, res, pin);
       return;
     }
     finalizeDeleteProfile(state, id);
@@ -473,7 +514,7 @@ const requireParentalAccess = function (this: AppContext, callback: () => void) 
         body: JSON.stringify({ pin }),
       });
       if (!res.ok) {
-        this.showToast(this.t('profile.pinWrong'), 'error');
+        reportPinCheckFailure(this, res);
         return;
       }
     } catch (e: unknown) {
@@ -504,7 +545,7 @@ const requireProfilePin = function (this: AppContext, profileId: string, callbac
         body: JSON.stringify({ pin }),
       });
       if (!res.ok) {
-        this.showToast(this.t('profile.pinWrong'), 'error');
+        reportPinCheckFailure(this, res);
         return;
       }
     } catch (e: unknown) {
