@@ -250,6 +250,21 @@ describe('blockedModerationStatus', () => {
     });
   });
 
+  it('sourceIds explicites : priment sur la sélection ; liste vide = toutes les sources', () => {
+    const ctx = makeContext({
+      sources: [
+        { id: 's1', moderation: { status: 'safe' } },
+        { id: 's2', moderation: { status: 'unsafe' } },
+      ],
+      selectedIds: ['s1'],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+    expect(gen.blockedModerationStatus.call(ctx, ['s2'])).toBe('unsafe');
+    expect(gen.blockedModerationSource.call(ctx, ['s2'])?.id).toBe('s2');
+    expect(gen.blockedModerationStatus.call(ctx, [])).toBe('unsafe');
+    expect(gen.blockedModerationStatus.call({ ...ctx, selectedIds: ['s2'] }, ['s1'])).toBeNull();
+  });
+
   it('applies the priority within selectedIds only', () => {
     const ctx = makeContext({
       sources: [
@@ -395,6 +410,144 @@ describe('generate', () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.lang).toBe('en');
   });
+
+  // Version facile à lire : le pré-contrôle de modération, le pending et les réessais portent sur
+  // les sources de la fiche d'origine (celles que le serveur garde), pas sur la sélection courante.
+  describe('generateSimplified — sources de la fiche', () => {
+    const moderatedProfile = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+    const bodyOf = (call: number) =>
+      JSON.parse((vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit).body as string);
+
+    it('source unsafe sélectionnée mais hors de la fiche : la génération part', async () => {
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-unsafe', moderation: { status: 'unsafe' } },
+          { id: 's-fiche', moderation: { status: 'safe' } },
+        ],
+        selectedIds: ['s-unsafe'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s-fiche'] } as any);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(bodyOf(0).sourceIds).toEqual(['s-fiche']);
+      expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.blocked', 'error');
+    });
+
+    it('source unsafe de la fiche, non sélectionnée : toast moderation.blocked, aucun appel', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-fiche', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s-fiche'] } as any);
+
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.pendingById).toEqual({});
+    });
+
+    it('fiche legacy sans sources (sourceIds: []) : toutes les sources, comme le serveur', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-other', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: [] } as any);
+
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('fiche sans sourceIds (donnée ancienne) : [] envoyé, pré-contrôle sur toutes les sources', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-other', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1' } as any);
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      const safeCtx = makeContext({ sources: [{ id: 's1' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(safeCtx, { id: 'g1' } as any);
+      expect(bodyOf(0).sourceIds).toEqual([]);
+    });
+
+    it('le pending optimiste porte les sources de la fiche', async () => {
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      let pendingSources: unknown;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        pendingSources = (Object.values(ctx.pendingById)[0] as { sourceIds: string[] }).sourceIds;
+        return { ok: true, json: async () => ({ id: 'g-falc', type: 'summary', data: {} }) } as any;
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+
+      expect(pendingSources).toEqual(['s2']);
+    });
+
+    it('réessai après erreur HTTP : même corps, registre falc et sources de la fiche', async () => {
+      mockFetchFail(500, { error: 'upstream_unavailable' });
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.error')![2];
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      await retry();
+
+      expect(bodyOf(1).register).toBe('falc');
+      expect(bodyOf(1).sourceIds).toEqual(['s2']);
+    });
+
+    it('réessai après exception réseau : même corps, registre falc et sources de la fiche', async () => {
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('offline'));
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+      const retry = ctx.showToast.mock.calls.find(
+        (c: any[]) => c[0] === 'toast.generationError',
+      )![2];
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      await retry();
+
+      expect(bodyOf(1).register).toBe('falc');
+      expect(bodyOf(1).sourceIds).toEqual(['s2']);
+    });
+  });
+
+  // Refus de modération renvoyé par le serveur (front périmé) : réessayer donnerait le même refus.
+  it('moderation.blocked du serveur : toast sans bouton Réessayer', async () => {
+    mockFetchFail(400, { error: 'moderation.blocked' });
+    const ctx = makeContext();
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', null);
+  });
+
+  it.each(['moderation.pending', 'moderation.error'])(
+    '%s du serveur : toast avec Réessayer (état transitoire)',
+    async (error) => {
+      mockFetchFail(409, { error });
+      const ctx = makeContext();
+      await gen.generate.call(ctx, 'summary');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+    },
+  );
 
   it('handles abort error (ignores)', async () => {
     const abortError = new DOMException('Aborted', 'AbortError');

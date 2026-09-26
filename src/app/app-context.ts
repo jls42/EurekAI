@@ -8,6 +8,7 @@ import type {
   Profile,
   Source,
   StudyFiche,
+  SummaryRegister,
 } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
 import type { PersistedNotification } from './notifications';
@@ -15,6 +16,15 @@ import type { PersistedNotification } from './notifications';
 export type AppState = ReturnType<typeof createState>;
 
 type TFn = (key: string, params?: Record<string, string | number>) => string;
+
+// Surcharges du body standard d'une génération : la version facile à lire (generateSimplified)
+// vise les sources de la fiche d'origine (pré-contrôle de modération et pending compris), son
+// registre et sa langue. Rejouées telles quelles par les réessais.
+export interface GenerateExtraBody {
+  sourceIds?: string[];
+  register?: SummaryRegister;
+  lang?: string;
+}
 
 export interface MetaPopoverConfig {
   title?: string;
@@ -154,10 +164,11 @@ export interface AppContext extends AppState {
   clearApiKey(scope: 'global' | 'profile'): Promise<void>;
   testApiKey(): Promise<void>;
 
-  blockedModerationSource(): Source | null;
-  blockedModerationStatus(): string | null;
-  moderationBlockedMessage(status: string | null): string;
-  generate(type: string, extraBody?: Record<string, unknown>): Promise<void>;
+  // sourceIds : sources visées explicitement (version facile à lire), sinon la sélection.
+  blockedModerationSource(sourceIds?: readonly string[]): Source | null;
+  blockedModerationStatus(sourceIds?: readonly string[]): string | null;
+  moderationBlockedMessage(status: string | null, sourceIds?: readonly string[]): string;
+  generate(type: string, extraBody?: GenerateExtraBody): Promise<void>;
   generateSimplified(gen: Generation): Promise<void>;
   generateAll(): Promise<void>;
   generateAuto(): Promise<void>;
