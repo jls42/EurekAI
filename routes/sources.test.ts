@@ -11,9 +11,10 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+import { Readable } from 'node:stream';
 import { ProjectStore } from '../store.js';
 import { ProfileStore } from '../profiles.js';
 import { sourceRoutes } from './sources.js';
@@ -393,6 +394,31 @@ describe('DELETE /:pid/sources/:sid', () => {
     // Verify deleted from store
     const updated = store.getProject(project.meta.id);
     expect(updated!.sources).toHaveLength(0);
+  });
+
+  it('supprime aussi le fichier importé de la source (photo)', () => {
+    const project = store.createProject('P1');
+    const pid = project.meta.id;
+    const uploadPath = join(store.getUploadDir(pid), 'uuid-photo.jpg');
+    writeFileSync(uploadPath, 'image');
+    store.addSource(pid, {
+      id: 'src-photo',
+      filename: 'photo.jpg',
+      markdown: '# OCR',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'ocr',
+      filePath: `projects/${pid}/uploads/uuid-photo.jpg`,
+    });
+
+    const res = mockRes();
+    getHandler(
+      router,
+      'delete',
+      '/:pid/sources/:sid',
+    )(mockReq({ params: { pid, sid: 'src-photo' } }), res);
+
+    expect(res.json).toHaveBeenCalledWith({ ok: true });
+    expect(existsSync(uploadPath)).toBe(false);
   });
 });
 
@@ -1289,12 +1315,21 @@ describe('POST /:pid/sources/voice', () => {
 // =============================================================================
 
 describe('POST /:pid/sources/upload', () => {
-  it('retourne 404 quand le projet n existe pas', async () => {
+  // Fichier réellement écrit (comme par multer) : les chemins de refus le suppriment. Contenu
+  // propre à chaque nom : deux contenus identiques seraient traités en doublons (dédup sha256).
+  const tempUpload = (name: string): string => {
+    const path = join(tempDir, name);
+    writeFileSync(path, `image:${name}`);
+    return path;
+  };
+
+  it('retourne 404 quand le projet n existe pas (fichiers reçus supprimés)', async () => {
+    const path = tempUpload('photo.jpg');
     const handler = getHandler(router, 'post', '/:pid/sources/upload');
     const req = mockReq({
       params: { pid: 'inexistant' },
       body: {},
-      files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+      files: [{ path, originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
     });
     const res = mockRes();
 
@@ -1302,6 +1337,7 @@ describe('POST /:pid/sources/upload', () => {
 
     expect(res.status).toHaveBeenCalledWith(404);
     expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(existsSync(path)).toBe(false);
   });
 
   it('retourne 400 quand aucun fichier n est envoye', async () => {
@@ -1335,8 +1371,12 @@ describe('POST /:pid/sources/upload', () => {
       params: { pid: project.meta.id },
       body: { lang: 'fr' },
       files: [
-        { path: '/tmp/file1.jpg', originalname: 'devoir.jpg', filename: 'uuid-devoir.jpg' },
-        { path: '/tmp/file2.pdf', originalname: 'cours.pdf', filename: 'uuid-cours.pdf' },
+        {
+          path: join(tempDir, 'file1.jpg'),
+          originalname: 'devoir.jpg',
+          filename: 'uuid-devoir.jpg',
+        },
+        { path: join(tempDir, 'file2.pdf'), originalname: 'cours.pdf', filename: 'uuid-cours.pdf' },
       ],
     });
     const res = mockRes();
@@ -1346,11 +1386,16 @@ describe('POST /:pid/sources/upload', () => {
     expect(ocrFile).toHaveBeenCalledTimes(2);
     expect(ocrFile).toHaveBeenCalledWith(
       client,
-      '/tmp/file1.jpg',
+      join(tempDir, 'file1.jpg'),
       'devoir.jpg',
       'mistral-ocr-2512',
     );
-    expect(ocrFile).toHaveBeenCalledWith(client, '/tmp/file2.pdf', 'cours.pdf', 'mistral-ocr-2512');
+    expect(ocrFile).toHaveBeenCalledWith(
+      client,
+      join(tempDir, 'file2.pdf'),
+      'cours.pdf',
+      'mistral-ocr-2512',
+    );
 
     expect(res.json).toHaveBeenCalledTimes(1);
     const results = res.json.mock.calls[0][0];
@@ -1379,7 +1424,9 @@ describe('POST /:pid/sources/upload', () => {
     const req = mockReq({
       params: { pid: project.meta.id },
       body: { lang: 'fr' },
-      files: [{ path: '/tmp/file.jpg', originalname: 'scan.jpg', filename: 'uuid-scan.jpg' }],
+      files: [
+        { path: join(tempDir, 'file.jpg'), originalname: 'scan.jpg', filename: 'uuid-scan.jpg' },
+      ],
     });
     const res = mockRes();
 
@@ -1392,15 +1439,16 @@ describe('POST /:pid/sources/upload', () => {
     expect(updated!.sources[0].ocrConfidence).toEqual({ average: 0.95 });
   });
 
-  it('retourne 500 quand ocrFile echoue sur le seul fichier', async () => {
+  it('retourne 500 quand ocrFile echoue sur le seul fichier (fichier supprimé)', async () => {
     const project = store.createProject('P1');
     vi.mocked(ocrFile).mockRejectedValueOnce(new Error('OCR failed'));
+    const path = tempUpload('bad.jpg');
 
     const handler = getHandler(router, 'post', '/:pid/sources/upload');
     const req = mockReq({
       params: { pid: project.meta.id },
       body: {},
-      files: [{ path: '/tmp/file.jpg', originalname: 'bad.jpg', filename: 'uuid-bad.jpg' }],
+      files: [{ path, originalname: 'bad.jpg', filename: 'uuid-bad.jpg' }],
     });
     const res = mockRes();
 
@@ -1411,6 +1459,8 @@ describe('POST /:pid/sources/upload', () => {
       error: 'upload_failed',
       failures: [{ filename: 'bad.jpg', error: 'internal_error' }],
     });
+    // Aucune source ne le référence : il resterait orphelin dans uploads/.
+    expect(existsSync(path)).toBe(false);
   });
 
   it('retourne { sources, failures } en partial success quand un fichier sur deux echoue', async () => {
@@ -1419,19 +1469,25 @@ describe('POST /:pid/sources/upload', () => {
       .mockResolvedValueOnce({ markdown: '# Good', elapsed: 1.1, confidence: { average: 0.9 } })
       .mockRejectedValueOnce(new Error('OCR crashed'));
 
+    const good = tempUpload('good.jpg');
+    const bad = tempUpload('bad.jpg');
+
     const handler = getHandler(router, 'post', '/:pid/sources/upload');
     const req = mockReq({
       params: { pid: project.meta.id },
       body: {},
       files: [
-        { path: '/tmp/good.jpg', originalname: 'good.jpg', filename: 'uuid-good.jpg' },
-        { path: '/tmp/bad.jpg', originalname: 'bad.jpg', filename: 'uuid-bad.jpg' },
+        { path: good, originalname: 'good.jpg', filename: 'uuid-good.jpg' },
+        { path: bad, originalname: 'bad.jpg', filename: 'uuid-bad.jpg' },
       ],
     });
     const res = mockRes();
 
     await handler(req, res);
 
+    // Seul le fichier de l'import échoué est supprimé.
+    expect(existsSync(good)).toBe(true);
+    expect(existsSync(bad)).toBe(false);
     expect(res.status).not.toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledTimes(1);
     const payload = res.json.mock.calls[0][0];
@@ -1451,18 +1507,22 @@ describe('POST /:pid/sources/upload', () => {
       .mockRejectedValueOnce(new Error('OCR down'))
       .mockRejectedValueOnce(new Error('timeout'));
 
+    const paths = [tempUpload('a.jpg'), tempUpload('b.jpg')];
+
     const handler = getHandler(router, 'post', '/:pid/sources/upload');
     const req = mockReq({
       params: { pid: project.meta.id },
       body: {},
       files: [
-        { path: '/tmp/a.jpg', originalname: 'a.jpg', filename: 'uuid-a.jpg' },
-        { path: '/tmp/b.jpg', originalname: 'b.jpg', filename: 'uuid-b.jpg' },
+        { path: paths[0], originalname: 'a.jpg', filename: 'uuid-a.jpg' },
+        { path: paths[1], originalname: 'b.jpg', filename: 'uuid-b.jpg' },
       ],
     });
     const res = mockRes();
 
     await handler(req, res);
+
+    for (const path of paths) expect(existsSync(path)).toBe(false);
 
     expect(res.status).toHaveBeenCalledWith(500);
     expect(res.json).toHaveBeenCalledWith({
@@ -1483,7 +1543,9 @@ describe('POST /:pid/sources/upload', () => {
     const req = mockReq({
       params: { pid: project.meta.id },
       body: {},
-      files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+      files: [
+        { path: join(tempDir, 'file.jpg'), originalname: 'photo.jpg', filename: 'uuid-photo.jpg' },
+      ],
     });
     const res = mockRes();
 
@@ -1500,7 +1562,9 @@ describe('POST /:pid/sources/upload', () => {
     const req = mockReq({
       params: { pid: project.meta.id },
       body: {},
-      files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+      files: [
+        { path: join(tempDir, 'file.jpg'), originalname: 'photo.jpg', filename: 'uuid-photo.jpg' },
+      ],
     });
     const res = mockRes();
 
@@ -1508,6 +1572,116 @@ describe('POST /:pid/sources/upload', () => {
 
     const results = res.json.mock.calls[0][0];
     expect(results[0].moderation).toBeUndefined();
+  });
+});
+
+// =============================================================================
+// POST /:pid/sources/upload — chaîne complète (garde pré-multer + vrai multer)
+// =============================================================================
+
+describe('POST /:pid/sources/upload — garde pré-multer', () => {
+  const UPLOAD_PATH = '/:pid/sources/upload';
+  const uploadStack = () => {
+    const layer = router.stack.find(
+      (l: any) => l.route?.path === UPLOAD_PATH && l.route.methods.post,
+    );
+    return layer.route.stack.map((l: any) => l.handle);
+  };
+
+  // Vraie requête multipart (un fichier) : multer diskStorage écrit réellement sur le disque.
+  const multipartRequest = (pid: string) => {
+    const boundary = 'eurekai-upload-boundary';
+    const body = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="files"; filename="photo.jpg"\r\n` +
+        `Content-Type: image/jpeg\r\n\r\nimage-bytes\r\n--${boundary}--\r\n`,
+    );
+    const headers = {
+      'content-type': `multipart/form-data; boundary=${boundary}`,
+      'content-length': String(body.length),
+    };
+    return Object.assign(Readable.from([body]), { headers, params: { pid }, body: {} });
+  };
+
+  // Exécute les middlewares à partir de `from` jusqu'à la réponse JSON.
+  const runFrom = (from: number, pid: string) =>
+    new Promise<any>((resolve, reject) => {
+      const stack = uploadStack();
+      const req = multipartRequest(pid);
+      const res: any = {};
+      res.status = vi.fn(() => res);
+      res.json = vi.fn(() => {
+        resolve(res);
+        return res;
+      });
+      const run = (i: number): void => {
+        const out = stack[i](req, res, (err?: unknown) => (err ? reject(err) : run(i + 1)));
+        if (out instanceof Promise) out.catch(reject);
+      };
+      run(from);
+    });
+
+  it('ordre : clé (auth-first), garde projet, multer enveloppé, handler', () => {
+    // 4 couches : requireKeyMiddleware, requireExistingProject, withUploadErrors(multer), handler.
+    expect(uploadStack()).toHaveLength(4);
+  });
+
+  it('pid inconnu : 404 sans exécuter multer, aucun dossier ni fichier écrit', async () => {
+    const res = await runFrom(0, 'projet-inconnu');
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(existsSync(join(tempDir, 'projects', 'projet-inconnu'))).toBe(false);
+    expect(ocrFile).not.toHaveBeenCalled();
+  });
+
+  it('pid invalide (traversée) : 404, aucune exception', async () => {
+    const res = await runFrom(0, '..');
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(existsSync(join(tempDir, 'uploads'))).toBe(false);
+  });
+
+  it('projet existant : multer écrit sous uploads/ puis la source est créée', async () => {
+    const pid = store.createProject('P1').meta.id;
+
+    const res = await runFrom(0, pid);
+
+    expect(res.status).not.toHaveBeenCalled();
+    const [source] = res.json.mock.calls[0][0];
+    expect(source.filename).toBe('photo.jpg');
+    expect(readdirSync(join(tempDir, 'projects', pid, 'uploads'))).toHaveLength(1);
+  });
+
+  it('projet disparu après la garde (course) : multer répond 500 sans recréer le dossier', async () => {
+    const pid = store.createProject('P1').meta.id;
+    store.deleteProject(pid);
+    const multerIndex = uploadStack().length - 2;
+
+    const res = await runFrom(multerIndex, pid);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+    expect(existsSync(join(tempDir, 'projects', pid))).toBe(false);
+  });
+
+  // Régression : une exception levée dans le callback destination de multer n'est pas capturée
+  // (busboy) et tuait le process Node — un pid au format invalide y suffisait.
+  it('pid au format invalide atteignant multer : 400 upload_failed, aucune exception', async () => {
+    const multerIndex = uploadStack().length - 2;
+
+    const res = await runFrom(multerIndex, 'a.b');
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'upload_failed' });
+  });
+
+  it('dossier uploads/ déjà présent : réutilisé (getUploadDir idempotent)', async () => {
+    const pid = store.createProject('P1').meta.id;
+    mkdirSync(join(tempDir, 'projects', pid, 'uploads'));
+
+    const res = await runFrom(0, pid);
+
+    expect(res.json.mock.calls[0][0]).toHaveLength(1);
   });
 });
 
@@ -1589,7 +1763,9 @@ describe('Background triggers after source addition', () => {
     const req = mockReq({
       params: { pid: project.meta.id },
       body: { lang: 'fr' },
-      files: [{ path: '/tmp/file.jpg', originalname: 'photo.jpg', filename: 'uuid-photo.jpg' }],
+      files: [
+        { path: join(tempDir, 'file.jpg'), originalname: 'photo.jpg', filename: 'uuid-photo.jpg' },
+      ],
     });
     const res = mockRes();
 

@@ -41,6 +41,11 @@ export type PromoteResult =
 export const DEFAULT_PRUNE_MAX_KEEP = 50;
 export const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Nom de fichier simple : ni vide, ni `.`/`..`, sans séparateur (basename identique).
+const isSimpleFileName = (name: string): boolean => {
+  return name !== '' && name !== '.' && name !== '..' && basename(name) === name;
+};
+
 export class ProjectStore {
   private readonly indexPath: string;
   private readonly projectsDir: string;
@@ -97,16 +102,22 @@ export class ProjectStore {
     return join(this.projectDir(id), 'project.json');
   }
 
+  // Crée seulement `uploads/`, SANS récursivité : si le projet n'existe plus, mkdirSync lève
+  // ENOENT au lieu de recréer un dossier projet fantôme (multer écrit via cette méthode).
   getUploadDir(id: string): string {
     const dir = join(this.projectDir(id), 'uploads');
-    mkdirSync(dir, { recursive: true });
+    try {
+      mkdirSync(dir);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    }
     return dir;
   }
 
+  // Ne crée rien : le dossier existe depuis createProject. Une génération qui écrit après la
+  // suppression du projet échoue (ENOENT) au lieu de recréer un dossier fantôme.
   getProjectDir(id: string): string {
-    const dir = this.projectDir(id);
-    mkdirSync(dir, { recursive: true });
-    return dir;
+    return this.projectDir(id);
   }
 
   listProjects(profileId?: string): ProjectMeta[] {
@@ -222,9 +233,31 @@ export class ProjectStore {
   deleteSource(projectId: string, sourceId: string): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
+    const removed = data.sources.find((s) => s.id === sourceId);
     data.sources = data.sources.filter((s) => s.id !== sourceId);
     this.saveProject(projectId, data);
+    // Fichier importé (photo, PDF, texte) : orphelin sinon. Gardé s'il sert encore à une source.
+    const filePath = removed?.filePath;
+    if (filePath && !data.sources.some((s) => s.filePath === filePath)) {
+      this.removeUploadFile(projectId, filePath);
+    }
     return data;
+  }
+
+  // Garde de chemin : `filePath` (lu dans project.json) ne désigne un fichier supprimable que sous
+  // la forme `projects/<pid>/uploads/<nom simple>` du projet visé — jamais de traversée.
+  private removeUploadFile(projectId: string, filePath: string): void {
+    const prefix = `projects/${projectId}/uploads/`;
+    const name = filePath.startsWith(prefix) ? filePath.slice(prefix.length) : '';
+    if (!isSimpleFileName(name)) {
+      logger.warn('store', 'deleteSource: upload path refused', projectId);
+      return;
+    }
+    try {
+      rmSync(join(this.projectDir(projectId), 'uploads', name), { force: true });
+    } catch (e) {
+      logger.warn('store', 'deleteSource: upload file removal failed', projectId, e);
+    }
   }
 
   addGeneration(projectId: string, generation: Generation): void {

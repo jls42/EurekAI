@@ -46,6 +46,8 @@ import { ttsQuestion, createQuizVocalGeneration } from '../generators/quiz-vocal
 import { generateImage } from '../generators/image.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
+import { runWithMediaLedger } from '../helpers/media-ledger.js';
+import { deleteMediaFiles } from '../helpers/generation-media.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
@@ -565,6 +567,40 @@ const respondNotPromoted = (
 // (signature seule mesurée, corps perdu ou détaché en anonyme) — runGeneratorAndPersist et
 // handleGeneration échappaient ainsi au plafond CCN.
 type GeneratorFn = (ctx: GenContext) => Promise<Generation | null>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+type AsyncThunk<T> = () => Promise<T>;
+type UsageAndMediaRun<T> = { result: T; mediaUrls: string[]; usage: ApiUsage[] };
+
+// Coûts ET médias écrits d'une génération ou d'une étape auto, chacune dans son propre contexte
+// (étapes auto parallèles comprises). Si `fn` lève, runWithMediaLedger a déjà supprimé les médias
+// écrits (quiz vocal en échec à la question N) ; le coût partiel reste attaché à l'erreur.
+const runWithUsageAndMedia = async <T>(
+  projectDir: string,
+  pid: string,
+  fn: AsyncThunk<T>,
+): Promise<UsageAndMediaRun<T>> => {
+  const { result: run, usage } = await runWithUsageTracking(() =>
+    runWithMediaLedger(projectDir, pid, fn),
+  );
+  return { result: run.result, mediaUrls: run.mediaUrls, usage };
+};
+
+// Defense en profondeur : aucune closure ne devrait return null après le commit d'extraction des
+// validations early. Logger UNCONDITIONAL pour Sentry (la surface de bug doit être visible même si
+// trackedType absent).
+const respondNullGeneration = (
+  store: ProjectStore,
+  pid: string,
+  gid: string,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): void => {
+  logger.error(
+    'generate',
+    `generator returned null: type=${options?.trackedType ?? 'unknown'} pid=${pid} gid=${gid}`,
+  );
+  if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
+  res.status(500).json({ error: 'internal_error' });
+};
 
 const runGeneratorAndPersist = async (
   store: ProjectStore,
@@ -575,37 +611,29 @@ const runGeneratorAndPersist = async (
   options: HandleGenerationOptions | undefined,
   res: Response,
 ): Promise<void> => {
-  const { result: gen, usage } = await runWithUsageTracking(() => generatorFn(ctx));
+  const projectDir = store.getProjectDir(pid);
+  const run = await runWithUsageAndMedia(projectDir, pid, () => generatorFn(ctx));
+  const gen = run.result;
   if (!gen) {
-    // Defense en profondeur : aucune closure ne devrait return null après le commit
-    // d'extraction des validations early. Logger UNCONDITIONAL pour Sentry (la
-    // surface de bug doit être visible même si trackedType absent).
-    logger.error(
-      'generate',
-      `generator returned null: type=${options?.trackedType ?? 'unknown'} pid=${pid} gid=${gid}`,
-    );
-    if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
-    res.status(500).json({ error: 'internal_error' });
+    deleteMediaFiles(projectDir, pid, run.mediaUrls);
+    respondNullGeneration(store, pid, gid, options, res);
     return;
   }
-  const persisted = persistUsage(
-    store,
-    pid,
-    `POST /api/projects/${pid}/generate/${gen.type}`,
-    usage,
-  );
-  const finalGen = buildFinalGeneration(gid, gen, persisted);
-  if (options?.trackedType) {
-    const promoteResult = store.promoteToGeneration(pid, gid, finalGen);
-    if (promoteResult.kind === 'promoted') {
-      res.json(promoteResult.generation);
-      return;
-    }
-    respondNotPromoted(res, pid, gid, promoteResult);
+  const route = `POST /api/projects/${pid}/generate/${gen.type}`;
+  const finalGen = buildFinalGeneration(gid, gen, persistUsage(store, pid, route, run.usage));
+  if (!options?.trackedType) {
+    store.addGeneration(pid, finalGen);
+    res.json(finalGen);
     return;
   }
-  store.addGeneration(pid, finalGen);
-  res.json(finalGen);
+  const promoteResult = store.promoteToGeneration(pid, gid, finalGen);
+  if (promoteResult.kind === 'promoted') {
+    res.json(promoteResult.generation);
+    return;
+  }
+  // Annulation ou échec gagnant la course : aucune génération ne référencera ces médias.
+  deleteMediaFiles(projectDir, pid, run.mediaUrls);
+  respondNotPromoted(res, pid, gid, promoteResult);
 };
 
 const handleGenerationFailure = (
@@ -1125,18 +1153,22 @@ const runStepBody = async (
   pid: string,
   gid: string,
 ): Promise<StepOutcome> => {
-  const { result: gen, usage } = await runWithUsageTracking(() => executor(autoCtx));
+  const projectDir = st.getProjectDir(pid);
+  const run = await runWithUsageAndMedia(projectDir, pid, () => executor(autoCtx));
   const persisted = persistUsage(
     st,
     pid,
     `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-    usage,
+    run.usage,
   );
-  const promoteResult = st.promoteToGeneration(pid, gid, buildFinalGeneration(gid, gen, persisted));
+  const finalGen = buildFinalGeneration(gid, run.result, persisted);
+  const promoteResult = st.promoteToGeneration(pid, gid, finalGen);
   if (promoteResult.kind === 'promoted') {
     logger.info('auto', `${step.agent} OK`);
     return { ok: true, gen: promoteResult.generation };
   }
+  // Étape annulée, échouée ou disparue du tracker : ses médias ne seront jamais référencés.
+  deleteMediaFiles(projectDir, pid, run.mediaUrls);
   const code = pickAutoStepFailureCode(promoteResult);
   if (promoteResult.kind === 'missing')
     logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);

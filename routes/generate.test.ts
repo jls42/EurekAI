@@ -11,7 +11,7 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ProjectStore } from '../store.js';
@@ -3442,6 +3442,168 @@ describe('generateRoutes', () => {
       await handler(req, res);
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json.mock.calls[0][0].error).toMatch(/^context_too_large:\d+$/);
+    });
+  });
+  // --- Médias d'une génération qui n'aboutit pas ---
+  // saveAudioFile N'EST PAS mocké : les MP3 sont réellement écrits dans le dossier du projet.
+  describe('médias des générations échouées ou non promues', () => {
+    const projectDirOf = (pid: string) => join(tmpDir, 'projects', pid);
+    const mediaFiles = (pid: string) =>
+      readdirSync(projectDirOf(pid)).filter((f) => f.endsWith('.mp3') || f.endsWith('.png'));
+    const question = { question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0, explanation: 'E' };
+
+    const createProjectWithSource = (name: string): string => {
+      const pid = store.createProject(name).meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'lecon.txt',
+        markdown: 'Contenu',
+        uploadedAt: new Date().toISOString(),
+      });
+      return pid;
+    };
+
+    // Audio TTS rendu à la demande : le test agit (annulation, suppression du projet) pendant
+    // que la génération attend Mistral.
+    const deferredAudio = () => {
+      let resolve: (value: Buffer) => void = () => {};
+      const promise = new Promise<Buffer>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+
+    const pendingGidOf = async (pid: string, type: string): Promise<string> => {
+      let gid = '';
+      await vi.waitFor(() => {
+        const entry = store
+          .getProject(pid)!
+          .results.pendingTracker?.find((e) => e.type === type && e.status === 'pending');
+        expect(entry).toBeDefined();
+        gid = entry!.id;
+      });
+      return gid;
+    };
+
+    const post = (path: string, pid: string, body: Record<string, unknown> = {}) => {
+      const res = mockRes();
+      const done = getHandler(router, 'post', path)(mockReq({ params: { pid }, body }), res);
+      return { res, done };
+    };
+
+    it('quiz vocal en échec à la question 2 : MP3 des questions 0 et 1 supprimés, 500', async () => {
+      const { generateQuizVocal } = await import('../generators/quiz.js');
+      const { ttsQuestion } = await import('../generators/quiz-vocal.js');
+      const pid = createProjectWithSource('QV partiel');
+      (generateQuizVocal as any).mockResolvedValueOnce([question, question, question]);
+      let writtenBeforeFailure: string[] = [];
+      (ttsQuestion as any)
+        .mockResolvedValueOnce(Buffer.from('q0'))
+        .mockResolvedValueOnce(Buffer.from('q1'))
+        .mockImplementationOnce(() => {
+          writtenBeforeFailure = mediaFiles(pid);
+          return Promise.reject(new Error('TTS API unreachable'));
+        });
+
+      const { res, done } = post('/:pid/generate/quiz-vocal', pid);
+      await done;
+
+      expect(writtenBeforeFailure).toHaveLength(2);
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(mediaFiles(pid)).toEqual([]);
+      expect(store.getProject(pid)!.results.pendingTracker![0].status).toBe('failed');
+    });
+
+    it('annulation pendant la génération : 409 cancelled et MP3 du podcast supprimé', async () => {
+      const { generateAudio } = await import('../generators/tts.js');
+      const audio = deferredAudio();
+      (generateAudio as any).mockReturnValueOnce(audio.promise);
+      const pid = createProjectWithSource('Podcast annulé');
+      const GID = '44444444-4444-4444-8444-444444444444';
+
+      const { res, done } = post('/:pid/generate/podcast', pid, { gid: GID });
+      await pendingGidOf(pid, 'podcast');
+      expect(store.markPendingCancelled(pid, GID)).toBe(true);
+      audio.resolve(Buffer.from('podcast-audio'));
+      await done;
+
+      expect(res.status).toHaveBeenCalledWith(409);
+      expect(res.json).toHaveBeenCalledWith({ error: 'cancelled', gid: GID });
+      expect(mediaFiles(pid)).toEqual([]);
+      expect(store.getProject(pid)!.results.generations).toHaveLength(0);
+    });
+
+    it('étape auto annulée : son MP3 est supprimé, failedSteps cancelled', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateAudio } = await import('../generators/tts.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [{ agent: 'podcast', reason: 'r' }],
+        context: 'ctx',
+      });
+      const audio = deferredAudio();
+      (generateAudio as any).mockReturnValueOnce(audio.promise);
+      const pid = createProjectWithSource('Auto annulé');
+
+      const { res, done } = post('/:pid/generate/auto', pid);
+      const gid = await pendingGidOf(pid, 'podcast');
+      expect(store.markPendingCancelled(pid, gid)).toBe(true);
+      audio.resolve(Buffer.from('podcast-audio'));
+      await done;
+
+      expect(res.json.mock.calls[0][0].failedSteps).toEqual([
+        { agent: 'podcast', code: 'cancelled' },
+      ]);
+      expect(mediaFiles(pid)).toEqual([]);
+    });
+
+    it('étape auto quiz vocal en échec à la question 1 : MP3 de la question 0 supprimé', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const { generateQuizVocal } = await import('../generators/quiz.js');
+      const { ttsQuestion } = await import('../generators/quiz-vocal.js');
+      (routeRequest as any).mockResolvedValueOnce({
+        plan: [
+          { agent: 'summary', reason: 'r' },
+          { agent: 'quiz-vocal', reason: 'r' },
+        ],
+        context: 'ctx',
+      });
+      (generateQuizVocal as any).mockResolvedValueOnce([question, question]);
+      (ttsQuestion as any)
+        .mockResolvedValueOnce(Buffer.from('q0'))
+        .mockRejectedValueOnce(new Error('TTS API unreachable'));
+      const pid = createProjectWithSource('Auto partiel');
+
+      const { res, done } = post('/:pid/generate/auto', pid);
+      await done;
+
+      const body = res.json.mock.calls[0][0];
+      expect(body.generations.map((g: any) => g.type)).toEqual(['summary']);
+      expect(body.failedSteps).toEqual([{ agent: 'quiz-vocal', code: 'tts_upstream_error' }]);
+      expect(mediaFiles(pid)).toEqual([]);
+    });
+
+    it('projet supprimé pendant la génération : aucun dossier recréé', async () => {
+      const { generateAudio } = await import('../generators/tts.js');
+      const audio = deferredAudio();
+      (generateAudio as any).mockReturnValueOnce(audio.promise);
+      const pid = createProjectWithSource('Projet supprimé');
+
+      const { res, done } = post('/:pid/generate/podcast', pid);
+      await pendingGidOf(pid, 'podcast');
+      expect(store.deleteProject(pid)).toBe(true);
+      audio.resolve(Buffer.from('podcast-audio'));
+      await done;
+
+      expect(res.status).toHaveBeenCalledWith(500);
+      expect(existsSync(projectDirOf(pid))).toBe(false);
+    });
+
+    it('génération réussie : ses médias restent sur le disque', async () => {
+      const pid = createProjectWithSource('Podcast OK');
+
+      const { res, done } = post('/:pid/generate/podcast', pid);
+      await done;
+
+      const gen = res.json.mock.calls[0][0];
+      expect(mediaFiles(pid)).toEqual([gen.data.audioUrl.split('/').pop()]);
     });
   });
 });

@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
 import { mediaUrl, uniqueMediaName } from '../helpers/generation-media.js';
 import { logger } from '../helpers/logger.js';
+import { recordMediaUrl } from '../helpers/media-ledger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
@@ -41,6 +42,16 @@ export function extractImageRef(outputs: unknown[]): ImageResult | null {
   return null;
 }
 
+// L'image générée reste stockée chez Mistral (fileId) tant qu'on ne la supprime pas : suppression
+// gratuite, tentée même si le téléchargement échoue ; un échec est seulement journalisé.
+const deleteRemoteImage = async (client: Mistral, fileId: string): Promise<void> => {
+  try {
+    await client.files.delete({ fileId });
+  } catch (e) {
+    logger.warn('image', `suppression du fichier Mistral ${fileId} impossible`, e);
+  }
+};
+
 // Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec extractImageRef et ne
 // la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
 const downloadAndSaveImage = async (
@@ -49,14 +60,21 @@ const downloadAndSaveImage = async (
   projectDir: string,
   pid: string,
 ): Promise<string> => {
-  console.log(`    Image fileId: ${fileId}, downloading...`);
-  const fileStream = await client.files.download({ fileId });
-  const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
-  // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
-  const imageFilename = uniqueMediaName('illustration', 'png');
-  writeFileSync(join(projectDir, imageFilename), imageBuffer);
-  console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-  return mediaUrl(pid, imageFilename);
+  try {
+    console.log(`    Image fileId: ${fileId}, downloading...`);
+    const fileStream = await client.files.download({ fileId });
+    const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
+    // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
+    const imageFilename = uniqueMediaName('illustration', 'png');
+    writeFileSync(join(projectDir, imageFilename), imageBuffer);
+    console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
+    const url = mediaUrl(pid, imageFilename);
+    // Registre de la génération (media-ledger) : image supprimée si la génération n'aboutit pas.
+    recordMediaUrl(url);
+    return url;
+  } finally {
+    await deleteRemoteImage(client, fileId);
+  }
 };
 
 // Arrow function (pas `function` declaration) pour contourner un crash du

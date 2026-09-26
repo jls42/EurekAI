@@ -11,7 +11,7 @@
    --
    Codacy lance ESLint sans notre project TS complet sur les handlers Express/Mistral;
    lint:ci local reste la couverture type-aware. */
-import { Router, type Request, type Response } from 'express';
+import { Router, type Request, type RequestHandler, type Response } from 'express';
 import multer from 'multer';
 import { randomUUID, createHash } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
@@ -91,6 +91,35 @@ const tryUnlinkOrphan = (path: string): void => {
     logger.warn('sources', `unlink orphan upload failed: ${path}`, e);
   }
 };
+
+// Fichiers déjà écrits par diskStorage pour une requête refusée : orphelins sinon.
+const unlinkReceivedFiles = (req: Request): void => {
+  for (const file of (req.files as Express.Multer.File[] | undefined) ?? []) {
+    tryUnlinkOrphan(file.path);
+  }
+};
+
+// Existence du projet, sans lever : un pid invalide (traversée) fait lever safeProjectSegment.
+const projectExists = (store: ProjectStore, pid: string): boolean => {
+  try {
+    return store.getProject(pid) !== null;
+  } catch {
+    return false;
+  }
+};
+
+// Garde PRÉ-multer, après requireKeyMiddleware (auth-first) : diskStorage écrit sous
+// projects/<pid>/uploads/ dès la réception, AVANT le handler. Un pid inconnu répondait 404 après
+// l'écriture (dossier projet fantôme + jusqu'à 10 fichiers) ; il répond 404 sans rien écrire.
+const requireExistingProject =
+  (store: ProjectStore): RequestHandler =>
+  (req, res, next) => {
+    if (!projectExists(store, String(req.params.pid))) {
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+      return;
+    }
+    next();
+  };
 
 type RawWebSearchBody = {
   query?: unknown;
@@ -290,9 +319,17 @@ const resolveOr4xx = (req: Request, res: Response): ResolvedClient | null => {
 const createDynamicUpload = (store: ProjectStore) =>
   multer({
     storage: multer.diskStorage({
+      // getUploadDir lève si le projet a disparu depuis la garde pré-multer (ENOENT, jamais de
+      // dossier recréé) : l'erreur passe par le callback (withUploadErrors → 500 JSON).
       destination: (req, _file, cb) => {
-        const pid = String(req.params.pid);
-        cb(null, store.getUploadDir(pid));
+        let dir: string;
+        try {
+          dir = store.getUploadDir(String(req.params.pid));
+        } catch (e) {
+          cb(e as Error, '');
+          return;
+        }
+        cb(null, dir);
       },
       filename: (_req, file, cb) => {
         cb(null, `${randomUUID()}-${file.originalname}`);
@@ -388,6 +425,8 @@ const attemptFileUpload = async (
     store.addSource(pid, source);
     return { source };
   } catch (e) {
+    // Aucune source ne référencera ce fichier : orphelin dans uploads/ sinon.
+    tryUnlinkOrphan(file.path);
     const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
     if (failedUsage?.length) {
       persistUsage(store, pid, `POST /api/projects/${pid}/sources/upload/failed`, failedUsage);
@@ -762,13 +801,16 @@ const registerUploadRoute = (
   router.post(
     '/:pid/sources/upload',
     requireKeyMiddleware,
+    requireExistingProject(store),
     withUploadErrors(dynamicUpload.array('files')),
     async (req, res) => {
       const resolved = resolveOr4xx(req, res);
       if (!resolved) return;
       const { client, fingerprint } = resolved;
       const pid = String(req.params.pid);
+      // Projet supprimé entre la garde pré-multer et ici : fichiers reçus supprimés.
       if (!store.getProject(pid)) {
+        unlinkReceivedFiles(req);
         res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
       }
