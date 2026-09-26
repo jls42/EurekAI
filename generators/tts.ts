@@ -1,12 +1,13 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { writeFile, readFile, unlink, mkdtemp } from 'node:fs/promises';
+import { writeFile, readFile, mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
+import { logger } from '../helpers/logger.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -14,6 +15,17 @@ export interface TtsVoiceConfig {
   host: VoiceId;
   guest: VoiceId;
 }
+
+// Supprime le dossier temporaire ET son contenu, dans le `finally` des deux pipelines ffmpeg.
+// `unlink` sur un dossier échoue toujours (EISDIR, erreur avalée) : les dossiers
+// eurekai-mp3-* / eurekai-silence-* s'accumulaient dans le tmpdir. `force` : rien à signaler si
+// le dossier a déjà disparu ; tout autre échec est journalisé sans masquer le résultat ni
+// l'erreur ffmpeg.
+const removeTmpDir = async (dir: string): Promise<void> => {
+  await rm(dir, { recursive: true, force: true }).catch((e: unknown) => {
+    logger.warn('tts', `temp dir cleanup failed: ${dir}`, e);
+  });
+};
 
 // Arrow functions avoid a Codacy eslint-plugin-security-node crash in
 // `security-node/detect-unhandled-async-errors` on async FunctionDeclaration nodes
@@ -38,8 +50,7 @@ export const generateSilence = async (durationMs: number): Promise<Buffer> => {
     ]);
     return await readFile(outputPath);
   } finally {
-    await unlink(outputPath).catch(() => {});
-    await unlink(tmpDir).catch(() => {});
+    await removeTmpDir(tmpDir);
   }
 };
 
@@ -47,21 +58,19 @@ export const concatMp3 = async (segments: Buffer[]): Promise<Buffer> => {
   if (segments.length === 1) return segments[0];
 
   const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-mp3-'));
-  const tempFiles: string[] = [];
 
   try {
+    const segmentPaths: string[] = [];
     for (let i = 0; i < segments.length; i++) {
       const p = join(tmpDir, `seg_${i}.mp3`);
       await writeFile(p, segments[i]);
-      tempFiles.push(p);
+      segmentPaths.push(p);
     }
 
     const listPath = join(tmpDir, 'list.txt');
-    await writeFile(listPath, tempFiles.map((f) => `file '${f}'`).join('\n'));
-    tempFiles.push(listPath);
+    await writeFile(listPath, segmentPaths.map((f) => `file '${f}'`).join('\n'));
 
     const outputPath = join(tmpDir, 'output.mp3');
-    tempFiles.push(outputPath);
 
     await execFileAsync(ffmpegPath as string, [
       '-y',
@@ -80,8 +89,7 @@ export const concatMp3 = async (segments: Buffer[]): Promise<Buffer> => {
 
     return await readFile(outputPath);
   } finally {
-    await Promise.all(tempFiles.map((f) => unlink(f).catch(() => {})));
-    await unlink(tmpDir).catch(() => {});
+    await removeTmpDir(tmpDir);
   }
 };
 
