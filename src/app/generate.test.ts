@@ -25,6 +25,15 @@ if (typeof globalThis.document === 'undefined') {
 
 const gen = createGenerate();
 
+// Génération telle que la manipulent generateVoice et les helpers audio : GenerationUI (non
+// exportée) = Generation + champs d'UI (_audioUrl_*, _generatingVoice_*, _playlistMode…). Les tests
+// ne fournissent que les champs lus : conversion unique ici, sans copie (les assertions relisent
+// les champs que la fonction pose sur CET objet).
+type GenerationUI = Parameters<typeof gen.generateVoice>[0];
+const asGenerationUI = <T extends object>(fields: T): T & GenerationUI => {
+  return fields as unknown as T & GenerationUI;
+};
+
 const defaultLoading = {
   summary: false,
   flashcards: false,
@@ -1280,12 +1289,12 @@ describe('generateVoice', () => {
   it('fetches read-aloud batch and sets section audioUrls on success', async () => {
     mockFetchOk({ audioUrls: { intro: '/audio/intro.mp3', key_points: '/audio/kp.mp3' } });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -1300,12 +1309,12 @@ describe('generateVoice', () => {
   it('fetches single section and sets audioUrl', async () => {
     mockFetchOk({ audioUrl: '/audio/intro.mp3' });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_intro: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj, 'intro');
     expect(genObj._audioUrl_intro).toBe('/audio/intro.mp3');
@@ -1315,7 +1324,12 @@ describe('generateVoice', () => {
 
   it('returns early if already generating', async () => {
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: true };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'summary',
+      data: {} as any,
+      _generatingVoice_all: true,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -1323,7 +1337,12 @@ describe('generateVoice', () => {
   it('handles fetch error', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
     expect(genObj._generatingVoice_all).toBe(false);
@@ -1338,7 +1357,12 @@ describe('generateVoice', () => {
         params?.error ? `${key}:${params.error}` : key,
       ),
     });
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
 
     await gen.generateVoice.call(ctx, genObj);
 
@@ -1353,7 +1377,12 @@ describe('generateVoice', () => {
   it('handles network exception', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.audioError', 'error', expect.any(Function));
     expect(genObj._generatingVoice_all).toBe(false);
@@ -1362,7 +1391,12 @@ describe('generateVoice', () => {
   it('sets _audioUrl_all for non-summary types (single response)', async () => {
     mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false } as any;
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
 
     await gen.generateVoice.call(ctx, genObj);
     expect(genObj._audioUrl_all).toBe('/audio/gen1.mp3');
@@ -1378,12 +1412,12 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj);
 
@@ -1404,12 +1438,12 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     // Should not throw
     await gen.generateVoice.call(ctx, genObj);
@@ -1424,7 +1458,12 @@ describe('generateVoice', () => {
   it('error response shows toast with retry callback', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'summary',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     // Verify the retry callback is passed as the third argument
@@ -1439,13 +1478,13 @@ describe('generateVoice', () => {
     // First call fails
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
       _audioUrl_intro: null as string | null,
-    };
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -1464,12 +1503,12 @@ describe('generateVoice', () => {
     // First call throws network error
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -1487,55 +1526,62 @@ describe('generateVoice', () => {
 
 describe('isBatchComplete', () => {
   it('returns false when no audio at all', () => {
-    const genObj = { data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    const genObj = asGenerationUI({ data: { fun_fact: 'fact', vocabulary: ['word'] } });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns false when only intro exists', () => {
-    const genObj = { _audioUrl_intro: '/a.mp3', data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    const genObj = asGenerationUI({
+      _audioUrl_intro: '/a.mp3',
+      data: { fun_fact: 'fact', vocabulary: ['word'] },
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns true when all required sections have audio (no optional)', () => {
-    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: {} };
+    const genObj = asGenerationUI({
+      _audioUrl_intro: '/a.mp3',
+      _audioUrl_key_points: '/b.mp3',
+      data: {},
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 
   it('returns false when fun_fact content exists but no audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { fun_fact: 'Wow!' },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns false when vocabulary content exists but no audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { vocabulary: ['w'] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns true when all sections including optionals have audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       _audioUrl_fun_fact: '/c.mp3',
       _audioUrl_vocabulary: '/d.mp3',
       data: { fun_fact: 'Wow!', vocabulary: ['w'] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 
   it('ignores empty vocabulary array', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { vocabulary: [] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 });
@@ -1546,12 +1592,12 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'intro',
       _audioUrl_key_points: '/kp.mp3',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('key_points');
   });
@@ -1561,13 +1607,13 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'intro',
       _audioUrl_vocabulary: '/vocab.mp3',
       // no key_points or fun_fact audio
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('vocabulary');
   });
@@ -1577,11 +1623,11 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'vocabulary',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._playlistMode).toBe(false);
   });
@@ -1591,12 +1637,12 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: false,
       _activeAudioSection: 'intro',
       _audioUrl_key_points: '/kp.mp3',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('intro');
   });
