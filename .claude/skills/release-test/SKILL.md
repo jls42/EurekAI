@@ -16,7 +16,7 @@ Le skill ne touche jamais aux donnees reelles de l'user et ne reset rien. Mode p
 
 1. **Sauvegarde** : `tar` de `output/` dans le scratchpad (`chmod 600`) + `sha256sum` de tous les fichiers (hors `.deps-checked.json`).
 2. **Donnees de test via l'API** : `POST /api/profiles` (profil enfant FR, age 9, PIN de test), `POST /api/projects` rattache a ce profil, 1 lecon texte via `POST /api/projects/:pid/sources/text`. Dans Chrome, pointer `sf-profileId` et `sf-profile-last-project` sur ce profil/projet puis recharger.
-3. **Nettoyage en fin de run** : `DELETE /api/profiles/:id` avec le PIN (cascade sur ses projets et fichiers), retirer les cles du profil de test du `localStorage` (`sf-profile-*`), remettre `sf-profileId` et `sf-locale` sur le profil d'origine, fermer l'onglet, puis verifier que les `sha256sum` de `output/` sont identiques a la sauvegarde.
+3. **Nettoyage en fin de run** : `DELETE /api/profiles/:id` avec le PIN (cascade sur ses projets et fichiers), retirer les cles du profil de test du `localStorage` (`sf-profile-*`), remettre `sf-profileId` et `sf-lang` sur le profil d'origine, fermer l'onglet, puis verifier que les `sha256sum` de `output/` sont identiques a la sauvegarde.
 
 Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent que si l'user le demande explicitement.
 
@@ -25,7 +25,7 @@ Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent qu
 - **`pinLimiter` = 10 PIN FAUX / 15 min par IP** sur `PUT` et `DELETE /api/profiles/:id` (seuls les refus 403 comptent : un bon PIN et une requete sans `pin` ne comptent pas). Au-dela, TOUT PIN de cette IP recoit 429 `rate_limited` jusqu'a la fin de la fenetre, bon PIN compris : le `DELETE` de nettoyage aussi. Ne jamais taper de PIN faux en dehors d'un test voulu. `authLimiter` (30 / 15 min) ne couvre plus que la creation (`POST /api/profiles`) ; la lecture et les enregistrements sans PIN n'ont que `generalLimiter`. Apres un 429 : lire `Retry-After` (`curl -i`) et attendre, ou redemarrer le serveur de dev, qui remet tous les compteurs a zero (stockage memoire) : c'est le moyen de nettoyer tout de suite apres une rafale de PIN.
 - **Le script securite (phase 3) sature `aiLimiter` puis `generalLimiter`** (rafales de 75 puis 350 requetes, la generale en dernier) : lancer la phase 3 APRES les phases UI, et attendre environ 60 s avant de nouveaux appels. Sa rafale de PIN faux est desactivee par defaut (`PIN_BURST=1`, sur un profil qui a un PIN : `PIN_PROFILE_ID`) : elle bloque les PIN de l'IP 15 min, nettoyage compris (redemarrer le serveur de dev ensuite).
 - **Onglet Chrome en arriere-plan** : les transitions Alpine n'avancent qu'a chaque capture, et une vue parait « estompee ». Enchainer 2 captures (la premiere en `scale` 0.2) avant de juger un rendu.
-- **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-locale` dans le `localStorage`, puis recharger.
+- **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-lang` (cle de langue lue par l'app, `src/i18n/index.ts`) dans le `localStorage`, puis recharger.
 - **Champs PIN** : une extension de gestion de mots de passe peut bloquer `javascript_tool` quand le focus est sur le champ (erreur `chrome-extension://`) : utiliser clic + frappe, pas de JS sur ce champ.
 - **Sondes audio** : ne pas attendre les metadonnees `<audio>` en JS (delai de 45 s depasse). Mesurer les MP3 avec `ffprobe` sur `output/projects/<pid>/`.
 
@@ -72,7 +72,7 @@ Array.from(document.querySelectorAll('button[aria-label^="Générer"]'))
   }))
 ```
 
-Les boutons de generation portent l'`aria-label` `"Générer des X"` **avec accent aigu** (i18n FR — verifie dans `src/i18n/fr.ts` cle `actions.generate`). Les locales autres mettent autre chose (`"Generate X"` en EN). Pour rester robuste cross-langue, soit (a) forcer la langue FR via `localStorage.setItem('sf-locale', 'fr')` + reload avant le scan, soit (b) selectionner par autre voie (par exemple `button[aria-label*="ner"]` + verification du texte du bouton). Les boutons de navigation portent `"Voir les X"`.
+Les boutons de generation portent l'`aria-label` `"Générer : X"` **avec accent aigu** (i18n FR, cle `a11y.generateCategory` dans `src/i18n/fr.ts`), X etant le libelle visible du bouton (`gen.*` sur la vue Sources, `nav.*` sur le Tableau de bord : le nom accessible contient toujours le libelle visible, WCAG 2.5.3). Les autres locales ont la meme forme, sans article (`"Generate: X"` en EN). Pour rester robuste cross-langue, soit (a) forcer la langue FR via `localStorage.setItem('sf-lang', 'fr')` + reload avant le scan, soit (b) selectionner par autre voie (par exemple `button[aria-label*="ner"]` + verification du texte du bouton). Les boutons de navigation portent `"Voir : X"` (cle `a11y.viewCategory` ; pastilles de stats du Tableau de bord : `"Voir : N X"`, compteur visible compris).
 
 **Note importante** : ces chips ne sont visibles que sur la vue **Sources** (rangee de boutons par-source) — pas sur le **Tableau de bord** (qui n'a que le CTA `Auto — Magie !`). Pour lancer une generation typee depuis le tableau de bord, soit naviguer vers la vue catégorie (`+ Nouvelle fiche` etc.), soit aller sur la vue Sources d'abord.
 
@@ -82,7 +82,7 @@ Pour chaque bouton visible avec aria-label commencant par `"Générer"` :
 1. Cliquer dessus (`computer.left_click` aux coords retournees par `find` ou la query JS).
 2. Surveiller le reseau : un `POST /api/projects/<pid>/generate/<type>` doit partir en `pending`.
 3. Attendre la complétion (poll `read_network_requests` jusqu'a status 200 ou >30s timeout).
-4. Naviguer vers la vue dediee (`Voir les X`) et capturer un screenshot pour valider le rendu.
+4. Naviguer vers la vue dediee (`Voir : X`) et capturer un screenshot pour valider le rendu.
 5. Pour les generateurs audio (podcast, quiz-vocal) : verifier la presence d'un element `<audio>` avec `duration > 0`.
 6. Pour `image` : verifier qu'une `<img>` charge un blob (pas d'erreur 404).
 7. Pour les exercices (quiz, fill-blank, flashcards) : cliquer une reponse / retourner une carte et verifier que le feedback s'affiche (Score change, message "Correct"/"Incorrect" visible).
@@ -97,7 +97,7 @@ Cliquer le bouton **"Auto"** (gradient bleu/violet, texte contient "magique" ou 
 ### Test cancel
 
 1. Cliquer un generateur lent (podcast ou quiz-vocal).
-2. Pendant le pending (badge visible en haut), cliquer le ✕ du badge.
+2. Pendant le pending (badge visible en haut), cliquer le ✕ du badge (`button[aria-label^="Annuler :"]` en FR, cle `a11y.cancelGeneration` : `"Annuler : X"`, X = type de la generation).
 3. Verifier :
    - `POST /generations/<gid>/cancel` retourne 200
    - Un toast de confirmation apparait (texte i18n "annule(e)" / "cancelled")
@@ -423,7 +423,7 @@ Pour que ce skill reste valable dans le temps :
 
 Quand l'app change et que le skill commence a echouer :
 
-- **Nouveau generateur ajoute** : le skill le decouvrira automatiquement via `categories[]`. Verifier juste qu'il a un bouton avec `aria-label="Générer ..."` (FR avec accent — voir cle i18n `actions.generate`).
+- **Nouveau generateur ajoute** : le skill le decouvrira automatiquement via `categories[]`. Verifier juste qu'il a un bouton avec `aria-label="Générer : ..."` (FR avec accent — voir cle i18n `a11y.generateCategory`).
 - **Refactor des endpoints** : si `/generate/auto/route` devient `/generate/orchestrate` par exemple, mettre a jour la phase 3.
 - **Nouveau code d'erreur** : ajouter dans `security-tests.sh` la regex d'assertion correspondante.
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.

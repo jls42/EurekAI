@@ -624,14 +624,20 @@
                         x-text="editingProfile?.useModeration ? t('profile.moderationOn') : t('profile.moderationOff')"
                       ></p>
                     </div>
+                    <!-- Interrupteur : role switch + aria-checked (état lu par les lecteurs d'écran),
+                         curseur miroir en RTL (translate physique : rtl:-translate-x-*). -->
                     <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="String(!!editingProfile?.useModeration)"
+                      :aria-label="t('profile.moderationToggle')"
                       @click="requireParentalAccess(() => { editingProfile.useModeration = !editingProfile.useModeration; autoSaveParental() })"
                       class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
-                      :class="editingProfile?.useModeration ? 'bg-success' : 'bg-gray-300'"
+                      :class="editingProfile?.useModeration ? 'bg-success' : 'bg-text-secondary'"
                     >
                       <span
                         class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                        :class="editingProfile?.useModeration ? 'translate-x-6' : 'translate-x-1'"
+                        :class="editingProfile?.useModeration ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'"
                       ></span>
                     </button>
                   </div>
@@ -649,13 +655,17 @@
                       ></p>
                     </div>
                     <button
+                      type="button"
+                      role="switch"
+                      :aria-checked="String(!!editingProfile?.chatEnabled)"
+                      :aria-label="t('profile.chatToggle')"
                       @click="requireParentalAccess(() => { editingProfile.chatEnabled = !editingProfile.chatEnabled; autoSaveParental() })"
                       class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-ring shrink-0"
-                      :class="editingProfile?.chatEnabled ? 'bg-primary' : 'bg-gray-300'"
+                      :class="editingProfile?.chatEnabled ? 'bg-primary' : 'bg-text-secondary'"
                     >
                       <span
                         class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                        :class="editingProfile?.chatEnabled ? 'translate-x-6' : 'translate-x-1'"
+                        :class="editingProfile?.chatEnabled ? 'translate-x-6 rtl:-translate-x-6' : 'translate-x-1 rtl:-translate-x-1'"
                       ></span>
                     </button>
                   </div>
