@@ -27,7 +27,8 @@ const cats = (flags: Record<string, boolean> = {}) => ({ ...NONE_FLAGGED, ...fla
 const withoutKeys = (keys: string[]) =>
   Object.fromEntries(Object.entries(NONE_FLAGGED).filter(([k]) => !keys.includes(k)));
 
-// Forme de ModerationResponse (SDK 2.3.0) : `categories` absent → résultat sans la clé.
+// Forme de ModerationResponse (SDK 2.7.0, inchangée depuis 2.3.0) : `categories` absent → résultat
+// sans la clé.
 function response(categories?: Record<string, boolean>) {
   const result = categories
     ? {

@@ -43,8 +43,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   // « Free for a limited amount of time. » → gratuité TEMPORAIRE. Facturée $0.1/M tokens en entrée
   // jusqu'en juillet 2026 : re-vérifier via `npx tsx scripts/update-pricing.ts mistral-moderation`.
   // Entrée gardée à 0 (modèle connu → resolvePricing non null). Non trackée à l'exécution :
-  // classifiers.moderate n'est pas wrappé par tracked-client, et le SDK 2.3.0 retire le champ `usage`
-  // pourtant présent dans le JSON HTTP — à instrumenter si elle redevient payante.
+  // classifiers.moderate n'est pas wrappé par tracked-client, et le SDK (2.3.0 comme 2.7.0) retire le
+  // champ `usage` pourtant présent dans le JSON HTTP — à instrumenter si elle redevient payante.
   'mistral-moderation': { inputPerMillion: 0, outputPerMillion: 0, unit: 'tokens' },
 };
 
