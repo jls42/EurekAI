@@ -32,6 +32,10 @@ describe('resolvePricing', () => {
     expect(resolvePricing('mistral-ocr-4-0')).toEqual(MODEL_PRICING['mistral-ocr-4']);
   });
 
+  it('resolves mistral-ocr-4-1 to OCR 4 pricing (same billing model as 4-0)', () => {
+    expect(resolvePricing('mistral-ocr-4-1')).toEqual(MODEL_PRICING['mistral-ocr-4']);
+  });
+
   it('resolves mistral-ocr-2512 to OCR 3 pricing', () => {
     expect(resolvePricing('mistral-ocr-2512')).toEqual(MODEL_PRICING['mistral-ocr']);
   });
@@ -90,14 +94,19 @@ describe('calculateCost', () => {
     expect(calculateCost(usage)).toBeCloseTo(0.003, 6);
   });
 
-  it('computes input-token cost for moderation (Moderation 2 = $0.1/M input)', () => {
+  it('costs $0 for moderation (Moderation 2 « Free », gratuité annoncée temporaire)', () => {
     const usage: ApiUsage = {
       promptTokens: 1000,
       completionTokens: 100,
       model: 'mistral-moderation-2603',
     };
-    // 1000 * 0.1 / 1M = 0.0001 ; output non facturé pour la modération
-    expect(calculateCost(usage)).toBeCloseTo(0.0001, 8);
+    // Tarif CONNU (resolvePricing non null) mais gratuit, en entrée comme en sortie.
+    expect(resolvePricing('mistral-moderation-2603')).toEqual({
+      inputPerMillion: 0,
+      outputPerMillion: 0,
+      unit: 'tokens',
+    });
+    expect(calculateCost(usage)).toBe(0);
   });
 
   it('returns 0 for unknown model', () => {
@@ -211,5 +220,15 @@ describe('PRICING_SOURCES', () => {
       expect(PRICING_SOURCES[key], `Missing source URL for ${key}`).toBeDefined();
       expect(PRICING_SOURCES[key]).toContain('https://docs.mistral.ai/');
     }
+  });
+
+  it('uses canonical model-card URLs (no /model-cards/ redirect)', () => {
+    for (const url of Object.values(PRICING_SOURCES)) {
+      expect(url).toMatch(/^https:\/\/docs\.mistral\.ai\/models\/[a-z0-9-]+$/);
+    }
+  });
+
+  it('points OCR 4 at the card of the model actually sent (OCR 4.0)', () => {
+    expect(PRICING_SOURCES['mistral-ocr-4']).toBe('https://docs.mistral.ai/models/ocr-4-0');
   });
 });

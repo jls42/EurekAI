@@ -5,7 +5,8 @@
  * Les pages de tarifs sont JS-rendered (Next.js RSC) : un simple `fetch()` ne voit PAS les prix
  * (ils sont injectés à l'hydratation). On rend donc chaque page via **Lightpanda**
  * (`@lightpanda/browser`, le même moteur headless que le scraping de sources de l'app, cf.
- * `helpers/index.ts` `fetchWithLightpanda`) et on extrait les `$prix` du markdown rendu.
+ * `helpers/index.ts` `fetchWithLightpanda`) et on extrait les `$prix` (ou « Free » = $0) du
+ * markdown rendu.
  *
  * Informatif (mise à jour manuelle) : affiche `Current` (configuré) vs `Found` (rendu, avec son
  * contexte d'unité). Lightpanda lance un navigateur par page → exécution **séquentielle** et lente.
@@ -23,14 +24,40 @@ async function renderMarkdown(url: string): Promise<string> {
   return text.trim();
 }
 
-/**
- * Extrait les prix (`$N`) du markdown rendu AVEC leur contexte (lignes adjacentes = label d'unité).
- * Robuste à l'ordre valeur/unité : `$2` puis `/1000 Pages` (OCR) comme `Input (/M tokens)` puis `$0.5`.
- */
-// Un vrai prix a une unité tarifaire adjacente — exclut les `$0` parasites (sections Speed/Features
-// des model-cards) qui empêcheraient le fallback page-tarifs (ex. moderation).
+// Un vrai prix `$N` a une unité tarifaire adjacente — exclut les `$0` parasites (sections
+// Speed/Features des model-cards) qui empêcheraient le fallback page-tarifs.
 const PRICE_UNIT = /tokens|pages|char|\/M\b|\/1000|\/min|per (1k|min|million)/i;
+// Un modèle gratuit affiche « Free » (EN) / « Gratuit » (FR) SEUL sur sa ligne et SANS unité (fiche :
+// `Price` / `i` / `Free` ; page tarifs : `Classifier APIs` / `Free`) → équivaut à $0. Ligne entière
+// exigée : l'infobulle « Free for a limited amount of time. » ne matche pas.
+const FREE_LINE = /^(free|gratuit)$/i;
+const DOLLAR_LINE = /^\$\d/;
 
+const isPriceLine = (line = ''): boolean => FREE_LINE.test(line) || DOLLAR_LINE.test(line);
+
+// Page tarifs : un bloc modèle = icône / nom / description / catégorie / prix. Le bloc d'un prix
+// commence juste après le prix précédent → l'ancre n'y voit ni la description d'un voisin
+// (« …tasks, like moderation » du Classifier 8B) ni l'icône du modèle suivant.
+// `.at()` plutôt que `lines[k]` : évite le faux positif security/detect-object-injection.
+const blockStart = (lines: readonly string[], i: number): number => {
+  let start = i;
+  while (start > 0 && !isPriceLine(lines.at(start - 1))) start--;
+  return start;
+};
+
+const matchesAnchor = (lines: readonly string[], i: number, anchor?: RegExp): boolean =>
+  !anchor || anchor.test(lines.slice(blockStart(lines, i), i + 1).join(' '));
+
+// `$N` exige une unité adjacente ; « Free » n'en a jamais (et ne peut pas être un `$0` parasite).
+const isPrice = (line: string, snippet: string): boolean =>
+  FREE_LINE.test(line) || (DOLLAR_LINE.test(line) && PRICE_UNIT.test(snippet));
+
+/**
+ * Extrait les prix (`$N`, ou « Free »/« Gratuit » = $0) du markdown rendu AVEC leur contexte (lignes
+ * adjacentes = label d'unité). Robuste à l'ordre valeur/unité : `$2` puis `/1000 Pages` (OCR) comme
+ * `Input (/M tokens)` puis `$0.5`. `anchor` (fallback page tarifs) : nom du modèle, cherché dans le
+ * BLOC du prix (depuis le prix précédent), pas seulement sur ±1 ligne.
+ */
 export function extractPriceSnippets(markdown: string, anchor?: RegExp): string[] {
   const lines = markdown
     .split('\n')
@@ -38,12 +65,11 @@ export function extractPriceSnippets(markdown: string, anchor?: RegExp): string[
     .filter(Boolean);
   const out = new Set<string>();
   for (let i = 0; i < lines.length; i++) {
-    if (/^\$\d/.test(lines[i])) {
-      const snippet = `${lines[i - 1] ?? ''} ${lines[i]} ${lines[i + 1] ?? ''}`
-        .replace(/\s+/g, ' ')
-        .trim();
-      if (PRICE_UNIT.test(snippet) && (!anchor || anchor.test(snippet))) out.add(snippet);
-    }
+    const price = FREE_LINE.test(lines[i]) ? `${lines[i]} (= $0)` : lines[i];
+    const snippet = `${lines[i - 1] ?? ''} ${price} ${lines[i + 1] ?? ''}`
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (isPrice(lines[i], snippet) && matchesAnchor(lines, i, anchor)) out.add(snippet);
   }
   return [...out];
 }
@@ -54,11 +80,14 @@ export function formatCurrent(prefix: string): string {
   return `${c.unit}: in=$${c.inputPerMillion}/M, out=$${c.outputPerMillion}/M`;
 }
 
-// La page tarifs globale (onglet API) liste TOUS les modèles : fallback pour ceux dont la model-card
-// n'expose pas de widget prix (ex. moderation), filtré par une ancre (nom/id du modèle).
-const PRICING_PAGE = 'https://mistral.ai/pricing/#api';
-const PAGE_FALLBACK: Record<string, RegExp> = {
-  'mistral-moderation': /moderation/i,
+// Page tarifs API (forme canonique avec `/` final : sans lui, 301 ; `/pricing/#api` affiche désormais
+// les formules Plans, sans tarifs API) : liste TOUS les modèles → fallback pour ceux dont la
+// model-card n'expose pas de prix, filtré par une ancre = NOM du modèle (`Mistral Moderation 2`, id
+// `mistral\-moderation…` échappé compris), jamais le mot seul (« like moderation » d'un voisin,
+// icône `Icon-Model-Moderation.svg`).
+const PRICING_PAGE = 'https://mistral.ai/pricing/api/';
+export const PAGE_FALLBACK: Record<string, RegExp> = {
+  'mistral-moderation': /mistral\W*moderation/i,
 };
 
 async function reportModel(prefix: string, url: string): Promise<string> {

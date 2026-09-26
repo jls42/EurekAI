@@ -4,12 +4,23 @@ import {
   OCR_MODELS,
   OCR_MODEL_LABELS,
   DEFAULT_OCR_MODEL,
+  OCR_DEFAULT_ACCEPTED_LAG,
   normalizeOcrModel,
 } from './ocr-models.js';
 
 describe('ocr-models', () => {
-  it('DEFAULT_OCR_MODEL is OCR 4 (OCR 4 et OCR 3 tous deux courants)', () => {
+  it('DEFAULT_OCR_MODEL reste OCR 4.0 (épinglage volontaire face à OCR 4.1)', () => {
     expect(DEFAULT_OCR_MODEL).toBe('mistral-ocr-4-0');
+  });
+
+  it('OCR_DEFAULT_ACCEPTED_LAG vise une mineure plus récente de la génération du défaut', () => {
+    // Défaut `P-M-m`, candidat `P-M-n` avec n > m. Échoue si le défaut est bumpé sans retirer
+    // l'acceptation (devenue sans objet) ou si elle vise une autre génération.
+    const generation = DEFAULT_OCR_MODEL.slice(0, DEFAULT_OCR_MODEL.lastIndexOf('-'));
+    const minor = (id: string) => Number(id.slice(generation.length + 1));
+    expect(OCR_DEFAULT_ACCEPTED_LAG.candidate.startsWith(`${generation}-`)).toBe(true);
+    expect(minor(OCR_DEFAULT_ACCEPTED_LAG.candidate)).toBeGreaterThan(minor(DEFAULT_OCR_MODEL));
+    expect(OCR_DEFAULT_ACCEPTED_LAG.since).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('OCR_MODELS lists OCR 4 (défaut) puis OCR 3', () => {
