@@ -17,7 +17,7 @@ import { tmpdir } from 'node:os';
 import { ProjectStore } from '../store.js';
 import { ProfileStore } from '../profiles.js';
 import { getMarkdown, generateRoutes } from './generate.js';
-import type { Source } from '../types.js';
+import type { ModerationStatus, Source } from '../types.js';
 
 // --- Mock generators ---
 
@@ -2149,6 +2149,124 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.json).toHaveBeenCalledTimes(1);
+    });
+
+    // Même garde de modération que buildGenContext, AVANT l'appel au routeur LLM : ni facturation
+    // ni `reason` rédigée sur du contenu non vérifié. Même sélection des sources (sourceIds).
+    describe('garde de modération (même que buildGenContext)', () => {
+      const addRouteSources = (pid: string, statuses: ReadonlyArray<ModerationStatus | null>) => {
+        for (const [i, status] of statuses.entries()) {
+          store.addSource(pid, {
+            id: `src-${i}`,
+            filename: `source${i}.txt`,
+            markdown: 'Content',
+            uploadedAt: new Date().toISOString(),
+            ...(status && { moderation: { status, categories: {} } }),
+          });
+        }
+      };
+
+      const postRoute = async (pid: string, body: Record<string, unknown> = {}) => {
+        const handler = getHandler(router, 'post', '/:pid/generate/route');
+        const res = mockRes();
+        await handler(mockReq({ params: { pid }, body }), res);
+        return res;
+      };
+
+      const kidProjectId = () =>
+        store.createProject('Test', profileStore.create('Kid', 9).id).meta.id;
+
+      it.each([
+        [['unsafe'], 400, 'moderation.blocked'],
+        [['error'], 503, 'moderation.error'],
+        [['pending'], 409, 'moderation.pending'],
+        [['pending', 'unsafe'], 400, 'moderation.blocked'],
+      ] as const)('sources %j → %i %s, routeur non appelé', async (statuses, httpStatus, error) => {
+        const { routeRequest } = await import('../generators/router.js');
+        const pid = kidProjectId();
+        addRouteSources(pid, statuses);
+
+        const res = await postRoute(pid);
+
+        expect(res.status).toHaveBeenCalledWith(httpStatus);
+        expect(res.json).toHaveBeenCalledWith({ error });
+        expect(routeRequest).not.toHaveBeenCalled();
+      });
+
+      it('modération active, sources safe ou sans statut → routeur appelé', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+        const pid = kidProjectId();
+        addRouteSources(pid, ['safe', null]);
+
+        const res = await postRoute(pid);
+
+        expect(routeRequest).toHaveBeenCalledTimes(1);
+        expect(res.json.mock.calls[0][0].plan).toHaveLength(2);
+      });
+
+      it('modération inactive, source unsafe → routeur appelé (inchangé)', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+        const pid = store.createProject('Test', profileStore.create('Adult', 30).id).meta.id;
+        addRouteSources(pid, ['unsafe']);
+
+        const res = await postRoute(pid);
+
+        expect(res.status).not.toHaveBeenCalled();
+        expect(routeRequest).toHaveBeenCalledTimes(1);
+      });
+
+      it('sourceIds : seule la sélection compte, comme buildGenContext', async () => {
+        const { routeRequest } = await import('../generators/router.js');
+        const pid = kidProjectId();
+        addRouteSources(pid, ['safe', 'unsafe']);
+
+        const safeOnly = await postRoute(pid, { sourceIds: ['src-0'] });
+        expect(safeOnly.status).not.toHaveBeenCalled();
+        expect(routeRequest).toHaveBeenCalledTimes(1);
+
+        const withUnsafe = await postRoute(pid, { sourceIds: ['src-1'] });
+        expect(withUnsafe.status).toHaveBeenCalledWith(400);
+        expect(withUnsafe.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+        expect(routeRequest).toHaveBeenCalledTimes(1);
+      });
+
+      it('la modération prime sur la limite de contexte (même ordre que buildGenContext)', async () => {
+        const { getModelLimits } = await import('../config.js');
+        // Limite du modèle routeur abaissée : 800 caractères ≈ 400 tokens > 80 % de 300.
+        vi.mocked(getModelLimits).mockReturnValue({ 'mistral-small-latest': 300 });
+        try {
+          const addBigSource = (pid: string, status: ModerationStatus) =>
+            store.addSource(pid, {
+              id: `big-${status}`,
+              filename: 'big.txt',
+              markdown: 'x'.repeat(800),
+              uploadedAt: new Date().toISOString(),
+              moderation: { status, categories: {} },
+            });
+          // Témoin : la limite est bien active pour le routeur (le test n'est pas vacant).
+          const control = kidProjectId();
+          addBigSource(control, 'safe');
+          const controlRes = await postRoute(control);
+          expect(controlRes.json.mock.calls[0][0].error).toMatch(/^context_too_large:\d+$/);
+
+          const pid = kidProjectId();
+          addBigSource(pid, 'unsafe');
+          const res = await postRoute(pid);
+          expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+        } finally {
+          vi.mocked(getModelLimits).mockReturnValue({});
+        }
+      });
+
+      it('body invalide : la validation prime sur la modération (même ordre que buildGenContext)', async () => {
+        const pid = kidProjectId();
+        addRouteSources(pid, ['unsafe']);
+
+        const res = await postRoute(pid, { lang: 12345 });
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
+      });
     });
   });
 

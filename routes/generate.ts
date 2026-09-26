@@ -1001,21 +1001,44 @@ const buildAutoImage = async (ctx: AutoCtx): Promise<Generation> => {
   return makeGen('image', data, ctx);
 };
 
-const prepareRouteRequest = (
+// Validation, projet, puis MÊME garde de modération que buildGenContext, dans le même ordre
+// (source bloquante par priorité → 400/503/409), AVANT l'appel au routeur LLM : sinon l'analyse
+// est facturée et ses `reason` sont rédigées sur du contenu non vérifié. Extrait de
+// prepareRouteRequest pour la garder sous CCN 8. Null = refus, réponse déjà envoyée.
+const loadRouteProject = (
   store: ProjectStore,
+  profileStore: ProfileStore,
   req: Request,
   res: Response,
-): { markdown: string; lang: string; ageGroup: AgeGroup } | null => {
+): NonNullable<ReturnType<ProjectStore['getProject']>> | null => {
   const validation = validateGenRequestBody(req.body);
   if (!validation.ok) {
     res.status(400).json({ error: validation.error });
     return null;
   }
-  const project = store.getProject(String(req.params.pid));
+  const pid = String(req.params.pid);
+  const project = store.getProject(pid);
   if (!project) {
     res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
     return null;
   }
+  const blocking = checkModeration(store, profileStore, pid, req.body.sourceIds);
+  const rejection = moderationRejection(blocking?.moderation?.status);
+  if (rejection) {
+    res.status(rejection.status).json({ error: rejection.error });
+    return null;
+  }
+  return project;
+};
+
+const prepareRouteRequest = (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  req: Request,
+  res: Response,
+): { markdown: string; lang: string; ageGroup: AgeGroup } | null => {
+  const project = loadRouteProject(store, profileStore, req, res);
+  if (!project) return null;
   const rawMarkdown = getMarkdownOrNull(project.sources, req.body.sourceIds);
   if (rawMarkdown === null) {
     res.status(400).json({ error: 'no_sources' });
@@ -1417,7 +1440,11 @@ const registerRemediationSummaryRoute = (
   });
 };
 
-const registerRouteAnalysisRoute = (router: Router, store: ProjectStore): void => {
+const registerRouteAnalysisRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
   router.post('/:pid/generate/route', async (req, res) => {
     try {
       const resolved = resolveClient(req);
@@ -1425,7 +1452,7 @@ const registerRouteAnalysisRoute = (router: Router, store: ProjectStore): void =
         res.status(resolved.status).json({ error: resolved.error });
         return;
       }
-      const prepared = prepareRouteRequest(store, req, res);
+      const prepared = prepareRouteRequest(store, profileStore, req, res);
       if (!prepared) return;
       const pid = String(req.params.pid);
       const { result: route, usage: routeUsage } = await runWithUsageTracking(() =>
@@ -1546,7 +1573,7 @@ export function generateRoutes(store: ProjectStore, profileStore: ProfileStore):
   registerQuizReviewRoute(router, store, profileStore);
   registerRemediationSummaryRoute(router, store, profileStore);
   registerMediaGenerationRoutes(router, store, profileStore);
-  registerRouteAnalysisRoute(router, store);
+  registerRouteAnalysisRoute(router, store, profileStore);
   registerAutoRoute(router, store, profileStore);
   return router;
 }
