@@ -101,6 +101,10 @@ export const es: Record<string, string> = {
     'Eliminacion del perfil incompleta: algunos proyectos no se pudieron eliminar',
   'errorCode.rate_limited':
     'Demasiadas solicitudes a la vez. Espera un poco y vuelve a intentarlo.',
+  'errorCode.url_blocked':
+    'No se puede abrir esta dirección. Prueba otra dirección, o escribe simplemente lo que buscas.',
+  'errorCode.all_sources_failed':
+    'No se ha podido añadir ninguna fuente. Vuelve a intentarlo dentro de un rato.',
 
   'header.menuProjects': 'Men\u00fa de proyectos',
   'header.switchToLight': 'Cambiar a modo claro',

@@ -103,6 +103,10 @@ export const fr: Record<string, string> = {
   'errorCode.profile_delete_partial':
     "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",
   'errorCode.rate_limited': "Trop de demandes d'un coup. Patiente un peu, puis réessaie.",
+  'errorCode.url_blocked':
+    'Cette adresse ne peut pas être ouverte. Essaie une autre adresse, ou écris simplement ce que tu cherches.',
+  'errorCode.all_sources_failed':
+    "Aucune source n'a pu être ajoutée. Réessaie dans un petit moment.",
 
   // Header
   'header.menuProjects': 'Menu projets',

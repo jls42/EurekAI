@@ -110,6 +110,8 @@ export const ar: Record<string, string> = {
   'errorCode.invalid_input': 'طلب غير صالح',
   'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
   'errorCode.rate_limited': 'طلبات كثيرة في وقت واحد. انتظر قليلا ثم أعد المحاولة.',
+  'errorCode.url_blocked': 'لا يمكن فتح هذا العنوان. جرّب عنوانا آخر، أو اكتب ببساطة ما تبحث عنه.',
+  'errorCode.all_sources_failed': 'تعذّرت إضافة أي مصدر. أعد المحاولة بعد قليل.',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',

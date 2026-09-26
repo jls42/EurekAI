@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createWebsearch } from './websearch';
+import { createWebsearch, websearchErrorCode } from './websearch';
 
 globalThis.fetch = vi.fn();
 
@@ -87,6 +87,80 @@ describe('createWebsearch', () => {
       expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
       expect(ctx.sources).toEqual([]);
       expect(ctx.loading.websearch).toBe(false);
+    });
+
+    // Refus du serveur : code traduit par resolveError, requête gardée, aucune source ajoutée.
+    const refuse = (status: number, body: unknown) => ({
+      ok: false,
+      status,
+      statusText: 'Refused',
+      json: async () => body,
+    });
+
+    it.each([
+      [
+        '422 url_blocked (garde SSRF)',
+        422,
+        {
+          error: 'url_blocked',
+          failures: [{ label: 'URL scrape: http://127.0.0.1/', code: 'url_blocked' }],
+        },
+        'url_blocked',
+      ],
+      [
+        '502 dû au quota : le code commun des échecs',
+        502,
+        {
+          error: 'all_sources_failed',
+          failures: [{ label: 'URL scrape: https://a.example', code: 'quota_exceeded' }],
+        },
+        'quota_exceeded',
+      ],
+      [
+        '502 aux causes mêlées : le code global',
+        502,
+        {
+          error: 'all_sources_failed',
+          failures: [
+            { label: 'URL scrape: http://127.0.0.1/', code: 'url_blocked' },
+            { label: 'Keyword search: volcans', code: 'upstream_unavailable' },
+          ],
+        },
+        'all_sources_failed',
+      ],
+      ['429 rate_limited', 429, { error: 'rate_limited' }, 'rate_limited'],
+    ])('%s → toast traduit (%i)', async (_label, status, body, code) => {
+      ctx.webQuery = 'http://127.0.0.1/';
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce(refuse(status, body) as any);
+
+      await ws.searchWeb.call(ctx);
+
+      expect(ctx.resolveError).toHaveBeenCalledWith(code);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.webQuery).toBe('http://127.0.0.1/');
+      expect(ctx.loading.websearch).toBe(false);
+    });
+
+    it('corps illisible (page HTML d’un proxy) → statut HTTP, pas d’exception', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 502,
+        statusText: 'Bad Gateway',
+        json: async () => {
+          throw new SyntaxError('Unexpected token <');
+        },
+      } as any);
+
+      await ws.searchWeb.call(ctx);
+
+      expect(ctx.resolveError).toHaveBeenCalledWith('Bad Gateway');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.showToast).not.toHaveBeenCalledWith(
+        'toast.webSearchError',
+        'error',
+        expect.any(Function),
+      );
     });
 
     it('shows network error toast on exception', async () => {
@@ -204,5 +278,50 @@ describe('createWebsearch', () => {
       await promise;
       expect(ctx.loading.websearch).toBe(false);
     });
+  });
+});
+
+describe('websearchErrorCode', () => {
+  const res = { statusText: 'Bad Gateway' } as Response;
+  const failure = (code: unknown) => ({ label: 'URL scrape: https://a.example', code });
+
+  it.each([
+    [
+      'code commun parlant',
+      { error: 'all_sources_failed', failures: [failure('auth_required')] },
+      'auth_required',
+    ],
+    [
+      'code commun répété',
+      {
+        error: 'all_sources_failed',
+        failures: [failure('upstream_unavailable'), failure('upstream_unavailable')],
+      },
+      'upstream_unavailable',
+    ],
+    [
+      'internal_error : code global',
+      { error: 'all_sources_failed', failures: [failure('internal_error')] },
+      'all_sources_failed',
+    ],
+    [
+      'codes différents : code global',
+      {
+        error: 'all_sources_failed',
+        failures: [failure('url_blocked'), failure('quota_exceeded')],
+      },
+      'all_sources_failed',
+    ],
+    [
+      'code d’échec illisible : code global',
+      { error: 'all_sources_failed', failures: [failure(42)] },
+      'all_sources_failed',
+    ],
+    ['sans failures', { error: 'rate_limited' }, 'rate_limited'],
+    ['failures non tableau', { error: 'invalid_input', failures: 'x' }, 'invalid_input'],
+    ['corps vide', {}, 'Bad Gateway'],
+    ['corps null', null, 'Bad Gateway'],
+  ])('%s', (_label, body, expected) => {
+    expect(websearchErrorCode(body, res)).toBe(expected);
   });
 });

@@ -100,6 +100,10 @@ export const it: Record<string, string> = {
   'errorCode.profile_delete_partial':
     'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',
   'errorCode.rate_limited': "Troppe richieste in una volta. Aspetta un po' e riprova.",
+  'errorCode.url_blocked':
+    'Questo indirizzo non si può aprire. Prova un altro indirizzo, o scrivi semplicemente cosa cerchi.',
+  'errorCode.all_sources_failed':
+    "Non è stato possibile aggiungere nessuna fonte. Riprova tra un po'.",
 
   'header.menuProjects': 'Menu progetti',
   'header.switchToLight': 'Passa alla modalit\u00e0 chiara',

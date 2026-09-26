@@ -100,6 +100,10 @@ export const nl: Record<string, string> = {
   'errorCode.profile_delete_partial':
     'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
   'errorCode.rate_limited': 'Te veel verzoeken tegelijk. Wacht even en probeer het dan opnieuw.',
+  'errorCode.url_blocked':
+    'Dit adres kan niet worden geopend. Probeer een ander adres, of typ gewoon wat je zoekt.',
+  'errorCode.all_sources_failed':
+    'Er kon geen bron worden toegevoegd. Probeer het zo meteen opnieuw.',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',

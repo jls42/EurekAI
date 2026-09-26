@@ -106,6 +106,9 @@ export const hi: Record<string, string> = {
   'errorCode.invalid_input': 'अमान्य अनुरोध',
   'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
   'errorCode.rate_limited': 'एक साथ बहुत सारे अनुरोध। थोड़ा रुको, फिर दोबारा कोशिश करो।',
+  'errorCode.url_blocked':
+    'यह पता खोला नहीं जा सकता। कोई दूसरा पता आज़माओ, या बस लिखो कि क्या खोजना है।',
+  'errorCode.all_sources_failed': 'कोई भी स्रोत नहीं जोड़ा जा सका। थोड़ी देर बाद फिर कोशिश करो।',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',

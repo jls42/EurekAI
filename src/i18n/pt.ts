@@ -101,6 +101,10 @@ export const pt: Record<string, string> = {
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
   'errorCode.rate_limited': 'Demasiados pedidos de uma vez. Espera um pouco e tenta de novo.',
+  'errorCode.url_blocked':
+    'Não é possível abrir este endereço. Experimenta outro endereço, ou escreve simplesmente o que procuras.',
+  'errorCode.all_sources_failed':
+    'Não foi possível adicionar nenhuma fonte. Tenta de novo daqui a pouco.',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',

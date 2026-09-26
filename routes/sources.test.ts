@@ -1388,7 +1388,7 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].filename).toBe(`Recherche web: ${'A'.repeat(50)}`);
   });
 
-  it('retourne 500 avec failures[] quand webSearchEnrich echoue (graceful fallback)', async () => {
+  it('retourne 502 all_sources_failed avec failures[] quand webSearchEnrich echoue', async () => {
     const project = store.createProject('P1');
     vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('network error'));
 
@@ -1401,9 +1401,9 @@ describe('POST /:pid/sources/websearch', () => {
 
     await handler(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.status).toHaveBeenCalledWith(502);
     const payload = res.json.mock.calls[0][0];
-    expect(payload.error).toBe('Aucune source extraite');
+    expect(payload.error).toBe('all_sources_failed');
     expect(Array.isArray(payload.failures)).toBe(true);
     expect(payload.failures).toHaveLength(1);
     expect(payload.failures[0].label).toContain('Keyword search');
@@ -1548,33 +1548,50 @@ describe('POST /:pid/sources/websearch', () => {
     expect(sources[0].scrapeEngine).toBe('mistral');
   });
 
-  it('retourne 500 avec failures[] quand scrape et fallback echouent tous les deux', async () => {
-    vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
-    vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('mistral failed'));
-    const project = store.createProject('P1');
-    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
-    const req = mockReq({
-      params: { pid: project.meta.id },
-      body: { query: 'https://example.com/dead' },
-    });
-    const res = mockRes();
+  // Le repli ne transforme plus son erreur en null : le code actionnable arrive au front.
+  it.each([
+    [429, 'quota_exceeded'],
+    [401, 'auth_required'],
+    [503, 'upstream_unavailable'],
+  ])(
+    'scrape puis repli en échec (%i) → 502 all_sources_failed avec le code propagé %s',
+    async (status, code) => {
+      const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+      vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
+      vi.mocked(webSearchEnrich).mockRejectedValueOnce(
+        Object.assign(new Error('mistral failed'), { status }),
+      );
+      const project = store.createProject('P1');
+      const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: { query: 'https://example.com/dead' },
+      });
+      const res = mockRes();
 
-    await handler(req, res);
+      await handler(req, res);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-    const payload = res.json.mock.calls[0][0];
-    expect(payload.error).toBe('Aucune source extraite');
-    // trackWebSource surface les failures pour l'UI — verrou contre un silent skip.
-    expect(payload.failures).toHaveLength(1);
-    expect(payload.failures[0].label).toContain('URL scrape: https://example.com/dead');
-    expect(payload.failures[0].code).toBe('upstream_unavailable');
-  });
+      expect(res.status).toHaveBeenCalledWith(502);
+      // trackWebSource surface les failures pour l'UI — verrou contre un silent skip.
+      expect(res.json).toHaveBeenCalledWith({
+        error: 'all_sources_failed',
+        failures: [{ label: 'URL scrape: https://example.com/dead', code }],
+      });
+      expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+      // Une seule trace, avec la stack de l'erreur du repli.
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy.mock.calls[0].some((a) => a instanceof Error)).toBe(true);
+      errorSpy.mockRestore();
+    },
+  );
 
   it('retourne {sources, failures} en partial success quand une URL sur deux echoue', async () => {
     vi.mocked(fetchPageContent)
       .mockResolvedValueOnce({ text: 'page 1 content', engine: 'readability' })
       .mockRejectedValueOnce(new Error('scrape failed'));
-    vi.mocked(webSearchEnrich).mockRejectedValueOnce(new Error('fallback failed'));
+    vi.mocked(webSearchEnrich).mockRejectedValueOnce(
+      Object.assign(new Error('fallback failed'), { status: 503 }),
+    );
     const project = store.createProject('P1');
     const handler = getHandler(router, 'post', '/:pid/sources/websearch');
     const req = mockReq({
@@ -1640,6 +1657,100 @@ describe('POST /:pid/sources/websearch', () => {
       expect(typeof f.code).toBe('string');
       expect(f.code).toMatch(/^(upstream_unavailable|internal_error)$/);
     }
+  });
+});
+
+// Garde SSRF RÉELLE (fetchPageContent d'origine, qui rejette avant tout fetch) : aucune source
+// créée, aucun appel Mistral (projet sans profil : pas de modération de la requête).
+describe('POST /:pid/sources/websearch — codes quand aucune source n’est créée', () => {
+  const useRealScraperOnce = async () => {
+    const actual =
+      await vi.importActual<typeof import('../helpers/index.js')>('../helpers/index.js');
+    vi.mocked(fetchPageContent).mockImplementationOnce(actual.fetchPageContent);
+  };
+
+  const postWebsearch = async (pid: string, query: string) => {
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const res = mockRes();
+    await handler(mockReq({ params: { pid }, body: { query } }), res);
+    return res;
+  };
+
+  it.each([
+    'http://127.0.0.1:3000/api/projects',
+    'http://169.254.169.254/latest/meta-data/',
+    'http://[::ffff:7f00:0001]/',
+    'http://198.18.0.1/',
+  ])('%s rejetée par la garde SSRF → 422 url_blocked, sans source ni appel', async (url) => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    await useRealScraperOnce();
+    const project = store.createProject('P1');
+
+    const res = await postWebsearch(project.meta.id, url);
+
+    expect(res.status).toHaveBeenCalledWith(422);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'url_blocked',
+      failures: [{ label: `URL scrape: ${url}`, code: 'url_blocked' }],
+    });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(webSearchEnrich).not.toHaveBeenCalled();
+    expect(moderateContent).not.toHaveBeenCalled();
+    expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+    expect(store.getProject(project.meta.id)!.costLog ?? []).toHaveLength(0);
+    // Rejet journalisé une fois, en warn SANS stack (la cause suffit) ; aucune erreur.
+    const ssrfWarns = warnSpy.mock.calls.filter((c) => String(c[1]).includes('SSRF guard'));
+    expect(ssrfWarns).toHaveLength(1);
+    expect(ssrfWarns[0].some((a) => a instanceof Error)).toBe(false);
+    expect(errorSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  it('rejet SSRF + autre échec, aucune source → 502 all_sources_failed avec les deux codes', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    await useRealScraperOnce();
+    vi.mocked(fetchPageContent).mockRejectedValueOnce(new Error('scrape failed'));
+    vi.mocked(webSearchEnrich).mockRejectedValueOnce(
+      Object.assign(new Error('rate limited'), { status: 429 }),
+    );
+    const project = store.createProject('P1');
+
+    const res = await postWebsearch(project.meta.id, 'http://127.0.0.1/ https://example.com/dead');
+
+    expect(res.status).toHaveBeenCalledWith(502);
+    expect(res.json).toHaveBeenCalledWith({
+      error: 'all_sources_failed',
+      failures: [
+        { label: 'URL scrape: http://127.0.0.1/', code: 'url_blocked' },
+        { label: 'URL scrape: https://example.com/dead', code: 'quota_exceeded' },
+      ],
+    });
+    expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+    errorSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('rejet SSRF + une source créée → succès partiel inchangé (200 { sources, failures })', async () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    await useRealScraperOnce();
+    const project = store.createProject('P1');
+
+    const res = await postWebsearch(project.meta.id, 'http://127.0.0.1/ https://example.com');
+
+    expect(res.status).not.toHaveBeenCalled();
+    const payload = res.json.mock.calls[0][0];
+    expect(payload.sources).toHaveLength(1);
+    expect(payload.sources[0].markdown).toBe('scraped page content');
+    expect(payload.failures).toEqual([
+      { label: 'URL scrape: http://127.0.0.1/', code: 'url_blocked' },
+    ]);
+    expect(store.getProject(project.meta.id)!.sources).toHaveLength(1);
+    warnSpy.mockRestore();
   });
 });
 

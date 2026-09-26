@@ -98,6 +98,9 @@ export const en: Record<string, string> = {
   'errorCode.profile_delete_partial':
     'Profile deletion incomplete: some projects could not be deleted',
   'errorCode.rate_limited': 'Too many requests at once. Wait a moment, then try again.',
+  'errorCode.url_blocked':
+    "This address can't be opened. Try another address, or just type what you're looking for.",
+  'errorCode.all_sources_failed': 'No source could be added. Try again in a little while.',
 
   'header.menuProjects': 'Projects menu',
   'header.switchToLight': 'Switch to light mode',

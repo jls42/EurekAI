@@ -385,6 +385,9 @@ type UploadBatchOutcome = {
 };
 type WebSourceFailure = { label: string; code: string };
 type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
+// Collecte d'une source web (scraping d'URL avec repli, ou recherche par mots-clés) : lève en cas
+// d'échec. Alias : un paramètre de type fonction écrit en ligne coupe la mesure de Lizard.
+type WebSourceTask = () => Promise<Source>;
 type ProcessedUpload = { markdown: string; elapsed: number; confidence?: OcrConfidence };
 type SttPipelineResult = {
   text: string;
@@ -393,6 +396,10 @@ type SttPipelineResult = {
 };
 
 const TEXT_EXTS = new Set(['.txt', '.md']);
+
+// Codes du contrat /sources/websearch quand aucune source n'est créée (respondNoWebSources).
+const URL_BLOCKED = 'url_blocked';
+const ALL_SOURCES_FAILED = 'all_sources_failed';
 
 // Discrimine les erreurs SSRF des erreurs reseau/parse pour decider du fallback LLM.
 const SSRF_ERROR_MARKERS = [
@@ -688,18 +695,14 @@ const webSource = (
   moderation: modCats ? pendingModeration() : undefined,
 });
 
+// Échec du scraping direct : bug du parseur (SyntaxError) et rejet de la garde SSRF relancés, sans
+// repli (le rejet SSRF est journalisé une fois, par trackWebSource) ; autre échec → repli Mistral.
 const handleScrapeFailure = (scrapeError: unknown, url: string): void => {
   if (scrapeError instanceof SyntaxError) {
     logger.error('sources', `URL scrape parser bug for "${url}":`, scrapeError);
     throw scrapeError;
   }
-  if (isSsrfError(scrapeError)) {
-    logger.warn(
-      'sources',
-      `URL rejected (SSRF guard): "${url}" — ${(scrapeError as Error).message}`,
-    );
-    throw scrapeError;
-  }
+  if (isSsrfError(scrapeError)) throw scrapeError;
   logger.warn(
     'sources',
     `URL scrape failed for "${url}", falling back to web search:`,
@@ -723,6 +726,8 @@ const scrapeDirectUrl = async (
   return webSource(url, result.text, now, modCats, result.engine);
 };
 
+// Repli par la recherche web Mistral sur l'URL. Un échec REMONTE (plus avalé en null) : son code
+// stable (quota_exceeded, auth_required…) arrive dans failures[].code via trackWebSource.
 const fallbackWebSearchUrl = async (
   client: Mistral,
   url: string,
@@ -730,18 +735,13 @@ const fallbackWebSearchUrl = async (
   ageGroup: AgeGroup,
   modCats: string[] | null,
   now: string,
-): Promise<Source | null> => {
-  try {
-    const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
-    logger.info(
-      'sources',
-      `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
-    );
-    return webSource(url, text, now, modCats, 'mistral');
-  } catch (e) {
-    logger.error('sources', `URL failed completely: "${url}"`, e);
-    return null;
-  }
+): Promise<Source> => {
+  const { text, elapsed } = await webSearchEnrich(client, url, lang, ageGroup);
+  logger.info(
+    'sources',
+    `URL fallback [mistral]: "${url}" (${elapsed.toFixed(1)}s, ${text.length} chars)`,
+  );
+  return webSource(url, text, now, modCats, 'mistral');
 };
 
 const scrapeUrl = async (
@@ -752,7 +752,7 @@ const scrapeUrl = async (
   ageGroup: AgeGroup,
   modCats: string[] | null,
   now: string,
-): Promise<Source | null> => {
+): Promise<Source> => {
   try {
     return await scrapeDirectUrl(url, scrapeMode, modCats, now);
   } catch (scrapeError) {
@@ -778,11 +778,22 @@ const searchByKeywords = async (
   return webSource(`${webLabel}: ${searchQuery.slice(0, 50)}`, text, now, modCats);
 };
 
+// Code d'un échec de collecte : url_blocked pour un rejet de la garde SSRF, journalisé en warn
+// SANS stack (la cause suffit) ; sinon code stable de l'erreur, journalisée avec sa stack.
+const webFailureCode = (label: string, err: unknown): string => {
+  if (isSsrfError(err)) {
+    logger.warn('sources', `${label} rejected (SSRF guard): ${(err as Error).message}`);
+    return URL_BLOCKED;
+  }
+  logger.error('sources', `${label} failed`, err);
+  return extractErrorCode(err);
+};
+
 const trackWebSource = async (
   store: ProjectStore,
   pid: string,
   label: string,
-  fn: () => Promise<Source | null>,
+  fn: WebSourceTask,
 ): Promise<WebSourceOutcome> => {
   try {
     const { result: source, usage } = await runWithUsageTracking(fn);
@@ -792,20 +803,18 @@ const trackWebSource = async (
       `POST /api/projects/${pid}/sources/websearch`,
       usage,
     );
-    if (source && persisted) {
+    if (persisted) {
       source.estimatedCost = persisted.cost;
       source.usage = persisted.usage;
       source.costBreakdown = persisted.costBreakdown;
     }
-    if (!source) return { source: null, failure: { label, code: 'upstream_unavailable' } };
     return { source, failure: null };
   } catch (err) {
     const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
     if (failedUsage?.length) {
       persistUsage(store, pid, `POST /api/projects/${pid}/sources/websearch/failed`, failedUsage);
     }
-    logger.error('sources', `${label} failed`, err);
-    return { source: null, failure: { label, code: extractErrorCode(err) } };
+    return { source: null, failure: { label, code: webFailureCode(label, err) } };
   }
 };
 
@@ -852,6 +861,18 @@ const respondWebsearchSources = (
 ): void => {
   if (failures.length > 0) res.json({ sources, failures });
   else res.json(sources);
+};
+
+// Aucune source créée : 422 url_blocked si la garde SSRF a rejeté TOUTES les tentatives, sinon
+// 502 all_sources_failed (repli en échec, erreur de l'API, mélange avec des rejets SSRF). failures[]
+// ({ label, code }) détaille chaque échec. Au moins une source : respondWebsearchSources (200).
+const respondNoWebSources = (res: Response, failures: WebSourceFailure[]): void => {
+  const allBlocked = failures.length > 0 && failures.every((f) => f.code === URL_BLOCKED);
+  if (allBlocked) {
+    res.status(422).json({ error: URL_BLOCKED, failures });
+    return;
+  }
+  res.status(502).json({ error: ALL_SOURCES_FAILED, failures });
 };
 
 const persistWebsearchSources = (
@@ -1029,7 +1050,7 @@ const registerWebsearchRoute = (
     try {
       const { sources, failures } = await collectWebSources(store, client, pid, params, modCats);
       if (sources.length === 0) {
-        res.status(500).json({ error: 'Aucune source extraite', failures });
+        respondNoWebSources(res, failures);
         return;
       }
       const deps = { store, profileStore, client };

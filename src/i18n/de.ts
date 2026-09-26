@@ -102,6 +102,10 @@ export const de: Record<string, string> = {
     'Profil loeschen unvollstaendig: einige Projekte konnten nicht geloescht werden',
   'errorCode.rate_limited':
     'Zu viele Anfragen auf einmal. Warte kurz und versuch es dann noch einmal.',
+  'errorCode.url_blocked':
+    'Diese Adresse kann nicht geöffnet werden. Versuch eine andere Adresse, oder schreib einfach, was du suchst.',
+  'errorCode.all_sources_failed':
+    'Es konnte keine Quelle hinzugefügt werden. Versuch es gleich noch einmal.',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',

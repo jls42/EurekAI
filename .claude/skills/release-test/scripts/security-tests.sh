@@ -127,12 +127,16 @@ for url in "${ssrf_urls[@]}"; do
     -w '__HTTP_%{http_code}')
   HTTP="${RESP##*__HTTP_}"
   BODY="${RESP%__HTTP_*}"
-  # Le serveur doit retourner soit 400 (URL rejetee), soit 500 (Aucune source extraite) avec failures[]
-  # MAIS PAS creer de source ni appeler Mistral.
+  # Rejet par la garde SSRF : 422 {"error":"url_blocked","failures":[{label,code:"url_blocked"}]},
+  # SANS source creee ni appel Mistral (ni scraping, ni repli par la recherche web).
+  if [ "$HTTP" = "422" ] && echo "$BODY" | grep -q '"error":"url_blocked"' \
+    && echo "$BODY" | grep -q '"code":"url_blocked"'; then
+    check_pass "SSRF $url : 422 url_blocked"
+  else
+    check_fail "SSRF $url : HTTP $HTTP body=$BODY (attendu 422 url_blocked)"
+  fi
   if echo "$BODY" | grep -qE '"sources":\[\{'; then
     check_fail "SSRF $url : source creee dans la reponse (LLM appele !) body=$BODY"
-  else
-    check_pass "SSRF $url : aucune source creee (HTTP $HTTP)"
   fi
 done
 
