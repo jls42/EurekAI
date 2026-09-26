@@ -1,5 +1,11 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import {
+  getContent,
+  retryTurns,
+  safeParseJson,
+  tryParseJson,
+  unwrapJsonArray,
+} from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
 import { podcastSystem, podcastUser, pickPodcastNames, podcastRetryUser } from '../prompts.js';
@@ -26,8 +32,10 @@ function isValidPodcast(data: PodcastLine[]): boolean {
   );
 }
 
-function parsePodcastResponse(raw: string): ParsedPodcastResponse {
-  const parsed = safeParseJson(raw) as Record<string, unknown>;
+// Reçoit le JSON déjà parsé : tryParseJson au 1er essai (null si tronqué → script vide → retry),
+// safeParseJson au retry (SyntaxError → llm_invalid_json). Fléchée : délimitée par Lizard.
+const parsePodcastResponse = (json: unknown): ParsedPodcastResponse => {
+  const parsed = json as Record<string, unknown> | null;
   // Extract sourceRefs before unwrapping the array
   const sourceRefs = Array.isArray(parsed?.sourceRefs)
     ? (parsed.sourceRefs as string[])
@@ -36,11 +44,11 @@ function parsePodcastResponse(raw: string): ParsedPodcastResponse {
   // trouvé — sur {"sourceRefs":[...],"script":[...]} (ordre légal en JSON), il
   // prendrait sourceRefs pour le script → retry Mistral inutile. Fallback conservé
   // pour les shapes dégradés (tableau nu, clé alternative).
-  const script = Array.isArray(parsed?.script)
+  const script: PodcastLine[] = Array.isArray(parsed?.script)
     ? (parsed.script as PodcastLine[])
-    : unwrapJsonArray<PodcastLine>(parsed);
+    : unwrapJsonArray(parsed);
   return { script, sourceRefs };
-}
+};
 
 export async function generatePodcastScript(
   client: Mistral,
@@ -64,7 +72,7 @@ export async function generatePodcastScript(
   });
 
   const raw = getContent(response);
-  const result = parsePodcastResponse(raw);
+  const result = parsePodcastResponse(tryParseJson(raw));
 
   if (isValidPodcast(result.script)) return { ...result, names };
 
@@ -73,13 +81,7 @@ export async function generatePodcastScript(
     'validation failed, retrying:',
     JSON.stringify(result.script).slice(0, 200),
   );
-  messages.push(
-    { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content: podcastRetryUser(lang),
-    },
-  );
+  messages.push(...retryTurns(raw, podcastRetryUser(lang)));
 
   const retry = await client.chat.complete({
     model,
@@ -87,10 +89,13 @@ export async function generatePodcastScript(
     responseFormat: { type: 'json_object' },
     ...diversityParams('podcast'),
   });
-  const retryResult = parsePodcastResponse(getContent(retry));
+  const retryResult = parsePodcastResponse(safeParseJson(getContent(retry)));
 
   if (!isValidPodcast(retryResult.script)) {
-    throw new Error("Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives");
+    // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
+    throw new SyntaxError(
+      "Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives",
+    );
   }
   return { ...retryResult, names };
 }
