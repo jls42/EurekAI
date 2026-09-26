@@ -16,7 +16,7 @@ import { join } from 'path';
 import { tmpdir } from 'os';
 import { Readable } from 'node:stream';
 import { ProjectStore } from '../store.js';
-import { ProfileStore } from '../profiles.js';
+import { MODERATION_CATEGORIES, ProfileStore } from '../profiles.js';
 import { sourceRoutes } from './sources.js';
 import { logger } from '../helpers/logger.js';
 
@@ -337,6 +337,37 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(moderateContent).not.toHaveBeenCalled();
+  });
+
+  it('modère avec les catégories du profil propriétaire (défauts de son âge)', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true, ageGroup: 'ado' });
+
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { text: 'cours' } });
+    await handler(req, mockRes());
+
+    expect(moderateContent).toHaveBeenCalledWith(mockClient, 'cours', MODERATION_CATEGORIES.ado);
+  });
+
+  // Liste vide (modération active, aucune catégorie cochée) : la source est quand même modérée et
+  // ses catégories stockées — le statut effectif s'en servira si le parent coche une catégorie.
+  it('liste vide : modère quand même et stocke les catégories de la source', async () => {
+    const { project, profile } = createProjectWithProfile({ useModeration: true });
+    profileStore.update(profile.id, { moderationCategories: [] });
+    vi.mocked(moderateContent).mockResolvedValueOnce({
+      status: 'safe',
+      categories: { criminal: true, sexual: false },
+    });
+
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { text: 'cours' } });
+    await handler(req, mockRes());
+
+    expect(moderateContent).toHaveBeenCalledWith(mockClient, 'cours', []);
+    expect(store.getProject(project.meta.id)!.sources[0].moderation).toEqual({
+      status: 'safe',
+      categories: { criminal: true, sexual: false },
+    });
   });
 });
 

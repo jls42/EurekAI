@@ -122,6 +122,30 @@ describe('profileBlockedCategories', () => {
       expect(profileBlockedCategories(undefined, DEFAULTS)).toEqual([]);
     },
   );
+
+  // Serveur : défauts d'enfant pour un âge illisible (activeModerationCategories), fail-closed.
+  it.each([['inconnu'], ['constructor'], ['__proto__'], [undefined]])(
+    'âge sans défauts (%s) → catégories de repli passées en 3e argument',
+    (ageGroup) => {
+      expect(profileBlockedCategories({ ageGroup }, DEFAULTS, ['selfharm'])).toEqual(['selfharm']);
+    },
+  );
+
+  it('le repli ne remplace ni la liste du profil ni les défauts connus', () => {
+    const own = { moderationCategories: [], ageGroup: 'constructor' };
+    expect(profileBlockedCategories(own, DEFAULTS, ['selfharm'])).toEqual([]);
+    expect(profileBlockedCategories({ ageGroup: 'adulte' }, DEFAULTS, ['selfharm'])).toEqual([]);
+  });
+
+  // Donnée disque corrompue (chaîne, objet) : jamais rendue telle quelle (une chaîne étalée
+  // donnerait ses lettres comme catégories) — défauts de l'âge à la place.
+  it.each([['sexual'], [{ sexual: true }]])('liste non-tableau (%j) → défauts de l’âge', (raw) => {
+    const profile = { moderationCategories: raw, ageGroup: 'enfant' } as unknown as {
+      moderationCategories?: string[];
+      ageGroup?: string;
+    };
+    expect(profileBlockedCategories(profile, DEFAULTS)).toEqual(['sexual', 'selfharm']);
+  });
 });
 
 describe('effectiveModerationStatus', () => {

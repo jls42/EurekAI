@@ -87,5 +87,26 @@ describe('selectChatSources', () => {
       const profile = { useModeration: false, moderationCategories: ['criminal'] };
       expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
     });
+
+    // Liste vide : modération active sans catégorie bloquée → seul le statut persisté compte.
+    it('liste vide : safe signalante gardée, statuts bloquants persistés exclus', () => {
+      const profile = { useModeration: true, moderationCategories: [] };
+      expect(ids(selectChatSources([...ALL, flagged], profile))).toEqual([
+        'safe',
+        'none',
+        'flagged',
+      ]);
+    });
+
+    // Âge illisible sans liste : défauts d'enfant (fail-closed), jamais le prototype.
+    it.each(['constructor', '__proto__', 'inconnu'])(
+      'âge %s sans liste : défauts enfant (criminal bloqué) → exclue',
+      (ageGroup) => {
+        const profile = { useModeration: true, ageGroup } as Parameters<
+          typeof selectChatSources
+        >[1];
+        expect(selectChatSources([flagged], profile)).toEqual([]);
+      },
+    );
   });
 });

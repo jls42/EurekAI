@@ -31,7 +31,7 @@ import type {
   ModerationStatus,
 } from '../types.js';
 import type { ProjectStore, PromoteResult } from '../store.js';
-import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
+import type { ProfileStore } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
@@ -63,11 +63,8 @@ import {
   isOptionalAgeGroup,
   isOptionalLangCode,
 } from '../helpers/request-validation.js';
-import {
-  blockingModerationStatus,
-  moderationRejection,
-  profileBlockedCategories,
-} from '../helpers/moderation-http.js';
+import { blockingModerationStatus, moderationRejection } from '../helpers/moderation-http.js';
+import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
@@ -170,11 +167,8 @@ const checkModeration = (
   profileStore: ProfileStore,
   sourceIds?: string[],
 ): ModerationStatus | undefined => {
-  const profileId = project.meta.profileId;
-  if (!profileId) return undefined;
-  const profile = profileStore.get(profileId);
-  if (!profile?.useModeration) return undefined;
-  const blocked = profileBlockedCategories(profile, MODERATION_CATEGORIES);
+  const blocked = activeModerationCategories(moderationProfileOf(project, profileStore));
+  if (!blocked) return undefined;
   return blockingModerationStatus(selectModeratedSources(project, sourceIds), blocked);
 };
 

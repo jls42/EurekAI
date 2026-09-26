@@ -29,19 +29,25 @@ export const moderationRejection = (
   return { status: 503, error: 'moderation.error' };
 };
 
+const NO_CATEGORIES: readonly string[] = [];
+
 /**
- * Catégories bloquées d'un profil : sa liste, sinon les défauts de son âge, sinon aucune — même
- * résolution que la modération des messages (runChatModeration). `defaults` = MODERATION_CATEGORIES
- * côté serveur, `moderationDefaults` (/api/moderation-categories) côté front. Object.hasOwn : un
- * ageGroup hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
+ * Catégories bloquées d'un profil : sa liste (seulement si c'est un tableau : une donnée corrompue
+ * retombe sur les défauts), sinon les défauts de son âge, sinon `unknownAgeDefaults` — aucune par
+ * défaut ; le serveur passe ceux d'`enfant` (activeModerationCategories,
+ * helpers/moderation-profile.ts). `defaults` = MODERATION_CATEGORIES côté serveur,
+ * `moderationDefaults` (/api/moderation-categories) côté front. Object.hasOwn : un ageGroup
+ * hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
  */
 export const profileBlockedCategories = (
   profile: { moderationCategories?: string[]; ageGroup?: string } | null | undefined,
   defaults: Readonly<Record<string, readonly string[]>>,
+  unknownAgeDefaults: readonly string[] = NO_CATEGORIES,
 ): readonly string[] => {
-  if (profile?.moderationCategories) return profile.moderationCategories;
+  const own = profile?.moderationCategories;
+  if (Array.isArray(own)) return own;
   const group = profile?.ageGroup;
-  return group && Object.hasOwn(defaults, group) ? defaults[group] : [];
+  return group && Object.hasOwn(defaults, group) ? defaults[group] : unknownAgeDefaults;
 };
 
 type PersistedModeration = { status: ModerationStatus; categories?: Record<string, boolean> };

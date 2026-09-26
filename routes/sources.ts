@@ -25,11 +25,12 @@ import type {
   ModerationResult,
 } from '../types.js';
 import type { ProjectStore } from '../store.js';
-import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
+import type { ProfileStore } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
 import { normalizeOcrModel } from '../helpers/ocr-models.js';
 import { moderateContent } from '../generators/moderation.js';
 import { moderationRejection } from '../helpers/moderation-http.js';
+import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
@@ -212,18 +213,15 @@ const triggerConsigneDetection = (
   })();
 };
 
+// Catégories actives du profil propriétaire du projet (activeModerationCategories), null si la
+// modération est inactive : la source importée n'est alors pas modérée.
 const getModerationCategories = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
 ): string[] | null => {
   const project = store.getProject(pid);
-  if (!project) return null;
-  const profileId = project.meta.profileId;
-  if (!profileId) return null;
-  const profile = profileStore.get(profileId);
-  if (!profile?.useModeration) return null;
-  return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
+  return project ? activeModerationCategories(moderationProfileOf(project, profileStore)) : null;
 };
 
 type InputModeration = { ok: true; moderation?: ModerationResult } | { ok: false };

@@ -15,7 +15,7 @@ import { mkdtempSync, rmSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from '../store.js';
-import { ProfileStore } from '../profiles.js';
+import { MODERATION_CATEGORIES, ProfileStore } from '../profiles.js';
 import { chatRoutes } from './chat.js';
 import { chatNoSourcesNotice } from '../prompts.js';
 import { logger } from '../helpers/logger.js';
@@ -632,6 +632,30 @@ describe('POST /:pid/chat', () => {
     // moderateContent should NOT be called since etudiant categories are empty
     expect(moderateContent).not.toHaveBeenCalled();
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
+  });
+
+  // Liste propre vide (cases toutes décochées) : même règle que les défauts vides, même pour un
+  // enfant — rien à bloquer, pas d'appel. Les deux sens : la liste par défaut, elle, est vérifiée.
+  it('liste vide explicite : message non vérifié ; liste par défaut : vérifié avec elle', async () => {
+    const { moderateContent } = await import('../generators/moderation.js');
+    const kid = profileStore.create('Kid', 9, '0', 'fr');
+    profileStore.update(kid.id, { chatEnabled: true, useModeration: true });
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const send = async (pid: string) => {
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: { message: 'Hello' } }), res);
+      return res;
+    };
+
+    const checked = await send(store.createProject('Défauts', kid.id).meta.id);
+    expect(moderateContent).toHaveBeenCalledWith(client, 'Hello', MODERATION_CATEGORIES.enfant);
+    expect(checked.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
+
+    vi.mocked(moderateContent).mockClear();
+    profileStore.update(kid.id, { moderationCategories: [] });
+    const unchecked = await send(store.createProject('Vide', kid.id).meta.id);
+    expect(moderateContent).not.toHaveBeenCalled();
+    expect(unchecked.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
   it('retourne 500 avec un FailedStepCode stable (pas le message brut) quand chatWithSources lance', async () => {

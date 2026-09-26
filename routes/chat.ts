@@ -21,9 +21,14 @@ import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import { generateQuiz } from '../generators/quiz.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
-import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
+import { ProfileStore } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 import { moderationRejection } from '../helpers/moderation-http.js';
+import {
+  activeModerationCategories,
+  moderationProfileOf,
+  type ModerationProfile,
+} from '../helpers/moderation-profile.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
@@ -70,8 +75,7 @@ const resolveProjectAndProfile = (
   const pid = req.params.pid;
   const project = store.getProject(pid);
   if (!project) return new ChatValidationError(404, ERR_PROJECT_NOT_FOUND);
-  const profileId = project.meta.profileId;
-  const profile = profileId ? profileStore.get(profileId) : null;
+  const profile = moderationProfileOf(project, profileStore);
   if (profile?.chatEnabled === false) return new ChatValidationError(403, 'chat.ageRestricted');
   return { pid, project, profile };
 };
@@ -97,14 +101,15 @@ const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidation
 
 // unsafe → 400 chat.moderationBlocked ; error (contrat rompu) → 503 moderation.error. Les
 // exceptions de l'API se propagent : le catch de la route répond en 500 JSON (extractErrorCode).
+// Message non vérifié si la modération est inactive OU sans catégorie bloquée (`[]`) : rien à
+// bloquer, pas d'appel facturé.
 const runChatModeration = async (
   client: Mistral,
-  profile: ReturnType<ProfileStore['get']>,
+  profile: ModerationProfile | null,
   message: string,
 ): Promise<ChatValidationError | null> => {
-  if (!profile?.useModeration) return null;
-  const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
-  if (categories.length === 0) return null;
+  const categories = activeModerationCategories(profile);
+  if (!categories || categories.length === 0) return null;
   const modResult = await moderateContent(client, message.trim(), categories);
   const rejection = moderationRejection(modResult.status, 'chat.moderationBlocked');
   return rejection ? new ChatValidationError(rejection.status, rejection.error) : null;

@@ -3323,6 +3323,29 @@ describe('generateRoutes', () => {
       expect(res.status).not.toHaveBeenCalled();
       expect(routeRequest).toHaveBeenCalledTimes(1);
     });
+
+    // Liste vide (modération active, aucune catégorie cochée) : pas de promotion, mais le statut
+    // persisté bloque toujours — la modération reste active.
+    it('liste vide : safe signalante générée, source unsafe persistée toujours bloquée', async () => {
+      const pid = projectWithFlaggedSource(false);
+      const ownerId = store.getProject(pid)!.meta.profileId!;
+      profileStore.update(ownerId, { moderationCategories: [] });
+
+      const generated = await post('/:pid/generate/summary', pid);
+      expect(generated.status).not.toHaveBeenCalled();
+      expect(generated.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
+
+      store.addSource(pid, {
+        id: 'unsafe-src',
+        filename: 'bad.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+        moderation: { status: 'unsafe', categories: {} },
+      });
+      const blocked = await post('/:pid/generate/summary', pid);
+      expect(blocked.status).toHaveBeenCalledWith(400);
+      expect(blocked.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
   });
 
   // --- sourceIds resolution ---
