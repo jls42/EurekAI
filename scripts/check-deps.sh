@@ -83,6 +83,8 @@ if [ -n "${MISTRAL_API_KEY:-}" ]; then export MISTRAL_API_KEY; fi
 # Ctrl-C : timeout se place dans son propre groupe, qu'un Ctrl-C du terminal n'atteint plus. On le
 # lance donc en arrière-plan et on relaie un TERM à son groupe (un job d'arrière-plan de script
 # ignore SIGINT), puis on ré-émet le signal pour arrêter le script (vérifié : aucun survivant).
+# Terminal fermé (SIGHUP) : même relais. Sans trap HUP, le script mourait seul et check-models
+# (timeout, npm exec, tsx, node) continuait jusqu'à 130 s (mesuré : 5 survivants, 0 avec le trap).
 run_bounded() {
   local status=0 bin=""
   if command -v timeout >/dev/null 2>&1; then
@@ -100,8 +102,10 @@ run_bounded() {
   trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - INT; kill -INT \$\$" INT
   # shellcheck disable=SC2064
   trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - TERM; kill -TERM \$\$" TERM
+  # shellcheck disable=SC2064
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - HUP; kill -HUP \$\$" HUP
   wait "$pid" || status=$?
-  trap - INT TERM
+  trap - INT TERM HUP
   if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
     echo "  ⚠ interrompu après 120 s (délai dépassé) — non bloquant"
   fi

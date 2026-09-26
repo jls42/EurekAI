@@ -21,7 +21,8 @@
  * modèle non suivi dans la famille d'un épinglé sans alias (modération).
  *
  * Informatif et **NON BLOQUANT** : `exit 0` toujours, skip sans `MISTRAL_API_KEY`, tolérant au shape de
- * l'API, dégrade gracieusement au diagnostic API-seul si l'overview/Lightpanda échoue. Appelé par
+ * l'API, dégrade gracieusement au diagnostic API-seul si l'overview/Lightpanda échoue ou rend une
+ * table Legacy vide ou partielle (legacyTableProblem). Appelé par
  * `scripts/check-deps.sh` (clé exportée, `timeout`, `|| true`). Usage direct :
  * `(set -a; . ./.env; set +a; npx tsx scripts/check-models.ts)` ou
  * `npx tsx --env-file=.env scripts/check-models.ts`.
@@ -159,6 +160,28 @@ export function parseLegacyTable(markdown: string): Map<string, LegacyEntry> {
   }
   return out;
 }
+
+// Complétude de la table Legacy, relevée sur la table réelle (2026-09-25 : 40 modèles). Seuil bas
+// (la table ne fait que grandir) + sentinelles retirées depuis longtemps, loin du début de la table :
+// un rendu TRONQUÉ par Lightpanda ne passe plus pour complet.
+const LEGACY_MIN_ROWS = 20;
+const LEGACY_SENTINELS: readonly string[] = ['mistral-ocr-2505', 'mistral-moderation-2411'];
+
+/**
+ * Problème de la table Legacy lue, ou null si elle paraît complète. Fonction PURE : vide → table
+ * introuvable ; moins de LEGACY_MIN_ROWS modèles ou une sentinelle absente → table partielle. Dans
+ * tous les cas `main` bascule en diagnostic API seul (retraits NON vérifiés), jamais un faux « OK ».
+ */
+export const legacyTableProblem = (legacy: ReadonlyMap<string, LegacyEntry>): string | null => {
+  if (legacy.size === 0) return 'table Legacy introuvable (0 ligne)';
+  if (legacy.size < LEGACY_MIN_ROWS) {
+    return `table Legacy partielle : ${legacy.size} modèles lus, au moins ${LEGACY_MIN_ROWS} attendus`;
+  }
+  const missing = LEGACY_SENTINELS.filter((id) => !legacy.has(id));
+  return missing.length > 0
+    ? `table Legacy partielle : sentinelle(s) absente(s) ${missing.join(', ')}`
+    : null;
+};
 
 const alertFinding = (message: string): Finding => ({ level: 'alert', message });
 const infoFinding = (message: string): Finding => ({ level: 'info', message });
@@ -473,20 +496,23 @@ export async function fetchModels(key: string): Promise<ModelEntry[]> {
 
 // I/O Lightpanda (non testée : navigateur headless, ~0,5-2 s mesuré le 2026-09-26). Rend l'overview
 // en markdown et parse la table. Table vide = rendu ou format inattendu (page déplacée, colonnes
-// renommées) : on le signale via le catch de loadLegacyTable plutôt que de conclure « rien de
-// retiré » — sinon le diagnostic API seul passerait pour un contrôle complet.
+// renommées), table partielle = rendu tronqué (legacyTableProblem) : on le signale via le catch de
+// loadLegacyTable plutôt que de conclure « rien de retiré » — sinon le diagnostic API seul passerait
+// pour un contrôle complet.
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy ESLint ne résout pas les types @lightpanda/browser (faux positifs) ; couvert par lint:ci local type-aware */
 const fetchLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
   const r = await lightpanda.fetch(OVERVIEW_URL, { dump: true, dumpOptions: { type: 'markdown' } });
   const md = typeof r === 'string' ? r : r.toString('utf-8');
   const table = parseLegacyTable(md);
-  if (table.size === 0) throw new Error('table Legacy introuvable (0 ligne)');
+  const problem = legacyTableProblem(table);
+  if (problem) throw new Error(problem);
   return table;
 };
 /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 
-// Dégradation gracieuse : un échec overview (réseau/Lightpanda) ne casse pas le diagnostic API-seul.
-// null = table Legacy non lue : le « OK » final ne doit alors pas affirmer « aucun retiré ».
+// Dégradation gracieuse : un échec overview (réseau/Lightpanda, table vide ou partielle) ne casse pas
+// le diagnostic API-seul. null = table Legacy non lue ou incomplète : le « OK » final ne doit alors
+// pas affirmer « aucun retiré ».
 const loadLegacyTable = async (): Promise<Map<string, LegacyEntry> | null> => {
   try {
     return await fetchLegacyTable();
@@ -497,11 +523,15 @@ const loadLegacyTable = async (): Promise<Map<string, LegacyEntry> | null> => {
   }
 };
 
-// Sans table Legacy, seuls les constats de l'API sont vérifiés : les retraits ne le sont pas.
-const okLine = (legacyChecked: boolean): string =>
-  legacyChecked
-    ? `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`
-    : `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible).`;
+// Sans table Legacy complète, seuls les constats de l'API sont vérifiés : les retraits ne le sont pas.
+// Corps entre accolades : une flèche à corps-expression sur plusieurs lignes n'est mesurée par
+// Lizard que sur sa première ligne.
+const okLine = (legacyChecked: boolean): string => {
+  if (legacyChecked) {
+    return `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`;
+  }
+  return `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible ou partielle).`;
+};
 
 // Alertes d'abord (en-tête ⚠ + marche à suivre), sinon « OK » ; les informations suivent toujours.
 const reportFindings = (findings: readonly Finding[], legacyChecked: boolean): void => {

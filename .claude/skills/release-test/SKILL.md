@@ -276,7 +276,7 @@ Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alia
    timeout 120 npx tsx --env-file=.env scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` (**toujours** non bloquant).
-   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés` = controle PARTIEL (table Legacy non lue) : a remonter aussi, ce n'est pas un OK complet.
+   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés (table Legacy indisponible ou partielle)` = controle PARTIEL (table Legacy non lue, vide, ou partielle : `table Legacy partielle : N modèles lus...` ou `sentinelle(s) absente(s) ...`, rendu Lightpanda tronque) : a remonter aussi, ce n'est pas un OK complet.
 2. **Path skip** (sans cle) :
    ```bash
    env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"
@@ -285,10 +285,11 @@ Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alia
 3. **Cablage non bloquant** dans `check-deps.sh` (cle exportee, appel borne) + pin moderation coherent :
    ```bash
    grep -n "check-models" scripts/check-deps.sh          # appel via run_bounded, suivi de `|| true`
+   grep -n "trap - INT TERM HUP" scripts/check-deps.sh  # INT, TERM et HUP (terminal ferme) relayes au groupe de timeout
    grep -n "export MISTRAL_API_KEY" scripts/check-deps.sh # sinon check-models skippe "absent"
    grep -n "MODERATION_MODEL =" helpers/moderation-model.ts   # 'mistral-moderation-2603', jamais -latest
    ```
-4. (Unit deja couvert : `parseLegacyTable`, `resolveGroup` (ordre, ambiguite), `findMissing`, `findLaggingDefaults` (retard assume), `findUntrackedFamilyModels`, instantane reel, degradation gracieuse — ne pas redupliquer ici.)
+4. (Unit deja couvert : `parseLegacyTable`, `legacyTableProblem` (table reelle tronquee ou privee d'une sentinelle → degrade), `resolveGroup` (ordre, ambiguite), `findMissing`, `findLaggingDefaults` (retard assume), `findUntrackedFamilyModels`, instantane reel, degradation gracieuse — ne pas redupliquer ici.)
 
 ## Phase 2sexies — Moderation 2 : categories, migration legacy, statuts (fix sept. 2026)
 
@@ -429,7 +430,7 @@ Quand l'app change et que le skill commence a echouer :
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
 - **N generations paralleles (Phase 2ter)** ancree sur `src/app/pending-utils.ts` (`pendingOfTypeExists`) + `body.gid` (UUID v4). Si le contrat gid ou la liberation de `loading[type]` change, mettre a jour la phase.
 - **Dedup sources (Phase 2quater)** ancree sur le contrat `/sources/upload` (array nu en full success, objet `{sources,duplicates?}` sinon, 200 sur lot 100% doublons, `allowDuplicates==='true'` strict) + `contentHash`. Si le contrat reponse evolue, mettre a jour la phase.
-- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda, `WATCHED_MODELS` = alias recopies + OCR_MODELS/MODERATION_MODEL importes des sources uniques, `OCR_DEFAULT_ACCEPTED_LAG`) + son cablage dans `check-deps.sh` (cle exportee, `run_bounded`, `|| true`). Si le script devient bloquant, change de source, de liste surveillee ou de libelles de sortie, mettre a jour la phase.
+- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda, `WATCHED_MODELS` = alias recopies + OCR_MODELS/MODERATION_MODEL importes des sources uniques, `OCR_DEFAULT_ACCEPTED_LAG`) + son cablage dans `check-deps.sh` (cle exportee, `run_bounded` et ses traps INT/TERM/HUP, `|| true`). Si le script devient bloquant, change de source, de liste surveillee ou de libelles de sortie, mettre a jour la phase.
 - **Moderation (Phase 2sexies)** ancree sur `helpers/moderation-model.ts` (taxonomie du modele epingle). Si `MODERATION_MODEL` change, la taxonomie et la table legacy changent avec lui : mettre a jour les assertions A-C (nombre de categories, cles legacy).
 
 Ouvrir une PR `chore(release-test): update for <changement>` quand cette maintenance est faite.

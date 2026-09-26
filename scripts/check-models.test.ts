@@ -18,6 +18,7 @@ import {
   findLaggingDefaults,
   findMissing,
   findUntrackedFamilyModels,
+  legacyTableProblem,
   main,
   parseLegacyTable,
   resolveGroup,
@@ -32,60 +33,68 @@ const LEGACY_MD = [
 ].join('\n');
 
 // Table « Deprecated & retired models » RÉELLE de l'overview (rendu Lightpanda du 2026-09-25, 49
-// lignes dont un séparateur répété et 3 lignes sans id d'API ; URLs des liens abrégées en `u`).
-const REAL_LEGACY = parseLegacyTable(
-  [
-    '| Model | Version | API | DeprecationRetirement | Alternative |',
-    '|---|---|---|---|---|',
-    '',
-    '| [Leanstral ↗](u) | `26.03` | labs\\-leanstral\\-2603 | 5/22/20266/30/2026 | [Leanstral 1.5](u) |',
-    '|---|---|---|---|---|',
-    '| [Mistral Medium 3.1 ↗](u) | `25.08` | mistral\\-medium\\-2508 | 5/22/20268/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Mistral Small 3.2 ↗](u) | `25.06` | mistral\\-small\\-2506 | 4/30/20267/31/2026 | [Mistral Small 4](u) |',
-    '| [Voxtral Mini Transcribe ↗](u) | `25.07` | voxtral\\-mini\\-2507 | 2/27/20265/31/2026 | [Voxtral Mini Transcribe 2](u) |',
-    '| [Devstral 2 ↗](u) | `25.12` | devstral\\-2512 | 5/22/20267/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Magistral Medium 1.1 ↗](u) | `25.07` | magistral\\-medium\\-2507 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
-    '| [Mistral Small Creative ↗](u) | `25.12` | labs\\-mistral\\-small\\-creative | 3/31/20264/30/2026 | [Ministral 3 8B](u) |',
-    '| [Devstral Small 2 ↗](u) | `25.12` | labs\\-devstral\\-small\\-2512 | 2/27/20263/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Magistral Medium 1.2 ↗](u) | `25.09` | magistral\\-medium\\-2509 | 5/22/20267/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Magistral Small 1.2 ↗](u) | `25.09` | magistral\\-small\\-2509 | 4/30/20267/31/2026 | [Mistral Small 4](u) |',
-    '| [Magistral Small 1.1 ↗](u) | `25.07` | magistral\\-small\\-2507 | 10/31/202511/30/2025 | [Mistral Small 4](u) |',
-    '| [Voxtral Mini ↗](u) | `25.07` | voxtral\\-mini\\-2507 | 2/27/20265/31/2026 | [Voxtral Mini Transcribe 2](u) |',
-    '| [Devstral Medium 1.0 ↗](u) | `25.07` | devstral\\-medium\\-2507 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Devstral Small 1.1 ↗](u) | `25.07` | devstral\\-small\\-2507 | 2/27/20265/31/2026 | [Mistral Small 4](u) |',
-    '| [Magistral Medium 1.0 ↗](u) | `25.06` | magistral\\-medium\\-2506 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
-    '| [Magistral Small 1.0 ↗](u) | `25.06` | magistral\\-small\\-2506 | 10/31/202511/30/2025 | [Mistral Small 4](u) |',
-    '| [OCR 2 ↗](u) | `25.05` | mistral\\-ocr\\-2505 | 2/27/20265/31/2026 | [OCR 4.1](u) |',
-    '| [Devstral Small 1.0 ↗](u) | `25.05` | devstral\\-small\\-2505 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
-    '| [Mistral Medium 3 ↗](u) | `25.05` | mistral\\-medium\\-2505 | 5/22/20268/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Mistral Small 3.1 ↗](u) | `25.03` | mistral\\-small\\-2503 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
-    '| [OCR ↗](u) | `25.03` | mistral\\-ocr\\-2503 | 12/2/202512/31/2025 | [OCR 4.1](u) |',
-    '| [Mistral Saba ↗](u) | `25.02` | mistral\\-saba\\-2502 | 6/10/20259/30/2025 | [Mistral Small 4](u) |',
-    '| [Mistral Small 3.0 ↗](u) | `25.01` | mistral\\-small\\-2501 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
-    '| [Codestral ↗](u) | `25.01` | codestral\\-2501 | 11/6/202511/30/2025 | [Codestral](u) |',
-    '| [Mistral Large 2.1 ↗](u) | `24.11` | mistral\\-large\\-2411 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Pixtral Large ↗](u) | `24.11` | pixtral\\-large\\-2411 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
-    '| [Mistral Moderation ↗](u) | `24.11` | mistral\\-moderation\\-2411 | 3/31/20266/30/2026 | [Mistral Moderation 2](u) |',
-    '| [Ministral 3B ↗](u) | `24.1` | ministral\\-3b\\-2410 | 12/2/202512/31/2025 | [Ministral 3 3B](u) |',
-    '| [Ministral 8B ↗](u) | `24.1` | ministral\\-8b\\-2410 | 12/2/202512/31/2025 | [Ministral 3 8B](u) |',
-    '| [Mistral Small 2.0 ↗](u) | `24.09` | mistral\\-small\\-2409 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
-    '| [Pixtral 12B ↗](u) | `24.09` | pixtral\\-12b\\-2409 | 12/2/202512/31/2025 | [Ministral 3 14B](u) |',
-    '| [Mistral Large 2.0 ↗](u) | `24.07` | mistral\\-large\\-2407 | 11/30/20243/30/2025 | [Mistral Large 3](u) |',
-    '| [Mistral Nemo 12B ↗](u) | `24.07` | open\\-mistral\\-nemo\\-2407 | 5/22/20267/31/2026 | [Ministral 3 8B](u) |',
-    '| [Codestral Mamba 7B ↗](u) | `0.1` | open\\-codestral\\-mamba | 6/6/20256/6/2025 | [Codestral](u) |',
-    '| [Mathstral 7B ↗](u) | `0.1` |  |  | [Mistral Small 4](u) |',
-    '| [Codestral ↗](u) | `24.05` | codestral\\-2405 | 12/2/20246/16/2025 | [Codestral](u) |',
-    '| [Mistral 7B ↗](u) | `0.3` | open\\-mistral\\-7b | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
-    '| [Mixtral 8x22B ↗](u) | `0.1\\-0.3` | open\\-mixtral\\-8x22b | 11/30/20243/30/2025 | [Mistral Small 4](u) |',
-    '| [Mistral Small 1.0 ↗](u) | `24.02` | mistral\\-small\\-2402 | 11/30/20246/16/2025 | [Mistral Small 4](u) |',
-    '| [Mistral Large 1.0 ↗](u) | `24.02` | mistral\\-large\\-2402 | 11/30/20246/16/2025 | [Mistral Large 3](u) |',
-    '| [Mistral Next ↗](u) | `` |  |  | [Mistral Large 3](u) |',
-    '| [Mistral Medium 1.0 ↗](u) | `23.12` | mistral\\-medium\\-2312 | 11/30/20246/16/2025 | [Mistral Medium 3.5](u) |',
-    '| [Mixtral 8x7B ↗](u) | `0.1` | open\\-mixtral\\-8x7b | 11/30/20243/30/2025 | [Mistral Small 4](u) |',
-    '| [Mistral 7B ↗](u) | `0.2` | open\\-mistral\\-7b | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
-    '| [Mistral 7B ↗](u) | `0.1` |  | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
-  ].join('\n'),
-);
+// lignes dont un séparateur répété et 3 lignes sans id d'API ; URLs des liens abrégées en `u`) :
+// 40 modèles, sentinelles de complétude comprises (mistral-ocr-2505, mistral-moderation-2411).
+const REAL_LEGACY_MD = [
+  '| Model | Version | API | DeprecationRetirement | Alternative |',
+  '|---|---|---|---|---|',
+  '',
+  '| [Leanstral ↗](u) | `26.03` | labs\\-leanstral\\-2603 | 5/22/20266/30/2026 | [Leanstral 1.5](u) |',
+  '|---|---|---|---|---|',
+  '| [Mistral Medium 3.1 ↗](u) | `25.08` | mistral\\-medium\\-2508 | 5/22/20268/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Mistral Small 3.2 ↗](u) | `25.06` | mistral\\-small\\-2506 | 4/30/20267/31/2026 | [Mistral Small 4](u) |',
+  '| [Voxtral Mini Transcribe ↗](u) | `25.07` | voxtral\\-mini\\-2507 | 2/27/20265/31/2026 | [Voxtral Mini Transcribe 2](u) |',
+  '| [Devstral 2 ↗](u) | `25.12` | devstral\\-2512 | 5/22/20267/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Magistral Medium 1.1 ↗](u) | `25.07` | magistral\\-medium\\-2507 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
+  '| [Mistral Small Creative ↗](u) | `25.12` | labs\\-mistral\\-small\\-creative | 3/31/20264/30/2026 | [Ministral 3 8B](u) |',
+  '| [Devstral Small 2 ↗](u) | `25.12` | labs\\-devstral\\-small\\-2512 | 2/27/20263/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Magistral Medium 1.2 ↗](u) | `25.09` | magistral\\-medium\\-2509 | 5/22/20267/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Magistral Small 1.2 ↗](u) | `25.09` | magistral\\-small\\-2509 | 4/30/20267/31/2026 | [Mistral Small 4](u) |',
+  '| [Magistral Small 1.1 ↗](u) | `25.07` | magistral\\-small\\-2507 | 10/31/202511/30/2025 | [Mistral Small 4](u) |',
+  '| [Voxtral Mini ↗](u) | `25.07` | voxtral\\-mini\\-2507 | 2/27/20265/31/2026 | [Voxtral Mini Transcribe 2](u) |',
+  '| [Devstral Medium 1.0 ↗](u) | `25.07` | devstral\\-medium\\-2507 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Devstral Small 1.1 ↗](u) | `25.07` | devstral\\-small\\-2507 | 2/27/20265/31/2026 | [Mistral Small 4](u) |',
+  '| [Magistral Medium 1.0 ↗](u) | `25.06` | magistral\\-medium\\-2506 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
+  '| [Magistral Small 1.0 ↗](u) | `25.06` | magistral\\-small\\-2506 | 10/31/202511/30/2025 | [Mistral Small 4](u) |',
+  '| [OCR 2 ↗](u) | `25.05` | mistral\\-ocr\\-2505 | 2/27/20265/31/2026 | [OCR 4.1](u) |',
+  '| [Devstral Small 1.0 ↗](u) | `25.05` | devstral\\-small\\-2505 | 10/31/202511/30/2025 | [Mistral Medium 3.5](u) |',
+  '| [Mistral Medium 3 ↗](u) | `25.05` | mistral\\-medium\\-2505 | 5/22/20268/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Mistral Small 3.1 ↗](u) | `25.03` | mistral\\-small\\-2503 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
+  '| [OCR ↗](u) | `25.03` | mistral\\-ocr\\-2503 | 12/2/202512/31/2025 | [OCR 4.1](u) |',
+  '| [Mistral Saba ↗](u) | `25.02` | mistral\\-saba\\-2502 | 6/10/20259/30/2025 | [Mistral Small 4](u) |',
+  '| [Mistral Small 3.0 ↗](u) | `25.01` | mistral\\-small\\-2501 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
+  '| [Codestral ↗](u) | `25.01` | codestral\\-2501 | 11/6/202511/30/2025 | [Codestral](u) |',
+  '| [Mistral Large 2.1 ↗](u) | `24.11` | mistral\\-large\\-2411 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Pixtral Large ↗](u) | `24.11` | pixtral\\-large\\-2411 | 2/27/20265/31/2026 | [Mistral Medium 3.5](u) |',
+  '| [Mistral Moderation ↗](u) | `24.11` | mistral\\-moderation\\-2411 | 3/31/20266/30/2026 | [Mistral Moderation 2](u) |',
+  '| [Ministral 3B ↗](u) | `24.1` | ministral\\-3b\\-2410 | 12/2/202512/31/2025 | [Ministral 3 3B](u) |',
+  '| [Ministral 8B ↗](u) | `24.1` | ministral\\-8b\\-2410 | 12/2/202512/31/2025 | [Ministral 3 8B](u) |',
+  '| [Mistral Small 2.0 ↗](u) | `24.09` | mistral\\-small\\-2409 | 11/6/202511/30/2025 | [Mistral Small 4](u) |',
+  '| [Pixtral 12B ↗](u) | `24.09` | pixtral\\-12b\\-2409 | 12/2/202512/31/2025 | [Ministral 3 14B](u) |',
+  '| [Mistral Large 2.0 ↗](u) | `24.07` | mistral\\-large\\-2407 | 11/30/20243/30/2025 | [Mistral Large 3](u) |',
+  '| [Mistral Nemo 12B ↗](u) | `24.07` | open\\-mistral\\-nemo\\-2407 | 5/22/20267/31/2026 | [Ministral 3 8B](u) |',
+  '| [Codestral Mamba 7B ↗](u) | `0.1` | open\\-codestral\\-mamba | 6/6/20256/6/2025 | [Codestral](u) |',
+  '| [Mathstral 7B ↗](u) | `0.1` |  |  | [Mistral Small 4](u) |',
+  '| [Codestral ↗](u) | `24.05` | codestral\\-2405 | 12/2/20246/16/2025 | [Codestral](u) |',
+  '| [Mistral 7B ↗](u) | `0.3` | open\\-mistral\\-7b | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
+  '| [Mixtral 8x22B ↗](u) | `0.1\\-0.3` | open\\-mixtral\\-8x22b | 11/30/20243/30/2025 | [Mistral Small 4](u) |',
+  '| [Mistral Small 1.0 ↗](u) | `24.02` | mistral\\-small\\-2402 | 11/30/20246/16/2025 | [Mistral Small 4](u) |',
+  '| [Mistral Large 1.0 ↗](u) | `24.02` | mistral\\-large\\-2402 | 11/30/20246/16/2025 | [Mistral Large 3](u) |',
+  '| [Mistral Next ↗](u) | `` |  |  | [Mistral Large 3](u) |',
+  '| [Mistral Medium 1.0 ↗](u) | `23.12` | mistral\\-medium\\-2312 | 11/30/20246/16/2025 | [Mistral Medium 3.5](u) |',
+  '| [Mixtral 8x7B ↗](u) | `0.1` | open\\-mixtral\\-8x7b | 11/30/20243/30/2025 | [Mistral Small 4](u) |',
+  '| [Mistral 7B ↗](u) | `0.2` | open\\-mistral\\-7b | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
+  '| [Mistral 7B ↗](u) | `0.1` |  | 11/30/20243/30/2025 | [Ministral 3 8B](u) |',
+].join('\n');
+const REAL_LEGACY = parseLegacyTable(REAL_LEGACY_MD);
+
+// Rendus dégradés de la table réelle : tronquée (10 premières lignes), privée de lignes données.
+const truncatedLegacyMd = (lines: number): string =>
+  REAL_LEGACY_MD.split('\n').slice(0, lines).join('\n');
+const legacyMdWithout = (...escapedIds: string[]): string =>
+  REAL_LEGACY_MD.split('\n')
+    .filter((line) => !escapedIds.some((id) => line.includes(id)))
+    .join('\n');
 
 // Forme RÉELLE de /v1/models (mesurée 2026-09-25) : chaque nom d'un modèle est SA PROPRE entrée,
 // qui liste ses frères dans `aliases`.
@@ -191,6 +200,48 @@ describe('parseLegacyTable', () => {
       alternative: 'Mistral Moderation 2',
     });
     expect(REAL_LEGACY.get('mistral-ocr-2505')?.alternative).toBe('OCR 4.1');
+  });
+});
+
+// Rendu TRONQUÉ de l'overview (Lightpanda) : sans contrôle de complétude, une table partielle
+// passait pour complète et les retraits absents étaient déclarés « OK ».
+describe('legacyTableProblem (complétude de la table Legacy)', () => {
+  it('real table (40 models, both sentinels) → complete', () => {
+    expect(legacyTableProblem(REAL_LEGACY)).toBeNull();
+  });
+
+  it('table truncated to 10 lines → partial (6 models < 20)', () => {
+    expect(legacyTableProblem(parseLegacyTable(truncatedLegacyMd(10)))).toBe(
+      'table Legacy partielle : 6 modèles lus, au moins 20 attendus',
+    );
+  });
+
+  it('below the threshold even with both sentinels → partial', () => {
+    expect(legacyTableProblem(parseLegacyTable(LEGACY_MD))).toBe(
+      'table Legacy partielle : 2 modèles lus, au moins 20 attendus',
+    );
+  });
+
+  it('truncated after the threshold (30 lines, 25 models) → the missing sentinel gives it away', () => {
+    expect(legacyTableProblem(parseLegacyTable(truncatedLegacyMd(30)))).toBe(
+      'table Legacy partielle : sentinelle(s) absente(s) mistral-moderation-2411',
+    );
+  });
+
+  it('a sentinel row missing from an otherwise full table → partial', () => {
+    const table = parseLegacyTable(legacyMdWithout('mistral\\-ocr\\-2505'));
+    expect(table.size).toBe(39);
+    expect(legacyTableProblem(table)).toBe(
+      'table Legacy partielle : sentinelle(s) absente(s) mistral-ocr-2505',
+    );
+    const neither = legacyMdWithout('mistral\\-ocr\\-2505', 'mistral\\-moderation\\-2411');
+    expect(legacyTableProblem(parseLegacyTable(neither))).toBe(
+      'table Legacy partielle : sentinelle(s) absente(s) mistral-ocr-2505, mistral-moderation-2411',
+    );
+  });
+
+  it('empty table → not found (unchanged message)', () => {
+    expect(legacyTableProblem(new Map())).toBe('table Legacy introuvable (0 ligne)');
   });
 });
 
@@ -638,9 +689,9 @@ describe('fetchModels', () => {
 
 describe('main (orchestration, non bloquant)', () => {
   const origKey = process.env.MISTRAL_API_KEY;
-  // Overview saine par défaut : 2 lignes Legacy étrangères aux modèles surveillés.
+  // Overview saine par défaut : la table Legacy réelle complète (aucun modèle surveillé listé).
   beforeEach(() => {
-    lightpandaFetch.mockResolvedValue(LEGACY_MD);
+    lightpandaFetch.mockResolvedValue(REAL_LEGACY_MD);
   });
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -693,8 +744,8 @@ describe('main (orchestration, non bloquant)', () => {
     ]);
   });
 
-  // Sans table Legacy : OK limité à l'API, retraits explicitement non vérifiés.
-  const DEGRADED_OK = `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible).`;
+  // Sans table Legacy complète : OK limité à l'API, retraits explicitement non vérifiés.
+  const DEGRADED_OK = `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible ou partielle).`;
 
   it('degrades to the API-only diagnosis when the overview cannot be rendered', async () => {
     lightpandaFetch.mockRejectedValueOnce(new Error('lightpanda down'));
@@ -715,6 +766,24 @@ describe('main (orchestration, non bloquant)', () => {
     ]);
     // « aucun retiré » n'est pas vérifiable sans la table : jamais affirmé.
     expect(DEGRADED_OK).not.toContain('retiré ni');
+  });
+
+  it('degrades (never a false OK) when the overview renders a table truncated to 10 lines', async () => {
+    lightpandaFetch.mockResolvedValueOnce(truncatedLegacyMd(10));
+    const lines = await run({ data: watchedData() });
+    expect(lines).toEqual([
+      'check-models: overview indisponible (table Legacy partielle : 6 modèles lus, au moins 20 attendus) — diagnostic API seul.',
+      DEGRADED_OK,
+    ]);
+  });
+
+  it('degrades when a sentinel row is missing from the Legacy table', async () => {
+    lightpandaFetch.mockResolvedValueOnce(legacyMdWithout('mistral\\-moderation\\-2411'));
+    const lines = await run({ data: watchedData() });
+    expect(lines).toEqual([
+      'check-models: overview indisponible (table Legacy partielle : sentinelle(s) absente(s) mistral-moderation-2411) — diagnostic API seul.',
+      DEGRADED_OK,
+    ]);
   });
 
   it('never throws when the API call fails (exit 0 spirit)', async () => {
