@@ -245,6 +245,7 @@ export const fr: Record<string, string> = {
   'sources.viewCompare': 'Voir et comparer',
   'sources.viewText': 'Voir le texte',
   'sources.deleteSource': 'Supprimer la source',
+  'sources.recheckModeration': 'Revérifier',
   'sources.emptyTitle': 'Ajoute une photo ou du texte',
   'sources.emptySubtitle': 'Utilise les boutons ci-dessus pour commencer',
   'sources.dragDrop': 'Glisser-déposer des fichiers ici',
@@ -483,6 +484,7 @@ export const fr: Record<string, string> = {
   'toast.remediationQuizError': "Le quiz d'entraînement n'a pas pu être généré",
   // Moderation
   'moderation.blocked': 'Ce contenu a été signalé comme inapproprié. La génération est bloquée.',
+  'moderation.checking': 'Vérification des sources…',
   'moderation.pending': 'Modération en cours',
   'moderation.error': 'Modération indisponible',
   'moderation.unsafe': 'Contenu signalé',

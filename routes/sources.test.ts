@@ -24,9 +24,13 @@ import { logger } from '../helpers/logger.js';
 
 // La clé est résolue par requête : on mocke la factory pour retourner un client stub
 // (les generators sont eux-mêmes mockés). requireKeyMiddleware = pass-through.
-const { mockClient } = vi.hoisted(() => ({ mockClient: {} as unknown }));
+// `authState.override` simule un échec de résolution (401/400), réinitialisé en afterEach.
+const { mockClient, authState } = vi.hoisted(() => ({
+  mockClient: {} as unknown,
+  authState: { override: null as { ok: false; status: number; error: string } | null },
+}));
 vi.mock('../helpers/mistral-client-factory.js', () => ({
-  resolveClient: () => ({ ok: true, client: mockClient, fingerprint: 'test' }),
+  resolveClient: () => authState.override ?? { ok: true, client: mockClient, fingerprint: 'test' },
   requireKeyMiddleware: (_req: unknown, _res: unknown, next: () => void) => next(),
 }));
 
@@ -76,6 +80,8 @@ import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
 import { fetchPageContent } from '../helpers/index.js';
+import { MODERATION_WAIT_MS } from '../helpers/source-moderation.js';
+import type { ModerationStatus } from '../types.js';
 
 // --- Helpers ---
 
@@ -115,6 +121,7 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tempDir, { recursive: true, force: true });
+  authState.override = null;
 });
 
 // --- Helper: create a project with optional moderation-enabled profile ---
@@ -700,6 +707,183 @@ describe('POST /:pid/moderate', () => {
       delete stub.classifiers;
       errorSpy.mockRestore();
     }
+  });
+});
+
+// =============================================================================
+// POST /:pid/sources/moderate (vérification à la demande)
+// =============================================================================
+
+describe('POST /:pid/sources/moderate', () => {
+  const PATH = '/:pid/sources/moderate';
+
+  const addModeratedSource = (pid: string, id: string, status?: ModerationStatus) =>
+    store.addSource(pid, {
+      id,
+      filename: `${id}.txt`,
+      markdown: `MD-${id}`,
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'text',
+      ...(status && { moderation: { status, categories: {} } }),
+    });
+
+  const post = async (pid: string, body: unknown = {}) => {
+    const res = mockRes();
+    await getHandler(router, 'post', PATH)(mockReq({ params: { pid }, body }), res);
+    return res;
+  };
+
+  it('auth-first : clé non résolue → 401 avant toute lecture ou validation', async () => {
+    authState.override = { ok: false, status: 401, error: 'auth_required' };
+
+    const res = await post('inconnu', { sourceIds: 'invalide' });
+
+    expect(res.status).toHaveBeenCalledWith(401);
+    expect(res.json).toHaveBeenCalledWith({ error: 'auth_required' });
+  });
+
+  it.each(['inconnu', '../evasion'])('projet %s → 404, aucune modération', async (pid) => {
+    const res = await post(pid);
+
+    expect(res.status).toHaveBeenCalledWith(404);
+    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(moderateContent).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['chaîne', 's1'],
+    ['objet', { id: 's1' }],
+    ['null', null],
+    ['élément non chaîne', ['s1', 42]],
+    ['51 éléments', Array.from({ length: 51 }, (_, i) => `s${i}`)],
+  ])(
+    'sourceIds invalide (%s) → 400 invalid_input, aucune modération',
+    async (_label, sourceIds) => {
+      const { project } = createProjectWithProfile();
+      addModeratedSource(project.meta.id, 's1', 'pending');
+
+      const res = await post(project.meta.id, { sourceIds });
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
+      expect(moderateContent).not.toHaveBeenCalled();
+    },
+  );
+
+  it('50 éléments : accepté (plafond inclus)', async () => {
+    const { project } = createProjectWithProfile();
+    addModeratedSource(project.meta.id, 's0', 'safe');
+
+    const res = await post(project.meta.id, {
+      sourceIds: Array.from({ length: 50 }, (_, i) => `s${i}`),
+    });
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      sources: [{ id: 's0', moderation: { status: 'safe', categories: {} } }],
+    });
+  });
+
+  it('profil non modéré : rien n’est lancé, statuts actuels', async () => {
+    const { project } = createProjectWithProfile({ useModeration: false });
+    addModeratedSource(project.meta.id, 's1', 'pending');
+    addModeratedSource(project.meta.id, 's2');
+
+    const res = await post(project.meta.id);
+
+    expect(moderateContent).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }, { id: 's2' }],
+    });
+  });
+
+  it('sources en attente ou en erreur remodérées avec les catégories du profil, statuts relus', async () => {
+    const { project } = createProjectWithProfile();
+    const pid = project.meta.id;
+    addModeratedSource(pid, 's-pending', 'pending');
+    addModeratedSource(pid, 's-error', 'error');
+    addModeratedSource(pid, 's-safe', 'safe');
+    vi.mocked(moderateContent)
+      .mockResolvedValueOnce({ status: 'safe', categories: {} })
+      .mockResolvedValueOnce({ status: 'unsafe', categories: { sexual: true } });
+
+    const res = await post(pid);
+
+    expect(moderateContent).toHaveBeenCalledTimes(2);
+    expect(moderateContent).toHaveBeenCalledWith(
+      client,
+      'MD-s-pending',
+      MODERATION_CATEGORIES.enfant,
+    );
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith({
+      sources: [
+        { id: 's-pending', moderation: { status: 'safe', categories: {} } },
+        { id: 's-error', moderation: { status: 'unsafe', categories: { sexual: true } } },
+        { id: 's-safe', moderation: { status: 'safe', categories: {} } },
+      ],
+    });
+  });
+
+  it('sourceIds : seules les sources visées sont vérifiées et renvoyées', async () => {
+    const { project } = createProjectWithProfile();
+    const pid = project.meta.id;
+    addModeratedSource(pid, 's1', 'pending');
+    addModeratedSource(pid, 's2', 'pending');
+
+    const res = await post(pid, { sourceIds: ['s2'] });
+
+    expect(moderateContent).toHaveBeenCalledTimes(1);
+    expect(moderateContent).toHaveBeenCalledWith(client, 'MD-s2', MODERATION_CATEGORIES.enfant);
+    expect(res.json).toHaveBeenCalledWith({
+      sources: [{ id: 's2', moderation: { status: 'safe', categories: {} } }],
+    });
+    expect(store.getProject(pid)!.sources[0].moderation?.status).toBe('pending');
+  });
+
+  it('vérification plus longue que MODERATION_WAIT_MS.recheck : 200 avec le statut en attente', async () => {
+    const { project } = createProjectWithProfile();
+    const pid = project.meta.id;
+    addModeratedSource(pid, 's1', 'pending');
+    vi.mocked(moderateContent).mockReturnValueOnce(new Promise(() => undefined));
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const res = mockRes();
+      const sending = getHandler(router, 'post', PATH)(mockReq({ params: { pid } }), res);
+      await vi.advanceTimersByTimeAsync(MODERATION_WAIT_MS.recheck - 1);
+      expect(res.json).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await sending;
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({
+        sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('exception inattendue → 500 au code stable, sans message brut', async () => {
+    const { project } = createProjectWithProfile();
+    const pid = project.meta.id;
+    addModeratedSource(pid, 's1', 'safe');
+    const readProject = store.getProject.bind(store);
+    // Existence du projet et reprise : lectures réelles ; relecture de la réponse : échec disque.
+    vi.spyOn(store, 'getProject')
+      .mockImplementationOnce(readProject)
+      .mockImplementationOnce(readProject)
+      .mockImplementationOnce(() => {
+        throw new Error('EACCES /srv/secret/project.json');
+      });
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const res = await post(pid);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'internal_error' });
+    expect(errorSpy).toHaveBeenCalledWith('moderation', 'recheck error:', expect.any(Error));
+    errorSpy.mockRestore();
   });
 });
 

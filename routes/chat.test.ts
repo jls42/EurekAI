@@ -19,6 +19,8 @@ import { MODERATION_CATEGORIES, ProfileStore } from '../profiles.js';
 import { chatRoutes } from './chat.js';
 import { chatNoSourcesNotice } from '../prompts.js';
 import { logger } from '../helpers/logger.js';
+import { moderateContent } from '../generators/moderation.js';
+import { MODERATION_WAIT_MS } from '../helpers/source-moderation.js';
 import type { ModerationStatus } from '../types.js';
 
 // --- Mocks ---
@@ -37,8 +39,10 @@ vi.mock('../generators/chat.js', () => ({
   chatWithSources: vi.fn().mockResolvedValue({ reply: 'Hello!', toolCalls: [] }),
 }));
 
+// Défaut `safe` (message et sources), rétabli avant chaque test : mockReset rend l'implémentation
+// passée à vi.fn.
 vi.mock('../generators/moderation.js', () => ({
-  moderateContent: vi.fn().mockResolvedValue({ status: 'safe', categories: {} }),
+  moderateContent: vi.fn(async () => ({ status: 'safe', categories: {} })),
 }));
 
 vi.mock('../generators/summary.js', () => ({
@@ -124,6 +128,7 @@ beforeEach(() => {
   profileStore = new ProfileStore(tempDir);
   router = chatRoutes(store, profileStore);
   vi.clearAllMocks();
+  vi.mocked(moderateContent).mockReset();
 });
 
 afterEach(() => {
@@ -835,6 +840,16 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
   const KEPT = ['src-safe', 'src-none'];
   const EXCLUDED = ['src-unsafe', 'src-error', 'src-pending', 'src-weird'];
 
+  // Les modérations en attente ou en erreur sont relancées avant le filtre
+  // (helpers/source-moderation.ts) : ici elles échouent encore (`error`), les sources restent
+  // exclues. Le message, lui, est vérifié `safe`.
+  beforeEach(() => {
+    vi.mocked(moderateContent).mockImplementation(async (_client, text) => ({
+      status: text.startsWith('MD-') ? 'error' : 'safe',
+      categories: {},
+    }));
+  });
+
   const addModeratedSources = (pid: string, ids = SOURCES.map((s) => s.id)) => {
     for (const { id, status } of SOURCES.filter((s) => ids.includes(s.id))) {
       store.addSource(pid, {
@@ -927,6 +942,8 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
 
     const res = await sendMessage(pid);
 
+    expect(moderateContent).not.toHaveBeenCalled();
+
     const context: string = (chatWithSources as any).mock.calls[0][2];
     const toolMarkdown: string = (generateSummary as any).mock.calls[0][1];
     for (const { id } of SOURCES) {
@@ -934,6 +951,58 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
       expect(toolMarkdown).toContain(`MD-${id}`);
     }
     expect(res.json.mock.calls[0][0].generations[0].sourceIds).toEqual(SOURCES.map((s) => s.id));
+  });
+
+  it('source en attente vérifiée avant le filtre : elle entre dans le contexte et les outils', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    vi.mocked(moderateContent).mockResolvedValue({ status: 'safe', categories: {} });
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'ok',
+      toolCalls: ['generate_summary'],
+    });
+    const pid = createChatProject(true);
+    addModeratedSources(pid, ['src-safe', 'src-pending', 'src-error']);
+
+    const res = await sendMessage(pid);
+
+    const moderated = vi.mocked(moderateContent).mock.calls.map((c) => c[1]);
+    expect(moderated).toEqual(expect.arrayContaining(['MD-src-pending', 'MD-src-error']));
+    const context: string = (chatWithSources as any).mock.calls[0][2];
+    for (const id of ['src-safe', 'src-pending', 'src-error']) {
+      expect(context).toContain(`MD-${id}`);
+    }
+    // Ordre du projet (SOURCES) : safe, error, pending.
+    expect(res.json.mock.calls[0][0].generations[0].sourceIds).toEqual([
+      'src-safe',
+      'src-error',
+      'src-pending',
+    ]);
+    expect(generateSummary).toHaveBeenCalledTimes(1);
+  });
+
+  it('vérification plus longue que MODERATION_WAIT_MS.chat : réponse sans la source', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    vi.mocked(moderateContent).mockImplementation((_client, text) =>
+      text.startsWith('MD-')
+        ? new Promise(() => undefined)
+        : Promise.resolve({ status: 'safe', categories: {} }),
+    );
+    const pid = createChatProject(true);
+    addModeratedSources(pid, ['src-safe', 'src-pending']);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const sending = sendMessage(pid);
+      await vi.advanceTimersByTimeAsync(MODERATION_WAIT_MS.chat);
+      const res = await sending;
+      expect(res.status).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const context: string = (chatWithSources as any).mock.calls[0][2];
+    expect(context).toContain('MD-src-safe');
+    expect(context).not.toContain('src-pending');
   });
 
   it('journalise le seul nombre de sources exclues, jamais leur nom ni leur contenu', async () => {

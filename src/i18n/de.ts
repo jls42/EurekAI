@@ -237,6 +237,7 @@ export const de: Record<string, string> = {
   'sources.viewCompare': 'Ansehen und vergleichen',
   'sources.viewText': 'Text anzeigen',
   'sources.deleteSource': 'Quelle l\u00f6schen',
+  'sources.recheckModeration': 'Erneut prüfen',
   'sources.emptyTitle': 'F\u00fcge ein Foto oder einen Text hinzu',
   'sources.emptySubtitle': 'Nutze die Buttons oben um loszulegen',
   'sources.dragDrop': 'Dateien hier ablegen',
@@ -464,6 +465,7 @@ export const de: Record<string, string> = {
   'toast.remediationQuizError': 'Das Übungsquiz konnte nicht erstellt werden',
   'moderation.blocked':
     'Dieser Inhalt wurde als unangemessen eingestuft. Die Generierung ist blockiert.',
+  'moderation.checking': 'Quellen werden geprüft…',
   'moderation.pending': 'Moderation l\u00e4uft',
   'moderation.error': 'Moderation nicht verf\u00fcgbar',
   'moderation.unsafe': 'Gemeldeter Inhalt',

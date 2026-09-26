@@ -41,6 +41,11 @@ const FILL_BLANK = 'fill-blank';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
 import { selectChatSources } from '../helpers/chat-sources.js';
+import {
+  MODERATION_WAIT_MS,
+  settleSourceModeration,
+  type SettleDeps,
+} from '../helpers/source-moderation.js';
 import { INVALID_INPUT, readLocaleFields } from '../helpers/request-validation.js';
 
 type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
@@ -304,6 +309,19 @@ const appendUserAndBuildHistory = (
   return history;
 };
 
+// Modérations en attente ou en erreur reprises AVANT le filtre des sources (attente de
+// MODERATION_WAIT_MS.chat au plus), puis projet relu : une source vérifiée entre dans le contexte
+// au lieu d'en être exclue. Profil propriétaire non modéré : rien n'est lancé. Repli sur le projet
+// déjà chargé s'il n'est plus lisible.
+const settleChatProject = async (
+  deps: SettleDeps,
+  pid: string,
+  project: ChatProject,
+): Promise<ChatProject> => {
+  await settleSourceModeration(deps, pid, { waitMs: MODERATION_WAIT_MS.chat });
+  return deps.store.getProject(pid) ?? project;
+};
+
 // Sources du chat (contexte ET outils), calculées une fois par message : sans ce filtre, une source
 // que la génération refuse (unsafe/error/pending) partait quand même au LLM et dans les générations
 // par outil. Seul le NOMBRE de sources exclues est journalisé, jamais leur contenu ni leur nom.
@@ -433,7 +451,9 @@ export function chatRoutes(store: ProjectStore, profileStore: ProfileStore): Rou
         res.status(validated.status).json({ error: validated.error });
         return;
       }
-      const { project, profile, message, lang, ageGroup } = validated;
+      const { profile, message, lang, ageGroup } = validated;
+      const deps = { store, profileStore, client };
+      const project = await settleChatProject(deps, pid, validated.project);
       const sources = resolveChatSources(project, profile);
       const historyForApi = appendUserAndBuildHistory(store, pid, project, message);
       const sourceContext = buildSourceContext(sources, lang);

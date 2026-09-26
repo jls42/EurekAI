@@ -1,6 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { withAiHeaders } from '../app/ai-fetch';
-import { canStartGenerate, registerGeneration } from '../app/generate';
+import { registerGeneration } from '../app/generate';
+import { ensureGenerationAllowed } from '../app/moderation-gate';
 import { getLocale } from '../i18n/index';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
@@ -246,12 +247,13 @@ const settleRemediationTarget = function (
 // résultat). Succès partiel : chaque génération obtenue est affichée même si
 // l'autre a échoué. Chaque échec propose un réessai ciblé (cf. retryRemediationTarget).
 // Pré-contrôle (projet, modération du profil) sur les sources du quiz d'origine, celles que le
-// serveur garde : même statut effectif et même toast que les autres générations.
+// serveur garde : même statut effectif et même toast que les autres générations, sources en
+// attente ou en erreur vérifiées d'abord (ensureGenerationAllowed), avant `reviewing`.
 // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy (ESLint sans résolution de types) compte le param `this` typé comme unused.
 const remediate = async function (this: QuizContext) {
   const weakQuestions = collectWeakQuestions(this.items(), this.answers);
   if (weakQuestions.length === 0) return;
-  if (!canStartGenerate(this, quizSourceIds(this.gen))) return;
+  if (!(await ensureGenerationAllowed(this, quizSourceIds(this.gen)))) return;
 
   this.reviewing = true;
   const [fiche, quiz] = await Promise.allSettled([

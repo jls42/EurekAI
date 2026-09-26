@@ -113,6 +113,8 @@ type UploadSession = {
 const initSourceState = () => ({
   sources: [] as Source[],
   selectedIds: [] as string[],
+  // Sources dont la vérification « Revérifier » est en cours (bouton désactivé), par id.
+  recheckingSources: {} as Record<string, boolean>,
   uploadSessions: [] as UploadSession[],
   dragging: false,
   viewSource: null as Source | null,

@@ -194,7 +194,7 @@ Couvre l'invariant PR #42 : re-cliquer un bouton de generation lance une generat
 
 ```bash
 grep -n "pendingOfTypeExists" src/app/pending-utils.ts src/app/helpers.ts
-grep -nE "canStartGenerate|loading\[" src/app/generate.ts | head
+grep -nE "canStartGenerate|ensureGenerationAllowed|loading\[" src/app/generate.ts src/app/moderation-gate.ts | head
 ```
 
 ### A — Lancement parallele (API, deterministe, ~2x cout d'un generateur rapide)

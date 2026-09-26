@@ -69,6 +69,7 @@ const state = vi.hoisted(() => {
       listProjects: ReturnType<typeof vi.fn>;
       migrateFromLegacy: ReturnType<typeof vi.fn>;
     }[],
+    resumeModerationAtBoot: vi.fn(() => Promise.resolve(0)),
     routeFactory: vi.fn(() => routeMiddleware),
     setModelLimits: vi.fn(),
     setVoiceCache: vi.fn(),
@@ -110,6 +111,9 @@ vi.mock('./config.js', () => ({
   setVoiceCache: state.setVoiceCache,
 }));
 vi.mock('./generators/tts-provider.js', () => ({ listVoices: state.listVoices }));
+vi.mock('./helpers/source-moderation.js', () => ({
+  resumeModerationAtBoot: state.resumeModerationAtBoot,
+}));
 vi.mock('./store.js', () => ({
   ProjectStore: class MockProjectStore {
     cancelAllPendingsAtBoot = vi.fn(() => 0);
@@ -286,6 +290,32 @@ describe('server bootstrap', () => {
     const next = vi.fn();
     aiMiddleware(requestForPath('/api/projects/p1/events'), responseMock(), next);
     expect(next).toHaveBeenCalled();
+  });
+
+  // Reprise des modérations interrompues : clé d'env seulement, jamais une clé utilisateur.
+  it('reprend les modérations interrompues au démarrage avec la clé d’env', async () => {
+    await importServer();
+
+    expect(state.resumeModerationAtBoot).toHaveBeenCalledTimes(1);
+    const [store, profileStore, client] = state.resumeModerationAtBoot.mock.calls[0] as unknown[];
+    expect(store).toBe(state.projectStoreInstances[0]);
+    expect(profileStore).toMatchObject({ outputDir: expect.stringMatching(/output$/) });
+    expect(client).toBeDefined();
+  });
+
+  it.each([
+    ['EUREKAI_REQUIRE_USER_KEY=true', { EUREKAI_REQUIRE_USER_KEY: 'true' }],
+    ['sans clé d’env', { MISTRAL_API_KEY: '' }],
+  ])('%s : aucune reprise au démarrage, journalisé', async (_label, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+
+    await importServer();
+
+    expect(state.resumeModerationAtBoot).not.toHaveBeenCalled();
+    expect(state.logger.info).toHaveBeenCalledWith(
+      'boot',
+      expect.stringContaining('interrupted moderations resume on next use'),
+    );
   });
 
   it('journalise les echecs de warmup non bloquants', async () => {

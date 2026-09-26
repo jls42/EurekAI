@@ -19,10 +19,12 @@ import { fileURLToPath } from 'node:url';
 
 import { logger } from './helpers/logger.js';
 import {
+  getBackgroundClient,
   getEnvClient,
   resolveClient,
   extractModelLimits,
 } from './helpers/mistral-client-factory.js';
+import { resumeModerationAtBoot } from './helpers/source-moderation.js';
 import { extractErrorCode } from './helpers/error-codes.js';
 import { ProjectStore } from './store.js';
 import {
@@ -126,6 +128,20 @@ if (cancelledAtBoot > 0) {
   logger.info(
     'store',
     `boot: cancelled ${cancelledAtBoot} pendings inherited from previous process`,
+  );
+}
+
+// Modérations interrompues par l'arrêt précédent (sources restées `pending`) : reprises en fond,
+// une par une, avec la clé d'env si le déploiement l'autorise (getBackgroundClient). Sinon, ou
+// pour une source en erreur, la reprise se fait au prochain usage (génération, chat,
+// « Revérifier »), avec la clé de l'utilisateur.
+const backgroundClient = getBackgroundClient();
+if (backgroundClient) {
+  void resumeModerationAtBoot(store, profileStore, backgroundClient);
+} else {
+  logger.info(
+    'boot',
+    'no background key — interrupted moderations resume on next use (generation, chat, recheck)',
   );
 }
 

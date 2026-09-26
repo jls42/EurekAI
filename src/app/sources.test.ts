@@ -308,6 +308,83 @@ describe('createSources', () => {
     });
   });
 
+  describe('« Revérifier » (canRecheckModeration / recheckSourceModeration)', () => {
+    const pendingSource = () => ({
+      id: 's1',
+      filename: 'cours.txt',
+      markdown: 'cours',
+      uploadedAt: '',
+      moderation: { status: 'pending', categories: {} },
+    });
+
+    const recheckCtx = (overrides: any = {}) =>
+      makeContext({
+        currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+        recheckingSources: {} as Record<string, boolean>,
+        moderationStatus: vi.fn((s: Source) => s.moderation?.status ?? null),
+        sources: [pendingSource()],
+        ...overrides,
+      });
+
+    it.each([
+      ['pending', true, true],
+      ['error', true, true],
+      ['safe', true, false],
+      ['unsafe', true, false],
+      ['pending', false, false],
+    ])('statut affiché %s, profil modéré %s → %s', (status, useModeration, expected) => {
+      const c = recheckCtx({ currentProfile: { id: 'p1', useModeration } });
+      const source = { ...pendingSource(), moderation: { status, categories: {} } } as Source;
+
+      expect(src.canRecheckModeration.call(c as any, source)).toBe(expected);
+    });
+
+    it('vérifie cette seule source, désactive le bouton pendant la requête, fusionne', async () => {
+      const c = recheckCtx();
+      let busyDuringRequest: unknown;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        busyDuringRequest = c.recheckingSources.s1;
+        return {
+          ok: true,
+          json: async () => ({
+            sources: [{ id: 's1', moderation: { status: 'safe', categories: {} } }],
+          }),
+        } as any;
+      });
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(url).toBe('/api/projects/pid-1/sources/moderate');
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ sourceIds: ['s1'] });
+      expect(busyDuringRequest).toBe(true);
+      expect(c.recheckingSources).toEqual({});
+      expect(c.sources[0].moderation.status).toBe('safe');
+      expect(c.showToast).toHaveBeenCalledWith('moderation.checking', 'info');
+    });
+
+    it('second clic pendant la vérification : ignoré', async () => {
+      const c = recheckCtx({ recheckingSources: { s1: true } });
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('échec de la requête : toast « Modération indisponible », bouton réactivé', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const c = recheckCtx();
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      expect(c.showToast).toHaveBeenCalledWith('moderation.error', 'error');
+      expect(c.recheckingSources).toEqual({});
+      expect(c.sources[0].moderation.status).toBe('pending');
+      warn.mockRestore();
+    });
+  });
+
   describe('handleFiles', () => {
     it('returns early if fileList is null', async () => {
       await src.handleFiles.call(ctx, null);

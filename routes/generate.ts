@@ -65,6 +65,7 @@ import {
 } from '../helpers/request-validation.js';
 import { blockingModerationStatus, moderationRejection } from '../helpers/moderation-http.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
+import { MODERATION_WAIT_MS, settleSourceModeration } from '../helpers/source-moderation.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
@@ -381,10 +382,28 @@ const assembleGenContext = (args: AssembleGenContextArgs): GenContextBase => {
   };
 };
 
+// Reprise des modérations en attente ou en erreur des sources visées, attendue au plus
+// MODERATION_WAIT_MS.request, APRÈS resolveClient (auth-first) et AVANT buildGenContext, qui relit
+// alors le projet (statuts frais). Corps invalide : aucune modération (400 de buildGenContext,
+// règle lang/ageGroup) ; projet absent ou profil propriétaire non modéré : rien n'est lancé
+// (settleSourceModeration), buildGenContext répond 404 ou génère. Ne lève jamais.
+const settleGenerationSources = async (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+  pid: string,
+  body: unknown,
+): Promise<void> => {
+  if (!validateGenRequestBody(body).ok) return;
+  const { sourceIds } = body as GenRequestBody;
+  const deps = { store, profileStore, client };
+  await settleSourceModeration(deps, pid, { sourceIds, waitMs: MODERATION_WAIT_MS.request });
+};
+
 // Contexte commun à toutes les générations ET à l'analyse de route. Ordre des refus : gardes
 // d'entrée (loadGenProject), sources (400 no_sources), limite de contexte. N'écrit ni dans le
 // projet ni dans le tracker : appelé AVANT addPendingEntry, un refus ne laisse aucune entrée
-// orpheline.
+// orpheline. Les modérations en attente sont reprises juste avant (settleGenerationSources).
 const buildGenContext = (
   store: ProjectStore,
   profileStore: ProfileStore,
@@ -673,6 +692,7 @@ const handleGeneration = (
       res.status(resolved.status).json({ error: resolved.error });
       return;
     }
+    await settleGenerationSources(store, profileStore, resolved.client, pid, req.body);
     const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
     if (!result.ok) {
       res.status(result.status).json({ error: result.error });
@@ -1537,6 +1557,7 @@ const registerRouteAnalysisRoute = (
       // modération, sources, consigne et limite de contexte AVANT l'appel au routeur LLM —
       // sinon l'analyse est facturée et ses `reason` rédigées sur du contenu non vérifié.
       const pid = String(req.params.pid);
+      await settleGenerationSources(store, profileStore, resolved.client, pid, req.body);
       const built = buildGenContext(store, profileStore, pid, req.body, ROUTER_MODEL);
       if (!built.ok) {
         res.status(built.status).json({ error: built.error });
@@ -1618,7 +1639,9 @@ const registerAutoRoute = (
         res.status(resolved.status).json({ error: resolved.error });
         return;
       }
-      const built = buildGenContext(store, profileStore, req.params.pid, req.body, ROUTER_MODEL);
+      const pid = String(req.params.pid);
+      await settleGenerationSources(store, profileStore, resolved.client, pid, req.body);
+      const built = buildGenContext(store, profileStore, pid, req.body, ROUTER_MODEL);
       if (!built.ok) {
         res.status(built.status).json({ error: built.error });
         return;

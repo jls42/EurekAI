@@ -153,6 +153,48 @@ describe('resolveClient (client tracké ou erreur HTTP stable)', () => {
   });
 });
 
+// Tâches de fond hors requête (reprise des modérations au démarrage) : clé d'env seulement, et
+// seulement si le déploiement l'autorise. Module rechargé : le client d'env est un singleton.
+describe('getBackgroundClient (tâches de fond)', () => {
+  const ORIG = { ...process.env };
+  const loadFactory = async () => {
+    vi.resetModules();
+    return import('./mistral-client-factory.js');
+  };
+  beforeEach(() => {
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.EUREKAI_REQUIRE_USER_KEY;
+  });
+  afterEach(() => {
+    process.env = { ...ORIG };
+  });
+
+  it('clé d’env présente : le client d’env (singleton)', async () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    const factory = await loadFactory();
+
+    const client = factory.getBackgroundClient();
+
+    expect(client).not.toBeNull();
+    expect(client).toBe(factory.getEnvClient());
+  });
+
+  it('EUREKAI_REQUIRE_USER_KEY=true : null, même avec une clé d’env', async () => {
+    process.env.MISTRAL_API_KEY = 'env-key-1234';
+    process.env.EUREKAI_REQUIRE_USER_KEY = 'true';
+    const factory = await loadFactory();
+
+    expect(factory.getBackgroundClient()).toBeNull();
+  });
+
+  it.each([undefined, ''])('clé d’env absente (%j) : null', async (key) => {
+    if (key !== undefined) process.env.MISTRAL_API_KEY = key;
+    const factory = await loadFactory();
+
+    expect(factory.getBackgroundClient()).toBeNull();
+  });
+});
+
 describe('requireKeyMiddleware (garde pré-multer)', () => {
   const ORIG = { ...process.env };
   beforeEach(() => {

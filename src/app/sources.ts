@@ -1,6 +1,7 @@
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { hashFile, findExistingDuplicate } from './source-dedup';
+import { mergeSourceModerations, requestSourceModeration } from './moderation-gate';
 import type { AppContext, AppState } from './app-context';
 import type { Source } from '../../types';
 
@@ -455,14 +456,37 @@ export function createSources() {
     async refreshModeration(this: AppContext, retries = 3) {
       await runRefreshModeration(this, retries);
     },
+
+    canRecheckModeration,
+
+    async recheckSourceModeration(this: AppContext, src: Source) {
+      await runRecheckSourceModeration(this, src);
+    },
   };
 }
 
-const mergeServerModeration = function (state: AppContext, serverSources: Source[]): void {
-  for (const src of serverSources) {
-    if (!src.moderation) continue;
-    const local = state.sources.find((s: Source) => s.id === src.id);
-    if (local) local.moderation = src.moderation;
+// « Revérifier » : proposé pour une source en attente ou en erreur (statut affiché), profil modéré
+// seulement — sans modération, aucune source ne bloque.
+const canRecheckModeration = function (this: AppContext, src: Source): boolean {
+  if (!this.currentProfile?.useModeration) return false;
+  const status = this.moderationStatus(src);
+  return status === 'pending' || status === 'error';
+};
+
+// Même route que le pré-contrôle des générations, pour cette seule source ; bouton désactivé
+// pendant la vérification. Échec (réseau, HTTP) : toast « Modération indisponible ».
+const runRecheckSourceModeration = async function (state: AppContext, src: Source): Promise<void> {
+  const projectId = state.currentProjectId;
+  if (!projectId || state.recheckingSources[src.id]) return;
+  state.recheckingSources[src.id] = true;
+  state.showToast(state.t('moderation.checking'), 'info');
+  try {
+    const merged = await requestSourceModeration(state, projectId, [src.id]);
+    if (!merged && state.currentProjectId === projectId) {
+      state.showToast(state.t('moderation.error'), 'error');
+    }
+  } finally {
+    delete state.recheckingSources[src.id];
   }
 };
 
@@ -477,7 +501,7 @@ const runRefreshModeration = async function (state: AppContext, retries: number)
     const res = await fetch('/api/projects/' + state.currentProjectId);
     if (!res.ok) return;
     const project = await res.json();
-    mergeServerModeration(state, project.sources as Source[]);
+    mergeSourceModerations(state, project.sources as Source[]);
     state.$nextTick(() => state.refreshIcons());
     const hasPending = state.sources.some((s: Source) => s.moderation?.status === 'pending');
     if (hasPending && retries > 0) {

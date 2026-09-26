@@ -602,6 +602,112 @@ describe('generate', () => {
   });
 });
 
+// --- Pré-contrôle asynchrone (ensureGenerationAllowed) : sources en attente vérifiées AVANT le
+// pending optimiste et avant tout appel de génération ---
+
+describe('vérification des sources avant la génération', () => {
+  const moderatedProfile = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+  const urls = () => vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+
+  // Réponse de POST /sources/moderate ; `during` observe l'état pendant la vérification.
+  const mockVerification = (status: string, during?: () => void) =>
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      during?.();
+      return {
+        ok: true,
+        json: async () => ({ sources: [{ id: 's1', moderation: { status, categories: {} } }] }),
+      } as any;
+    });
+
+  it('source en attente vérifiée safe : vérification, puis génération (aucun pending avant)', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    let pendingDuringVerification: unknown;
+    mockVerification('safe', () => {
+      pendingDuringVerification = { ...ctx.pendingById };
+    });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(pendingDuringVerification).toEqual({});
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.checking', 'info');
+    expect(ctx.generations).toHaveLength(1);
+  });
+
+  it('source toujours en attente : toast moderation.pending, ni génération ni pending', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('pending');
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+  });
+
+  it('projet changé pendant la vérification : aucune génération', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('safe', () => {
+      ctx.currentProjectId = 'pid-2';
+    });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.pendingById).toEqual({});
+  });
+
+  it('generateAuto : vérification avant l’analyse de route', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'error', categories: {} } }],
+      apiStatus: { ttsAvailable: false },
+    });
+    let autoLoadingDuringVerification: unknown;
+    mockVerification('safe', () => {
+      autoLoadingDuringVerification = ctx.loading.auto;
+    });
+    mockFetchOk({ plan: [{ agent: 'summary', reason: 'r' }] });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(autoLoadingDuringVerification).toBe(false);
+  });
+
+  it('generateAll : vérification avant les trois générations', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('pending');
+
+    await gen.generateAll.call(ctx);
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
+  });
+});
+
 // --- generateAll ---
 
 describe('generateAll', () => {

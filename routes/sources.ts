@@ -43,6 +43,12 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { getConfig } from '../config.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
+import {
+  MODERATION_WAIT_MS,
+  selectSources,
+  settleSourceModeration,
+  startSourceModeration,
+} from '../helpers/source-moderation.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
 import {
@@ -57,9 +63,6 @@ const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
 }
-
-// cf. CLAUDE.md "Pièges Lizard"
-const errorModeration = (): Source['moderation'] => ({ status: 'error', categories: {} });
 
 // Texte vide/non-string (arrow pour éviter l'agglomération Lizard + garder les
 // handlers sous CCN 8 après ajout de la garde auth resolveOr4xx).
@@ -255,24 +258,6 @@ const moderateUserInput = async (
   return { ok: true, moderation };
 };
 
-const triggerModeration = async (
-  store: ProjectStore,
-  client: Mistral,
-  pid: string,
-  sourceId: string,
-  markdown: string,
-  categories: string[],
-): Promise<void> => {
-  try {
-    const result = await moderateContent(client, markdown, categories);
-    if (!store.setSourceModeration(pid, sourceId, result)) return;
-    logger.info('moderation', `${result.status.toUpperCase()} (source ${sourceId.slice(0, 8)})`);
-  } catch (e) {
-    logger.error('moderation', 'error:', e);
-    store.setSourceModeration(pid, sourceId, errorModeration());
-  }
-};
-
 type ResolvedClient = { client: Mistral; fingerprint: string };
 type UploadFailure = { filename: string; error: string };
 type UploadOutcome = { source?: Source; failure?: UploadFailure };
@@ -445,8 +430,7 @@ const triggerUploadDownstream = (
 ): void => {
   triggerConsigneDetection(store, client, fingerprint, pid, lang);
   if (!modCats) return;
-  for (const src of results)
-    void triggerModeration(store, client, pid, src.id, src.markdown, modCats);
+  for (const src of results) startSourceModeration(store, client, pid, src, modCats);
 };
 
 const sendUploadResponse = (
@@ -563,7 +547,7 @@ const persistAndDispatchVoiceSource = (
   store.addSource(pid, source);
   logger.info('sources', `STT OK: ${stt.text.length} chars (${stt.elapsed.toFixed(1)}s)`);
   triggerConsigneDetection(store, client, fingerprint, pid, lang);
-  if (modCats) void triggerModeration(store, client, pid, source.id, source.markdown, modCats);
+  if (modCats) startSourceModeration(store, client, pid, source, modCats);
   return source;
 };
 
@@ -766,7 +750,7 @@ const persistWebsearchSources = (
   for (const s of sources) store.addSource(pid, s);
   triggerConsigneDetection(store, client, fingerprint, pid, lang);
   for (const s of sources) {
-    if (modCats) void triggerModeration(store, client, pid, s.id, s.markdown, modCats);
+    if (modCats) startSourceModeration(store, client, pid, s, modCats);
   }
 };
 
@@ -1004,12 +988,72 @@ const registerModerateRoute = (router: Router): void => {
   });
 };
 
+// Plafond de sourceIds de POST /sources/moderate (le front envoie les sources à vérifier).
+const MAX_MODERATE_SOURCE_IDS = 50;
+
+type ModerateSourcesRequest = { sourceIds?: string[] };
+
+// Corps de POST /sources/moderate : `sourceIds` absent (toutes les sources) ou tableau de chaînes
+// d'au plus MAX_MODERATE_SOURCE_IDS éléments ; null = invalide (400 invalid_input).
+const readModerateSourcesBody = (body: unknown): ModerateSourcesRequest | null => {
+  const sourceIds = (body as { sourceIds?: unknown } | null | undefined)?.sourceIds;
+  if (sourceIds === undefined) return {};
+  if (!Array.isArray(sourceIds) || sourceIds.length > MAX_MODERATE_SOURCE_IDS) return null;
+  return sourceIds.every((id) => typeof id === 'string') ? { sourceIds } : null;
+};
+
+// Statut PERSISTÉ des sources sélectionnées, relu après l'attente : le front en déduit le statut
+// effectif avec les catégories du profil courant (sans objet `moderation` : champ absent).
+const selectedModerations = (
+  store: ProjectStore,
+  pid: string,
+  sourceIds?: string[],
+): Array<Pick<Source, 'id' | 'moderation'>> => {
+  const sources = store.getProject(pid)?.sources ?? [];
+  return selectSources(sources, sourceIds).map((s) => ({ id: s.id, moderation: s.moderation }));
+};
+
+// Vérification à la demande (pré-contrôle des générations, bouton « Revérifier ») : reprend les
+// modérations en attente ou en erreur des sources sélectionnées ([] ou absent = toutes) et attend
+// au plus MODERATION_WAIT_MS.recheck. Profil propriétaire non modéré : rien n'est lancé, statuts
+// actuels. Sous /sources/ : couverte par aiLimiter.
+const registerSourceModerationRoute = (
+  router: Router,
+  store: ProjectStore,
+  profileStore: ProfileStore,
+): void => {
+  router.post('/:pid/sources/moderate', async (req, res) => {
+    const resolved = resolveOr4xx(req, res);
+    if (!resolved) return;
+    const pid = String(req.params.pid);
+    if (!projectExists(store, pid)) {
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
+      return;
+    }
+    const body = readModerateSourcesBody(req.body);
+    if (!body) {
+      res.status(400).json({ error: INVALID_INPUT });
+      return;
+    }
+    try {
+      const deps = { store, profileStore, client: resolved.client };
+      const options = { sourceIds: body.sourceIds, waitMs: MODERATION_WAIT_MS.recheck };
+      await settleSourceModeration(deps, pid, options);
+      res.json({ sources: selectedModerations(store, pid, body.sourceIds) });
+    } catch (e) {
+      logger.error('moderation', 'recheck error:', e);
+      res.status(500).json({ error: extractErrorCode(e, 'moderation') });
+    }
+  });
+};
+
 export function sourceRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
   registerUploadRoute(router, store, profileStore, createDynamicUpload(store));
   registerTextRoute(router, store, profileStore);
   registerVoiceRoute(router, store, profileStore, createMemoryUpload());
   registerWebsearchRoute(router, store, profileStore);
+  registerSourceModerationRoute(router, store, profileStore);
   registerDeleteRoute(router, store);
   registerConsigneRoute(router, store);
   registerModerateRoute(router);

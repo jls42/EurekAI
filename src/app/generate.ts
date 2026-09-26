@@ -6,10 +6,11 @@ import { withAiHeaders } from './ai-fetch';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
 import type { AppContext, GenerateExtraBody } from './app-context';
-import type { FailedStepCode, Generation, Source } from '../../types';
+import type { FailedStepCode, Generation } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
 import { blockingModerationStatus, pickBlockingSource } from '@helpers/moderation-http';
 import { currentBlockedCategories } from './effective-moderation';
+import { ensureGenerationAllowed, generationSources } from './moderation-gate';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 // Refus de modération (contenu signalé) : réessayer produirait le même refus, pas de bouton.
@@ -358,25 +359,6 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
   );
 }
 
-/** Pre-flight check for generate / generateAll / generateAuto. Returns false
- * (with optional moderation toast) when the action cannot proceed. Caller
- * reads `this.currentProjectId` directly afterwards — keeping the projectId
- * source as a literal property access avoids re-tainting the URL flow for
- * Codacy `rule-node-ssrf`. */
-export function canStartGenerate(state: AppContext, sourceIds?: readonly string[]): boolean {
-  if (!state.currentProjectId) return false;
-  // Plus de verrou `loading[type]` : N générations du même type en parallèle sont autorisées —
-  // re-cliquer le bouton lance une génération de plus (un pending de plus, annulable
-  // individuellement). Un double-clic produit donc 2 générations, comportement voulu par la feature.
-  // `sourceIds` : sources visées explicitement (version facile à lire), sinon la sélection.
-  const moderationStatus = state.blockedModerationStatus(sourceIds);
-  if (state.currentProfile?.useModeration && moderationStatus) {
-    state.showToast(state.moderationBlockedMessage(moderationStatus, sourceIds), 'error');
-    return false;
-  }
-  return true;
-}
-
 export function handleGenerateError(
   state: AppContext,
   type: string,
@@ -554,10 +536,11 @@ const cleanupGenerateAllPending = function (state: AppContext): void {
   state.$nextTick(() => state.refreshIcons());
 };
 
+// Pré-contrôle (ensureGenerationAllowed) AVANT tout état de chargement. projectId lu ici, en accès
+// direct à la propriété : pas de re-taint du flux d'URL pour Codacy `rule-node-ssrf`.
 const runGenerateAll = async function (state: AppContext): Promise<void> {
-  if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
+  if (!projectId || !(await ensureGenerationAllowed(state))) return;
   const controller = new AbortController();
   setupGenerateAllPending(state, controller);
   try {
@@ -610,10 +593,10 @@ const orchestrateAutoSteps = async function (
   showAutoResult(state, failures, plannedTypes.length, codes);
 };
 
+// Pré-contrôle AVANT l'analyse de route et les étapes (ensureGenerationAllowed).
 const runGenerateAuto = async function (state: AppContext): Promise<void> {
-  if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
+  if (!projectId || !(await ensureGenerationAllowed(state))) return;
   state.loading.auto = true;
   const controller = new AbortController();
   state.abortControllers.auto = controller;
@@ -629,6 +612,19 @@ const runGenerateAuto = async function (state: AppContext): Promise<void> {
   }
 };
 
+// Cible sûre, puis pré-contrôle de modération asynchrone (sources en attente ou en erreur
+// vérifiées), AVANT le pending optimiste : un cancel pendant la vérification ne peut pas manquer
+// sa cible.
+const singleGenerateAllowed = async function (
+  state: AppContext,
+  projectId: string,
+  type: string,
+  sourceIds?: readonly string[],
+): Promise<boolean> {
+  if (!isSingleGenerateTargetSafe(projectId, type)) return false;
+  return ensureGenerationAllowed(state, sourceIds);
+};
+
 const runSingleGenerate = async function (
   state: AppContext,
   type: string,
@@ -637,10 +633,8 @@ const runSingleGenerate = async function (
   // Sources de la fiche d'origine pour la version facile à lire : c'est sur elles que portent le
   // pré-contrôle de modération et le pending, comme la garde serveur (body.sourceIds).
   const sourceIds = extraBody?.sourceIds;
-  if (!canStartGenerate(state, sourceIds)) return;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
-  if (!isSingleGenerateTargetSafe(projectId, type)) return;
+  if (!projectId || !(await singleGenerateAllowed(state, projectId, type, sourceIds))) return;
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
@@ -666,14 +660,6 @@ const runSingleGenerate = async function (
   } finally {
     cleanupGenerateState(state, type, gid, projectId);
   }
-};
-
-// Sources visées par une génération : `sourceIds` explicites (version facile à lire : les sources
-// de la fiche d'origine), sinon la sélection ; une liste vide vaut toutes les sources, même règle
-// que le serveur (getMarkdownOrNull, checkModeration) — fiche legacy à `sourceIds: []` comprise.
-const generationSources = (state: AppContext, sourceIds?: readonly string[]): Source[] => {
-  const ids = sourceIds ?? state.selectedIds;
-  return ids.length > 0 ? state.sources.filter((s: Source) => ids.includes(s.id)) : state.sources;
 };
 
 export function createGenerate() {
