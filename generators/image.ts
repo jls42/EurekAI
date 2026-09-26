@@ -30,17 +30,22 @@ export function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
   return null;
 }
 
-export function extractImageRef(outputs: unknown[]): ImageResult | null {
+// Toutes les images de la réponse, dans l'ordre et sans doublon : l'agent peut appeler l'outil
+// plusieurs fois malgré la consigne « une SEULE image » (vécu le 2026-09-26 : 2 appels
+// `image_generation` facturés pour une illustration), et chaque fichier généré reste stocké chez
+// Mistral tant qu'on ne le supprime pas.
+export const extractImageRefs = (outputs: unknown[]): ImageResult[] => {
+  const refs: ImageResult[] = [];
   for (const output of outputs) {
-    const o = output as Record<string, unknown>;
-    if (!Array.isArray(o.content)) continue;
-    for (const chunk of o.content) {
+    const content = (output as Record<string, unknown>).content;
+    if (!Array.isArray(content)) continue;
+    for (const chunk of content) {
       const ref = parseChunkRef(chunk as Record<string, unknown>);
-      if (ref) return ref;
+      if (ref && !refs.some((r) => r.value === ref.value)) refs.push(ref);
     }
   }
-  return null;
-}
+  return refs;
+};
 
 // L'image générée reste stockée chez Mistral (fileId) tant qu'on ne la supprime pas : suppression
 // gratuite, tentée même si le téléchargement échoue ; un échec est seulement journalisé.
@@ -52,7 +57,21 @@ const deleteRemoteImage = async (client: Mistral, fileId: string): Promise<void>
   }
 };
 
-// Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec extractImageRef et ne
+// Images au-delà de la première (seule gardée) : leurs fichiers sont supprimés chez Mistral, comme
+// celui de la première après son téléchargement ; l'avertissement trace le surcoût (chaque appel
+// de l'outil est facturé, cf. le coût de la génération).
+const discardExtraImages = async (client: Mistral, extra: ImageResult[]): Promise<void> => {
+  if (extra.length === 0) return;
+  logger.warn(
+    'image',
+    `${extra.length + 1} images reçues de l'agent, seule la première est gardée`,
+  );
+  for (const ref of extra) {
+    if (ref.type === 'fileId') await deleteRemoteImage(client, ref.value);
+  }
+};
+
+// Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec sa voisine et ne
 // la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
 const downloadAndSaveImage = async (
   client: Mistral,
@@ -101,18 +120,22 @@ export const generateImage = async (
   try {
     const prompt = imageUser(lang, markdown);
     const response = await client.beta.conversations.start({ agentId: agent.id, inputs: prompt });
-    const imageRef = extractImageRef(response.outputs);
+    const [imageRef, ...extra] = extractImageRefs(response.outputs);
 
     if (!imageRef) {
       console.error('    Image outputs:', JSON.stringify(response.outputs, null, 2).slice(0, 2000));
       throw new Error("Aucune image generee par l'agent");
     }
 
-    const imageUrl =
-      imageRef.type === 'url'
-        ? imageRef.value
-        : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
-    return { imageUrl, prompt };
+    try {
+      const imageUrl =
+        imageRef.type === 'url'
+          ? imageRef.value
+          : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
+      return { imageUrl, prompt };
+    } finally {
+      await discardExtraImages(client, extra);
+    }
   } finally {
     await client.beta.agents
       .delete({ agentId: agent.id })

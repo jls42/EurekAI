@@ -159,3 +159,59 @@ describe('generateImage — fichier Mistral et registre des médias', () => {
     expect(client.files.delete).not.toHaveBeenCalled();
   });
 });
+
+describe('generateImage — plusieurs images renvoyées par l’agent', () => {
+  it('garde la première, supprime tous les fichiers chez Mistral et journalise le surcoût', async () => {
+    loggerWarn.mockClear();
+    const client = createClient([
+      { content: [{ fileId: 'file-1' }] },
+      { content: [{ text: 'Voici ton image' }, { fileId: 'file-2' }] },
+    ]);
+
+    const result = await generateImage(client, '# Content', '/tmp/project', 'pid-10');
+
+    expect(client.files.download).toHaveBeenCalledTimes(1);
+    expect(client.files.download).toHaveBeenCalledWith({ fileId: 'file-1' });
+    expect(result.imageUrl).toMatch(/^\/output\/projects\/pid-10\/illustration-/);
+    expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-1' });
+    expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-2' });
+    expect(loggerWarn).toHaveBeenCalledWith('image', expect.stringContaining('2 images'));
+  });
+
+  it('même fichier cité deux fois : un seul téléchargement, une seule suppression, pas d’alerte', async () => {
+    loggerWarn.mockClear();
+    const client = createClient([
+      { content: [{ fileId: 'file-1' }] },
+      { content: [{ file_id: 'file-1' }] },
+    ]);
+
+    await generateImage(client, '# Content', '/tmp/project', 'pid-11');
+
+    expect(client.files.download).toHaveBeenCalledTimes(1);
+    expect(client.files.delete).toHaveBeenCalledTimes(1);
+    expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('URL puis fichier : URL gardée, fichier supplémentaire supprimé chez Mistral', async () => {
+    const client = createClient([
+      { content: [{ imageUrl: 'https://example.com/a.png' }, { fileId: 'file-3' }] },
+    ]);
+
+    const result = await generateImage(client, '# Content', '/tmp/project', 'pid-12');
+
+    expect(result.imageUrl).toBe('https://example.com/a.png');
+    expect(client.files.download).not.toHaveBeenCalled();
+    expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-3' });
+  });
+
+  it('téléchargement de la première en échec : les fichiers supplémentaires sont supprimés quand même', async () => {
+    const client = createClient([{ content: [{ fileId: 'file-1' }, { fileId: 'file-2' }] }]);
+    client.files.download.mockRejectedValue(new Error('download failed'));
+
+    await expect(generateImage(client, '# Content', '/tmp/project', 'pid-13')).rejects.toThrow(
+      'download failed',
+    );
+    expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-1' });
+    expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-2' });
+  });
+});
