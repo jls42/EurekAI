@@ -68,11 +68,16 @@ function toMistralVoice(v: unknown): MistralVoice {
 
 const MAX_VOICE_PAGES = 50;
 
+// `voices.list` (GET /v1/audio/voices, pagination par offset) est marqué déprécié depuis le SDK
+// 2.7.0 au profit de GET /v2/audio/voices (pagination par curseur `next_page_token`), que le SDK
+// n'expose pas encore. La v1 répond toujours (vérifié le 2026-09-26, aucune date de retrait
+// publiée) : migrer dès qu'une méthode v2 existe dans le SDK.
 async function fetchAllVoices(client: Mistral): Promise<MistralVoice[]> {
   const voices: MistralVoice[] = [];
   let offset = 0;
   for (let page = 0; page < MAX_VOICE_PAGES; page++) {
-    const res = await client.audio.voices.list({ limit: 100, offset });
+    // eslint-disable-next-line sonarjs/deprecation -- v2 absente du SDK 2.7.0, cf. ci-dessus
+    const res = await client.audio.voices.list({ limit: 100, offset }); // NOSONAR(S1874) — v2 absente du SDK
     const items = res.items ?? [];
     for (const v of items) voices.push(toMistralVoice(v));
     if (offset + items.length >= res.total) break;

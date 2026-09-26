@@ -1,22 +1,39 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { quizComponent } from './quiz';
-import { registerGeneration } from '../app/generate';
+import { createGenerate, registerGeneration } from '../app/generate';
 
-vi.mock('../app/generate', () => ({
+vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
+vi.mock('../app/helpers', () => ({ normalizeSummaryData: vi.fn() }));
+// Pré-contrôle réel (canStartGenerate et statut effectif) ; seul l'enregistrement est simulé.
+vi.mock('../app/generate', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../app/generate')>()),
   registerGeneration: vi.fn(),
 }));
 
-function createQuiz(questions: any[]) {
+const { blockedModerationSource, blockedModerationStatus, moderationBlockedMessage } =
+  createGenerate();
+
+function createQuiz(questions: any[], genOverrides: Record<string, unknown> = {}) {
   const gen = {
     id: 'gen-quiz-1',
     data: questions,
+    ...genOverrides,
   };
-  const comp = quizComponent(gen) as any;
+  const comp = quizComponent(gen as any) as any;
   comp.currentProjectId = 'proj-1';
+  comp.currentProfile = null;
+  comp.sources = [];
+  comp.selectedIds = [];
   comp.showToast = vi.fn();
   comp.t = vi.fn((key: string) => key);
   comp.generations = [];
   comp.openGens = {};
+  comp.blockedModerationSource = blockedModerationSource;
+  comp.blockedModerationStatus = blockedModerationStatus;
+  comp.moderationBlockedMessage = moderationBlockedMessage;
+  comp.flaggedCategoryLabels = vi.fn(() => '');
+  comp.$nextTick = vi.fn((cb?: () => void) => cb?.());
+  comp.refreshIcons = vi.fn();
   return comp;
 }
 
@@ -238,18 +255,22 @@ describe('quizComponent', () => {
       vi.mocked(registerGeneration).mockClear();
     });
 
-    it('appelle les deux routes en parallele avec les questions faibles', async () => {
+    it('appelle les deux routes en parallele avec les questions faibles, lang et ageGroup', async () => {
       mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
       const comp = createQuiz(sampleQuestions);
+      comp.currentProfile = { id: 'p1', ageGroup: 'ado', useModeration: false };
       // q0 correct (ci=1), q1 incorrect (ci=0)
       comp.answers = { 0: 1, 1: 0 };
       await comp.remediate();
 
+      // lang (langue de l'interface) et ageGroup (profil courant) : obligatoires sur tout appel IA.
       const expectedInit = expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({
           generationId: 'gen-quiz-1',
           weakQuestions: [sampleQuestions[1]],
+          lang: 'fr',
+          ageGroup: 'ado',
         }),
       });
       expect(global.fetch).toHaveBeenCalledWith(
@@ -370,6 +391,200 @@ describe('quizComponent', () => {
       expect(registerGeneration).not.toHaveBeenCalled();
     });
 
+    // Pré-contrôle sur les sources du quiz d'origine (celles que le serveur garde), profil modéré.
+    describe('pré-contrôle de modération (sources du quiz)', () => {
+      const moderated = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+
+      it('source signalée du quiz : toast moderation.blocked, aucun appel', async () => {
+        mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = moderated;
+        comp.sources = [
+          { id: 's-quiz', moderation: { status: 'unsafe' } },
+          { id: 's-other', moderation: { status: 'safe' } },
+        ];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(comp.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(comp.reviewing).toBe(false);
+      });
+
+      it('source signalée hors du quiz : les deux appels partent', async () => {
+        mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = moderated;
+        comp.sources = [
+          { id: 's-quiz', moderation: { status: 'safe' } },
+          { id: 's-other', moderation: { status: 'unsafe' } },
+        ];
+        comp.selectedIds = ['s-other'];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(comp.showToast).toHaveBeenCalledWith('toast.remediationGenerated', 'success');
+      });
+
+      it('quiz ancien sans sourceIds : toutes les sources, comme le serveur', async () => {
+        mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
+        const comp = createQuiz(sampleQuestions);
+        comp.currentProfile = moderated;
+        comp.sources = [{ id: 's-any', moderation: { status: 'unsafe' } }];
+        comp.selectedIds = [];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(comp.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+        expect(global.fetch).not.toHaveBeenCalled();
+      });
+
+      // Source du quiz en attente : vérifiée (POST /sources/moderate) AVANT les deux appels.
+      const mockVerifiedFetch = (status: string) => {
+        global.fetch = vi.fn((url: string) => {
+          if (url.endsWith('/sources/moderate')) {
+            return Promise.resolve({
+              ok: true,
+              json: () =>
+                Promise.resolve({
+                  sources: [{ id: 's-quiz', moderation: { status, categories: {} } }],
+                }),
+            });
+          }
+          const gen = url.includes('remediation-summary') ? summaryGen : quizGen;
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(gen) });
+        }) as any;
+      };
+
+      it('source du quiz en attente, vérifiée safe : vérification puis les deux appels', async () => {
+        mockVerifiedFetch('safe');
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = moderated;
+        comp.sources = [{ id: 's-quiz', moderation: { status: 'pending' } }];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        const calls = (global.fetch as any).mock.calls as [string, RequestInit][];
+        expect(calls.map(([url]) => url)).toEqual([
+          '/api/projects/proj-1/sources/moderate',
+          '/api/projects/proj-1/generate/remediation-summary',
+          '/api/projects/proj-1/generate/quiz-review',
+        ]);
+        expect(JSON.parse(calls[0][1].body as string)).toEqual({ sourceIds: ['s-quiz'] });
+        expect(comp.showToast).toHaveBeenCalledWith('moderation.checking', 'info');
+        expect(comp.sources[0].moderation.status).toBe('safe');
+      });
+
+      it('source du quiz toujours en attente après vérification : toast pending, aucun appel', async () => {
+        mockVerifiedFetch('pending');
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = moderated;
+        comp.sources = [{ id: 's-quiz', moderation: { status: 'pending' } }];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        expect(comp.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
+        expect(comp.reviewing).toBe(false);
+      });
+
+      it('profil non modéré : pas de pré-contrôle, le serveur tranche', async () => {
+        mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = { ...moderated, useModeration: false };
+        comp.sources = [{ id: 's-quiz', moderation: { status: 'unsafe' } }];
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    // Refus du serveur (état local périmé) : réessayer donnerait le même refus.
+    describe('refus moderation.blocked du serveur', () => {
+      function mockBlockedFetch() {
+        global.fetch = vi.fn(() =>
+          Promise.resolve({
+            ok: false,
+            status: 400,
+            json: () => Promise.resolve({ error: 'moderation.blocked' }),
+          }),
+        ) as any;
+      }
+
+      it('un seul toast moderation.blocked, sans bouton Réessayer', async () => {
+        mockBlockedFetch();
+        const comp = createQuiz(sampleQuestions);
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        const toasts = (comp.showToast as any).mock.calls;
+        expect(toasts).toEqual([['moderation.blocked', 'error']]);
+        expect(registerGeneration).not.toHaveBeenCalled();
+        expect(comp.reviewing).toBe(false);
+      });
+
+      it('fiche refusée, quiz en panne : refus sans réessai, quiz avec réessai', async () => {
+        global.fetch = vi.fn((url: string) =>
+          Promise.resolve(
+            url.includes('remediation-summary')
+              ? {
+                  ok: false,
+                  status: 400,
+                  json: () => Promise.resolve({ error: 'moderation.blocked' }),
+                }
+              : {
+                  ok: false,
+                  status: 503,
+                  json: () => Promise.resolve({ error: 'upstream_unavailable' }),
+                },
+          ),
+        ) as any;
+        const comp = createQuiz(sampleQuestions);
+        comp.answers = { 0: 0 };
+
+        await comp.remediate();
+
+        expect(comp.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+        expect(comp.showToast).not.toHaveBeenCalledWith(
+          'toast.remediationSummaryError',
+          'error',
+          expect.any(Function),
+        );
+        expect(comp.showToast).toHaveBeenCalledWith(
+          'toast.remediationQuizError',
+          'error',
+          expect.any(Function),
+        );
+      });
+
+      it('réessai ciblé refusé par la modération : toast sans nouveau réessai', async () => {
+        mockRemediationFetch({ ok: false }, { ok: true, gen: quizGen });
+        const comp = createQuiz(sampleQuestions);
+        comp.answers = { 0: 0 };
+        await comp.remediate();
+        const retryFn = (comp.showToast as any).mock.calls.find(
+          (c: any[]) => c[0] === 'toast.remediationSummaryError',
+        )?.[2] as () => void;
+        (comp.showToast as any).mockClear();
+
+        mockBlockedFetch();
+        retryFn();
+        await vi.waitFor(() =>
+          expect(comp.showToast).toHaveBeenCalledWith('moderation.blocked', 'error'),
+        );
+        expect((comp.showToast as any).mock.calls).toEqual([['moderation.blocked', 'error']]);
+      });
+    });
+
     it('ne fait rien si tout est correct', async () => {
       const comp = createQuiz(sampleQuestions);
       comp.answers = { 0: 1, 1: 2, 2: 1 }; // all correct
@@ -390,6 +605,8 @@ describe('quizComponent', () => {
       ) as any;
 
       const promise = comp.remediate();
+      // Pré-contrôle asynchrone (ensureGenerationAllowed) d'abord, puis les deux appels.
+      await vi.waitFor(() => expect(resolvers).toHaveLength(2));
       expect(comp.reviewing).toBe(true);
 
       for (const resolve of resolvers) {

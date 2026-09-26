@@ -122,6 +122,14 @@ describe('resetSession', () => {
     expect(ctx.confirmTrigger).toBeNull();
   });
 
+  it('masque de nouveau le contenu des sources révélées par le PIN parental', () => {
+    const ctx = makeCtx({ revealedSourceIds: ['src-1', 'src-2'] });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.revealedSourceIds).toEqual([]);
+  });
+
   it('ne throw pas si un controller est déjà aborté', () => {
     const ctrl = new AbortController();
     ctrl.abort();

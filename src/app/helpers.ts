@@ -1,6 +1,12 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import { pendingOfTypeExists } from './pending-utils';
+import {
+  consigneVisibleFor,
+  displayedModerationStatus,
+  sourceContentMasked as contentMaskedFor,
+} from './effective-moderation';
+import { openingProfileQuery } from './project-snapshot';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
@@ -299,6 +305,12 @@ const consigneStatus = function (consigne: Consigne | null | undefined): 'failed
   return 'ok';
 };
 
+// Consigne montrée à l'enfant (dialogue, bandeaux) : garde partagée avec le serveur, pour le profil
+// courant (cf. consigneVisibleFor). Les gabarits ne testent jamais `consigne.found` directement.
+const consigneVisible = function (this: AppContext): boolean {
+  return consigneVisibleFor(this);
+};
+
 const ocrConfidenceTier = function (src: Source): string | null {
   if (!src?.ocrConfidence) return null;
   const avg = src.ocrConfidence.average;
@@ -337,8 +349,23 @@ const ocrConfidenceToneClass = function (this: AppContext, src: Source) {
   return TEXT_TEXT_PRIMARY;
 };
 
-const moderationStatus = function (src: Source): string | null {
-  return src?.moderation?.status ?? null;
+// Statut affiché par le badge (icône, couleur, titre, popover) : EFFECTIF si le profil courant est
+// modéré, persisté sinon (cf. displayedModerationStatus).
+const moderationStatus = function (this: AppContext, src: Source): string | null {
+  return displayedModerationStatus(this, src) ?? null;
+};
+
+// Contenu de la source masqué pour le profil courant (cf. sourceContentMasked) : les gabarits
+// n'affichent alors ni texte, ni original, ni comparaison, seulement l'encart neutre.
+const sourceContentMasked = function (this: AppContext, src: Source): boolean {
+  return contentMaskedFor(this, src);
+};
+
+// Texte de l'encart : vérification en cours pour une source en attente (ou jamais vérifiée),
+// sinon « contenu masqué » (signalée, modération en erreur, statut inattendu).
+const sourceMaskMessage = function (this: AppContext, src: Source): string {
+  const pending = this.moderationStatus(src) === 'pending';
+  return this.t(pending ? 'sources.contentChecking' : 'sources.contentMasked');
 };
 
 const podcastSpeakerName = function (gen: PodcastGeneration, line: PodcastLine): string {
@@ -475,14 +502,16 @@ const costEntryLabel = function (this: AppContext, route: string): string {
 };
 
 /* Nettoyage cosmétique du markdown produit par le LLM (texte affiché en x-text,
-   déjà échappé par Alpine — aucun rôle de sécurité ici). */
+   déjà échappé par Alpine — aucun rôle de sécurité ici). Accent grave écrit \x60 dans la
+   regex : un accent grave littéral ouvrait un gabarit pour Lizard, qui ne mesurait plus rien
+   dans la suite du fichier (cf. CLAUDE.md, pièges Lizard). */
 const stripMarkdown = (text: string): string =>
   text
     .replace(/^#{1,6}\s+/gm, '')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
     .replace(/\*([^*]+)\*/g, '$1')
     .replace(/__([^_]+)__/g, '$1')
-    .replace(/`([^`]+)`/g, '$1');
+    .replace(/\x60([^\x60]+)\x60/g, '$1');
 
 const showCostPopover = function (this: AppContext, el: HTMLElement, item: CostPopoverItem) {
   let lines: string[] = [];
@@ -819,9 +848,11 @@ const reconcilePendings = async function (
   // 1. Fetch + parse snapshot — offline / 5xx / non-JSON = acceptable.
   let project: ProjectData;
   try {
-    const res = await fetch('/api/projects/' + projectId);
+    const res = await fetch('/api/projects/' + projectId + openingProfileQuery(profileId));
     if (!res.ok) return;
-    project = (await res.json()) as ProjectData;
+    // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+    const snapshot: unknown = await res.json();
+    project = snapshot as ProjectData;
   } catch (err) {
     console.warn('[reconcile] snapshot fetch failed for project', projectId, err);
     return;
@@ -1116,6 +1147,7 @@ const SOURCE_HELPERS = {
   sourceTypeBadge,
   sourceTypeBadgeColor,
   consigneStatus,
+  consigneVisible,
   resolveSourceRef,
   itemSources,
   questionSources,
@@ -1131,6 +1163,8 @@ const OCR_MODERATION_HELPERS = {
   ocrConfidenceIcon,
   ocrConfidenceToneClass,
   moderationStatus,
+  sourceContentMasked,
+  sourceMaskMessage,
   moderationBadgeColor,
   moderationBadgeIcon,
   moderationBadgeIconClass,

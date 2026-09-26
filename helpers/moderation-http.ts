@@ -1,0 +1,204 @@
+/**
+ * Traduction des statuts de modération en refus HTTP. Fonctions pures, sans dépendance Node :
+ * partagées par les routes (sources, chat, generate), la reprise des modérations
+ * (helpers/source-moderation.ts) ET le front (src/app/generate.ts, src/app/moderation-gate.ts,
+ * src/app/effective-moderation.ts), pour que la priorité entre sources bloquantes, le statut
+ * effectif, le statut de garde et la garde de la consigne (consigneUsable) soient les mêmes des
+ * deux côtés.
+ */
+import type { ModerationStatus } from '../types.js';
+import { expandLegacyModerationCategories } from './moderation-model.js';
+
+export interface ModerationRejection {
+  status: 400 | 409 | 503;
+  error: string;
+}
+
+/**
+ * Refus à renvoyer pour un statut de modération, ou null s'il ne bloque pas (absent ou `safe`) :
+ * - `unsafe` → 400 `unsafeKey` (contenu signalé ; le chat passe sa propre clé) ;
+ * - `pending` → 409 `moderation.pending` (vérification en cours, réessayer plus tard) ;
+ * - `error` → 503 `moderation.error` (modération indisponible). Une valeur inattendue (donnée
+ *   disque corrompue) suit ce chemin : fail-closed, jamais laissée passer.
+ */
+export const moderationRejection = (
+  status: ModerationStatus | undefined,
+  unsafeKey = 'moderation.blocked',
+): ModerationRejection | null => {
+  if (!status || status === 'safe') return null;
+  if (status === 'unsafe') return { status: 400, error: unsafeKey };
+  if (status === 'pending') return { status: 409, error: 'moderation.pending' };
+  return { status: 503, error: 'moderation.error' };
+};
+
+const NO_CATEGORIES: readonly string[] = [];
+
+/**
+ * Catégories bloquées d'un profil : sa liste (seulement si c'est un tableau : une donnée corrompue
+ * retombe sur les défauts), sinon les défauts de son âge, sinon `unknownAgeDefaults` — aucune par
+ * défaut ; le serveur passe ceux d'`enfant` (activeModerationCategories,
+ * helpers/moderation-profile.ts). `defaults` = MODERATION_CATEGORIES côté serveur,
+ * `moderationDefaults` (/api/moderation-categories) côté front. Object.hasOwn : un ageGroup
+ * hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
+ */
+export const profileBlockedCategories = (
+  profile: { moderationCategories?: string[]; ageGroup?: string } | null | undefined,
+  defaults: Readonly<Record<string, readonly string[]>>,
+  unknownAgeDefaults: readonly string[] = NO_CATEGORIES,
+): readonly string[] => {
+  const own = profile?.moderationCategories;
+  if (Array.isArray(own)) return own;
+  const group = profile?.ageGroup;
+  return group && Object.hasOwn(defaults, group) ? defaults[group] : unknownAgeDefaults;
+};
+
+type PersistedModeration = { status: ModerationStatus; categories?: Record<string, boolean> };
+
+// Catégories signalées (true) d'une modération persistée ; une clé legacy stockée (2411) compte
+// pour ses successeurs, via la même table que la migration des profils.
+const flaggedCategoriesOf = (categories: Record<string, boolean> | undefined): string[] =>
+  expandLegacyModerationCategories(
+    Object.entries(categories ?? {})
+      .filter(([, flagged]) => flagged === true)
+      .map(([category]) => category),
+  );
+
+/**
+ * Statut EFFECTIF d'une source pour un profil modéré, uniquement dans le sens fail-closed : un
+ * `safe` persisté devient `unsafe` si ses catégories persistées signalent (true) au moins une
+ * catégorie bloquée (étendue legacy des deux côtés). Cas visé : les sources modérées de v1.5.4 à
+ * v1.7.1, persistées `safe` alors qu'elles portaient `dangerous`/`criminal` à true (le profil
+ * bloquait la clé 2411, que 2603 ne renvoie jamais) ; plus généralement, le statut n'est plus figé
+ * à l'import. Jamais de déclassement : `unsafe`/`error`/`pending` (et tout statut inattendu) sont
+ * rendus tels quels ; sans objet `moderation` (import modération inactive) → undefined. Les
+ * GARDES passent par gateModerationStatus, qui traite ce dernier cas.
+ */
+export const effectiveModerationStatus = (
+  moderation: PersistedModeration | undefined,
+  blockedCategories: readonly string[],
+): ModerationStatus | undefined => {
+  if (moderation?.status !== 'safe') return moderation?.status;
+  const blocked = expandLegacyModerationCategories(blockedCategories);
+  const flagsBlocked = flaggedCategoriesOf(moderation.categories).some((c) => blocked.includes(c));
+  return flagsBlocked ? 'unsafe' : 'safe';
+};
+
+/**
+ * Statut qui décide des GARDES pour un profil modéré (génération, analyse de route, chat,
+ * pré-contrôle et badge du front) : statut EFFECTIF d'une source vérifiée ; `pending` pour une
+ * source JAMAIS vérifiée — sans objet `moderation` ou sans statut (importée quand la modération
+ * était inactive, projet orphelin rattaché, donnée legacy) : elle attend sa vérification au lieu de
+ * passer. Réservé aux profils modérés : sans modération, aucune source ne bloque.
+ */
+export const gateModerationStatus = (
+  moderation: PersistedModeration | undefined,
+  blockedCategories: readonly string[],
+): ModerationStatus => {
+  if (!moderation?.status) return 'pending';
+  return effectiveModerationStatus(moderation, blockedCategories) ?? 'pending';
+};
+
+/**
+ * Source à (re)vérifier pour un profil modéré : jamais vérifiée, en attente, en erreur ou au
+ * statut inattendu — tout ce qui n'est pas `safe`/`unsafe` persisté. Partagé par la reprise
+ * serveur (settleSourceModeration) et le front (pré-contrôle, ouverture d'un projet).
+ */
+export const awaitsModeration = (moderation: PersistedModeration | undefined): boolean => {
+  const status = moderation?.status;
+  return status !== 'safe' && status !== 'unsafe';
+};
+
+// Un contenu déjà signalé prime sur une panne, qui prime sur une vérification en cours : sinon
+// « Modération en cours » masquerait une source signalée.
+const BLOCKING_PRIORITY: readonly ModerationStatus[] = ['unsafe', 'error', 'pending'];
+
+interface ModeratedSource {
+  moderation?: PersistedModeration;
+}
+
+/**
+ * Source qui bloque, par priorité `unsafe` > `error` > `pending` de son statut de garde
+ * (gateModerationStatus : effectif avec les catégories bloquées du profil, `pending` pour une
+ * source jamais vérifiée) ; undefined si aucune ne bloque. Un statut inattendu bloque en dernier
+ * recours (fail-closed). Profil modéré seulement.
+ */
+export const pickBlockingSource = <T extends ModeratedSource>(
+  sources: readonly T[],
+  blockedCategories: readonly string[],
+): T | undefined => {
+  const statusOf = (s: T) => gateModerationStatus(s.moderation, blockedCategories);
+  for (const status of BLOCKING_PRIORITY) {
+    const match = sources.find((s) => statusOf(s) === status);
+    if (match) return match;
+  }
+  return sources.find((s) => moderationRejection(statusOf(s)) !== null);
+};
+
+/**
+ * Statut de garde de la source bloquante (pickBlockingSource) ; undefined si rien ne bloque. À
+ * passer tel quel à moderationRejection : relire `source.moderation.status` rendrait `safe` pour
+ * une source promue `unsafe`, et le statut effectif rendrait undefined pour une source jamais
+ * vérifiée : dans les deux cas la génération passerait (fail-open).
+ */
+export const blockingModerationStatus = (
+  sources: readonly ModeratedSource[],
+  blockedCategories: readonly string[],
+): ModerationStatus | undefined => {
+  const picked = pickBlockingSource(sources, blockedCategories);
+  return picked ? gateModerationStatus(picked.moderation, blockedCategories) : undefined;
+};
+
+/** Champs d'une consigne lus par la garde (types.ts `Consigne`, champs optionnels : legacy). */
+interface ConsigneProvenance {
+  found?: boolean;
+  keyTopics?: readonly string[];
+  sourceIds?: readonly string[];
+}
+
+interface IdentifiedSource extends ModeratedSource {
+  id: string;
+}
+
+// Consigne porteuse de points à réviser : trouvée, avec au moins un point.
+const hasConsigneTopics = (consigne: ConsigneProvenance | null | undefined): boolean => {
+  const topics = consigne?.keyTopics;
+  return Boolean(consigne?.found) && Array.isArray(topics) && topics.length > 0;
+};
+
+// Chaque source de la provenance existe encore et a le statut de garde `safe`. Provenance vide ou
+// illisible : rien ne garantit son contenu (fail-closed).
+const provenanceIsSafe = (
+  provenance: unknown,
+  sources: readonly IdentifiedSource[],
+  blockedCategories: readonly string[],
+): boolean => {
+  if (!Array.isArray(provenance) || provenance.length === 0) return false;
+  return provenance.every((id) => {
+    const source = sources.find((s) => s.id === id);
+    return (
+      source !== undefined && gateModerationStatus(source.moderation, blockedCategories) === 'safe'
+    );
+  });
+};
+
+/**
+ * Consigne utilisable : affichée à l'enfant (dialogue, bandeaux), appliquée aux prompts de la
+ * génération et des outils du chat. Garde unique, serveur (routes/generate.ts, routes/chat.ts) et
+ * front (src/app/effective-moderation.ts). `blockedCategories` null = profil non modéré.
+ * - faux sans `found` ou sans point (`keyTopics` vide) ;
+ * - vrai si le profil n'est pas modéré ;
+ * - sinon chaque source de sa provenance (`sourceIds` ; toutes les sources actuelles pour une
+ *   consigne legacy) doit exister et avoir le statut de garde `safe` : une source signalée, en
+ *   attente, en erreur ou jamais vérifiée, ou une source disparue, la rend inutilisable
+ *   (fail-closed : la consigne a pu être tirée de ce contenu).
+ */
+export const consigneUsable = (
+  consigne: ConsigneProvenance | null | undefined,
+  sources: readonly IdentifiedSource[],
+  blockedCategories: readonly string[] | null,
+): boolean => {
+  if (!hasConsigneTopics(consigne)) return false;
+  if (blockedCategories === null) return true;
+  const provenance = consigne?.sourceIds ?? sources.map((s) => s.id);
+  return provenanceIsSafe(provenance, sources, blockedCategories);
+};

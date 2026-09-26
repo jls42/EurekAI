@@ -289,6 +289,21 @@ describe('selectProject', () => {
     );
   });
 
+  // Le profil courant accompagne l'ouverture : le serveur y rattache un projet orphelin.
+  it('envoie le profil courant qui ouvre le projet (profileId encodé)', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ currentProfile: { id: 'profil 1&x', ageGroup: 'enfant' } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1?profileId=profil%201%26x');
+  });
+
+  it('sans profil courant : ouverture sans profileId', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ currentProfile: null });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1');
+  });
+
   it('sets activeView to sources when no sources', async () => {
     mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
     const ctx = makeContext();
@@ -309,6 +324,74 @@ describe('selectProject', () => {
       expect.any(Function),
     );
     warnSpy.mockRestore();
+  });
+
+  // Reprise à l'ouverture : profil modéré et source en attente, en erreur ou jamais vérifiée →
+  // POST /sources/moderate en arrière-plan (l'ouverture n'attend pas), statuts fusionnés au retour.
+  describe('reprise des modérations à l’ouverture', () => {
+    const moderated = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+    const urls = () => vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+    const projectWith = (sources: any[]) => ({ id: 'p1', sources, results: { generations: [] } });
+    const safe = { status: 'safe', categories: {} };
+
+    it('source jamais vérifiée : vérification en arrière-plan, puis fusion', async () => {
+      mockFetchOk(projectWith([{ id: 's1' }, { id: 's2', moderation: safe }]));
+      let release!: (value: unknown) => void;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }) as any,
+      );
+      const ctx = makeContext({ currentProfile: moderated });
+
+      await proj.selectProject.call(ctx, 'p1');
+
+      // Ouverture terminée pendant que la vérification est encore en cours.
+      expect(ctx.sources).toHaveLength(2);
+      expect(urls()).toEqual([
+        '/api/projects/p1?profileId=p1',
+        '/api/projects/p1/sources/moderate',
+      ]);
+      const init = vi.mocked(globalThis.fetch).mock.calls[1][1] as RequestInit;
+      expect(init.method).toBe('POST');
+      expect(JSON.parse(init.body as string)).toEqual({});
+      release({ ok: true, json: async () => ({ sources: [{ id: 's1', moderation: safe }] }) });
+      await vi.waitFor(() => expect((ctx.sources[0] as any).moderation?.status).toBe('safe'));
+    });
+
+    it.each(['pending', 'error'])('source %s : vérifiée à l’ouverture', async (status) => {
+      mockFetchOk(projectWith([{ id: 's1', moderation: { status, categories: {} } }]));
+      mockFetchOk({ sources: [] });
+      const ctx = makeContext({ currentProfile: moderated });
+
+      await proj.selectProject.call(ctx, 'p1');
+
+      expect(urls()).toContain('/api/projects/p1/sources/moderate');
+    });
+
+    it('profil non modéré : aucune vérification', async () => {
+      mockFetchOk(projectWith([{ id: 's1' }]));
+      const ctx = makeContext();
+
+      await proj.selectProject.call(ctx, 'p1');
+
+      expect(urls()).toEqual(['/api/projects/p1?profileId=p1']);
+    });
+
+    it('sources toutes vérifiées (safe, unsafe) : aucune vérification', async () => {
+      mockFetchOk(
+        projectWith([
+          { id: 's1', moderation: safe },
+          { id: 's2', moderation: { status: 'unsafe', categories: {} } },
+        ]),
+      );
+      const ctx = makeContext({ currentProfile: moderated });
+
+      await proj.selectProject.call(ctx, 'p1');
+
+      expect(urls()).toEqual(['/api/projects/p1?profileId=p1']);
+    });
   });
 
   it('logs fetch exceptions et reset currentProjectId pour eviter le freeze UI', async () => {

@@ -34,16 +34,19 @@ import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { diffDictation } from '../helpers/dictation-diff.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
+import { cleanupDeletedGeneration, readAloudPrefix } from '../helpers/generation-media.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
-import { aiLimiter } from '../helpers/rate-limit.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
+import { rejectInvalidLang } from '../helpers/request-validation.js';
+import { screenUserText } from '../helpers/input-moderation.js';
+import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -52,6 +55,7 @@ const upload = multer({
 
 const FILL_BLANK = 'fill-blank';
 const DICTATION = 'dictation';
+const QUIZ_VOCAL = 'quiz-vocal';
 const ERR_ANSWERS_REQUIRED = 'answers requis';
 const LOG_ATTEMPT_ERROR = 'attempt error';
 
@@ -71,6 +75,120 @@ function resolveVocalAnswerLocale(
     ageGroup: quizGen.ageGroup ?? 'enfant',
   };
 }
+
+// Réponse orale refusée par la modération (transcription signalée) : clé i18n du front, message
+// bienveillant ; la question reste rejouable.
+const ANSWER_BLOCKED = 'quiz.answerBlocked';
+
+type VocalQuestion = QuizVocalGeneration['data'][number];
+
+interface VocalAnswerInput {
+  client: Mistral;
+  audio: Buffer;
+  question: VocalQuestion;
+  lang: string;
+  ageGroup: AgeGroup;
+  // Catégories vérifiées sur la transcription (vocalAnswerCategories) ; null = aucune vérification.
+  categories: string[] | null;
+}
+
+// Issue du pipeline : réponse vérifiée, ou refus AVANT la vérification (modération : 400
+// quiz.answerBlocked, 503 moderation.error ; exception de la modération : 500) — ni verifyAnswer
+// ni transcription dans la réponse, rien de stocké.
+type VocalAnswerOutcome =
+  | { kind: 'verified'; correct: boolean; feedback: string; transcription: string }
+  | { kind: 'refused'; status: number; error: string };
+
+// Catégories vérifiées sur la réponse orale : celles du profil PROPRIÉTAIRE du projet
+// (activeModerationCategories). null si la modération est inactive ou sans catégorie cochée
+// (`[]`) : rien à bloquer, pas d'appel, comme pour le message du chat.
+const vocalAnswerCategories = (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  pid: string,
+): string[] | null => {
+  const project = store.getProject(pid);
+  const categories = project
+    ? activeModerationCategories(moderationProfileOf(project, profileStore))
+    : null;
+  return categories && categories.length > 0 ? categories : null;
+};
+
+// Modération de la transcription AVANT sa vérification (screenUserText, partagé avec le texte
+// libre des sources). Transcription vide : rien à vérifier. null = acceptée. Une exception de
+// l'API devient un refus 500 au code stable : le pipeline se termine normalement, l'usage de la
+// transcription déjà faite est donc persisté par l'appelant.
+const screenTranscription = async (
+  input: VocalAnswerInput,
+  transcription: string,
+): Promise<VocalAnswerOutcome | null> => {
+  if (!transcription.trim()) return null;
+  try {
+    const screening = await screenUserText(
+      input.client,
+      transcription,
+      input.categories,
+      ANSWER_BLOCKED,
+    );
+    if (screening.ok) return null;
+    logger.info(QUIZ_VOCAL, `vocal answer refused by moderation (${screening.rejection.error})`);
+    return { kind: 'refused', ...screening.rejection };
+  } catch (e) {
+    logger.error('moderation', 'vocal answer moderation error:', e);
+    return { kind: 'refused', status: 500, error: extractErrorCode(e, 'moderation') };
+  }
+};
+
+/**
+ * Réponse orale d'un quiz vocal : transcription (STT), modération de la transcription avec les
+ * catégories du profil propriétaire, puis vérification par le LLM. Appelé sous
+ * runWithUsageTracking : STT et vérification sont facturés et persistés, y compris quand la
+ * réponse est refusée après la transcription. Jamais la transcription dans les journaux.
+ */
+const runVocalAnswer = async (input: VocalAnswerInput): Promise<VocalAnswerOutcome> => {
+  const { client, question, lang, ageGroup } = input;
+  const transcription = await transcribeAudio(client, input.audio, 'answer.webm', lang);
+  const refusal = await screenTranscription(input, transcription);
+  if (refusal) return refusal;
+  const { correct, feedback } = await verifyAnswer(
+    client,
+    question.question,
+    question.choices,
+    question.correct,
+    transcription,
+    { model: getConfig().models.quizVerify, lang, ageGroup },
+  );
+  return { kind: 'verified', correct, feedback, transcription };
+};
+
+// Libellé du costLog : dernier segment `vocal-answer` → « Réponse vocale » (COST_ROUTE_LABEL_KEYS,
+// src/app/helpers.ts), comme `read-aloud` pour la lecture à voix haute.
+const vocalAnswerCostRoute = (pid: string): string => `POST /api/projects/${pid}/vocal-answer`;
+
+// Réponse HTTP : 200 { correct, feedback, transcription } ou refus { error } (statut du refus),
+// avec `costDelta` (coût de CET appel, STT compris) dès qu'il est non nul : le front l'ajoute au
+// total du projet, refus compris.
+const sendVocalAnswer = (
+  res: Response,
+  outcome: VocalAnswerOutcome,
+  cost: number | undefined,
+): void => {
+  const costField = cost ? { costDelta: cost } : {};
+  if (outcome.kind === 'refused') {
+    res.status(outcome.status).json({ error: outcome.error, ...costField });
+    return;
+  }
+  const { correct, feedback, transcription } = outcome;
+  res.json({ correct, feedback, transcription, ...costField });
+};
+
+// Usage capté avant une exception (STT faite, vérification en échec) : persisté sous /failed.
+const persistFailedVocalUsage = (store: ProjectStore, pid: string, e: unknown): void => {
+  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (failedUsage?.length) {
+    persistUsage(store, pid, `${vocalAnswerCostRoute(pid)}/failed`, failedUsage);
+  }
+};
 
 const bumpQuestionStat = (stats: QuestionStats, qi: number, correct: boolean): void => {
   stats[qi] ??= { correct: 0, wrong: 0 };
@@ -181,13 +299,13 @@ const generateBatchAudio = async (
   const d = gen.data;
   const audioUrls: Record<string, string> = {};
   const failedSections: FailedSection[] = [];
-  const baseId = gen.id.slice(0, 8);
+  const audioPrefix = readAloudPrefix(gen.id);
   for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
     if (!txt) continue;
     try {
       const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
-      audioUrls[s] = saveAudioFile(buf, projectDir, pid, `read-aloud-${baseId}-${s}`);
+      audioUrls[s] = saveAudioFile(buf, projectDir, pid, `${audioPrefix}${s}`);
     } catch (err) {
       logger.error('tts', `section ${s} failed:`, err);
       failedSections.push({ section: s, code: extractErrorCode(err, 'tts') });
@@ -254,13 +372,13 @@ interface SectionAudioCtx {
   ttsOpts: TtsOptions;
   projectDir: string;
   pid: string;
-  baseId: string;
+  audioPrefix: string;
   store: ProjectStore;
   gid: string;
 }
 
 async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promise<string | null> {
-  const { gen, section, voiceId, ttsOpts, projectDir, pid, baseId, store, gid } = ctx;
+  const { gen, section, voiceId, ttsOpts, projectDir, pid, audioPrefix, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
     res.status(400).json({ error: 'Type non supporte pour la lecture' });
@@ -272,7 +390,7 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promis
   }
 
   const audioBuffer = await textToSpeech(text.slice(0, 5000), voiceId, ttsOpts);
-  const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `read-aloud-${baseId}-${section}`);
+  const audioUrl = saveAudioFile(audioBuffer, projectDir, pid, `${audioPrefix}${section}`);
 
   if (gen.type === 'summary') {
     const d = gen.data;
@@ -319,7 +437,9 @@ function resolveReadAloudContext(
 export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
 
-  router.use(aiLimiter);
+  // Pas de limiteur ici : aiLimiter est monté une seule fois par server.ts (aiPathLimiter), sur
+  // les seules routes IA de ce routeur (vocal-answer, read-aloud). Un `router.use` le comptait
+  // sur toute requête /api/projects/* qui traversait ce routeur (chat compté deux fois).
 
   // Auth-first : résout le client (header > env) ou répond 4xx stable.
   const resolveOr4xx = (req: Request, res: Response): Mistral | null => {
@@ -451,11 +571,14 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     // 404 si aucune génération n'a effectivement été retirée (project missing
     // OU gid inconnu). Sinon double-delete (race entre 2 onglets) renvoie 200
     // sur la 2e tentative et le user voit un toast "supprimé" trompeur.
-    const ok = store.deleteGeneration(req.params.pid, req.params.gid);
-    if (!ok) {
+    const removed = store.deleteGeneration(req.params.pid, req.params.gid);
+    if (!removed) {
       res.status(404).json({ error: 'generation_not_found' });
       return;
     }
+    // Médias (MP3, PNG) de la génération retirée : sans ce nettoyage, orphelins sur le disque.
+    // Best-effort, ne lève jamais (la suppression de la génération est déjà persistée).
+    cleanupDeletedGeneration(store, req.params.pid, removed);
     res.json({ ok: true });
   });
 
@@ -477,7 +600,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   });
 
   // Sous-helper : valide la cible vocal-answer (gen quiz-vocal + question +
-  // file). Retourne le triplet validé, ou null après envoi de la réponse 4xx.
+  // file + lang). Retourne le couple validé, ou null après envoi de la réponse 4xx.
   function validateVocalAnswerTarget(
     req: Request,
     res: Response,
@@ -485,7 +608,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     const pid = String(req.params.pid);
     const gid = String(req.params.gid);
     const gen = store.getGeneration(pid, gid);
-    if (gen?.type !== 'quiz-vocal') {
+    if (gen?.type !== QUIZ_VOCAL) {
       res.status(404).json({ error: 'Quiz vocal introuvable' });
       return null;
     }
@@ -500,11 +623,16 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       res.status(400).json({ error: 'Fichier audio requis' });
       return null;
     }
+    // Repli des quiz legacy sans langue figée (resolveVocalAnswerLocale) : STT + prompt de
+    // vérification. Validé même quand la langue figée prime (400 invalid_input).
+    if (rejectInvalidLang(req, res)) return null;
     return { quizGen, question };
   }
 
   // --- Quiz vocal: verify spoken answer ---
-  // requireKeyMiddleware AVANT multer → pas d'upload audio écrit en mémoire sans clé.
+  // requireKeyMiddleware AVANT multer → pas d'upload audio écrit en mémoire sans clé. Ordre :
+  // clé, cible et `lang` validés (4xx avant tout appel), puis runVocalAnswer (STT, modération de
+  // la transcription, vérification), coût persisté quelle que soit l'issue.
   router.post(
     '/:pid/generations/:gid/vocal-answer',
     requireKeyMiddleware,
@@ -512,25 +640,23 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     async (req, res) => {
       const client = resolveOr4xx(req, res);
       if (!client) return;
+      const pid = String(req.params.pid);
       try {
         const target = validateVocalAnswerTarget(req, res);
         if (!target) return;
-        const { quizGen, question } = target;
-        const { lang, ageGroup } = resolveVocalAnswerLocale(quizGen, req);
-        const config = getConfig();
-        const transcription = await transcribeAudio(client, req.file!.buffer, 'answer.webm', lang); // NOSONAR(S4325) — multer middleware guarantees req.file
-        const result = await verifyAnswer(
+        const input: VocalAnswerInput = {
           client,
-          question.question,
-          question.choices,
-          question.correct,
-          transcription,
-          { model: config.models.quizVerify, lang, ageGroup },
-        );
-
-        res.json({ correct: result.correct, feedback: result.feedback, transcription });
+          audio: req.file!.buffer, // NOSONAR(S4325) — validateVocalAnswerTarget garantit req.file
+          question: target.question,
+          ...resolveVocalAnswerLocale(target.quizGen, req),
+          categories: vocalAnswerCategories(store, profileStore, pid),
+        };
+        const { result, usage } = await runWithUsageTracking(() => runVocalAnswer(input));
+        const persisted = persistUsage(store, pid, vocalAnswerCostRoute(pid), usage);
+        sendVocalAnswer(res, result, persisted?.cost);
       } catch (e) {
-        logger.error('quiz-vocal', 'vocal answer error:', e);
+        persistFailedVocalUsage(store, pid, e);
+        logger.error(QUIZ_VOCAL, 'vocal answer error:', e);
         // Agent 'stt' : le chemin passe par transcribeAudio en premier ; les erreurs upstream
         // côté transcription doivent pouvoir matcher tts_upstream_error via TTS_AGENTS.
         res.status(500).json({ error: extractErrorCode(e, 'stt') });
@@ -546,7 +672,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     'all',
   ]);
 
-  // Sous-helper extrait : valide la cible read-aloud (gen + section). Retourne
+  // Sous-helper extrait : valide la cible read-aloud (gen + section + lang). Retourne
   // null après envoi d'une réponse 4xx si invalide.
   function validateReadAloudTarget(
     pid: string,
@@ -564,6 +690,8 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       res.status(400).json({ error: 'Section invalide' });
       return null;
     }
+    // `lang` choisit la voix (resolveVoices) et apparaît dans ses logs de repli.
+    if (rejectInvalidLang(req, res)) return null;
     return { gen, section };
   }
 
@@ -579,7 +707,9 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     voices: { host: VoiceId; guest: VoiceId };
     ttsOpts: TtsOptions;
     projectDir: string;
-    baseId: string;
+    // Préfixe des fichiers read-aloud de la génération (readAloudPrefix) : le balayage de
+    // cleanupDeletedGeneration retrouve ainsi ceux qu'aucune génération ne référence.
+    audioPrefix: string;
   };
 
   // Sous-helper : pipeline batch summary all-sections.
@@ -621,12 +751,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       `POST /api/projects/${ctx.pid}/read-aloud/flashcards`,
       fcUsage,
     );
-    const audioUrl = saveAudioFile(
-      audioBuffer,
-      ctx.projectDir,
-      ctx.pid,
-      `read-aloud-${ctx.baseId}-all`,
-    );
+    const audioUrl = saveAudioFile(audioBuffer, ctx.projectDir, ctx.pid, `${ctx.audioPrefix}all`);
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
   }
 
@@ -645,7 +770,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
           ttsOpts: ctx.ttsOpts,
           projectDir: ctx.projectDir,
           pid: ctx.pid,
-          baseId: ctx.baseId,
+          audioPrefix: ctx.audioPrefix,
           store,
           gid: ctx.gid,
         },
@@ -695,8 +820,17 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
         pid,
         req.body.lang,
       );
-      const baseId = gen.id.slice(0, 8);
-      const ctx: ReadAloudCtx = { pid, gid, gen, voiceId, voices, ttsOpts, projectDir, baseId };
+      const audioPrefix = readAloudPrefix(gen.id);
+      const ctx: ReadAloudCtx = {
+        pid,
+        gid,
+        gen,
+        voiceId,
+        voices,
+        ttsOpts,
+        projectDir,
+        audioPrefix,
+      };
       await runReadAloudPipeline(ctx, section, res);
     } catch (e) {
       const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;

@@ -14,8 +14,9 @@
       :key="cat.key"
     >
       <button
+        type="button"
         @click="goToView(cat.key)"
-        :aria-label="t('a11y.viewCategory', { category: t(cat.labelKey) })"
+        :aria-label="t('a11y.viewCategory', { category: (dashboardStats()[cat.key] || 0) + ' ' + t(cat.labelKey) })"
         class="stat-pill hover:shadow-card transition-shadow cursor-pointer"
       >
         <i :data-lucide="cat.icon" class="w-3.5 h-3.5" :style="'color:' + cat.color"></i>
@@ -69,10 +70,11 @@
         :key="cat.key"
       >
         <button
+          type="button"
           @click="generate(cat.key)"
           :disabled="(['podcast','quiz-vocal'].includes(cat.key) && !ttsReady())"
           :title="['podcast','quiz-vocal'].includes(cat.key) && !ttsReady() ? t('gen.needsTts') : ''"
-          :aria-label="t('a11y.generateCategory', { category: t('gen.' + cat.key) })"
+          :aria-label="t('a11y.generateCategory', { category: t(cat.labelKey) })"
           class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-white shadow-card disabled:opacity-50"
           :style="'color:' + cat.color"
         >

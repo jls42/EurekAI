@@ -2,6 +2,7 @@ import { Readability } from '@mozilla/readability';
 import { parseHTML } from 'linkedom';
 import { isIPv4, isIPv6 } from 'node:net';
 import { promises as dns } from 'node:dns';
+import { logger } from './logger.js';
 
 /** Parse web input: separate URLs from search keywords. */
 export function parseWebInput(input: string): { urls: string[]; searchQuery: string } {
@@ -229,6 +230,35 @@ export function safeParseJson<T = unknown>(text: string): T {
   const cleaned = stripJsonMarkdown(text);
   return JSON.parse(cleaned) as T;
 }
+
+/**
+ * 1er parse d'une réponse LLM : null sur JSON invalide (réponse tronquée, texte d'emballage) au
+ * lieu de lever, pour que la validation déclenche le retry du générateur (`unwrapJsonArray(null)`
+ * vaut `[]`). Toute autre erreur est relancée. Le parse du retry garde safeParseJson : sa
+ * SyntaxError est mappée sur llm_invalid_json. Fléchée : Lizard ne mesure pas `function f<T>(`.
+ */
+export const tryParseJson = <T>(text: string): T | null => {
+  try {
+    return safeParseJson<T>(text);
+  } catch (e) {
+    if (!(e instanceof SyntaxError)) throw e;
+    logger.warn('llm-json', `invalid JSON (${text.length} chars): ${e.message}`);
+    return null;
+  }
+};
+
+export type RetryTurn = { role: 'assistant' | 'user'; content: string };
+
+/**
+ * Tours ajoutés pour le 2e appel : la réponse rejetée (tour assistant) puis la consigne de retry.
+ * Réponse vide ou blanche → pas de tour assistant : l'API Mistral refuse en 400 un assistant au
+ * contenu vide (« Assistant message must have either content or tool_calls », mesuré) et accepte
+ * deux messages user consécutifs.
+ */
+export const retryTurns = (raw: string, retryPrompt: string): RetryTurn[] => {
+  const retry: RetryTurn = { role: 'user', content: retryPrompt };
+  return raw.trim() === '' ? [retry] : [{ role: 'assistant', content: raw }, retry];
+};
 
 /** Timer simple : retourne une fonction stop() qui donne les secondes ecoulees */
 export function timer(): () => number {

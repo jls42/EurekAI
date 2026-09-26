@@ -57,8 +57,9 @@ export const pt: Record<string, string> = {
   'gen.all': 'Gerar tudo',
   'gen.voice': 'Ler em voz alta',
   'gen.websearch': 'Pesquisa na web',
-  'a11y.viewCategory': 'Ver {category}',
-  'a11y.generateCategory': 'Gerar {category}',
+  'a11y.viewCategory': 'Ver: {category}',
+  'a11y.generateCategory': 'Gerar: {category}',
+  'a11y.cancelGeneration': 'Cancelar: {type}',
   'a11y.fillBlankAnswer': 'Resposta a preencher',
   'a11y.selectSource': 'Selecionar esta fonte',
   'a11y.editTitle': 'Editar o título',
@@ -97,8 +98,14 @@ export const pt: Record<string, string> = {
   'errorCode.upload_failed': 'Falha no envio',
   'errorCode.file_too_large': 'Este ficheiro \u00e9 demasiado grande. Tenta com um mais pequeno.',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
+  'errorCode.invalid_input': 'Pedido inválido',
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
+  'errorCode.rate_limited': 'Demasiados pedidos de uma vez. Espera um pouco e tenta de novo.',
+  'errorCode.url_blocked':
+    'Não é possível abrir este endereço. Experimenta outro endereço, ou escreve simplesmente o que procuras.',
+  'errorCode.all_sources_failed':
+    'Não foi possível adicionar nenhuma fonte. Tenta de novo daqui a pouco.',
 
   'header.menuProjects': 'Menu de projetos',
   'header.switchToLight': 'Mudar para modo claro',
@@ -235,6 +242,10 @@ export const pt: Record<string, string> = {
   'sources.viewCompare': 'Ver e comparar',
   'sources.viewText': 'Ver texto',
   'sources.deleteSource': 'Excluir fonte',
+  'sources.recheckModeration': 'Verificar de novo',
+  'sources.contentMasked': 'Este conteúdo está oculto',
+  'sources.contentChecking': 'Verificação em curso…',
+  'sources.revealContent': 'Mostrar (pais)',
   'sources.emptyTitle': 'Adicione uma foto ou texto',
   'sources.emptySubtitle': 'Use os bot\u00f5es acima para come\u00e7ar',
   'sources.dragDrop': 'Arraste e solte arquivos aqui',
@@ -311,6 +322,7 @@ export const pt: Record<string, string> = {
   'quiz.youSaid': 'Voc\u00ea disse: {text}',
   'quiz.nextQuestion': 'Pr\u00f3xima quest\u00e3o',
   'quiz.verificationError': 'Ops, n\u00e3o consegui ouvir sua resposta. Vamos tentar de novo?',
+  'quiz.answerBlocked': 'Não posso aceitar essa resposta. Tente dizê-la com outras palavras!',
 
   'chat.heading': 'Converse sobre seus cursos',
   'chat.clear': 'Limpar',
@@ -462,6 +474,7 @@ export const pt: Record<string, string> = {
   'toast.remediationQuizError': 'N\u00e3o foi poss\u00edvel gerar o quiz de treino',
   'moderation.blocked':
     'Este conte\u00fado foi sinalizado como inapropriado. A gera\u00e7\u00e3o est\u00e1 bloqueada.',
+  'moderation.checking': 'A verificar as fontes…',
   'moderation.pending': 'Modera\u00e7\u00e3o em andamento',
   'moderation.error': 'Modera\u00e7\u00e3o indispon\u00edvel',
   'moderation.unsafe': 'Conte\u00fado sinalizado',
@@ -469,7 +482,9 @@ export const pt: Record<string, string> = {
   'moderation.cat.sexual': 'Conteudo sexual',
   'moderation.cat.hate_and_discrimination': 'Odio e discriminacao',
   'moderation.cat.violence_and_threats': 'Violencia e ameacas',
-  'moderation.cat.dangerous_and_criminal_content': 'Conteudo perigoso',
+  'moderation.cat.dangerous_and_criminal_content': 'Conte\u00fado perigoso ou ilegal',
+  'moderation.cat.dangerous': 'Conte\u00fado perigoso',
+  'moderation.cat.criminal': 'Atividades ilegais',
   'moderation.cat.selfharm': 'Autolesao',
   'moderation.cat.health': 'Saude',
   'moderation.cat.financial': 'Financas',
@@ -490,6 +505,7 @@ export const pt: Record<string, string> = {
   'profile.pinMismatch': 'Os c\u00f3digos PIN n\u00e3o coincidem',
   'profile.pinVerify': 'Verifica\u00e7\u00e3o dos pais',
   'profile.pinWrong': 'C\u00f3digo PIN incorreto',
+  'profile.pinRateLimited': 'Demasiadas tentativas de PIN. Tenta de novo daqui a {minutes} min.',
   'profile.pinInfo':
     'Um c\u00f3digo PIN dos pais protege este perfil. Ele ser\u00e1 solicitado para editar ou excluir o perfil.',
   'profile.moderationToggle': 'Modera\u00e7\u00e3o de conte\u00fado',

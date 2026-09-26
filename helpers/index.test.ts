@@ -3,6 +3,8 @@ import { promises as dns } from 'node:dns';
 import {
   stripJsonMarkdown,
   safeParseJson,
+  tryParseJson,
+  retryTurns,
   unwrapJsonArray,
   extractAllText,
   timer,
@@ -43,6 +45,53 @@ describe('safeParseJson', () => {
 
   it('throw sur du JSON invalide', () => {
     expect(() => safeParseJson('not json')).toThrow();
+  });
+});
+
+describe('tryParseJson', () => {
+  it('parse du JSON valide, markdown compris', () => {
+    expect(tryParseJson('```json\n{"x":1}\n```')).toEqual({ x: 1 });
+  });
+
+  it.each([
+    ['tronqué', '{"items":[{"word":"a"'],
+    ['vide', ''],
+    ['texte d emballage', 'Voici le JSON : {"a":1}'],
+  ])('JSON %s → null (pas d exception), avertissement journalisé', (_label, text) => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(tryParseJson(text)).toBeNull();
+      expect(warn).toHaveBeenCalledTimes(1);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('relance toute erreur autre que SyntaxError', () => {
+    expect(() => tryParseJson(undefined as unknown as string)).toThrow(TypeError);
+  });
+
+  it('null + unwrapJsonArray → [] : la validation du générateur déclenche le retry', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    try {
+      expect(unwrapJsonArray(tryParseJson('[{"q":'))).toEqual([]);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+});
+
+describe('retryTurns', () => {
+  it('réponse non vide → tour assistant (texte brut) puis consigne de retry', () => {
+    expect(retryTurns('{"items":[{"word":"a"', 'Recommence')).toEqual([
+      { role: 'assistant', content: '{"items":[{"word":"a"' },
+      { role: 'user', content: 'Recommence' },
+    ]);
+  });
+
+  // L'API Mistral refuse en 400 un tour assistant au contenu vide (mesuré).
+  it.each(['', '   ', '\n\t'])('réponse vide ou blanche %j → consigne de retry seule', (raw) => {
+    expect(retryTurns(raw, 'Recommence')).toEqual([{ role: 'user', content: 'Recommence' }]);
   });
 });
 

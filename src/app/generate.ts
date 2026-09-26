@@ -5,11 +5,16 @@ import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
 import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
-import type { AppContext } from './app-context';
-import type { FailedStepCode, Generation, Source } from '../../types';
+import type { AppContext, GenerateExtraBody } from './app-context';
+import type { FailedStepCode, Generation } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
+import { blockingModerationStatus, pickBlockingSource } from '@helpers/moderation-http';
+import { currentBlockedCategories } from './effective-moderation';
+import { ensureGenerationAllowed, generationSources } from './moderation-gate';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
+// Refus de modération (contenu signalé) : réessayer produirait le même refus, pas de bouton.
+const MODERATION_BLOCKED = 'moderation.blocked';
 const TOAST_ERROR = 'toast.error';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
@@ -322,16 +327,20 @@ export function showAutoResult(
   }
 }
 
+// Réessai = même génération, surcharges comprises (version facile à lire : registre et sources
+// de la fiche d'origine) ; aucun sur un refus de modération.
 export function handleGenerateHttpError(
   state: AppContext,
   type: string,
   res: Response,
   err: { error?: string },
+  extraBody?: GenerateExtraBody,
 ): void {
+  const retry = err.error === MODERATION_BLOCKED ? null : () => state.generate(type, extraBody);
   state.showToast(
     state.t(TOAST_ERROR, { error: state.resolveError(err.error || res.statusText) }),
     'error',
-    () => state.generate(type),
+    retry,
   );
 }
 
@@ -350,28 +359,15 @@ export function handleGenerateSuccess(state: AppContext, type: string, gen: Gene
   );
 }
 
-/** Pre-flight check for generate / generateAll / generateAuto. Returns false
- * (with optional moderation toast) when the action cannot proceed. Caller
- * reads `this.currentProjectId` directly afterwards — keeping the projectId
- * source as a literal property access avoids re-tainting the URL flow for
- * Codacy `rule-node-ssrf`. */
-export function canStartGenerate(state: AppContext): boolean {
-  if (!state.currentProjectId) return false;
-  // Plus de verrou `loading[type]` : N générations du même type en parallèle sont autorisées —
-  // re-cliquer le bouton lance une génération de plus (un pending de plus, annulable
-  // individuellement). Un double-clic produit donc 2 générations, comportement voulu par la feature.
-  const moderationStatus = state.blockedModerationStatus();
-  if (state.currentProfile?.useModeration && moderationStatus) {
-    state.showToast(state.moderationBlockedMessage(moderationStatus), 'error');
-    return false;
-  }
-  return true;
-}
-
-export function handleGenerateError(state: AppContext, type: string, e: unknown): void {
+export function handleGenerateError(
+  state: AppContext,
+  type: string,
+  e: unknown,
+  extraBody?: GenerateExtraBody,
+): void {
   if (e instanceof Error && e.name === 'AbortError') return;
   console.error('[generate]', type, e);
-  state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type));
+  state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type, extraBody));
 }
 
 // Toast dispatché par code pour les partial-fails (action user vs warning vs partial générique),
@@ -435,11 +431,14 @@ type TrackedType =
   | 'image'
   | 'fill-blank';
 
+// Pending optimiste : mêmes sources que la génération envoyée (celles de la fiche pour la
+// version facile à lire, sinon la sélection).
 const setupGeneratePending = function (
   state: AppContext,
   type: string,
   gid: string,
   controller: AbortController,
+  sourceIds?: readonly string[],
 ): void {
   state.loading[type] = true;
   state.abortControllers[type] = controller;
@@ -449,7 +448,7 @@ const setupGeneratePending = function (
     type: type as TrackedType,
     status: 'pending',
     startedAt: new Date().toISOString(),
-    sourceIds: [...state.selectedIds],
+    sourceIds: [...(sourceIds ?? state.selectedIds)],
   };
 };
 
@@ -458,13 +457,15 @@ const dispatchGenerateResponse = async function (
   type: string,
   gid: string,
   res: Response,
+  extraBody?: GenerateExtraBody,
 ): Promise<void> {
   if (!res.ok) {
     // Validation early serveur (no_sources, context_too_large, moderation,
     // duplicate_gid, race cancel/fail = 409). Aucun event SSE ne nettoiera
     // le pending optimiste — cleanup local ici.
     delete state.pendingById[gid];
-    handleGenerateHttpError(state, type, res, await res.json().catch(() => ({})));
+    const err: { error?: string } = await res.json().catch(() => ({}));
+    handleGenerateHttpError(state, type, res, err, extraBody);
     return;
   }
   // Payload 200 fallback IDEMPOTENT avec SSE : si SSE down au moment du
@@ -535,10 +536,11 @@ const cleanupGenerateAllPending = function (state: AppContext): void {
   state.$nextTick(() => state.refreshIcons());
 };
 
+// Pré-contrôle (ensureGenerationAllowed) AVANT tout état de chargement. projectId lu ici, en accès
+// direct à la propriété : pas de re-taint du flux d'URL pour Codacy `rule-node-ssrf`.
 const runGenerateAll = async function (state: AppContext): Promise<void> {
-  if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
+  if (!projectId || !(await ensureGenerationAllowed(state))) return;
   const controller = new AbortController();
   setupGenerateAllPending(state, controller);
   try {
@@ -591,10 +593,10 @@ const orchestrateAutoSteps = async function (
   showAutoResult(state, failures, plannedTypes.length, codes);
 };
 
+// Pré-contrôle AVANT l'analyse de route et les étapes (ensureGenerationAllowed).
 const runGenerateAuto = async function (state: AppContext): Promise<void> {
-  if (!canStartGenerate(state)) return;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
+  if (!projectId || !(await ensureGenerationAllowed(state))) return;
   state.loading.auto = true;
   const controller = new AbortController();
   state.abortControllers.auto = controller;
@@ -610,20 +612,34 @@ const runGenerateAuto = async function (state: AppContext): Promise<void> {
   }
 };
 
+// Cible sûre, puis pré-contrôle de modération asynchrone (sources en attente ou en erreur
+// vérifiées), AVANT le pending optimiste : un cancel pendant la vérification ne peut pas manquer
+// sa cible.
+const singleGenerateAllowed = async function (
+  state: AppContext,
+  projectId: string,
+  type: string,
+  sourceIds?: readonly string[],
+): Promise<boolean> {
+  if (!isSingleGenerateTargetSafe(projectId, type)) return false;
+  return ensureGenerationAllowed(state, sourceIds);
+};
+
 const runSingleGenerate = async function (
   state: AppContext,
   type: string,
-  extraBody?: Record<string, unknown>,
+  extraBody?: GenerateExtraBody,
 ): Promise<void> {
-  if (!canStartGenerate(state)) return;
+  // Sources de la fiche d'origine pour la version facile à lire : c'est sur elles que portent le
+  // pré-contrôle de modération et le pending, comme la garde serveur (body.sourceIds).
+  const sourceIds = extraBody?.sourceIds;
   const projectId = state.currentProjectId;
-  if (!projectId) return;
-  if (!isSingleGenerateTargetSafe(projectId, type)) return;
+  if (!projectId || !(await singleGenerateAllowed(state, projectId, type, sourceIds))) return;
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
   const controller = new AbortController();
-  setupGeneratePending(state, type, gid, controller);
+  setupGeneratePending(state, type, gid, controller, sourceIds);
   try {
     const res = await fetchSingleGenerate(
       projectId,
@@ -636,11 +652,11 @@ const runSingleGenerate = async function (
     );
     if (!res) return;
     if (state.currentProjectId !== projectId) return;
-    await dispatchGenerateResponse(state, type, gid, res);
+    await dispatchGenerateResponse(state, type, gid, res, extraBody);
   } catch (e: unknown) {
     if (state.currentProjectId !== projectId) return;
     delete state.pendingById[gid];
-    handleGenerateError(state, type, e);
+    handleGenerateError(state, type, e, extraBody);
   } finally {
     cleanupGenerateState(state, type, gid, projectId);
   }
@@ -648,27 +664,35 @@ const runSingleGenerate = async function (
 
 export function createGenerate() {
   return {
-    blockedModerationSource(this: AppContext) {
-      const selected =
-        this.selectedIds.length > 0
-          ? this.sources.filter((s: Source) => this.selectedIds.includes(s.id))
-          : this.sources;
-      return selected.find((s: Source) => s.moderation && s.moderation.status !== 'safe') ?? null;
+    // Même priorité que le serveur (unsafe > error > pending, helper partagé) : sinon « Modération
+    // en cours » masquerait une source déjà signalée. Statut EFFECTIF, avec les catégories
+    // bloquées du profil courant : un `safe` qui signale une catégorie bloquée compte `unsafe`.
+    // `sourceIds` (version facile à lire) : sources visées explicitement, sinon la sélection.
+    blockedModerationSource(this: AppContext, sourceIds?: readonly string[]) {
+      const sources = generationSources(this, sourceIds);
+      return pickBlockingSource(sources, currentBlockedCategories(this)) ?? null;
     },
 
-    blockedModerationStatus(this: AppContext): string | null {
-      return this.blockedModerationSource()?.moderation?.status ?? null;
+    // Statut effectif de la source bloquante : relire son `moderation.status` rendrait `safe` pour
+    // une source promue (cf. blockingModerationStatus).
+    blockedModerationStatus(this: AppContext, sourceIds?: readonly string[]): string | null {
+      const blocked = currentBlockedCategories(this);
+      return blockingModerationStatus(generationSources(this, sourceIds), blocked) ?? null;
     },
 
-    moderationBlockedMessage(this: AppContext, status: string | null): string {
+    moderationBlockedMessage(
+      this: AppContext,
+      status: string | null,
+      sourceIds?: readonly string[],
+    ): string {
       if (status === 'pending') return this.t('moderation.pending');
       if (status === 'error') return this.t('moderation.error');
-      const src = this.blockedModerationSource();
+      const src = this.blockedModerationSource(sourceIds);
       const cats = src ? this.flaggedCategoryLabels(src) : '';
-      return this.t('moderation.blocked') + (cats ? ` (${cats})` : '');
+      return this.t(MODERATION_BLOCKED) + (cats ? ` (${cats})` : '');
     },
 
-    async generate(this: AppContext, type: string, extraBody?: Record<string, unknown>) {
+    async generate(this: AppContext, type: string, extraBody?: GenerateExtraBody) {
       await runSingleGenerate(this, type, extraBody);
     },
 
@@ -676,9 +700,11 @@ export function createGenerate() {
     // en registre falc. Nouvelle génération standard (gid/pending/SSE/coût) —
     // pas de mutation in-place. Si la fiche d'origine porte une langue (pas le
     // cas des summaries aujourd'hui), elle prime sur la langue UI courante.
+    // Fiche legacy sans `sourceIds` : [] (toutes les sources), pour que le pré-contrôle vise les
+    // mêmes sources que le serveur au lieu de retomber sur la sélection.
     async generateSimplified(this: AppContext, gen: Generation) {
-      const extraBody: Record<string, unknown> = {
-        sourceIds: gen.sourceIds,
+      const extraBody: GenerateExtraBody = {
+        sourceIds: (gen.sourceIds as string[] | undefined) ?? [],
         register: 'falc',
       };
       const lang = (gen as { lang?: string }).lang;
@@ -784,8 +810,10 @@ export function createGenerate() {
         if (res.ok) {
           applyVoiceResult(this, gen, await res.json(), section);
         } else {
+          // Code stable traduit (rate_limited, auth_required, tts_upstream_error…), jamais brut.
           const err = await res.json().catch(() => ({}));
-          this.showToast(this.t(TOAST_ERROR, { error: err.error || res.statusText }), 'error', () =>
+          const error = this.resolveError(err.error || res.statusText);
+          this.showToast(this.t(TOAST_ERROR, { error }), 'error', () =>
             this.generateVoice(gen, section),
           );
         }

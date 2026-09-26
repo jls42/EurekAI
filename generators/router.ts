@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson } from '../helpers/index.js';
+import { getContent, tryParseJson } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
 import { routerSystem, routerUser, defaultReasonFor } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
@@ -137,6 +137,23 @@ export function normalizePlan(
   return deduped.slice(0, MAX_PLAN_LENGTH);
 }
 
+type PlanStep = RoutePlan['plan'][number];
+type ParsedRoutePlan = Omit<RoutePlan, 'plan'> & { plan: unknown[] };
+
+// Étape lisible par normalizePlan : un objet porteur d'un `agent` texte (un `null` dans le
+// tableau faisait lever normalizePlan sur `step.agent`).
+const isPlanStep = (step: unknown): step is PlanStep => {
+  if (typeof step !== 'object' || step === null) return false;
+  return typeof (step as { agent?: unknown }).agent === 'string';
+};
+
+// Réponse du routeur exploitable : objet JSON dont `plan` est un tableau ; null sinon.
+const readRoutePlan = (raw: string): ParsedRoutePlan | null => {
+  const parsed = tryParseJson(raw);
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  return Array.isArray((parsed as { plan?: unknown }).plan) ? (parsed as ParsedRoutePlan) : null;
+};
+
 export async function routeRequest(
   client: Mistral,
   markdown: string,
@@ -161,7 +178,12 @@ export async function routeRequest(
   });
 
   const raw = getContent(response);
-  const parsed = safeParseJson<RoutePlan>(raw);
-  parsed.plan = normalizePlan(parsed.plan ?? [], lang, markdown);
-  return parsed;
+  const parsed = readRoutePlan(raw);
+  if (!parsed) {
+    // JSON invalide ou tronqué, non-objet, `plan` absent ou non-tableau : plan de secours
+    // (normalizePlan([]) → summary/flashcards/quiz) plutôt qu'une TypeError → internal_error.
+    logger.warn('router', `unusable router response (${raw.length} chars), fallback plan`);
+    return { plan: normalizePlan([], lang, markdown), context: '' };
+  }
+  return { ...parsed, plan: normalizePlan(parsed.plan.filter(isPlanStep), lang, markdown) };
 }

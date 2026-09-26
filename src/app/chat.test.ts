@@ -27,7 +27,9 @@ function makeContext(overrides: any = {}) {
     chatMessages: [] as any[],
     chatInput: '',
     chatLoading: false,
+    useConsigne: true,
     t: vi.fn((key: string) => key),
+    resolveError: vi.fn((code: string) => `resolved:${code}`),
     showToast: vi.fn(),
     refreshIcons: vi.fn(),
     $nextTick: vi.fn((cb: () => void) => cb()),
@@ -120,15 +122,32 @@ describe('sendChatMessage', () => {
     expect(ctx.chatLoading).toBe(false);
   });
 
-  it('sends correct request body with locale and ageGroup', async () => {
+  it('sends correct request body with locale, ageGroup and useConsigne', async () => {
     mockFetchOk({ reply: 'ok' });
     const ctx = makeContext({ chatInput: 'test msg' });
     await chat.sendChatMessage.call(ctx);
     expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: 'test msg', lang: 'fr', ageGroup: 'enfant' }),
+      body: JSON.stringify({
+        message: 'test msg',
+        lang: 'fr',
+        ageGroup: 'enfant',
+        useConsigne: true,
+      }),
     });
+  });
+
+  // Consigne écartée par l'enfant (bandeau « Ignorer ») : les générations par outil du chat la
+  // respectent, comme les boutons de génération.
+  it('consigne écartée → useConsigne: false envoyé', async () => {
+    mockFetchOk({ reply: 'ok' });
+    const ctx = makeContext({ chatInput: 'test msg', useConsigne: false });
+    await chat.sendChatMessage.call(ctx);
+    const init = vi.mocked(globalThis.fetch).mock.calls.at(-1)![1] as RequestInit;
+    expect(JSON.parse(init.body as string)).toEqual(
+      expect.objectContaining({ useConsigne: false }),
+    );
   });
 
   it('adds generations from response', async () => {
@@ -171,6 +190,35 @@ describe('sendChatMessage', () => {
     expect(ctx.chatMessages[1].role).toBe('assistant');
     expect(ctx.chatMessages[1].content).toBe('chat.errorReply');
     expect(ctx.showToast).toHaveBeenCalledWith('toast.chatErrorMsg', 'error');
+  });
+
+  // Modération indisponible (503) : même chemin qu'un message bloqué — le message n'a pas été
+  // traité, la bulle de l'enfant est retirée, pas de bulle d'erreur de l'assistant.
+  it('handles moderation.error: pops user message, translated toast, no assistant bubble', async () => {
+    mockFetchFail(503, { error: 'moderation.error' });
+    const ctx = makeContext({ chatInput: 'Bonjour' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.chatMessages).toHaveLength(0);
+    expect(ctx.t).toHaveBeenCalledWith('moderation.error');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.error', 'error');
+    expect(ctx.showToast).toHaveBeenCalledTimes(1);
+  });
+
+  // Code d'erreur stable (extractErrorCode) : traduit via resolveError, jamais la clé brute.
+  it('translates other error codes in the toast via resolveError', async () => {
+    mockFetchFail(500, { error: 'quota_exceeded' });
+    const ctx = makeContext({ chatInput: 'test' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.resolveError).toHaveBeenCalledWith('quota_exceeded');
+    expect(ctx.t).toHaveBeenCalledWith('toast.chatErrorMsg', { error: 'resolved:quota_exceeded' });
+  });
+
+  it('empty error payload: resolveError receives an empty code', async () => {
+    mockFetchFail(500, {});
+    const ctx = makeContext({ chatInput: 'test' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.resolveError).toHaveBeenCalledWith('');
+    expect(ctx.chatMessages).toHaveLength(2);
   });
 
   it('handles network error: adds connection error message', async () => {
@@ -230,6 +278,25 @@ describe('clearChat', () => {
     const ctx = makeContext({ currentProjectId: null });
     await chat.clearChat.call(ctx);
     expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  // Refus du serveur (429 de aiLimiter) : historique gardé, code traduit, pas de faux succès.
+  it('refus du serveur (429 rate_limited) → historique gardé, erreur traduite', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+      ok: false,
+      status: 429,
+      statusText: 'Too Many Requests',
+      json: async () => ({ error: 'rate_limited' }),
+    } as any);
+    const messages = [{ role: 'user', content: 'hi' }];
+    const ctx = makeContext({ chatMessages: messages });
+
+    await chat.clearChat.call(ctx);
+
+    expect(ctx.chatMessages).toEqual(messages);
+    expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.chatErrorMsg', 'error');
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.chatCleared', 'info');
   });
 });
 

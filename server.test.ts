@@ -54,6 +54,7 @@ const state = vi.hoisted(() => {
       const next = args[2];
       if (typeof next === 'function') next();
     }),
+    aiPathLimiter: makeMiddleware(),
     dotenvConfig: vi.fn(),
     expressJson: vi.fn(() => jsonMiddleware),
     expressStatic: vi.fn(() => staticMiddleware),
@@ -69,6 +70,7 @@ const state = vi.hoisted(() => {
       listProjects: ReturnType<typeof vi.fn>;
       migrateFromLegacy: ReturnType<typeof vi.fn>;
     }[],
+    resumeModerationAtBoot: vi.fn(() => Promise.resolve(0)),
     routeFactory: vi.fn(() => routeMiddleware),
     setModelLimits: vi.fn(),
     setVoiceCache: vi.fn(),
@@ -98,6 +100,7 @@ vi.mock('./helpers/logger.js', () => ({ logger: state.logger }));
 vi.mock('./helpers/usage-context.js', () => ({ recordUsage: vi.fn() }));
 vi.mock('./helpers/rate-limit.js', () => ({
   aiLimiter: state.aiLimiter,
+  aiPathLimiter: state.aiPathLimiter,
   generalLimiter: state.generalLimiter,
 }));
 vi.mock('./config.js', () => ({
@@ -110,6 +113,9 @@ vi.mock('./config.js', () => ({
   setVoiceCache: state.setVoiceCache,
 }));
 vi.mock('./generators/tts-provider.js', () => ({ listVoices: state.listVoices }));
+vi.mock('./helpers/source-moderation.js', () => ({
+  resumeModerationAtBoot: state.resumeModerationAtBoot,
+}));
 vi.mock('./store.js', () => ({
   ProjectStore: class MockProjectStore {
     cancelAllPendingsAtBoot = vi.fn(() => 0);
@@ -179,11 +185,11 @@ function getJsonErrorHandler() {
   return handler as ErrorRequestHandler;
 }
 
-function getAiMiddleware() {
-  const generalLimiterIndex = state.app.use.mock.calls.findIndex(([path]) => path === '/api');
-  const handler = state.app.use.mock.calls[generalLimiterIndex + 1]?.[0];
-  if (typeof handler !== 'function') throw new TypeError('Missing AI rate-limit middleware');
-  return handler as RequestHandler;
+// Rang d'appel (invocationCallOrder) du premier `app.use` qui vérifie `match`.
+function useCallOrder(match: (args: unknown[]) => boolean): number {
+  const index = state.app.use.mock.calls.findIndex((args) => match(args));
+  if (index === -1) throw new TypeError('Missing app.use call');
+  return state.app.use.mock.invocationCallOrder[index];
 }
 
 function requestForPath(path: string): Request {
@@ -254,16 +260,73 @@ describe('server bootstrap', () => {
     expect(nextError).toHaveBeenCalledWith(otherError);
   });
 
-  it('limite les routes API couteuses uniquement', async () => {
+  it('ne sert sous /output que les médias des projets', async () => {
     await importServer();
 
-    const aiMiddleware = getAiMiddleware();
-    aiMiddleware(requestForPath('/api/projects/p1/generate'), responseMock(), vi.fn());
-    expect(state.aiLimiter).toHaveBeenCalled();
-
+    const mount = state.app.use.mock.calls.find(([path]) => path === '/output');
+    expect(mount).toBeDefined();
+    expect(state.expressStatic).toHaveBeenCalledWith(expect.stringMatching(/output$/), {
+      dotfiles: 'deny',
+      index: false,
+      redirect: false,
+    });
+    const guard = mount?.[1] as RequestHandler;
+    const denied = { status: vi.fn(), end: vi.fn() };
+    denied.status.mockReturnValue(denied);
     const next = vi.fn();
-    aiMiddleware(requestForPath('/api/projects/p1/events'), responseMock(), next);
-    expect(next).toHaveBeenCalled();
+    guard(requestForPath('/profiles.json'), denied as unknown as Response, next);
+    expect(denied.status).toHaveBeenCalledWith(404);
+    expect(next).not.toHaveBeenCalled();
+
+    guard(requestForPath('/projects/p1/podcast-1.mp3'), responseMock(), next);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  // generalLimiter avant la 1re route /api (les routes de config lui échappaient) ; aiPathLimiter
+  // une seule fois, avant les routeurs (les chemins IA sont testés dans helpers/rate-limit.test.ts).
+  it('monte generalLimiter avant toute route /api et aiPathLimiter avant les routeurs', async () => {
+    await importServer();
+
+    const generalOrder = useCallOrder(
+      ([path, mw]) => path === '/api' && mw === state.generalLimiter,
+    );
+    const [firstApiRoute] = state.app.get.mock.calls[0] as [string];
+    expect(firstApiRoute).toBe('/api/config');
+    expect(generalOrder).toBeLessThan(state.app.get.mock.invocationCallOrder[0]);
+    expect(generalOrder).toBeLessThan(state.app.put.mock.invocationCallOrder[0]);
+    expect(generalOrder).toBeLessThan(state.app.post.mock.invocationCallOrder[0]);
+
+    const aiUses = state.app.use.mock.calls.filter(([mw]) => mw === state.aiPathLimiter);
+    expect(aiUses).toHaveLength(1);
+    const aiOrder = useCallOrder(([mw]) => mw === state.aiPathLimiter);
+    expect(aiOrder).toBeLessThan(useCallOrder(([path]) => path === '/api/profiles'));
+    expect(aiOrder).toBeLessThan(useCallOrder(([path]) => path === '/api/projects'));
+  });
+
+  // Reprise des modérations interrompues : clé d'env seulement, jamais une clé utilisateur.
+  it('reprend les modérations interrompues au démarrage avec la clé d’env', async () => {
+    await importServer();
+
+    expect(state.resumeModerationAtBoot).toHaveBeenCalledTimes(1);
+    const [store, profileStore, client] = state.resumeModerationAtBoot.mock.calls[0] as unknown[];
+    expect(store).toBe(state.projectStoreInstances[0]);
+    expect(profileStore).toMatchObject({ outputDir: expect.stringMatching(/output$/) });
+    expect(client).toBeDefined();
+  });
+
+  it.each([
+    ['EUREKAI_REQUIRE_USER_KEY=true', { EUREKAI_REQUIRE_USER_KEY: 'true' }],
+    ['sans clé d’env', { MISTRAL_API_KEY: '' }],
+  ])('%s : aucune reprise au démarrage, journalisé', async (_label, env) => {
+    for (const [name, value] of Object.entries(env)) vi.stubEnv(name, value);
+
+    await importServer();
+
+    expect(state.resumeModerationAtBoot).not.toHaveBeenCalled();
+    expect(state.logger.info).toHaveBeenCalledWith(
+      'boot',
+      expect.stringContaining('interrupted moderations resume on next use'),
+    );
   });
 
   it('journalise les echecs de warmup non bloquants', async () => {

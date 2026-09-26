@@ -56,8 +56,9 @@ export const nl: Record<string, string> = {
   'gen.all': 'Alles genereren',
   'gen.voice': 'Voorlezen',
   'gen.websearch': 'Zoeken op internet',
-  'a11y.viewCategory': '{category} bekijken',
-  'a11y.generateCategory': '{category} genereren',
+  'a11y.viewCategory': 'Bekijken: {category}',
+  'a11y.generateCategory': 'Genereren: {category}',
+  'a11y.cancelGeneration': 'Annuleren: {type}',
   'a11y.fillBlankAnswer': 'Antwoord invullen',
   'a11y.selectSource': 'Deze bron selecteren',
   'a11y.editTitle': 'Titel bewerken',
@@ -96,8 +97,14 @@ export const nl: Record<string, string> = {
   'errorCode.upload_failed': 'Uploaden mislukt',
   'errorCode.file_too_large': 'Dit bestand is te groot. Probeer een kleiner bestand.',
   'errorCode.all_steps_failed': 'Alle generaties mislukt',
+  'errorCode.invalid_input': 'Ongeldig verzoek',
   'errorCode.profile_delete_partial':
     'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
+  'errorCode.rate_limited': 'Te veel verzoeken tegelijk. Wacht even en probeer het dan opnieuw.',
+  'errorCode.url_blocked':
+    'Dit adres kan niet worden geopend. Probeer een ander adres, of typ gewoon wat je zoekt.',
+  'errorCode.all_sources_failed':
+    'Er kon geen bron worden toegevoegd. Probeer het zo meteen opnieuw.',
 
   'header.menuProjects': 'Projectenmenu',
   'header.switchToLight': 'Schakel naar lichte modus',
@@ -233,6 +240,10 @@ export const nl: Record<string, string> = {
   'sources.viewCompare': 'Bekijken en vergelijken',
   'sources.viewText': 'Tekst bekijken',
   'sources.deleteSource': 'Bron verwijderen',
+  'sources.recheckModeration': 'Opnieuw controleren',
+  'sources.contentMasked': 'Deze inhoud is verborgen',
+  'sources.contentChecking': 'Wordt gecontroleerd…',
+  'sources.revealContent': 'Tonen (ouder)',
   'sources.emptyTitle': 'Voeg een foto of tekst toe',
   'sources.emptySubtitle': 'Gebruik de knoppen hierboven om te beginnen',
   'sources.dragDrop': 'Sleep bestanden hierheen',
@@ -308,6 +319,8 @@ export const nl: Record<string, string> = {
   'quiz.youSaid': 'Je zei: {text}',
   'quiz.nextQuestion': 'Volgende vraag',
   'quiz.verificationError': 'Oeps, ik kon je antwoord niet horen. Zullen we het opnieuw proberen?',
+  'quiz.answerBlocked':
+    'Dit antwoord kan ik niet aannemen. Probeer het met andere woorden te zeggen!',
 
   'chat.heading': 'Chat met je cursussen',
   'chat.clear': 'Wissen',
@@ -455,6 +468,7 @@ export const nl: Record<string, string> = {
   'toast.remediationSummaryError': 'De herhalingskaart kon niet worden gegenereerd',
   'toast.remediationQuizError': 'De oefenquiz kon niet worden gegenereerd',
   'moderation.blocked': 'Deze inhoud is als ongepast gemarkeerd. Generatie is geblokkeerd.',
+  'moderation.checking': 'Bronnen worden gecontroleerd…',
   'moderation.pending': 'Moderatie bezig',
   'moderation.error': 'Moderatie niet beschikbaar',
   'moderation.unsafe': 'Gemarkeerde inhoud',
@@ -462,7 +476,9 @@ export const nl: Record<string, string> = {
   'moderation.cat.sexual': 'Seksuele inhoud',
   'moderation.cat.hate_and_discrimination': 'Haat en discriminatie',
   'moderation.cat.violence_and_threats': 'Geweld en bedreigingen',
-  'moderation.cat.dangerous_and_criminal_content': 'Gevaarlijke inhoud',
+  'moderation.cat.dangerous_and_criminal_content': 'Gevaarlijke of illegale inhoud',
+  'moderation.cat.dangerous': 'Gevaarlijke inhoud',
+  'moderation.cat.criminal': 'Illegale activiteiten',
   'moderation.cat.selfharm': 'Zelfbeschadiging',
   'moderation.cat.health': 'Gezondheid',
   'moderation.cat.financial': 'Financieel',
@@ -482,6 +498,8 @@ export const nl: Record<string, string> = {
   'profile.pinMismatch': 'PIN-codes komen niet overeen',
   'profile.pinVerify': 'Ouderlijke verificatie',
   'profile.pinWrong': 'Onjuiste PIN-code',
+  'profile.pinRateLimited':
+    'Te veel pogingen met de pincode. Probeer het over {minutes} min opnieuw.',
   'profile.pinInfo':
     'Een ouderlijke PIN-code beschermt dit profiel. Deze wordt gevraagd om het profiel te bewerken of te verwijderen.',
   'profile.moderationToggle': 'Inhoudmoderatie',

@@ -18,7 +18,12 @@ vi.mock('./profile-locale', () => ({
   clearProfileLocale: vi.fn(),
 }));
 
-import { createProfiles } from './profiles.js';
+import {
+  createProfiles,
+  executeDeleteProfile,
+  mapServerErrorCode,
+  retryAfterMinutes,
+} from './profiles.js';
 import { clearProfileLocale, setProfileLocale } from './profile-locale';
 
 // Mock localStorage
@@ -1550,6 +1555,130 @@ describe('createProfiles', () => {
       await captured.promise;
       expect(ctx.showToast).toHaveBeenCalled();
       expect(cb).not.toHaveBeenCalled();
+    });
+  });
+
+  // Refus du PIN : trop d'essais (429 de pinLimiter, délai lu dans Retry-After) ou PIN faux (403).
+  describe('refus du PIN : trop d’essais (429) et PIN faux (403)', () => {
+    afterEach(() => {
+      vi.unstubAllGlobals();
+    });
+
+    const response = (status: number, retryAfter?: string, body: unknown = {}) => ({
+      ok: false,
+      status,
+      statusText: 'Refused',
+      headers: new Headers(retryAfter === undefined ? {} : { 'Retry-After': retryAfter }),
+      json: () => Promise.resolve(body),
+    });
+
+    it.each([
+      ['120', 2],
+      ['61', 2],
+      ['60', 1],
+      ['1', 1],
+      ['0', 1],
+      [' 90 ', 2],
+      [undefined, 15],
+      ['', 15],
+      ['abc', 15],
+      ['-5', 15],
+      ['1.5', 15],
+      ['Wed, 21 Oct 2026 07:28:00 GMT', 15],
+    ])('retryAfterMinutes(Retry-After=%s) → %i min', (header, minutes) => {
+      expect(retryAfterMinutes(response(429, header) as unknown as Response)).toBe(minutes);
+    });
+
+    it('requireParentalAccess : 429 → pinRateLimited avec les minutes, callback non appelé', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(429, '120')));
+      const ctx = makeCtx({ editingProfile: { id: 'p1', hasPin: true } });
+      const captured: { promise?: Promise<unknown> } = {};
+      ctx.requirePin = vi.fn((fn: (pin: string) => unknown) => {
+        captured.promise = Promise.resolve(fn('9999'));
+      });
+      const cb = vi.fn();
+
+      callMethod('requireParentalAccess', ctx, cb);
+      await captured.promise;
+
+      expect(ctx.t).toHaveBeenCalledWith('profile.pinRateLimited', { minutes: 2 });
+      expect(ctx.showToast).toHaveBeenCalledWith('profile.pinRateLimited', 'error');
+      expect(ctx.showToast).not.toHaveBeenCalledWith('profile.pinWrong', 'error');
+      expect(cb).not.toHaveBeenCalled();
+      expect(ctx.editingProfile._verifiedPin).toBeUndefined();
+    });
+
+    it('requireParentalAccess : 403 → pinWrong', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(403)));
+      const ctx = makeCtx({ editingProfile: { id: 'p1', hasPin: true } });
+      const captured: { promise?: Promise<unknown> } = {};
+      ctx.requirePin = vi.fn((fn: (pin: string) => unknown) => {
+        captured.promise = Promise.resolve(fn('9999'));
+      });
+      const cb = vi.fn();
+
+      callMethod('requireParentalAccess', ctx, cb);
+      await captured.promise;
+
+      expect(ctx.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it('requireProfilePin : 429 sans Retry-After → 15 min (fenêtre du limiteur)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(429)));
+      const captured: { promise?: Promise<unknown> } = {};
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', hasPin: true }],
+        requirePin: vi.fn((fn: (pin: string) => unknown) => {
+          captured.promise = Promise.resolve(fn('0000'));
+        }),
+      });
+      const cb = vi.fn();
+
+      callMethod('requireProfilePin', ctx, 'p1', cb);
+      await captured.promise;
+
+      expect(ctx.t).toHaveBeenCalledWith('profile.pinRateLimited', { minutes: 15 });
+      expect(ctx.showToast).toHaveBeenCalledWith('profile.pinRateLimited', 'error');
+      expect(cb).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [403, 'profile.pinWrong'],
+      [429, 'profile.pinRateLimited'],
+    ])('suppression avec PIN : %i → %s, profil gardé', async (status, key) => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response(status, '300')));
+      const profile = { id: 'p1', hasPin: true };
+      const ctx = makeCtx({ profiles: [profile] });
+
+      await executeDeleteProfile(ctx as any, 'p1', '0000');
+
+      expect(ctx.showToast).toHaveBeenCalledWith(key, 'error');
+      expect(ctx.profiles).toEqual([profile]);
+    });
+
+    it('suppression sans PIN : 429 rate_limited → erreur traduite, pas un message de PIN', async () => {
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue(response(429, '30', { error: 'rate_limited' })),
+      );
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', hasPin: false }],
+        t: vi.fn((key: string, params?: Record<string, string>) =>
+          key === 'toast.error' ? `Erreur: ${params?.error}` : `<${key}>`,
+        ),
+      });
+
+      await executeDeleteProfile(ctx as any, 'p1');
+
+      expect(ctx.showToast).toHaveBeenCalledWith('Erreur: <errorCode.rate_limited>', 'error');
+      expect(ctx.profiles).toHaveLength(1);
+    });
+
+    it('mapServerErrorCode traduit rate_limited (code stable des limiteurs)', () => {
+      const ctx = makeCtx();
+      mapServerErrorCode(ctx as any, 'rate_limited');
+      expect(ctx.t).toHaveBeenCalledWith('errorCode.rate_limited');
     });
   });
 });

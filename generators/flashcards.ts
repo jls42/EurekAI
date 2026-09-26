@@ -1,5 +1,11 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import {
+  getContent,
+  retryTurns,
+  safeParseJson,
+  tryParseJson,
+  unwrapJsonArray,
+} from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { flashcardsSystem, flashcardsUser, flashcardsRetryUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
@@ -39,19 +45,15 @@ export async function generateFlashcards(
     ...diversityParams('flashcards'),
   });
 
+  // JSON invalide au 1er essai (réponse tronquée) → [] → retry, comme une validation ratée.
+  // Annotation plutôt que `unwrapJsonArray<Flashcard>(…)` : Lizard coupait la fonction à cet appel.
   const raw = getContent(response);
-  const data = unwrapJsonArray<Flashcard>(safeParseJson(raw));
+  const data: Flashcard[] = unwrapJsonArray(tryParseJson(raw));
 
   if (isValidFlashcards(data)) return data;
 
   console.warn('Flashcards validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
-  messages.push(
-    { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content: flashcardsRetryUser(effectiveCount, lang),
-    },
-  );
+  messages.push(...retryTurns(raw, flashcardsRetryUser(effectiveCount, lang)));
 
   const retry = await client.chat.complete({
     model,
@@ -59,11 +61,13 @@ export async function generateFlashcards(
     responseFormat: { type: 'json_object' },
     ...diversityParams('flashcards'),
   });
-  const retryRaw = getContent(retry);
-  const retryData = unwrapJsonArray<Flashcard>(safeParseJson(retryRaw));
+  const retryData: Flashcard[] = unwrapJsonArray(safeParseJson(getContent(retry)));
 
   if (!isValidFlashcards(retryData)) {
-    throw new Error("Le modele n'a pas reussi a generer des flashcards valides apres 2 tentatives");
+    // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
+    throw new SyntaxError(
+      "Le modele n'a pas reussi a generer des flashcards valides apres 2 tentatives",
+    );
   }
   return retryData;
 }

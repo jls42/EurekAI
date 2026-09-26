@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSources } from './sources';
+import { createProfiles } from './profiles';
 import type { Source } from '../../types';
 
 // Mock document.querySelector for openSourceDialog
@@ -53,6 +54,8 @@ function makeContext(overrides: any = {}) {
     showToast: vi.fn(),
     refreshIcons: vi.fn(),
     refreshConsigne: vi.fn(),
+    followConsigneDetection: vi.fn(),
+    consigne: null as any,
     refreshModeration: vi.fn(),
     resolveError: vi.fn((e: string) => e),
     $nextTick: vi.fn((cb: () => void) => cb()),
@@ -165,6 +168,90 @@ describe('createSources', () => {
       expect(ctx.selectedIds).toEqual(['s2']);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.sourceDeleted', 'info');
     });
+
+    // Le serveur efface la consigne tirée de la source supprimée : la réponse porte la consigne
+    // restante, le front s'y resynchronise (sinon le bandeau montrerait une consigne effacée).
+    it('resynchronise la consigne sur celle que renvoie le serveur', async () => {
+      ctx.sources = [{ id: 's1' }];
+      ctx.consigne = { found: true, text: 'tirée de s1', keyTopics: ['k'], sourceIds: ['s1'] };
+      mockFetchOk({ ok: true, consigne: null });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toBeNull();
+    });
+
+    it('consigne restante renvoyée → gardée', async () => {
+      const remaining = { found: true, text: 'autre', keyTopics: ['k'], sourceIds: ['s2'] };
+      ctx.sources = [{ id: 's1' }, { id: 's2' }];
+      ctx.consigne = remaining;
+      mockFetchOk({ ok: true, consigne: remaining });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toEqual(remaining);
+    });
+
+    // Refus du serveur (429 de aiLimiter) : source gardée, erreur traduite, pas de faux succès.
+    it('refus du serveur (429 rate_limited) → source gardée, erreur traduite', async () => {
+      ctx.sources = [{ id: 's1', text: 'a' }];
+      ctx.selectedIds = ['s1'];
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        statusText: 'Too Many Requests',
+        json: async () => ({ error: 'rate_limited' }),
+      } as any);
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.sources).toEqual([{ id: 's1', text: 'a' }]);
+      expect(ctx.selectedIds).toEqual(['s1']);
+      expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.sourceDeleted', 'info');
+    });
+
+    // Liste blanche (rule-node-ssrf) : seule une source affichée du projet ouvert est supprimable.
+    it('id absent des sources affichées : aucune requête', async () => {
+      ctx.sources = [{ id: 's2', text: 'b' }];
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.sources).toEqual([{ id: 's2', text: 'b' }]);
+    });
+
+    it('404 (déjà supprimée ailleurs) → retirée comme un succès', async () => {
+      ctx.sources = [{ id: 's1', text: 'a' }];
+      ctx.selectedIds = ['s1'];
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: async () => ({ error: 'Source introuvable' }),
+      } as any);
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.selectedIds).toEqual([]);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.sourceDeleted', 'info');
+    });
+
+    it('projet changé pendant la suppression : consigne du nouveau projet intacte', async () => {
+      const other = { found: true, text: 'projet 2', keyTopics: ['k'] };
+      ctx.sources = [{ id: 's1' }];
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.consigne = other;
+        return { ok: true, json: async () => ({ ok: true, consigne: null }) } as any;
+      });
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(ctx.consigne).toBe(other);
+    });
   });
 
   describe('openSourceDialog', () => {
@@ -187,6 +274,13 @@ describe('createSources', () => {
       src.openSourceDialog.call(ctx, mockSrc);
 
       expect(ctx.viewSourceRotation).toBe(180);
+    });
+
+    it('repart masqué : une révélation ne survit pas à une nouvelle ouverture', () => {
+      (ctx as any).revealedSourceIds = ['s1'];
+      src.openSourceDialog.call(ctx, { id: 's1' } as unknown as Source);
+
+      expect((ctx as any).revealedSourceIds).toEqual([]);
     });
   });
 
@@ -267,6 +361,123 @@ describe('createSources', () => {
       expect(ctx.$refs.sourceDialog.close).toHaveBeenCalled();
       expect(ctx.viewSource).toBeNull();
     });
+
+    it('remasque le contenu révélé (dialogue et aperçu de la carte) à la fermeture', () => {
+      ctx.viewSource = { id: 's1' };
+      (ctx as any).revealedSourceIds = ['s1'];
+      src.closeSourceDialog.call(ctx);
+
+      expect((ctx as any).revealedSourceIds).toEqual([]);
+    });
+  });
+
+  // « Afficher (parent) » : révélation par le PIN du profil COURANT (requireProfilePin), pour
+  // l'ouverture en cours du dialogue seulement.
+  describe('revealSourceContent', () => {
+    const shown = { id: 's1' } as unknown as Source;
+    const revealCtx = (overrides: Record<string, any> = {}) =>
+      Object.assign(ctx, {
+        currentProfile: { id: 'p1', useModeration: true },
+        viewSource: shown,
+        revealedSourceIds: [] as string[],
+        requireProfilePin: vi.fn(),
+        ...overrides,
+      }) as any;
+
+    it('passe par requireProfilePin avec le profil courant, rien de révélé avant le PIN', () => {
+      const c = revealCtx();
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.requireProfilePin).toHaveBeenCalledWith('p1', expect.any(Function));
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    it('PIN vérifié : la source est révélée une seule fois, icônes rafraîchies', () => {
+      const c = revealCtx({ requireProfilePin: vi.fn((_id: string, cb: () => void) => cb()) });
+      src.revealSourceContent.call(c, shown);
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.revealedSourceIds).toEqual(['s1']);
+      expect(c.refreshIcons).toHaveBeenCalled();
+    });
+
+    it('dialogue fermé (ou autre source) avant la fin de la vérification : rien de révélé', () => {
+      let verified: (() => void) | undefined;
+      const c = revealCtx({
+        requireProfilePin: vi.fn((_id: string, cb: () => void) => {
+          verified = cb;
+        }),
+      });
+      src.revealSourceContent.call(c, shown);
+      src.closeSourceDialog.call(c);
+      verified?.();
+
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    it('aucun profil courant : aucune garde lancée, rien de révélé', () => {
+      const c = revealCtx({ currentProfile: null });
+      src.revealSourceContent.call(c, shown);
+
+      expect(c.requireProfilePin).not.toHaveBeenCalled();
+      expect(c.revealedSourceIds).toEqual([]);
+    });
+
+    // Avec la VRAIE garde (createProfiles().requireProfilePin) : PIN demandé puis vérifié par
+    // PUT /api/profiles/:id ; profil sans PIN (≥ 15 ans) → révélation directe.
+    describe('avec la vraie garde PIN', () => {
+      const guard = createProfiles().requireProfilePin;
+
+      const pinCtx = (hasPin: boolean) => {
+        const captured: { verification?: Promise<unknown> } = {};
+        const c = revealCtx({
+          profiles: [{ id: 'p1', hasPin }],
+          requireProfilePin: guard,
+          requirePin: vi.fn((fn: (pin: string) => unknown) => {
+            captured.verification = Promise.resolve(fn('1234'));
+          }),
+        });
+        return { c, captured };
+      };
+
+      it('PIN correct → requête de vérification puis révélation', async () => {
+        vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+        const { c, captured } = pinCtx(true);
+        src.revealSourceContent.call(c, shown);
+        expect(c.requirePin).toHaveBeenCalled();
+        expect(c.revealedSourceIds).toEqual([]);
+        await captured.verification;
+
+        expect(globalThis.fetch).toHaveBeenCalledWith(
+          '/api/profiles/p1',
+          expect.objectContaining({ method: 'PUT', body: JSON.stringify({ pin: '1234' }) }),
+        );
+        expect(c.revealedSourceIds).toEqual(['s1']);
+      });
+
+      it('PIN refusé (403) → contenu toujours masqué', async () => {
+        vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+          ok: false,
+          status: 403,
+          headers: new Headers(),
+        } as any);
+        const { c, captured } = pinCtx(true);
+        src.revealSourceContent.call(c, shown);
+        await captured.verification;
+
+        expect(c.revealedSourceIds).toEqual([]);
+        expect(c.showToast).toHaveBeenCalledWith('profile.pinWrong', 'error');
+      });
+
+      it('profil sans PIN → révélation directe, sans dialogue PIN ni requête', () => {
+        const { c } = pinCtx(false);
+        src.revealSourceContent.call(c, shown);
+
+        expect(c.requirePin).not.toHaveBeenCalled();
+        expect(globalThis.fetch).not.toHaveBeenCalled();
+        expect(c.revealedSourceIds).toEqual(['s1']);
+      });
+    });
   });
 
   describe('handleDrop', () => {
@@ -305,6 +516,122 @@ describe('createSources', () => {
       vi.mocked(globalThis.fetch).mockClear();
       await src.refreshModeration.call(ctx);
       expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    // Consigne relue quand il ne reste plus de source en attente : la détection de fond attend la
+    // modération, une consigne détectée APRÈS n'apparaîtrait jamais sinon.
+    it('plus aucune source en attente → relecture de la consigne lancée', async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      mockFetchOk({ sources: [{ id: 's1', moderation: { status: 'safe', categories: {} } }] });
+
+      await src.refreshModeration.call(ctx);
+
+      expect(ctx.followConsigneDetection).toHaveBeenCalledWith('pid-1');
+    });
+
+    it('source encore en attente → nouvelle relecture des modérations, pas de la consigne', async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      mockFetchOk({ sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }] });
+      ctx.refreshModeration = vi.fn();
+
+      await src.refreshModeration.call(ctx, 2);
+      expect(ctx.followConsigneDetection).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(3000);
+
+      expect(ctx.refreshModeration).toHaveBeenCalledWith(1);
+    });
+
+    it("projet changé pendant la relecture : rien n'est fusionné ni relu", async () => {
+      ctx.sources = [{ id: 's1', moderation: { status: 'pending', categories: {} } }];
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        return {
+          ok: true,
+          json: async () => ({ sources: [{ id: 's1', moderation: { status: 'safe' } }] }),
+        } as any;
+      });
+
+      await src.refreshModeration.call(ctx);
+
+      expect(ctx.sources[0].moderation.status).toBe('pending');
+      expect(ctx.followConsigneDetection).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('« Revérifier » (canRecheckModeration / recheckSourceModeration)', () => {
+    const pendingSource = () => ({
+      id: 's1',
+      filename: 'cours.txt',
+      markdown: 'cours',
+      uploadedAt: '',
+      moderation: { status: 'pending', categories: {} },
+    });
+
+    const recheckCtx = (overrides: any = {}) =>
+      makeContext({
+        currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+        recheckingSources: {} as Record<string, boolean>,
+        moderationStatus: vi.fn((s: Source) => s.moderation?.status ?? null),
+        sources: [pendingSource()],
+        ...overrides,
+      });
+
+    it.each([
+      ['pending', true, true],
+      ['error', true, true],
+      ['safe', true, false],
+      ['unsafe', true, false],
+      ['pending', false, false],
+    ])('statut affiché %s, profil modéré %s → %s', (status, useModeration, expected) => {
+      const c = recheckCtx({ currentProfile: { id: 'p1', useModeration } });
+      const source = { ...pendingSource(), moderation: { status, categories: {} } } as Source;
+
+      expect(src.canRecheckModeration.call(c as any, source)).toBe(expected);
+    });
+
+    it('vérifie cette seule source, désactive le bouton pendant la requête, fusionne', async () => {
+      const c = recheckCtx();
+      let busyDuringRequest: unknown;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        busyDuringRequest = c.recheckingSources.s1;
+        return {
+          ok: true,
+          json: async () => ({
+            sources: [{ id: 's1', moderation: { status: 'safe', categories: {} } }],
+          }),
+        } as any;
+      });
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0];
+      expect(url).toBe('/api/projects/pid-1/sources/moderate');
+      expect(JSON.parse((init as RequestInit).body as string)).toEqual({ sourceIds: ['s1'] });
+      expect(busyDuringRequest).toBe(true);
+      expect(c.recheckingSources).toEqual({});
+      expect(c.sources[0].moderation.status).toBe('safe');
+      expect(c.showToast).toHaveBeenCalledWith('moderation.checking', 'info');
+    });
+
+    it('second clic pendant la vérification : ignoré', async () => {
+      const c = recheckCtx({ recheckingSources: { s1: true } });
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('échec de la requête : toast « Modération indisponible », bouton réactivé', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const c = recheckCtx();
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+
+      await src.recheckSourceModeration.call(c as any, c.sources[0]);
+
+      expect(c.showToast).toHaveBeenCalledWith('moderation.error', 'error');
+      expect(c.recheckingSources).toEqual({});
+      expect(c.sources[0].moderation.status).toBe('pending');
+      warn.mockRestore();
     });
   });
 

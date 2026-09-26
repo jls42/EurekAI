@@ -17,17 +17,30 @@ vi.mock('node:fs/promises', async (importOriginal) => {
     mkdtemp: vi.fn().mockResolvedValue('/tmp/eurekai-mp3-test'),
     writeFile: vi.fn().mockResolvedValue(undefined),
     readFile: vi.fn().mockResolvedValue(Buffer.from('concatenated-audio')),
-    unlink: vi.fn().mockResolvedValue(undefined),
+    rm: vi.fn().mockResolvedValue(undefined),
   };
 });
 
+import { join } from 'node:path';
 import { generateAudio, generateSilence, concatMp3 } from './tts.js';
 import { textToSpeech } from './tts-provider.js';
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, unlink } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import type { TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
 import { asVoiceId } from '../helpers/voice-types.js';
+import { logger } from '../helpers/logger.js';
+
+// Dossier renvoyé par le mkdtemp mocké, et options du nettoyage attendu : `unlink` sur un
+// dossier échouait toujours (EISDIR avalé), les dossiers s'accumulaient dans le tmpdir.
+const TMP_DIR = '/tmp/eurekai-mp3-test';
+const RECURSIVE = { recursive: true, force: true };
+
+const failNextFfmpeg = (message: string) => {
+  vi.mocked(execFile).mockImplementationOnce(((_cmd: any, _args: any, cb: any) => {
+    cb(new Error(message), '', '');
+  }) as any);
+};
 
 const ttsOptions: TtsOptions = {
   model: 'voxtral-mini-tts-2603',
@@ -53,13 +66,20 @@ describe('generateSilence', () => {
     expect(result).toBeInstanceOf(Buffer);
   });
 
-  it('cleans up temp files in finally block', async () => {
-    vi.mocked(unlink).mockClear();
-
+  it('supprime le dossier temporaire récursivement dans le finally', async () => {
     await generateSilence(500);
 
-    // unlink called for output file + tmpDir
-    expect(unlink).toHaveBeenCalledTimes(2);
+    expect(rm).toHaveBeenCalledTimes(1);
+    expect(rm).toHaveBeenCalledWith(TMP_DIR, RECURSIVE);
+  });
+
+  it('supprime le dossier même quand ffmpeg échoue, et propage l erreur ffmpeg', async () => {
+    failNextFfmpeg('ffmpeg exploded');
+
+    await expect(generateSilence(500)).rejects.toThrow('ffmpeg exploded');
+
+    expect(readFile).not.toHaveBeenCalled();
+    expect(rm).toHaveBeenCalledWith(TMP_DIR, RECURSIVE);
   });
 });
 
@@ -68,6 +88,48 @@ describe('concatMp3', () => {
     const buf = Buffer.from('single');
     const result = await concatMp3([buf]);
     expect(result).toBe(buf);
+    expect(mkdtemp).not.toHaveBeenCalled();
+    expect(rm).not.toHaveBeenCalled();
+  });
+
+  it('concatène les segments via ffmpeg (liste écrite une fois) puis supprime le dossier', async () => {
+    const result = await concatMp3([Buffer.from('a'), Buffer.from('b')]);
+
+    expect(result.toString()).toBe('concatenated-audio');
+    // 2 segments + list.txt : une seule écriture de la liste.
+    expect(writeFile).toHaveBeenCalledTimes(3);
+    expect(writeFile).toHaveBeenLastCalledWith(
+      join(TMP_DIR, 'list.txt'),
+      `file '${join(TMP_DIR, 'seg_0.mp3')}'\nfile '${join(TMP_DIR, 'seg_1.mp3')}'`,
+    );
+    expect(vi.mocked(execFile).mock.calls[0][1]).toContain('concat');
+    expect(rm).toHaveBeenCalledTimes(1);
+    expect(rm).toHaveBeenCalledWith(TMP_DIR, RECURSIVE);
+  });
+
+  it('supprime le dossier même quand ffmpeg échoue, et propage l erreur ffmpeg', async () => {
+    failNextFfmpeg('concat failed');
+
+    await expect(concatMp3([Buffer.from('a'), Buffer.from('b')])).rejects.toThrow('concat failed');
+
+    expect(rm).toHaveBeenCalledWith(TMP_DIR, RECURSIVE);
+  });
+
+  it('un échec du nettoyage est journalisé sans masquer le résultat', async () => {
+    vi.mocked(rm).mockRejectedValueOnce(Object.assign(new Error('busy'), { code: 'EBUSY' }));
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    try {
+      const result = await concatMp3([Buffer.from('a'), Buffer.from('b')]);
+
+      expect(result.toString()).toBe('concatenated-audio');
+      expect(warn).toHaveBeenCalledWith(
+        'tts',
+        expect.stringContaining('temp dir cleanup failed'),
+        expect.any(Error),
+      );
+    } finally {
+      warn.mockRestore();
+    }
   });
 });
 

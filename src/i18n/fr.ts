@@ -59,8 +59,9 @@ export const fr: Record<string, string> = {
   'gen.all': 'Tout générer',
   'gen.voice': 'Lecture vocale',
   'gen.websearch': 'Recherche web',
-  'a11y.viewCategory': 'Voir les {category}',
-  'a11y.generateCategory': 'Générer des {category}',
+  'a11y.viewCategory': 'Voir : {category}',
+  'a11y.generateCategory': 'Générer : {category}',
+  'a11y.cancelGeneration': 'Annuler : {type}',
   'a11y.fillBlankAnswer': 'Réponse à compléter',
   'a11y.selectSource': 'Sélectionner cette source',
   'a11y.editTitle': 'Modifier le titre',
@@ -99,8 +100,14 @@ export const fr: Record<string, string> = {
   'errorCode.upload_failed': "Échec de l'envoi",
   'errorCode.file_too_large': 'Ce fichier est trop gros. Essaie avec un fichier plus léger.',
   'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
+  'errorCode.invalid_input': 'Demande invalide',
   'errorCode.profile_delete_partial':
     "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",
+  'errorCode.rate_limited': "Trop de demandes d'un coup. Patiente un peu, puis réessaie.",
+  'errorCode.url_blocked':
+    'Cette adresse ne peut pas être ouverte. Essaie une autre adresse, ou écris simplement ce que tu cherches.',
+  'errorCode.all_sources_failed':
+    "Aucune source n'a pu être ajoutée. Réessaie dans un petit moment.",
 
   // Header
   'header.menuProjects': 'Menu projets',
@@ -244,6 +251,10 @@ export const fr: Record<string, string> = {
   'sources.viewCompare': 'Voir et comparer',
   'sources.viewText': 'Voir le texte',
   'sources.deleteSource': 'Supprimer la source',
+  'sources.recheckModeration': 'Revérifier',
+  'sources.contentMasked': 'Ce contenu est masqué',
+  'sources.contentChecking': 'Vérification en cours…',
+  'sources.revealContent': 'Afficher (parent)',
   'sources.emptyTitle': 'Ajoute une photo ou du texte',
   'sources.emptySubtitle': 'Utilise les boutons ci-dessus pour commencer',
   'sources.dragDrop': 'Glisser-déposer des fichiers ici',
@@ -324,6 +335,8 @@ export const fr: Record<string, string> = {
   'quiz.youSaid': 'Tu as dit : {text}',
   'quiz.nextQuestion': 'Question suivante',
   'quiz.verificationError': "Oups, je n'ai pas réussi à écouter ta réponse. On réessaie ?",
+  'quiz.answerBlocked':
+    "Je ne peux pas accepter cette réponse. Essaie de la redire avec d'autres mots !",
 
   // Chat view
   'chat.heading': 'Chat avec tes cours',
@@ -482,6 +495,7 @@ export const fr: Record<string, string> = {
   'toast.remediationQuizError': "Le quiz d'entraînement n'a pas pu être généré",
   // Moderation
   'moderation.blocked': 'Ce contenu a été signalé comme inapproprié. La génération est bloquée.',
+  'moderation.checking': 'Vérification des sources…',
   'moderation.pending': 'Modération en cours',
   'moderation.error': 'Modération indisponible',
   'moderation.unsafe': 'Contenu signalé',
@@ -489,7 +503,11 @@ export const fr: Record<string, string> = {
   'moderation.cat.sexual': 'Contenu sexuel',
   'moderation.cat.hate_and_discrimination': 'Haine et discrimination',
   'moderation.cat.violence_and_threats': 'Violence et menaces',
-  'moderation.cat.dangerous_and_criminal_content': 'Contenu dangereux',
+  // Clé du modèle 2411 (scindée en dangerous + criminal par 2603) : plus proposée aux parents,
+  // conservée pour l'historique (affichage des sources modérées avant la migration).
+  'moderation.cat.dangerous_and_criminal_content': 'Contenu dangereux ou illégal',
+  'moderation.cat.dangerous': 'Contenu dangereux',
+  'moderation.cat.criminal': 'Activités illégales',
   'moderation.cat.selfharm': 'Automutilation',
   'moderation.cat.health': 'Santé',
   'moderation.cat.financial': 'Finance',
@@ -510,6 +528,7 @@ export const fr: Record<string, string> = {
   'profile.pinMismatch': 'Les codes PIN ne correspondent pas',
   'profile.pinVerify': 'Vérification parentale',
   'profile.pinWrong': 'Code PIN incorrect',
+  'profile.pinRateLimited': "Trop d'essais de code PIN. Réessaie dans {minutes} min.",
   'profile.pinInfo':
     'Un code PIN parental protège ce profil. Il sera demandé pour modifier ou supprimer le profil.',
   'profile.moderationToggle': 'Modération du contenu',

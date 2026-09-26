@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { trackClient } from './tracked-client.js';
+import { logger } from './logger.js';
 import type { ApiUsage } from './pricing.js';
 import type { Mistral } from '@mistralai/mistralai';
 
@@ -277,5 +278,127 @@ describe('trackClient', () => {
     await client.beta.conversations.start({ agentId: 'agent-1', inputs: 'test' });
 
     expect(captured).toHaveLength(0);
+  });
+});
+
+describe("trackClient — frais d'outils des agents", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // `usage` d'une recherche web capturé en réel le 2026-09-26 (forme camelCase du SDK).
+  const WEB_SEARCH_USAGE = {
+    promptTokens: 789,
+    completionTokens: 94,
+    totalTokens: 8100,
+    connectorTokens: 7217,
+    connectors: { web_search: 1 },
+  };
+  const toolExecution = (name: string) => ({ type: 'tool.execution', name, arguments: '{}' });
+  const MESSAGE = { type: 'message.output', content: 'ok' };
+
+  const captureAgent = async (response: unknown): Promise<ApiUsage> => {
+    const client = makeFakeClient();
+    client.beta.conversations.start.mockResolvedValue(response);
+    const captured: ApiUsage[] = [];
+    trackClient(client, (u) => captured.push(u));
+    await client.beta.conversations.start({ agentId: 'agent-1', inputs: 'test' });
+    expect(captured).toHaveLength(1);
+    return captured[0];
+  };
+
+  it('usage.connectors présent → toolCalls et connectorTokens captés', async () => {
+    const usage = await captureAgent({
+      outputs: [toolExecution('web_search'), MESSAGE],
+      usage: WEB_SEARCH_USAGE,
+    });
+    expect(usage).toEqual({
+      promptTokens: 789,
+      completionTokens: 94,
+      totalTokens: 8100,
+      toolCalls: { web_search: 1 },
+      connectorTokens: 7217,
+      model: 'mistral-large-latest',
+    });
+  });
+
+  it('usage.connectors prime sur les sorties tool.execution (jamais les deux)', async () => {
+    const usage = await captureAgent({
+      outputs: [toolExecution('web_search'), toolExecution('web_search'), MESSAGE],
+      usage: WEB_SEARCH_USAGE,
+    });
+    expect(usage.toolCalls).toEqual({ web_search: 1 });
+  });
+
+  it('sans usage.connectors → décompte des sorties tool.execution par nom', async () => {
+    const usage = await captureAgent({
+      outputs: [
+        toolExecution('image_generation'),
+        toolExecution('web_search'),
+        toolExecution('web_search'),
+        { type: 'tool.execution' }, // sans nom : ignorée
+        MESSAGE,
+      ],
+      usage: { promptTokens: 187, completionTokens: 464, totalTokens: 651 },
+    });
+    expect(usage.toolCalls).toEqual({ image_generation: 1, web_search: 2 });
+    expect(usage.connectorTokens).toBeUndefined();
+  });
+
+  it('aucun outil (connectors vide, aucune sortie tool.execution) → ni toolCalls ni connectorTokens', async () => {
+    const usage = await captureAgent({
+      outputs: [MESSAGE],
+      usage: { promptTokens: 200, completionTokens: 150, totalTokens: 350, connectors: {} },
+    });
+    expect(usage).not.toHaveProperty('toolCalls');
+    expect(usage).not.toHaveProperty('connectorTokens');
+  });
+
+  it('ne garde que les compteurs entiers finis ≥ 0', async () => {
+    const usage = await captureAgent({
+      outputs: [MESSAGE],
+      usage: {
+        ...WEB_SEARCH_USAGE,
+        connectors: {
+          web_search: 2,
+          image_generation: -1,
+          fractional: 1.5,
+          nan: Number.NaN,
+          infinite: Number.POSITIVE_INFINITY,
+          text: '3',
+          empty: null,
+        },
+      },
+    });
+    expect(usage.toolCalls).toEqual({ web_search: 2 });
+  });
+
+  it('usage.connectors sans compteur valide → repli sur les sorties tool.execution', async () => {
+    const usage = await captureAgent({
+      outputs: [toolExecution('image_generation'), MESSAGE],
+      usage: { ...WEB_SEARCH_USAGE, connectors: { image_generation: -1 } },
+    });
+    expect(usage.toolCalls).toEqual({ image_generation: 1 });
+  });
+
+  it('connectorTokens invalide (négatif, fractionnaire, null, texte) ignoré', async () => {
+    for (const connectorTokens of [-5, 2.5, null, '10']) {
+      const usage = await captureAgent({
+        outputs: [MESSAGE],
+        usage: { ...WEB_SEARCH_USAGE, connectorTokens },
+      });
+      expect(usage.connectorTokens).toBeUndefined();
+    }
+  });
+
+  it('outil sans tarif → gardé dans toolCalls et signalé par logger.warn', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const usage = await captureAgent({
+      outputs: [toolExecution('code_interpreter'), toolExecution('web_search'), MESSAGE],
+      usage: { ...WEB_SEARCH_USAGE, connectors: { code_interpreter: 1, web_search: 1 } },
+    });
+    expect(usage.toolCalls).toEqual({ code_interpreter: 1, web_search: 1 });
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('cost', expect.stringContaining('code_interpreter'));
   });
 });

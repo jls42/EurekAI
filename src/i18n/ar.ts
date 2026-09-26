@@ -65,8 +65,9 @@ export const ar: Record<string, string> = {
   'gen.voice':
     '\u0627\u0644\u0642\u0631\u0627\u0621\u0629 \u0628\u0635\u0648\u062a \u0639\u0627\u0644\u064d',
   'gen.websearch': '\u0628\u062d\u062b \u0639\u0644\u0649 \u0627\u0644\u0648\u064a\u0628',
-  'a11y.viewCategory': '\u0639\u0631\u0636 {category}',
-  'a11y.generateCategory': '\u0625\u0646\u0634\u0627\u0621 {category}',
+  'a11y.viewCategory': 'عرض: {category}',
+  'a11y.generateCategory': 'إنشاء: {category}',
+  'a11y.cancelGeneration': 'إلغاء: {type}',
   'a11y.fillBlankAnswer':
     '\u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629',
   'a11y.selectSource':
@@ -107,7 +108,11 @@ export const ar: Record<string, string> = {
   'errorCode.file_too_large':
     '\u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0643\u0628\u064a\u0631 \u062c\u062f\u0627. \u0627\u062e\u062a\u0631 \u0645\u0644\u0641\u0627 \u0623\u0635\u063a\u0631.',
   'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
+  'errorCode.invalid_input': 'طلب غير صالح',
   'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
+  'errorCode.rate_limited': 'طلبات كثيرة في وقت واحد. انتظر قليلا ثم أعد المحاولة.',
+  'errorCode.url_blocked': 'لا يمكن فتح هذا العنوان. جرّب عنوانا آخر، أو اكتب ببساطة ما تبحث عنه.',
+  'errorCode.all_sources_failed': 'تعذّرت إضافة أي مصدر. أعد المحاولة بعد قليل.',
 
   'header.menuProjects':
     '\u0642\u0627\u0626\u0645\u0629 \u0627\u0644\u0645\u0634\u0627\u0631\u064a\u0639',
@@ -280,6 +285,10 @@ export const ar: Record<string, string> = {
   'sources.viewCompare': '\u0639\u0631\u0636 \u0648\u0645\u0642\u0627\u0631\u0646\u0629',
   'sources.viewText': '\u0639\u0631\u0636 \u0627\u0644\u0646\u0635',
   'sources.deleteSource': '\u062d\u0630\u0641 \u0627\u0644\u0645\u0635\u062f\u0631',
+  'sources.recheckModeration': 'إعادة التحقق',
+  'sources.contentMasked': 'هذا المحتوى مخفي',
+  'sources.contentChecking': 'جارٍ التحقق…',
+  'sources.revealContent': 'إظهار (وليّ الأمر)',
   'sources.emptyTitle':
     '\u0623\u0636\u0641 \u0635\u0648\u0631\u0629 \u0623\u0648 \u0646\u0635\u0627\u064b',
   'sources.emptySubtitle':
@@ -378,6 +387,7 @@ export const ar: Record<string, string> = {
   'quiz.nextQuestion': '\u0627\u0644\u0633\u0624\u0627\u0644 \u0627\u0644\u062a\u0627\u0644\u064a',
   'quiz.verificationError':
     '\u0639\u0630\u0631\u0627\u064b\u060c \u0644\u0645 \u0623\u062a\u0645\u0643\u0651\u0646 \u0645\u0646 \u0633\u0645\u0627\u0639 \u0625\u062c\u0627\u0628\u062a\u0643. \u0646\u0639\u064a\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629\u061f',
+  'quiz.answerBlocked': 'لا يمكنني قبول هذه الإجابة. لنجرّب قولها بكلمات أخرى!',
 
   'chat.heading': '\u062a\u062d\u062f\u0651\u062b \u0645\u0639 \u062f\u0631\u0648\u0633\u0643',
   'chat.clear': '\u0645\u0633\u062d',
@@ -607,6 +617,7 @@ export const ar: Record<string, string> = {
     '\u062a\u0639\u0630\u0651\u0631 \u0625\u0646\u0634\u0627\u0621 \u0627\u062e\u062a\u0628\u0627\u0631 \u0627\u0644\u062a\u062f\u0631\u064a\u0628',
   'moderation.blocked':
     '\u062a\u0645\u0651 \u0627\u0644\u0625\u0628\u0644\u0627\u063a \u0639\u0646 \u0647\u0630\u0627 \u0627\u0644\u0645\u062d\u062a\u0648\u0649 \u0628\u0627\u0639\u062a\u0628\u0627\u0631\u0647 \u063a\u064a\u0631 \u0645\u0646\u0627\u0633\u0628. \u062a\u0645\u0651 \u062d\u0638\u0631 \u0627\u0644\u062a\u0648\u0644\u064a\u062f.',
+  'moderation.checking': 'جارٍ التحقق من المصادر…',
   'moderation.pending': '\u062c\u0627\u0631\u064d \u0627\u0644\u0625\u0634\u0631\u0627\u0641',
   'moderation.error':
     '\u0627\u0644\u0625\u0634\u0631\u0627\u0641 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d',
@@ -620,7 +631,10 @@ export const ar: Record<string, string> = {
   'moderation.cat.violence_and_threats':
     '\u0639\u0646\u0641 \u0648\u062a\u0647\u062f\u064a\u062f\u0627\u062a',
   'moderation.cat.dangerous_and_criminal_content':
-    '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631',
+    '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631 \u0623\u0648 \u063a\u064a\u0631 \u0642\u0627\u0646\u0648\u0646\u064a',
+  'moderation.cat.dangerous': '\u0645\u062d\u062a\u0648\u0649 \u062e\u0637\u064a\u0631',
+  'moderation.cat.criminal':
+    '\u0623\u0646\u0634\u0637\u0629 \u063a\u064a\u0631 \u0642\u0627\u0646\u0648\u0646\u064a\u0629',
   'moderation.cat.selfharm': '\u0625\u064a\u0630\u0627\u0621 \u0627\u0644\u0646\u0641\u0633',
   'moderation.cat.health': '\u0635\u062d\u0629',
   'moderation.cat.financial': '\u0645\u0627\u0644\u064a',
@@ -645,6 +659,7 @@ export const ar: Record<string, string> = {
   'profile.pinVerify':
     '\u0627\u0644\u062a\u062d\u0642\u0651\u0642 \u0627\u0644\u0648\u0627\u0644\u062f\u064a',
   'profile.pinWrong': '\u0631\u0645\u0632 PIN \u063a\u064a\u0631 \u0635\u062d\u064a\u062d',
+  'profile.pinRateLimited': 'محاولات كثيرة لرمز PIN. أعد المحاولة بعد {minutes} دقيقة.',
   'profile.pinInfo':
     '\u0631\u0645\u0632 PIN \u0627\u0644\u0648\u0627\u0644\u062f\u064a \u064a\u062d\u0645\u064a \u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0627\u0644\u0634\u062e\u0635\u064a. \u0633\u064a\u064f\u0637\u0644\u0628 \u0639\u0646\u062f \u0627\u0644\u062a\u0639\u062f\u064a\u0644 \u0623\u0648 \u0627\u0644\u062d\u0630\u0641.',
   'profile.moderationToggle':

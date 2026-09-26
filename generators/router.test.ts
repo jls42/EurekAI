@@ -63,6 +63,64 @@ describe('routeRequest', () => {
     const call = client.chat.complete.mock.calls[0][0];
     expect(call.model).toBe('custom-model');
   });
+
+  // Réponse inexploitable : plan de secours (normalizePlan([])) + warn, jamais d'exception
+  // (TypeError → internal_error, ou SyntaxError → échec de /generate/auto et /generate/route).
+  describe('réponse inexploitable → plan de secours', () => {
+    const rawClient = (content: string) =>
+      ({
+        chat: {
+          complete: vi.fn().mockResolvedValue({ choices: [{ message: { content } }] }),
+        },
+      }) as any;
+
+    it.each([
+      ['JSON tronqué', '{"plan":[{"agent":"summary"'],
+      ['réponse vide', ''],
+      ['JSON null', 'null'],
+      ['JSON chaîne', '"summary, quiz"'],
+      ['tableau nu', '[{"agent":"quiz","reason":"r"}]'],
+      ['plan absent', '{"context":"x"}'],
+      ['plan non-tableau', '{"plan":{"agent":"quiz"},"context":"x"}'],
+    ])('%s → [summary, flashcards, quiz] + warn', async (_label, content) => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        const result = await routeRequest(rawClient(content), 'content');
+
+        expect(result.plan.map((s) => s.agent)).toEqual(['summary', 'flashcards', 'quiz']);
+        expect(warn).toHaveBeenCalledWith('router', expect.stringContaining('catastrophe'), []);
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('JSON inexploitable : context vide et warn dédié au routeur', async () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      try {
+        const result = await routeRequest(rawClient('{"plan":[{"agent"'), 'content');
+
+        expect(result.context).toBe('');
+        expect(warn).toHaveBeenCalledWith('router', expect.stringContaining('fallback plan'));
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('étapes non-objet ignorées, les étapes valides gardées (pas de TypeError)', async () => {
+      const content = JSON.stringify({
+        plan: [null, 'quiz', { agent: 'quiz', reason: 'r' }],
+        context: 'Ctx',
+      });
+
+      const result = await routeRequest(rawClient(content), 'content');
+
+      expect(result.plan).toEqual([
+        { agent: 'summary', reason: expect.any(String) },
+        { agent: 'quiz', reason: 'r' },
+      ]);
+      expect(result.context).toBe('Ctx');
+    });
+  });
 });
 
 // ── normalizePlan unit tests (Phase 2.4) ─────────────────────────────

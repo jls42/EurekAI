@@ -1,6 +1,7 @@
 #!/bin/bash
 # Check for outdated dependencies, API model availability, and collect changelogs.
-# Output is structured for human reading and LLM analysis (used by /check-sdk-updates skill).
+# Output is structured for human reading and LLM analysis. Run it by hand before a release
+# (no skill wraps it; the release-test skill only checks its check-models wiring).
 set -euo pipefail
 
 echo "=== Outdated npm packages ==="
@@ -70,84 +71,58 @@ if [ -z "${MISTRAL_API_KEY:-}" ]; then
   # shellcheck disable=SC1091
   source .env 2>/dev/null || true
 fi
+# Exporter la SEULE clé utile : check-models tourne dans un process enfant (npx tsx) qui ne voit pas
+# une variable shell non exportée — un `source .env` seul le faisait skipper « absent » à chaque run.
+if [ -n "${MISTRAL_API_KEY:-}" ]; then export MISTRAL_API_KEY; fi
 
-echo ""
-echo "=== Mistral API model check ==="
-if [ -z "${MISTRAL_API_KEY:-}" ]; then
-  echo "  MISTRAL_API_KEY not set, skipping"
-else
-  # Chat models — tested via /v1/chat/completions
-  chat_models=("mistral-large-latest" "mistral-medium-latest" "mistral-small-latest")
-  # Non-chat models — tested via /v1/models listing (OCR 3 défaut + OCR 4 option pinnés)
-  other_models=("mistral-ocr-2512" "mistral-ocr-4-0" "mistral-ocr-latest" "voxtral-mini-latest" "voxtral-mini-tts-latest" "mistral-moderation-latest")
-  all_ok=true
-
-  for model in "${chat_models[@]}"; do
-    status=$(curl -s -w "\n%{http_code}" -X POST https://api.mistral.ai/v1/chat/completions \
-      -H "Authorization: Bearer $MISTRAL_API_KEY" \
-      -H "Content-Type: application/json" \
-      -d "{\"model\":\"$model\",\"messages\":[{\"role\":\"user\",\"content\":\"hi\"}],\"max_tokens\":1}" 2>/dev/null | tail -1)
-    if [ "$status" = "200" ]; then
-      echo "  ✓ $model (chat)"
-    else
-      echo "  ✗ $model (HTTP $status)"
-      all_ok=false
-    fi
-  done
-
-  # For non-chat models, check if they appear in the models list
-  models_list=$(curl -s https://api.mistral.ai/v1/models \
-    -H "Authorization: Bearer $MISTRAL_API_KEY" 2>/dev/null)
-  for model in "${other_models[@]}"; do
-    if echo "$models_list" | grep -q "\"$model\""; then
-      echo "  ✓ $model"
-    else
-      echo "  ✗ $model (not found in /v1/models)"
-      all_ok=false
-    fi
-  done
-  if [ "$all_ok" = false ]; then
-    echo "  ⚠ Some models are unavailable — check Mistral docs for renames/deprecations"
+# Borne la commande passée à 120 s : timeout (coreutils), sinon gtimeout (coreutils Homebrew sur
+# macOS), sinon exécution directe. Réservé à check-models : Lightpanda y rend l'overview via
+# execSync (boucle Node bloquée, aucun timer interne ne peut l'interrompre ; run mesuré 1 à 2 s).
+# timeout tue tout le groupe de processus (npx → tsx → node → navigateur) ; -k 10 = SIGKILL si
+# SIGTERM est ignoré. 124/137 = délai dépassé : le dire, sinon la section resterait muette.
+# Ctrl-C : timeout se place dans son propre groupe, qu'un Ctrl-C du terminal n'atteint plus. On le
+# lance donc en arrière-plan et on relaie un TERM à son groupe (un job d'arrière-plan de script
+# ignore SIGINT), puis on ré-émet le signal pour arrêter le script (vérifié : aucun survivant).
+# Terminal fermé (SIGHUP) : même relais. Sans trap HUP, le script mourait seul et check-models
+# (timeout, npm exec, tsx, node) continuait jusqu'à 130 s (mesuré : 5 survivants, 0 avec le trap).
+run_bounded() {
+  local status=0 bin=""
+  if command -v timeout >/dev/null 2>&1; then
+    bin="timeout"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    bin="gtimeout"
   fi
-fi
-
-echo ""
-echo "=== Known model deprecations (local table — Mistral docs lag /v1/models) ==="
-# Mistral publie les dates de retrait sur https://docs.mistral.ai/models/overview (colonnes
-# Deprecation / Retirement / Alternative). Le champ `deprecation` de /v1/models est tantôt None
-# (lag, ex. OCR), tantôt peuplé (ex. moderation) — donc peu fiable seul. Le smoke-test d'existence
-# ci-dessus ne voit rien tant que le modèle reste listé. Cette table locale produit un rappel DATÉ
-# au release-time. Format: "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
-# N'y mettre que les modèles RÉELLEMENT utilisés (cf. audit modèles).
-known_deprecations=(
-  # Aucun modèle OCR proposé n'est en retrait : OCR 4 et OCR 3 (mistral-ocr-2512) sont tous deux
-  # courants (docs.mistral.ai/models/overview, section « Premier »). Format si besoin un jour :
-  # "model-id|deprecation(YYYY-MM-DD)|retirement(YYYY-MM-DD)|alternative".
-)
-today_ymd=$(date -u +%Y-%m-%d)
-today_epoch=$(date -u -d "$today_ymd" +%s)
-days_until() { # echo le nb de jours (signé) entre aujourd'hui et $1 (YYYY-MM-DD), ou "" si non parsable
-  local e
-  e=$(date -u -d "$1" +%s 2>/dev/null) || { echo ""; return; }
-  echo "$(((e - today_epoch) / 86400))"
+  if [ -z "$bin" ]; then
+    "$@" || status=$?
+    return "$status"
+  fi
+  "$bin" -k 10 120 "$@" &
+  local pid=$!
+  # shellcheck disable=SC2064 # $pid est figé à la pose du trap, volontairement
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - INT; kill -INT \$\$" INT
+  # shellcheck disable=SC2064
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - TERM; kill -TERM \$\$" TERM
+  # shellcheck disable=SC2064
+  trap "kill -TERM $pid 2>/dev/null; wait $pid || true; trap - HUP; kill -HUP \$\$" HUP
+  wait "$pid" || status=$?
+  trap - INT TERM HUP
+  if [ "$status" -eq 124 ] || [ "$status" -eq 137 ]; then
+    echo "  ⚠ interrompu après 120 s (délai dépassé) — non bloquant"
+  fi
+  return "$status"
 }
-fmt_date() { # "le $1 (dans N j)" / "depuis le $1 (il y a N j)" selon le signe de $2
-  if [ "$2" -gt 0 ]; then echo "le $1 (dans $2 j)"; else echo "depuis le $1 (il y a $((-$2)) j)"; fi
-}
-for entry in "${known_deprecations[@]}"; do
-  IFS='|' read -r dep_model dep_date ret_date alt <<< "$entry"
-  dd=$(days_until "$dep_date")
-  rd=$(days_until "$ret_date")
-  msg="  ⚠ $dep_model"
-  [ -n "$dd" ] && msg="$msg déprécié $(fmt_date "$dep_date" "$dd")"
-  [ -n "$rd" ] && msg="$msg, RETIRÉ $(fmt_date "$ret_date" "$rd")"
-  echo "$msg — alternative: ${alt:-?}"
-done
 
-# Vérification dynamique des alias -latest via l'API /v1/models (source de vérité, non bloquant).
+# Modèles Mistral : UNE seule source, scripts/check-models.ts (non bloquant). Il surveille les ids
+# réellement envoyés (alias -latest résolus + helpers/ocr-models.ts + helpers/moderation-model.ts),
+# croise /v1/models (présence, groupe ambigu, dépréciation, défaut épinglé en retard) et la table
+# Legacy de l'overview (date de retrait + remplaçant). Suppression ASSUMÉE de l'ancienne liste bash
+# (sonde chat/completions + `other_models`) et de la table locale `known_deprecations` : elles
+# dérivaient (ex. `✗ mistral-moderation-latest` alors que l'app envoie `mistral-moderation-2603`) et
+# l'acceptation d'un id par un endpoint ne prouve rien (/v1/moderations sert encore l'id retiré
+# 2411). Ne pas réintroduire de seconde liste de modèles ici.
 echo ""
-echo "── Alias -latest vs API /v1/models ──"
-npx tsx scripts/check-models.ts || true
+echo "=== Mistral models (check-models : /v1/models + overview Legacy) ==="
+run_bounded npx tsx scripts/check-models.ts || true
 
 # ── Changelogs with persistent state (disable strict mode for robustness) ──
 set +eo pipefail

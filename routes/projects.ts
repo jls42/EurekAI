@@ -1,5 +1,7 @@
 import { Router, type Response } from 'express';
 import type { ProjectStore } from '../store.js';
+import type { ProfileStore } from '../profiles.js';
+import type { ProjectData } from '../types.js';
 import { subscribeGeneration, type GenerationEvent } from '../helpers/event-bus.js';
 import { logger } from '../helpers/logger.js';
 
@@ -28,7 +30,34 @@ function writeGenerationEvent(res: Response, event: GenerationEvent): void {
   }
 }
 
-export function projectRoutes(store: ProjectStore): Router {
+// Profil qui ouvre le projet (`?profileId=`) : l'identifiant d'un profil EXISTANT, sinon null
+// (absent, pas une chaîne — `?profileId=a&profileId=b` donne un tableau —, vide ou inconnu).
+const openingProfileId = (profileStore: Pick<ProfileStore, 'get'>, raw: unknown): string | null => {
+  if (typeof raw !== 'string' || raw === '') return null;
+  return profileStore.get(raw) ? raw : null;
+};
+
+// Projet ouvert par un profil. Un projet orphelin (sans meta.profileId, listé pour tous les
+// profils et donc modéré par aucun côté serveur) est rattaché DÉFINITIVEMENT au premier profil
+// existant qui l'ouvre : la modération de ce profil s'applique ensuite (génération, chat, import)
+// et le projet quitte les listes des autres profils. Profil absent, invalide ou inconnu : simple
+// lecture, jamais d'erreur. Projet déjà rattaché : jamais réattribué (store.adoptProject).
+const openProject = (
+  store: ProjectStore,
+  profileStore: Pick<ProfileStore, 'get'>,
+  pid: string,
+  rawProfileId: unknown,
+): ProjectData | null => {
+  const project = store.getProject(pid);
+  if (!project || project.meta.profileId) return project;
+  const profileId = openingProfileId(profileStore, rawProfileId);
+  return profileId ? store.adoptProject(pid, profileId) : project;
+};
+
+export function projectRoutes(
+  store: ProjectStore,
+  profileStore: Pick<ProfileStore, 'get'>,
+): Router {
   const router = Router();
 
   router.get('/', (req, res) => {
@@ -47,7 +76,7 @@ export function projectRoutes(store: ProjectStore): Router {
   });
 
   router.get('/:pid', (req, res) => {
-    const project = store.getProject(req.params.pid);
+    const project = openProject(store, profileStore, req.params.pid, req.query.profileId);
     if (!project) {
       res.status(404).json({ error: 'Projet introuvable' });
       return;

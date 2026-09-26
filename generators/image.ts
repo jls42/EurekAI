@@ -2,7 +2,9 @@ import { Mistral } from '@mistralai/mistralai';
 import { writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { collectStream } from '../helpers/audio.js';
+import { mediaUrl, uniqueMediaName } from '../helpers/generation-media.js';
 import { logger } from '../helpers/logger.js';
+import { recordMediaUrl } from '../helpers/media-ledger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
@@ -28,32 +30,71 @@ export function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
   return null;
 }
 
-export function extractImageRef(outputs: unknown[]): ImageResult | null {
+// Toutes les images de la réponse, dans l'ordre et sans doublon : l'agent peut appeler l'outil
+// plusieurs fois malgré la consigne « une SEULE image » (vécu le 2026-09-26 : 2 appels
+// `image_generation` facturés pour une illustration), et chaque fichier généré reste stocké chez
+// Mistral tant qu'on ne le supprime pas.
+export const extractImageRefs = (outputs: unknown[]): ImageResult[] => {
+  const refs: ImageResult[] = [];
   for (const output of outputs) {
-    const o = output as Record<string, unknown>;
-    if (!Array.isArray(o.content)) continue;
-    for (const chunk of o.content) {
+    const content = (output as Record<string, unknown>).content;
+    if (!Array.isArray(content)) continue;
+    for (const chunk of content) {
       const ref = parseChunkRef(chunk as Record<string, unknown>);
-      if (ref) return ref;
+      if (ref && !refs.some((r) => r.value === ref.value)) refs.push(ref);
     }
   }
-  return null;
-}
+  return refs;
+};
 
-async function downloadAndSaveImage(
+// L'image générée reste stockée chez Mistral (fileId) tant qu'on ne la supprime pas : suppression
+// gratuite, tentée même si le téléchargement échoue ; un échec est seulement journalisé.
+const deleteRemoteImage = async (client: Mistral, fileId: string): Promise<void> => {
+  try {
+    await client.files.delete({ fileId });
+  } catch (e) {
+    logger.warn('image', `suppression du fichier Mistral ${fileId} impossible`, e);
+  }
+};
+
+// Images au-delà de la première (seule gardée) : leurs fichiers sont supprimés chez Mistral, comme
+// celui de la première après son téléchargement ; l'avertissement trace le surcoût (chaque appel
+// de l'outil est facturé, cf. le coût de la génération).
+const discardExtraImages = async (client: Mistral, extra: ImageResult[]): Promise<void> => {
+  if (extra.length === 0) return;
+  logger.warn(
+    'image',
+    `${extra.length + 1} images reçues de l'agent, seule la première est gardée`,
+  );
+  for (const ref of extra) {
+    if (ref.type === 'fileId') await deleteRemoteImage(client, ref.value);
+  }
+};
+
+// Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec sa voisine et ne
+// la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
+const downloadAndSaveImage = async (
   client: Mistral,
   fileId: string,
   projectDir: string,
   pid: string,
-): Promise<string> {
-  console.log(`    Image fileId: ${fileId}, downloading...`);
-  const fileStream = await client.files.download({ fileId });
-  const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
-  const imageFilename = `illustration-${Date.now()}.png`;
-  writeFileSync(join(projectDir, imageFilename), imageBuffer);
-  console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-  return `/output/projects/${pid}/${imageFilename}`;
-}
+): Promise<string> => {
+  try {
+    console.log(`    Image fileId: ${fileId}, downloading...`);
+    const fileStream = await client.files.download({ fileId });
+    const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
+    // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
+    const imageFilename = uniqueMediaName('illustration', 'png');
+    writeFileSync(join(projectDir, imageFilename), imageBuffer);
+    console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
+    const url = mediaUrl(pid, imageFilename);
+    // Registre de la génération (media-ledger) : image supprimée si la génération n'aboutit pas.
+    recordMediaUrl(url);
+    return url;
+  } finally {
+    await deleteRemoteImage(client, fileId);
+  }
+};
 
 // Arrow function (pas `function` declaration) pour contourner un crash du
 // plugin Codacy `eslint-plugin-security-node` (rule `detect-unhandled-async-errors`)
@@ -79,18 +120,22 @@ export const generateImage = async (
   try {
     const prompt = imageUser(lang, markdown);
     const response = await client.beta.conversations.start({ agentId: agent.id, inputs: prompt });
-    const imageRef = extractImageRef(response.outputs);
+    const [imageRef, ...extra] = extractImageRefs(response.outputs);
 
     if (!imageRef) {
       console.error('    Image outputs:', JSON.stringify(response.outputs, null, 2).slice(0, 2000));
       throw new Error("Aucune image generee par l'agent");
     }
 
-    const imageUrl =
-      imageRef.type === 'url'
-        ? imageRef.value
-        : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
-    return { imageUrl, prompt };
+    try {
+      const imageUrl =
+        imageRef.type === 'url'
+          ? imageRef.value
+          : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
+      return { imageUrl, prompt };
+    } finally {
+      await discardExtraImages(client, extra);
+    }
   } finally {
     await client.beta.agents
       .delete({ agentId: agent.id })

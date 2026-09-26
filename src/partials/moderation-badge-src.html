@@ -2,7 +2,8 @@
 <!-- Params: sourceRef, badgeClass, wrapperClass, iconClass -->
 <!-- Uses separate <i> per state to avoid Lucide + Alpine :data-lucide desync -->
 <!-- Bouton focusable : toggle au clic/Enter (tactile + clavier), hover conservé (souris). -->
-<template x-if="{{sourceRef}}.moderation?.status">
+<!-- Statut AFFICHÉ (moderationStatus) : une source jamais vérifiée d'un profil modéré a son badge. -->
+<template x-if="moderationStatus({{sourceRef}})">
   <button
     type="button"
     class="inline-block {{wrapperClass}} focus-ring rounded-badge"

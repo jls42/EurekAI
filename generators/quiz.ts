@@ -1,5 +1,11 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import {
+  getContent,
+  retryTurns,
+  safeParseJson,
+  tryParseJson,
+  unwrapJsonArray,
+} from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import {
   quizSystem,
@@ -14,8 +20,8 @@ import type { QuizQuestion, AgeGroup } from '../types.js';
 
 const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
 
-// Type guard : le JSON du LLM peut contenir null/objets incomplets (notamment un
-// item de queue cassé récupéré par le salvage de safeParseJson).
+// Type guard : le JSON du LLM peut contenir null ou des objets incomplets (champ
+// manquant, mauvais type) — safeParseJson ne répare rien, il parse ou lève.
 const isValidQuizItem = (q: unknown): q is QuizQuestion => {
   if (typeof q !== 'object' || q === null) return false;
   const it = q as Partial<QuizQuestion>;
@@ -60,14 +66,15 @@ async function generateQuizWithRetry(
     ...diversityParams(type),
   });
 
+  // JSON invalide au 1er essai (réponse tronquée) → [] → retry, comme une validation ratée.
   const raw = getContent(response);
-  const data = unwrapJsonArray<QuizQuestion>(safeParseJson(raw));
+  const data: QuizQuestion[] = unwrapJsonArray(tryParseJson(raw));
   const valid = filterValidQuestions(data);
 
   if (valid.length > 0) return valid;
 
   console.warn('Quiz validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
-  messages.push({ role: 'assistant', content: raw }, { role: 'user', content: retryMsg });
+  messages.push(...retryTurns(raw, retryMsg));
 
   const retry = await client.chat.complete({
     model,
@@ -75,12 +82,12 @@ async function generateQuizWithRetry(
     responseFormat: { type: 'json_object' },
     ...diversityParams(type),
   });
-  const retryValid = filterValidQuestions(
-    unwrapJsonArray<QuizQuestion>(safeParseJson(getContent(retry))),
-  );
+  const retryData: QuizQuestion[] = unwrapJsonArray(safeParseJson(getContent(retry)));
+  const retryValid = filterValidQuestions(retryData);
 
   if (retryValid.length === 0) {
-    throw new Error(errorMsg);
+    // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
+    throw new SyntaxError(errorMsg);
   }
   return retryValid;
 }

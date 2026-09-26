@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, existsSync } from 'fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 import { ProjectStore } from './store.js';
-import type { Source, Generation } from './types.js';
+import type { Source, Generation, ProjectData, ProjectMeta } from './types.js';
 
 let store: ProjectStore;
 let tempDir: string;
@@ -163,6 +163,24 @@ describe('addGeneration / deleteGeneration', () => {
     const found = store.getProject(p.meta.id);
     expect(found!.results.generations).toHaveLength(0);
   });
+
+  it('renvoie la generation retiree (ses medias sont nettoyes par la route), null sinon', () => {
+    const p = store.createProject('Gen test 3');
+    const gen: Generation = {
+      id: 'g3',
+      title: 'Quiz vocal',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'quiz-vocal',
+      data: [],
+      audioUrls: ['/output/projects/x/q0.mp3'],
+    };
+    store.addGeneration(p.meta.id, gen);
+
+    expect(store.deleteGeneration(p.meta.id, 'g3')).toEqual(gen);
+    expect(store.deleteGeneration(p.meta.id, 'g3')).toBeNull();
+    expect(store.deleteGeneration('nope', 'g3')).toBeNull();
+  });
 });
 
 describe('getUploadDir', () => {
@@ -172,14 +190,114 @@ describe('getUploadDir', () => {
     expect(dir).toContain('uploads');
     expect(existsSync(dir)).toBe(true);
   });
+
+  it('idempotent : dossier uploads deja present', () => {
+    const p = store.createProject('Upload test 2');
+    const first = store.getUploadDir(p.meta.id);
+    expect(store.getUploadDir(p.meta.id)).toBe(first);
+  });
+
+  // multer ecrit via getUploadDir : un projet supprime ne doit pas etre recree (dossier fantome).
+  it('projet inexistant : leve ENOENT sans creer de dossier projet', () => {
+    expect(() => store.getUploadDir('projet-fantome')).toThrow(
+      expect.objectContaining({ code: 'ENOENT' }),
+    );
+    expect(existsSync(join(tempDir, 'projects', 'projet-fantome'))).toBe(false);
+  });
 });
 
 describe('getProjectDir', () => {
-  it('cree le dossier projet et retourne le path', () => {
+  it('retourne le dossier du projet (cree par createProject)', () => {
     const p = store.createProject('Dir test');
     const dir = store.getProjectDir(p.meta.id);
     expect(dir).toContain(p.meta.id);
     expect(existsSync(dir)).toBe(true);
+  });
+
+  // Une generation qui ecrit apres la suppression du projet echoue (ENOENT) au lieu de
+  // recreer un dossier fantome.
+  it('ne recree pas le dossier d un projet supprime', () => {
+    const p = store.createProject('Dir test 2');
+    store.deleteProject(p.meta.id);
+    const dir = store.getProjectDir(p.meta.id);
+    expect(existsSync(dir)).toBe(false);
+  });
+
+  it('refuse un id de projet invalide (traversee)', () => {
+    expect(() => store.getProjectDir('../escape')).toThrow('invalid_project_id');
+  });
+});
+
+describe('deleteSource : fichier importe', () => {
+  const addUploadSource = (pid: string, id: string, filePath: string) =>
+    store.addSource(pid, {
+      id,
+      filename: 'photo.jpg',
+      markdown: '# OCR',
+      uploadedAt: new Date().toISOString(),
+      sourceType: 'ocr',
+      filePath,
+    });
+
+  const writeUpload = (pid: string, name: string): string => {
+    const path = join(store.getUploadDir(pid), name);
+    writeFileSync(path, 'image');
+    return path;
+  };
+
+  it('supprime le fichier importe de la source', () => {
+    const pid = store.createProject('Upload del').meta.id;
+    const path = writeUpload(pid, 'uuid-photo.jpg');
+    addUploadSource(pid, 's1', `projects/${pid}/uploads/uuid-photo.jpg`);
+
+    store.deleteSource(pid, 's1');
+
+    expect(existsSync(path)).toBe(false);
+  });
+
+  it('garde le fichier encore reference par une autre source', () => {
+    const pid = store.createProject('Upload shared').meta.id;
+    const path = writeUpload(pid, 'uuid-photo.jpg');
+    addUploadSource(pid, 's1', `projects/${pid}/uploads/uuid-photo.jpg`);
+    addUploadSource(pid, 's2', `projects/${pid}/uploads/uuid-photo.jpg`);
+
+    store.deleteSource(pid, 's1');
+
+    expect(existsSync(path)).toBe(true);
+  });
+
+  it.each([
+    ['traversee', (pid: string) => `projects/${pid}/uploads/../project.json`],
+    ['dossier uploads lui-meme', (pid: string) => `projects/${pid}/uploads/..`],
+    ['autre projet', () => 'projects/autre-projet/uploads/uuid-photo.jpg'],
+    ['hors uploads', (pid: string) => `projects/${pid}/project.json`],
+  ])('chemin refuse (%s) : rien supprime', (_label, filePathFor) => {
+    const pid = store.createProject('Upload guard').meta.id;
+    const upload = writeUpload(pid, 'uuid-photo.jpg');
+    const other = store.createProject('Autre').meta.id;
+    const otherUpload = writeUpload(other, 'uuid-photo.jpg');
+    addUploadSource(pid, 's1', filePathFor(pid).replace('autre-projet', other));
+
+    const result = store.deleteSource(pid, 's1');
+
+    expect(result!.sources).toHaveLength(0);
+    expect(existsSync(join(tempDir, 'projects', pid, 'project.json'))).toBe(true);
+    expect(existsSync(upload)).toBe(true);
+    expect(existsSync(otherUpload)).toBe(true);
+  });
+
+  it('fichier deja absent ou source sans fichier : suppression normale', () => {
+    const pid = store.createProject('Upload absent').meta.id;
+    addUploadSource(pid, 's1', `projects/${pid}/uploads/absent.jpg`);
+    store.addSource(pid, {
+      id: 's2',
+      filename: 'Texte libre',
+      markdown: 'x',
+      uploadedAt: new Date().toISOString(),
+    });
+
+    expect(store.deleteSource(pid, 's1')!.sources).toHaveLength(1);
+    expect(store.deleteSource(pid, 's2')!.sources).toHaveLength(0);
   });
 });
 
@@ -409,6 +527,64 @@ describe('listProjects with profileId filter', () => {
 
     const allProjects = store.listProjects();
     expect(allProjects).toHaveLength(3);
+  });
+});
+
+describe('adoptProject (projet orphelin rattaché au profil qui l’ouvre)', () => {
+  const projectFile = (pid: string): string => join(tempDir, 'projects', pid, 'project.json');
+  const readProjectFile = (pid: string): ProjectData => {
+    const raw = readFileSync(projectFile(pid), 'utf-8');
+    return JSON.parse(raw) as ProjectData;
+  };
+  const indexEntry = (pid: string): ProjectMeta | undefined => {
+    const index = JSON.parse(
+      readFileSync(join(tempDir, 'projects.json'), 'utf-8'),
+    ) as ProjectMeta[];
+    return index.find((p) => p.id === pid);
+  };
+
+  it('écrit meta.profileId dans project.json ET dans l’index, puis rend le projet à jour', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+
+    const adopted = store.adoptProject(pid, 'profile-alice');
+
+    expect(adopted?.meta.profileId).toBe('profile-alice');
+    expect(readProjectFile(pid).meta.profileId).toBe('profile-alice');
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('le projet quitte la liste des autres profils, reste dans celle du profil adoptant', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+    expect(store.listProjects('profile-bob').map((p) => p.id)).toContain(pid);
+
+    store.adoptProject(pid, 'profile-alice');
+
+    expect(store.listProjects('profile-bob').map((p) => p.id)).not.toContain(pid);
+    expect(store.listProjects('profile-alice').map((p) => p.id)).toContain(pid);
+  });
+
+  it('projet déjà rattaché : jamais réattribué, rien n’est réécrit', () => {
+    const pid = store.createProject('Projet Alice', 'profile-alice').meta.id;
+    const before = readFileSync(projectFile(pid), 'utf-8');
+
+    const result = store.adoptProject(pid, 'profile-bob');
+
+    expect(result?.meta.profileId).toBe('profile-alice');
+    expect(readFileSync(projectFile(pid), 'utf-8')).toBe(before);
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('seconde ouverture par un autre profil : le premier rattachement reste', () => {
+    const pid = store.createProject('Orphelin').meta.id;
+    store.adoptProject(pid, 'profile-alice');
+
+    expect(store.adoptProject(pid, 'profile-bob')?.meta.profileId).toBe('profile-alice');
+    expect(indexEntry(pid)?.profileId).toBe('profile-alice');
+  });
+
+  it('projet inexistant : null, aucune écriture', () => {
+    expect(store.adoptProject('nope', 'profile-alice')).toBeNull();
+    expect(existsSync(join(tempDir, 'projects', 'nope'))).toBe(false);
   });
 });
 

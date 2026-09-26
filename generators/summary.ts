@@ -1,5 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson } from '../helpers/index.js';
+import { getContent, retryTurns, safeParseJson } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
 import {
@@ -152,10 +152,8 @@ const completeStudyFiche = async (
     logger.warn('summary', `JSON parse failed, retrying: ${(e as Error).message}`);
   }
 
-  messages.push(
-    { role: 'assistant', content: raw },
-    { role: 'user', content: summaryRetryUser(lang) },
-  );
+  // Réponse vide → pas de tour assistant (l'API refuse un assistant au contenu vide).
+  messages.push(...retryTurns(raw, summaryRetryUser(lang)));
 
   let retryRaw: string;
   try {

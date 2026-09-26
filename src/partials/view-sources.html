@@ -239,7 +239,7 @@
 
   <!-- Consigne de revision detectee (active) -->
   <div
-    x-show="consigne && consigne.found && useConsigne"
+    x-show="consigneVisible() && useConsigne"
     x-transition
     class="mb-4 bg-success-light border border-success/30 rounded-card p-4 animate-slide-up"
   >
@@ -281,7 +281,7 @@
 
   <!-- Consigne dismissed — small re-enable banner -->
   <div
-    x-show="consigne && consigne.found && !useConsigne"
+    x-show="consigneVisible() && !useConsigne"
     x-transition
     class="mb-4 bg-gray-50 border border-gray-200 rounded-card px-4 py-2.5"
   >
@@ -296,8 +296,8 @@
     </div>
   </div>
 
-  <!-- Re-analyser consigne button -->
-  <div x-show="sources.length > 0 && (!consigne || !consigne.found)" class="mb-4">
+  <!-- Détecter la consigne : proposé tant qu'aucune consigne n'est montrable (consigneVisible) -->
+  <div x-show="sources.length > 0 && !consigneVisible()" class="mb-4">
     <button
       @click="detectConsigne()"
       :disabled="consigneLoading"
@@ -432,11 +432,36 @@
             {{> ocr-badge-src sourceRef="src" wrapperClass="shrink-0" badgeClass="text-[10px]
             font-bold px-1.5 py-0.5" gapClass="gap-0.5" }} {{> moderation-badge-src sourceRef="src"
             wrapperClass="shrink-0" badgeClass="text-[10px] px-1.5 py-0.5" iconClass="w-3 h-3" }}
+            <!-- Revérifier : source en attente ou en erreur, profil modéré (POST /sources/moderate) -->
+            <button
+              type="button"
+              x-show="canRecheckModeration(src)"
+              @click.stop="recheckSourceModeration(src)"
+              @keydown.enter.stop.prevent="recheckSourceModeration(src)"
+              :disabled="!!recheckingSources[src.id]"
+              :aria-busy="recheckingSources[src.id] ? 'true' : 'false'"
+              class="shrink-0 inline-flex items-center min-h-[24px] px-2 rounded-badge bg-primary-light text-primary-dark text-[11px] font-semibold hover:underline focus-ring disabled:opacity-60 disabled:cursor-wait"
+              x-text="t('sources.recheckModeration')"
+            >
+              Revérifier
+            </button>
           </div>
-          <p
-            class="text-sm text-text-secondary line-clamp-1"
-            x-text="src.markdown.slice(0, 100)"
-          ></p>
+          <!-- Aperçu du texte : jamais rendu quand le contenu est masqué (profil modéré, source
+               non sûre, cf. sourceContentMasked) ; nom, type et badges restent visibles. -->
+          <template x-if="!sourceContentMasked(src)">
+            <p
+              class="text-sm text-text-secondary line-clamp-1"
+              x-text="src.markdown.slice(0, 100)"
+            ></p>
+          </template>
+          <template x-if="sourceContentMasked(src)">
+            <p
+              class="text-sm text-text-secondary italic line-clamp-1"
+              x-text="sourceMaskMessage(src)"
+            >
+              Ce contenu est masqué
+            </p>
+          </template>
         </div>
         <button
           @click="openSourceDialog(src)"

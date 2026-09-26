@@ -1,0 +1,330 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- Codacy lance ESLint sans resolution des types vitest (describe/it/expect typés error) : faux positifs ; couvert par lint:ci local type-aware */
+import { describe, it, expect } from 'vitest';
+import {
+  awaitsModeration,
+  blockingModerationStatus,
+  consigneUsable,
+  effectiveModerationStatus,
+  gateModerationStatus,
+  moderationRejection,
+  pickBlockingSource,
+  profileBlockedCategories,
+} from './moderation-http.js';
+import type { ModerationStatus } from '../types.js';
+
+const NO_BLOCKED: readonly string[] = [];
+
+const src = (id: string, status?: string, categories?: Record<string, boolean>) => ({
+  id,
+  ...(status === undefined
+    ? {}
+    : { moderation: { status: status as ModerationStatus, ...(categories && { categories }) } }),
+});
+
+const mod = (status: string, categories?: Record<string, boolean>) => ({
+  status: status as ModerationStatus,
+  ...(categories && { categories }),
+});
+
+describe('moderationRejection', () => {
+  it.each([undefined, 'safe'] as const)('%s → null (ne bloque pas)', (status) => {
+    expect(moderationRejection(status)).toBeNull();
+  });
+
+  it('unsafe → 400 moderation.blocked par défaut', () => {
+    expect(moderationRejection('unsafe')).toEqual({ status: 400, error: 'moderation.blocked' });
+  });
+
+  it('unsafe → 400 avec la clé passée (chat)', () => {
+    expect(moderationRejection('unsafe', 'chat.moderationBlocked')).toEqual({
+      status: 400,
+      error: 'chat.moderationBlocked',
+    });
+  });
+
+  it('error → 503 moderation.error, même avec une clé unsafe spécifique', () => {
+    expect(moderationRejection('error')).toEqual({ status: 503, error: 'moderation.error' });
+    expect(moderationRejection('error', 'chat.moderationBlocked')).toEqual({
+      status: 503,
+      error: 'moderation.error',
+    });
+  });
+
+  it('pending → 409 moderation.pending', () => {
+    expect(moderationRejection('pending')).toEqual({ status: 409, error: 'moderation.pending' });
+  });
+
+  it('statut inattendu (donnée disque corrompue) → 503 moderation.error (fail-closed)', () => {
+    expect(moderationRejection('blocked' as ModerationStatus)).toEqual({
+      status: 503,
+      error: 'moderation.error',
+    });
+  });
+});
+
+describe('pickBlockingSource', () => {
+  it('aucune source ou sources safe → undefined', () => {
+    expect(pickBlockingSource([], NO_BLOCKED)).toBeUndefined();
+    expect(pickBlockingSource([src('a', 'safe'), src('b', 'safe')], NO_BLOCKED)).toBeUndefined();
+  });
+
+  // Source jamais vérifiée (sans objet moderation) : en attente pour la garde (gateModerationStatus).
+  it('source jamais vérifiée : bloque comme une source en attente, après unsafe et error', () => {
+    expect(pickBlockingSource([src('s', 'safe'), src('n')], NO_BLOCKED)?.id).toBe('n');
+    expect(pickBlockingSource([src('n'), src('e', 'error')], NO_BLOCKED)?.id).toBe('e');
+    expect(pickBlockingSource([src('n'), src('u', 'unsafe')], NO_BLOCKED)?.id).toBe('u');
+  });
+
+  it("priorité unsafe > error > pending, quel que soit l'ordre des sources", () => {
+    const all = [src('p', 'pending'), src('e', 'error'), src('u', 'unsafe')];
+    expect(pickBlockingSource(all, NO_BLOCKED)?.id).toBe('u');
+    const pendingError = [src('p', 'pending'), src('e', 'error')];
+    expect(pickBlockingSource(pendingError, NO_BLOCKED)?.id).toBe('e');
+    const safePending = [src('s', 'safe'), src('p', 'pending')];
+    expect(pickBlockingSource(safePending, NO_BLOCKED)?.id).toBe('p');
+  });
+
+  it('à statut égal, la première source gagne', () => {
+    const twoUnsafe = [src('u1', 'unsafe'), src('u2', 'unsafe')];
+    expect(pickBlockingSource(twoUnsafe, NO_BLOCKED)?.id).toBe('u1');
+  });
+
+  it('statut inattendu : bloque en dernier recours, après les statuts connus', () => {
+    expect(pickBlockingSource([src('x', 'blocked'), src('s', 'safe')], NO_BLOCKED)?.id).toBe('x');
+    const withPending = [src('x', 'blocked'), src('p', 'pending')];
+    expect(pickBlockingSource(withPending, NO_BLOCKED)?.id).toBe('p');
+  });
+
+  it('priorité sur le statut EFFECTIF : un safe promu unsafe passe devant un pending', () => {
+    const sources = [src('p', 'pending'), src('s', 'safe', { criminal: true })];
+    expect(pickBlockingSource(sources, ['criminal'])?.id).toBe('s');
+    expect(pickBlockingSource(sources, ['sexual'])?.id).toBe('p');
+  });
+});
+
+describe('profileBlockedCategories', () => {
+  const DEFAULTS = { enfant: ['sexual', 'selfharm'], adulte: [] };
+
+  it('la liste du profil prime sur les défauts, même vide', () => {
+    expect(
+      profileBlockedCategories(
+        { moderationCategories: ['criminal'], ageGroup: 'enfant' },
+        DEFAULTS,
+      ),
+    ).toEqual(['criminal']);
+    expect(
+      profileBlockedCategories({ moderationCategories: [], ageGroup: 'enfant' }, DEFAULTS),
+    ).toEqual([]);
+  });
+
+  it("sans liste : défauts de l'âge", () => {
+    expect(profileBlockedCategories({ ageGroup: 'enfant' }, DEFAULTS)).toEqual([
+      'sexual',
+      'selfharm',
+    ]);
+  });
+
+  it.each([['inconnu'], ['constructor'], ['__proto__'], [undefined]])(
+    'âge sans défauts (%s), profil absent → aucune catégorie',
+    (ageGroup) => {
+      expect(profileBlockedCategories({ ageGroup }, DEFAULTS)).toEqual([]);
+      expect(profileBlockedCategories(null, DEFAULTS)).toEqual([]);
+      expect(profileBlockedCategories(undefined, DEFAULTS)).toEqual([]);
+    },
+  );
+
+  // Serveur : défauts d'enfant pour un âge illisible (activeModerationCategories), fail-closed.
+  it.each([['inconnu'], ['constructor'], ['__proto__'], [undefined]])(
+    'âge sans défauts (%s) → catégories de repli passées en 3e argument',
+    (ageGroup) => {
+      expect(profileBlockedCategories({ ageGroup }, DEFAULTS, ['selfharm'])).toEqual(['selfharm']);
+    },
+  );
+
+  it('le repli ne remplace ni la liste du profil ni les défauts connus', () => {
+    const own = { moderationCategories: [], ageGroup: 'constructor' };
+    expect(profileBlockedCategories(own, DEFAULTS, ['selfharm'])).toEqual([]);
+    expect(profileBlockedCategories({ ageGroup: 'adulte' }, DEFAULTS, ['selfharm'])).toEqual([]);
+  });
+
+  // Donnée disque corrompue (chaîne, objet) : jamais rendue telle quelle (une chaîne étalée
+  // donnerait ses lettres comme catégories) — défauts de l'âge à la place.
+  it.each([['sexual'], [{ sexual: true }]])('liste non-tableau (%j) → défauts de l’âge', (raw) => {
+    const profile = { moderationCategories: raw, ageGroup: 'enfant' } as unknown as {
+      moderationCategories?: string[];
+      ageGroup?: string;
+    };
+    expect(profileBlockedCategories(profile, DEFAULTS)).toEqual(['sexual', 'selfharm']);
+  });
+});
+
+describe('effectiveModerationStatus', () => {
+  it('safe + catégorie BLOQUÉE à true → unsafe (sources persistées de v1.5.4 à v1.7.1)', () => {
+    expect(effectiveModerationStatus(mod('safe', { criminal: true }), ['criminal'])).toBe('unsafe');
+    expect(
+      effectiveModerationStatus(mod('safe', { dangerous: true }), ['sexual', 'dangerous']),
+    ).toBe('unsafe');
+  });
+
+  it('safe + catégorie NON bloquée à true, ou bloquée à false → safe', () => {
+    expect(effectiveModerationStatus(mod('safe', { criminal: true }), ['sexual'])).toBe('safe');
+    expect(effectiveModerationStatus(mod('safe', { criminal: false }), ['criminal'])).toBe('safe');
+    expect(effectiveModerationStatus(mod('safe', { criminal: true }), NO_BLOCKED)).toBe('safe');
+    expect(effectiveModerationStatus(mod('safe'), ['criminal'])).toBe('safe');
+  });
+
+  it('clé legacy 2411 stockée à true : compte pour ses successeurs', () => {
+    const legacy = mod('safe', { dangerous_and_criminal_content: true });
+    expect(effectiveModerationStatus(legacy, ['criminal'])).toBe('unsafe');
+    expect(effectiveModerationStatus(legacy, ['dangerous'])).toBe('unsafe');
+    expect(effectiveModerationStatus(legacy, ['sexual'])).toBe('safe');
+  });
+
+  it('liste bloquée portant la clé legacy : étendue à ses successeurs', () => {
+    const criminal = mod('safe', { criminal: true });
+    expect(effectiveModerationStatus(criminal, ['dangerous_and_criminal_content'])).toBe('unsafe');
+  });
+
+  it.each(['unsafe', 'error', 'pending', 'blocked'])(
+    '%s : jamais de déclassement, statut rendu tel quel',
+    (status) => {
+      expect(effectiveModerationStatus(mod(status, { criminal: false }), ['criminal'])).toBe(
+        status,
+      );
+      expect(effectiveModerationStatus(mod(status), NO_BLOCKED)).toBe(status);
+    },
+  );
+
+  it('sans objet moderation (import modération inactive) → undefined', () => {
+    expect(effectiveModerationStatus(undefined, ['criminal'])).toBeUndefined();
+  });
+
+  it('catégories persistées corrompues → pas de promotion, sans exception', () => {
+    const corrupt = { status: 'safe' as ModerationStatus, categories: 'criminal' as never };
+    expect(effectiveModerationStatus(corrupt, ['criminal'])).toBe('safe');
+    const nullCats = { status: 'safe' as ModerationStatus, categories: null as never };
+    expect(effectiveModerationStatus(nullCats, ['criminal'])).toBe('safe');
+  });
+});
+
+describe('blockingModerationStatus', () => {
+  it('rend le statut EFFECTIF de la source bloquante (pas le safe persisté)', () => {
+    const promoted = src('s', 'safe', { criminal: true });
+    expect(promoted.moderation?.status).toBe('safe');
+    expect(blockingModerationStatus([promoted], ['criminal'])).toBe('unsafe');
+  });
+
+  it('undefined quand rien ne bloque', () => {
+    expect(
+      blockingModerationStatus(
+        [src('s', 'safe', { criminal: true }), src('t', 'safe')],
+        ['sexual'],
+      ),
+    ).toBeUndefined();
+  });
+
+  // R9 : la source bloquante jamais vérifiée rend `pending`, jamais undefined — undefined passerait
+  // moderationRejection (null) et laisserait partir la génération (fail-open).
+  it('source bloquante jamais vérifiée : pending, refusée par moderationRejection', () => {
+    const unverified = [src('s', 'safe'), src('n')];
+    expect(blockingModerationStatus(unverified, ['sexual'])).toBe('pending');
+    expect(moderationRejection(blockingModerationStatus(unverified, ['sexual']))).toEqual({
+      status: 409,
+      error: 'moderation.pending',
+    });
+    const noStatus = [{ moderation: {} as { status: ModerationStatus } }];
+    expect(blockingModerationStatus(noStatus, NO_BLOCKED)).toBe('pending');
+  });
+});
+
+describe('gateModerationStatus', () => {
+  it('sans objet moderation ou sans statut : pending (jamais vérifiée)', () => {
+    expect(gateModerationStatus(undefined, NO_BLOCKED)).toBe('pending');
+    expect(gateModerationStatus({} as { status: ModerationStatus }, ['criminal'])).toBe('pending');
+  });
+
+  it('avec objet moderation : statut effectif', () => {
+    expect(gateModerationStatus(mod('safe'), ['criminal'])).toBe('safe');
+    expect(gateModerationStatus(mod('safe', { criminal: true }), ['criminal'])).toBe('unsafe');
+    expect(gateModerationStatus(mod('safe', { criminal: true }), ['sexual'])).toBe('safe');
+    expect(gateModerationStatus(mod('error'), NO_BLOCKED)).toBe('error');
+    expect(gateModerationStatus(mod('pending'), NO_BLOCKED)).toBe('pending');
+    expect(gateModerationStatus(mod('unsafe'), NO_BLOCKED)).toBe('unsafe');
+  });
+});
+
+describe('awaitsModeration', () => {
+  it.each([
+    ['jamais vérifiée', undefined, true],
+    ['sans statut', {} as { status: ModerationStatus }, true],
+    ['en attente', mod('pending'), true],
+    ['en erreur', mod('error'), true],
+    ['statut inattendu', mod('blocked'), true],
+    ['safe', mod('safe'), false],
+    ['unsafe', mod('unsafe'), false],
+  ])('%s → %s', (_label, moderation, expected) => {
+    expect(awaitsModeration(moderation)).toBe(expected);
+  });
+});
+
+describe('consigneUsable', () => {
+  const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['dates'] };
+  const withProvenance = (...sourceIds: string[]) => ({ ...CONSIGNE, sourceIds });
+  const BLOCKED = ['criminal'];
+
+  it.each([
+    ['absente', null],
+    ['non trouvée', { ...CONSIGNE, found: false }],
+    ['sans point', { ...CONSIGNE, keyTopics: [] }],
+    ['points illisibles', { ...CONSIGNE, keyTopics: 'dates' as unknown as string[] }],
+    ['en échec de détection', { found: false, text: '', keyTopics: [], status: 'failed' }],
+  ])('%s → false, même pour un profil non modéré', (_label, consigne) => {
+    expect(consigneUsable(consigne, [src('a', 'safe')], null)).toBe(false);
+    expect(consigneUsable(consigne, [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it("profil non modéré (null) : vraie dès qu'elle a des points, statuts et provenance ignorés", () => {
+    expect(consigneUsable(CONSIGNE, [src('a', 'unsafe')], null)).toBe(true);
+    expect(consigneUsable(withProvenance('disparue'), [], null)).toBe(true);
+  });
+
+  it('provenance entièrement sûre → true, sources hors provenance ignorées', () => {
+    const sources = [src('a', 'safe'), src('b', 'safe'), src('hors', 'unsafe')];
+    expect(consigneUsable(withProvenance('a', 'b'), sources, BLOCKED)).toBe(true);
+  });
+
+  it.each([
+    ['signalée', src('a', 'unsafe')],
+    ['en attente', src('a', 'pending')],
+    ['en erreur', src('a', 'error')],
+    ['jamais vérifiée', src('a')],
+    ['statut effectif unsafe (catégorie bloquée à true)', src('a', 'safe', { criminal: true })],
+  ])('une source de la provenance %s → false', (_label, source) => {
+    expect(consigneUsable(withProvenance('a'), [source, src('b', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('source de la provenance disparue → false (fail-closed)', () => {
+    expect(consigneUsable(withProvenance('a', 'b'), [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('provenance vide ou illisible → false', () => {
+    expect(consigneUsable(withProvenance(), [src('a', 'safe')], BLOCKED)).toBe(false);
+    const corrupted = { ...CONSIGNE, sourceIds: 'a' as unknown as string[] };
+    expect(consigneUsable(corrupted, [src('a', 'safe')], BLOCKED)).toBe(false);
+  });
+
+  it('consigne legacy (sans provenance) : toutes les sources actuelles doivent être sûres', () => {
+    expect(consigneUsable(CONSIGNE, [src('a', 'safe'), src('b', 'safe')], BLOCKED)).toBe(true);
+    expect(consigneUsable(CONSIGNE, [src('a', 'safe'), src('b', 'pending')], BLOCKED)).toBe(false);
+    // Plus aucune source : la consigne vient de sources disparues.
+    expect(consigneUsable(CONSIGNE, [], BLOCKED)).toBe(false);
+  });
+
+  it('profil modéré sans catégorie bloquée ([]) : la provenance doit quand même être vérifiée', () => {
+    expect(consigneUsable(withProvenance('a'), [src('a', 'safe', { criminal: true })], [])).toBe(
+      true,
+    );
+    expect(consigneUsable(withProvenance('a'), [src('a')], [])).toBe(false);
+    expect(consigneUsable(withProvenance('a'), [src('a', 'unsafe')], [])).toBe(false);
+  });
+});

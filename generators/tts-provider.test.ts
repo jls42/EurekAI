@@ -80,7 +80,7 @@ describe('listVoices', () => {
     vi.mocked(client.audio.voices.list).mockResolvedValue({
       items: [voice('v1', ['fr_fr']), voice('v2', ['en_us'])],
       total: 2,
-    } as Awaited<ReturnType<typeof client.audio.voices.list>>);
+    } as never);
     const result = await listVoices(client);
     expect(result).toHaveLength(2);
     expect(client.audio.voices.list).toHaveBeenCalledTimes(1);

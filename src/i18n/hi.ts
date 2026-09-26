@@ -60,8 +60,9 @@ export const hi: Record<string, string> = {
   'gen.all': '\u0938\u092C \u092C\u0928\u093E\u090F\u0901',
   'gen.voice': '\u091C\u094B\u0930 \u0938\u0947 \u092A\u0922\u093C\u0947\u0902',
   'gen.websearch': '\u0935\u0947\u092C \u0916\u094B\u091C',
-  'a11y.viewCategory': '{category} \u0926\u0947\u0916\u0947\u0902',
-  'a11y.generateCategory': '{category} \u092C\u0928\u093E\u090F\u0902',
+  'a11y.viewCategory': 'देखें: {category}',
+  'a11y.generateCategory': 'बनाएं: {category}',
+  'a11y.cancelGeneration': 'रद्द करें: {type}',
   'a11y.fillBlankAnswer':
     '\u092d\u0930\u0928\u0947 \u0915\u0947 \u0932\u093f\u090f \u0909\u0924\u094d\u0924\u0930',
   'a11y.selectSource':
@@ -103,7 +104,12 @@ export const hi: Record<string, string> = {
   'errorCode.file_too_large':
     '\u092F\u0939 \u092B\u093C\u093E\u0907\u0932 \u092C\u0939\u0941\u0924 \u092C\u0921\u093C\u0940 \u0939\u0948\u0964 \u0915\u094B\u0908 \u091B\u094B\u091F\u0940 \u092B\u093C\u093E\u0907\u0932 \u091A\u0941\u0928\u094B\u0964',
   'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
+  'errorCode.invalid_input': 'अमान्य अनुरोध',
   'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
+  'errorCode.rate_limited': 'एक साथ बहुत सारे अनुरोध। थोड़ा रुको, फिर दोबारा कोशिश करो।',
+  'errorCode.url_blocked':
+    'यह पता खोला नहीं जा सकता। कोई दूसरा पता आज़माओ, या बस लिखो कि क्या खोजना है।',
+  'errorCode.all_sources_failed': 'कोई भी स्रोत नहीं जोड़ा जा सका। थोड़ी देर बाद फिर कोशिश करो।',
 
   'header.menuProjects':
     '\u092A\u094D\u0930\u094B\u091C\u0947\u0915\u094D\u091F \u092E\u0947\u0928\u094D\u092F\u0942',
@@ -281,6 +287,10 @@ export const hi: Record<string, string> = {
     '\u0926\u0947\u0916\u0947\u0902 \u0914\u0930 \u0924\u0941\u0932\u0928\u093E \u0915\u0930\u0947\u0902',
   'sources.viewText': '\u091F\u0947\u0915\u094D\u0938\u094D\u091F \u0926\u0947\u0916\u0947\u0902',
   'sources.deleteSource': '\u0938\u094D\u0930\u094B\u0924 \u0939\u091F\u093E\u090F\u0901',
+  'sources.recheckModeration': 'फिर से जाँचें',
+  'sources.contentMasked': 'यह सामग्री छिपी हुई है',
+  'sources.contentChecking': 'जाँच हो रही है…',
+  'sources.revealContent': 'दिखाएँ (अभिभावक)',
   'sources.emptyTitle':
     '\u092B\u093C\u094B\u091F\u094B \u092F\u093E \u091F\u0947\u0915\u094D\u0938\u094D\u091F \u091C\u094B\u0921\u093C\u0947\u0902',
   'sources.emptySubtitle':
@@ -382,6 +392,8 @@ export const hi: Record<string, string> = {
   'quiz.nextQuestion': '\u0905\u0917\u0932\u093E \u092A\u094D\u0930\u0936\u094D\u0928',
   'quiz.verificationError':
     '\u0913\u0939\u094B, \u092E\u0948\u0902 \u0924\u0941\u092E\u094D\u0939\u093E\u0930\u093E \u091C\u0935\u093E\u092C \u0938\u0941\u0928 \u0928\u0939\u0940\u0902 \u092A\u093E\u092F\u093E\u0964 \u092B\u093F\u0930 \u0938\u0947 \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u0947\u0902?',
+  'quiz.answerBlocked':
+    'मैं यह जवाब स्वीकार नहीं कर सकता। चलो, इसे दूसरे शब्दों में कहकर देखते हैं!',
 
   'chat.heading':
     '\u0905\u092A\u0928\u0947 \u092A\u093E\u0920\u094D\u092F\u0915\u094D\u0930\u092E \u0938\u0947 Chat \u0915\u0930\u0947\u0902',
@@ -613,6 +625,7 @@ export const hi: Record<string, string> = {
     '\u0905\u092D\u094D\u092F\u093E\u0938 \u0915\u094D\u0935\u093F\u091C\u093C \u0928\u0939\u0940\u0902 \u092C\u0928 \u0938\u0915\u093E',
   'moderation.blocked':
     '\u092F\u0939 \u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0905\u0928\u0941\u091A\u093F\u0924 \u091A\u093F\u0939\u094D\u0928\u093F\u0924 \u0939\u0948\u0964 \u091C\u0947\u0928\u0930\u0947\u0936\u0928 \u0905\u0935\u0930\u0941\u0926\u094D\u0927 \u0939\u0948\u0964',
+  'moderation.checking': 'स्रोतों की जाँच हो रही है…',
   'moderation.pending':
     '\u0938\u0902\u092F\u092E \u091C\u093E\u0901\u091A \u091C\u093E\u0930\u0940 \u0939\u0948',
   'moderation.error':
@@ -627,7 +640,11 @@ export const hi: Record<string, string> = {
   'moderation.cat.violence_and_threats':
     '\u0939\u093F\u0902\u0938\u093E \u0914\u0930 \u0927\u092E\u0915\u0940',
   'moderation.cat.dangerous_and_criminal_content':
+    '\u0916\u0924\u0930\u0928\u093E\u0915 \u092F\u093E \u0905\u0935\u0948\u0927 \u0938\u093E\u092E\u0917\u094D\u0930\u0940',
+  'moderation.cat.dangerous':
     '\u0916\u0924\u0930\u0928\u093E\u0915 \u0938\u093E\u092E\u0917\u094D\u0930\u0940',
+  'moderation.cat.criminal':
+    '\u0905\u0935\u0948\u0927 \u0917\u0924\u093F\u0935\u093F\u0927\u093F\u092F\u093E\u0901',
   'moderation.cat.selfharm': '\u0906\u0924\u094D\u092E\u0939\u093E\u0928\u093F',
   'moderation.cat.health': '\u0938\u094D\u0935\u093E\u0938\u094D\u0925\u094D\u092F',
   'moderation.cat.financial': '\u0935\u093F\u0924\u094D\u0924\u0940\u092F',
@@ -654,6 +671,7 @@ export const hi: Record<string, string> = {
   'profile.pinVerify':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E \u0938\u0924\u094D\u092F\u093E\u092A\u0928',
   'profile.pinWrong': '\u0917\u0932\u0924 PIN \u0915\u094B\u0921',
+  'profile.pinRateLimited': 'PIN के बहुत सारे प्रयास हो गए। {minutes} मिनट बाद फिर कोशिश करो।',
   'profile.pinInfo':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E PIN \u0915\u094B\u0921 \u0907\u0938 \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u0915\u0940 \u0938\u0941\u0930\u0915\u094D\u0937\u093E \u0915\u0930\u0924\u093E \u0939\u0948\u0964 \u092A\u094D\u0930\u094B\u092B\u093C\u093E\u0907\u0932 \u092C\u0926\u0932\u0928\u0947 \u092F\u093E \u0939\u091F\u093E\u0928\u0947 \u0915\u0947 \u0932\u093F\u090F \u0907\u0938\u0915\u0940 \u091C\u093C\u0930\u0942\u0930\u0924 \u0939\u094B\u0917\u0940\u0964',
   'profile.moderationToggle': '\u0938\u093E\u092E\u0917\u094D\u0930\u0940 \u0938\u0902\u092F\u092E',

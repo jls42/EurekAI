@@ -1,7 +1,13 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument -- Codacy lance ESLint sans résoudre les types du SDK Mistral ni des helpers cross-module ; lint:ci local reste type-aware. */
 import { Mistral } from '@mistralai/mistralai';
 import { randomInt } from 'node:crypto';
-import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import {
+  getContent,
+  retryTurns,
+  safeParseJson,
+  tryParseJson,
+  unwrapJsonArray,
+} from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { maskWordInSentence } from '../helpers/dictation-diff.js';
 import { dictationSystem, dictationUser, dictationRetryUser } from '../prompts.js';
@@ -72,8 +78,9 @@ export async function generateDictation(
     ...diversityParams('dictation'),
   });
 
+  // JSON invalide au 1er essai (réponse tronquée) → [] → retry, comme une validation ratée.
   const raw = getContent(response);
-  const data = unwrapJsonArray<DictationItem>(safeParseJson(raw));
+  const data: DictationItem[] = unwrapJsonArray(tryParseJson(raw));
   const valid = filterValidItems(data);
 
   // Mélange puis slice(capped) : sous-échantillon aléatoire si le LLM déborde le
@@ -81,10 +88,7 @@ export async function generateDictation(
   if (valid.length > 0) return shuffleItems(valid).slice(0, capped);
 
   console.warn('Dictation validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
-  messages.push(
-    { role: 'assistant', content: raw },
-    { role: 'user', content: dictationRetryUser(capped, lang) },
-  );
+  messages.push(...retryTurns(raw, dictationRetryUser(capped, lang)));
 
   const retry = await client.chat.complete({
     model,
@@ -92,12 +96,14 @@ export async function generateDictation(
     responseFormat: { type: 'json_object' },
     ...diversityParams('dictation'),
   });
-  const retryValid = filterValidItems(
-    unwrapJsonArray<DictationItem>(safeParseJson(getContent(retry))),
-  );
+  const retryData: DictationItem[] = unwrapJsonArray(safeParseJson(getContent(retry)));
+  const retryValid = filterValidItems(retryData);
 
   if (retryValid.length === 0) {
-    throw new Error("Le modele n'a pas reussi a generer un entrainement valide apres 2 tentatives");
+    // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
+    throw new SyntaxError(
+      "Le modele n'a pas reussi a generer un entrainement valide apres 2 tentatives",
+    );
   }
   return shuffleItems(retryValid).slice(0, capped);
 }

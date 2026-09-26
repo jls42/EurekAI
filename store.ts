@@ -41,6 +41,20 @@ export type PromoteResult =
 export const DEFAULT_PRUNE_MAX_KEEP = 50;
 export const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Nom de fichier simple : ni vide, ni `.`/`..`, sans séparateur (basename identique).
+const isSimpleFileName = (name: string): boolean => {
+  return name !== '' && name !== '.' && name !== '..' && basename(name) === name;
+};
+
+// Consigne tirée (au moins en partie) de la source supprimée : la source figure dans sa
+// provenance, ou la consigne est legacy (sans provenance : elle a pu venir de n'importe quelle
+// source). Elle ne doit pas survivre au document dont elle vient.
+const consigneDependsOn = (consigne: ProjectData['consigne'], sourceId: string): boolean => {
+  if (!consigne) return false;
+  const provenance = consigne.sourceIds;
+  return !Array.isArray(provenance) || provenance.includes(sourceId);
+};
+
 export class ProjectStore {
   private readonly indexPath: string;
   private readonly projectsDir: string;
@@ -97,16 +111,22 @@ export class ProjectStore {
     return join(this.projectDir(id), 'project.json');
   }
 
+  // Crée seulement `uploads/`, SANS récursivité : si le projet n'existe plus, mkdirSync lève
+  // ENOENT au lieu de recréer un dossier projet fantôme (multer écrit via cette méthode).
   getUploadDir(id: string): string {
     const dir = join(this.projectDir(id), 'uploads');
-    mkdirSync(dir, { recursive: true });
+    try {
+      mkdirSync(dir);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+    }
     return dir;
   }
 
+  // Ne crée rien : le dossier existe depuis createProject. Une génération qui écrit après la
+  // suppression du projet échoue (ENOENT) au lieu de recréer un dossier fantôme.
   getProjectDir(id: string): string {
-    const dir = this.projectDir(id);
-    mkdirSync(dir, { recursive: true });
-    return dir;
+    return this.projectDir(id);
   }
 
   listProjects(profileId?: string): ProjectMeta[] {
@@ -211,6 +231,20 @@ export class ProjectStore {
     this.saveProject(id, data);
   }
 
+  // Rattache DÉFINITIVEMENT un projet orphelin (sans meta.profileId, listé pour tous les profils)
+  // au profil qui l'ouvre : project.json ET index (saveProject → touchIndex). Un projet déjà
+  // rattaché n'est jamais réattribué. Rend le projet (à jour ou inchangé), null s'il n'existe
+  // pas. Lecture et écriture synchrones : deux ouvertures concurrentes ne s'entrelacent pas, la
+  // seconde voit le rattachement de la première. Le profil est validé par l'appelant.
+  adoptProject(id: string, profileId: string): ProjectData | null {
+    const data = this.getProject(id);
+    if (!data || data.meta.profileId) return data;
+    data.meta.profileId = profileId;
+    this.saveProject(id, data);
+    logger.info('store', 'orphan project adopted', id, profileId);
+    return data;
+  }
+
   addSource(projectId: string, source: Source): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
@@ -219,12 +253,37 @@ export class ProjectStore {
     return data;
   }
 
+  // Consigne effacée avec la source dont elle dépend (consigneDependsOn), dans la même écriture ;
+  // gardée sinon, et intacte si l'id ne désigne aucune source. La route renvoie la consigne restante.
   deleteSource(projectId: string, sourceId: string): ProjectData | null {
     const data = this.getProject(projectId);
     if (!data) return null;
+    const removed = data.sources.find((s) => s.id === sourceId);
     data.sources = data.sources.filter((s) => s.id !== sourceId);
+    if (removed && consigneDependsOn(data.consigne, sourceId)) delete data.consigne;
     this.saveProject(projectId, data);
+    // Fichier importé (photo, PDF, texte) : orphelin sinon. Gardé s'il sert encore à une source.
+    const filePath = removed?.filePath;
+    if (filePath && !data.sources.some((s) => s.filePath === filePath)) {
+      this.removeUploadFile(projectId, filePath);
+    }
     return data;
+  }
+
+  // Garde de chemin : `filePath` (lu dans project.json) ne désigne un fichier supprimable que sous
+  // la forme `projects/<pid>/uploads/<nom simple>` du projet visé — jamais de traversée.
+  private removeUploadFile(projectId: string, filePath: string): void {
+    const prefix = `projects/${projectId}/uploads/`;
+    const name = filePath.startsWith(prefix) ? filePath.slice(prefix.length) : '';
+    if (!isSimpleFileName(name)) {
+      logger.warn('store', 'deleteSource: upload path refused', projectId);
+      return;
+    }
+    try {
+      rmSync(join(this.projectDir(projectId), 'uploads', name), { force: true });
+    } catch (e) {
+      logger.warn('store', 'deleteSource: upload file removal failed', projectId, e);
+    }
   }
 
   addGeneration(projectId: string, generation: Generation): void {
@@ -308,17 +367,18 @@ export class ProjectStore {
     return source;
   }
 
-  deleteGeneration(projectId: string, generationId: string): boolean {
-    // Retourne true uniquement si la generation a effectivement été retirée :
-    // route delete renvoie 404 sinon (cf. CLAUDE.md : double-delete entre 2
-    // onglets ne doit pas masquer un toast "supprimé" trompeur).
+  deleteGeneration(projectId: string, generationId: string): Generation | null {
+    // Retourne la génération effectivement retirée, null sinon : la route delete
+    // renvoie 404 sur null (cf. CLAUDE.md : double-delete entre 2 onglets ne doit
+    // pas masquer un toast "supprimé" trompeur) et supprime les médias de la
+    // génération retirée (helpers/generation-media.ts).
     const data = this.getProject(projectId);
-    if (!data) return false;
-    const before = data.results.generations.length;
+    if (!data) return null;
+    const removed = data.results.generations.find((g) => g.id === generationId);
+    if (!removed) return null;
     data.results.generations = data.results.generations.filter((g) => g.id !== generationId);
-    if (data.results.generations.length === before) return false;
     this.saveProject(projectId, data);
-    return true;
+    return removed;
   }
 
   updateGeneration(

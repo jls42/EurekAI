@@ -25,6 +25,15 @@ if (typeof globalThis.document === 'undefined') {
 
 const gen = createGenerate();
 
+// Génération telle que la manipulent generateVoice et les helpers audio : GenerationUI (non
+// exportée) = Generation + champs d'UI (_audioUrl_*, _generatingVoice_*, _playlistMode…). Les tests
+// ne fournissent que les champs lus : conversion unique ici, sans copie (les assertions relisent
+// les champs que la fonction pose sur CET objet).
+type GenerationUI = Parameters<typeof gen.generateVoice>[0];
+const asGenerationUI = <T extends object>(fields: T): T & GenerationUI => {
+  return fields as unknown as T & GenerationUI;
+};
+
 const defaultLoading = {
   summary: false,
   flashcards: false,
@@ -133,9 +142,13 @@ describe('blockedModerationStatus', () => {
     expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
   });
 
-  it('returns null when sources have no moderation field', () => {
-    const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }] });
-    expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+  // Source jamais vérifiée (sans objet moderation) : en attente pour la garde, comme le serveur
+  // (gateModerationStatus). canStartGenerate ne l'applique qu'à un profil modéré.
+  it('returns "pending" when a source was never checked (no moderation field)', () => {
+    const ctx = makeContext({
+      sources: [{ id: 's1', moderation: { status: 'safe' } }, { id: 's2' }],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe('pending');
   });
 
   it('returns "unsafe" when a source is unsafe', () => {
@@ -177,6 +190,105 @@ describe('blockedModerationStatus', () => {
     });
     expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
   });
+
+  // Même priorité que le serveur (unsafe > error > pending), quel que soit l'ordre des sources :
+  // « Modération en cours » ne doit pas masquer une source déjà signalée.
+  it.each([
+    [['pending', 'unsafe'], 'unsafe'],
+    [['pending', 'error'], 'error'],
+    [['error', 'unsafe'], 'unsafe'],
+    [['safe', 'pending'], 'pending'],
+  ])('sources %j → %s', (statuses, expected) => {
+    const ctx = makeContext({
+      sources: statuses.map((status, i) => ({ id: `s${i}`, moderation: { status } })),
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe(expected);
+  });
+
+  // Statut EFFECTIF (MOD-1) : source persistée `safe` mais `criminal: true` (v1.5.4 → v1.7.1).
+  describe('statut effectif (catégories bloquées du profil courant)', () => {
+    const flagged = {
+      id: 'f1',
+      moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+    };
+
+    it('profil bloquant criminal : la source safe est bloquante, statut unsafe', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['criminal'],
+        },
+        sources: [{ id: 's0', moderation: { status: 'safe', categories: {} } }, flagged],
+      });
+      expect(gen.blockedModerationSource.call(ctx)?.id).toBe('f1');
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+
+    it("sans liste propre : défauts de l'âge chargés depuis l'API (moderationDefaults)", () => {
+      const ctx = makeContext({
+        currentProfile: { id: 'p1', ageGroup: 'ado', useModeration: true },
+        moderationDefaults: { ado: ['criminal'] },
+        sources: [flagged],
+      });
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+
+    it('profil ne bloquant pas criminal : rien ne bloque', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['sexual'],
+        },
+        sources: [flagged],
+      });
+      expect(gen.blockedModerationSource.call(ctx)).toBeNull();
+      expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+    });
+
+    it('priorité sur le statut effectif : la source promue passe devant un pending', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['criminal'],
+        },
+        sources: [{ id: 'p0', moderation: { status: 'pending' } }, flagged],
+      });
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+  });
+
+  it('sourceIds explicites : priment sur la sélection ; liste vide = toutes les sources', () => {
+    const ctx = makeContext({
+      sources: [
+        { id: 's1', moderation: { status: 'safe' } },
+        { id: 's2', moderation: { status: 'unsafe' } },
+      ],
+      selectedIds: ['s1'],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+    expect(gen.blockedModerationStatus.call(ctx, ['s2'])).toBe('unsafe');
+    expect(gen.blockedModerationSource.call(ctx, ['s2'])?.id).toBe('s2');
+    expect(gen.blockedModerationStatus.call(ctx, [])).toBe('unsafe');
+    expect(gen.blockedModerationStatus.call({ ...ctx, selectedIds: ['s2'] }, ['s1'])).toBeNull();
+  });
+
+  it('applies the priority within selectedIds only', () => {
+    const ctx = makeContext({
+      sources: [
+        { id: 's1', moderation: { status: 'unsafe' } },
+        { id: 's2', moderation: { status: 'pending' } },
+        { id: 's3', moderation: { status: 'error' } },
+      ],
+      selectedIds: ['s2', 's3'],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe('error');
+  });
 });
 
 // --- moderationBlockedMessage ---
@@ -217,6 +329,35 @@ describe('generate', () => {
     });
     await gen.generate.call(ctx, 'summary');
     expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('safe source flagging a blocked category (effective unsafe): blocked toast, no fetch', async () => {
+    const ctx = makeContext({
+      currentProfile: {
+        id: 'p1',
+        ageGroup: 'enfant',
+        useModeration: true,
+        moderationCategories: ['criminal'],
+      },
+      sources: [{ id: 'f1', moderation: { status: 'safe', categories: { criminal: true } } }],
+    });
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('source pending listed first: the toast still reports the flagged source', async () => {
+    const ctx = makeContext({
+      currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+      sources: [
+        { id: 's1', moderation: { status: 'pending' } },
+        { id: 's2', moderation: { status: 'unsafe' } },
+      ],
+    });
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.pending', 'error');
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
@@ -283,6 +424,144 @@ describe('generate', () => {
     expect(body.lang).toBe('en');
   });
 
+  // Version facile à lire : le pré-contrôle de modération, le pending et les réessais portent sur
+  // les sources de la fiche d'origine (celles que le serveur garde), pas sur la sélection courante.
+  describe('generateSimplified — sources de la fiche', () => {
+    const moderatedProfile = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+    const bodyOf = (call: number) =>
+      JSON.parse((vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit).body as string);
+
+    it('source unsafe sélectionnée mais hors de la fiche : la génération part', async () => {
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-unsafe', moderation: { status: 'unsafe' } },
+          { id: 's-fiche', moderation: { status: 'safe' } },
+        ],
+        selectedIds: ['s-unsafe'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s-fiche'] } as any);
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(bodyOf(0).sourceIds).toEqual(['s-fiche']);
+      expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.blocked', 'error');
+    });
+
+    it('source unsafe de la fiche, non sélectionnée : toast moderation.blocked, aucun appel', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-fiche', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s-fiche'] } as any);
+
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.pendingById).toEqual({});
+    });
+
+    it('fiche legacy sans sources (sourceIds: []) : toutes les sources, comme le serveur', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-other', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: [] } as any);
+
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+    });
+
+    it('fiche sans sourceIds (donnée ancienne) : [] envoyé, pré-contrôle sur toutes les sources', async () => {
+      const ctx = makeContext({
+        currentProfile: moderatedProfile,
+        sources: [
+          { id: 's-selected', moderation: { status: 'safe' } },
+          { id: 's-other', moderation: { status: 'unsafe' } },
+        ],
+        selectedIds: ['s-selected'],
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1' } as any);
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      const safeCtx = makeContext({ sources: [{ id: 's1' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(safeCtx, { id: 'g1' } as any);
+      expect(bodyOf(0).sourceIds).toEqual([]);
+    });
+
+    it('le pending optimiste porte les sources de la fiche', async () => {
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      let pendingSources: unknown;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        pendingSources = (Object.values(ctx.pendingById)[0] as { sourceIds: string[] }).sourceIds;
+        return { ok: true, json: async () => ({ id: 'g-falc', type: 'summary', data: {} }) } as any;
+      });
+
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+
+      expect(pendingSources).toEqual(['s2']);
+    });
+
+    it('réessai après erreur HTTP : même corps, registre falc et sources de la fiche', async () => {
+      mockFetchFail(500, { error: 'upstream_unavailable' });
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.error')![2];
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      await retry();
+
+      expect(bodyOf(1).register).toBe('falc');
+      expect(bodyOf(1).sourceIds).toEqual(['s2']);
+    });
+
+    it('réessai après exception réseau : même corps, registre falc et sources de la fiche', async () => {
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('offline'));
+      const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
+      await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
+      const retry = ctx.showToast.mock.calls.find(
+        (c: any[]) => c[0] === 'toast.generationError',
+      )![2];
+
+      mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
+      await retry();
+
+      expect(bodyOf(1).register).toBe('falc');
+      expect(bodyOf(1).sourceIds).toEqual(['s2']);
+    });
+  });
+
+  // Refus de modération renvoyé par le serveur (front périmé) : réessayer donnerait le même refus.
+  it('moderation.blocked du serveur : toast sans bouton Réessayer', async () => {
+    mockFetchFail(400, { error: 'moderation.blocked' });
+    const ctx = makeContext();
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', null);
+  });
+
+  it.each(['moderation.pending', 'moderation.error'])(
+    '%s du serveur : toast avec Réessayer (état transitoire)',
+    async (error) => {
+      mockFetchFail(409, { error });
+      const ctx = makeContext();
+      await gen.generate.call(ctx, 'summary');
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+    },
+  );
+
   it('handles abort error (ignores)', async () => {
     const abortError = new DOMException('Aborted', 'AbortError');
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(abortError);
@@ -333,6 +612,141 @@ describe('generate', () => {
     await gen.generate.call(ctx, 'summary');
     expect(ctx.loading.summary).toBe(false);
     expect(ctx.abortControllers.summary).toBeUndefined();
+  });
+});
+
+// --- Pré-contrôle asynchrone (ensureGenerationAllowed) : sources en attente vérifiées AVANT le
+// pending optimiste et avant tout appel de génération ---
+
+describe('vérification des sources avant la génération', () => {
+  const moderatedProfile = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+  const urls = () => vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+
+  // Réponse de POST /sources/moderate ; `during` observe l'état pendant la vérification.
+  const mockVerification = (status: string, during?: () => void) =>
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      during?.();
+      return {
+        ok: true,
+        json: async () => ({ sources: [{ id: 's1', moderation: { status, categories: {} } }] }),
+      } as any;
+    });
+
+  it('source en attente vérifiée safe : vérification, puis génération (aucun pending avant)', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    let pendingDuringVerification: unknown;
+    mockVerification('safe', () => {
+      pendingDuringVerification = { ...ctx.pendingById };
+    });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(pendingDuringVerification).toEqual({});
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.checking', 'info');
+    expect(ctx.generations).toHaveLength(1);
+  });
+
+  it('source toujours en attente : toast moderation.pending, ni génération ni pending', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('pending');
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+  });
+
+  it('projet changé pendant la vérification : aucune génération', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('safe', () => {
+      ctx.currentProjectId = 'pid-2';
+    });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.pendingById).toEqual({});
+  });
+
+  it('generateAuto : vérification avant l’analyse de route', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'error', categories: {} } }],
+      apiStatus: { ttsAvailable: false },
+    });
+    let autoLoadingDuringVerification: unknown;
+    mockVerification('safe', () => {
+      autoLoadingDuringVerification = ctx.loading.auto;
+    });
+    mockFetchOk({ plan: [{ agent: 'summary', reason: 'r' }] });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(autoLoadingDuringVerification).toBe(false);
+  });
+
+  it('source jamais vérifiée, profil modéré : vérifiée avant la génération', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1' }],
+    });
+    mockVerification('safe');
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(
+      JSON.parse((vi.mocked(globalThis.fetch).mock.calls[0][1] as RequestInit).body as string),
+    ).toEqual({ sourceIds: ['s1'] });
+  });
+
+  it('source jamais vérifiée, profil non modéré : ni vérification ni refus', async () => {
+    const ctx = makeContext({ sources: [{ id: 's1' }] });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/summary']);
+    expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.pending', 'error');
+  });
+
+  it('generateAll : vérification avant les trois générations', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    mockVerification('pending');
+
+    await gen.generateAll.call(ctx);
+
+    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
   });
 });
 
@@ -875,12 +1289,12 @@ describe('generateVoice', () => {
   it('fetches read-aloud batch and sets section audioUrls on success', async () => {
     mockFetchOk({ audioUrls: { intro: '/audio/intro.mp3', key_points: '/audio/kp.mp3' } });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
@@ -895,12 +1309,12 @@ describe('generateVoice', () => {
   it('fetches single section and sets audioUrl', async () => {
     mockFetchOk({ audioUrl: '/audio/intro.mp3' });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_intro: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj, 'intro');
     expect(genObj._audioUrl_intro).toBe('/audio/intro.mp3');
@@ -910,7 +1324,12 @@ describe('generateVoice', () => {
 
   it('returns early if already generating', async () => {
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: true };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'summary',
+      data: {} as any,
+      _generatingVoice_all: true,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
@@ -918,16 +1337,52 @@ describe('generateVoice', () => {
   it('handles fetch error', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
     expect(genObj._generatingVoice_all).toBe(false);
   });
 
+  // Code stable traduit (resolveError), jamais le code brut : 429 de aiLimiter compris.
+  it('refus HTTP : code traduit par resolveError (rate_limited)', async () => {
+    mockFetchFail(429, { error: 'rate_limited' });
+    const ctx = makeContext({
+      resolveError: vi.fn((code: string) => `<${code}>`),
+      t: vi.fn((key: string, params?: Record<string, string>) =>
+        params?.error ? `${key}:${params.error}` : key,
+      ),
+    });
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
+
+    await gen.generateVoice.call(ctx, genObj);
+
+    expect(ctx.resolveError).toHaveBeenCalledWith('rate_limited');
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.error:<rate_limited>',
+      'error',
+      expect.any(Function),
+    );
+  });
+
   it('handles network exception', async () => {
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.audioError', 'error', expect.any(Function));
     expect(genObj._generatingVoice_all).toBe(false);
@@ -936,7 +1391,12 @@ describe('generateVoice', () => {
   it('sets _audioUrl_all for non-summary types (single response)', async () => {
     mockFetchOk({ audioUrl: '/audio/gen1.mp3' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'quiz', data: {} as any, _generatingVoice_all: false } as any;
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'quiz',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
 
     await gen.generateVoice.call(ctx, genObj);
     expect(genObj._audioUrl_all).toBe('/audio/gen1.mp3');
@@ -952,12 +1412,12 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     await gen.generateVoice.call(ctx, genObj);
 
@@ -978,12 +1438,12 @@ describe('generateVoice', () => {
     document.querySelector = vi.fn().mockReturnValue(mockAudioEl);
 
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
 
     // Should not throw
     await gen.generateVoice.call(ctx, genObj);
@@ -998,7 +1458,12 @@ describe('generateVoice', () => {
   it('error response shows toast with retry callback', async () => {
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = { id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false };
+    const genObj = asGenerationUI({
+      id: 'g1',
+      type: 'summary',
+      data: {} as any,
+      _generatingVoice_all: false,
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     // Verify the retry callback is passed as the third argument
@@ -1013,13 +1478,13 @@ describe('generateVoice', () => {
     // First call fails
     mockFetchFail(500, { error: 'TTS unavailable' });
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
       _audioUrl_intro: null as string | null,
-    };
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -1038,12 +1503,12 @@ describe('generateVoice', () => {
     // First call throws network error
     vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('Network fail'));
     const ctx = makeContext();
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       type: 'summary',
       data: {} as any,
       _generatingVoice_all: false,
-    } as any;
+    });
     await gen.generateVoice.call(ctx, genObj);
 
     const toastCall = ctx.showToast.mock.calls.find(
@@ -1061,55 +1526,62 @@ describe('generateVoice', () => {
 
 describe('isBatchComplete', () => {
   it('returns false when no audio at all', () => {
-    const genObj = { data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    const genObj = asGenerationUI({ data: { fun_fact: 'fact', vocabulary: ['word'] } });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns false when only intro exists', () => {
-    const genObj = { _audioUrl_intro: '/a.mp3', data: { fun_fact: 'fact', vocabulary: ['word'] } };
+    const genObj = asGenerationUI({
+      _audioUrl_intro: '/a.mp3',
+      data: { fun_fact: 'fact', vocabulary: ['word'] },
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns true when all required sections have audio (no optional)', () => {
-    const genObj = { _audioUrl_intro: '/a.mp3', _audioUrl_key_points: '/b.mp3', data: {} };
+    const genObj = asGenerationUI({
+      _audioUrl_intro: '/a.mp3',
+      _audioUrl_key_points: '/b.mp3',
+      data: {},
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 
   it('returns false when fun_fact content exists but no audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { fun_fact: 'Wow!' },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns false when vocabulary content exists but no audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { vocabulary: ['w'] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(false);
   });
 
   it('returns true when all sections including optionals have audio', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       _audioUrl_fun_fact: '/c.mp3',
       _audioUrl_vocabulary: '/d.mp3',
       data: { fun_fact: 'Wow!', vocabulary: ['w'] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 
   it('ignores empty vocabulary array', () => {
-    const genObj = {
+    const genObj = asGenerationUI({
       _audioUrl_intro: '/a.mp3',
       _audioUrl_key_points: '/b.mp3',
       data: { vocabulary: [] },
-    };
+    });
     expect(gen.isBatchComplete(genObj)).toBe(true);
   });
 });
@@ -1120,12 +1592,12 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'intro',
       _audioUrl_key_points: '/kp.mp3',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('key_points');
   });
@@ -1135,13 +1607,13 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'intro',
       _audioUrl_vocabulary: '/vocab.mp3',
       // no key_points or fun_fact audio
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('vocabulary');
   });
@@ -1151,11 +1623,11 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: true,
       _activeAudioSection: 'vocabulary',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._playlistMode).toBe(false);
   });
@@ -1165,12 +1637,12 @@ describe('playNextSection', () => {
       _audioSectionOrder: gen._audioSectionOrder,
       playNextSection: gen.playNextSection,
     });
-    const genObj = {
+    const genObj = asGenerationUI({
       id: 'g1',
       _playlistMode: false,
       _activeAudioSection: 'intro',
       _audioUrl_key_points: '/kp.mp3',
-    };
+    });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('intro');
   });

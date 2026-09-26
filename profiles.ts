@@ -5,6 +5,12 @@ import type { AgeGroup, Profile } from './types.js';
 import type { VoiceId } from './helpers/voice-types.js';
 import { normalizeReadingComfort } from './helpers/reading-comfort.js';
 import { logger } from './helpers/logger.js';
+import {
+  type ModerationCategory,
+  expandLegacyModerationCategories,
+  isModerationCategory,
+  legacyModerationCategoriesIn,
+} from './helpers/moderation-model.js';
 
 export function ageToGroup(age: number): AgeGroup {
   if (age <= 10) return 'enfant';
@@ -13,23 +19,27 @@ export function ageToGroup(age: number): AgeGroup {
   return 'adulte';
 }
 
-export const ALL_MODERATION_CATEGORIES = [
+// Taxonomie du modèle de modération épinglé — source unique : helpers/moderation-model.ts.
+// Ré-exportée ici : server.ts (/api/moderation-categories) et les tests l'importent depuis profiles.
+export { MODERATION_MODEL_CATEGORIES as ALL_MODERATION_CATEGORIES } from './helpers/moderation-model.js';
+
+// Défauts enfant/ado = les 5 historiques + `criminal`, mesuré le 2026-09-26 sur Moderation 2 :
+// 0 faux positif sur 50 leçons (dont 16 d'histoire et de guerre) sur 3 passes, rappel 7/7 sur le
+// contrôle. `dangerous` reste hors défauts (0 faux positif, mais rappel 5/8 sous le critère de
+// 80 % écrit avant la mesure). En 2411, `dangerous_and_criminal_content` signalait des leçons de
+// sciences (électricité, chimie) : c'est pourquoi il avait été retiré. Rejouer la mesure à chaque
+// bump du modèle (cf. CLAUDE.md, section Modération). Ne vaut que pour les NOUVEAUX profils.
+const CHILD_DEFAULTS: ModerationCategory[] = [
   'sexual',
   'hate_and_discrimination',
   'violence_and_threats',
-  'dangerous_and_criminal_content',
+  'criminal',
   'selfharm',
-  'health',
-  'financial',
-  'law',
-  'pii',
   'jailbreaking',
-] as const;
-
-// dangerous_and_criminal_content removed — too many false positives on educational content (electricity, chemistry, energy)
-export const MODERATION_CATEGORIES: Record<AgeGroup, string[]> = {
-  enfant: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
-  ado: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
+];
+export const MODERATION_CATEGORIES: Record<AgeGroup, ModerationCategory[]> = {
+  enfant: [...CHILD_DEFAULTS],
+  ado: [...CHILD_DEFAULTS],
   etudiant: [],
   adulte: [],
 };
@@ -47,6 +57,11 @@ export const AGE_GROUP_CONFIG: Record<
   etudiant: { moderationDefault: false, consigneDefault: false, chatDefault: true },
   adulte: { moderationDefault: false, consigneDefault: false, chatDefault: true },
 };
+
+// Garde d'entrée des routes IA (cf. helpers/request-validation.ts). Object.hasOwn plutôt qu'une
+// lecture d'index : un ageGroup hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
+export const isAgeGroup = (v: unknown): v is AgeGroup =>
+  typeof v === 'string' && Object.hasOwn(AGE_GROUP_CONFIG, v);
 
 export function hashPin(pin: string): string {
   return createHash('sha256').update(pin).digest('hex');
@@ -102,18 +117,28 @@ function normalizeMistralVoices(
   return { ...(host ? { host } : {}), ...(guest ? { guest } : {}) };
 }
 
-// Filtre et warn les catégories inconnues. Extraction depuis update() pour
-// limiter la cognitive complexity Sonar et isoler la responsabilité.
+// Convertit les clés legacy puis filtre et warn les catégories inconnues. Extraction depuis
+// update() pour limiter la cognitive complexity Sonar et isoler la responsabilité.
+// Clé legacy CONVERTIE, jamais rejetée : un client stale (onglet ouvert avant la mise à jour)
+// renvoie la clé 2411 à chaque sauvegarde parentale, la rejeter effacerait silencieusement
+// `dangerous`/`criminal` déjà migrés. Symétrie config.ts saveConfig (legacy normalisé + warn).
 const applyModerationCategories = (raw: string[]): string[] => {
-  const allowed = ALL_MODERATION_CATEGORIES as readonly string[];
-  const rejected = raw.filter((c) => !allowed.includes(c));
+  const legacy = legacyModerationCategoriesIn(raw);
+  if (legacy.length > 0) {
+    logger.warn(
+      'profiles',
+      `update: mapped legacy moderation categories (stale client?): ${legacy.join(', ')}`,
+    );
+  }
+  const expanded = expandLegacyModerationCategories(raw);
+  const rejected = expanded.filter((c) => !isModerationCategory(c));
   if (rejected.length > 0) {
     logger.warn(
       'profiles',
       `update: rejected unknown moderation categories: ${rejected.join(', ')}`,
     );
   }
-  return raw.filter((c) => allowed.includes(c));
+  return expanded.filter(isModerationCategory);
 };
 
 type ProfileUpdates = Partial<
@@ -155,6 +180,57 @@ const applyTheme = (profile: Profile, theme: 'dark' | 'light' | undefined): void
   }
 };
 
+// Défauts de l'âge, ou ceux d'`enfant` (protection maximale) si `ageGroup` est illisible.
+// Object.hasOwn : un ageGroup hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
+const fallbackModerationCategories = (ageGroup: AgeGroup): ModerationCategory[] => [
+  ...(Object.hasOwn(MODERATION_CATEGORIES, ageGroup)
+    ? MODERATION_CATEGORIES[ageGroup]
+    : MODERATION_CATEGORIES.enfant),
+];
+
+// Valeur corrompue (chaîne, objet, nombre) : jamais d'exception (le profil entier serait masqué)
+// ni de non-tableau laissé en mémoire (modération en 'error' permanent, bascule des cases cassée
+// côté front). On log l'id du profil, jamais son prénom.
+const resetCorruptModerationCategories = (p: Profile): void => {
+  const defaults = fallbackModerationCategories(p.ageGroup);
+  logger.warn(
+    'profiles',
+    `migration: profile ${p.id} moderationCategories is not an array (type=${typeof p.moderationCategories}), reset to defaults [${defaults.join(', ')}]`,
+  );
+  p.moderationCategories = defaults;
+};
+
+// Normalise `moderationCategories` au chargement. Extrait de migrateProfile pour garder son CCN
+// à 7 (Lizard, seuil 8) ; arrow `const` : pas d'agglomération Lizard.
+// - absent (ou falsy) → défauts de l'âge (throw conservé si ageGroup inconnu : migrateInPlace
+//   isole l'entrée) ;
+// - non-tableau → défauts de l'âge (ou `enfant`) + warn ;
+// - clé legacy 2411 → successeurs 2603 à la même position, dédoublonnés + logger.info ;
+// - sinon aucun changement : ni écriture parasite, ni filtrage silencieux des clés inconnues.
+// updatedAt JAMAIS bumpé : changement de représentation, pas une édition (un bump ferait échouer
+// en 409 `stale` la prochaine sauvegarde de chaque onglet ouvert).
+const migrateModerationCategories = (p: Profile): boolean => {
+  // Donnée disque : forme non garantie malgré le type Profile.
+  const current: unknown = p.moderationCategories;
+  if (!current) {
+    p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
+    return true;
+  }
+  if (!Array.isArray(current)) {
+    resetCorruptModerationCategories(p);
+    return true;
+  }
+  const legacy = legacyModerationCategoriesIn(current);
+  if (legacy.length === 0) return false;
+  p.moderationCategories = expandLegacyModerationCategories(current);
+  const successors = expandLegacyModerationCategories(legacy);
+  logger.info(
+    'profiles',
+    `migration: profile ${p.id} moderation categories ${legacy.join(', ')} -> ${successors.join(', ')}`,
+  );
+  return true;
+};
+
 function migrateProfile(p: Profile): boolean {
   let changed = false;
   if (!p.locale) {
@@ -165,10 +241,7 @@ function migrateProfile(p: Profile): boolean {
     p.chatEnabled = p.age >= 15;
     changed = true;
   }
-  if (!p.moderationCategories) {
-    p.moderationCategories = [...MODERATION_CATEGORIES[p.ageGroup]];
-    changed = true;
-  }
+  if (migrateModerationCategories(p)) changed = true;
   if (!p.updatedAt) {
     p.updatedAt = p.createdAt || new Date().toISOString();
     changed = true;

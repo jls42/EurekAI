@@ -56,8 +56,9 @@ export const de: Record<string, string> = {
   'gen.all': 'Alles generieren',
   'gen.voice': 'Vorlesen',
   'gen.websearch': 'Websuche',
-  'a11y.viewCategory': '{category} anzeigen',
-  'a11y.generateCategory': '{category} generieren',
+  'a11y.viewCategory': 'Anzeigen: {category}',
+  'a11y.generateCategory': 'Generieren: {category}',
+  'a11y.cancelGeneration': 'Abbrechen: {type}',
   'a11y.fillBlankAnswer': 'Antwort eingeben',
   'a11y.selectSource': 'Diese Quelle auswählen',
   'a11y.editTitle': 'Titel bearbeiten',
@@ -97,8 +98,15 @@ export const de: Record<string, string> = {
   'errorCode.upload_failed': 'Upload fehlgeschlagen',
   'errorCode.file_too_large': 'Diese Datei ist zu gro\u00df. Versuch es mit einer kleineren Datei.',
   'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
+  'errorCode.invalid_input': 'Ungültige Anfrage',
   'errorCode.profile_delete_partial':
     'Profil loeschen unvollstaendig: einige Projekte konnten nicht geloescht werden',
+  'errorCode.rate_limited':
+    'Zu viele Anfragen auf einmal. Warte kurz und versuch es dann noch einmal.',
+  'errorCode.url_blocked':
+    'Diese Adresse kann nicht geöffnet werden. Versuch eine andere Adresse, oder schreib einfach, was du suchst.',
+  'errorCode.all_sources_failed':
+    'Es konnte keine Quelle hinzugefügt werden. Versuch es gleich noch einmal.',
 
   'header.menuProjects': 'Projektmen\u00fc',
   'header.switchToLight': 'Zum hellen Modus wechseln',
@@ -236,6 +244,10 @@ export const de: Record<string, string> = {
   'sources.viewCompare': 'Ansehen und vergleichen',
   'sources.viewText': 'Text anzeigen',
   'sources.deleteSource': 'Quelle l\u00f6schen',
+  'sources.recheckModeration': 'Erneut prüfen',
+  'sources.contentMasked': 'Dieser Inhalt ist ausgeblendet',
+  'sources.contentChecking': 'Wird geprüft…',
+  'sources.revealContent': 'Anzeigen (Eltern)',
   'sources.emptyTitle': 'F\u00fcge ein Foto oder einen Text hinzu',
   'sources.emptySubtitle': 'Nutze die Buttons oben um loszulegen',
   'sources.dragDrop': 'Dateien hier ablegen',
@@ -313,6 +325,8 @@ export const de: Record<string, string> = {
   'quiz.nextQuestion': 'N\u00e4chste Frage',
   'quiz.verificationError':
     'Ups, ich konnte deine Antwort nicht h\u00f6ren. Versuchen wir es noch mal?',
+  'quiz.answerBlocked':
+    'Diese Antwort kann ich nicht annehmen. Versuch, sie mit anderen Worten zu sagen!',
 
   'chat.heading': 'Chat mit deinen Kursen',
   'chat.clear': 'Leeren',
@@ -463,6 +477,7 @@ export const de: Record<string, string> = {
   'toast.remediationQuizError': 'Das Übungsquiz konnte nicht erstellt werden',
   'moderation.blocked':
     'Dieser Inhalt wurde als unangemessen eingestuft. Die Generierung ist blockiert.',
+  'moderation.checking': 'Quellen werden geprüft…',
   'moderation.pending': 'Moderation l\u00e4uft',
   'moderation.error': 'Moderation nicht verf\u00fcgbar',
   'moderation.unsafe': 'Gemeldeter Inhalt',
@@ -470,7 +485,9 @@ export const de: Record<string, string> = {
   'moderation.cat.sexual': 'Sexueller Inhalt',
   'moderation.cat.hate_and_discrimination': 'Hass und Diskriminierung',
   'moderation.cat.violence_and_threats': 'Gewalt und Drohungen',
-  'moderation.cat.dangerous_and_criminal_content': 'Gefahrlicher Inhalt',
+  'moderation.cat.dangerous_and_criminal_content': 'Gef\u00e4hrlicher oder illegaler Inhalt',
+  'moderation.cat.dangerous': 'Gef\u00e4hrlicher Inhalt',
+  'moderation.cat.criminal': 'Illegale Aktivit\u00e4ten',
   'moderation.cat.selfharm': 'Selbstverletzung',
   'moderation.cat.health': 'Gesundheit',
   'moderation.cat.financial': 'Finanzen',
@@ -490,6 +507,7 @@ export const de: Record<string, string> = {
   'profile.pinMismatch': 'PIN-Codes stimmen nicht \u00fcberein',
   'profile.pinVerify': 'Eltern-Verifizierung',
   'profile.pinWrong': 'Falscher PIN-Code',
+  'profile.pinRateLimited': 'Zu viele PIN-Versuche. Versuch es in {minutes} Min. noch einmal.',
   'profile.pinInfo':
     'Ein Eltern-PIN-Code sch\u00fctzt dieses Profil. Er wird zum Bearbeiten oder L\u00f6schen des Profils ben\u00f6tigt.',
   'profile.moderationToggle': 'Inhaltsmoderation',

@@ -171,6 +171,16 @@ function envFallbackAllowed(allowEnv: boolean): boolean {
   return allowEnv && process.env.EUREKAI_REQUIRE_USER_KEY !== 'true' && hasEnvKey();
 }
 
+/**
+ * Client des tâches de fond, hors de toute requête (reprise des modérations au démarrage) : le
+ * client d'env si le déploiement autorise son usage (clé d'env présente, pas de
+ * EUREKAI_REQUIRE_USER_KEY=true), sinon null. Jamais une clé utilisateur : elle n'existe que le
+ * temps de la requête qui l'apporte.
+ */
+export function getBackgroundClient(): Mistral | null {
+  return envFallbackAllowed(true) ? getEnvClient() : null;
+}
+
 // Discriminants extraits en const (évite no-duplicate-string sonarjs sur 3 usages runtime).
 const KIND_HEADER_INVALID = 'header-invalid';
 const KIND_UNSUPPORTED = 'unsupported-provider';

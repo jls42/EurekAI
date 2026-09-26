@@ -1,5 +1,11 @@
 import { Mistral } from '@mistralai/mistralai';
-import { getContent, safeParseJson, unwrapJsonArray } from '../helpers/index.js';
+import {
+  getContent,
+  retryTurns,
+  safeParseJson,
+  tryParseJson,
+  unwrapJsonArray,
+} from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
 import { fillBlankSystem, fillBlankUser, fillBlankRetryUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
@@ -39,19 +45,14 @@ export async function generateFillBlank(
     ...diversityParams('fill-blank'),
   });
 
+  // JSON invalide au 1er essai (réponse tronquée) → [] → retry, comme une validation ratée.
   const raw = getContent(response);
-  const data = unwrapJsonArray<FillBlankItem>(safeParseJson(raw));
+  const data: FillBlankItem[] = unwrapJsonArray(tryParseJson(raw));
 
   if (isValidFillBlank(data)) return data;
 
   console.warn('Fill-blank validation failed, retrying. Got:', JSON.stringify(data).slice(0, 200));
-  messages.push(
-    { role: 'assistant', content: raw },
-    {
-      role: 'user',
-      content: fillBlankRetryUser(count, lang),
-    },
-  );
+  messages.push(...retryTurns(raw, fillBlankRetryUser(count, lang)));
 
   const retry = await client.chat.complete({
     model,
@@ -59,10 +60,11 @@ export async function generateFillBlank(
     responseFormat: { type: 'json_object' },
     ...diversityParams('fill-blank'),
   });
-  const retryData = unwrapJsonArray<FillBlankItem>(safeParseJson(getContent(retry)));
+  const retryData: FillBlankItem[] = unwrapJsonArray(safeParseJson(getContent(retry)));
 
   if (!isValidFillBlank(retryData)) {
-    throw new Error(
+    // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
+    throw new SyntaxError(
       "Le modele n'a pas reussi a generer des exercices a trous valides apres 2 tentatives",
     );
   }

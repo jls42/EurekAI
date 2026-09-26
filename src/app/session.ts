@@ -57,6 +57,9 @@ function doResetSession(ctx: AppContext): void {
   // s'exécute sur le nouveau contexte (le user vient de switcher).
   ctx.confirmCallback = null;
   ctx.confirmTrigger = null;
+  // Contenu de source révélé par le PIN parental : valable pour une seule ouverture du
+  // dialogue source, jamais pour le profil ou le projet suivant.
+  ctx.revealedSourceIds = [];
 }
 
 export function createSession() {

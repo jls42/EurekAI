@@ -4,7 +4,7 @@ import { ProjectStore } from '../store.js';
 import { isValidReadingComfortInput } from '../helpers/reading-comfort.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
-import { authLimiter } from '../helpers/rate-limit.js';
+import { authLimiter, pinLimiter } from '../helpers/rate-limit.js';
 import type { Profile } from '../types.js';
 
 const ERR_PROFILE_NOT_FOUND = 'Profil introuvable';
@@ -222,7 +222,9 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
   const store = new ProfileStore(outputDir);
   const router = Router();
 
-  router.use(authLimiter);
+  // Limiteurs par route (cf. helpers/rate-limit.ts) : la liste n'a que generalLimiter (global),
+  // la création passe par authLimiter, la modification et la suppression par pinLimiter (seuls
+  // les PIN faux comptent : l'enregistrement automatique du profil n'use aucun quota).
 
   // Wrap les handlers pour catcher les erreurs de persistence (ENOSPC, EACCES, EIO).
   // Sans ça, Express renvoie sa réponse par défaut — en dev, la stacktrace HTML peut
@@ -268,6 +270,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
 
   router.post(
     '/',
+    authLimiter,
     handle((req, res) => {
       const validationError = validateCreateProfileInput(req.body);
       if (validationError) {
@@ -282,6 +285,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
 
   router.put(
     '/:id',
+    pinLimiter,
     handle((req, res) => {
       const id = req.params.id as string;
       const profile = store.get(id);
@@ -310,6 +314,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
 
   router.delete(
     '/:id',
+    pinLimiter,
     handle((req, res) => {
       const profileId = req.params.id as string;
       const profile = store.get(profileId);
@@ -318,8 +323,9 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
         return;
       }
       if (profile.pinHash) {
-        const { pin } = req.body;
-        if (!pin || !verifyPin(pin, profile.pinHash)) {
+        // Corps absent (DELETE sans JSON) : req.body vaut undefined sous Express 5 → 403, pas 500.
+        const pin: unknown = req.body?.pin;
+        if (!pin || !verifyPin(pin as string, profile.pinHash)) {
           res.status(403).json({ error: ERR_PIN_WRONG });
           return;
         }

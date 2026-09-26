@@ -60,6 +60,8 @@ describe('createState', () => {
     expect(state.uploading).toBe(false);
     expect(state.dragging).toBe(false);
     expect(state.viewSource).toBeNull();
+    // Aucune source révélée au démarrage : le contenu masqué l'est jusqu'au PIN parental.
+    expect(state.revealedSourceIds).toEqual([]);
     expect(state.textInput).toBe('');
     expect(state.webQuery).toBe('');
     expect(state.showTextInput).toBe(false);

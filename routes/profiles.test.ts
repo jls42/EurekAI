@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { profileRoutes } from './profiles.js';
@@ -665,6 +665,33 @@ describe('profileRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: 'Catégories de modération invalides' });
+    });
+
+    // Client stale (onglet ouvert avant la migration 2603) : la clé 2411 est convertie, pas un 400
+    // qui casserait toutes ses sauvegardes parentales.
+    it('PUT avec la clé legacy 2411 (PIN fourni) : 200, convertie dans la réponse et sur disque', async () => {
+      vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const store = new ProfileStore(tmpDir);
+      const created = store.create('Enfant', 9, '0', 'fr', '1234');
+
+      const handler = getHandler(router, 'put', '/:id');
+      const req = mockReq({
+        params: { id: created.id },
+        body: {
+          pin: '1234',
+          moderationCategories: ['sexual', 'dangerous_and_criminal_content'],
+        },
+      });
+      const res = mockRes();
+      await handler(req, res);
+
+      const expected = ['sexual', 'dangerous', 'criminal'];
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json.mock.calls[0][0].moderationCategories).toEqual(expected);
+      const onDisk = JSON.parse(readFileSync(join(tmpDir, 'profiles.json'), 'utf-8'));
+      expect(onDisk.find((p: { id: string }) => p.id === created.id).moderationCategories).toEqual(
+        expected,
+      );
     });
 
     it('rejects PUT with non-boolean parental toggles', async () => {

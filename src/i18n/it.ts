@@ -56,8 +56,9 @@ export const it: Record<string, string> = {
   'gen.all': 'Genera tutto',
   'gen.voice': 'Lettura vocale',
   'gen.websearch': 'Ricerca web',
-  'a11y.viewCategory': 'Vedi {category}',
-  'a11y.generateCategory': 'Genera {category}',
+  'a11y.viewCategory': 'Vedi: {category}',
+  'a11y.generateCategory': 'Genera: {category}',
+  'a11y.cancelGeneration': 'Annulla: {type}',
   'a11y.fillBlankAnswer': 'Risposta da completare',
   'a11y.selectSource': 'Seleziona questa fonte',
   'a11y.editTitle': 'Modifica il titolo',
@@ -96,8 +97,14 @@ export const it: Record<string, string> = {
   'errorCode.file_too_large':
     'Questo file \u00e8 troppo grande. Prova con un file pi\u00f9 piccolo.',
   'errorCode.all_steps_failed': 'Tutte le generazioni sono fallite',
+  'errorCode.invalid_input': 'Richiesta non valida',
   'errorCode.profile_delete_partial':
     'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',
+  'errorCode.rate_limited': "Troppe richieste in una volta. Aspetta un po' e riprova.",
+  'errorCode.url_blocked':
+    'Questo indirizzo non si può aprire. Prova un altro indirizzo, o scrivi semplicemente cosa cerchi.',
+  'errorCode.all_sources_failed':
+    "Non è stato possibile aggiungere nessuna fonte. Riprova tra un po'.",
 
   'header.menuProjects': 'Menu progetti',
   'header.switchToLight': 'Passa alla modalit\u00e0 chiara',
@@ -233,6 +240,10 @@ export const it: Record<string, string> = {
   'sources.viewCompare': 'Visualizza e confronta',
   'sources.viewText': 'Visualizza testo',
   'sources.deleteSource': 'Elimina fonte',
+  'sources.recheckModeration': 'Ricontrolla',
+  'sources.contentMasked': 'Questo contenuto è nascosto',
+  'sources.contentChecking': 'Verifica in corso…',
+  'sources.revealContent': 'Mostra (genitore)',
   'sources.emptyTitle': 'Aggiungi una foto o del testo',
   'sources.emptySubtitle': 'Usa i pulsanti qui sopra per iniziare',
   'sources.dragDrop': 'Trascina e rilascia i file qui',
@@ -308,6 +319,7 @@ export const it: Record<string, string> = {
   'quiz.youSaid': 'Hai detto: {text}',
   'quiz.nextQuestion': 'Domanda successiva',
   'quiz.verificationError': 'Ops, non sono riuscito ad ascoltare la tua risposta. Riproviamo?',
+  'quiz.answerBlocked': 'Non posso accettare questa risposta. Prova a dirla con altre parole!',
 
   'chat.heading': 'Chatta con i tuoi corsi',
   'chat.clear': 'Cancella',
@@ -456,6 +468,7 @@ export const it: Record<string, string> = {
   'toast.remediationQuizError': 'Impossibile generare il quiz di allenamento',
   'moderation.blocked':
     'Questo contenuto \u00e8 stato segnalato come inappropriato. La generazione \u00e8 bloccata.',
+  'moderation.checking': 'Verifica delle fonti…',
   'moderation.pending': 'Moderazione in corso',
   'moderation.error': 'Moderazione non disponibile',
   'moderation.unsafe': 'Contenuto segnalato',
@@ -463,7 +476,9 @@ export const it: Record<string, string> = {
   'moderation.cat.sexual': 'Contenuto sessuale',
   'moderation.cat.hate_and_discrimination': 'Odio e discriminazione',
   'moderation.cat.violence_and_threats': 'Violenza e minacce',
-  'moderation.cat.dangerous_and_criminal_content': 'Contenuto pericoloso',
+  'moderation.cat.dangerous_and_criminal_content': 'Contenuto pericoloso o illegale',
+  'moderation.cat.dangerous': 'Contenuto pericoloso',
+  'moderation.cat.criminal': 'Attivit\u00e0 illegali',
   'moderation.cat.selfharm': 'Autolesionismo',
   'moderation.cat.health': 'Salute',
   'moderation.cat.financial': 'Finanza',
@@ -483,6 +498,7 @@ export const it: Record<string, string> = {
   'profile.pinMismatch': 'I codici PIN non corrispondono',
   'profile.pinVerify': 'Verifica genitoriale',
   'profile.pinWrong': 'Codice PIN errato',
+  'profile.pinRateLimited': 'Troppi tentativi di PIN. Riprova tra {minutes} min.',
   'profile.pinInfo':
     'Un codice PIN genitoriale protegge questo profilo. Sar\u00e0 richiesto per modificare o eliminare il profilo.',
   'profile.moderationToggle': 'Moderazione dei contenuti',

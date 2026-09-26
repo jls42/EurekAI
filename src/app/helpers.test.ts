@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createHelpers } from './helpers';
 import type { EventKey } from '../../helpers/event-bus.js';
 
@@ -1297,21 +1298,227 @@ describe('ocrConfidenceToneClass', () => {
 // --- Moderation helpers ---
 
 describe('moderationStatus', () => {
+  const statusOf = (src: unknown) =>
+    callWith<string | null>(helpers.moderationStatus, helpers, src);
+
   it('returns status when present', () => {
-    expect(helpers.moderationStatus({ moderation: { status: 'safe' } })).toBe('safe');
-    expect(helpers.moderationStatus({ moderation: { status: 'unsafe' } })).toBe('unsafe');
-    expect(helpers.moderationStatus({ moderation: { status: 'pending' } })).toBe('pending');
-    expect(helpers.moderationStatus({ moderation: { status: 'error' } })).toBe('error');
+    expect(statusOf({ moderation: { status: 'safe' } })).toBe('safe');
+    expect(statusOf({ moderation: { status: 'unsafe' } })).toBe('unsafe');
+    expect(statusOf({ moderation: { status: 'pending' } })).toBe('pending');
+    expect(statusOf({ moderation: { status: 'error' } })).toBe('error');
   });
 
   it('returns null when no moderation', () => {
-    expect(helpers.moderationStatus({})).toBeNull();
-    expect(helpers.moderationStatus(null)).toBeNull();
-    expect(helpers.moderationStatus(undefined)).toBeNull();
+    expect(statusOf({})).toBeNull();
+    expect(statusOf(null)).toBeNull();
+    expect(statusOf(undefined)).toBeNull();
   });
 
   it('preserves empty string status instead of coercing to null', () => {
-    expect(helpers.moderationStatus({ moderation: { status: '' } })).toBe('');
+    expect(statusOf({ moderation: { status: '' } })).toBe('');
+  });
+});
+
+// Statut EFFECTIF (MOD-1) : source persistée `safe` alors que ses catégories signalent
+// `criminal`. Profil modéré qui bloque criminal → badge `unsafe`, pas de bouclier vert.
+describe('badge de modération : statut effectif', () => {
+  const t = (key: string) => key;
+  const flagged = {
+    moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+  };
+  const ctxFor = (profile: Record<string, unknown> | null) => ({
+    ...helpers,
+    t,
+    currentProfile: profile,
+    moderationDefaults: { enfant: ['sexual'], ado: ['criminal'] },
+  });
+  const blocking = ctxFor({
+    useModeration: true,
+    ageGroup: 'enfant',
+    moderationCategories: ['criminal'],
+  });
+
+  it('profil modéré bloquant criminal : unsafe partout (icône, couleur, titre, ton)', () => {
+    expect(callWith(helpers.moderationStatus, blocking, flagged)).toBe('unsafe');
+    expect(callWith(helpers.moderationBadgeIcon, blocking, flagged)).toBe('shield-alert');
+    expect(callWith(helpers.moderationBadgeColor, blocking, flagged)).toBe(
+      'bg-danger-light text-danger-dark',
+    );
+    expect(callWith(helpers.moderationBadgeTitle, blocking, flagged)).toBe(
+      'moderation.unsafe — moderation.cat.criminal',
+    );
+    expect(callWith(helpers.moderationToneClass, blocking, flagged)).toBe('text-danger-dark');
+  });
+
+  it("sans liste propre : défauts de l'âge (ado bloque criminal ici)", () => {
+    const ctx = ctxFor({ useModeration: true, ageGroup: 'ado' });
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('unsafe');
+  });
+
+  it('catégorie non bloquée par le profil : badge safe inchangé', () => {
+    const ctx = ctxFor({
+      useModeration: true,
+      ageGroup: 'enfant',
+      moderationCategories: ['sexual'],
+    });
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('safe');
+    expect(callWith(helpers.moderationBadgeIcon, ctx, flagged)).toBe('shield-check');
+  });
+
+  it.each([
+    ['modération inactive', { useModeration: false, moderationCategories: ['criminal'] }],
+    ['aucun profil', null],
+  ])('%s : badge sur le statut persisté (inchangé)', (_label, profile) => {
+    const ctx = ctxFor(profile);
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('safe');
+    expect(callWith(helpers.moderationBadgeIcon, ctx, flagged)).toBe('shield-check');
+  });
+
+  it('jamais de déclassement : unsafe/pending/error restent tels quels', () => {
+    for (const status of ['unsafe', 'pending', 'error']) {
+      const src = { moderation: { status, categories: { criminal: false } } };
+      expect(callWith(helpers.moderationStatus, blocking, src)).toBe(status);
+    }
+  });
+
+  // Source jamais vérifiée (sans objet moderation) : en attente pour un profil modéré, comme le
+  // serveur la traite (gateModerationStatus) ; aucun badge sans modération.
+  it('source jamais vérifiée, profil modéré : badge en attente (icône, couleur, titre)', () => {
+    const unverified = { id: 'n' };
+    expect(callWith(helpers.moderationStatus, blocking, unverified)).toBe('pending');
+    expect(callWith(helpers.moderationBadgeIcon, blocking, unverified)).toBe('loader-circle');
+    expect(callWith(helpers.moderationBadgeColor, blocking, unverified)).toBe(
+      'bg-primary-light text-primary',
+    );
+    expect(callWith(helpers.moderationBadgeTitle, blocking, unverified)).toBe('moderation.pending');
+  });
+
+  it.each([
+    ['modération inactive', { useModeration: false }],
+    ['aucun profil', null],
+  ])('source jamais vérifiée, %s : aucun badge', (_label, profile) => {
+    expect(callWith(helpers.moderationStatus, ctxFor(profile), { id: 'n' })).toBeNull();
+  });
+
+  // Le gabarit teste le statut AFFICHÉ, pas `src.moderation?.status` : sinon une source jamais
+  // vérifiée d'un profil modéré (bloquée par le serveur) n'aurait aucun badge.
+  it('gabarit moderation-badge-src : x-if sur moderationStatus(src)', () => {
+    const partial = readFileSync(
+      new URL('../partials/moderation-badge-src.html', import.meta.url),
+      'utf-8',
+    );
+    expect(partial).toContain('<template x-if="moderationStatus({{sourceRef}})">');
+    expect(partial).not.toContain('.moderation?.status');
+  });
+});
+
+// Contenu d'une source non sûre masqué pour un profil modéré (aperçu de la carte, dialogue) :
+// méthodes des gabarits, sur le statut AFFICHÉ et la liste des sources révélées.
+describe('contenu masqué : sourceContentMasked / sourceMaskMessage', () => {
+  const t = (key: string) => key;
+  const ctxFor = (profile: Record<string, unknown> | null, revealedSourceIds: string[] = []) => ({
+    ...helpers,
+    t,
+    currentProfile: profile,
+    moderationDefaults: { enfant: ['sexual'] },
+    revealedSourceIds,
+  });
+  const moderated = ctxFor({ useModeration: true, ageGroup: 'enfant' });
+  const src = (status?: string) => ({
+    id: 's1',
+    markdown: 'texte',
+    ...(status ? { moderation: { status, categories: {} } } : {}),
+  });
+
+  it('profil modéré : signalée, en erreur, en attente ou jamais vérifiée → masquée', () => {
+    for (const s of [src('unsafe'), src('error'), src('pending'), src()]) {
+      expect(callWith(helpers.sourceContentMasked, moderated, s)).toBe(true);
+    }
+    expect(callWith(helpers.sourceContentMasked, moderated, src('safe'))).toBe(false);
+  });
+
+  it('révélée par un parent ou profil non modéré → affichée', () => {
+    const revealed = ctxFor({ useModeration: true, ageGroup: 'enfant' }, ['s1']);
+    expect(callWith(helpers.sourceContentMasked, revealed, src('unsafe'))).toBe(false);
+    const free = ctxFor({ useModeration: false });
+    expect(callWith(helpers.sourceContentMasked, free, src('unsafe'))).toBe(false);
+  });
+
+  it('encart : « vérification en cours » en attente (ou jamais vérifiée), sinon « masqué »', () => {
+    expect(callWith(helpers.sourceMaskMessage, moderated, src('pending'))).toBe(
+      'sources.contentChecking',
+    );
+    expect(callWith(helpers.sourceMaskMessage, moderated, src())).toBe('sources.contentChecking');
+    for (const status of ['unsafe', 'error', 'blocked']) {
+      expect(callWith(helpers.sourceMaskMessage, moderated, src(status))).toBe(
+        'sources.contentMasked',
+      );
+    }
+  });
+});
+
+// Consigne montrée à l'enfant (dialogue, bandeaux) : même garde que le serveur (consigneUsable),
+// pour le profil courant ; les gabarits ne testent jamais `consigne.found` seul.
+describe('consigneVisible', () => {
+  const CONSIGNE = { found: true, text: 'Reviser', keyTopics: ['dates'], sourceIds: ['a'] };
+  const safe = (id: string) => ({ id, moderation: { status: 'safe', categories: {} } });
+  const ctxFor = (overrides: Record<string, unknown>) => ({
+    ...helpers,
+    currentProfile: { useModeration: true, ageGroup: 'enfant', moderationCategories: ['criminal'] },
+    moderationDefaults: {},
+    sources: [safe('a')],
+    consigne: CONSIGNE,
+    ...overrides,
+  });
+  const visible = (ctx: unknown) => callWith<boolean>(helpers.consigneVisible, ctx);
+
+  it('profil modéré, provenance sûre → visible', () => {
+    expect(visible(ctxFor({}))).toBe(true);
+  });
+
+  it.each([
+    ['signalée', { id: 'a', moderation: { status: 'unsafe', categories: {} } }],
+    ['en attente', { id: 'a', moderation: { status: 'pending', categories: {} } }],
+    ['jamais vérifiée', { id: 'a' }],
+    [
+      'promue unsafe (catégorie bloquée)',
+      { id: 'a', moderation: { status: 'safe', categories: { criminal: true } } },
+    ],
+  ])('profil modéré, source de la provenance %s → cachée', (_label, source) => {
+    expect(visible(ctxFor({ sources: [source] }))).toBe(false);
+  });
+
+  it('source de la provenance supprimée → cachée', () => {
+    expect(visible(ctxFor({ sources: [safe('b')] }))).toBe(false);
+  });
+
+  it("profil non modéré (ou aucun profil) : visible dès qu'elle a des points", () => {
+    const unverified = [{ id: 'a' }];
+    expect(visible(ctxFor({ currentProfile: { useModeration: false }, sources: unverified }))).toBe(
+      true,
+    );
+    expect(visible(ctxFor({ currentProfile: null, sources: unverified }))).toBe(true);
+  });
+
+  it('absente, non trouvée ou sans point → cachée', () => {
+    expect(visible(ctxFor({ consigne: null }))).toBe(false);
+    expect(visible(ctxFor({ consigne: { ...CONSIGNE, found: false } }))).toBe(false);
+    expect(visible(ctxFor({ consigne: { ...CONSIGNE, keyTopics: [] } }))).toBe(false);
+  });
+
+  it('gabarits : dialogue et bandeaux sur consigneVisible(), bouton de détection sinon', () => {
+    const read = (name: string) =>
+      readFileSync(new URL(`../partials/${name}`, import.meta.url), 'utf-8');
+    const dialog = read('dialog-consigne.html');
+    const view = read('view-sources.html');
+    expect(dialog).toContain('<template x-if="consigneVisible()">');
+    expect(view).toContain('x-show="consigneVisible() && useConsigne"');
+    expect(view).toContain('x-show="consigneVisible() && !useConsigne"');
+    expect(view).toContain('x-show="sources.length > 0 && !consigneVisible()"');
+    for (const html of [dialog, view]) {
+      expect(html).not.toContain('consigne && consigne.found');
+      expect(html).not.toContain('!consigne.found');
+    }
   });
 });
 
@@ -2044,6 +2251,10 @@ describe('reconcilePendings', () => {
 
     await ctx.reconcilePendings.call(ctx as any, 'pid-1', '2026-04-26T11:00:00Z');
 
+    // Snapshot demandé au nom du profil courant (rattachement d'un projet orphelin).
+    expect((globalThis as any).fetch).toHaveBeenCalledWith(
+      '/api/projects/pid-1?profileId=profile-A',
+    );
     expect(ctx.pendingById['p1']).toBeDefined();
     expect(ctx.generations).toHaveLength(1);
     expect(ctx.generations[0].id).toBe('g-completed');

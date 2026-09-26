@@ -113,6 +113,8 @@ type UploadSession = {
 const initSourceState = () => ({
   sources: [] as Source[],
   selectedIds: [] as string[],
+  // Sources dont la vérification « Revérifier » est en cours (bouton désactivé), par id.
+  recheckingSources: {} as Record<string, boolean>,
   uploadSessions: [] as UploadSession[],
   dragging: false,
   viewSource: null as Source | null,
@@ -126,6 +128,10 @@ const initSourceState = () => ({
   viewSourcePanY: 0,
   viewSourcePanStart: { x: 0, y: 0 },
   viewSourceCompareVertical: true,
+  // Sources dont un parent a révélé le contenu masqué (profil modéré, source non sûre), pour
+  // l'ouverture en cours du dialogue source seulement : vidé à sa fermeture et par resetSession,
+  // jamais persisté.
+  revealedSourceIds: [] as string[],
   textInput: '',
   webQuery: '',
   scrapeMode: 'auto' as 'auto' | 'readability' | 'lightpanda',
