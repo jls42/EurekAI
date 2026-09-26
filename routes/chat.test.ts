@@ -955,7 +955,8 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
       profileStore.update(profile.id, {
         chatEnabled: true,
         useModeration: true,
-        ...(blockCriminal && { moderationCategories: ['sexual', 'criminal'] }),
+        // Explicite dans les deux cas : les défauts bloquent `criminal` depuis le 2026-09-26.
+        moderationCategories: blockCriminal ? ['sexual', 'criminal'] : ['sexual'],
       });
       const pid = store.createProject('Test', profile.id).meta.id;
       for (const [id, categories] of [

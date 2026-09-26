@@ -185,20 +185,25 @@ describe('MODERATION_CATEGORIES', () => {
     expect(MODERATION_CATEGORIES.adulte).toEqual([]);
   });
 
-  // Décision produit : faux positifs éducatifs constatés en 2411 sur le volet dangereux/criminel.
-  it('enfant/ado : défauts inchangés, sans dangerous ni criminal', () => {
+  // Décision produit après mesure sur Moderation 2 (2026-09-26) : `criminal` ajouté (0 faux positif
+  // éducatif, rappel 7/7), `dangerous` écarté (rappel 5/8 < 80 %).
+  it('enfant/ado : défauts historiques + criminal, sans dangerous', () => {
     const expected = [
       'sexual',
       'hate_and_discrimination',
       'violence_and_threats',
+      'criminal',
       'selfharm',
       'jailbreaking',
     ];
     for (const group of ['enfant', 'ado'] as const) {
       expect(MODERATION_CATEGORIES[group]).toEqual(expected);
       expect(MODERATION_CATEGORIES[group]).not.toContain('dangerous');
-      expect(MODERATION_CATEGORIES[group]).not.toContain('criminal');
     }
+  });
+
+  it('enfant et ado ne partagent pas le même tableau (une mutation ne fuit pas)', () => {
+    expect(MODERATION_CATEGORIES.enfant).not.toBe(MODERATION_CATEGORIES.ado);
   });
 });
 
@@ -1152,12 +1157,25 @@ describe('bout en bout : profil persisté → moderateContent', () => {
     expect(result.status).toBe('unsafe');
   });
 
-  it('profil enfant par défaut (dangerous/criminal non bloqués) : même réponse → safe', async () => {
+  it('profil enfant par défaut : criminal bloqué → unsafe', async () => {
     const created = store.create('Kid', 9);
 
     const p = new ProfileStore(tempDir).get(created.id)!;
     const result = await moderateContent(
       clientFlagging({ criminal: true }),
+      'texte',
+      p.moderationCategories,
+    );
+
+    expect(result.status).toBe('unsafe');
+  });
+
+  it('profil enfant par défaut : dangerous non bloqué → safe', async () => {
+    const created = store.create('Kid', 9);
+
+    const p = new ProfileStore(tempDir).get(created.id)!;
+    const result = await moderateContent(
+      clientFlagging({ dangerous: true }),
       'texte',
       p.moderationCategories,
     );

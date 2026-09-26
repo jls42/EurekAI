@@ -23,12 +23,23 @@ export function ageToGroup(age: number): AgeGroup {
 // Ré-exportée ici : server.ts (/api/moderation-categories) et les tests l'importent depuis profiles.
 export { MODERATION_MODEL_CATEGORIES as ALL_MODERATION_CATEGORIES } from './helpers/moderation-model.js';
 
-// `dangerous` et `criminal` (scission 2603 de `dangerous_and_criminal_content`) NON bloqués par
-// défaut : faux positifs sur du contenu éducatif (électricité, chimie, énergie) constatés en 2411.
-// Décision produit ; `criminal` seul pourrait être réévalué après mesure sur 2603.
+// Défauts enfant/ado = les 5 historiques + `criminal`, mesuré le 2026-09-26 sur Moderation 2 :
+// 0 faux positif sur 50 leçons (dont 16 d'histoire et de guerre) sur 3 passes, rappel 7/7 sur le
+// contrôle. `dangerous` reste hors défauts (0 faux positif, mais rappel 5/8 sous le critère de
+// 80 % écrit avant la mesure). En 2411, `dangerous_and_criminal_content` signalait des leçons de
+// sciences (électricité, chimie) : c'est pourquoi il avait été retiré. Rejouer la mesure à chaque
+// bump du modèle (cf. CLAUDE.md, section Modération). Ne vaut que pour les NOUVEAUX profils.
+const CHILD_DEFAULTS: ModerationCategory[] = [
+  'sexual',
+  'hate_and_discrimination',
+  'violence_and_threats',
+  'criminal',
+  'selfharm',
+  'jailbreaking',
+];
 export const MODERATION_CATEGORIES: Record<AgeGroup, ModerationCategory[]> = {
-  enfant: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
-  ado: ['sexual', 'hate_and_discrimination', 'violence_and_threats', 'selfharm', 'jailbreaking'],
+  enfant: [...CHILD_DEFAULTS],
+  ado: [...CHILD_DEFAULTS],
   etudiant: [],
   adulte: [],
 };

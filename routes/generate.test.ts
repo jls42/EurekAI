@@ -3269,9 +3269,11 @@ describe('generateRoutes', () => {
   describe('statut effectif des sources (safe persisté, criminal signalé)', () => {
     const projectWithFlaggedSource = (blockCriminal: boolean): string => {
       const profile = profileStore.create('Kid', 9, '0', 'fr');
-      if (blockCriminal) {
-        profileStore.update(profile.id, { moderationCategories: ['sexual', 'criminal'] });
-      }
+      // Liste explicite dans les deux cas : les défauts enfant bloquent `criminal` depuis la mesure
+      // du 2026-09-26, le cas « non bloquant » doit donc l'écarter lui-même.
+      profileStore.update(profile.id, {
+        moderationCategories: blockCriminal ? ['sexual', 'criminal'] : ['sexual'],
+      });
       const pid = store.createProject('Test', profile.id).meta.id;
       store.addSource(pid, {
         id: 'flagged-src',

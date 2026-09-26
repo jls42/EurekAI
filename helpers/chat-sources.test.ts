@@ -69,9 +69,13 @@ describe('selectChatSources', () => {
       expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
     });
 
-    it("sans liste propre : défauts de l'âge (enfant ne bloque ni dangerous ni criminal)", () => {
+    it("sans liste propre : défauts de l'âge (enfant bloque criminal, pas dangerous)", () => {
       const profile = { useModeration: true, ageGroup: 'enfant' as const };
-      expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
+      const dangerousOnly: Source = {
+        ...src('dangerous'),
+        moderation: { status: 'safe', categories: { dangerous: true } },
+      };
+      expect(ids(selectChatSources([flagged, dangerousOnly], profile))).toEqual(['dangerous']);
     });
 
     it('clé legacy 2411 stockée à true → comptée pour criminal → exclue', () => {
