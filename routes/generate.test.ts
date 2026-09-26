@@ -3122,6 +3122,67 @@ describe('generateRoutes', () => {
     });
   });
 
+  // --- Statut EFFECTIF des sources (MOD-1) ---
+
+  // Sources modérées de v1.5.4 à v1.7.1 : persistées `safe` alors que leurs catégories portaient
+  // `criminal: true` (le profil bloquait la clé 2411, jamais renvoyée par 2603).
+  describe('statut effectif des sources (safe persisté, criminal signalé)', () => {
+    const projectWithFlaggedSource = (blockCriminal: boolean): string => {
+      const profile = profileStore.create('Kid', 9, '0', 'fr');
+      if (blockCriminal) {
+        profileStore.update(profile.id, { moderationCategories: ['sexual', 'criminal'] });
+      }
+      const pid = store.createProject('Test', profile.id).meta.id;
+      store.addSource(pid, {
+        id: 'flagged-src',
+        filename: 'flagged.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+        moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+      });
+      return pid;
+    };
+
+    const post = async (path: string, pid: string) => {
+      const res = mockRes();
+      await getHandler(router, 'post', path)(mockReq({ params: { pid }, body: {} }), res);
+      return res;
+    };
+
+    it('génération : profil bloquant criminal → 400 moderation.blocked, générateur non appelé', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      const res = await post('/:pid/generate/summary', projectWithFlaggedSource(true));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+      expect(generateSummary).not.toHaveBeenCalled();
+    });
+
+    it('génération : profil ne bloquant pas criminal → générée', async () => {
+      const res = await post('/:pid/generate/summary', projectWithFlaggedSource(false));
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
+    });
+
+    it('analyse de route : profil bloquant criminal → 400, routeur non appelé', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const res = await post('/:pid/generate/route', projectWithFlaggedSource(true));
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+      expect(routeRequest).not.toHaveBeenCalled();
+    });
+
+    it('analyse de route : profil ne bloquant pas criminal → routeur appelé', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const res = await post('/:pid/generate/route', projectWithFlaggedSource(false));
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(routeRequest).toHaveBeenCalledTimes(1);
+    });
+  });
+
   // --- sourceIds resolution ---
 
   describe('resolveSourceIds', () => {

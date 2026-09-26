@@ -67,4 +67,48 @@ describe('moderation-model', () => {
       }
     });
   });
+
+  // Clés DÉJÀ LIVRÉES, figées ici en dur (pas dérivées du code) : profils et sources persistés
+  // peuvent les porter. Chacune doit rester connue — dans la taxonomie courante ou dans la table
+  // legacy. Un bump de MODERATION_MODEL qui retire une clé sans l'ajouter à la table legacy casse
+  // ce test (sinon : case parentale inopérante et sources jamais bloquées, cf. #41).
+  describe('clés livrées (2411 puis 2603)', () => {
+    const SHIPPED_KEYS = {
+      'mistral-moderation-2411': [
+        'sexual',
+        'hate_and_discrimination',
+        'violence_and_threats',
+        'dangerous_and_criminal_content',
+        'selfharm',
+        'health',
+        'financial',
+        'law',
+        'pii',
+        'jailbreaking',
+      ],
+      'mistral-moderation-2603': [
+        'sexual',
+        'hate_and_discrimination',
+        'violence_and_threats',
+        'dangerous',
+        'criminal',
+        'selfharm',
+        'health',
+        'financial',
+        'law',
+        'pii',
+        'jailbreaking',
+      ],
+    };
+
+    it.each(Object.entries(SHIPPED_KEYS))(
+      '%s : chaque clé est dans la taxonomie courante ou dans la table legacy',
+      (_model, keys) => {
+        const orphans = keys.filter(
+          (k) => !isModerationCategory(k) && legacyModerationCategoriesIn([k]).length !== 1,
+        );
+        expect(orphans).toEqual([]);
+      },
+    );
+  });
 });

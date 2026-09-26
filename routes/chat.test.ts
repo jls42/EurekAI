@@ -940,4 +940,62 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
     expect(exclusionLogs).toHaveLength(0);
     infoSpy.mockRestore();
   });
+
+  // Statut EFFECTIF (MOD-1) : source persistée `safe` (fenêtre v1.5.4 → v1.7.1) alors que ses
+  // catégories signalent `criminal` — exclue seulement si le profil bloque `criminal`.
+  describe('statut effectif : source safe signalant criminal', () => {
+    const chatWithFlaggedSource = async (blockCriminal: boolean) => {
+      const { chatWithSources } = await import('../generators/chat.js');
+      const { generateSummary } = await import('../generators/summary.js');
+      (chatWithSources as any).mockResolvedValueOnce({
+        reply: 'ok',
+        toolCalls: ['generate_summary'],
+      });
+      const profile = profileStore.create('Teen', 14, '0', 'fr');
+      profileStore.update(profile.id, {
+        chatEnabled: true,
+        useModeration: true,
+        ...(blockCriminal && { moderationCategories: ['sexual', 'criminal'] }),
+      });
+      const pid = store.createProject('Test', profile.id).meta.id;
+      for (const [id, categories] of [
+        ['src-safe', {}],
+        ['src-flagged', { sexual: false, criminal: true }],
+      ] as const) {
+        store.addSource(pid, {
+          id,
+          filename: `${id}.txt`,
+          markdown: `MD-${id}`,
+          uploadedAt: new Date().toISOString(),
+          sourceType: 'text',
+          moderation: { status: 'safe', categories },
+        });
+      }
+      const res = await sendMessage(pid);
+      return {
+        texts: [
+          (chatWithSources as any).mock.calls[0][2] as string,
+          (generateSummary as any).mock.calls[0][1] as string,
+        ],
+        sourceIds: res.json.mock.calls[0][0].generations[0].sourceIds,
+      };
+    };
+
+    it('profil bloquant criminal : exclue du contexte ET des outils', async () => {
+      const { texts, sourceIds } = await chatWithFlaggedSource(true);
+
+      for (const text of texts) {
+        expect(text).toContain('MD-src-safe');
+        expect(text).not.toContain('src-flagged');
+      }
+      expect(sourceIds).toEqual(['src-safe']);
+    });
+
+    it('profil ne bloquant pas criminal : gardée partout', async () => {
+      const { texts, sourceIds } = await chatWithFlaggedSource(false);
+
+      for (const text of texts) expect(text).toContain('MD-src-flagged');
+      expect(sourceIds).toEqual(['src-safe', 'src-flagged']);
+    });
+  });
 });

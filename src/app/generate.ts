@@ -8,7 +8,8 @@ import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/gen
 import type { AppContext } from './app-context';
 import type { FailedStepCode, Generation, Source } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
-import { pickBlockingSource } from '@helpers/moderation-http';
+import { blockingModerationStatus, pickBlockingSource } from '@helpers/moderation-http';
+import { currentBlockedCategories } from './effective-moderation';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
@@ -647,20 +648,26 @@ const runSingleGenerate = async function (
   }
 };
 
+// Sources visées par une génération : la sélection, sinon toutes (même règle que le serveur).
+const generationSources = (state: AppContext): Source[] =>
+  state.selectedIds.length > 0
+    ? state.sources.filter((s: Source) => state.selectedIds.includes(s.id))
+    : state.sources;
+
 export function createGenerate() {
   return {
     // Même priorité que le serveur (unsafe > error > pending, helper partagé) : sinon « Modération
-    // en cours » masquerait une source déjà signalée.
+    // en cours » masquerait une source déjà signalée. Statut EFFECTIF, avec les catégories
+    // bloquées du profil courant : un `safe` qui signale une catégorie bloquée compte `unsafe`.
     blockedModerationSource(this: AppContext) {
-      const selected =
-        this.selectedIds.length > 0
-          ? this.sources.filter((s: Source) => this.selectedIds.includes(s.id))
-          : this.sources;
-      return pickBlockingSource(selected) ?? null;
+      return pickBlockingSource(generationSources(this), currentBlockedCategories(this)) ?? null;
     },
 
+    // Statut effectif de la source bloquante : relire son `moderation.status` rendrait `safe` pour
+    // une source promue (cf. blockingModerationStatus).
     blockedModerationStatus(this: AppContext): string | null {
-      return this.blockedModerationSource()?.moderation?.status ?? null;
+      const blocked = currentBlockedCategories(this);
+      return blockingModerationStatus(generationSources(this), blocked) ?? null;
     },
 
     moderationBlockedMessage(this: AppContext, status: string | null): string {

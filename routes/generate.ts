@@ -28,9 +28,10 @@ import type {
   PromoteErrorResponse,
   SummaryRegister,
   DictationItem,
+  ModerationStatus,
 } from '../types.js';
 import type { ProjectStore, PromoteResult } from '../store.js';
-import type { ProfileStore } from '../profiles.js';
+import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
@@ -55,7 +56,11 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
-import { moderationRejection, pickBlockingSource } from '../helpers/moderation-http.js';
+import {
+  blockingModerationStatus,
+  moderationRejection,
+  profileBlockedCategories,
+} from '../helpers/moderation-http.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
@@ -149,21 +154,21 @@ const selectModeratedSources = (project: { sources: Source[] }, sourceIds?: stri
     ? project.sources.filter((s) => sourceIds.includes(s.id))
     : project.sources;
 
-// Source bloquante des sources sélectionnées, par priorité unsafe > error > pending
-// (pickBlockingSource) ; undefined si la modération est inactive ou si rien ne bloque.
+// Statut EFFECTIF qui bloque la génération sur les sources sélectionnées (un `safe` dont les
+// catégories persistées signalent une catégorie bloquée par le profil compte comme `unsafe`),
+// priorité unsafe > error > pending ; undefined si la modération est inactive ou si rien ne
+// bloque. Reçoit le projet déjà chargé par l'appelant : pas de relecture de project.json.
 const checkModeration = (
-  store: ProjectStore,
+  project: { meta: { profileId?: string }; sources: Source[] },
   profileStore: ProfileStore,
-  pid: string,
   sourceIds?: string[],
-): Source | undefined => {
-  const project = store.getProject(pid);
-  if (!project) return undefined;
+): ModerationStatus | undefined => {
   const profileId = project.meta.profileId;
   if (!profileId) return undefined;
   const profile = profileStore.get(profileId);
   if (!profile?.useModeration) return undefined;
-  return pickBlockingSource(selectModeratedSources(project, sourceIds));
+  const blocked = profileBlockedCategories(profile, MODERATION_CATEGORIES);
+  return blockingModerationStatus(selectModeratedSources(project, sourceIds), blocked);
 };
 
 interface GenContext {
@@ -295,8 +300,7 @@ function buildGenContext(
   if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
 
   // 400 moderation.blocked (signalée) / 503 moderation.error (panne) / 409 moderation.pending.
-  const blocking = checkModeration(store, profileStore, pid, body.sourceIds);
-  const rejection = moderationRejection(blocking?.moderation?.status);
+  const rejection = moderationRejection(checkModeration(project, profileStore, body.sourceIds));
   if (rejection) return { ok: false, error: rejection.error, status: rejection.status };
 
   const rawMarkdown = getMarkdownOrNull(project.sources, body.sourceIds);
@@ -1016,14 +1020,12 @@ const loadRouteProject = (
     res.status(400).json({ error: validation.error });
     return null;
   }
-  const pid = String(req.params.pid);
-  const project = store.getProject(pid);
+  const project = store.getProject(String(req.params.pid));
   if (!project) {
     res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
     return null;
   }
-  const blocking = checkModeration(store, profileStore, pid, req.body.sourceIds);
-  const rejection = moderationRejection(blocking?.moderation?.status);
+  const rejection = moderationRejection(checkModeration(project, profileStore, req.body.sourceIds));
   if (rejection) {
     res.status(rejection.status).json({ error: rejection.error });
     return null;

@@ -47,4 +47,41 @@ describe('selectChatSources', () => {
     selectChatSources(sources, { useModeration: true });
     expect(sources).toEqual(ALL);
   });
+
+  // Statut EFFECTIF : source persistée `safe` (fenêtre v1.5.4 → v1.7.1) mais `criminal: true`.
+  describe('statut effectif (catégories bloquées du profil)', () => {
+    const flagged: Source = {
+      ...src('flagged'),
+      moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+    };
+    const legacy: Source = {
+      ...src('legacy'),
+      moderation: { status: 'safe', categories: { dangerous_and_criminal_content: true } },
+    };
+
+    it('safe signalant une catégorie bloquée par le profil → exclue', () => {
+      const profile = { useModeration: true, moderationCategories: ['criminal'] };
+      expect(ids(selectChatSources([src('safe', 'safe'), flagged], profile))).toEqual(['safe']);
+    });
+
+    it('safe signalant une catégorie NON bloquée → gardée', () => {
+      const profile = { useModeration: true, moderationCategories: ['sexual'] };
+      expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
+    });
+
+    it("sans liste propre : défauts de l'âge (enfant ne bloque ni dangerous ni criminal)", () => {
+      const profile = { useModeration: true, ageGroup: 'enfant' as const };
+      expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
+    });
+
+    it('clé legacy 2411 stockée à true → comptée pour criminal → exclue', () => {
+      const profile = { useModeration: true, moderationCategories: ['criminal'] };
+      expect(selectChatSources([legacy], profile)).toEqual([]);
+    });
+
+    it('modération inactive : gardée même si elle signale une catégorie bloquée', () => {
+      const profile = { useModeration: false, moderationCategories: ['criminal'] };
+      expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
+    });
+  });
 });

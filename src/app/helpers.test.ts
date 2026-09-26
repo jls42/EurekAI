@@ -1297,21 +1297,87 @@ describe('ocrConfidenceToneClass', () => {
 // --- Moderation helpers ---
 
 describe('moderationStatus', () => {
+  const statusOf = (src: unknown) =>
+    callWith<string | null>(helpers.moderationStatus, helpers, src);
+
   it('returns status when present', () => {
-    expect(helpers.moderationStatus({ moderation: { status: 'safe' } })).toBe('safe');
-    expect(helpers.moderationStatus({ moderation: { status: 'unsafe' } })).toBe('unsafe');
-    expect(helpers.moderationStatus({ moderation: { status: 'pending' } })).toBe('pending');
-    expect(helpers.moderationStatus({ moderation: { status: 'error' } })).toBe('error');
+    expect(statusOf({ moderation: { status: 'safe' } })).toBe('safe');
+    expect(statusOf({ moderation: { status: 'unsafe' } })).toBe('unsafe');
+    expect(statusOf({ moderation: { status: 'pending' } })).toBe('pending');
+    expect(statusOf({ moderation: { status: 'error' } })).toBe('error');
   });
 
   it('returns null when no moderation', () => {
-    expect(helpers.moderationStatus({})).toBeNull();
-    expect(helpers.moderationStatus(null)).toBeNull();
-    expect(helpers.moderationStatus(undefined)).toBeNull();
+    expect(statusOf({})).toBeNull();
+    expect(statusOf(null)).toBeNull();
+    expect(statusOf(undefined)).toBeNull();
   });
 
   it('preserves empty string status instead of coercing to null', () => {
-    expect(helpers.moderationStatus({ moderation: { status: '' } })).toBe('');
+    expect(statusOf({ moderation: { status: '' } })).toBe('');
+  });
+});
+
+// Statut EFFECTIF (MOD-1) : source persistée `safe` alors que ses catégories signalent
+// `criminal`. Profil modéré qui bloque criminal → badge `unsafe`, pas de bouclier vert.
+describe('badge de modération : statut effectif', () => {
+  const t = (key: string) => key;
+  const flagged = {
+    moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+  };
+  const ctxFor = (profile: Record<string, unknown> | null) => ({
+    ...helpers,
+    t,
+    currentProfile: profile,
+    moderationDefaults: { enfant: ['sexual'], ado: ['criminal'] },
+  });
+  const blocking = ctxFor({
+    useModeration: true,
+    ageGroup: 'enfant',
+    moderationCategories: ['criminal'],
+  });
+
+  it('profil modéré bloquant criminal : unsafe partout (icône, couleur, titre, ton)', () => {
+    expect(callWith(helpers.moderationStatus, blocking, flagged)).toBe('unsafe');
+    expect(callWith(helpers.moderationBadgeIcon, blocking, flagged)).toBe('shield-alert');
+    expect(callWith(helpers.moderationBadgeColor, blocking, flagged)).toBe(
+      'bg-danger-light text-danger-dark',
+    );
+    expect(callWith(helpers.moderationBadgeTitle, blocking, flagged)).toBe(
+      'moderation.unsafe — moderation.cat.criminal',
+    );
+    expect(callWith(helpers.moderationToneClass, blocking, flagged)).toBe('text-danger-dark');
+  });
+
+  it("sans liste propre : défauts de l'âge (ado bloque criminal ici)", () => {
+    const ctx = ctxFor({ useModeration: true, ageGroup: 'ado' });
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('unsafe');
+  });
+
+  it('catégorie non bloquée par le profil : badge safe inchangé', () => {
+    const ctx = ctxFor({
+      useModeration: true,
+      ageGroup: 'enfant',
+      moderationCategories: ['sexual'],
+    });
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('safe');
+    expect(callWith(helpers.moderationBadgeIcon, ctx, flagged)).toBe('shield-check');
+  });
+
+  it.each([
+    ['modération inactive', { useModeration: false, moderationCategories: ['criminal'] }],
+    ['aucun profil', null],
+  ])('%s : badge sur le statut persisté (inchangé)', (_label, profile) => {
+    const ctx = ctxFor(profile);
+    expect(callWith(helpers.moderationStatus, ctx, flagged)).toBe('safe');
+    expect(callWith(helpers.moderationBadgeIcon, ctx, flagged)).toBe('shield-check');
+  });
+
+  it('jamais de déclassement : unsafe/pending/error restent tels quels', () => {
+    for (const status of ['unsafe', 'pending', 'error']) {
+      const src = { moderation: { status, categories: { criminal: false } } };
+      expect(callWith(helpers.moderationStatus, blocking, src)).toBe(status);
+    }
   });
 });
 

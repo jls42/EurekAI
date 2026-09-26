@@ -1,6 +1,7 @@
 import { createIcons, icons } from 'lucide';
 import { extractSourceNums } from './source-markers';
 import { pendingOfTypeExists } from './pending-utils';
+import { displayedModerationStatus } from './effective-moderation';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
@@ -337,8 +338,10 @@ const ocrConfidenceToneClass = function (this: AppContext, src: Source) {
   return TEXT_TEXT_PRIMARY;
 };
 
-const moderationStatus = function (src: Source): string | null {
-  return src?.moderation?.status ?? null;
+// Statut affiché par le badge (icône, couleur, titre, popover) : EFFECTIF si le profil courant est
+// modéré, persisté sinon (cf. displayedModerationStatus).
+const moderationStatus = function (this: AppContext, src: Source): string | null {
+  return displayedModerationStatus(this, src) ?? null;
 };
 
 const podcastSpeakerName = function (gen: PodcastGeneration, line: PodcastLine): string {

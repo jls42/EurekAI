@@ -192,6 +192,64 @@ describe('blockedModerationStatus', () => {
     expect(gen.blockedModerationStatus.call(ctx)).toBe(expected);
   });
 
+  // Statut EFFECTIF (MOD-1) : source persistée `safe` mais `criminal: true` (v1.5.4 → v1.7.1).
+  describe('statut effectif (catégories bloquées du profil courant)', () => {
+    const flagged = {
+      id: 'f1',
+      moderation: { status: 'safe', categories: { sexual: false, criminal: true } },
+    };
+
+    it('profil bloquant criminal : la source safe est bloquante, statut unsafe', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['criminal'],
+        },
+        sources: [{ id: 's0', moderation: { status: 'safe', categories: {} } }, flagged],
+      });
+      expect(gen.blockedModerationSource.call(ctx)?.id).toBe('f1');
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+
+    it("sans liste propre : défauts de l'âge chargés depuis l'API (moderationDefaults)", () => {
+      const ctx = makeContext({
+        currentProfile: { id: 'p1', ageGroup: 'ado', useModeration: true },
+        moderationDefaults: { ado: ['criminal'] },
+        sources: [flagged],
+      });
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+
+    it('profil ne bloquant pas criminal : rien ne bloque', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['sexual'],
+        },
+        sources: [flagged],
+      });
+      expect(gen.blockedModerationSource.call(ctx)).toBeNull();
+      expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+    });
+
+    it('priorité sur le statut effectif : la source promue passe devant un pending', () => {
+      const ctx = makeContext({
+        currentProfile: {
+          id: 'p1',
+          ageGroup: 'enfant',
+          useModeration: true,
+          moderationCategories: ['criminal'],
+        },
+        sources: [{ id: 'p0', moderation: { status: 'pending' } }, flagged],
+      });
+      expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
+    });
+  });
+
   it('applies the priority within selectedIds only', () => {
     const ctx = makeContext({
       sources: [
@@ -240,6 +298,21 @@ describe('generate', () => {
     const ctx = makeContext({
       currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
       sources: [{ id: 's1', moderation: { status: 'unsafe' } }],
+    });
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('safe source flagging a blocked category (effective unsafe): blocked toast, no fetch', async () => {
+    const ctx = makeContext({
+      currentProfile: {
+        id: 'p1',
+        ageGroup: 'enfant',
+        useModeration: true,
+        moderationCategories: ['criminal'],
+      },
+      sources: [{ id: 'f1', moderation: { status: 'safe', categories: { criminal: true } } }],
     });
     await gen.generate.call(ctx, 'summary');
     expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
