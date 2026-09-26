@@ -1,38 +1,38 @@
 <p align="center">
-  <img src="public/assets/logo.webp" alt="EurekAI Logo" width="120" />
+  <img src="public/assets/logo.webp" alt="EurekAI लोगो" width="120" />
 </p>
 
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>किसी भी सामग्री को इंटरैक्टिव सीखने के अनुभव में बदलें — <a href="https://mistral.ai">Mistral AI</a> द्वारा संचालित।</strong>
+  <strong>किसी भी सामग्री को एक इंटरैक्टिव सीखने के अनुभव में बदलें — <a href="https://mistral.ai">Mistral AI</a> द्वारा संचालित।</strong>
 </p>
 
 <p align="center">
-  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Español</a> · <a href="README-pt.md">🇧🇷 Português</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Nederlands</a> · <a href="README-ar.md">🇸🇦 العربية</a><br>
-  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日本語</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 Polski</a> · <a href="README-ro.md">🇷🇴 Română</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
+  <a href="README-en.md">🇬🇧 अंग्रेज़ी</a> · <a href="README-es.md">🇪🇸 स्पेनिश</a> · <a href="README-pt.md">🇧🇷 पुर्तगाली</a> · <a href="README-de.md">🇩🇪 जर्मन</a> · <a href="README-it.md">🇮🇹 इतालवी</a> · <a href="README-nl.md">🇳🇱 डच</a> · <a href="README-ar.md">🇸🇦 अरबी</a><br>
+  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 चीनी</a> · <a href="README-ja.md">🇯🇵 जापानी</a> · <a href="README-ko.md">🇰🇷 कोरियाई</a> · <a href="README-pl.md">🇵🇱 पोलिश</a> · <a href="README-ro.md">🇷🇴 रोमानियाई</a> · <a href="README-sv.md">🇸🇪 स्वीडिश</a>
 </p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=_b1TQz2leoI"><img src="https://img.shields.io/badge/▶️_Voir_la_démo-YouTube-red?style=for-the-badge&logo=youtube" alt="YouTube डेमो"></a>
 </p>
 
-<h4 align="center">📊 कोड की गुणवत्ता</h4>
+<h4 align="center">📊 कोड गुणवत्ता</h4>
 
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="Quality Gate"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="Security Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="Reliability Rating"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="Maintainability Rating"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="गुणवत्ता गेट"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="सुरक्षा रेटिंग"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="विश्वसनीयता रेटिंग"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="रखरखाव रेटिंग"></a>
 </p>
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="Coverage"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="Vulnerabilities"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="Code Smells"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="Lines of Code"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="कवरेज"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="कमज़ोरियाँ"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="कोड स्मेल्स"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="कोड की पंक्तियाँ"></a>
 </p>
 <p align="center">
-  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy Badge"></a>
+  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy बैज"></a>
   <a href="https://www.codefactor.io/repository/github/jls42/eurekai"><img src="https://www.codefactor.io/repository/github/jls42/eurekai/badge" alt="CodeFactor"></a>
 </p>
 
@@ -40,15 +40,15 @@
 
 ## कहानी — EurekAI क्यों?
 
-**EurekAI** का जन्म [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([आधिकारिक साइट](https://worldwide-hackathon.mistral.ai/)) (मार्च 2026) के दौरान हुआ। मुझे एक विषय चाहिए था — और विचार बहुत ठोस चीज़ से आया: मैं नियमित रूप से अपनी बेटी के साथ परीक्षा की तैयारी करती/करता हूँ, और सोचा कि AI की मदद से इसे और मज़ेदार और इंटरैक्टिव बनाना संभव होना चाहिए।
+**EurekAI** का जन्म [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([आधिकारिक साइट](https://worldwide-hackathon.mistral.ai/)) (मार्च 2026) के दौरान हुआ। मुझे एक विषय चाहिए था — और यह विचार एक बहुत ही ठोस चीज़ से आया: मैं नियमित रूप से अपनी बेटी के साथ टेस्ट की तैयारी करता हूँ, और मैंने सोचा कि AI की मदद से इसे और मज़ेदार तथा इंटरैक्टिव बनाना संभव होना चाहिए।
 
-उद्देश्य: **किसी भी इनपुट** को लें — पाठ की तस्वीर, कॉपी-पेस्ट किया गया टेक्स्ट, वॉयस रिकॉर्डिंग, वेब खोज — और उसे **रिवीज़न शीट्स, फ्लैशकार्ड्स, क्विज़, पॉडकास्ट, रिक्त स्थान भरें वाले टेक्स्ट, चित्रण, और बहुत कुछ** में बदलें। सब कुछ Mistral AI के फ्रेंच मॉडल से संचालित, जो फ्रैंकोफ़ोन छात्रों के लिए स्वाभाविक रूप से उपयुक्त समाधान बनाता है।
+लक्ष्य: **किसी भी इनपुट** को लें — पाठ की फोटो, कॉपी-पेस्ट किया हुआ टेक्स्ट, एक वॉइस रिकॉर्डिंग, एक वेब खोज — और उसे **पुनरावृत्ति शीट, फ्लैशकार्ड्स, क्विज़, पॉडकास्ट, रिक्त-स्थान वाले पाठ, चित्रण, और भी बहुत कुछ** में बदल दें। यह सब Mistral AI के फ्रेंच मॉडल्स द्वारा संचालित है, जिससे यह फ्रेंच-भाषी छात्रों के लिए स्वाभाविक रूप से उपयुक्त समाधान बनता है।
 
-[प्रारंभिक प्रोटोटाइप](https://github.com/jls42/worldwide-hackathon.mistral.ai) हैकथॉन के दौरान 48 घंटे में Mistral सेवाओं के आसपास प्रमाण के रूप में बनाया गया था — पहले से ही कार्यात्मक, लेकिन सीमित। तब से, EurekAI एक वास्तविक परियोजना बन गया है: रिक्त स्थान भरें वाले टेक्स्ट, अभ्यासों में नेविगेशन, वेब स्क्रैपिंग, कॉन्फ़िगर करने योग्य अभिभावकीय मॉडरेशन, गहन कोड समीक्षा, और बहुत कुछ। संपूर्ण कोड AI द्वारा जनरेट किया गया है — मुख्यतः [Claude Code](https://code.claude.com/), कुछ योगदान [Codex](https://openai.com/codex/) और [Gemini CLI](https://geminicli.com/) के माध्यम से।
+[प्रारंभिक प्रोटोटाइप](https://github.com/jls42/worldwide-hackathon.mistral.ai) को हैकाथॉन के दौरान 48 घंटे में Mistral सेवाओं के इर्द-गिर्द एक proof of concept के रूप में बनाया गया था — वह पहले से ही काम कर रहा था, लेकिन सीमित था। तब से, EurekAI एक वास्तविक प्रोजेक्ट बन गया है: रिक्त-स्थान वाले पाठ, अभ्यासों में नेविगेशन, वेब स्क्रैपिंग, कॉन्फ़िगर करने योग्य अभिभावकीय मॉडरेशन, गहन कोड समीक्षा, और बहुत कुछ। पूरा कोड AI द्वारा जनरेट किया गया है — मुख्यतः [Claude Code](https://code.claude.com/), कुछ योगदान [Codex](https://openai.com/codex/) और [Gemini CLI](https://geminicli.com/) के माध्यम से।
 
 ---
 
-## अवलोकन
+## झलक
 
 <p align="center">
   <img src="docs/screenshots/eurekai-tour.gif" alt="EurekAI का निर्देशित टूर: स्रोत, शीट, क्विज़, फ्लैशकार्ड्स, चित्रण" width="820" />
@@ -56,59 +56,59 @@
 
 | | |
 |---|---|
-| ![डैशबोर्ड](docs/screenshots/dashboard.webp)<br>**डैशबोर्ड** — हाल की जनरेशन, प्रति कार्ड अनुमानित लागत और प्रोजेक्ट कुल, « Auto — Magie ! » बटन | ![स्रोत](docs/screenshots/sources.webp)<br>**स्रोत** — फोटो/PDF/टेक्स्ट/वॉयस/वेब इंपोर्ट, एक क्लिक में जनरेशन, निर्देश का पता लगाना |
+| ![डैशबोर्ड](docs/screenshots/dashboard.webp)<br>**डैशबोर्ड** — हाल की जनरेशन, प्रति कार्ड अनुमानित लागत और कुल प्रोजेक्ट लागत, « Auto — Magie ! » बटन | ![स्रोत](docs/screenshots/sources.webp)<br>**स्रोत** — फोटो/PDF/टेक्स्ट/आवाज़/वेब आयात, एक क्लिक में जनरेशन, निर्देश पहचान |
 
-प्रत्येक इंपोर्ट किए गए स्रोत में उसका [OCR कॉन्फ़िडेंस स्कोर, मॉडरेशन और अनुमानित लागत](docs/screenshots/sources-list.webp) दिखता है।
+प्रत्येक आयातित स्रोत अपने [OCR विश्वास स्कोर, उसकी मॉडरेशन और उसकी अनुमानित लागत](docs/screenshots/sources-list.webp) दिखाता है।
 
-### क्रिया में घटक
-
-| | |
-|---|---|
-| ![रिवीज़न शीट](docs/screenshots/notes.gif)<br>**रिवीज़न शीट** — मुख्य बिंदु, शब्दावली, स्रोतित उद्धरण, अनुभाग अनुसार ऑडियो पठन | ![क्विज़](docs/screenshots/quiz.gif)<br>**QCM क्विज़** — व्याख्या के साथ तत्काल फीडबैक, चरण-दर-चरण नेविगेशन |
-| ![फ्लैशकार्ड्स](docs/screenshots/flashcards.gif)<br>**फ्लैशकार्ड्स** — पलटने योग्य कार्ड फिर आत्म-मूल्यांकन « मुझे पता था / मुझे नहीं पता था » | ![रिक्त स्थान भरें](docs/screenshots/fillblank.gif)<br>**रिक्त स्थान भरें** — माँग पर संकेत, सहनशील सत्यापन |
-| ![श्रुतलेख](docs/screenshots/dictation.gif)<br>**श्रुतलेख** — ऑडियो में बोला गया शब्द, अक्षर-दर-अक्षर सख्त सुधार | ![वोकल क्विज़](docs/screenshots/vocal-quiz.gif)<br>**वोकल क्विज़** — ज़ोर से पढ़ा गया प्रश्न, माइक से उत्तर |
-| ![पॉडकास्ट](docs/screenshots/podcast.gif)<br>**पॉडकास्ट** — 2 आवाज़ों का मिनी-पॉडकास्ट, देखने योग्य संवाद स्क्रिप्ट | ![चित्रण](docs/screenshots/illustrations.gif)<br>**चित्रण** — Agent द्वारा जनरेट की गई शैक्षिक छवियाँ |
-| ![AI ट्यूटर](docs/screenshots/chat.gif)<br>**AI ट्यूटर** — कोर्स दस्तावेज़ों पर आधारित चैट, समझाए गए उत्तर, क्विज़ और फ्लैशकार्ड जनरेट कर सकता है | |
-
-### आरंभ करना
+### घटक कार्रवाई में
 
 | | |
 |---|---|
-| ![प्रोफ़ाइल चुनना](docs/screenshots/login.gif)<br>**प्रोफ़ाइल चुनना** — प्रत्येक बच्चे का अपना स्थान, अवतार और भाषा | ![प्रोफ़ाइल बनाना](docs/screenshots/profile-create.gif)<br>**प्रोफ़ाइल बनाना** — उम्र, अवतार, 15 वर्ष से कम के लिए अभिभावकीय PIN |
-| ![कोर्स बनाना](docs/screenshots/course.gif)<br>**कोर्स बनाना** — प्रति पाठ एक प्रोजेक्ट, स्रोत प्राप्त करने के लिए तैयार | ![सेटिंग्स](docs/screenshots/settings.gif)<br>**सेटिंग्स** — API स्थिति, दिखाए गए टैरिफ के साथ AI मॉडल चुनना |
+| ![पुनरावृत्ति शीट](docs/screenshots/notes.gif)<br>**पुनरावृत्ति शीट** — मुख्य बिंदु, शब्दावली, स्रोत-संदर्भित उद्धरण, अनुभाग-दर-अनुभाग ऑडियो पठन | ![क्विज़](docs/screenshots/quiz.gif)<br>**बहुविकल्पी क्विज़** — तुरंत फ़ीडबैक के साथ व्याख्या, चरण-दर-चरण नेविगेशन |
+| ![फ्लैशकार्ड्स](docs/screenshots/flashcards.gif)<br>**फ्लैशकार्ड्स** — कार्ड पलटें, फिर « मैं जानता था / मैं नहीं जानता था » स्व-मूल्यांकन | ![रिक्त-स्थान वाले पाठ](docs/screenshots/fillblank.gif)<br>**रिक्त-स्थान वाले पाठ** — अनुरोध पर संकेत, सहनशील सत्यापन |
+| ![श्रुतिलेख](docs/screenshots/dictation.gif)<br>**श्रुतिलेख** — ऑडियो में बोले गए शब्द, अक्षर-दर-अक्षर सख्त सुधार | ![मौखिक क्विज़](docs/screenshots/vocal-quiz.gif)<br>**मौखिक क्विज़** — प्रश्न ज़ोर से पढ़ा जाता है, माइक्रोफ़ोन से उत्तर |
+| ![पॉडकास्ट](docs/screenshots/podcast.gif)<br>**पॉडकास्ट** — 2-आवाज़ वाला मिनी-पॉडकास्ट, देखने योग्य संवाद स्क्रिप्ट | ![चित्रण](docs/screenshots/illustrations.gif)<br>**चित्रण** — Agent द्वारा जनरेट की गई शैक्षिक छवियाँ |
+| ![AI ट्यूटर](docs/screenshots/chat.gif)<br>**AI ट्यूटर** — पाठ्य दस्तावेज़ों में आधारित चैट, व्याख्यात्मक उत्तर, क्विज़ और फ्लैशकार्ड्स जनरेट कर सकता है | |
+
+### शुरुआत
+
+| | |
+|---|---|
+| ![प्रोफ़ाइल चयन](docs/screenshots/login.gif)<br>**प्रोफ़ाइल चयन** — हर बच्चे का अपना स्थान, अपना अवतार और अपनी भाषा | ![प्रोफ़ाइल निर्माण](docs/screenshots/profile-create.gif)<br>**प्रोफ़ाइल निर्माण** — आयु, अवतार, 15 वर्ष से कम के लिए अभिभावकीय PIN |
+| ![कोर्स निर्माण](docs/screenshots/course.gif)<br>**कोर्स निर्माण** — प्रति पाठ एक प्रोजेक्ट, स्रोत प्राप्त करने के लिए तैयार | ![सेटिंग्स](docs/screenshots/settings.gif)<br>**सेटिंग्स** — API स्थिति, प्रदर्शित दरों के साथ AI मॉडल चयन |
 
 ---
 
-## सुविधाएँ
+## विशेषताएँ
 
-| | सुविधा | विवरण |
+| | फ़ीचर | विवरण |
 |---|---|---|
-| 📷 | **फ़ाइल इंपोर्ट** | अपने पाठ इंपोर्ट करें — फोटो, PDF (औसत कॉन्फ़िडेंस स्कोर के साथ Mistral OCR के माध्यम से, टियर `high`/`medium`/`low`) या टेक्स्ट फ़ाइल (TXT, MD)। प्रति फ़ाइल retry और व्यक्तिगत प्रगति के साथ अपलोड सत्र |
-| 📝 | **टेक्स्ट इनपुट** | कोई भी टेक्स्ट सीधे टाइप करें या पेस्ट करें |
-| 🎤 | **वॉयस इनपुट** | रिकॉर्ड करें — Voxtral STT आपकी आवाज़ को ट्रांसक्राइब करता है |
-| 🌐 | **वेब / URL** | एक URL पेस्ट करें (Readability + Lightpanda के माध्यम से सीधा स्क्रैपिंग) या खोज टाइप करें (Agent Mistral web_search) |
-| 📄 | **रिवीज़न शीट्स** | मुख्य बिंदु, शब्दावली, उद्धरण, किस्सों के साथ संरचित नोट्स |
-| 🃏 | **फ्लैशकार्ड्स** | इंटरैक्टिव Q/A कार्ड, संवाद ऑडियो पठन |
-| ❓ | **QCM क्विज़** | त्रुटियों की अनुकूली समीक्षा के साथ बहुविकल्पीय प्रश्न (कॉन्फ़िगर करने योग्य संख्या) |
-| ✏️ | **रिक्त स्थान भरें** | संकेतों और सहनशील सत्यापन के साथ पूरा करने वाले अभ्यास |
-| 🔤 | **श्रुतलेख** | इंपोर्ट की गई सूची से ऑडियो में बोले गए शब्द (Voxtral TTS), कीबोर्ड इनपुट, समझाए गए वर्तनी नियम के साथ अक्षर-दर-अक्षर सख्त सुधार |
-| 🎙️ | **पॉडकास्ट** | ऑडियो में 2 आवाज़ों का मिनी-पॉडकास्ट — डिफ़ॉल्ट Mistral आवाज़ें या कस्टम आवाज़ें (माता-पिता!) |
-| 🖼️ | **चित्रण** | Agent Mistral द्वारा जनरेट की गई शैक्षिक छवियाँ |
-| 🗣️ | **वोकल क्विज़** | ज़ोर से पढ़े गए प्रश्न (कस्टम आवाज़ संभव), मौखिक उत्तर, AI सत्यापन |
-| 💬 | **AI ट्यूटर** | टूल कॉल के साथ आपके कोर्स दस्तावेज़ों वाला प्रासंगिक चैट |
-| 🧠 | **स्वचालित राउटर** | `mistral-small-latest` पर आधारित राउटर सामग्री का विश्लेषण करता है और उपलब्ध 8 प्रकारों में से जनरेटरों का संयोजन प्रस्तावित करता है |
-| 🔒 | **अभिभावकीय नियंत्रण** | प्रति प्रोफ़ाइल कॉन्फ़िगर करने योग्य मॉडरेशन (अनुकूलन योग्य श्रेणियाँ), अभिभावकीय PIN, चैट प्रतिबंध |
-| 🌍 | **बहुभाषी** | इंटरफ़ेस 9 भाषाओं में उपलब्ध; प्रॉम्प्ट के माध्यम से 15 भाषाओं में AI जनरेशन नियंत्रित |
-| 🔊 | **ज़ोर से पढ़ना** | Mistral Voxtral TTS के माध्यम से शीट्स और फ्लैशकार्ड्स सुनें (प्रश्न/उत्तर संवाद) |
-| 💶 | **API लागत ट्रैकिंग** | प्रत्येक जनरेशन और स्रोत की € लागत का पारदर्शी अनुमान (टोकन / वर्ण / पृष्ठ / ऑडियो सेकंड)। प्रति कार्ड बैज + प्रति प्रोजेक्ट कुल, डैशबोर्ड में दिखाई देता है |
-| 🎨 | **प्रति प्रोफ़ाइल थीम** | प्रत्येक प्रोफ़ाइल अपनी थीम `dark` या `light` चुनती है — प्रोफ़ाइल बदलने पर बनी रहती है |
+| 📷 | **फ़ाइल आयात** | अपनी पाठ सामग्री आयात करें — फोटो, PDF (Mistral OCR के माध्यम से, औसत विश्वास स्कोर के साथ, स्तर `high`/`medium`/`low`) या टेक्स्ट फ़ाइल (TXT, MD)। प्रति फ़ाइल रीट्राई और व्यक्तिगत प्रगति के साथ अपलोड सत्र |
+| 📝 | **टेक्स्ट इनपुट** | कोई भी टेक्स्ट सीधे टाइप या पेस्ट करें |
+| 🎤 | **वॉइस इनपुट** | स्वयं को रिकॉर्ड करें — Voxtral STT आपकी आवाज़ को लिप्यंतरित करता है |
+| 🌐 | **वेब / URL** | एक URL चिपकाएँ (Readability + Lightpanda के माध्यम से सीधा scraping) या एक खोज टाइप करें (Agent Mistral web_search) |
+| 📄 | **पुनरावृत्ति शीट** | मुख्य बिंदुओं, शब्दावली, उद्धरणों, किस्सों के साथ संरचित नोट्स |
+| 🃏 | **फ्लैशकार्ड्स** | इंटरैक्टिव प्रश्न/उत्तर कार्ड, संवादात्मक ऑडियो पठन |
+| ❓ | **बहुविकल्पी क्विज़** | अनुकूली त्रुटि पुनरावलोकन के साथ बहुविकल्पीय प्रश्न (कॉन्फ़िगर करने योग्य संख्या) |
+| ✏️ | **रिक्त-स्थान वाले पाठ** | संकेतों और सहनशील सत्यापन के साथ पूरा करने वाले अभ्यास |
+| 🔤 | **श्रुतिलेख** | आयातित सूची, कीबोर्ड इनपुट, अक्षर-दर-अक्षर सख्त सुधार, समझाई गई वर्तनी नियम के साथ ऑडियो में बोले गए शब्द (Voxtral TTS) |
+| 🎙️ | **पॉडकास्ट** | 2-आवाज़ वाला मिनी-पॉडकास्ट — डिफ़ॉल्ट Mistral आवाज़ें या कस्टम आवाज़ें (माता-पिता!) |
+| 🖼️ | **चित्रण** | एक Mistral Agent द्वारा जनरेट की गई शैक्षिक छवियाँ |
+| 🗣️ | **मौखिक क्विज़** | ज़ोर से पढ़े गए प्रश्न (कस्टम आवाज़ संभव), मौखिक उत्तर, AI सत्यापन |
+| 💬 | **AI ट्यूटर** | आपके पाठ्य दस्तावेज़ों के साथ संदर्भ-आधारित चैट, टूल कॉलिंग सहित |
+| 🧠 | **स्वचालित राउटर** | `mistral-small-latest` पर आधारित एक राउटर सामग्री का विश्लेषण करता है और उपलब्ध 8 प्रकारों में से जनरेटर्स का एक संयोजन सुझाता है |
+| 🔒 | **अभिभावकीय नियंत्रण** | प्रोफ़ाइल-आधारित कॉन्फ़िगर करने योग्य मॉडरेशन (अनुकूलन योग्य श्रेणियाँ), अभिभावकीय PIN, चैट प्रतिबंध |
+| 🌍 | **बहुभाषी** | इंटरफ़ेस 9 भाषाओं में उपलब्ध है; प्रॉम्प्ट्स के माध्यम से AI जनरेशन 15 भाषाओं में नियंत्रित की जा सकती है |
+| 🔊 | **ज़ोर से पढ़ना** | Mistral Voxtral TTS के माध्यम से शीट्स और फ्लैशकार्ड्स (प्रश्न/उत्तर संवाद) सुनें |
+| 💶 | **API लागत ट्रैकिंग** | हर जनरेशन और स्रोत की लागत € का पारदर्शी अनुमान (tokens / characters / pages / seconds audio)। प्रति कार्ड बैज + प्रति प्रोजेक्ट कुल, डैशबोर्ड में दृश्यमान |
+| 🎨 | **प्रोफ़ाइल-आधारित थीम** | हर प्रोफ़ाइल अपनी थीम `dark` या `light` चुनती है — प्रोफ़ाइल बदलने पर बनी रहती है |
 
 ---
 
 ## आर्किटेक्चर का अवलोकन
 
 <p align="center">
-  <img src="public/assets/architecture-overview.webp" alt="Architecture Overview" width="800" />
+  <img src="public/assets/architecture-overview.webp" alt="आर्किटेक्चर अवलोकन" width="800" />
 </p>
 
 ---
@@ -116,7 +116,7 @@
 ## मॉडल उपयोग मानचित्र
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="AI Model-to-Task Mapping" width="800" />
+  <img src="public/assets/model-map.webp" alt="AI मॉडल-से-कार्य मानचित्रण" width="800" />
 </p>
 
 ---
@@ -124,114 +124,114 @@
 ## उपयोगकर्ता यात्रा
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="Student Learning Journey" width="800" />
+  <img src="public/assets/user-journey.webp" alt="छात्र सीखने की यात्रा" width="800" />
 </p>
 
 ---
 
-## गहन विश्लेषण — सुविधाएँ
+## गहराई में — विशेषताएँ
 
-### मल्टी-मोडल इनपुट
+### बहु-मोडल इनपुट
 
-EurekAI 4 प्रकार के स्रोत स्वीकार करता है, प्रोफ़ाइल के अनुसार मॉडरेट (बच्चे और किशोर के लिए डिफ़ॉल्ट रूप से सक्रिय):
+EurekAI 4 प्रकार के स्रोत स्वीकार करता है, प्रोफ़ाइल के अनुसार मॉडरेट किए गए (बच्चे और किशोर के लिए डिफ़ॉल्ट रूप से सक्रिय) :
 
-- **फ़ाइल इंपोर्ट** — Mistral OCR द्वारा संसाधित JPG, PNG या PDF फ़ाइलें — **OCR 4 (`mistral-ocr-4-0`) डिफ़ॉल्ट** (बेहतर गुणवत्ता), **OCR 3 (`mistral-ocr-2512`) वैकल्पिक** सेटिंग्स में (सस्ता, ~½ लागत) — मुद्रित टेक्स्ट, तालिकाओं और हस्तलेखन के लिए; या सीधे इंपोर्ट की गई टेक्स्ट फ़ाइलें (TXT, MD)। मल्टी-फ़ाइल अपलोड **अपलोड सत्र** सिस्टम का उपयोग करते हैं: प्रति फ़ाइल व्यक्तिगत प्रगति, अन्य को फिर से सबमिट किए बिना विफल फ़ाइल का retry, समाप्त होने पर सत्र dismiss। OCR एक औसत **कॉन्फ़िडेंस स्कोर** दिखाता है (`average`, `[0,1]` में क्लैंप, Mistral द्वारा लौटाए गए `averagePageConfidenceScore` से गणना), UI में बैज टियर `high` / `medium` / `low` के रूप में प्रदर्शित (थ्रेशोल्ड ~0.9 / ~0.7) — स्कैन खराब गुणवत्ता का हो तो ब्लॉक किए बिना चेतावनी देता है।
-- **मुक्त टेक्स्ट** — कोई भी सामग्री टाइप या पेस्ट करें। मॉडरेशन सक्रिय होने पर भंडारण से पहले मॉडरेट।
-- **वॉयस इनपुट** — ब्राउज़र में ऑडियो रिकॉर्ड करें। `voxtral-mini-latest` द्वारा ट्रांसक्राइब। पैरामीटर `language="fr"` पहचान को अनुकूलित करता है।
-- **वेब / URL** — सामग्री सीधे स्क्रैप करने के लिए एक या अधिक URL पेस्ट करें (JS पृष्ठों के लिए Readability + Lightpanda), या Agent Mistral के माध्यम से वेब खोज के लिए कीवर्ड टाइप करें। एकल फ़ील्ड दोनों स्वीकार करता है — URL और कीवर्ड स्वचालित रूप से अलग होते हैं, प्रत्येक परिणाम एक स्वतंत्र स्रोत बनाता है।
+- **फ़ाइल आयात** — JPG, PNG या PDF फ़ाइलें Mistral OCR द्वारा प्रोसेस की जाती हैं — **डिफ़ॉल्ट रूप से OCR 4 (`mistral-ocr-4-0`)** (बेहतर गुणवत्ता), **विकल्प के रूप में OCR 3 (`mistral-ocr-2512`)** सेटिंग्स में (सस्ता, लागत का लगभग आधा) — मुद्रित टेक्स्ट, तालिकाओं और हस्तलिखित लेखन के लिए; या टेक्स्ट फ़ाइलें (TXT, MD) सीधे आयात की जाती हैं। बहु-फ़ाइल अपलोड **अपलोड सत्रों** की प्रणाली का उपयोग करते हैं: प्रत्येक फ़ाइल की अलग प्रगति, एक फ़ाइल के विफल होने पर अन्य को फिर से भेजे बिना उसका पुनः प्रयास, पूरा होने पर सत्र को बंद करना। OCR एक औसत **विश्वास स्कोर** (`average`, `[0,1]` में सीमित, Mistral द्वारा लौटाए गए `averagePageConfidenceScore` से गणना किया गया) प्रदर्शित करता है, जिसे UI में `high` / `medium` / `low` स्तर बैज के रूप में दिखाया जाता है (सीमाएँ ~0.9 / ~0.7) — खराब गुणवत्ता वाले स्कैन पर बिना रोके चेतावनी देता है।
+- **मुक्त टेक्स्ट** — कोई भी सामग्री टाइप या पेस्ट करें। यदि मॉडरेशन सक्रिय है, तो स्टोरेज से पहले मॉडरेट किया जाता है।
+- **वॉइस इनपुट** — ब्राउज़र में ऑडियो रिकॉर्ड करें। `voxtral-mini-latest` द्वारा लिप्यंतरित। `language="fr"` पैरामीटर पहचान को अनुकूलित करता है।
+- **Web / URL** — सामग्री को सीधे स्क्रैप करने के लिए एक या अधिक URLs चिपकाएँ (JS पेजों के लिए Readability + Lightpanda), या Mistral Agent के माध्यम से वेब खोज के लिए कीवर्ड टाइप करें। एकल फ़ील्ड दोनों को स्वीकार करता है — URLs और कीवर्ड स्वचालित रूप से अलग किए जाते हैं, और प्रत्येक परिणाम एक स्वतंत्र स्रोत बनाता है।
 
-### AI सामग्री जनरेशन
+### AI सामग्री निर्माण
 
-जनरेट की गई सीखने की सामग्री के आठ प्रकार:
+आठ प्रकार की जनरेट की गई सीखने की सामग्री:
 
 | जनरेटर | मॉडल | आउटपुट |
 |---|---|---|
-| **रिवीज़न शीट** | `mistral-large-latest` | शीर्षक, सारांश, मुख्य बिंदु, शब्दावली, उद्धरण, किस्सा |
-| **फ्लैशकार्ड्स** | `mistral-large-latest` | स्रोतों के संदर्भों के साथ Q/A कार्ड (कॉन्फ़िगर करने योग्य संख्या) |
-| **QCM क्विज़** | `mistral-large-latest` | बहुविकल्पीय प्रश्न, व्याख्याएँ, अनुकूली समीक्षा (कॉन्फ़िगर करने योग्य संख्या) |
-| **रिक्त स्थान भरें** | `mistral-large-latest` | संकेतों के साथ पूरा करने वाले वाक्य, सहनशील सत्यापन (Levenshtein) |
-| **श्रुतलेख** | `mistral-large-latest` + Voxtral TTS | ऑडियो में बोले गए मुख्य शब्द (1 MP3/शब्द) → कीबोर्ड इनपुट → समझाए गए नियम के साथ सख्त सुधार (उच्चारण चिह्न) |
-| **पॉडकास्ट** | `mistral-large-latest` + Voxtral TTS | 2 आवाज़ों की स्क्रिप्ट → MP3 ऑडियो |
-| **चित्रण** | Agent `mistral-large-latest` | टूल `image_generation` के माध्यम से शैक्षिक छवि |
-| **वोकल क्विज़** | `mistral-large-latest` + Voxtral TTS + STT | TTS प्रश्न → STT उत्तर → AI सत्यापन |
+| **पुनरावृत्ति शीट** | `mistral-large-latest` | शीर्षक, सारांश, मुख्य बिंदु, शब्दावली, उद्धरण, किस्सा |
+| **फ्लैशकार्ड्स** | `mistral-large-latest` | स्रोत-संदर्भों के साथ प्रश्न/उत्तर कार्ड (कॉन्फ़िगर करने योग्य संख्या) |
+| **बहुविकल्पी क्विज़** | `mistral-large-latest` | बहुविकल्पीय प्रश्न, स्पष्टीकरण, अनुकूली पुनरावलोकन (कॉन्फ़िगर करने योग्य संख्या) |
+| **रिक्त-स्थान वाले पाठ** | `mistral-large-latest` | संकेतों के साथ पूरा करने योग्य वाक्य, सहनशील सत्यापन (Levenshtein) |
+| **श्रुतिलेख** | `mistral-large-latest` + Voxtral TTS | ऑडियो में बोले गए मुख्य शब्द (1 MP3/शब्द) → कीबोर्ड इनपुट → सख्त सुधार (उच्चारण चिह्न) समझाए गए नियम के साथ |
+| **पॉडकास्ट** | `mistral-large-latest` + Voxtral TTS | 2-आवाज़ स्क्रिप्ट → MP3 ऑडियो |
+| **चित्रण** | Agent `mistral-large-latest` | `image_generation` टूल के माध्यम से शैक्षिक छवि |
+| **मौखिक क्विज़** | `mistral-large-latest` + Voxtral TTS + STT | TTS प्रश्न → STT उत्तर → AI सत्यापन |
 
-### चैट द्वारा AI ट्यूटर
+### चैट-आधारित AI ट्यूटर
 
-कोर्स दस्तावेज़ों तक पूर्ण पहुँच वाला संवादात्मक ट्यूटर:
+पाठ्य दस्तावेज़ों तक पूर्ण पहुँच वाला एक संवादात्मक ट्यूटर:
 
 - `mistral-large-latest` का उपयोग करता है
-- **टूल कॉल**: बातचीत के दौरान शीट्स, फ्लैशकार्ड्स, क्विज़ या रिक्त स्थान भरें जनरेट कर सकता है
+- **टूल कॉलिंग**: बातचीत के दौरान शीट्स, फ्लैशकार्ड्स, क्विज़ या रिक्त-स्थान वाले पाठ जनरेट कर सकता है
 - प्रति कोर्स 50 संदेशों का इतिहास
-- प्रोफ़ाइल के लिए सक्रिय होने पर सामग्री मॉडरेशन
+- यदि प्रोफ़ाइल के लिए सक्रिय हो, तो सामग्री मॉडरेशन
 
 ### स्वचालित राउटर
 
-राउटर स्रोत सामग्री का विश्लेषण करने और उपलब्ध 8 में से सबसे प्रासंगिक जनरेटर प्रस्तावित करने के लिए `mistral-small-latest` का उपयोग करता है। इंटरफ़ेस वास्तविक समय में प्रगति दिखाता है: पहले विश्लेषण चरण, फिर रद्द करने की संभावना के साथ व्यक्तिगत जनरेशन।
+राउटर स्रोतों की सामग्री का विश्लेषण करने और उपलब्ध 8 में से सबसे प्रासंगिक जनरेटरों का सुझाव देने के लिए `mistral-small-latest` का उपयोग करता है। इंटरफ़ेस वास्तविक समय में प्रगति दिखाता है: पहले विश्लेषण चरण, फिर व्यक्तिगत जनरेशन, जिसमें रद्द करने की संभावना होती है।
 
 ### अनुकूली सीखना
 
-- **क्विज़ आँकड़े**: प्रति प्रश्न प्रयासों और सटीकता की ट्रैकिंग
-- **क्विज़ समीक्षा**: कमज़ोर अवधारणाओं को लक्षित करते हुए 5-10 नए प्रश्न जनरेट करता है
-- **निर्देश का पता लगाना**: रिवीज़न निर्देशों का पता लगाता है ("अगर मुझे पता हो तो मैं अपना पाठ जानता हूँ...") और उन्हें संगत टेक्स्ट जनरेटरों में प्राथमिकता देता है (शीट, फ्लैशकार्ड्स, क्विज़, रिक्त स्थान भरें)
+- **क्विज़ आँकड़े**: प्रत्येक प्रश्न के लिए प्रयासों और सटीकता का ट्रैकिंग
+- **क्विज़ पुनरावलोकन**: कमजोर अवधारणाओं को लक्षित करते हुए 5-10 नए प्रश्न जनरेट करता है
+- **निर्देश पहचान**: पुनरावलोकन निर्देशों ("मैं अपनी पाठ सामग्री तब जानता हूँ जब मैं...") का पता लगाता है और उन्हें संगत पाठ्य जनरेटरों (शीट, फ्लैशकार्ड्स, क्विज़, रिक्त-स्थान वाले पाठ) में प्राथमिकता देता है
 
 ### सुरक्षा और अभिभावकीय नियंत्रण
 
 - **4 आयु समूह**: बच्चा (≤10 वर्ष), किशोर (11-15), छात्र (16-25), वयस्क (26+)
-- **सामग्री मॉडरेशन**: `mistral-moderation-2603` (Mistral Moderation 2) 11 उपलब्ध श्रेणियों के साथ, बच्चे/किशोर के लिए डिफ़ॉल्ट रूप से 5 ब्लॉक (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`)। सेटिंग्स में प्रति प्रोफ़ाइल अनुकूलन योग्य श्रेणियाँ; Moderation 2 ने पुरानी श्रेणी « खतरनाक सामग्री » को `dangerous` + `criminal` में विभाजित किया (मौजूदा प्रोफ़ाइल स्वचालित रूप से माइग्रेट होते हैं, और ब्लॉक श्रेणियाँ पहले से इंपोर्ट किए गए स्रोतों पर भी लागू होती हैं)। डिफ़ॉल्ट सुरक्षा: यदि मॉडल का उत्तर ब्लॉक श्रेणी की जाँच की अनुमति नहीं देता, तो सामग्री अस्वीकृत होती है (« मॉडरेशन अनुपलब्ध »); सक्रिय मॉडरेशन के साथ, जनरेशन और चैट दोनों फ्लैग किए गए, त्रुटि वाले या जाँच में चल रहे स्रोतों को हटा देते हैं (मॉडरेशन अक्षम करके इंपोर्ट किया गया स्रोत फिर से जाँचा नहीं जाता)। `helpers/moderation-model.ts` में दिनांकित Id पिन किया गया: एलियास `-latest`, अप्रचलित, अब API द्वारा सूचीबद्ध नहीं।
-- **अभिभावकीय PIN**: SHA-256 हैश, 15 वर्ष से कम प्रोफ़ाइल के लिए आवश्यक। प्रोडक्शन डिप्लॉयमेंट के लिए, नमक के साथ धीमा हैश (Argon2id, bcrypt) की योजना बनाएँ।
-- **चैट प्रतिबंध**: 16 वर्ष से कम के लिए AI चैट डिफ़ॉल्ट रूप से अक्षम, माता-पिता द्वारा सक्रिय करने योग्य
+- **सामग्री मॉडरेशन**: `mistral-moderation-2603` (Mistral Moderation 2) 10 उपलब्ध श्रेणियों के साथ, जिनमें से 5 बच्चे/किशोर के लिए डिफ़ॉल्ट रूप से ब्लॉक हैं (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`)। सेटिंग्स में प्रति प्रोफ़ाइल अनुकूलन योग्य श्रेणियाँ। `-latest` उपनाम जानबूझकर टाला गया है (यह अभी भी एक deprecated संस्करण की ओर इशारा करता है)।
+- **अभिभावकीय PIN**: SHA-256 हैश, 15 वर्ष से कम आयु की प्रोफ़ाइल के लिए आवश्यक। production deployment के लिए, नमक के साथ एक धीमा हैश (Argon2id, bcrypt) अपनाएँ।
+- **चैट प्रतिबंध**: 16 वर्ष से कम के लिए AI चैट डिफ़ॉल्ट रूप से निष्क्रिय, माता-पिता द्वारा सक्रिय की जा सकती है
 
-### मल्टी-प्रोफ़ाइल सिस्टम
+### बहु-प्रोफ़ाइल प्रणाली
 
-- नाम, उम्र, अवतार, भाषा प्राथमिकताओं के साथ कई प्रोफ़ाइल
-- **प्रति प्रोफ़ाइल आवाज़** (`Profile.mistralVoices?: { host?, guest? }` — प्रत्येक भूमिका वैकल्पिक है) — प्रत्येक बच्चे की अपनी पॉडकास्ट/वोकल क्विज़ आवाज़ जोड़ी हो सकती है
-- **प्रति प्रोफ़ाइल थीम** (`Profile.theme: 'dark' | 'light'`) — प्रोफ़ाइल बदलने पर स्वचालित स्विच, बैकएंड पर संग्रहीत
-- `profileId` के माध्यम से प्रोफ़ाइल से जुड़े प्रोजेक्ट
-- कैस्केड डिलीट: प्रोफ़ाइल हटाने से उसके सभी प्रोजेक्ट हट जाते हैं
+- नाम, आयु, अवतार, भाषा प्राथमिकताओं के साथ कई प्रोफ़ाइल
+- **प्रति प्रोफ़ाइल आवाज़ें** (`Profile.mistralVoices?: { host?, guest? }` — प्रत्येक भूमिका वैकल्पिक है) — हर बच्चे के पास अपनी पॉडकास्ट/मौखिक क्विज़ आवाज़ जोड़ी हो सकती है
+- **प्रति प्रोफ़ाइल थीम** (`Profile.theme: 'dark' | 'light'`) — प्रोफ़ाइल बदलने पर स्वतः स्विच, backend में स्थायी
+- `profileId` के माध्यम से प्रोफ़ाइलों से जुड़े प्रोजेक्ट
+- कैस्केड हटाना: किसी प्रोफ़ाइल को हटाने पर उसके सभी प्रोजेक्ट हट जाते हैं
 
 ### API लागत ट्रैकिंग
 
-प्रत्येक बिल योग्य Mistral कॉल (चैट, OCR, STT, TTS, एजेंट) उपयोगकर्ता को € अनुमान **पारदर्शी** देने के लिए इंस्ट्रूमेंटेड है। मुफ़्त मॉडरेशन गिनी नहीं जाती। ज्ञात सीमा: एजेंट टूल शुल्क (वेब खोज 30 $/1000 कॉल, छवि जनरेशन 100 $/1000 छवियाँ) अभी गिने नहीं जाते — चित्रण की प्रदर्शित लागत कम आँकी गई है।
+हर Mistral कॉल (चैट, OCR, STT, TTS, मॉडरेशन, एजेंट्स) को उपयोगकर्ता को एक **पारदर्शी** € अनुमान देने के लिए instrument किया गया है — बिलिंग में कोई आश्चर्य नहीं।
 
-- **सत्य का स्रोत**: `helpers/pricing.ts` — मॉडल प्रीफ़िक्स के अनुसार `MODEL_PRICING` (उदा.: `mistral-large` → इनपुट 0.5 €/M टोकन, आउटपुट 1.5 €/M टोकन), आवधिक पुनः-स्क्रैपिंग के लिए Mistral डॉक URL के साथ `PRICING_SOURCES`
-- **समर्थित इकाइयाँ**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — `helpers/cost-calc.ts` द्वारा संचालित रूपांतरण
-- **इंस्ट्रूमेंटेशन श्रृंखला**: `helpers/tracked-client.ts` (Mistral क्लाइंट रैप) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (HTTP प्रतिक्रिया में इंजेक्शन)
-- **UI**: प्रति जनरेशन लागत बैज (`src/partials/cost-badge-gen.html`), प्रति स्रोत (`cost-badge-src.html`), डैशबोर्ड में संचयी कुल (`Project.totalCost`)
-- **Endpoints**: `/generate/*` और `/sources/*` प्रतिक्रियाएँ लौटाए गए ऑब्जेक्ट (Generation / Source) को `estimatedCost`, `usage` और `costBreakdown` से सजाती हैं। `POST /generate/route` केवल रूटिंग लागत के लिए `costDelta: number` फ़ील्ड जोड़ता है। `GET /projects/:pid` `totalCost` से समृद्ध प्रोजेक्ट लौटाता है (`costLog[]` से गणना की गई योग) + पूर्ण इतिहास
+- **सत्य स्रोत**: `helpers/pricing.ts` — मॉडल prefix द्वारा `MODEL_PRICING` (उदाहरण: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` जिसमें आवधिक पुनः-स्क्रैपिंग के लिए Mistral डॉक URLs शामिल हैं
+- **समर्थित इकाइयाँ**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — `helpers/cost-calc.ts` द्वारा नियंत्रित रूपांतरण
+- **इंस्ट्रूमेंटेशन श्रृंखला**: `helpers/tracked-client.ts` (Mistral client wrap) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (HTTP response में injection)
+- **UI**: प्रति जनरेशन लागत बैज (`src/partials/cost-badge-gen.html`), प्रति स्रोत (`cost-badge-src.html`), डैशबोर्ड में कुल संचयी (`Project.totalCost`)
+- **Endpoints**: `/generate/*` और `/sources/*` प्रतिक्रियाएँ लौटाए गए ऑब्जेक्ट (Generation / Source) को `estimatedCost`, `usage` और `costBreakdown` के साथ सजाती हैं। `POST /generate/route` राउटिंग की केवल लागत के लिए `costDelta: number` फ़ील्ड जोड़ता है। `GET /projects/:pid` `totalCost` (जो `costLog[]` से गणना किए गए योग के साथ) + पूर्ण इतिहास वाला समृद्ध project लौटाता है
 
 ### TTS (Mistral Voxtral) और कस्टम आवाज़ें
 
-- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100% Mistral वॉयस सिंथेसिस, कोई अतिरिक्त कुंजी आवश्यक नहीं
-- **कस्टम आवाज़ें**: माता-पिता Mistral Voices API के माध्यम से (ऑडियो नमूने से) अपनी आवाज़ें बना सकते हैं और उन्हें होस्ट/अतिथि भूमिकाओं को असाइन कर सकते हैं — तब पॉडकास्ट और वोकल क्विज़ माता-पिता की आवाज़ में पढ़े जाते हैं, जिससे बच्चे के लिए अनुभव और भी अधिक इमर्सिव बनता है
-- दो कॉन्फ़िगर करने योग्य वॉयस भूमिकाएँ: **होस्ट** (मुख्य कथावाचक) और **अतिथि** (पॉडकास्ट की दूसरी आवाज़)
-- सेटिंग्स में उपलब्ध Mistral आवाज़ों की पूर्ण सूची, भाषा के अनुसार फ़िल्टर करने योग्य
-### अंतरराष्ट्रीयकरण
+- **Mistral Voxtral TTS**: `voxtral-mini-tts-latest`, 100% Mistral वॉइस सिंथेसिस, किसी अतिरिक्त कुंजी की आवश्यकता नहीं
+- **कस्टम आवाज़ें**: माता-पिता Mistral Voices API (एक ऑडियो सैंपल से) के माध्यम से अपनी खुद की आवाज़ें बना सकते हैं और उन्हें host/guest भूमिकाओं को असाइन कर सकते हैं — तब पॉडकास्ट और मौखिक क्विज़ माता-पिता की आवाज़ में पढ़े जाते हैं, जिससे अनुभव बच्चे के लिए और भी अधिक immersive बन जाता है
+- दो कॉन्फ़िगर करने योग्य वॉइस भूमिकाएँ: **host** (मुख्य कथावाचक) और **guest** (पॉडकास्ट की दूसरी आवाज़)
+- सेटिंग्स में Mistral आवाज़ों का पूरा कैटलॉग उपलब्ध है, भाषा के अनुसार फ़िल्टर करने योग्य
 
-- इंटरफ़ेस 9 भाषाओं में उपलब्ध : fr, en, es, pt, it, nl, de, hi, ar
-- IA प्रॉम्प्ट 15 भाषाओं का समर्थन करते हैं (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
-- भाषा प्रोफ़ाइल के अनुसार कॉन्फ़िगर करने योग्य
+### अंतर्राष्ट्रीयकरण
+
+- इंटरफ़ेस 9 भाषाओं में उपलब्ध: fr, en, es, pt, it, nl, de, hi, ar
+- AI प्रॉम्प्ट्स 15 भाषाओं का समर्थन करते हैं (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
+- भाषा प्रति प्रोफ़ाइल कॉन्फ़िगर करने योग्य
 
 ---
-
 ## तकनीकी स्टैक
 
 | परत | तकनीक | भूमिका |
 |---|---|---|
-| **Runtime** | Node.js + TypeScript 6.x | सर्वर और प्रकार की सुरक्षा |
-| **Backend** | Express 5.x | API REST |
-| **डेव सर्वर** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars partials, proxy |
-| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | प्रतिक्रियाशील इंटरफ़ेस, TypeScript Vite द्वारा संकलित |
-| **Templating** | vite-plugin-handlebars | partials द्वारा HTML संयोजन |
-| **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, मॉडरेशन |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, एकीकृत वाक् संश्लेषण |
+| **Runtime** | Node.js + TypeScript 6.x | सर्वर और टाइप सुरक्षा |
+| **Backend** | Express 5.x | REST API |
+| **विकास सर्वर** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars partials, proxy |
+| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | प्रतिक्रियाशील इंटरफ़ेस, Vite द्वारा संकलित TypeScript |
+| **Templating** | vite-plugin-handlebars | partials के माध्यम से HTML संयोजन |
+| **IA** | Mistral AI SDK 2.x | चैट, OCR, STT, TTS, एजेंट, मॉडरेशन |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, एकीकृत वॉयस सिंथेसिस |
 | **आइकन** | Lucide 1.x | SVG आइकन लाइब्रेरी |
-| **वेब स्क्रैपिंग** | Readability + linkedom | वेब पेजों की मुख्य सामग्री निकालना (Firefox Reader View तकनीक) |
-| **Headless browser** | Lightpanda | JS/SPA पेजों के लिए अति-हल्का headless ब्राउज़र (Zig + V8) — स्क्रैपिंग fallback |
+| **वेब स्क्रैपिंग** | Readability + linkedom | वेब पेजों की मुख्य सामग्री का निष्कर्षण (Firefox Reader View तकनीक) |
+| **हेडलेस ब्राउज़र** | Lightpanda | JS/SPA पेजों के लिए अल्ट्रा-लाइट headless browser (Zig + V8) — scraping fallback |
 | **Markdown** | Marked | चैट में markdown रेंडरिंग |
-| **फ़ाइल अपलोड** | Multer 2.x | multipart फ़ॉर्म प्रबंधन |
+| **फ़ाइल अपलोड** | Multer 2.x | multipart फ़ॉर्मों का प्रबंधन |
 | **ऑडियो** | ffmpeg-static | ऑडियो खंडों का संयोजन |
-| **टेस्ट** | Vitest | यूनिट टेस्ट — SonarCloud द्वारा मापी गई कवरेज |
-| **Persistence** | JSON फ़ाइलें | बिना निर्भरता का भंडारण |
+| **परीक्षण** | Vitest | यूनिट परीक्षण — SonarCloud द्वारा मापी गई कवरेज |
+| **स्थायित्व** | JSON फ़ाइलें | बिना निर्भरता वाला भंडारण |
 
 ---
 
@@ -239,17 +239,17 @@ EurekAI 4 प्रकार के स्रोत स्वीकार कर
 
 | मॉडल | उपयोग | क्यों |
 |---|---|---|
-| `mistral-large-latest` | शीट, Flashcards, Podcast, Quiz, रिक्त स्थान वाले पाठ, Chat, मौखिक quiz सत्यापन, Agent Image, Agent Web Search, निर्देश पहचान | सर्वश्रेष्ठ multilingual + निर्देश अनुसरण |
-| `mistral-ocr-4-0` (OCR 4, डिफ़ॉल्ट) | दस्तावेज़ OCR — श्रेष्ठ गुणवत्ता | मुद्रित पाठ, तालिकाएँ, हस्तलेख ($4 / 1000 पृष्ठ) |
-| `mistral-ocr-2512` (OCR 3, विकल्प) | दस्तावेज़ OCR | सेटिंग्स में चयन योग्य, सस्ता ($2 / 1000 पृष्ठ) |
+| `mistral-large-latest` | शीट, Flashcards, Podcast, Quiz, क्लोज़ टेक्स्ट, Chat, मौखिक क्विज़ सत्यापन, इमेज एजेंट, वेब सर्च एजेंट, निर्देश पहचान | सर्वोत्तम multilingual + निर्देशों का पालन |
+| `mistral-ocr-4-0` (OCR 4, डिफ़ॉल्ट) | दस्तावेज़ OCR — बेहतर गुणवत्ता | मुद्रित पाठ, तालिकाएँ, हस्तलिखित लेखन ($4 / 1000 पृष्ठ) |
+| `mistral-ocr-2512` (OCR 3, विकल्प) | दस्तावेज़ OCR | सेटिंग्स में चुना जा सकता है, सस्ता ($2 / 1000 पृष्ठ) |
 | `voxtral-mini-latest` | वाक् पहचान (STT) | बहुभाषी STT, `language="fr"` के साथ अनुकूलित |
-| `voxtral-mini-tts-latest` | वाक् संश्लेषण (TTS) | Podcasts, मौखिक quiz, ज़ोर से पढ़ना |
-| `mistral-moderation-2603` | सामग्री मॉडरेशन | बच्चे/किशोर के लिए 5 अवरुद्ध श्रेणियाँ (जिनमें `jailbreaking`) |
-| `mistral-small-latest` | स्वचालित राउटर | रूटिंग निर्णयों के लिए सामग्री का तेज़ विश्लेषण |
+| `voxtral-mini-tts-latest` | वाक् संश्लेषण (TTS) | Podcasts, मौखिक क्विज़, ज़ोर से पढ़ना |
+| `mistral-moderation-2603` | सामग्री मॉडरेशन | बच्चों/किशोरों के लिए 5 अवरुद्ध श्रेणियाँ (जिसमें `jailbreaking` शामिल) |
+| `mistral-small-latest` | स्वचालित राउटर | रूटिंग निर्णयों के लिए सामग्री का त्वरित विश्लेषण |
 
 ---
 
-## त्वरित आरंभ
+## त्वरित शुरुआत
 
 ```bash
 # Cloner le dépôt
@@ -271,29 +271,29 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **नोट** : Mistral Voxtral TTS एकमात्र TTS provider है — `MISTRAL_API_KEY` से परे कोई अतिरिक्त कुंजी आवश्यक नहीं।
+> **नोट** : Mistral Voxtral TTS एकमात्र TTS provider है — `MISTRAL_API_KEY` के अलावा किसी अतिरिक्त key की आवश्यकता नहीं।
 
-> **उपयोगकर्ता द्वारा दर्ज API कुंजी** : `MISTRAL_API_KEY` अब **वैकल्पिक** है। यदि यह अनुपस्थित हो, तो ऐप फिर भी शुरू होता है और प्रत्येक उपयोगकर्ता को इंटरफ़ेस में **अपनी स्वयं की Mistral कुंजी** दर्ज करने के लिए आमंत्रित करता है। कुंजी **ब्राउज़र में संग्रहीत** होती है (सुरक्षित संदर्भ में Web Crypto + IndexedDB के माध्यम से एन्क्रिप्टेड) और प्रति अनुरोध भेजी जाती है — **सर्वर पर कभी संग्रहीत नहीं**। प्राथमिकता : प्रोफ़ाइल कुंजी > वैश्विक ब्राउज़र कुंजी > `MISTRAL_API_KEY` (env)। `EUREKAI_REQUIRE_USER_KEY=true` परिभाषित करने पर प्रत्येक उपयोगकर्ता को अपनी कुंजी देनी होती है (env कुंजी केवल प्रीलोड के लिए रह जाती है)।
+> **उपयोगकर्ता द्वारा दर्ज API कुंजी** : `MISTRAL_API_KEY` अब **वैकल्पिक** है। यदि यह अनुपस्थित है, तो ऐप फिर भी शुरू होता है और हर उपयोगकर्ता को इंटरफ़ेस में **अपनी Mistral कुंजी** दर्ज करने के लिए कहता है। कुंजी **ब्राउज़र में संग्रहीत** होती है (सुरक्षित संदर्भ में Web Crypto + IndexedDB के माध्यम से एन्क्रिप्टेड) और अनुरोध के माध्यम से भेजी जाती है — **कभी भी सर्वर पर स्थायी रूप से नहीं रखी जाती**। प्राथमिकता: प्रोफ़ाइल कुंजी > वैश्विक ब्राउज़र कुंजी > `MISTRAL_API_KEY` (env). `EUREKAI_REQUIRE_USER_KEY=true` सेट करने से हर उपयोगकर्ता को अपनी कुंजी प्रदान करनी पड़ती है (env कुंजी अब केवल प्रीलोड के लिए रहती है)।
 
-> **स्थानीय HTTPS (टैबलेट/LAN)** : `localhost` पहले से एक सुरक्षित संदर्भ है। LAN पहुँच (टैबलेट) के लिए, स्थानीय प्रमाणपत्र बनाएँ और ब्राउज़र एन्क्रिप्शन अनलॉक करने तथा ट्रांज़िट में कुंजी एन्क्रिप्ट करने हेतु HTTPS सक्रिय करें :
+> **स्थानीय HTTPS (टैबलेट/LAN)** : `localhost` पहले से ही एक सुरक्षित संदर्भ है। LAN एक्सेस (टैबलेट) के लिए, एक स्थानीय प्रमाणपत्र जनरेट करें और HTTPS सक्रिय करें ताकि ब्राउज़र एन्क्रिप्शन अनलॉक हो सके + कुंजी को ट्रांज़िट में एन्क्रिप्ट किया जा सके:
 > ```bash
-> ./scripts/gen-cert.sh 192.168.1.42   # mkcert si dispo, sinon openssl self-signed
+> ./scripts/gen-cert.sh 192.168.1.42   # mkcert यदि उपलब्ध हो, अन्यथा openssl self-signed
 > export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
 > npm run dev                          # Express + Vite en HTTPS
 > ```
 
 ### पर्यावरण चर
 
-| चर | आवश्यक | डिफ़ॉल्ट | भूमिका |
+| Variable | Requis | Défaut | भूमिका |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | वैकल्पिक | — | Mistral API कुंजी (chat, OCR, STT, TTS Voxtral, agents, मॉडरेशन)। यदि अनुपस्थित हो, तो उपयोगकर्ता ऐप में अपनी कुंजी दर्ज करता है (ब्राउज़र में संग्रहीत, कभी सर्वर पर नहीं) |
-| `EUREKAI_REQUIRE_USER_KEY` | वैकल्पिक | `false` | `true` → IA अनुरोधों के लिए `MISTRAL_API_KEY` पर fallback अक्षम करता है (प्रत्येक उपयोगकर्ता को अपनी कुंजी देनी **होगी**)। उजागर इंस्टेंस पर उपयोगी |
-| `HTTPS_KEY` / `HTTPS_CERT` | वैकल्पिक | — | TLS कुंजी/प्रमाणपत्र पथ (देखें `scripts/gen-cert.sh`) → Express और Vite HTTPS पर सेवा देते हैं (LAN/टैबलेट secure context) |
-| `PORT` | वैकल्पिक | `3000` | Express backend का HTTP पोर्ट |
-| `NODE_ENV` | वैकल्पिक | `development` | यदि `production` → Express frontend को `dist/` से परोसता है (अन्यथा `public/`) |
-| `SONAR_TOKEN` | वैकल्पिक CI | — | केवल GitHub Actions SonarCloud वर्कफ़्लो द्वारा उपयोग |
+| `MISTRAL_API_KEY` | वैकल्पिक | — | Mistral API कुंजी (chat, OCR, STT, TTS Voxtral, एजेंट, मॉडरेशन)। यदि अनुपस्थित हो, तो उपयोगकर्ता ऐप में अपनी कुंजी दर्ज करता है (ब्राउज़र में संग्रहीत, कभी सर्वर पर नहीं) |
+| `EUREKAI_REQUIRE_USER_KEY` | वैकल्पिक | `false` | `true` → IA अनुरोधों के लिए `MISTRAL_API_KEY` पर fallback को निष्क्रिय करता है (हर उपयोगकर्ता को अपनी कुंजी देनी होगी)। उजागर instance पर उपयोगी |
+| `HTTPS_KEY` / `HTTPS_CERT` | वैकल्पिक | — | TLS key/cert के पथ (cf. `scripts/gen-cert.sh`) → Express और Vite HTTPS में सेवा देते हैं (secure context LAN/tablette) |
+| `PORT` | वैकल्पिक | `3000` | Backend Express का HTTP पोर्ट |
+| `NODE_ENV` | वैकल्पिक | `development` | यदि `production` → Express frontend को `dist/` से सेवा देता है (अन्यथा `public/`) |
+| `SONAR_TOKEN` | वैकल्पिक CI | — | केवल GitHub Actions SonarCloud workflow द्वारा उपयोग किया जाता है |
 
-### टेस्ट, कोड गुणवत्ता और योगदान
+### परीक्षण, कोड गुणवत्ता और योगदान
 
 ```bash
 npm test                # vitest (déclenche pretest : typecheck + lint:complexity + lint:ci + lint:deadcode)
@@ -304,9 +304,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git Hooks (Husky)** : `pre-commit` क्रम में `scripts/pre-commit-fast.sh` (संघर्ष, बड़ी फ़ाइलें, shellcheck), फिर `lint-staged`, फिर `npm test` चलाता है ; `pre-push` पहले एक `npm audit` गेट चलाता है (पारंपरिक महत्वपूर्ण भेद्यता पर अवरुद्ध करता है, देखें `scripts/audit-verdict.mjs`) फिर `npm run security`। विफलता पर सभी commit/push अवरुद्ध करते हैं।
+**Git hooks (Husky)** : `pre-commit` क्रमशः `scripts/pre-commit-fast.sh` (conflicts, बड़े फ़ाइलें, shellcheck), `lint-staged` और फिर `npm test` चलाता है; `pre-push` पहले एक `npm audit` gate चलाता है (गंभीर transitive vulnerability पर रोक, cf. `scripts/audit-verdict.mjs`) फिर `npm run security`। असफल होने पर सभी commit/push को रोकते हैं।
 
-**आवश्यक बाहरी उपकरण (वैकल्पिक लेकिन `pretest` / `npm run security` द्वारा उपयोग)** :
+**आवश्यक बाहरी उपकरण (वैकल्पिक, लेकिन `pretest` / `npm run security` द्वारा उपयोग किए जाते हैं)** :
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -316,13 +316,13 @@ pipx install lizard          # ou : pipx run lizard
 ./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
 ```
 
-इन उपकरणों के बिना, `npm test` `pretest` पर विफल होता है (lizard अनुपस्थित) और `npm run security` विफल होता है (opengrep अनुपस्थित)। तब husky hooks commit/push अवरुद्ध करते हैं।
+इन उपकरणों के बिना, `npm test` `pretest` पर असफल होता है (lizard अनुपलब्ध) और `npm run security` असफल होता है (opengrep अनुपलब्ध)। तब husky hooks commit/push को रोक देते हैं।
 
 ---
 
 ## कंटेनर के साथ परिनियोजन
 
-छवि **GitHub Container Registry** पर प्रकाशित है :
+इमेज **GitHub Container Registry** पर प्रकाशित की जाती है :
 
 ```bash
 # Télécharger l'image
@@ -338,7 +338,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`** एक Podman rootless flag है जो वॉल्यूम अनुमतियों को स्वचालित रूप से समायोजित करता है।
+> **`:U`** एक Podman rootless flag है जो volume की permissions को स्वचालित रूप से समायोजित करता है।
 
 ```bash
 # Build local
@@ -350,7 +350,7 @@ podman build -t eurekai -f Containerfile .
 
 ---
 
-## प्रोजेक्ट संरचना
+## परियोजना संरचना
 
 ```
 server.ts                 — Point d'entrée Express, monte les routes + config
@@ -404,9 +404,6 @@ helpers/
   dictation-diff.ts       — Comparaison stricte lettre à lettre pour la correction de dictée (local, zéro coût IA)
   reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
   ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
-  moderation-model.ts     — Modèle de modération épinglé + ses 11 catégories + migration des catégories legacy
-  moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours)
-  chat-sources.ts         — Sources accessibles au chat (sans les sources non vérifiées si la modération est active)
 
   # Codes d'erreur stables
   error-codes.ts              — Re-export mince de l'API publique
@@ -478,120 +475,120 @@ scripts/                  — Tooling : check-deps, check-models, check-security
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **IA योगदानकर्ताओं के लिए** : विस्तृत आर्किटेक्चर संदर्भ, अनिवार्य नियम (anti-leak prompts, त्रुटि कोड, cost tracking) और ज्ञात जाल (Lizard CCN, Opengrep, Codacy/Semgrep माइग्रेशन) के लिए [`CLAUDE.md`](CLAUDE.md) देखें।
+> **AI योगदानकर्ताओं के लिए** : विस्तृत वास्तुकला संदर्भ, अनिवार्य नियम (anti-leak prompts, error codes, cost tracking) और ज्ञात pitfalls (Lizard CCN, Opengrep, Codacy/Semgrep migration) के लिए [`CLAUDE.md`](CLAUDE.md) देखें।
 
 ---
 
 ## API संदर्भ
 
-### Config
+### कॉन्फ़िग
 | विधि | Endpoint | विवरण |
 |---|---|---|
 | `GET` | `/api/config` | वर्तमान कॉन्फ़िगरेशन |
-| `PUT` | `/api/config` | कॉन्फ़िग संशोधित करें (मॉडल, आवाज़ें, TTS मॉडल) |
-| `GET` | `/api/config/status` | API स्थिति : `mistral` (Mistral कुंजी परिभाषित), `ttsAvailable` (`mistral` का alias, Mistral Voxtral एकमात्र TTS provider है) |
-| `POST` | `/api/config/reset` | डिफ़ॉल्ट कॉन्फ़िग रीसेट करें |
+| `PUT` | `/api/config` | कॉन्फ़िगरेशन बदलें (मॉडल, आवाज़, TTS मॉडल) |
+| `GET` | `/api/config/status` | APIs की स्थिति: `mistral` (Mistral कुंजी परिभाषित), `ttsAvailable` (`mistral` का उपनाम, Mistral Voxtral ही एकमात्र TTS provider है) |
+| `POST` | `/api/config/reset` | डिफ़ॉल्ट कॉन्फ़िगरेशन रीसेट करें |
 | `GET` | `/api/config/voices` | Mistral TTS आवाज़ें सूचीबद्ध करें (वैकल्पिक `?lang=fr`) |
-| `GET` | `/api/moderation-categories` | उपलब्ध मॉडरेशन श्रेणियाँ + आयु अनुसार डिफ़ॉल्ट |
-| `POST` | `/api/providers/mistral/validate` | उपयोगकर्ता द्वारा दर्ज Mistral कुंजी मान्य करें — हमेशा 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), कोई env fallback नहीं |
+| `GET` | `/api/moderation-categories` | उपलब्ध मॉडरेशन श्रेणियाँ + उम्र के अनुसार डिफ़ॉल्ट |
+| `POST` | `/api/providers/mistral/validate` | उपयोगकर्ता द्वारा दर्ज Mistral कुंजी को मान्य करें — हमेशा 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), env fallback नहीं |
 
 ### प्रोफ़ाइल
 | विधि | Endpoint | विवरण |
 |---|---|---|
 | `GET` | `/api/profiles` | सभी प्रोफ़ाइल सूचीबद्ध करें |
-| `POST` | `/api/profiles` | प्रोफ़ाइल बनाएँ |
-| `PUT` | `/api/profiles/:id` | प्रोफ़ाइल संशोधित करें (< 15 वर्ष के लिए PIN आवश्यक) |
-| `DELETE` | `/api/profiles/:id` | प्रोफ़ाइल हटाएँ + प्रोजेक्ट cascade `{pin?}` → `{ok, deletedProjects}` |
+| `POST` | `/api/profiles` | एक प्रोफ़ाइल बनाएँ |
+| `PUT` | `/api/profiles/:id` | एक प्रोफ़ाइल संशोधित करें (15 वर्ष से कम के लिए PIN आवश्यक) |
+| `DELETE` | `/api/profiles/:id` | प्रोफ़ाइल हटाएँ + cascade projects `{pin?}` → `{ok, deletedProjects}` |
 
-### प्रोजेक्ट
+### परियोजनाएँ
 | विधि | Endpoint | विवरण |
 |---|---|---|
-| `GET` | `/api/projects` | प्रोजेक्ट सूचीबद्ध करें (वैकल्पिक `?profileId=`) |
-| `POST` | `/api/projects` | प्रोजेक्ट बनाएँ `{name, profileId}` |
-| `GET` | `/api/projects/:pid` | प्रोजेक्ट विवरण |
-| `PUT` | `/api/projects/:pid` | नाम बदलें `{name}` |
-| `DELETE` | `/api/projects/:pid` | प्रोजेक्ट हटाएँ |
-| `GET` | `/api/projects/:pid/events` | जनरेशन संक्रमणों का वास्तविक समय SSE प्रवाह (`event: generation`) (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
+| `GET` | `/api/projects` | परियोजनाएँ सूचीबद्ध करें (`?profileId=` वैकल्पिक) |
+| `POST` | `/api/projects` | एक `{name, profileId}` परियोजना बनाएँ |
+| `GET` | `/api/projects/:pid` | परियोजना विवरण |
+| `PUT` | `/api/projects/:pid` | `{name}` का नाम बदलें |
+| `DELETE` | `/api/projects/:pid` | परियोजना हटाएँ |
+| `GET` | `/api/projects/:pid/events` | जनरेशन transitions का real-time SSE stream (`event: generation`) (`completed`/`failed`/`cancelled`) + heartbeat keep-alive |
 
 ### स्रोत
 | विधि | Endpoint | विवरण |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | multipart फ़ाइल आयात (JPG/PNG/PDF के लिए OCR, TXT/MD के लिए सीधा पठन) |
+| `POST` | `/api/projects/:pid/sources/upload` | multipart फ़ाइलें आयात करें (JPG/PNG/PDF के लिए OCR, TXT/MD के लिए सीधे पढ़ना) |
 | `POST` | `/api/projects/:pid/sources/text` | मुक्त पाठ `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | STT आवाज़ (multipart ऑडियो) |
-| `POST` | `/api/projects/:pid/sources/websearch` | URL स्क्रैपिंग या वेब खोज `{query}` — स्रोतों की सूची लौटाता है |
-| `DELETE` | `/api/projects/:pid/sources/:sid` | स्रोत हटाएँ |
-| `POST` | `/api/projects/:pid/moderate` | मॉडरेट करें `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | पुनरीक्षण निर्देश पहचानें |
+| `POST` | `/api/projects/:pid/sources/voice` | STT आवाज़ (audio multipart) |
+| `POST` | `/api/projects/:pid/sources/websearch` | URL scraping या वेब खोज `{query}` — स्रोतों की एक तालिका लौटाता है |
+| `DELETE` | `/api/projects/:pid/sources/:sid` | एक स्रोत हटाएँ |
+| `POST` | `/api/projects/:pid/moderate` | `{text}` को मॉडरेट करें |
+| `POST` | `/api/projects/:pid/detect-consigne` | पुनरीक्षण निर्देशों का पता लगाएँ |
 
 ### जनरेशन
 | विधि | Endpoint | विवरण |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generate/summary` | पुनरीक्षण शीट |
 | `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
-| `POST` | `/api/projects/:pid/generate/quiz` | MCQ Quiz |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | रिक्त स्थान वाले पाठ |
-| `POST` | `/api/projects/:pid/generate/dictation` | श्रुतलेख (शब्द + उदाहरण वाक्य + नियम, प्रति शब्द 1 TTS ऑडियो ; auto-router द्वारा भी प्रस्तावित) |
+| `POST` | `/api/projects/:pid/generate/quiz` | QCM Quiz |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | क्लोज़ टेक्स्ट |
+| `POST` | `/api/projects/:pid/generate/dictation` | श्रुतलेख (शब्द + उदाहरण वाक्य + नियम, प्रति शब्द 1 TTS audio; auto-router द्वारा भी प्रस्तावित) |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | चित्रण |
-| `POST` | `/api/projects/:pid/generate/quiz-vocal` | मौखिक quiz |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | अनुकूलनशील पुनरीक्षण `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/remediation-summary` | किसी quiz की गलत प्रश्नों पर लक्षित स्मरण शीट `{generationId, weakQuestions}` — « अपनी गलतियों पर अभ्यास करूँ » बटन द्वारा `quiz-review` के समानांतर बुलाई जाती है |
-| `POST` | `/api/projects/:pid/generate/route` | रूटिंग विश्लेषण (चालू करने वाले जनरेटरों की योजना) — `{plan, costDelta}` लौटाता है (केवल रूटिंग लागत) |
-| `POST` | `/api/projects/:pid/generate/auto` | स्वचालित backend जनरेशन (रूटिंग + 8 प्रकार : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation)। समानांतर निष्पादन — rate-limit ≥ 8 एक साथ अनुरोध वाले Mistral tier की अपेक्षा ; अन्यथा कई 429 `failedSteps` में आ सकते हैं। |
+| `POST` | `/api/projects/:pid/generate/quiz-vocal` | मौखिक क्विज़ |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | अनुकूली पुनरीक्षण `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/remediation-summary` | एक quiz की छूटी हुई questions पर केंद्रित रिमाइंडर शीट `{generationId, weakQuestions}` — “मेरी गलतियों पर अभ्यास करें” बटन द्वारा `quiz-review` के साथ समानांतर में कॉल की जाती है |
+| `POST` | `/api/projects/:pid/generate/route` | रूटिंग विश्लेषण (चलाने वाले generators की योजना) — `{plan, costDelta}` लौटाता है (केवल routing cost) |
+| `POST` | `/api/projects/:pid/generate/auto` | backend auto-generation (routing + 8 प्रकार: summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). समानांतर निष्पादन — ≥ 8 समकालिक अनुरोधों की rate-limit वाले Mistral tier की अपेक्षा करता है; अन्यथा कई 429 `failedSteps` में ऊपर आ सकते हैं। |
 
-सभी जनरेशन रूट `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` स्वीकार करते हैं। `quiz-review` और `remediation-summary` अतिरिक्त रूप से `{generationId, weakQuestions}` की अपेक्षा करते हैं।
+सभी जनरेशन routes `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` स्वीकार करते हैं। `quiz-review` और `remediation-summary` अतिरिक्त रूप से `{generationId, weakQuestions}` की आवश्यकता रखते हैं।
 
 ### CRUD जनरेशन
 | विधि | Endpoint | विवरण |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | quiz उत्तर जमा करें `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | रिक्त स्थान वाले पाठ के उत्तर जमा करें `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | क्लोज़ टेक्स्ट उत्तर जमा करें `{answers}` |
 | `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | श्रुतलेख उत्तर जमा करें `{answers}` (सख्त सर्वर स्कोर) |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | मौखिक उत्तर सत्यापित करें (ऑडियो + questionIndex) |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | ज़ोर से TTS पठन (शीट/flashcards) |
-| `POST` | `/api/projects/:pid/generations/:gid/cancel` | चल रही जनरेशन रद्द करें (pending रद्द करने का एकमात्र मार्ग) |
-| `PUT` | `/api/projects/:pid/generations/:gid` | नाम बदलें `{title}` |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | जनरेशन हटाएँ |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | मौखिक उत्तर सत्यापित करें (audio + questionIndex) |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS को ज़ोर से पढ़ें (शीट/flashcards) |
+| `POST` | `/api/projects/:pid/generations/:gid/cancel` | चल रही generation रद्द करें (pending को रद्द करने का एकमात्र मार्ग) |
+| `PUT` | `/api/projects/:pid/generations/:gid` | `{title}` का नाम बदलें |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | generation हटाएँ |
 
-### Chat
+### चैट
 | विधि | Endpoint | विवरण |
 |---|---|---|
 | `GET` | `/api/projects/:pid/chat` | चैट इतिहास प्राप्त करें |
-| `POST` | `/api/projects/:pid/chat` | संदेश भेजें `{message, lang, ageGroup}` |
+| `POST` | `/api/projects/:pid/chat` | एक संदेश भेजें `{message, lang, ageGroup}` |
 | `DELETE` | `/api/projects/:pid/chat` | चैट इतिहास साफ़ करें |
 
 ---
 
-## आर्किटेक्चरल निर्णय
+## वास्तु निर्णय
 
 | निर्णय | औचित्य |
 |---|---|
-| **React/Vue के स्थान पर Alpine.js** | न्यूनतम पदचिह्न, Vite द्वारा संकलित TypeScript के साथ हल्की प्रतिक्रियाशीलता। हैकथॉन के लिए आदर्श जहाँ गति मायने रखती है। |
-| **JSON फ़ाइलों में persistence** | शून्य निर्भरता, तत्काल आरंभ। कॉन्फ़िगर करने के लिए कोई डेटाबेस नहीं — शुरू करें और आगे बढ़ें। |
-| **Vite + Handlebars** | दोनों संसारों का सर्वश्रेष्ठ : विकास के लिए तेज़ HMR, कोड संगठन के लिए HTML partials, Tailwind JIT। |
-| **केंद्रीकृत प्रॉम्प्ट** | सभी IA प्रॉम्प्ट `prompts.ts` में — भाषा/आयु समूह के अनुसार दोहराना, परीक्षण और अनुकूलन आसान। |
-| **बहु-जनरेशन प्रणाली** | प्रत्येक जनरेशन अपना स्वयं का ID वाला स्वतंत्र ऑब्जेक्ट है — प्रति पाठ्यक्रम कई शीट, quiz आदि की अनुमति। |
-| **आयु अनुसार अनुकूलित प्रॉम्प्ट** | भिन्न शब्दावली, जटिलता और स्वर वाले 4 आयु समूह — समान सामग्री शिक्षार्थी के अनुसार भिन्न रूप से सिखाती है। |
-| **Agents पर आधारित सुविधाएँ** | छवि जनरेशन और वेब खोज अस्थायी Mistral Agents का उपयोग करते हैं — स्वचालित सफ़ाई के साथ स्वच्छ जीवन चक्र। |
-| **बुद्धिमान URL स्क्रैपिंग** | एक ही फ़ील्ड मिश्रित URL और कीवर्ड स्वीकार करता है — URL Readability (स्थिर पेज) के माध्यम से स्क्रैप होते हैं, Lightpanda (JS/SPA पेज) fallback के साथ, कीवर्ड Mistral web_search Agent ट्रिगर करते हैं। प्रत्येक परिणाम एक स्वतंत्र स्रोत बनाता है। |
-| **100% Mistral TTS** | Mistral Voxtral TTS (`MISTRAL_API_KEY` से परे कोई अतिरिक्त कुंजी नहीं) — लागत श्रृंखला और भाषा अनुसार आवाज़ समाधान में एकीकृत वाक् संश्लेषण। |
+| **React/Vue के बजाय Alpine.js** | न्यूनतम footprint, Vite द्वारा संकलित TypeScript के साथ हल्की reactivity। एक hackathon के लिए बिल्कुल उपयुक्त जहाँ गति मायने रखती है। |
+| **JSON फ़ाइलों में स्थायित्व** | शून्य निर्भरता, तुरंत प्रारंभ। कॉन्फ़िगर करने के लिए कोई database नहीं — बस शुरू करें और काम शुरू। |
+| **Vite + Handlebars** | दोनों दुनिया का सर्वश्रेष्ठ: विकास के लिए तेज़ HMR, code organization के लिए HTML partials, Tailwind JIT. |
+| **केंद्रित prompts** | सभी IA prompts `prompts.ts` में — भाषा/उम्र-समूह के अनुसार iterate, test और अनुकूलित करना आसान। |
+| **बहु-जनरेशन प्रणाली** | प्रत्येक generation अपना स्वतंत्र ID वाला एक अलग object है — प्रति course कई शीट, quiz आदि संभव बनाता है। |
+| **आयु-अनुकूल prompts** | 4 आयु समूह, अलग vocabulary, जटिलता और tone के साथ — वही सामग्री learner के अनुसार अलग ढंग से सिखाती है। |
+| **Agents-आधारित सुविधाएँ** | इमेज जनरेशन और वेब खोज अस्थायी Mistral Agents का उपयोग करती हैं — स्वचालित सफाई के साथ अपना lifecycle। |
+| **बुद्धिमान URL scraping** | एक ही field मिश्रित URLs और keywords स्वीकार करती है — URLs को Readability (static pages) के माध्यम से scrape किया जाता है, Lightpanda fallback (JS/SPA pages) के साथ; keywords एक Mistral web_search Agent को ट्रिगर करते हैं। हर परिणाम एक स्वतंत्र source बनाता है। |
+| **100% Mistral TTS** | Mistral Voxtral TTS (`MISTRAL_API_KEY` के अलावा कोई अतिरिक्त key नहीं) — cost chain में एकीकृत voice synthesis और भाषा के अनुसार voice resolution। |
 
 ---
 
-## श्रेय और आभार
+## श्रेय एवं आभार
 
 - **[Mistral AI](https://mistral.ai)** — IA मॉडल (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
-- **[Alpine.js](https://alpinejs.dev)** — हल्का प्रतिक्रियाशील फ्रेमवर्क
-- **[TailwindCSS](https://tailwindcss.com)** — उपयोगिता CSS फ्रेमवर्क
-- **[Vite](https://vitejs.dev)** — frontend बिल्ड टूल
+- **[Alpine.js](https://alpinejs.dev)** — हल्का प्रतिक्रियाशील framework
+- **[TailwindCSS](https://tailwindcss.com)** — utility CSS framework
+- **[Vite](https://vitejs.dev)** — frontend build tool
 - **[Lucide](https://lucide.dev)** — आइकन लाइब्रेरी
-- **[Marked](https://marked.js.org)** — Markdown पार्सर
+- **[Marked](https://marked.js.org)** — Markdown parser
 - **[Readability](https://github.com/mozilla/readability)** — वेब सामग्री निष्कर्षण (Firefox Reader View तकनीक)
-- **[Lightpanda](https://lightpanda.io)** — JS/SPA पेज स्क्रैपिंग के लिए अति-हल्का headless ब्राउज़र
-- **[Luciole](https://luciole-vision.com)** — कमज़ोर दृष्टि वाले पाठकों के लिए डिज़ाइन किया गया फ़ॉन्ट, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (प्रोफ़ाइल का « पठन आराम » विकल्प)
+- **[Lightpanda](https://lightpanda.io)** — JS/SPA पेजों की scraping के लिए अल्ट्रा-लाइट headless browser
+- **[Luciole](https://luciole-vision.com)** — कम दृष्टि वाले पाठकों के लिए डिज़ाइन की गई फ़ॉन्ट, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (प्रोफ़ाइलों का "पठन आराम" विकल्प)
 
-Mistral AI Worldwide Hackathon (मार्च 2026) के दौरान आरंभ, [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) और [Gemini CLI](https://geminicli.com/) के साथ पूर्णतः IA द्वारा विकसित।
+Mistral AI Worldwide Hackathon (मार्च 2026) के दौरान आरंभ किया गया, [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) और [Gemini CLI](https://geminicli.com/) के साथ पूरी तरह AI द्वारा विकसित किया गया।
 
 ---
 
@@ -603,4 +600,4 @@ Mistral AI Worldwide Hackathon (मार्च 2026) के दौरान आ
 
 [AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**grok-4.5 के साथ fr से hi में अनुवादित लेख।**
+**gpt-5.4-mini के साथ fr से hi में अनुवादित लेख।**
