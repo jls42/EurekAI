@@ -2328,13 +2328,15 @@ describe('generateRoutes', () => {
         expect(routeRequest).not.toHaveBeenCalled();
       });
 
-      it('modération active, sources safe ou sans statut → routeur appelé', async () => {
+      // Source sans statut (jamais vérifiée) : en attente pour la garde, vérifiée d'abord.
+      it('modération active : source sans statut vérifiée, puis routeur appelé', async () => {
         const { routeRequest } = await import('../generators/router.js');
         const pid = kidProjectId();
         addRouteSources(pid, ['safe', null]);
 
         const res = await postRoute(pid);
 
+        expect(moderateContent).toHaveBeenCalledTimes(1);
         expect(routeRequest).toHaveBeenCalledTimes(1);
         expect(res.json.mock.calls[0][0].plan).toHaveLength(2);
       });
@@ -3553,6 +3555,53 @@ describe('generateRoutes', () => {
       expect(generateSummary).not.toHaveBeenCalled();
       expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
       expect(statusOf(pid, 'src-a')).toBe('pending');
+    });
+
+    // Source jamais vérifiée (import modération inactive, projet orphelin rattaché, donnée legacy)
+    // d'un profil modéré : en attente pour la garde tant que sa vérification n'a pas abouti.
+    it('source jamais vérifiée : 409 pendant sa vérification, 200 une fois vérifiée', async () => {
+      const { generateSummary } = await import('../generators/summary.js');
+      let release!: (value: ModerationResult) => void;
+      vi.mocked(moderateContent).mockReturnValueOnce(
+        new Promise<ModerationResult>((resolve) => {
+          release = resolve;
+        }),
+      );
+      const pid = kidProject();
+      addSource(pid, 'src-a');
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+
+      const first = mockRes();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        const running = handler(mockReq({ params: { pid }, body: {} }), first);
+        await vi.advanceTimersByTimeAsync(MODERATION_WAIT_MS.request);
+        await running;
+      } finally {
+        vi.useRealTimers();
+      }
+      expect(first.status).toHaveBeenCalledWith(409);
+      expect(first.json).toHaveBeenCalledWith({ error: 'moderation.pending' });
+      expect(generateSummary).not.toHaveBeenCalled();
+      expect(statusOf(pid, 'src-a')).toBeUndefined();
+
+      // La vérification aboutit après la réponse : la génération suivante passe, sans nouvel appel.
+      release(SAFE);
+      await vi.waitFor(() => expect(statusOf(pid, 'src-a')).toBe('safe'));
+      const second = await post('/:pid/generate/summary', pid);
+      expect(moderateContent).toHaveBeenCalledTimes(1);
+      expect(second.status).not.toHaveBeenCalled();
+      expect(second.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
+    });
+
+    it('source jamais vérifiée, profil non modéré : générée sans vérification', async () => {
+      const pid = store.createProject('Test', profileStore.create('Adult', 30).id).meta.id;
+      addSource(pid, 'src-a');
+
+      const res = await post('/:pid/generate/summary', pid);
+
+      expect(moderateContent).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ type: 'summary' }));
     });
 
     it('source en erreur reprise : génération qui passe', async () => {

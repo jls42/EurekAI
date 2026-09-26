@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { createHelpers } from './helpers';
 import type { EventKey } from '../../helpers/event-bus.js';
 
@@ -1378,6 +1379,36 @@ describe('badge de modération : statut effectif', () => {
       const src = { moderation: { status, categories: { criminal: false } } };
       expect(callWith(helpers.moderationStatus, blocking, src)).toBe(status);
     }
+  });
+
+  // Source jamais vérifiée (sans objet moderation) : en attente pour un profil modéré, comme le
+  // serveur la traite (gateModerationStatus) ; aucun badge sans modération.
+  it('source jamais vérifiée, profil modéré : badge en attente (icône, couleur, titre)', () => {
+    const unverified = { id: 'n' };
+    expect(callWith(helpers.moderationStatus, blocking, unverified)).toBe('pending');
+    expect(callWith(helpers.moderationBadgeIcon, blocking, unverified)).toBe('loader-circle');
+    expect(callWith(helpers.moderationBadgeColor, blocking, unverified)).toBe(
+      'bg-primary-light text-primary',
+    );
+    expect(callWith(helpers.moderationBadgeTitle, blocking, unverified)).toBe('moderation.pending');
+  });
+
+  it.each([
+    ['modération inactive', { useModeration: false }],
+    ['aucun profil', null],
+  ])('source jamais vérifiée, %s : aucun badge', (_label, profile) => {
+    expect(callWith(helpers.moderationStatus, ctxFor(profile), { id: 'n' })).toBeNull();
+  });
+
+  // Le gabarit teste le statut AFFICHÉ, pas `src.moderation?.status` : sinon une source jamais
+  // vérifiée d'un profil modéré (bloquée par le serveur) n'aurait aucun badge.
+  it('gabarit moderation-badge-src : x-if sur moderationStatus(src)', () => {
+    const partial = readFileSync(
+      new URL('../partials/moderation-badge-src.html', import.meta.url),
+      'utf-8',
+    );
+    expect(partial).toContain('<template x-if="moderationStatus({{sourceRef}})">');
+    expect(partial).not.toContain('.moderation?.status');
   });
 });
 

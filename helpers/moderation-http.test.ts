@@ -1,8 +1,10 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- Codacy lance ESLint sans resolution des types vitest (describe/it/expect typés error) : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect } from 'vitest';
 import {
+  awaitsModeration,
   blockingModerationStatus,
   effectiveModerationStatus,
+  gateModerationStatus,
   moderationRejection,
   pickBlockingSource,
   profileBlockedCategories,
@@ -60,9 +62,16 @@ describe('moderationRejection', () => {
 });
 
 describe('pickBlockingSource', () => {
-  it('aucune source, sources sans statut ou safe → undefined', () => {
+  it('aucune source ou sources safe → undefined', () => {
     expect(pickBlockingSource([], NO_BLOCKED)).toBeUndefined();
-    expect(pickBlockingSource([src('a'), src('b', 'safe')], NO_BLOCKED)).toBeUndefined();
+    expect(pickBlockingSource([src('a', 'safe'), src('b', 'safe')], NO_BLOCKED)).toBeUndefined();
+  });
+
+  // Source jamais vérifiée (sans objet moderation) : en attente pour la garde (gateModerationStatus).
+  it('source jamais vérifiée : bloque comme une source en attente, après unsafe et error', () => {
+    expect(pickBlockingSource([src('s', 'safe'), src('n')], NO_BLOCKED)?.id).toBe('n');
+    expect(pickBlockingSource([src('n'), src('e', 'error')], NO_BLOCKED)?.id).toBe('e');
+    expect(pickBlockingSource([src('n'), src('u', 'unsafe')], NO_BLOCKED)?.id).toBe('u');
   });
 
   it("priorité unsafe > error > pending, quel que soit l'ordre des sources", () => {
@@ -206,7 +215,53 @@ describe('blockingModerationStatus', () => {
 
   it('undefined quand rien ne bloque', () => {
     expect(
-      blockingModerationStatus([src('s', 'safe', { criminal: true }), src('n')], ['sexual']),
+      blockingModerationStatus(
+        [src('s', 'safe', { criminal: true }), src('t', 'safe')],
+        ['sexual'],
+      ),
     ).toBeUndefined();
+  });
+
+  // R9 : la source bloquante jamais vérifiée rend `pending`, jamais undefined — undefined passerait
+  // moderationRejection (null) et laisserait partir la génération (fail-open).
+  it('source bloquante jamais vérifiée : pending, refusée par moderationRejection', () => {
+    const unverified = [src('s', 'safe'), src('n')];
+    expect(blockingModerationStatus(unverified, ['sexual'])).toBe('pending');
+    expect(moderationRejection(blockingModerationStatus(unverified, ['sexual']))).toEqual({
+      status: 409,
+      error: 'moderation.pending',
+    });
+    const noStatus = [{ moderation: {} as { status: ModerationStatus } }];
+    expect(blockingModerationStatus(noStatus, NO_BLOCKED)).toBe('pending');
+  });
+});
+
+describe('gateModerationStatus', () => {
+  it('sans objet moderation ou sans statut : pending (jamais vérifiée)', () => {
+    expect(gateModerationStatus(undefined, NO_BLOCKED)).toBe('pending');
+    expect(gateModerationStatus({} as { status: ModerationStatus }, ['criminal'])).toBe('pending');
+  });
+
+  it('avec objet moderation : statut effectif', () => {
+    expect(gateModerationStatus(mod('safe'), ['criminal'])).toBe('safe');
+    expect(gateModerationStatus(mod('safe', { criminal: true }), ['criminal'])).toBe('unsafe');
+    expect(gateModerationStatus(mod('safe', { criminal: true }), ['sexual'])).toBe('safe');
+    expect(gateModerationStatus(mod('error'), NO_BLOCKED)).toBe('error');
+    expect(gateModerationStatus(mod('pending'), NO_BLOCKED)).toBe('pending');
+    expect(gateModerationStatus(mod('unsafe'), NO_BLOCKED)).toBe('unsafe');
+  });
+});
+
+describe('awaitsModeration', () => {
+  it.each([
+    ['jamais vérifiée', undefined, true],
+    ['sans statut', {} as { status: ModerationStatus }, true],
+    ['en attente', mod('pending'), true],
+    ['en erreur', mod('error'), true],
+    ['statut inattendu', mod('blocked'), true],
+    ['safe', mod('safe'), false],
+    ['unsafe', mod('unsafe'), false],
+  ])('%s → %s', (_label, moderation, expected) => {
+    expect(awaitsModeration(moderation)).toBe(expected);
   });
 });

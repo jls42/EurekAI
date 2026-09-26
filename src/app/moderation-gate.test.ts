@@ -15,6 +15,7 @@ import {
   generationSources,
   mergeSourceModerations,
   requestSourceModeration,
+  resumeProjectModeration,
 } from './moderation-gate';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
@@ -226,6 +227,37 @@ describe('ensureGenerationAllowed', () => {
     expect(sentBody()).toEqual({ sourceIds: ['s2'] });
   });
 
+  // Source jamais vérifiée (sans objet moderation) d'un profil modéré : en attente pour la garde,
+  // vérifiée comme une source en attente.
+  it('source jamais vérifiée : vérifiée puis acceptée', async () => {
+    const state = makeState({
+      sources: [{ id: 's1', moderation: moderation('safe') }, { id: 's2' }],
+    });
+    respondWith([{ id: 's2', moderation: moderation('safe') }]);
+
+    await expect(ensureGenerationAllowed(state)).resolves.toBe(true);
+    expect(sentBody()).toEqual({ sourceIds: ['s2'] });
+    expect(state.sources[1].moderation.status).toBe('safe');
+  });
+
+  it('source jamais vérifiée et vérification sans résultat : false, toast moderation.pending', async () => {
+    const state = makeState({ sources: [{ id: 's1' }] });
+    respondWith([{ id: 's1' }]);
+
+    await expect(ensureGenerationAllowed(state)).resolves.toBe(false);
+    expect(state.showToast).toHaveBeenCalledWith('moderation.pending', 'error');
+  });
+
+  it('source jamais vérifiée, profil non modéré : ni vérification ni refus', async () => {
+    const state = makeState({
+      currentProfile: { id: 'p1', ageGroup: 'adulte', useModeration: false },
+      sources: [{ id: 's1' }],
+    });
+
+    await expect(ensureGenerationAllowed(state)).resolves.toBe(true);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('au plus 50 identifiants envoyés (plafond de la route)', async () => {
     const sources = Array.from({ length: 60 }, (_, i) => ({
       id: `s${i}`,
@@ -283,5 +315,45 @@ describe('requestSourceModeration', () => {
 
     await expect(requestSourceModeration(state, 'pid-1')).resolves.toBe(true);
     expect(state.sources[0].moderation.status).toBe('pending');
+  });
+});
+
+describe('resumeProjectModeration (ouverture d’un projet)', () => {
+  it.each([
+    ['jamais vérifiée', { id: 's1' }],
+    ['en attente', { id: 's1', moderation: moderation('pending') }],
+    ['en erreur', { id: 's1', moderation: moderation('error') }],
+  ])('source %s, profil modéré : POST /sources/moderate sur toutes les sources', (_l, source) => {
+    const state = makeState({ sources: [{ id: 's0', moderation: moderation('safe') }, source] });
+    respondWith([]);
+
+    resumeProjectModeration(state, 'pid-1');
+
+    expect(vi.mocked(globalThis.fetch).mock.calls[0][0]).toBe(MODERATE_URL);
+    expect(sentBody()).toEqual({});
+  });
+
+  it('profil non modéré : aucune vérification', () => {
+    const state = makeState({
+      currentProfile: { id: 'p1', ageGroup: 'adulte', useModeration: false },
+      sources: [{ id: 's1' }],
+    });
+
+    resumeProjectModeration(state, 'pid-1');
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('sources toutes vérifiées : aucune vérification', () => {
+    const state = makeState({
+      sources: [
+        { id: 's1', moderation: moderation('safe') },
+        { id: 's2', moderation: moderation('unsafe') },
+      ],
+    });
+
+    resumeProjectModeration(state, 'pid-1');
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

@@ -26,8 +26,15 @@ const ALL = [
 const ids = (sources: Source[]) => sources.map((s) => s.id);
 
 describe('selectChatSources', () => {
-  it("modération active : ne garde que les sources safe et sans statut, dans l'ordre", () => {
-    expect(ids(selectChatSources(ALL, { useModeration: true }))).toEqual(['safe', 'none']);
+  it("modération active : ne garde que les sources safe, dans l'ordre", () => {
+    expect(ids(selectChatSources(ALL, { useModeration: true }))).toEqual(['safe']);
+  });
+
+  // Source jamais vérifiée (sans objet moderation) : en attente pour la garde, exclue jusqu'à sa
+  // vérification (reprise avant ce filtre, routes/chat.ts) ; modération inactive : gardée.
+  it('source jamais vérifiée : exclue si la modération est active, gardée sinon', () => {
+    expect(selectChatSources([src('none')], { useModeration: true })).toEqual([]);
+    expect(ids(selectChatSources([src('none')], { useModeration: false }))).toEqual(['none']);
   });
 
   it('modération active : un statut inattendu est exclu (fail-closed)', () => {
@@ -88,14 +95,11 @@ describe('selectChatSources', () => {
       expect(ids(selectChatSources([flagged], profile))).toEqual(['flagged']);
     });
 
-    // Liste vide : modération active sans catégorie bloquée → seul le statut persisté compte.
-    it('liste vide : safe signalante gardée, statuts bloquants persistés exclus', () => {
+    // Liste vide : modération active sans catégorie bloquée → seul le statut persisté compte
+    // (une source jamais vérifiée reste en attente : la modération est active).
+    it('liste vide : safe signalante gardée, statuts bloquants et non vérifiée exclus', () => {
       const profile = { useModeration: true, moderationCategories: [] };
-      expect(ids(selectChatSources([...ALL, flagged], profile))).toEqual([
-        'safe',
-        'none',
-        'flagged',
-      ]);
+      expect(ids(selectChatSources([...ALL, flagged], profile))).toEqual(['safe', 'flagged']);
     });
 
     // Âge illisible sans liste : défauts d'enfant (fail-closed), jamais le prototype.

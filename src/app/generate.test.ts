@@ -133,9 +133,13 @@ describe('blockedModerationStatus', () => {
     expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
   });
 
-  it('returns null when sources have no moderation field', () => {
-    const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }] });
-    expect(gen.blockedModerationStatus.call(ctx)).toBeNull();
+  // Source jamais vérifiée (sans objet moderation) : en attente pour la garde, comme le serveur
+  // (gateModerationStatus). canStartGenerate ne l'applique qu'à un profil modéré.
+  it('returns "pending" when a source was never checked (no moderation field)', () => {
+    const ctx = makeContext({
+      sources: [{ id: 's1', moderation: { status: 'safe' } }, { id: 's2' }],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe('pending');
   });
 
   it('returns "unsafe" when a source is unsafe', () => {
@@ -692,6 +696,35 @@ describe('vérification des sources avant la génération', () => {
       '/api/projects/pid-1/generate/summary',
     ]);
     expect(autoLoadingDuringVerification).toBe(false);
+  });
+
+  it('source jamais vérifiée, profil modéré : vérifiée avant la génération', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1' }],
+    });
+    mockVerification('safe');
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(
+      JSON.parse((vi.mocked(globalThis.fetch).mock.calls[0][1] as RequestInit).body as string),
+    ).toEqual({ sourceIds: ['s1'] });
+  });
+
+  it('source jamais vérifiée, profil non modéré : ni vérification ni refus', async () => {
+    const ctx = makeContext({ sources: [{ id: 's1' }] });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/summary']);
+    expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.pending', 'error');
   });
 
   it('generateAll : vérification avant les trois générations', async () => {

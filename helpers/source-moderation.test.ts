@@ -208,7 +208,7 @@ describe('startSourceModeration', () => {
 });
 
 describe('settleSourceModeration', () => {
-  it('reprend les sources en attente, en erreur ou au statut inattendu, jamais les autres', async () => {
+  it('reprend les sources en attente, en erreur, au statut inattendu ou jamais vérifiées', async () => {
     const pid = createModeratedProject();
     for (const [id, status] of [
       ['s-pending', 'pending'],
@@ -226,12 +226,24 @@ describe('settleSourceModeration', () => {
 
     expect(moderatedTexts().sort((a, b) => a.localeCompare(b))).toEqual([
       'MD-s-error',
+      'MD-s-none',
       'MD-s-pending',
       'MD-s-weird',
     ]);
     expect(statusOf(pid, 's-pending')).toBe('safe');
     expect(statusOf(pid, 's-error')).toBe('safe');
     expect(statusOf(pid, 's-unsafe')).toBe('unsafe');
+    // Jamais vérifiée (import modération inactive, projet rattaché) : vérifiée à son tour.
+    expect(statusOf(pid, 's-none')).toBe('safe');
+  });
+
+  it('profil non modéré : une source jamais vérifiée n’est pas modérée', async () => {
+    const pid = store.createProject('P', profileStore.create('A', 30).id).meta.id;
+    addSource(pid, 's-none');
+
+    await settle(pid);
+
+    expect(moderateContent).not.toHaveBeenCalled();
     expect(statusOf(pid, 's-none')).toBeUndefined();
   });
 

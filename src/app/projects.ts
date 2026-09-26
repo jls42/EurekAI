@@ -1,5 +1,6 @@
 import { normalizeSummaryData } from './helpers';
 import { openingProfileQuery } from './project-snapshot';
+import { resumeProjectModeration } from './moderation-gate';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
@@ -215,6 +216,8 @@ const selectProject = async function (this: AppContext, id: string) {
     // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
     const snapshot: unknown = await res.json();
     applyProjectSnapshot(this, snapshot as ProjectData, id);
+    // Sources en attente, en erreur ou jamais vérifiées d'un profil modéré : vérifiées en fond.
+    resumeProjectModeration(this, id);
   } catch (err) {
     console.warn('[selectProject] failed', err);
     this.currentProjectId = null;

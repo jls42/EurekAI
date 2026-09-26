@@ -1,8 +1,9 @@
 /**
  * Traduction des statuts de modération en refus HTTP. Fonctions pures, sans dépendance Node :
- * partagées par les routes (sources, chat, generate) ET le front (src/app/generate.ts,
- * src/app/effective-moderation.ts), pour que la priorité entre sources bloquantes et le statut
- * effectif soient les mêmes des deux côtés.
+ * partagées par les routes (sources, chat, generate), la reprise des modérations
+ * (helpers/source-moderation.ts) ET le front (src/app/generate.ts, src/app/moderation-gate.ts,
+ * src/app/effective-moderation.ts), pour que la priorité entre sources bloquantes, le statut
+ * effectif et le statut de garde soient les mêmes des deux côtés.
  */
 import type { ModerationStatus } from '../types.js';
 import { expandLegacyModerationCategories } from './moderation-model.js';
@@ -68,7 +69,8 @@ const flaggedCategoriesOf = (categories: Record<string, boolean> | undefined): s
  * v1.7.1, persistées `safe` alors qu'elles portaient `dangerous`/`criminal` à true (le profil
  * bloquait la clé 2411, que 2603 ne renvoie jamais) ; plus généralement, le statut n'est plus figé
  * à l'import. Jamais de déclassement : `unsafe`/`error`/`pending` (et tout statut inattendu) sont
- * rendus tels quels ; sans objet `moderation` (import modération inactive) → undefined.
+ * rendus tels quels ; sans objet `moderation` (import modération inactive) → undefined. Les
+ * GARDES passent par gateModerationStatus, qui traite ce dernier cas.
  */
 export const effectiveModerationStatus = (
   moderation: PersistedModeration | undefined,
@@ -80,6 +82,31 @@ export const effectiveModerationStatus = (
   return flagsBlocked ? 'unsafe' : 'safe';
 };
 
+/**
+ * Statut qui décide des GARDES pour un profil modéré (génération, analyse de route, chat,
+ * pré-contrôle et badge du front) : statut EFFECTIF d'une source vérifiée ; `pending` pour une
+ * source JAMAIS vérifiée — sans objet `moderation` ou sans statut (importée quand la modération
+ * était inactive, projet orphelin rattaché, donnée legacy) : elle attend sa vérification au lieu de
+ * passer. Réservé aux profils modérés : sans modération, aucune source ne bloque.
+ */
+export const gateModerationStatus = (
+  moderation: PersistedModeration | undefined,
+  blockedCategories: readonly string[],
+): ModerationStatus => {
+  if (!moderation?.status) return 'pending';
+  return effectiveModerationStatus(moderation, blockedCategories) ?? 'pending';
+};
+
+/**
+ * Source à (re)vérifier pour un profil modéré : jamais vérifiée, en attente, en erreur ou au
+ * statut inattendu — tout ce qui n'est pas `safe`/`unsafe` persisté. Partagé par la reprise
+ * serveur (settleSourceModeration) et le front (pré-contrôle, ouverture d'un projet).
+ */
+export const awaitsModeration = (moderation: PersistedModeration | undefined): boolean => {
+  const status = moderation?.status;
+  return status !== 'safe' && status !== 'unsafe';
+};
+
 // Un contenu déjà signalé prime sur une panne, qui prime sur une vérification en cours : sinon
 // « Modération en cours » masquerait une source signalée.
 const BLOCKING_PRIORITY: readonly ModerationStatus[] = ['unsafe', 'error', 'pending'];
@@ -89,15 +116,16 @@ interface ModeratedSource {
 }
 
 /**
- * Source qui bloque, par priorité `unsafe` > `error` > `pending` de son statut EFFECTIF
- * (effectiveModerationStatus avec les catégories bloquées du profil) ; undefined si aucune ne
- * bloque. Un statut inattendu bloque en dernier recours (fail-closed).
+ * Source qui bloque, par priorité `unsafe` > `error` > `pending` de son statut de garde
+ * (gateModerationStatus : effectif avec les catégories bloquées du profil, `pending` pour une
+ * source jamais vérifiée) ; undefined si aucune ne bloque. Un statut inattendu bloque en dernier
+ * recours (fail-closed). Profil modéré seulement.
  */
 export const pickBlockingSource = <T extends ModeratedSource>(
   sources: readonly T[],
   blockedCategories: readonly string[],
 ): T | undefined => {
-  const statusOf = (s: T) => effectiveModerationStatus(s.moderation, blockedCategories);
+  const statusOf = (s: T) => gateModerationStatus(s.moderation, blockedCategories);
   for (const status of BLOCKING_PRIORITY) {
     const match = sources.find((s) => statusOf(s) === status);
     if (match) return match;
@@ -106,15 +134,15 @@ export const pickBlockingSource = <T extends ModeratedSource>(
 };
 
 /**
- * Statut EFFECTIF de la source bloquante (pickBlockingSource) ; undefined si rien ne bloque. À
+ * Statut de garde de la source bloquante (pickBlockingSource) ; undefined si rien ne bloque. À
  * passer tel quel à moderationRejection : relire `source.moderation.status` rendrait `safe` pour
- * une source promue `unsafe` et laisserait passer la génération (fail-open).
+ * une source promue `unsafe`, et le statut effectif rendrait undefined pour une source jamais
+ * vérifiée : dans les deux cas la génération passerait (fail-open).
  */
 export const blockingModerationStatus = (
   sources: readonly ModeratedSource[],
   blockedCategories: readonly string[],
-): ModerationStatus | undefined =>
-  effectiveModerationStatus(
-    pickBlockingSource(sources, blockedCategories)?.moderation,
-    blockedCategories,
-  );
+): ModerationStatus | undefined => {
+  const picked = pickBlockingSource(sources, blockedCategories);
+  return picked ? gateModerationStatus(picked.moderation, blockedCategories) : undefined;
+};

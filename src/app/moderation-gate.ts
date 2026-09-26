@@ -4,11 +4,7 @@
  * effective-moderation.ts) : partagé par generate.ts (génération simple, tout générer, auto et son
  * analyse de route), components/quiz.ts (remédiation) et sources.ts (« Revérifier »).
  */
-import {
-  blockingModerationStatus,
-  effectiveModerationStatus,
-  moderationRejection,
-} from '@helpers/moderation-http';
+import { awaitsModeration, blockingModerationStatus } from '@helpers/moderation-http';
 import { withAiHeaders } from './ai-fetch';
 import { currentBlockedCategories } from './effective-moderation';
 import type { AppContext } from './app-context';
@@ -98,16 +94,15 @@ export const requestSourceModeration = async (
   }
 };
 
-// Sources à vérifier avant de refuser : celles dont le statut EFFECTIF bloque sans être un contenu
-// signalé (en attente, en erreur, inattendu), profil modéré seulement. Aucune si une source visée
-// est signalée : le refus est assuré, sans appel.
+// Sources à vérifier avant de refuser : en attente, en erreur, au statut inattendu ou jamais
+// vérifiées (awaitsModeration), profil modéré seulement. Aucune si une source visée est signalée
+// (statut effectif) : le refus est assuré, sans appel.
 const sourcesToVerify = (state: AppContext, sourceIds?: readonly string[]): string[] => {
   if (!state.currentProfile?.useModeration) return [];
-  const blocked = currentBlockedCategories(state);
   const sources = generationSources(state, sourceIds);
-  if (blockingModerationStatus(sources, blocked) === 'unsafe') return [];
+  if (blockingModerationStatus(sources, currentBlockedCategories(state)) === 'unsafe') return [];
   return sources
-    .filter((s) => moderationRejection(effectiveModerationStatus(s.moderation, blocked)) !== null)
+    .filter((s) => awaitsModeration(s.moderation))
     .map((s) => s.id)
     .slice(0, MAX_VERIFIED_SOURCE_IDS);
 };
@@ -115,10 +110,11 @@ const sourcesToVerify = (state: AppContext, sourceIds?: readonly string[]): stri
 /**
  * Pré-contrôle ASYNCHRONE d'une génération, à appeler AVANT tout pending optimiste (sinon un
  * cancel pendant l'attente serveur trouverait 404 et la génération partirait quand même). Source
- * signalée : refus immédiat (même toast). Source en attente ou en erreur : toast « Vérification des
- * sources… », vérification (requestSourceModeration), puis pré-contrôle sur les statuts fusionnés
- * (canStartGenerate) ; un échec réseau laisse l'état local, donc le toast en attente/erreur. true
- * si la génération peut partir sur le projet courant, inchangé pendant la vérification.
+ * signalée : refus immédiat (même toast). Source en attente, en erreur ou jamais vérifiée : toast
+ * « Vérification des sources… », vérification (requestSourceModeration), puis pré-contrôle sur
+ * les statuts fusionnés (canStartGenerate) ; un échec réseau laisse l'état local, donc le toast en
+ * attente/erreur. true si la génération peut partir sur le projet courant, inchangé pendant la
+ * vérification.
  */
 export const ensureGenerationAllowed = async (
   state: AppContext,
@@ -133,4 +129,16 @@ export const ensureGenerationAllowed = async (
     if (state.currentProjectId !== projectId) return false;
   }
   return canStartGenerate(state, sourceIds);
+};
+
+/**
+ * Ouverture d'un projet : profil courant modéré et au moins une source qui attend sa vérification
+ * (en attente, en erreur ou jamais vérifiée) → POST /sources/moderate en arrière-plan, sur toutes
+ * les sources (le serveur en lance au plus 10 par appel), sans bloquer l'ouverture ; statuts
+ * fusionnés au retour, si le projet est toujours ouvert.
+ */
+export const resumeProjectModeration = (state: AppContext, projectId: string): void => {
+  if (!state.currentProfile?.useModeration) return;
+  if (!state.sources.some((s: Source) => awaitsModeration(s.moderation))) return;
+  void requestSourceModeration(state, projectId);
 };

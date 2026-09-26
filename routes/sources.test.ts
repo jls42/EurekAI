@@ -825,6 +825,19 @@ describe('POST /:pid/sources/moderate', () => {
     });
   });
 
+  // Source jamais vérifiée (import modération inactive, projet rattaché, legacy) : vérifiée.
+  it('source jamais vérifiée d’un profil modéré : vérifiée, statut renvoyé', async () => {
+    const { project } = createProjectWithProfile();
+    addModeratedSource(project.meta.id, 's-none');
+
+    const res = await post(project.meta.id);
+
+    expect(moderateContent).toHaveBeenCalledWith(client, 'MD-s-none', MODERATION_CATEGORIES.enfant);
+    expect(res.json).toHaveBeenCalledWith({
+      sources: [{ id: 's-none', moderation: { status: 'safe', categories: {} } }],
+    });
+  });
+
   it('sourceIds : seules les sources visées sont vérifiées et renvoyées', async () => {
     const { project } = createProjectWithProfile();
     const pid = project.meta.id;

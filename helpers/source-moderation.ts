@@ -14,6 +14,7 @@ import type { ProfileStore } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
 import { logger } from './logger.js';
 import { activeModerationCategories, moderationProfileOf } from './moderation-profile.js';
+import { awaitsModeration } from './moderation-http.js';
 
 /**
  * Attente maximale d'une vérification, par usage. Un délai dépassé ne coupe rien : la modération
@@ -114,14 +115,12 @@ export const startSourceModeration = (
 };
 
 /**
- * Source à (re)vérifier : modération en attente (en cours ou interrompue), en erreur, ou statut
- * inattendu (donnée corrompue, que les gardes traitent comme une erreur). `safe`/`unsafe` : déjà
- * vérifiée. Sans objet `moderation` (import modération inactive) : pas de cible.
+ * Source à (re)vérifier (awaitsModeration) : jamais vérifiée (sans objet `moderation` : importée
+ * quand la modération était inactive, projet orphelin rattaché, donnée legacy), modération en
+ * attente (en cours ou interrompue), en erreur, ou statut inattendu (donnée corrompue).
+ * `safe`/`unsafe` : déjà vérifiée.
  */
-const needsModeration = (source: Source): boolean => {
-  const status = source.moderation?.status;
-  return status !== undefined && status !== 'safe' && status !== 'unsafe';
-};
+const needsModeration = (source: Source): boolean => awaitsModeration(source.moderation);
 
 /** Sources visées : `sourceIds` absent ou vide = toutes, comme la génération (getMarkdownOrNull). */
 export const selectSources = <T extends { id: string }>(
@@ -208,11 +207,12 @@ const waitAtMost = async (work: Promise<unknown>, ms: number): Promise<boolean> 
 };
 
 /**
- * Reprise des modérations en attente ou en erreur des sources visées, avant une génération, un
- * message de chat ou une revérification : seulement si le profil propriétaire du projet est modéré,
- * avec ses catégories. Attend au plus `waitMs` ; le délai dépassé, les modérations continuent en
- * arrière-plan et l'appelant relit le projet tel quel (statut toujours en attente). Ne lève jamais
- * (identifiant de projet invalide compris) : l'appelant poursuit avec ses propres gardes.
+ * Reprise des modérations en attente, en erreur ou jamais faites des sources visées, avant une
+ * génération, un message de chat ou une revérification : seulement si le profil propriétaire du
+ * projet est modéré, avec ses catégories. Attend au plus `waitMs` ; le délai dépassé, les
+ * modérations continuent en arrière-plan et l'appelant relit le projet tel quel (statut toujours
+ * en attente). Ne lève jamais (identifiant de projet invalide compris) : l'appelant poursuit avec
+ * ses propres gardes.
  */
 export const settleSourceModeration = async (
   deps: SettleDeps,

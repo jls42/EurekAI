@@ -634,8 +634,11 @@ describe('POST /:pid/chat', () => {
 
     await handler(req, res);
 
-    // moderateContent should NOT be called since etudiant categories are empty
-    expect(moderateContent).not.toHaveBeenCalled();
+    // Catégories vides : le message n'est pas vérifié. La modération reste active (`[]` ≠ null) :
+    // la source jamais vérifiée l'est avant le filtre, avec cette liste vide.
+    expect(moderateContent).not.toHaveBeenCalledWith(client, 'Hello', expect.anything());
+    expect(moderateContent).toHaveBeenCalledTimes(1);
+    expect(moderateContent).toHaveBeenCalledWith(client, 'Some source content', []);
     expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Hello!' }));
   });
 
@@ -837,8 +840,10 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
     { id: 'src-none', status: undefined },
     { id: 'src-weird', status: 'blocked' },
   ];
-  const KEPT = ['src-safe', 'src-none'];
-  const EXCLUDED = ['src-unsafe', 'src-error', 'src-pending', 'src-weird'];
+  // src-none (jamais vérifiée) compte en attente pour la garde : vérifiée avant le filtre, elle
+  // échoue ici comme les autres reprises et reste exclue.
+  const KEPT = ['src-safe'];
+  const EXCLUDED = ['src-unsafe', 'src-error', 'src-pending', 'src-none', 'src-weird'];
 
   // Les modérations en attente ou en erreur sont relancées avant le filtre
   // (helpers/source-moderation.ts) : ici elles échouent encore (`error`), les sources restent
@@ -876,7 +881,7 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
     return res;
   };
 
-  it('modération active : le LLM et les outils ne reçoivent que les sources safe et sans statut', async () => {
+  it('modération active : le LLM et les outils ne reçoivent que les sources safe', async () => {
     const { chatWithSources } = await import('../generators/chat.js');
     const { generateSummary } = await import('../generators/summary.js');
     (chatWithSources as any).mockResolvedValueOnce({
@@ -1005,6 +1010,42 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
     expect(context).not.toContain('src-pending');
   });
 
+  // Source jamais vérifiée (import modération inactive, projet rattaché) : exclue tant que sa
+  // vérification n'a pas abouti, puis incluse au message suivant.
+  it('source jamais vérifiée : exclue pendant sa vérification, incluse une fois vérifiée', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    let release!: (value: { status: 'safe'; categories: Record<string, boolean> }) => void;
+    vi.mocked(moderateContent).mockImplementation((_client, text) =>
+      text === 'MD-src-none'
+        ? new Promise((resolve) => {
+            release = resolve;
+          })
+        : Promise.resolve({ status: 'safe', categories: {} }),
+    );
+    const pid = createChatProject(true);
+    addModeratedSources(pid, ['src-safe', 'src-none']);
+
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const sending = sendMessage(pid);
+      await vi.advanceTimersByTimeAsync(MODERATION_WAIT_MS.chat);
+      await sending;
+    } finally {
+      vi.useRealTimers();
+    }
+    const firstContext: string = (chatWithSources as any).mock.calls[0][2];
+    expect(firstContext).toContain('MD-src-safe');
+    expect(firstContext).not.toContain('src-none');
+
+    release({ status: 'safe', categories: {} });
+    await vi.waitFor(() =>
+      expect(store.getProject(pid)!.sources[1].moderation?.status).toBe('safe'),
+    );
+    await sendMessage(pid);
+    const secondContext: string = (chatWithSources as any).mock.calls[1][2];
+    expect(secondContext).toContain('MD-src-none');
+  });
+
   it('journalise le seul nombre de sources exclues, jamais leur nom ni leur contenu', async () => {
     const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
     const pid = createChatProject(true);
@@ -1015,7 +1056,7 @@ describe('POST /:pid/chat — sources exclues par la modération', () => {
     const chatLogs = infoSpy.mock.calls
       .filter((c) => c[0] === 'chat')
       .map((c) => c.slice(1).join(' '));
-    expect(chatLogs).toContain('moderation: 4 source(s) excluded from chat context and tools');
+    expect(chatLogs).toContain('moderation: 5 source(s) excluded from chat context and tools');
     for (const { id } of SOURCES) expect(chatLogs.join('\n')).not.toContain(id);
     infoSpy.mockRestore();
   });
