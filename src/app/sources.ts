@@ -481,13 +481,25 @@ const reportDeleteSourceError = async (state: AppContext, res: Response): Promis
   state.showToast(state.t(TOAST_ERROR, { error }), 'error');
 };
 
+// DELETE d'une source affichée du projet ouvert, null pour tout autre id : forme `if
+// (allowedUrls.includes(url)) { fetch(url, …) }` reconnue par Codacy rule-node-ssrf (cf. confirm.ts).
+const deleteSourceRequest = async (state: AppContext, id: string): Promise<Response | null> => {
+  const allowedUrls = state.sources.map((s: Source) => state.apiBase() + '/sources/' + s.id);
+  const url = state.apiBase() + '/sources/' + id;
+  if (allowedUrls.includes(url)) {
+    return await fetch(url, { method: 'DELETE' });
+  }
+  return null;
+};
+
 // Suppression d'une source, puis consigne resynchronisée sur la réponse (le serveur efface celle
 // qui dépendait de la source), sauf si le projet a changé entre-temps. Refus du serveur (ex. 429) :
 // source gardée et erreur traduite, jamais un faux « Source supprimée » ; 404 = déjà supprimée
 // (autre onglet), retirée comme un succès.
 const runDeleteSource = async function (state: AppContext, id: string): Promise<void> {
   const projectId = state.currentProjectId;
-  const res = await fetch(state.apiBase() + '/sources/' + id, { method: 'DELETE' });
+  const res = await deleteSourceRequest(state, id);
+  if (!res) return;
   if (!res.ok && res.status !== 404) {
     await reportDeleteSourceError(state, res);
     return;

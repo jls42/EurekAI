@@ -298,6 +298,12 @@ describe('requestSourceModeration', () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 
+  // Liste blanche (rule-node-ssrf) : seul le projet ouvert est vérifiable.
+  it('projet autre que le projet ouvert : false, aucun appel', async () => {
+    await expect(requestSourceModeration(makeState(), 'pid-2')).resolves.toBe(false);
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
   it('sans sourceIds : corps vide (toutes les sources), statuts fusionnés, icônes rafraîchies', async () => {
     const state = makeState({ sources: [{ id: 's1', moderation: moderation('pending') }] });
     respondWith([{ id: 's1', moderation: moderation('safe') }]);

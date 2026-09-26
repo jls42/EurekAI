@@ -53,7 +53,10 @@ describe('Espace parent : interrupteurs accessibles (profile-picker.html)', () =
 // Chaque expression affichée (x-text) d'un bouton de catégorie figure dans son aria-label :
 // « Générer : Fiches » pour un bouton qui affiche « Fiches », jamais « Générer : Fiche ».
 describe('boutons de catégorie : le nom accessible contient le libellé visible', () => {
-  const LABEL_RE = /:aria-label="t\('a11y\.(?:generate|view)Category', \{ category: (.+?) \}\)"/g;
+  // Guillemets en \x22 / \x27 : dans une regex littérale, Lizard les prend pour des chaînes et ne
+  // délimite plus les fonctions suivantes (cf. CLAUDE.md, pièges Lizard).
+  const LABEL_RE =
+    /:aria-label=\x22t\(\x27a11y\.(?:generate|view)Category\x27, \{ category: (.+?) \}\)\x22/g;
   const files = [
     './partials/view-dashboard.html',
     './partials/view-sources.html',
@@ -80,7 +83,7 @@ describe('boutons de catégorie : le nom accessible contient le libellé visible
   it.each(labelled.map((b) => [b.path, b.category, b.button]))(
     '%s : %s',
     (_path, category, button) => {
-      const shown = [...button.matchAll(/x-text="([^"]+)"/g)].map((m) => m[1]);
+      const shown = [...button.matchAll(/x-text=\x22([^\x22]+)\x22/g)].map((m) => m[1]);
       expect(shown.length).toBeGreaterThan(0);
       for (const expression of shown) expect(category).toContain(expression);
     },

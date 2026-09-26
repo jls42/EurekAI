@@ -212,6 +212,16 @@ describe('createSources', () => {
       expect(ctx.showToast).not.toHaveBeenCalledWith('toast.sourceDeleted', 'info');
     });
 
+    // Liste blanche (rule-node-ssrf) : seule une source affichée du projet ouvert est supprimable.
+    it('id absent des sources affichées : aucune requête', async () => {
+      ctx.sources = [{ id: 's2', text: 'b' }];
+
+      await src.deleteSource.call(ctx, 's1');
+
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.sources).toEqual([{ id: 's2', text: 'b' }]);
+    });
+
     it('404 (déjà supprimée ailleurs) → retirée comme un succès', async () => {
       ctx.sources = [{ id: 's1', text: 'a' }];
       ctx.selectedIds = ['s1'];
@@ -231,6 +241,7 @@ describe('createSources', () => {
 
     it('projet changé pendant la suppression : consigne du nouveau projet intacte', async () => {
       const other = { found: true, text: 'projet 2', keyTopics: ['k'] };
+      ctx.sources = [{ id: 's1' }];
       vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
         ctx.currentProjectId = 'pid-2';
         ctx.consigne = other;

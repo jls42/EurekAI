@@ -70,7 +70,10 @@ const startProfilesApp = async (): Promise<{ base: string; id: string }> => {
   return { base: await start(app), id };
 };
 
+// URL du serveur Express éphémère du test (127.0.0.1, port aléatoire) et d'un profil créé par le
+// test : aucune entrée utilisateur (faux positif Opengrep rule-node-ssrf).
 const putProfile = (base: string, id: string, body: Record<string, unknown>) =>
+  // nosemgrep
   fetch(`${base}/api/profiles/${id}`, {
     method: 'PUT',
     headers: JSON_HEADERS,
@@ -78,6 +81,7 @@ const putProfile = (base: string, id: string, body: Record<string, unknown>) =>
   });
 
 const deleteProfile = (base: string, id: string, pin?: string) =>
+  // nosemgrep
   fetch(`${base}/api/profiles/${id}`, {
     method: 'DELETE',
     ...(pin === undefined ? {} : { headers: JSON_HEADERS, body: JSON.stringify({ pin }) }),

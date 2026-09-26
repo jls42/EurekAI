@@ -78,16 +78,23 @@ export const requestSourceModeration = async (
   sourceIds?: readonly string[],
 ): Promise<boolean> => {
   if (!PROJECT_ID_SAFE.test(projectId)) return false;
+  // Seul le projet ouvert peut être vérifié : forme `if (allowedUrls.includes(url)) { fetch(url,
+  // …) }` reconnue par Codacy rule-node-ssrf (cf. src/components/quiz.ts).
+  const allowedUrls = ['/api/projects/' + state.currentProjectId + '/sources/moderate'];
+  const url = '/api/projects/' + projectId + '/sources/moderate';
   try {
-    const res = await fetch(
-      '/api/projects/' + projectId + '/sources/moderate',
-      withAiHeaders({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sourceIds ? { sourceIds } : {}),
-      }),
-    );
-    return await applyModerationResponse(state, projectId, res);
+    if (allowedUrls.includes(url)) {
+      const res = await fetch(
+        url,
+        withAiHeaders({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(sourceIds ? { sourceIds } : {}),
+        }),
+      );
+      return await applyModerationResponse(state, projectId, res);
+    }
+    return false;
   } catch (e) {
     console.warn('[moderation] vérification des sources impossible', e);
     return false;
