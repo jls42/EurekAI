@@ -177,7 +177,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 ### Sécurité & contrôle parental
 
 - **4 groupes d'âge** : enfant (≤10 ans), ado (11-15), étudiant (16-25), adulte (26+)
-- **Modération du contenu** : `mistral-moderation-2603` (Mistral Moderation 2) avec 10 catégories disponibles, 5 bloquées par défaut pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Catégories personnalisables par profil dans les paramètres. L'alias `-latest` est volontairement évité (il pointe encore sur une version dépréciée).
+- **Modération du contenu** : `mistral-moderation-2603` (Mistral Moderation 2) avec 11 catégories disponibles, 5 bloquées par défaut pour enfant/ado (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `selfharm`, `jailbreaking`). Catégories personnalisables par profil dans les paramètres ; Moderation 2 a scindé l'ancienne catégorie « contenu dangereux » en `dangerous` + `criminal` (les profils existants sont migrés automatiquement, et les catégories bloquées s'appliquent aussi aux sources déjà importées). Sécurité par défaut : si la réponse du modèle ne permet pas de vérifier une catégorie bloquée, le contenu est refusé (« Modération indisponible ») ; avec la modération active, la génération comme le chat écartent les sources signalées, en erreur ou en cours de vérification (une source importée modération désactivée n'est pas re-vérifiée). Id daté épinglé dans `helpers/moderation-model.ts` : l'alias `-latest`, déprécié, n'est plus listé par l'API.
 - **PIN parental** : hash SHA-256, requis pour les profils de moins de 15 ans. Pour un déploiement production, prévoir un hash lent avec sel (Argon2id, bcrypt).
 - **Restrictions du chat** : chat IA désactivé par défaut pour les moins de 16 ans, activable par les parents
 
@@ -191,7 +191,7 @@ Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources e
 
 ### Suivi des coûts API
 
-Chaque appel Mistral (chat, OCR, STT, TTS, modération, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur — pas de surprise sur la facturation.
+Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents) est instrumenté pour fournir une estimation € **transparente** à l'utilisateur. La modération, gratuite, n'est pas comptée. Limite connue : les frais d'outils des agents (recherche web 30 $/1000 appels, génération d'image 100 $/1000 images) ne sont pas encore comptés — le coût affiché d'une illustration est sous-estimé.
 
 - **Source de vérité** : `helpers/pricing.ts` — `MODEL_PRICING` par prefix de modèle (ex: `mistral-large` → input 0.5 €/M tokens, output 1.5 €/M tokens), `PRICING_SOURCES` avec URLs doc Mistral pour re-scraping périodique
 - **Unités supportées** : `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — conversion pilotée par `helpers/cost-calc.ts`
@@ -405,6 +405,9 @@ helpers/
   dictation-diff.ts       — Comparaison stricte lettre à lettre pour la correction de dictée (local, zéro coût IA)
   reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
   ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
+  moderation-model.ts     — Modèle de modération épinglé + ses 11 catégories + migration des catégories legacy
+  moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours)
+  chat-sources.ts         — Sources accessibles au chat (sans les sources non vérifiées si la modération est active)
 
   # Codes d'erreur stables
   error-codes.ts              — Re-export mince de l'API publique

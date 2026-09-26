@@ -21,10 +21,12 @@ export const OCR_MODEL_LABELS: Record<OcrModel, string> = {
  * Défaut **OCR 4.0** (`mistral-ocr-4-0`, $4/1000 pages), épinglé VOLONTAIREMENT. Les alias
  * `mistral-ocr-latest` et `mistral-ocr-4` (alias de génération) pointent désormais sur
  * `mistral-ocr-4-1` (OCR 4.1 : publié 2026-07-16, GA 2026-08-31, même prix $4/1000). 4.0 est gardé
- * après une évaluation mesurée le 2026-09-26 (11 leçons réelles, jury vision + contre-expertise,
- * 3 passages) : 4.1 perd de façon stable du texte proche des figures (consigne d'exercice, légende
- * de carte à 9 entrées, annotation manuscrite) que 4.0 conserve — cf. rapport de PR. OCR 4.0 n'est
- * pas déprécié au 2026-09-26. Ce retard est déclaré dans OCR_DEFAULT_ACCEPTED_LAG ci-dessous.
+ * après une évaluation mesurée le 2026-09-26 (11 photos de leçons réelles, 1 passage par photo jugé
+ * contre l'image, contre-expertise aveugle sur les 4 litigieuses, stabilité vérifiée sur 3 passages
+ * pour les 5 décisives) : 4.1 perd de façon stable du texte proche des figures (consigne
+ * d'exercice, légende de carte à 9 entrées, annotation manuscrite) que 4.0 conserve — détail dans
+ * la description de la PR du passage à Moderation 2. OCR 4.0 n'est pas déprécié au 2026-09-26.
+ * Ce retard est déclaré dans OCR_DEFAULT_ACCEPTED_LAG ci-dessous.
  *
  * Toujours épingler l'id major-minor, JAMAIS `mistral-ocr-4` ni `mistral-ocr-latest` : un alias
  * mouvant changerait le modèle (donc le texte extrait) sans évaluation.

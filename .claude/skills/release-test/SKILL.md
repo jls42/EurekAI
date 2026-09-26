@@ -1,6 +1,6 @@
 ---
 name: release-test
-description: Suite de tests E2E pre-release pour EurekAI. Lance le dev server si necessaire, joue le golden path via Chrome (tous les generateurs depuis des sources reelles), couvre les features recentes (N generations paralleles du meme type, dedup re-import sources, selection OCR + tarifs, garde-fou check-models), audit securite (SSRF, rate-limit, validation, headers, JSON malformed), et compile un rapport de findings. A utiliser avant chaque release/merge sur main, ou quand l'user demande "lance les tests de release", "verifie avant release", "/release-test".
+description: Suite de tests E2E pre-release pour EurekAI. Lance le dev server si necessaire, joue le golden path via Chrome (tous les generateurs depuis des sources reelles), couvre les features recentes (N generations paralleles du meme type, dedup re-import sources, selection OCR + tarifs, garde-fou check-models, categories et statuts de moderation), audit securite (SSRF, rate-limit, validation, headers, JSON malformed), et compile un rapport de findings. A utiliser avant chaque release/merge sur main, ou quand l'user demande "lance les tests de release", "verifie avant release", "/release-test".
 allowed-tools: Bash, Read, Grep, Glob
 ---
 
@@ -258,26 +258,44 @@ Glisser/uploader le meme fichier via l'UI → statut **`'duplicate'`** par fichi
 
 ## Phase 2quinquies — check-models : surveillance modeles (Feature B, PR #42)
 
-Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (resolution alias `-latest` + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) pour alerter sur un alias pointant vers une version depreciee/retiree. Script, pas d'UI.
+Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alias ↔ versions, independants de l'ordre, + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) sur `WATCHED_MODELS` (5 alias `-latest` resolus par l'app, recopies dans `WATCHED_ALIASES`, + `OCR_MODELS` et `MODERATION_MODEL` importes des sources uniques). Alertes : modele surveille **absent** de `/v1/models`, **alias ambigu**, groupe **deprecie/retire**, **defaut epingle en retard** sur l'alias de sa generation (sauf retard assume `OCR_DEFAULT_ACCEPTED_LAG`). Informations : retard assume, nouvelle generation (`-latest`), modele non suivi dans la famille moderation. Script, pas d'UI.
 
-1. **Path nominal** (avec cle) — rend l'overview via Lightpanda (~40s, budget timeout 120s) :
+1. **Path nominal** (avec cle) — rend l'overview via Lightpanda (1-2 s mesure, budget timeout 120s) :
    ```bash
-   set -a; . ./.env; set +a
-   timeout 120 npx tsx scripts/check-models.ts; echo "exit=$?"
+   timeout 120 npx tsx --env-file=.env scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` (**toujours** non bloquant).
-   - Sortie = soit `alias OK`, soit des alertes `⚠ ... deprecie ou retire`. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue (ex. `mistral-moderation-latest → mistral-moderation-2411 ... retire ...`). Reporter le contenu verbatim.
+   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user.
 2. **Path skip** (sans cle) :
    ```bash
    env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` + sortie contient `absent` / `skip`.
-3. **Cablage non bloquant** dans `check-deps.sh` + pin moderation coherent :
+3. **Cablage non bloquant** dans `check-deps.sh` (cle exportee, appel borne) + pin moderation coherent :
    ```bash
-   grep -n "check-models" scripts/check-deps.sh   # doit etre suivi de `|| true`
-   grep -n "mistral-moderation" generators/moderation.ts   # doit etre pinne 2603, pas -latest
+   grep -n "check-models" scripts/check-deps.sh          # appel via run_bounded, suivi de `|| true`
+   grep -n "export MISTRAL_API_KEY" scripts/check-deps.sh # sinon check-models skippe "absent"
+   grep -n "MODERATION_MODEL =" helpers/moderation-model.ts   # 'mistral-moderation-2603', jamais -latest
    ```
-4. (Unit deja couvert : `parseLegacyTable`, cross-reference, degradation gracieuse — ne pas redupliquer ici.)
+4. (Unit deja couvert : `parseLegacyTable`, `resolveGroup` (ordre, ambiguite), `findMissing`, `findLaggingDefaults` (retard assume), `findUntrackedFamilyModels`, instantane reel, degradation gracieuse — ne pas redupliquer ici.)
+
+## Phase 2sexies — Moderation 2 : categories, migration legacy, statuts (fix sept. 2026)
+
+Couvre le correctif Moderation 2 (`mistral-moderation-2603` a scinde `dangerous_and_criminal_content` en `dangerous` + `criminal`) et les statuts distingues. Moderation **gratuite** (cout Mistral nul).
+
+### Source unique a relire (ne jamais redupliquer la liste ici)
+- `helpers/moderation-model.ts` (`MODERATION_MODEL`, `MODERATION_MODEL_CATEGORIES`, table legacy), `helpers/moderation-http.ts` (statut → HTTP, priorite), `helpers/chat-sources.ts` (sources du chat).
+
+### A — Categories parentales (Chrome, cout nul)
+Ouvrir les reglages parentaux d'un profil avec moderation active : autant de cases que `GET /api/moderation-categories` → `all` (11 au 2026-09-26), chaque libelle **traduit** (jamais une cle brute `moderation.cat.*`), en FR, EN et AR (RTL) ; en largeur mobile (~390 px), la grille reste lisible et le bouton « reinitialiser » atteignable. Screenshot.
+
+### B — Conversion legacy (API, cout nul, MUTE un profil → profil de test uniquement)
+`PUT /api/profiles/:id` (avec `pin` si le profil en a un) et `moderationCategories: ["sexual","dangerous_and_criminal_content"]` → la reponse (et `profiles.json`) contient `["sexual","dangerous","criminal"]` + warn `mapped legacy` dans les logs serveur.
+
+### C — Blocage reel (API ; le 400 est gratuit, le 200 ajoute 1 source et declenche 1 detection de consigne mistral-large facturee → projet de test uniquement, supprimer la source ensuite)
+Profil de test avec moderation active et `criminal` coche : `POST /api/projects/:pid/sources/text` avec un texte d'activite illegale → **400** `moderation.blocked` ; un texte scolaire neutre → 200. Assert : jamais de page HTML sur une erreur.
+
+(Unit deja couvert : fail-closed `error` sur contrat rompu, 400/503/409 + priorite, statut effectif (source persistee `safe` dont une categorie bloquee vaut `true` → refusee en generation et au chat, badge rouge), chat sans sources non verifiees, garde `/generate/route` — ne pas redupliquer ici.)
 
 ## Phase 3 — Audit securite
 
@@ -342,9 +360,14 @@ Compiler dans la reponse a l'user :
 - Bouton reste cliquable pendant un pending (pas de spinner-disable) : ✓/✗
 - Dedup rejet (200, duplicates[], 0 source, 0 cout OCR) : ✓/✗
 - Dedup re-import force (allowDuplicates, contentHash identique) : ✓/✗/skip
-- check-models nominal (exit 0, alias OK ou alertes reportees) : ✓/✗
+- check-models nominal (exit 0, "modèles surveillés OK" + infos, ou alertes reportees) : ✓/✗
 - check-models skip sans cle (exit 0, "absent") : ✓/✗
-- Cablage check-deps.sh `|| true` + pin moderation 2603 : ✓/✗
+- Cablage check-deps.sh (cle exportee, run_bounded, `|| true`) + MODERATION_MODEL 2603 : ✓/✗
+
+### Moderation 2 (fix sept. 2026)
+- Categories parentales (11, libelles traduits FR/EN/AR, mobile) : ✓/✗
+- Conversion legacy dangerous_and_criminal_content → dangerous + criminal : ✓/✗/skip
+- Blocage reel (400 moderation.blocked, jamais de HTML) : ✓/✗/skip
 
 ### Securite (output script)
 - JSON malformed : ✓/✗
@@ -392,6 +415,7 @@ Quand l'app change et que le skill commence a echouer :
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
 - **N generations paralleles (Phase 2ter)** ancree sur `src/app/pending-utils.ts` (`pendingOfTypeExists`) + `body.gid` (UUID v4). Si le contrat gid ou la liberation de `loading[type]` change, mettre a jour la phase.
 - **Dedup sources (Phase 2quater)** ancree sur le contrat `/sources/upload` (array nu en full success, objet `{sources,duplicates?}` sinon, 200 sur lot 100% doublons, `allowDuplicates==='true'` strict) + `contentHash`. Si le contrat reponse evolue, mettre a jour la phase.
-- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda) + son cablage `|| true` dans `check-deps.sh`. Si le script devient bloquant ou change de source, mettre a jour la phase.
+- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda, `WATCHED_MODELS` = alias recopies + OCR_MODELS/MODERATION_MODEL importes des sources uniques, `OCR_DEFAULT_ACCEPTED_LAG`) + son cablage dans `check-deps.sh` (cle exportee, `run_bounded`, `|| true`). Si le script devient bloquant, change de source, de liste surveillee ou de libelles de sortie, mettre a jour la phase.
+- **Moderation (Phase 2sexies)** ancree sur `helpers/moderation-model.ts` (taxonomie du modele epingle). Si `MODERATION_MODEL` change, la taxonomie et la table legacy changent avec lui : mettre a jour les assertions A-C (nombre de categories, cles legacy).
 
 Ouvrir une PR `chore(release-test): update for <changement>` quand cette maintenance est faite.
