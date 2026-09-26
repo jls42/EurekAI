@@ -486,23 +486,28 @@ const fetchLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
 /* eslint-enable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument */
 
 // Dégradation gracieuse : un échec overview (réseau/Lightpanda) ne casse pas le diagnostic API-seul.
-const loadLegacyTable = async (): Promise<Map<string, LegacyEntry>> => {
+// null = table Legacy non lue : le « OK » final ne doit alors pas affirmer « aucun retiré ».
+const loadLegacyTable = async (): Promise<Map<string, LegacyEntry> | null> => {
   try {
     return await fetchLegacyTable();
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.log(`check-models: overview indisponible (${msg}) — diagnostic API seul.`);
-    return new Map();
+    return null;
   }
 };
 
+// Sans table Legacy, seuls les constats de l'API sont vérifiés : les retraits ne le sont pas.
+const okLine = (legacyChecked: boolean): string =>
+  legacyChecked
+    ? `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`
+    : `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible).`;
+
 // Alertes d'abord (en-tête ⚠ + marche à suivre), sinon « OK » ; les informations suivent toujours.
-const reportFindings = (findings: readonly Finding[]): void => {
+const reportFindings = (findings: readonly Finding[], legacyChecked: boolean): void => {
   const alerts = findings.filter((f) => f.level === 'alert');
   if (alerts.length === 0) {
-    console.log(
-      `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`,
-    );
+    console.log(okLine(legacyChecked));
   } else {
     console.log(
       'check-models: ⚠ modèles à vérifier (absent, ambigu, déprécié/retiré ou en retard) :',
@@ -532,7 +537,8 @@ export async function main(): Promise<void> {
       console.log('check-models: /v1/models renvoie une liste vide — skip (non bloquant).');
       return;
     }
-    reportFindings(collectFindings(models, await loadLegacyTable()));
+    const legacy = await loadLegacyTable();
+    reportFindings(collectFindings(models, legacy ?? NO_LEGACY), legacy !== null);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.log(`check-models: vérification impossible (${msg}) — skip (non bloquant).`);

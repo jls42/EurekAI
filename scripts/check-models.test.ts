@@ -693,23 +693,28 @@ describe('main (orchestration, non bloquant)', () => {
     ]);
   });
 
+  // Sans table Legacy : OK limité à l'API, retraits explicitement non vérifiés.
+  const DEGRADED_OK = `check-models: ${WATCHED_MODELS.length} modèles surveillés OK côté API (aucun absent, ambigu, déprécié ni en retard non assumé) — retraits NON vérifiés (table Legacy indisponible).`;
+
   it('degrades to the API-only diagnosis when the overview cannot be rendered', async () => {
     lightpandaFetch.mockRejectedValueOnce(new Error('lightpanda down'));
     const lines = await run({ data: watchedData() });
-    expect(lines[0]).toBe(
+    expect(lines).toEqual([
       'check-models: overview indisponible (lightpanda down) — diagnostic API seul.',
-    );
-    expect(lines[1]).toContain('modèles surveillés OK');
+      DEGRADED_OK,
+    ]);
   });
 
   it('signals a degraded diagnosis when the overview renders without a Legacy table', async () => {
     // Page déplacée ou format changé : jamais « rien de retiré » en silence.
     lightpandaFetch.mockResolvedValueOnce('# Overview\nno table here');
     const lines = await run({ data: watchedData() });
-    expect(lines[0]).toBe(
+    expect(lines).toEqual([
       'check-models: overview indisponible (table Legacy introuvable (0 ligne)) — diagnostic API seul.',
-    );
-    expect(lines[1]).toContain('modèles surveillés OK');
+      DEGRADED_OK,
+    ]);
+    // « aucun retiré » n'est pas vérifiable sans la table : jamais affirmé.
+    expect(DEGRADED_OK).not.toContain('retiré ni');
   });
 
   it('never throws when the API call fails (exit 0 spirit)', async () => {

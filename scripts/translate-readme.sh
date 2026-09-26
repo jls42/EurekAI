@@ -36,15 +36,17 @@ fi
 # Fournisseur : Codex sur l'abonnement ChatGPT (aucune facturation à l'usage), comme le
 # regen_translations.sh du traducteur — l'outil n'auto-détecte plus de clé d'API payante.
 # TRANSLATE_FLAGS REMPLACE ce défaut (ex. "--use_grok_cli --eco" si le quota Codex est épuisé).
-# Sans --use_codex / --use_grok_cli / --use_opencode, aipmt retombe sur l'API OpenAI FACTURÉE :
-# refusé sauf dérogation explicite TRANSLATE_ALLOW_PAID_API=1.
+# Sans --use_codex ni --use_grok_cli, aipmt retombe sur l'API OpenAI FACTURÉE ; --use_opencode
+# passe par le fournisseur configuré dans OpenCode (local, gratuit, abonnement ou CLÉ facturée,
+# selon --model) : refusés sauf dérogation explicite TRANSLATE_ALLOW_PAID_API=1.
 read -r -a PROVIDER_FLAGS <<< "${TRANSLATE_FLAGS:---use_codex}"
 case " ${PROVIDER_FLAGS[*]} " in
-  *" --use_codex "* | *" --use_grok_cli "* | *" --use_opencode "*) ;;
+  *" --use_codex "* | *" --use_grok_cli "*) ;;
   *)
     if [ "${TRANSLATE_ALLOW_PAID_API:-}" != "1" ]; then
       echo "ERROR: TRANSLATE_FLAGS='${TRANSLATE_FLAGS:-}' ne choisit aucun fournisseur sur abonnement" >&2
-      echo "(--use_codex, --use_grok_cli, --use_opencode) : API facturée à l'usage refusée." >&2
+      echo "(--use_codex, --use_grok_cli) : API potentiellement facturée à l'usage refusée" >&2
+      echo "(OpenCode compris : son fournisseur peut être une clé facturée)." >&2
       echo "Dérogation explicite : TRANSLATE_ALLOW_PAID_API=1." >&2
       exit 2
     fi
@@ -69,6 +71,19 @@ fi
 echo "=== Translating README.md from FR to: $LANGS ==="
 
 pids=()
+# Ctrl-C / TERM : un script non interactif lance ses jobs d'arrière-plan en ignorant SIGINT. Sans
+# relais, les traductions continueraient après l'arrêt (quota consommé, README-xx.md écrits avec
+# --force) : TERM à chaque job, attente, puis ré-émission du signal pour arrêter le script. Un
+# appel CLI déjà en vol (codex, grok…) peut finir seul, sans rien écrire.
+stop_jobs() {
+  if [ "${#pids[@]}" -gt 0 ]; then
+    kill -TERM "${pids[@]}" 2>/dev/null || true
+  fi
+  wait || true
+}
+trap 'stop_jobs; trap - INT; kill -INT $$' INT
+trap 'stop_jobs; trap - TERM; kill -TERM $$' TERM
+
 for lang in $LANGS; do
   echo "[README] -> $lang"
   "${TRANSLATE_CMD[@]}" \
