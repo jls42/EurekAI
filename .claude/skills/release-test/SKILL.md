@@ -265,7 +265,7 @@ Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alia
    timeout 120 npx tsx --env-file=.env scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` (**toujours** non bloquant).
-   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user.
+   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés` = controle PARTIEL (table Legacy non lue) : a remonter aussi, ce n'est pas un OK complet.
 2. **Path skip** (sans cle) :
    ```bash
    env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"

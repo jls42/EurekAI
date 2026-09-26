@@ -648,7 +648,9 @@ const runSingleGenerate = async function (
   }
 };
 
-// Sources visées par une génération : la sélection, sinon toutes (même règle que le serveur).
+// Sources visées par une génération standard : la sélection, sinon toutes (même règle que
+// buildGenContext). Limite : la « version facile à lire » (generateSimplified) envoie les sources
+// de la fiche d'origine, mais ce pré-contrôle porte sur la sélection courante — le serveur tranche.
 const generationSources = (state: AppContext): Source[] =>
   state.selectedIds.length > 0
     ? state.sources.filter((s: Source) => state.selectedIds.includes(s.id))
