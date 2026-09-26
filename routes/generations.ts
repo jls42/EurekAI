@@ -44,6 +44,7 @@ import { aiLimiter } from '../helpers/rate-limit.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
+import { rejectInvalidLang } from '../helpers/request-validation.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -477,7 +478,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   });
 
   // Sous-helper : valide la cible vocal-answer (gen quiz-vocal + question +
-  // file). Retourne le triplet validé, ou null après envoi de la réponse 4xx.
+  // file + lang). Retourne le couple validé, ou null après envoi de la réponse 4xx.
   function validateVocalAnswerTarget(
     req: Request,
     res: Response,
@@ -500,6 +501,9 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       res.status(400).json({ error: 'Fichier audio requis' });
       return null;
     }
+    // Repli des quiz legacy sans langue figée (resolveVocalAnswerLocale) : STT + prompt de
+    // vérification. Validé même quand la langue figée prime (400 invalid_input).
+    if (rejectInvalidLang(req, res)) return null;
     return { quizGen, question };
   }
 
@@ -546,7 +550,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     'all',
   ]);
 
-  // Sous-helper extrait : valide la cible read-aloud (gen + section). Retourne
+  // Sous-helper extrait : valide la cible read-aloud (gen + section + lang). Retourne
   // null après envoi d'une réponse 4xx si invalide.
   function validateReadAloudTarget(
     pid: string,
@@ -564,6 +568,8 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       res.status(400).json({ error: 'Section invalide' });
       return null;
     }
+    // `lang` choisit la voix (resolveVoices) et apparaît dans ses logs de repli.
+    if (rejectInvalidLang(req, res)) return null;
     return { gen, section };
   }
 

@@ -44,6 +44,12 @@ import { getConfig } from '../config.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
+import {
+  INVALID_INPUT,
+  type LocaleFields,
+  readBodyLang,
+  readLocaleFields,
+} from '../helpers/request-validation.js';
 
 const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
 
@@ -82,20 +88,30 @@ const tryUnlinkOrphan = (path: string): void => {
   try {
     unlinkSync(path);
   } catch (e) {
-    logger.warn('sources', `unlink orphan duplicate failed: ${path}`, e);
+    logger.warn('sources', `unlink orphan upload failed: ${path}`, e);
   }
 };
 
-// Sous-helper : valide le query input pour /sources/websearch. Retourne null si
-// invalide (et envoie déjà la réponse HTTP) — caller juste `return` après.
-function validateWebsearchQuery(req: Request, res: Response): string | null {
-  const { query } = req.body;
-  if (!query || typeof query !== 'string' || query.trim().length === 0) {
-    res.status(400).json({ error: 'query requis' });
+type RawWebSearchBody = {
+  query?: unknown;
+  lang?: unknown;
+  ageGroup?: unknown;
+  scrapeMode?: string;
+};
+type WebSearchParams = LocaleFields & { query: string; scrapeMode: string };
+
+// Corps de /sources/websearch validé AVANT la modération et toute collecte : requête non vide,
+// lang/ageGroup absents (défauts fr/enfant) ou valides — ils partent dans le prompt de
+// recherche. null = 400 invalid_input déjà envoyé, l'appelant `return`.
+const validateWebsearchBody = (req: Request, res: Response): WebSearchParams | null => {
+  const body = (req.body ?? {}) as RawWebSearchBody;
+  const locale = readLocaleFields(body.lang, body.ageGroup);
+  if (isBlankString(body.query) || !locale) {
+    res.status(400).json({ error: INVALID_INPUT });
     return null;
   }
-  return query;
-}
+  return { ...locale, query: body.query as string, scrapeMode: body.scrapeMode ?? 'auto' };
+};
 
 const runConsigneDetection = async (
   store: ProjectStore,
@@ -240,7 +256,6 @@ type UploadBatchOutcome = {
 };
 type WebSourceFailure = { label: string; code: string };
 type WebSourceOutcome = { source: Source | null; failure: WebSourceFailure | null };
-type WebSearchBody = { lang?: string; ageGroup?: AgeGroup; query: string; scrapeMode?: string };
 type ProcessedUpload = { markdown: string; elapsed: number; confidence?: OcrConfidence };
 type SttPipelineResult = {
   text: string;
@@ -666,21 +681,15 @@ const pushOutcome = (
   if (outcome.failure) failures.push(outcome.failure);
 };
 
-const normalizeWebSearchBody = (body: WebSearchBody) => ({
-  lang: body.lang ?? 'fr',
-  ageGroup: body.ageGroup ?? 'enfant',
-  scrapeMode: body.scrapeMode ?? 'auto',
-  ...parseWebInput(body.query.trim()),
-});
-
 const collectWebSources = async (
   store: ProjectStore,
   client: Mistral,
   pid: string,
-  body: WebSearchBody,
+  params: WebSearchParams,
   modCats: string[] | null,
 ): Promise<{ sources: Source[]; failures: WebSourceFailure[] }> => {
-  const { lang, ageGroup, scrapeMode, urls, searchQuery } = normalizeWebSearchBody(body);
+  const { lang, ageGroup, scrapeMode } = params;
+  const { urls, searchQuery } = parseWebInput(params.query.trim());
   const sources: Source[] = [];
   const failures: WebSourceFailure[] = [];
   const now = new Date().toISOString();
@@ -724,6 +733,26 @@ const persistWebsearchSources = (
   }
 };
 
+type UploadRequest = { files: Express.Multer.File[]; lang: string; allowDuplicates: boolean };
+
+// Champs de /sources/upload, lus APRÈS multer (multipart) : fichiers présents, `lang` valide. Un
+// refus supprime les fichiers que diskStorage a déjà écrits (sinon orphelins dans le dossier
+// uploads du projet). null = 400 déjà envoyé. `allowDuplicates === 'true'` STRICT (cf. CLAUDE.md).
+const readUploadRequest = (req: Request, res: Response): UploadRequest | null => {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  if (files.length === 0) {
+    res.status(400).json({ error: 'Aucun fichier envoye' });
+    return null;
+  }
+  const lang = readBodyLang(req, res);
+  if (lang === null) {
+    for (const file of files) tryUnlinkOrphan(file.path);
+    return null;
+  }
+  const allowDuplicates = req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
+  return { files, lang, allowDuplicates };
+};
+
 const registerUploadRoute = (
   router: Router,
   store: ProjectStore,
@@ -743,32 +772,19 @@ const registerUploadRoute = (
         res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;
       }
-      const files = req.files as Express.Multer.File[];
-      if (!files || files.length === 0) {
-        res.status(400).json({ error: 'Aucun fichier envoye' });
-        return;
-      }
+      const upload = readUploadRequest(req, res);
+      if (!upload) return;
       const modCats = getModerationCategories(store, profileStore, pid);
-      const allowDuplicates =
-        req.body.allowDuplicates === 'true' || req.body.allowDuplicates === true;
       const { results, failures, duplicates } = await processUploadBatch(
         store,
         client,
-        files,
+        upload.files,
         pid,
         modCats,
-        allowDuplicates,
+        upload.allowDuplicates,
       );
       if (results.length > 0) {
-        triggerUploadDownstream(
-          store,
-          client,
-          fingerprint,
-          pid,
-          req.body.lang || 'fr',
-          modCats,
-          results,
-        );
+        triggerUploadDownstream(store, client, fingerprint, pid, upload.lang, modCats, results);
       }
       sendUploadResponse(res, results, failures, duplicates);
     },
@@ -793,6 +809,8 @@ const registerTextRoute = (
       res.status(400).json({ error: 'Texte requis' });
       return;
     }
+    const lang = readBodyLang(req, res);
+    if (lang === null) return;
     const modCats = getModerationCategories(store, profileStore, req.params.pid);
     const checked = await moderateUserInput(client, res, text, modCats);
     if (!checked.ok) return;
@@ -807,7 +825,7 @@ const registerTextRoute = (
     };
     store.addSource(req.params.pid, source);
     logger.info('sources', `Texte libre ajoute: ${source.markdown.length} chars`);
-    triggerConsigneDetection(store, client, fingerprint, req.params.pid, req.body.lang || 'fr');
+    triggerConsigneDetection(store, client, fingerprint, req.params.pid, lang);
     res.json(source);
   });
 };
@@ -836,8 +854,9 @@ const registerVoiceRoute = (
         res.status(400).json({ error: 'Fichier audio requis' });
         return;
       }
+      const lang = readBodyLang(req, res);
+      if (lang === null) return;
       try {
-        const lang = req.body.lang || 'fr';
         const stt = await runSttPipeline(store, client, pid, file, lang, res);
         if (!stt) return;
         res.json(
@@ -866,25 +885,17 @@ const registerWebsearchRoute = (
       res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
-    const query = validateWebsearchQuery(req, res);
-    if (query === null) return;
+    const params = validateWebsearchBody(req, res);
+    if (params === null) return;
     const modCats = getModerationCategories(store, profileStore, pid);
-    if (!(await moderateUserInput(client, res, query, modCats)).ok) return;
+    if (!(await moderateUserInput(client, res, params.query, modCats)).ok) return;
     try {
-      const { sources, failures } = await collectWebSources(store, client, pid, req.body, modCats);
+      const { sources, failures } = await collectWebSources(store, client, pid, params, modCats);
       if (sources.length === 0) {
         res.status(500).json({ error: 'Aucune source extraite', failures });
         return;
       }
-      persistWebsearchSources(
-        store,
-        client,
-        fingerprint,
-        pid,
-        sources,
-        modCats,
-        req.body.lang || 'fr',
-      );
+      persistWebsearchSources(store, client, fingerprint, pid, sources, modCats, params.lang);
       respondWebsearchSources(res, sources, failures);
     } catch (e) {
       logger.error('sources', 'Web search error:', e);
@@ -919,13 +930,10 @@ const registerConsigneRoute = (router: Router, store: ProjectStore): void => {
       res.status(400).json({ error: 'Aucune source' });
       return;
     }
+    const lang = readBodyLang(req, res);
+    if (lang === null) return;
     try {
-      const result = await detectConsigne(
-        client,
-        getMarkdown(project.sources),
-        undefined,
-        req.body.lang || 'fr',
-      );
+      const result = await detectConsigne(client, getMarkdown(project.sources), undefined, lang);
       if (!store.setConsigne(pid, result)) {
         res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
         return;

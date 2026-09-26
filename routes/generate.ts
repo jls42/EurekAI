@@ -57,6 +57,11 @@ import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import {
+  INVALID_INPUT,
+  isOptionalAgeGroup,
+  isOptionalLangCode,
+} from '../helpers/request-validation.js';
+import {
   blockingModerationStatus,
   moderationRejection,
   profileBlockedCategories,
@@ -201,14 +206,10 @@ function parseCount(raw: unknown): number | undefined {
   return n && Number.isFinite(n) ? Math.min(Math.max(Math.round(n), 1), 50) : undefined;
 }
 
-const VALID_AGE_GROUPS: ReadonlySet<AgeGroup> = new Set(['enfant', 'ado', 'etudiant', 'adulte']);
-
 // Predicates individuels (arrow) — evitent le piege Lizard d'agglomeration des
 // `function foo()` top-level consecutives, et gardent chaque check sous CCN 8.
-const isNonEmptyString = (v: unknown): boolean => typeof v === 'string' && v.length > 0;
-const isOptionalNonEmptyString = (v: unknown): boolean => v === undefined || isNonEmptyString(v);
-const isOptionalAgeGroup = (v: unknown): boolean =>
-  v === undefined || VALID_AGE_GROUPS.has(v as AgeGroup);
+// lang/ageGroup : predicats partages avec le chat, la recherche web et les sources
+// (helpers/request-validation.ts) — un code de langue, jamais du texte libre.
 const isOptionalNullableString = (v: unknown): boolean =>
   v === undefined || v === null || typeof v === 'string';
 const isOptionalBoolean = (v: unknown): boolean => v === undefined || typeof v === 'boolean';
@@ -225,7 +226,7 @@ type BodyCheck = (b: Record<string, unknown>) => boolean; // eslint-disable-line
 // Un contrôle par champ, dans l'ordre historique ; `every` s'arrête au premier échec comme
 // la chaîne de && qu'il remplace (Lizard ne mesurait pas ce corps d'expression multi-lignes).
 const BODY_CHECKS: readonly BodyCheck[] = [
-  (b) => isOptionalNonEmptyString(b.lang),
+  (b) => isOptionalLangCode(b.lang),
   (b) => isOptionalAgeGroup(b.ageGroup),
   (b) => isOptionalNullableString(b.profileId),
   (b) => isOptionalBoolean(b.useConsigne),
@@ -256,13 +257,15 @@ const configuredModel = (models: ModelConfig, modelId?: string): string => {
 
 type ValidateResult = { ok: true } | { ok: false; error: string };
 
-const INVALID: ValidateResult = { ok: false, error: 'invalid_input' };
+const INVALID: ValidateResult = { ok: false, error: INVALID_INPUT };
 const OK: ValidateResult = { ok: true };
 
 // Validation primitive des inputs de /generate/*. Sans ce check, un payload
 // avec types incorrects (lang: 12345, ageGroup: [], profileId: null) etait
 // silencieusement accepte et fallback sur les defaults — consommation Mistral
 // sans validation, et impossible de distinguer un bug client d'une vraie demande.
+// `lang` doit etre un code de langue : une chaine libre finissait telle quelle dans
+// langInstruction (injection de consignes que la moderation ne voit pas).
 // Appele en tete de buildGenContext, donc EN AMONT de addPendingEntry, pour rejet 400 propre
 // (cf. CLAUDE.md "Validations early extraites des generators").
 const allChecksPass = (b: Record<string, unknown>): boolean => BODY_CHECKS.every((c) => c(b));

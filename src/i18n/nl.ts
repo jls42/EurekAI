@@ -96,6 +96,7 @@ export const nl: Record<string, string> = {
   'errorCode.upload_failed': 'Uploaden mislukt',
   'errorCode.file_too_large': 'Dit bestand is te groot. Probeer een kleiner bestand.',
   'errorCode.all_steps_failed': 'Alle generaties mislukt',
+  'errorCode.invalid_input': 'Ongeldig verzoek',
   'errorCode.profile_delete_partial':
     'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',
 

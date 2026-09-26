@@ -97,6 +97,7 @@ export const de: Record<string, string> = {
   'errorCode.upload_failed': 'Upload fehlgeschlagen',
   'errorCode.file_too_large': 'Diese Datei ist zu gro\u00df. Versuch es mit einer kleineren Datei.',
   'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
+  'errorCode.invalid_input': 'Ungültige Anfrage',
   'errorCode.profile_delete_partial':
     'Profil loeschen unvollstaendig: einige Projekte konnten nicht geloescht werden',
 

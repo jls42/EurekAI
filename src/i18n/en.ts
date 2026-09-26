@@ -94,6 +94,7 @@ export const en: Record<string, string> = {
   'errorCode.upload_failed': 'Upload failed',
   'errorCode.file_too_large': 'This file is too big. Try a smaller one.',
   'errorCode.all_steps_failed': 'All generations failed',
+  'errorCode.invalid_input': 'Invalid request',
   'errorCode.profile_delete_partial':
     'Profile deletion incomplete: some projects could not be deleted',
 

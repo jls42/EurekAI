@@ -97,6 +97,7 @@ export const pt: Record<string, string> = {
   'errorCode.upload_failed': 'Falha no envio',
   'errorCode.file_too_large': 'Este ficheiro \u00e9 demasiado grande. Tenta com um mais pequeno.',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
+  'errorCode.invalid_input': 'Pedido inválido',
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',
 

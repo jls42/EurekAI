@@ -47,6 +47,11 @@ export const AGE_GROUP_CONFIG: Record<
   adulte: { moderationDefault: false, consigneDefault: false, chatDefault: true },
 };
 
+// Garde d'entrée des routes IA (cf. helpers/request-validation.ts). Object.hasOwn plutôt qu'une
+// lecture d'index : un ageGroup hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
+export const isAgeGroup = (v: unknown): v is AgeGroup =>
+  typeof v === 'string' && Object.hasOwn(AGE_GROUP_CONFIG, v);
+
 export function hashPin(pin: string): string {
   return createHash('sha256').update(pin).digest('hex');
 }

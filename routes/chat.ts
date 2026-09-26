@@ -36,6 +36,7 @@ const FILL_BLANK = 'fill-blank';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
 import { selectChatSources } from '../helpers/chat-sources.js';
+import { INVALID_INPUT, readLocaleFields } from '../helpers/request-validation.js';
 
 type ChatProject = NonNullable<ReturnType<ProjectStore['getProject']>>;
 
@@ -79,19 +80,19 @@ type ChatBody = { message: string; lang: string; ageGroup: AgeGroup };
 
 interface RawChatBody {
   message?: unknown;
-  lang?: string;
-  ageGroup?: AgeGroup;
+  lang?: unknown;
+  ageGroup?: unknown;
 }
 
+// lang/ageGroup partent dans le prompt système du chat et des outils : validés ici (400
+// invalid_input), AVANT la modération, qui ne lit que le message.
 const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidationError => {
-  const { message, lang: reqLang, ageGroup: reqAgeGroup } = body ?? {};
+  const { message, lang, ageGroup } = body ?? {};
   if (!message || typeof message !== 'string')
     return new ChatValidationError(400, 'message requis');
-  return {
-    message,
-    lang: reqLang || 'fr',
-    ageGroup: reqAgeGroup || 'enfant',
-  };
+  const locale = readLocaleFields(lang, ageGroup);
+  if (!locale) return new ChatValidationError(400, INVALID_INPUT);
+  return { message, ...locale };
 };
 
 // unsafe → 400 chat.moderationBlocked ; error (contrat rompu) → 503 moderation.error. Les
