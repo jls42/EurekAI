@@ -8,15 +8,26 @@ allowed-tools: Bash, Read, Grep, Glob
 
 Pre-release validation : golden path E2E + audit securite. Generique par construction (lit `categories[]` dynamique cote app, decouvre projet/profil via API, pas de coords HTML hardcodees) — robuste aux refactors UI et ajouts de generateurs.
 
-## Pre-requis utilisateur (a annoncer au debut)
+> **Redaction de ce fichier** : ne jamais ecrire un `$` suivi d'un chiffre (prix, `dirname`…). Quand le skill est invoque avec des arguments, Claude Code remplace « dollar + chiffre » (dollar-zero, dollar-un…) par ces arguments et rend les attentes illisibles (vecu : un prix a 0.50 devenu « Validation.50 »). Ecrire les prix en `USD`.
 
-Le skill **ne reset pas les donnees** automatiquement (preservation des sources de l'user). Demander une fois au debut :
+## Pre-requis : mode par defaut, SANS demander
 
-> "Je vais lancer les tests E2E + securite. Tu veux que je :
->   (a) **tester sur l'etat actuel** (sources existantes, profil actuel) — le plus rapide, mais skip les checks d'import
->   (b) attendre que tu **resets** (`sudo rm -rf output/*`) et importes des sources fraiches — couverture complete
->
-> Je peux aussi reproduire automatiquement les conditions de test : profil enfant FR + au moins 1 source. Dis-moi."
+Le skill ne touche jamais aux donnees reelles de l'user et ne reset rien. Mode par defaut, a annoncer en une ligne puis a executer sans attendre de reponse :
+
+1. **Sauvegarde** : `tar` de `output/` dans le scratchpad (`chmod 600`) + `sha256sum` de tous les fichiers (hors `.deps-checked.json`).
+2. **Donnees de test via l'API** : `POST /api/profiles` (profil enfant FR, age 9, PIN de test), `POST /api/projects` rattache a ce profil, 1 lecon texte via `POST /api/projects/:pid/sources/text`. Dans Chrome, pointer `sf-profileId` et `sf-profile-last-project` sur ce profil/projet puis recharger.
+3. **Nettoyage en fin de run** : `DELETE /api/profiles/:id` avec le PIN (cascade sur ses projets et fichiers), retirer les cles du profil de test du `localStorage` (`sf-profile-*`), remettre `sf-profileId` et `sf-locale` sur le profil d'origine, fermer l'onglet, puis verifier que les `sha256sum` de `output/` sont identiques a la sauvegarde.
+
+Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent que si l'user le demande explicitement.
+
+### Pieges d'automatisation connus (mesures 2026-09-26)
+
+- **`authLimiter` = 30 requetes / 15 min sur TOUTES les routes `/api/profiles`** (lecture comprise, saisies de PIN, `PUT`, `DELETE`). Economiser ces appels (lire `updatedAt` une seule fois, peu de saisies de PIN) : sinon le `DELETE` de nettoyage recoit un 429. Lire alors `Retry-After` (`curl -i`) et reessayer apres ce delai.
+- **Le script securite (phase 3) sature `generalLimiter`** (rafales de 350 requetes) : lancer la phase 3 APRES les phases UI, et attendre environ 60 s avant de nouveaux appels.
+- **Onglet Chrome en arriere-plan** : les transitions Alpine n'avancent qu'a chaque capture, et une vue parait « estompee ». Enchainer 2 captures (la premiere en `scale` 0.2) avant de juger un rendu.
+- **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-locale` dans le `localStorage`, puis recharger.
+- **Champs PIN** : une extension de gestion de mots de passe peut bloquer `javascript_tool` quand le focus est sur le champ (erreur `chrome-extension://`) : utiliser clic + frappe, pas de JS sur ce champ.
+- **Sondes audio** : ne pas attendre les metadonnees `<audio>` en JS (delai de 45 s depasse). Mesurer les MP3 avec `ffprobe` sur `output/projects/<pid>/`.
 
 ## Phase 0 — Boot
 
@@ -144,15 +155,15 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
    ```
 3. Assertions (croiser avec les `grep` ci-dessus, ne rien hardcoder) :
    - `ocr` (les `option.value`) = exactement les valeurs de `OCR_MODELS` (ordre actuel : OCR 4 puis OCR 3).
-   - Les labels OCR montrent le **nom produit** (`OCR_MODEL_LABELS` : "OCR 4" / "OCR 3"), PAS l'ID brut ; OCR 4 contient `$4`, OCR 3 contient `$2`, les deux l'unite pages (`1000`).
+   - Les labels OCR montrent le **nom produit** (`OCR_MODEL_LABELS` : "OCR 4" / "OCR 3"), PAS l'ID brut ; OCR 4 affiche 4 USD, OCR 3 affiche 2 USD (signe dollar dans l'UI), les deux avec l'unite pages (`1000`).
    - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-0`).
    - L'option `DEFAULT_OCR_MODEL` (OCR 4) porte le suffixe recommande (texte i18n `settings.recommended`).
-   - Labels modele principal : `mistral-large` → `$0.50 / $1.50`, `mistral-medium` → `$1.50 / $7.50`, `mistral-small` → `$0.15 / $0.60`.
-   - `tts` contient `$16`.
+   - Labels modele principal : en USD par M tokens (entree / sortie) : `mistral-large` → 0.50 / 1.50, `mistral-medium` → 1.50 / 7.50, `mistral-small` → 0.15 / 0.60.
+   - `tts` affiche 16 USD par M caracteres.
    - **AUCUN** label/span ne contient `tarif indisponible` / `price unavailable` (regression `modelPriceLabel` → `priceUnknown`, ex. unite `audio-seconds` non geree).
 4. Screenshot du dialog (preuve visuelle des tarifs).
 
-### B — Routage effectif des deux modèles OCR (cost-tracking, ~$0.005, 2 uploads)
+### B — Routage effectif des deux modèles OCR (cost-tracking, ~0.006 USD, 2 uploads)
 
 **⚠ Mute la config** (`PUT /api/config`, restauree en fin de phase) **et ajoute 2 sources de test** au projet. A confirmer avec l'user si mode "etat actuel". But : prouver end-to-end que le modele OCR choisi est bien envoye ET tarife correctement (OCR 4 = 2x OCR 3).
 
@@ -228,7 +239,7 @@ grep -nE "contentHash|hashFileContent|allowDuplicates" routes/sources.ts | head
 grep -nE "findExistingDuplicate|hashFile" src/app/source-dedup.ts | head
 ```
 
-### A — Rejet du doublon (API, cout $0, ne mute rien)
+### A — Rejet du doublon (API, cout nul, ne mute rien)
 
 Pre-req : au moins 1 source avec `contentHash` (la fixture de 2bis B, sinon l'uploader 1×). `FIX=/tmp/ocr-test.png`.
 
@@ -244,7 +255,7 @@ Assertions :
 - Reponse = objet `{ ..., duplicates: [...] }` avec `duplicates.length >= 1` (pas un array nu, et la fixture n'est PAS dans `sources`).
 - `GET /api/projects` : `sources.length === SRC_BEFORE` (aucune source creee) **ET** `totalCost === COST_BEFORE` (aucun OCR refacture). ← invariant anti-double-facturation, le plus important.
 
-### B — Re-import force (API, +1 OCR ~ $0.004, MUTE le projet → confirmer en mode "etat actuel")
+### B — Re-import force (API, +1 OCR ~0.004 USD, MUTE le projet → confirmer en mode "etat actuel")
 
 ```bash
 curl -s -X POST "$BASE/api/projects/$PROJECT_ID/sources/upload" -F "files=@$FIX" -F "allowDuplicates=true" -w '\n__HTTP_%{http_code}'
@@ -302,7 +313,7 @@ Profil de test avec moderation active et `criminal` coche : `POST /api/projects/
 Lancer le script securite dedie :
 
 ```bash
-PROJECT_ID=$PROJECT_ID PROFILE_ID=$PROFILE_ID bash ${CLAUDE_PLUGIN_ROOT:-$(dirname $0)/..}/scripts/security-tests.sh
+PROJECT_ID=$PROJECT_ID PROFILE_ID=$PROFILE_ID bash "${CLAUDE_PLUGIN_ROOT:-.claude/skills/release-test}/scripts/security-tests.sh"
 ```
 
 Note : si `CLAUDE_PLUGIN_ROOT` n'est pas defini (skill en project mode), fallback sur `.claude/skills/release-test/scripts/security-tests.sh` depuis la racine du repo.
@@ -346,13 +357,13 @@ Compiler dans la reponse a l'user :
 ### Golden path E2E
 | Generateur | Status | Cout | Notes |
 |------------|--------|------|-------|
-| summary    | ✓/✗    | $0.X | ...   |
+| summary    | ✓/✗    | 0.X USD | ...   |
 ...
 
 ### OCR + tarifs modeles (PR #41)
 - Selecteur OCR (OCR 3 / OCR 4 + tarifs) : ✓/✗
 - Libelles tarifaires modele principal + TTS (aucun "tarif indisponible") : ✓/✗
-- Routage live OCR 3 (cout/page ≈ $2/1000) : ✓/✗/skip
+- Routage live OCR 3 (cout/page ≈ 2 USD/1000) : ✓/✗/skip
 - Routage live OCR 4 (cout/page ≈ 2x OCR 3) : ✓/✗/skip
 
 ### Features PR #42
@@ -402,7 +413,7 @@ Pour que ce skill reste valable dans le temps :
 3. **Lire les listes dynamiques** (`categories[]`, `AUTO_AGENTS_SET`) depuis le code/DOM, jamais redupliquer ici. Ce skill **ne doit pas connaitre la liste exhaustive des generateurs** — il l'observe.
 4. **Tests securite : noms des cles d'erreur stables** (`invalid_json`, `invalid_input`, `upstream_unavailable`, `internal_error`) — cf. `types.ts:FailedStepCode`. Si ces codes changent, mettre a jour ce skill ET `helpers/error-code-resolution.ts`.
 5. **Budgets de timeout** : podcast/quiz-vocal peuvent prendre 60-90s. Ne pas timeout < 120s.
-6. **Cost-conscious** : tester 1× chaque generateur par run (pas en boucle). Le script securite ne fait QUE des requetes qui doivent etre rejetees en amont (pas d'appel Mistral). Budget run complet ≈ $0.15-0.25.
+6. **Cost-conscious** : tester 1× chaque generateur par run (pas en boucle). Le script securite ne fait QUE des requetes qui doivent etre rejetees en amont (pas d'appel Mistral). Budget run complet ≈ 0.30-0.50 USD (mesure 2026-09-26 : 0.28 USD suivis + ~0.10 USD de frais d'outil par illustration, non suivis par le cost tracking).
 7. **Pas de destructive** : ne JAMAIS faire `rm -rf output/`, `DELETE /api/projects/*`, ou modifier `config.json` sans confirmation explicite. Seul le mode "reset" requiert l'action de l'user (commande affichee, mais executee par lui).
 
 ## En cas d'evolution du projet

@@ -175,6 +175,7 @@ Cycle de vie des générations en cours :
 - Pour les taches complexes : commencer en Plan mode, iterer sur le plan, puis implementer
 - **Modele des sous-agents** : spawner **TOUS** les sous-agents (Explore, Plan, recherche, review, general-purpose, etc.) en **Opus** — **jamais Haiku**. Passer `model: "opus"` explicitement a l'outil Agent.
 - Apres implementation : verifier l'integration complete (pas de bouton manquant, pas de type oublie)
+- **Avant d'annoncer une PR « prête à merger » ou une release, lancer SOI-MÊME le skill `/release-test`** (golden path Chrome sur TOUS les générateurs, phases des features récentes, audit sécurité, cost tracking), sans attendre que l'utilisateur le demande : les tests unitaires + un E2E ciblé sur la zone modifiée ne suffisent pas. Toujours sur un profil/projet de test (jamais les données réelles), `output/` sauvegardé avant et restauré après ; joindre le rapport du skill au bilan (findings HIGH/MEDIUM = pas de « prêt à merger »).
 - **Avant chaque commit** : verifier si `CLAUDE.md`, `.claude/rules/` ou `README.md` doivent etre mis a jour pour refleter les changements. Mettre a jour si necessaire, montrer le diff README a l'utilisateur pour validation avant traduction
 - **Après chaque `git push`** (sur une PR, jamais main) : surveiller les checks GitHub automatiquement.
   1. Attendre ~30-60s que Codacy / SonarQube / SonarCloud / CodeFactor scannent.
