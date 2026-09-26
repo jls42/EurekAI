@@ -441,6 +441,15 @@ const remediationLabelForLang = (lang: string): string => (lang === 'en' ? 'Reca
 const falcLabelForLang = (lang: string): string =>
   lang === 'en' ? 'Easy version' : 'Version facile';
 
+// quiz-review et remediation-summary : la garde de modération (buildGenContext → checkModeration)
+// et le tracker portent sur les sources que reçoit le LLM, celles du quiz d'origine ([] legacy =
+// toutes, comme getMarkdownOrNull) — jamais sur body.sourceIds : absent dans l'UI (toutes les
+// sources : sur-blocage par une source signalée sans rapport), et libre pour un appel API direct
+// (d'autres sources passaient la garde). Réassigné, pas muté : le corps reçu reste intact.
+const scopeToOriginalQuizSources = (req: Request, originalGen: QuizGeneration): void => {
+  req.body = { ...req.body, sourceIds: originalGen.sourceIds };
+};
+
 function validateQuizReviewInputs(
   store: ProjectStore,
   pid: string,
@@ -1434,6 +1443,7 @@ const registerQuizReviewRoute = (
       return;
     }
     const { originalGen, weakQuestions, markdown, reviewLabel } = validation.data;
+    scopeToOriginalQuizSources(req, originalGen);
     await handleGeneration(
       store,
       profileStore,
@@ -1483,6 +1493,7 @@ const registerRemediationSummaryRoute = (
     }
     const { originalGen, weakQuestions, markdown } = validation.data;
     const remediationLabel = remediationLabelForLang(req.body.lang || 'fr');
+    scopeToOriginalQuizSources(req, originalGen);
     await handleGeneration(
       store,
       profileStore,

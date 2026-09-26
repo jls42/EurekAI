@@ -1902,6 +1902,85 @@ describe('generateRoutes', () => {
     });
   });
 
+  // Garde de modération de la remédiation sur les sources que reçoit le LLM : celles du quiz
+  // d'origine, jamais body.sourceIds (absent dans l'UI → toutes ; libre pour un appel direct).
+  describe.each([
+    ['/:pid/generate/quiz-review', 'quiz'],
+    ['/:pid/generate/remediation-summary', 'summary'],
+  ] as const)('%s : garde sur les sources du quiz d’origine', (path, expectedType) => {
+    const weak = [{ question: 'Q1', choices: ['a', 'b'], correct: 0, explanation: 'E1' }];
+
+    // Profil enfant modéré, deux sources et un quiz construit sur `quizSourceIds`.
+    const setup = (statuses: Record<string, 'safe' | 'unsafe'>, quizSourceIds: string[]) => {
+      const kid = profileStore.create('Kid', 9, '0', 'fr');
+      const pid = store.createProject('Test', kid.id).meta.id;
+      for (const [id, status] of Object.entries(statuses)) {
+        store.addSource(pid, {
+          id,
+          filename: `${id}.txt`,
+          markdown: `Contenu ${id}`,
+          uploadedAt: new Date().toISOString(),
+          moderation: { status, categories: {} },
+        });
+      }
+      store.addGeneration(pid, {
+        id: 'gen-quiz',
+        title: 'Quiz',
+        createdAt: new Date().toISOString(),
+        sourceIds: quizSourceIds,
+        type: 'quiz',
+        data: [{ question: 'Q1', choices: ['a', 'b'], correct: 0, explanation: 'E1' }],
+      });
+      return pid;
+    };
+
+    const post = async (pid: string, extra: Record<string, unknown> = {}) => {
+      const res = mockRes();
+      const body = { generationId: 'gen-quiz', weakQuestions: weak, lang: 'fr', ...extra };
+      await getHandler(router, 'post', path)(mockReq({ params: { pid }, body }), res);
+      return res;
+    };
+
+    it('source signalée hors du quiz, UI sans sourceIds : 200, tracker sur les sources du quiz', async () => {
+      const pid = setup({ 'src-quiz': 'safe', 'src-other': 'unsafe' }, ['src-quiz']);
+      const addPending = vi.spyOn(store, 'addPendingEntry');
+
+      const res = await post(pid);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith(
+        expect.objectContaining({ type: expectedType, sourceIds: ['src-quiz'] }),
+      );
+      expect(addPending).toHaveBeenCalledWith(
+        pid,
+        expect.objectContaining({ sourceIds: ['src-quiz'] }),
+      );
+    });
+
+    it('source signalée du quiz : 400 même avec body.sourceIds vers une source saine', async () => {
+      const pid = setup({ 'src-quiz': 'unsafe', 'src-safe': 'safe' }, ['src-quiz']);
+      const { generateQuizReview } = await import('../generators/quiz.js');
+      const { generateRemediationSummary } = await import('../generators/summary.js');
+
+      const res = await post(pid, { sourceIds: ['src-safe'] });
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+      expect(generateQuizReview).not.toHaveBeenCalled();
+      expect(generateRemediationSummary).not.toHaveBeenCalled();
+      expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
+    });
+
+    it('quiz legacy sans sources (sourceIds: []) : toutes les sources, comme le LLM', async () => {
+      const pid = setup({ 'src-a': 'safe', 'src-b': 'unsafe' }, []);
+
+      const res = await post(pid, { sourceIds: ['src-a'] });
+
+      expect(res.status).toHaveBeenCalledWith(400);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
+  });
+
   describe('POST /:pid/generate/dictation', () => {
     it('génère items + 1 audio par mot, lang/ageGroup figés', async () => {
       const project = store.createProject('Test');

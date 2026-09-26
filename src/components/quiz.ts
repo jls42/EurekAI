@@ -1,6 +1,7 @@
 import { stepByStep, type StepByStepBase } from './step-by-step';
 import { withAiHeaders } from '../app/ai-fetch';
-import { registerGeneration } from '../app/generate';
+import { canStartGenerate, registerGeneration } from '../app/generate';
+import { getLocale } from '../i18n/index';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
 import type { Generation, QuizGeneration, QuizQuestion, QuizStats } from '../../types';
@@ -23,6 +24,11 @@ interface QuizContext extends StepByStepBase<QuizQuestion>, AppContext {
 type QuizGen = Generation & { data: QuizQuestion[]; stats?: QuizStats };
 
 const API_PROJECTS = '/api/projects/';
+
+type RemediationTarget = 'remediation-summary' | 'quiz-review';
+
+// Refus de modération (contenu signalé) : réessayer produirait le même refus.
+const MODERATION_BLOCKED = 'moderation.blocked';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Méthodes extraites de quizComponent — `const = function` pour éviter
@@ -116,9 +122,38 @@ const collectWeakQuestions = function (
   return weak;
 };
 
+// Sources du quiz d'origine : le serveur garde la remédiation sur elles et ne donne qu'elles au
+// LLM. [] = toutes les sources du projet, comme le serveur (quiz ancien sans sourceIds compris).
+const quizSourceIds = (gen: Generation): string[] => {
+  return (gen.sourceIds as string[] | undefined) ?? [];
+};
+
+// Corps d'une cible : lang et ageGroup, obligatoires sur tout appel IA — langue de l'interface,
+// âge du profil courant (absent sans profil : défaut du serveur).
+const remediationBody = (state: QuizContext, weakQuestions: QuizQuestion[]) => {
+  return {
+    generationId: state.gen.id,
+    weakQuestions,
+    lang: getLocale(),
+    ageGroup: state.currentProfile?.ageGroup,
+  };
+};
+
+// Code d'erreur stable renvoyé par le serveur (`{ error }`), undefined si le corps n'en porte pas.
+const readErrorCode = async (res: Response): Promise<string | undefined> => {
+  const body: unknown = await res.json().catch(() => null);
+  const code = (body as { error?: unknown } | null)?.error;
+  return typeof code === 'string' ? code : undefined;
+};
+
+// Vrai si l'échec est un refus de modération du serveur (code porté par l'exception).
+const isModerationBlocked = (reason: unknown): boolean => {
+  return (reason as { code?: unknown } | null | undefined)?.code === MODERATION_BLOCKED;
+};
+
 const postRemediationTarget = async function (
   this: QuizContext,
-  target: 'remediation-summary' | 'quiz-review',
+  target: RemediationTarget,
   weakQuestions: QuizQuestion[],
 ): Promise<Generation> {
   const pid = this.currentProjectId;
@@ -135,21 +170,39 @@ const postRemediationTarget = async function (
       withAiHeaders({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ generationId: this.gen.id, weakQuestions }),
+        body: JSON.stringify(remediationBody(this, weakQuestions)),
       }),
     );
-    if (!res.ok) throw new Error(`${target} failed: ${res.status}`);
-    return (await res.json()) as Generation;
+    if (!res.ok) {
+      const code = await readErrorCode(res);
+      throw Object.assign(new Error(`${target} failed: ${res.status}`), { code });
+    }
+    const gen: unknown = await res.json();
+    return gen as Generation;
   }
   throw new Error('invalid remediation target');
 };
 
+// Échec d'une cible : toast avec réessai ciblé (la chaîne se poursuit tant qu'il échoue).
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte `this`/params typés comme unused.
+const notifyRemediationFailure = function (
+  this: QuizContext,
+  target: RemediationTarget,
+  weakQuestions: QuizQuestion[],
+  errorKey: string,
+): void {
+  this.showToast(this.t(errorKey), 'error', () => {
+    void retryRemediationTarget.call(this, target, weakQuestions, errorKey);
+  });
+};
+
 // Réessai CIBLÉ d'une seule cible de remédiation (pas les deux) : évite de
-// régénérer la moitié déjà réussie. Le toast d'échec re-propose le réessai (chaîne).
+// régénérer la moitié déjà réussie. Le toast d'échec re-propose le réessai (chaîne),
+// sauf refus de modération : même refus assuré, toast sans bouton.
 // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte `this`/params typés comme unused.
 const retryRemediationTarget = async function (
   this: QuizContext,
-  target: 'remediation-summary' | 'quiz-review',
+  target: RemediationTarget,
   weakQuestions: QuizQuestion[],
   errorKey: string,
 ): Promise<void> {
@@ -159,9 +212,32 @@ const retryRemediationTarget = async function (
     registerGeneration(this, gen);
   } catch (e) {
     console.error(`Remediation ${target} retry failed:`, e);
-    this.showToast(this.t(errorKey), 'error', () => {
-      void retryRemediationTarget.call(this, target, weakQuestions, errorKey);
-    });
+    if (isModerationBlocked(e)) {
+      this.showToast(this.t(MODERATION_BLOCKED), 'error');
+      return;
+    }
+    notifyRemediationFailure.call(this, target, weakQuestions, errorKey);
+  }
+};
+
+// Résultat d'une cible : génération enregistrée, sinon échec signalé avec réessai ciblé — sauf
+// refus de modération, signalé une seule fois pour les deux cibles par remediate.
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte `this`/params typés comme unused.
+const settleRemediationTarget = function (
+  this: QuizContext,
+  result: PromiseSettledResult<Generation>,
+  target: RemediationTarget,
+  weakQuestions: QuizQuestion[],
+  errorKey: string,
+): void {
+  if (result.status === 'fulfilled') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
+    registerGeneration(this, result.value);
+    return;
+  }
+  console.error(`Remediation ${target} failed:`, result.reason);
+  if (!isModerationBlocked(result.reason)) {
+    notifyRemediationFailure.call(this, target, weakQuestions, errorKey);
   }
 };
 
@@ -169,44 +245,38 @@ const retryRemediationTarget = async function (
 // parallèle (allSettled, jamais Promise.all : un rejet réseau masquerait l'autre
 // résultat). Succès partiel : chaque génération obtenue est affichée même si
 // l'autre a échoué. Chaque échec propose un réessai ciblé (cf. retryRemediationTarget).
+// Pré-contrôle (projet, modération du profil) sur les sources du quiz d'origine, celles que le
+// serveur garde : même statut effectif et même toast que les autres générations.
 // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy (ESLint sans résolution de types) compte le param `this` typé comme unused.
 const remediate = async function (this: QuizContext) {
   const weakQuestions = collectWeakQuestions(this.items(), this.answers);
   if (weakQuestions.length === 0) return;
+  if (!canStartGenerate(this, quizSourceIds(this.gen))) return;
 
   this.reviewing = true;
   const [fiche, quiz] = await Promise.allSettled([
     postRemediationTarget.call(this, 'remediation-summary', weakQuestions),
     postRemediationTarget.call(this, 'quiz-review', weakQuestions),
   ]);
-  if (fiche.status === 'fulfilled') {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
-    registerGeneration(this, fiche.value);
-  } else {
-    console.error('Remediation summary failed:', fiche.reason);
-    this.showToast(this.t('toast.remediationSummaryError'), 'error', () => {
-      void retryRemediationTarget.call(
-        this,
-        'remediation-summary',
-        weakQuestions,
-        'toast.remediationSummaryError',
-      );
-    });
-  }
-  if (quiz.status === 'fulfilled') {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas PromiseFulfilledResult<Generation> cross-module.
-    registerGeneration(this, quiz.value);
-  } else {
-    console.error('Remediation quiz failed:', quiz.reason);
-    this.showToast(this.t('toast.remediationQuizError'), 'error', () => {
-      void retryRemediationTarget.call(
-        this,
-        'quiz-review',
-        weakQuestions,
-        'toast.remediationQuizError',
-      );
-    });
-  }
+  // Refus de modération du serveur (état local périmé) : un seul toast, sans réessai.
+  const refused = [fiche, quiz].some(
+    (r) => r.status === 'rejected' && isModerationBlocked(r.reason),
+  );
+  if (refused) this.showToast(this.t(MODERATION_BLOCKED), 'error');
+  settleRemediationTarget.call(
+    this,
+    fiche,
+    'remediation-summary',
+    weakQuestions,
+    'toast.remediationSummaryError',
+  );
+  settleRemediationTarget.call(
+    this,
+    quiz,
+    'quiz-review',
+    weakQuestions,
+    'toast.remediationQuizError',
+  );
   if (fiche.status === 'fulfilled' && quiz.status === 'fulfilled') {
     this.showToast(this.t('toast.remediationGenerated'), 'success');
   }
