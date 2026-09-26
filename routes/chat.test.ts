@@ -232,6 +232,45 @@ describe('POST /:pid/chat', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'chat.moderationBlocked' });
   });
 
+  // Contrat de modération rompu : « Modération indisponible », pas « message bloqué ».
+  it('retourne 503 moderation.error quand la modération est indisponible, sans rien persister', async () => {
+    const { moderateContent } = await import('../generators/moderation.js');
+    const { chatWithSources } = await import('../generators/chat.js');
+    (moderateContent as any).mockResolvedValueOnce({ status: 'error', categories: {} });
+    const profile = profileStore.create('Teen', 14, '0', 'fr');
+    profileStore.update(profile.id, { chatEnabled: true, useModeration: true });
+    const project = store.createProject('Test', profile.id);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { message: 'Bonjour' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({ error: 'moderation.error' });
+    expect(chatWithSources).not.toHaveBeenCalled();
+    expect(store.getProject(project.meta.id)!.chat?.messages ?? []).toHaveLength(0);
+  });
+
+  // Inchangé : l'exception remonte au catch de la route → 500 JSON au code actionnable.
+  it('exception de la modération → 500 JSON au code stable (catch de la route)', async () => {
+    const { moderateContent } = await import('../generators/moderation.js');
+    (moderateContent as any).mockRejectedValueOnce(
+      Object.assign(new Error('rate limited'), { status: 429 }),
+    );
+    const profile = profileStore.create('Teen', 14, '0', 'fr');
+    profileStore.update(profile.id, { chatEnabled: true, useModeration: true });
+    const project = store.createProject('Test', profile.id);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { message: 'Bonjour' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'quota_exceeded' });
+  });
+
   it('envoie un message et recoit une reponse, stocke les deux dans l historique', async () => {
     const project = store.createProject('Test');
     addSource(project.meta.id);

@@ -177,6 +177,32 @@ describe('blockedModerationStatus', () => {
     });
     expect(gen.blockedModerationStatus.call(ctx)).toBe('unsafe');
   });
+
+  // Même priorité que le serveur (unsafe > error > pending), quel que soit l'ordre des sources :
+  // « Modération en cours » ne doit pas masquer une source déjà signalée.
+  it.each([
+    [['pending', 'unsafe'], 'unsafe'],
+    [['pending', 'error'], 'error'],
+    [['error', 'unsafe'], 'unsafe'],
+    [['safe', 'pending'], 'pending'],
+  ])('sources %j → %s', (statuses, expected) => {
+    const ctx = makeContext({
+      sources: statuses.map((status, i) => ({ id: `s${i}`, moderation: { status } })),
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe(expected);
+  });
+
+  it('applies the priority within selectedIds only', () => {
+    const ctx = makeContext({
+      sources: [
+        { id: 's1', moderation: { status: 'unsafe' } },
+        { id: 's2', moderation: { status: 'pending' } },
+        { id: 's3', moderation: { status: 'error' } },
+      ],
+      selectedIds: ['s2', 's3'],
+    });
+    expect(gen.blockedModerationStatus.call(ctx)).toBe('error');
+  });
 });
 
 // --- moderationBlockedMessage ---
@@ -217,6 +243,20 @@ describe('generate', () => {
     });
     await gen.generate.call(ctx, 'summary');
     expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('source pending listed first: the toast still reports the flagged source', async () => {
+    const ctx = makeContext({
+      currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+      sources: [
+        { id: 's1', moderation: { status: 'pending' } },
+        { id: 's2', moderation: { status: 'unsafe' } },
+      ],
+    });
+    await gen.generate.call(ctx, 'summary');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+    expect(ctx.showToast).not.toHaveBeenCalledWith('moderation.pending', 'error');
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 

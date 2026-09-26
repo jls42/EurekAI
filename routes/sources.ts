@@ -17,12 +17,19 @@ import { randomUUID, createHash } from 'node:crypto';
 import { unlinkSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Mistral } from '@mistralai/mistralai';
-import type { Source, OcrConfidence, AgeGroup, DuplicateUpload } from '../types.js';
+import type {
+  Source,
+  OcrConfidence,
+  AgeGroup,
+  DuplicateUpload,
+  ModerationResult,
+} from '../types.js';
 import type { ProjectStore } from '../store.js';
 import { type ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { ocrFile } from '../generators/ocr.js';
 import { normalizeOcrModel } from '../helpers/ocr-models.js';
 import { moderateContent } from '../generators/moderation.js';
+import { moderationRejection } from '../helpers/moderation-http.js';
 import { transcribeAudio } from '../generators/stt.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne } from '../generators/consigne.js';
@@ -174,22 +181,35 @@ const getModerationCategories = (
   return profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? null;
 };
 
-// Sous-helper websearch : si modération activée, vérifie que la query passe la modération.
-// Retourne true si OK, false si bloquée (réponse 400 déjà envoyée). Module-scope (n'utilise
-// que des params) — cf. SonarQube S7721 ; arrow pour éviter l'agglomération Lizard.
-const checkWebsearchModeration = async (
+type InputModeration = { ok: true; moderation?: ModerationResult } | { ok: false };
+
+// Sous-helper texte libre / websearch : modère la saisie AVANT tout traitement (aucune source
+// créée, aucune collecte lancée si refus). `ok: false` = réponse déjà envoyée : 400/503/409 selon
+// le statut (moderationRejection), 500 JSON sur exception de l'API — sans ce catch, l'exception
+// partait dans le handler Express par défaut (500 HTML). `moderation` absent = modération
+// inactive. Module-scope (n'utilise que des params) — cf. SonarQube S7721 ; arrow pour éviter
+// l'agglomération Lizard.
+const moderateUserInput = async (
   client: Mistral,
   res: Response,
-  query: string,
+  text: string,
   modCats: string[] | null,
-): Promise<boolean> => {
-  if (!modCats) return true;
-  const modResult = await moderateContent(client, query.trim(), modCats);
-  if (modResult.status !== 'safe') {
-    res.status(400).json({ error: 'moderation.blocked' });
-    return false;
+): Promise<InputModeration> => {
+  if (!modCats) return { ok: true };
+  let moderation: ModerationResult;
+  try {
+    moderation = await moderateContent(client, text.trim(), modCats);
+  } catch (e) {
+    logger.error('moderation', 'input moderation error:', e);
+    res.status(500).json({ error: extractErrorCode(e, 'moderation') });
+    return { ok: false };
   }
-  return true;
+  const rejection = moderationRejection(moderation.status);
+  if (rejection) {
+    res.status(rejection.status).json({ error: rejection.error });
+    return { ok: false };
+  }
+  return { ok: true, moderation };
 };
 
 const triggerModeration = async (
@@ -774,18 +794,15 @@ const registerTextRoute = (
       return;
     }
     const modCats = getModerationCategories(store, profileStore, req.params.pid);
-    const moderation = modCats ? await moderateContent(client, text.trim(), modCats) : undefined;
-    if (moderation?.status && moderation.status !== 'safe') {
-      res.status(400).json({ error: 'moderation.blocked' });
-      return;
-    }
+    const checked = await moderateUserInput(client, res, text, modCats);
+    if (!checked.ok) return;
     const source: Source = {
       id: randomUUID(),
       filename: 'Texte libre',
       markdown: text.trim(),
       uploadedAt: new Date().toISOString(),
       sourceType: 'text',
-      moderation,
+      moderation: checked.moderation,
       estimatedCost: 0,
     };
     store.addSource(req.params.pid, source);
@@ -852,7 +869,7 @@ const registerWebsearchRoute = (
     const query = validateWebsearchQuery(req, res);
     if (query === null) return;
     const modCats = getModerationCategories(store, profileStore, pid);
-    if (!(await checkWebsearchModeration(client, res, query, modCats))) return;
+    if (!(await moderateUserInput(client, res, query, modCats)).ok) return;
     try {
       const { sources, failures } = await collectWebSources(store, client, pid, req.body, modCats);
       if (sources.length === 0) {

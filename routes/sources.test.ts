@@ -17,6 +17,7 @@ import { tmpdir } from 'os';
 import { ProjectStore } from '../store.js';
 import { ProfileStore } from '../profiles.js';
 import { sourceRoutes } from './sources.js';
+import { logger } from '../helpers/logger.js';
 
 // --- Mocks ---
 
@@ -251,6 +252,44 @@ describe('POST /:pid/sources/text', () => {
     // Verify source was NOT added
     const updated = store.getProject(project.meta.id);
     expect(updated!.sources).toHaveLength(0);
+  });
+
+  // Contrat de modération rompu (statut error) : « Modération indisponible », pas « inapproprié ».
+  it('modération indisponible (status error) → 503 moderation.error, aucune source créée', async () => {
+    const { project } = createProjectWithProfile({ useModeration: true });
+    vi.mocked(moderateContent).mockResolvedValueOnce({ status: 'error', categories: {} });
+
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { text: 'cours de maths' } });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    expect(res.status).toHaveBeenCalledWith(503);
+    expect(res.json).toHaveBeenCalledWith({ error: 'moderation.error' });
+    expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+  });
+
+  // Avant : exception hors try → handler Express par défaut → 500 HTML.
+  it('exception de la modération → 500 JSON au code stable, sans fuite du message', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const { project } = createProjectWithProfile({ useModeration: true });
+    vi.mocked(moderateContent).mockRejectedValueOnce(
+      Object.assign(new Error('sk-SECRET-123 rate limited'), { status: 429 }),
+    );
+
+    const handler = getHandler(router, 'post', '/:pid/sources/text');
+    const req = mockReq({ params: { pid: project.meta.id }, body: { text: 'cours de maths' } });
+    const res = mockRes();
+
+    await expect(handler(req, res)).resolves.toBeUndefined();
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'quota_exceeded' });
+    expect(JSON.stringify(res.json.mock.calls)).not.toContain('SECRET');
+    expect(errorSpy).toHaveBeenCalled();
+    expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+    errorSpy.mockRestore();
   });
 
   it('autorise le contenu safe quand la moderation est activee', async () => {
@@ -572,6 +611,39 @@ describe('POST /:pid/moderate', () => {
       categories: { violence_and_threats: true },
     });
   });
+
+  // Endpoint de diagnostic (sans liste bloquée, aucun consommateur front) : un contrat rompu
+  // (réponse sans objet categories) est rendu tel quel, statut 'error' en 200 — pas une
+  // exception 500. Vrai générateur, seul le client Mistral est simulé.
+  it("contrat rompu : 200 {status: 'error'} via le vrai moderateContent", async () => {
+    const actual = await vi.importActual<typeof import('../generators/moderation.js')>(
+      '../generators/moderation.js',
+    );
+    vi.mocked(moderateContent).mockImplementationOnce(actual.moderateContent);
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const stub = mockClient as { classifiers?: unknown };
+    stub.classifiers = {
+      moderate: vi.fn().mockResolvedValue({
+        id: 'mod-test',
+        model: 'mistral-moderation-2603',
+        results: [{ categoryScores: {} }],
+      }),
+    };
+    try {
+      const handler = getHandler(router, 'post', '/:pid/moderate');
+      const req = mockReq({ params: { pid: 'any' }, body: { text: 'texte' } });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).not.toHaveBeenCalled();
+      expect(res.json).toHaveBeenCalledWith({ status: 'error', categories: {} });
+      expect(errorSpy).toHaveBeenCalledWith('moderation', expect.stringContaining('contract'));
+    } finally {
+      delete stub.classifiers;
+      errorSpy.mockRestore();
+    }
+  });
 });
 
 // =============================================================================
@@ -718,6 +790,58 @@ describe('POST /:pid/sources/websearch', () => {
     // Verify source was NOT added
     const updated = store.getProject(project.meta.id);
     expect(updated!.sources).toHaveLength(0);
+  });
+
+  // Requête mixte URL + mots-clés (cf. « gere un mix URL + mots-cles ») : un refus ne lance
+  // AUCUNE collecte, ni scraping ni recherche.
+  it.each([
+    ['unsafe', 400, 'moderation.blocked'],
+    ['error', 503, 'moderation.error'],
+  ] as const)(
+    'requête refusée (%s) → %i %s, sans scraping ni recherche',
+    async (status, httpStatus, error) => {
+      const { project } = createProjectWithProfile({ useModeration: true });
+      vi.mocked(moderateContent).mockResolvedValueOnce({ status, categories: {} });
+
+      const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+      const req = mockReq({
+        params: { pid: project.meta.id },
+        body: { query: 'https://example.com les energies' },
+      });
+      const res = mockRes();
+
+      await handler(req, res);
+
+      expect(res.status).toHaveBeenCalledWith(httpStatus);
+      expect(res.json).toHaveBeenCalledWith({ error });
+      expect(fetchPageContent).not.toHaveBeenCalled();
+      expect(webSearchEnrich).not.toHaveBeenCalled();
+      expect(store.getProject(project.meta.id)!.sources).toHaveLength(0);
+    },
+  );
+
+  // Avant : vérification appelée hors du try de la route → 500 HTML (handler Express par défaut).
+  it('exception de la modération de la requête → 500 JSON au code stable, sans collecte', async () => {
+    const errorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+    const { project } = createProjectWithProfile({ useModeration: true });
+    vi.mocked(moderateContent).mockRejectedValueOnce(
+      Object.assign(new Error('upstream down'), { status: 503 }),
+    );
+
+    const handler = getHandler(router, 'post', '/:pid/sources/websearch');
+    const req = mockReq({
+      params: { pid: project.meta.id },
+      body: { query: 'https://example.com les energies' },
+    });
+    const res = mockRes();
+
+    await expect(handler(req, res)).resolves.toBeUndefined();
+
+    expect(res.status).toHaveBeenCalledWith(500);
+    expect(res.json).toHaveBeenCalledWith({ error: 'upstream_unavailable' });
+    expect(fetchPageContent).not.toHaveBeenCalled();
+    expect(webSearchEnrich).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 
   it('autorise la query safe quand la moderation est activee', async () => {

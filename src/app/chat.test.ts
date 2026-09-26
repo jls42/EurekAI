@@ -28,6 +28,7 @@ function makeContext(overrides: any = {}) {
     chatInput: '',
     chatLoading: false,
     t: vi.fn((key: string) => key),
+    resolveError: vi.fn((code: string) => `resolved:${code}`),
     showToast: vi.fn(),
     refreshIcons: vi.fn(),
     $nextTick: vi.fn((cb: () => void) => cb()),
@@ -171,6 +172,35 @@ describe('sendChatMessage', () => {
     expect(ctx.chatMessages[1].role).toBe('assistant');
     expect(ctx.chatMessages[1].content).toBe('chat.errorReply');
     expect(ctx.showToast).toHaveBeenCalledWith('toast.chatErrorMsg', 'error');
+  });
+
+  // Modération indisponible (503) : même chemin qu'un message bloqué — le message n'a pas été
+  // traité, la bulle de l'enfant est retirée, pas de bulle d'erreur de l'assistant.
+  it('handles moderation.error: pops user message, translated toast, no assistant bubble', async () => {
+    mockFetchFail(503, { error: 'moderation.error' });
+    const ctx = makeContext({ chatInput: 'Bonjour' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.chatMessages).toHaveLength(0);
+    expect(ctx.t).toHaveBeenCalledWith('moderation.error');
+    expect(ctx.showToast).toHaveBeenCalledWith('moderation.error', 'error');
+    expect(ctx.showToast).toHaveBeenCalledTimes(1);
+  });
+
+  // Code d'erreur stable (extractErrorCode) : traduit via resolveError, jamais la clé brute.
+  it('translates other error codes in the toast via resolveError', async () => {
+    mockFetchFail(500, { error: 'quota_exceeded' });
+    const ctx = makeContext({ chatInput: 'test' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.resolveError).toHaveBeenCalledWith('quota_exceeded');
+    expect(ctx.t).toHaveBeenCalledWith('toast.chatErrorMsg', { error: 'resolved:quota_exceeded' });
+  });
+
+  it('empty error payload: resolveError receives an empty code', async () => {
+    mockFetchFail(500, {});
+    const ctx = makeContext({ chatInput: 'test' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.resolveError).toHaveBeenCalledWith('');
+    expect(ctx.chatMessages).toHaveLength(2);
   });
 
   it('handles network error: adds connection error message', async () => {

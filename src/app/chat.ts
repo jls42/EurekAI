@@ -32,17 +32,26 @@ function handleChatSuccess(state: AppContext, data: ChatSuccessPayload): void {
   }
 }
 
+// Refus AVANT tout traitement du message (rien n'est persisté côté serveur) : la bulle de l'enfant
+// est retirée et le toast traduit la clé, sans bulle d'erreur de l'assistant.
+const REFUSED_BEFORE_SEND = new Set([
+  'chat.moderationBlocked',
+  'chat.ageRestricted',
+  'moderation.error',
+]);
+
 function handleChatError(state: AppContext, err: ChatErrorPayload): void {
-  if (err.error === 'chat.moderationBlocked' || err.error === 'chat.ageRestricted') {
+  const code = err.error || '';
+  if (REFUSED_BEFORE_SEND.has(code)) {
     state.chatMessages.pop();
-    state.showToast(state.t(err.error), 'error');
+    state.showToast(state.t(code), 'error');
   } else {
     state.chatMessages.push({
       role: 'assistant',
       content: state.t('chat.errorReply'),
       timestamp: new Date().toISOString(),
     });
-    state.showToast(state.t('toast.chatErrorMsg', { error: err.error || '' }), 'error');
+    state.showToast(state.t('toast.chatErrorMsg', { error: state.resolveError(code) }), 'error');
   }
 }
 

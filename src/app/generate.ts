@@ -8,6 +8,7 @@ import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/gen
 import type { AppContext } from './app-context';
 import type { FailedStepCode, Generation, Source } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
+import { pickBlockingSource } from '@helpers/moderation-http';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 const TOAST_ERROR = 'toast.error';
@@ -648,12 +649,14 @@ const runSingleGenerate = async function (
 
 export function createGenerate() {
   return {
+    // Même priorité que le serveur (unsafe > error > pending, helper partagé) : sinon « Modération
+    // en cours » masquerait une source déjà signalée.
     blockedModerationSource(this: AppContext) {
       const selected =
         this.selectedIds.length > 0
           ? this.sources.filter((s: Source) => this.selectedIds.includes(s.id))
           : this.sources;
-      return selected.find((s: Source) => s.moderation && s.moderation.status !== 'safe') ?? null;
+      return pickBlockingSource(selected) ?? null;
     },
 
     blockedModerationStatus(this: AppContext): string | null {

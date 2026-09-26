@@ -23,6 +23,7 @@ import { generateQuiz } from '../generators/quiz.js';
 import { generateFillBlank } from '../generators/fill-blank.js';
 import { ProfileStore, MODERATION_CATEGORIES } from '../profiles.js';
 import { moderateContent } from '../generators/moderation.js';
+import { moderationRejection } from '../helpers/moderation-http.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
@@ -92,6 +93,8 @@ const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidation
   };
 };
 
+// unsafe → 400 chat.moderationBlocked ; error (contrat rompu) → 503 moderation.error. Les
+// exceptions de l'API se propagent : le catch de la route répond en 500 JSON (extractErrorCode).
 const runChatModeration = async (
   client: Mistral,
   profile: ReturnType<ProfileStore['get']>,
@@ -101,8 +104,8 @@ const runChatModeration = async (
   const categories = profile.moderationCategories ?? MODERATION_CATEGORIES[profile.ageGroup] ?? [];
   if (categories.length === 0) return null;
   const modResult = await moderateContent(client, message.trim(), categories);
-  if (modResult.status !== 'safe') return new ChatValidationError(400, 'chat.moderationBlocked');
-  return null;
+  const rejection = moderationRejection(modResult.status, 'chat.moderationBlocked');
+  return rejection ? new ChatValidationError(rejection.status, rejection.error) : null;
 };
 
 async function validateChatRequest(

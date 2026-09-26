@@ -348,6 +348,40 @@ describe('generateRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
     });
 
+    // Statuts distingués (panne ≠ contenu signalé) et priorité unsafe > error > pending entre
+    // sources, quel que soit leur ordre. Refus AVANT addPendingEntry : ni tracker ni génération.
+    it.each([
+      [['error'], 503, 'moderation.error'],
+      [['pending'], 409, 'moderation.pending'],
+      [['pending', 'unsafe'], 400, 'moderation.blocked'],
+      [['pending', 'error'], 503, 'moderation.error'],
+      [['error', 'unsafe'], 400, 'moderation.blocked'],
+    ] as const)('sources %j → %i %s', async (statuses, httpStatus, error) => {
+      const { generateSummary } = await import('../generators/summary.js');
+      const profile = profileStore.create('Kid', 9, '0', 'fr');
+      const pid = store.createProject('Test', profile.id).meta.id;
+      for (const [i, status] of statuses.entries()) {
+        store.addSource(pid, {
+          id: `src-${i}`,
+          filename: `source${i}.txt`,
+          markdown: 'Content',
+          uploadedAt: new Date().toISOString(),
+          moderation: { status, categories: {} },
+        });
+      }
+
+      const handler = getHandler(router, 'post', '/:pid/generate/summary');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+
+      expect(res.status).toHaveBeenCalledWith(httpStatus);
+      expect(res.json).toHaveBeenCalledWith({ error });
+      expect(generateSummary).not.toHaveBeenCalled();
+      const { results } = store.getProject(pid)!;
+      expect(results.generations).toHaveLength(0);
+      expect(results.pendingTracker ?? []).toHaveLength(0);
+    });
+
     it('does not block when profile has useModeration=false', async () => {
       const profile = profileStore.create('Adult', 30, '0', 'fr');
       // Adults have useModeration=false by default
@@ -2153,6 +2187,27 @@ describe('generateRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
+    });
+
+    it('returns 503 moderation.error when a source failed moderation (no routing)', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      const profile = profileStore.create('Kid', 9, '0', 'fr');
+      const pid = store.createProject('Test', profile.id).meta.id;
+      store.addSource(pid, {
+        id: 'error-src',
+        filename: 'unchecked.txt',
+        markdown: 'Content',
+        uploadedAt: new Date().toISOString(),
+        moderation: { status: 'error', categories: {} },
+      });
+
+      const handler = getHandler(router, 'post', '/:pid/generate/auto');
+      const res = mockRes();
+      await handler(mockReq({ params: { pid }, body: {} }), res);
+
+      expect(res.status).toHaveBeenCalledWith(503);
+      expect(res.json).toHaveBeenCalledWith({ error: 'moderation.error' });
+      expect(routeRequest).not.toHaveBeenCalled();
     });
 
     // Régression-lock CLAUDE.md "Pour /generate/auto (batch), la route NE LIT PAS

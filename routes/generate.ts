@@ -55,6 +55,7 @@ import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
 import { logger } from '../helpers/logger.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
+import { moderationRejection, pickBlockingSource } from '../helpers/moderation-http.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
@@ -148,23 +149,21 @@ const selectModeratedSources = (project: { sources: Source[] }, sourceIds?: stri
     ? project.sources.filter((s) => sourceIds.includes(s.id))
     : project.sources;
 
-const findBlockedSource = (sources: Source[]): Source | undefined =>
-  sources.find((s) => s.moderation?.status && s.moderation.status !== 'safe');
-
+// Source bloquante des sources sélectionnées, par priorité unsafe > error > pending
+// (pickBlockingSource) ; undefined si la modération est inactive ou si rien ne bloque.
 const checkModeration = (
   store: ProjectStore,
   profileStore: ProfileStore,
   pid: string,
   sourceIds?: string[],
-): string | null => {
+): Source | undefined => {
   const project = store.getProject(pid);
-  if (!project) return null;
+  if (!project) return undefined;
   const profileId = project.meta.profileId;
-  if (!profileId) return null;
+  if (!profileId) return undefined;
   const profile = profileStore.get(profileId);
-  if (!profile?.useModeration) return null;
-  const blocked = findBlockedSource(selectModeratedSources(project, sourceIds));
-  return blocked ? blocked.filename : null;
+  if (!profile?.useModeration) return undefined;
+  return pickBlockingSource(selectModeratedSources(project, sourceIds));
 };
 
 interface GenContext {
@@ -295,8 +294,10 @@ function buildGenContext(
   const project = store.getProject(pid);
   if (!project) return { ok: false, error: ERR_PROJECT_NOT_FOUND, status: 404 };
 
-  const unsafeSource = checkModeration(store, profileStore, pid, body.sourceIds);
-  if (unsafeSource) return { ok: false, error: 'moderation.blocked', status: 400 };
+  // 400 moderation.blocked (signalée) / 503 moderation.error (panne) / 409 moderation.pending.
+  const blocking = checkModeration(store, profileStore, pid, body.sourceIds);
+  const rejection = moderationRejection(blocking?.moderation?.status);
+  if (rejection) return { ok: false, error: rejection.error, status: rejection.status };
 
   const rawMarkdown = getMarkdownOrNull(project.sources, body.sourceIds);
   if (rawMarkdown === null) return { ok: false, error: 'no_sources', status: 400 };
