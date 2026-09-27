@@ -89,6 +89,9 @@ export const de: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Tab-Synchronisierung inaktiv',
   'errorCode.no_sources': 'Keine Quelle verfuegbar',
   'errorCode.auth_required': 'Mistral-API-Schluessel fehlt oder ungueltig',
+  'errorCode.invalid_api_key':
+    'API-Schlüssel hat ein ungültiges Format: prüfe ihn in den Einstellungen',
+  'errorCode.unsupported_provider': 'KI-Anbieter wird nicht unterstützt',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
   'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
   'errorCode.upstream_unavailable':

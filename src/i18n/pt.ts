@@ -89,6 +89,8 @@ export const pt: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Sincronização entre abas inativa',
   'errorCode.no_sources': 'Nenhuma fonte disponivel',
   'errorCode.auth_required': 'Chave API Mistral ausente ou invalida',
+  'errorCode.invalid_api_key': 'Chave API com formato inválido: verifica-a nas Configurações',
+  'errorCode.unsupported_provider': 'Fornecedor de IA não suportado',
   'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
   'errorCode.upstream_unavailable':

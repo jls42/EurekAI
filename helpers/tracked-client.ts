@@ -1,6 +1,6 @@
 import type { Mistral } from '@mistralai/mistralai';
 import type { ApiUsage, ToolCalls } from './pricing.js';
-import { resolveToolPricing } from './pricing.js';
+import { resolvePricing, resolveToolPricing } from './pricing.js';
 import { callWithRetry } from './mistral-retry.js';
 import { logger } from './logger.js';
 
@@ -94,6 +94,19 @@ const warnUnpricedTools = (toolCalls: ToolCalls): void => {
   }
 };
 
+// Modèle sans tarif : compté 0 $ par cost-calc (qui reste pur) et persistUsage n'écrit rien pour un
+// coût nul — signalé ici, comme un outil sans tarif, pour qu'un nouveau modèle ou un id renommé ne
+// passe pas inaperçu. Un tarif à 0 $ (modèle gratuit) ne déclenche rien ; la modération n'est pas
+// instrumentée.
+const warnUnpricedModel = (onUsage: UsageCallback): UsageCallback => {
+  return (usage) => {
+    if (!resolvePricing(usage.model)) {
+      logger.warn('cost', `model without pricing: ${usage.model} ($0)`);
+    }
+    onUsage(usage);
+  };
+};
+
 // Usage d'un agent : tokens du modèle + frais d'outils. `usage.connectors` prime ; à défaut, les
 // sorties `tool.execution` sont décomptées — jamais les deux (pas de double comptage).
 const extractAgentUsage = (response: AgentResponseShape): ApiUsage => {
@@ -114,11 +127,12 @@ const extractAgentUsage = (response: AgentResponseShape): ApiUsage => {
  * Generators remain untouched — tracking is transparent.
  */
 export function trackClient(client: Mistral, onUsage: UsageCallback): void {
-  wrapChatComplete(client, onUsage);
-  wrapStt(client, onUsage);
-  wrapOcr(client, onUsage);
-  wrapAgent(client, onUsage);
-  wrapTts(client, onUsage);
+  const report = warnUnpricedModel(onUsage);
+  wrapChatComplete(client, report);
+  wrapStt(client, report);
+  wrapOcr(client, report);
+  wrapAgent(client, report);
+  wrapTts(client, report);
 }
 
 function wrapChatComplete(client: Mistral, onUsage: UsageCallback): void {

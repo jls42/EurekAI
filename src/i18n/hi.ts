@@ -95,6 +95,8 @@ export const hi: Record<string, string> = {
   'notif.crossTabSyncInactive': 'टैबों के बीच सिंक निष्क्रिय',
   'errorCode.no_sources': 'कोई स्रोत उपलब्ध नहीं',
   'errorCode.auth_required': 'Mistral API कुंजी अनुपस्थित या अमान्य',
+  'errorCode.invalid_api_key': 'API कुंजी का प्रारूप गलत है: सेटिंग्स में इसे जाँचो',
+  'errorCode.unsupported_provider': 'यह AI प्रदाता समर्थित नहीं है',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
   'errorCode.quota_exceeded': 'कोटा समाप्त, कुछ समय बाद पुनः प्रयास करें',
   'errorCode.upstream_unavailable': 'सेवा अस्थायी रूप से अनुपलब्ध, जल्द ही पुनः प्रयास करें',

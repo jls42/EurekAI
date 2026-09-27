@@ -99,6 +99,8 @@ export const ar: Record<string, string> = {
   'notif.crossTabSyncInactive': 'مزامنة التبويبات غير نشطة',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
+  'errorCode.invalid_api_key': 'صيغة مفتاح API غير صحيحة: تحقّق منه في الإعدادات',
+  'errorCode.unsupported_provider': 'مزوّد الذكاء الاصطناعي غير مدعوم',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
   'errorCode.quota_exceeded': 'تم تجاوز الحصة، أعد المحاولة لاحقا',
   'errorCode.upstream_unavailable': 'الخدمة غير متاحة مؤقتا، أعد المحاولة قريبا',

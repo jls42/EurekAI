@@ -157,7 +157,7 @@ app.put('/api/config', (req, res) => {
     res.json(saveConfig(req.body));
   } catch (e) {
     logger.error('config', 'Config save error', e);
-    res.status(500).json({ error: 'Failed to save configuration' });
+    res.status(500).json({ error: extractErrorCode(e, 'config') });
   }
 });
 app.get('/api/config/status', (_req, res) => res.json(getApiStatus()));
@@ -166,7 +166,7 @@ app.post('/api/config/reset', (_req, res) => {
     res.json(resetConfig());
   } catch (e) {
     logger.error('config', 'Config reset error', e);
-    res.status(500).json({ error: 'Failed to reset configuration' });
+    res.status(500).json({ error: extractErrorCode(e, 'config') });
   }
 });
 app.get('/api/config/voices', aiLimiter, async (req, res) => {
@@ -188,7 +188,7 @@ app.get('/api/config/voices', aiLimiter, async (req, res) => {
     res.json(voices);
   } catch (e) {
     logger.error('config', 'List voices error', e);
-    res.status(502).json({ error: 'Failed to fetch voices from Mistral API' });
+    res.status(502).json({ error: extractErrorCode(e, 'tts') });
   }
 });
 

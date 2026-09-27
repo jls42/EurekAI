@@ -92,6 +92,8 @@ export const fr: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Sync cross-onglets inactive',
   'errorCode.no_sources': 'Aucune source disponible',
   'errorCode.auth_required': 'Clé API Mistral manquante ou invalide',
+  'errorCode.invalid_api_key': 'Clé API mal formée : vérifie-la dans les Paramètres',
+  'errorCode.unsupported_provider': "Fournisseur d'IA non pris en charge",
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
   'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',

@@ -237,6 +237,26 @@ describe('trackClient', () => {
     expect(captured[0].inputCharacters).toBe(0);
   });
 
+  // Modèle sans tarif : compté 0 $ par cost-calc (pur), donc signalé à la capture, comme un outil
+  // d'agent sans tarif. Un modèle tarifé (préfixe connu) ne déclenche rien.
+  it('signale un modèle sans tarif, jamais un modèle tarifé', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const client = makeFakeClient();
+    client.chat.complete.mockResolvedValueOnce({
+      model: 'modele-inconnu-2609',
+      usage: { promptTokens: 10, completionTokens: 5, totalTokens: 15 },
+      choices: [{ message: { content: 'ok' } }],
+    });
+    trackClient(client as unknown as Mistral, () => {});
+
+    await client.chat.complete({ model: 'modele-inconnu-2609', messages: [] });
+    expect(warn).toHaveBeenCalledWith('cost', 'model without pricing: modele-inconnu-2609 ($0)');
+
+    warn.mockClear();
+    await client.chat.complete({ model: 'mistral-large-latest', messages: [] });
+    expect(warn).not.toHaveBeenCalled();
+  });
+
   // 520 (Cloudflare) : rejoué par callWithRetry, le SDK ne le rejouant pas (un 503 l'est déjà par
   // le SDK, jamais par l'application). Vraie erreur du SDK : statut dans `statusCode`.
   it('retries on 520 and calls onUsage once with final usage', async () => {

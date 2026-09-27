@@ -70,8 +70,10 @@ const state = vi.hoisted(() => {
       listProjects: ReturnType<typeof vi.fn>;
       migrateFromLegacy: ReturnType<typeof vi.fn>;
     }[],
+    resetConfig: vi.fn(() => ({})),
     resumeModerationAtBoot: vi.fn(() => Promise.resolve(0)),
     routeFactory: vi.fn(() => routeMiddleware),
+    saveConfig: vi.fn(() => ({})),
     setModelLimits: vi.fn(),
     setVoiceCache: vi.fn(),
     trackClient: vi.fn(),
@@ -106,9 +108,11 @@ vi.mock('./helpers/rate-limit.js', () => ({
 vi.mock('./config.js', () => ({
   getApiStatus: vi.fn(() => ({ mistral: true, ttsAvailable: false })),
   getConfig: vi.fn(() => ({})),
+  // Limites déjà connues : resolveClient ne relance pas leur chargement paresseux.
+  getModelLimits: vi.fn(() => ({ 'model-a': 32_000 })),
   initConfig: state.initConfig,
-  resetConfig: vi.fn(() => ({})),
-  saveConfig: vi.fn(() => ({})),
+  resetConfig: state.resetConfig,
+  saveConfig: state.saveConfig,
   setModelLimits: state.setModelLimits,
   setVoiceCache: state.setVoiceCache,
 }));
@@ -177,6 +181,15 @@ function getRouteHandler(path: string) {
   return handler;
 }
 
+// Handler d'une route, quelle que soit la méthode : le DERNIER argument (un middleware comme
+// aiLimiter peut le précéder).
+function getMethodHandler(method: 'get' | 'post' | 'put', path: string): RequestHandler {
+  const calls = state.app[method].mock.calls as unknown as unknown[][];
+  const handler = calls.find(([routePath]) => routePath === path)?.at(-1);
+  if (typeof handler !== 'function') throw new TypeError(`Missing ${method} handler for ${path}`);
+  return handler as RequestHandler;
+}
+
 function getJsonErrorHandler() {
   const handler = state.app.use.mock.calls
     .map(([middleware]) => middleware)
@@ -242,6 +255,40 @@ describe('server bootstrap', () => {
     const moderationRes = responseMock();
     moderationHandler({} as Request, moderationRes, vi.fn());
     expect(moderationRes.jsonMock).toHaveBeenCalledWith({ all: [], defaults: {} });
+  });
+
+  // Réglages et voix : codes stables (extractErrorCode), jamais un texte libre en anglais.
+  it('réglages : un échec d’écriture ou de reset répond 500 avec un code stable', async () => {
+    await importServer();
+    state.saveConfig.mockImplementationOnce(() => {
+      throw Object.assign(new Error('EACCES: permission denied'), { code: 'EACCES' });
+    });
+    const saveRes = responseMock();
+    getMethodHandler('put', '/api/config')({ body: {} } as Request, saveRes, vi.fn());
+    expect(saveRes.statusMock).toHaveBeenCalledWith(500);
+    expect(saveRes.jsonMock).toHaveBeenCalledWith({ error: 'internal_error' });
+
+    state.resetConfig.mockImplementationOnce(() => {
+      throw new Error('ENOSPC: no space left on device');
+    });
+    const resetRes = responseMock();
+    getMethodHandler('post', '/api/config/reset')({} as Request, resetRes, vi.fn());
+    expect(resetRes.statusMock).toHaveBeenCalledWith(500);
+    expect(resetRes.jsonMock).toHaveBeenCalledWith({ error: 'internal_error' });
+  });
+
+  it('voix : un échec de l’API répond 502 avec un code stable', async () => {
+    await importServer();
+    // Le préchauffage du démarrage consomme la première réponse de listVoices.
+    await vi.waitFor(() => expect(state.listVoices).toHaveBeenCalled());
+    state.listVoices.mockRejectedValueOnce(
+      Object.assign(new Error('API error occurred: Status 401'), { statusCode: 401 }),
+    );
+    const res = responseMock();
+    const req = { headers: {}, query: {} } as unknown as Request;
+    await getMethodHandler('get', '/api/config/voices')(req, res, vi.fn());
+    expect(res.statusMock).toHaveBeenCalledWith(502);
+    expect(res.jsonMock).toHaveBeenCalledWith({ error: 'auth_required' });
   });
 
   it('masque les details des payloads JSON invalides', async () => {

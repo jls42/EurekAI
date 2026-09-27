@@ -88,6 +88,8 @@ export const es: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Sincronización entre pestañas inactiva',
   'errorCode.no_sources': 'Ninguna fuente disponible',
   'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
+  'errorCode.invalid_api_key': 'Clave API con formato incorrecto: revísala en Configuración',
+  'errorCode.unsupported_provider': 'Proveedor de IA no compatible',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',

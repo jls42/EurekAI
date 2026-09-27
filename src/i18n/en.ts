@@ -87,6 +87,8 @@ export const en: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Cross-tab sync inactive',
   'errorCode.no_sources': 'No source available',
   'errorCode.auth_required': 'Missing or invalid Mistral API key',
+  'errorCode.invalid_api_key': 'Malformed API key: check it in Settings',
+  'errorCode.unsupported_provider': 'Unsupported AI provider',
   'errorCode.tts_upstream_error': 'Audio service error (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota exceeded, try again shortly',
   'errorCode.upstream_unavailable': 'Service temporarily unavailable, please retry soon',
