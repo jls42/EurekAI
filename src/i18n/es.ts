@@ -90,6 +90,15 @@ export const es: Record<string, string> = {
   'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
   'errorCode.invalid_api_key': 'Clave API con formato incorrecto: revísala en Configuración',
   'errorCode.unsupported_provider': 'Proveedor de IA no compatible',
+  'errorCode.duplicate_gid': 'Esta generación ya está en curso.',
+  'errorCode.generation_not_found': 'No se encuentra este contenido: quizá se ha borrado.',
+  'errorCode.pending_not_found': 'Esta generación ya no está en curso.',
+  'errorCode.invalid_json': 'Solicitud ilegible. Recarga la página y vuelve a intentarlo.',
+  'errorCode.project_delete_failed':
+    'No se puede borrar este curso por ahora. Vuelve a intentarlo.',
+  'errorCode.project_not_found': 'No se encuentra este curso: quizá se ha borrado.',
+  'errorCode.stale':
+    'Este perfil se ha modificado en otro lugar. Recarga la página y vuelve a empezar.',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',

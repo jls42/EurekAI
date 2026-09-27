@@ -25,6 +25,7 @@ import {
   retryAfterMinutes,
 } from './profiles.js';
 import { clearProfileLocale, setProfileLocale } from './profile-locale';
+import { fr } from '../i18n/fr';
 
 // Mock localStorage
 const mockStorage: Record<string, string> = {};
@@ -1679,6 +1680,15 @@ describe('createProfiles', () => {
       const ctx = makeCtx();
       mapServerErrorCode(ctx as any, 'rate_limited');
       expect(ctx.t).toHaveBeenCalledWith('errorCode.rate_limited');
+    });
+
+    // Plus de liste blanche : tout code qui a sa clé errorCode.* est traduit (le 409 `stale` d'un
+    // enregistrement concurrent s'affichait brut), un code inconnu reste brut.
+    it('mapServerErrorCode traduit tout code qui a sa clé errorCode (dictionnaire fr réel)', () => {
+      const ctx = makeCtx({ t: (key: string) => fr[key] ?? key });
+      expect(mapServerErrorCode(ctx as any, 'stale')).toBe(fr['errorCode.stale']);
+      expect(mapServerErrorCode(ctx as any, 'stale')).not.toBe('stale');
+      expect(mapServerErrorCode(ctx as any, 'code_inconnu')).toBe('code_inconnu');
     });
   });
 });

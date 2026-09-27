@@ -92,6 +92,15 @@ export const nl: Record<string, string> = {
   'errorCode.invalid_api_key':
     'API-sleutel heeft een ongeldig formaat: controleer hem in Instellingen',
   'errorCode.unsupported_provider': 'AI-aanbieder niet ondersteund',
+  'errorCode.duplicate_gid': 'Deze generatie is al bezig.',
+  'errorCode.generation_not_found': 'Deze inhoud is niet gevonden: misschien is hij verwijderd.',
+  'errorCode.pending_not_found': 'Deze generatie is niet meer bezig.',
+  'errorCode.invalid_json': 'Onleesbaar verzoek. Laad de pagina opnieuw en probeer het nog eens.',
+  'errorCode.project_delete_failed':
+    'Deze cursus kan nu niet worden verwijderd. Probeer het nog eens.',
+  'errorCode.project_not_found': 'Deze cursus is niet gevonden: misschien is hij verwijderd.',
+  'errorCode.stale':
+    'Dit profiel is ergens anders gewijzigd. Laad de pagina opnieuw en begin dan opnieuw.',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
   'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
   'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',
