@@ -2,6 +2,7 @@ import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { registerGeneration } from './generate';
+import { displayedReply, withReplyFallback } from './chat-reply';
 import type { AppContext } from './app-context';
 import type { Generation } from '../../types';
 
@@ -15,14 +16,6 @@ interface ChatSuccessPayload {
 interface ChatErrorPayload {
   error?: string;
 }
-
-// Réponse vide qui n'a rien lancé : repli lisible au lieu d'une bulle vide. Avec une génération, le
-// badge « Génération déclenchée » suffit (un « je n'ai pas su répondre » le contredirait).
-const displayedReply = (state: AppContext, content: unknown, generatedIds?: string[]): string => {
-  const text = typeof content === 'string' ? content : '';
-  if (text.trim() !== '' || (generatedIds?.length ?? 0) > 0) return text;
-  return state.t('chat.emptyReply');
-};
 
 function handleChatSuccess(state: AppContext, data: ChatSuccessPayload): void {
   state.chatMessages.push({
@@ -67,18 +60,6 @@ function handleChatError(state: AppContext, err: ChatErrorPayload): void {
 // Méthodes extraites de createChat — `const = function` pour éviter
 // l'agglomération Lizard CCN (cf. CLAUDE.md piège connu).
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Historique rechargé : même repli pour un tour assistant vide (enregistré avant le correctif
-// serveur) que pour une réponse reçue.
-const withReplyFallback = (
-  state: AppContext,
-  messages: AppContext['chatMessages'],
-): AppContext['chatMessages'] => {
-  return messages.map((m) => {
-    if (m.role !== 'assistant') return m;
-    return { ...m, content: displayedReply(state, m.content, m.generatedIds) };
-  });
-};
 
 const loadChatHistory = async function (this: AppContext) {
   if (!this.currentProjectId) return;
