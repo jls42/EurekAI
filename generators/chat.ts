@@ -84,18 +84,27 @@ const firstMessage = (response: ChatResponse): AssistantMessage => {
 // appels. Un outil lancé à un tour précédent reçoit sa réponse sans être relancé (le modèle rappelle
 // parfois l'outil qu'il vient de lancer, mesuré) ; dans un même tour, un doublon reste une demande
 // explicite (« deux quiz »).
+// Un nom inconnu (mesuré : « ### 3. **Quiz… » en guise de nom d'outil) reçoit sa réponse mais
+// n'est ni compté ni lancé : il ne prend pas une place du plafond.
+const TOOL_NAMES: ReadonlySet<string> = new Set(TOOLS.map((t) => t.function.name));
+
+const toolResult = (fnName: string): string => {
+  if (!TOOL_NAMES.has(fnName)) return JSON.stringify({ status: 'unknown_tool' });
+  return JSON.stringify({ status: 'triggered', type: fnName.replace('generate_', '') });
+};
+
 const answerToolCalls = (message: AssistantMessage, loop: ToolLoop): void => {
   const calls = (message.toolCalls ?? []).slice(0, MAX_TOOL_CALLS - loop.triggered.length);
   const earlier = new Set(loop.triggered);
   loop.apiMessages.push({ ...message, role: 'assistant', toolCalls: calls });
   for (const tc of calls) {
     const fnName = tc.function.name;
-    if (!earlier.has(fnName)) loop.triggered.push(fnName);
+    if (TOOL_NAMES.has(fnName) && !earlier.has(fnName)) loop.triggered.push(fnName);
     loop.apiMessages.push({
       role: 'tool',
       toolCallId: tc.id,
       name: fnName,
-      content: JSON.stringify({ status: 'triggered', type: fnName.replace('generate_', '') }),
+      content: toolResult(fnName),
     });
   }
 };
