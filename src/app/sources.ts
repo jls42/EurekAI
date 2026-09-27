@@ -294,8 +294,10 @@ const handleAddTextResponse = async function (
   state.showTextInput = false;
   state.showToast(state.t('toast.textAdded'), 'success');
   state.$nextTick(() => state.refreshIcons());
+  // Projet seulement : la session est déjà retirée (finally de runAddText) quand la relecture part,
+  // et c'est elle qui enchaîne sur la consigne détectée en fond (followConsigneDetection).
   setTimeout(() => {
-    if (_isSessionActive(state, session)) state.refreshModeration();
+    if (state.currentProjectId === session.projectId) state.refreshModeration();
   }, 2000);
 };
 

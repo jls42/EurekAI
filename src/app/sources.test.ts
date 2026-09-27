@@ -132,6 +132,28 @@ describe('createSources', () => {
       expect(ctx.uploading).toBe(false);
     });
 
+    // La session d'import est retirée dès la fin de runAddText (finally) : la relecture différée
+    // ne doit pas en dépendre, sinon la consigne détectée en fond n'apparaît qu'au rechargement.
+    it('relit les modérations 2 s après un ajout réussi, session déjà retirée', async () => {
+      const refresh = vi.fn();
+      (ctx as any).refreshModeration = refresh;
+      mockFetchOk({ id: 's1', text: 'hello world' });
+      await src.addText.call(ctx);
+      expect(ctx.uploadSessions).toEqual([]);
+      vi.advanceTimersByTime(2000);
+      expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    it('ne relit rien si le projet a changé avant la relecture', async () => {
+      const refresh = vi.fn();
+      (ctx as any).refreshModeration = refresh;
+      mockFetchOk({ id: 's1', text: 'hello world' });
+      await src.addText.call(ctx);
+      ctx.currentProjectId = 'pid-2';
+      vi.advanceTimersByTime(2000);
+      expect(refresh).not.toHaveBeenCalled();
+    });
+
     it('shows error on failure', async () => {
       mockFetchErr('Invalid text');
       await src.addText.call(ctx);

@@ -1,5 +1,6 @@
 import type { AppContext } from './app-context';
 import { pendingOfTypeExists } from './pending-utils';
+import { buildEventKey } from '../../helpers/event-key';
 
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
 // readClientGid). Validation pré-fetch pour Codacy `rule-node-ssrf` : la regex
@@ -84,6 +85,9 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   }
   const label = state.t('gen.' + type) || type;
   state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
+  // L'événement SSE `cancelled` de ce gid afficherait le même toast : il est marqué comme déjà vu
+  // dans l'onglet. Sa notification persistée reste écrite par le SSE (source de vérité serveur).
+  state.shownToastEventKeys.add(buildEventKey(gid, 'cancelled'));
 
   const pid = state.currentProjectId;
   if (!pid) return;
