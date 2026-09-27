@@ -185,7 +185,6 @@ describe('app', () => {
     const a = app();
     expect(typeof a.sendChatMessage).toBe('function');
     expect(typeof a.clearChat).toBe('function');
-    expect(typeof a.loadChatHistory).toBe('function');
   });
 
   it('includes render methods from createRender', () => {

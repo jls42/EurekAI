@@ -165,7 +165,7 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne 400 quand le texte est manquant', async () => {
@@ -177,7 +177,7 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Texte requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand le texte est vide', async () => {
@@ -189,7 +189,7 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Texte requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand le texte ne contient que des espaces', async () => {
@@ -201,7 +201,7 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Texte requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand le texte n est pas une string', async () => {
@@ -213,7 +213,7 @@ describe('POST /:pid/sources/text', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Texte requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('ajoute une source texte avec succes', async () => {
@@ -405,7 +405,7 @@ describe('DELETE /:pid/sources/:sid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet ou source introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'source_not_found' });
   });
 
   it('retourne 404 quand la source n existe pas', () => {
@@ -554,7 +554,7 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne 400 no_sources quand le projet n a aucune source (aucun appel LLM)', async () => {
@@ -642,7 +642,7 @@ describe('POST /:pid/detect-consigne', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
 
     // Restore
     vi.mocked(store.setConsigne).mockRestore();
@@ -889,7 +889,7 @@ describe('POST /:pid/moderate', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'text requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne le resultat de moderation', async () => {
@@ -1000,7 +1000,7 @@ describe('POST /:pid/sources/moderate', () => {
     const res = await post(pid);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     expect(moderateContent).not.toHaveBeenCalled();
   });
 
@@ -1167,7 +1167,7 @@ describe('POST /:pid/sources/websearch', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne 400 quand la query est manquante', async () => {
@@ -1771,7 +1771,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne 400 quand aucun fichier audio n est fourni', async () => {
@@ -1783,7 +1783,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Fichier audio requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('ajoute une source vocale avec succes', async () => {
@@ -1831,7 +1831,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Transcription vide — aucune parole detectee' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'empty_transcription' });
   });
 
   it('retourne 400 quand la transcription ne contient que des espaces', async () => {
@@ -1849,7 +1849,7 @@ describe('POST /:pid/sources/voice', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Transcription vide — aucune parole detectee' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'empty_transcription' });
   });
 
   it('retourne 500 quand transcribeAudio echoue', async () => {
@@ -1929,7 +1929,7 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     expect(existsSync(path)).toBe(false);
   });
 
@@ -1942,7 +1942,7 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Aucun fichier envoye' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand files est undefined', async () => {
@@ -1954,7 +1954,7 @@ describe('POST /:pid/sources/upload', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Aucun fichier envoye' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('ajoute des sources OCR avec succes', async () => {
@@ -2222,7 +2222,7 @@ describe('POST /:pid/sources/upload — garde pré-multer', () => {
     const res = await runFrom(0, 'projet-inconnu');
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     expect(existsSync(join(tempDir, 'projects', 'projet-inconnu'))).toBe(false);
     expect(ocrFile).not.toHaveBeenCalled();
   });

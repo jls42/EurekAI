@@ -104,6 +104,10 @@ export const hi: Record<string, string> = {
   'errorCode.project_delete_failed': 'यह पाठ्यक्रम अभी हटाया नहीं जा सकता। दोबारा कोशिश करो।',
   'errorCode.project_not_found': 'यह पाठ्यक्रम नहीं मिला: शायद इसे हटा दिया गया है।',
   'errorCode.stale': 'यह प्रोफ़ाइल कहीं और बदली गई है। पेज फिर से लोड करो, फिर दोबारा शुरू करो।',
+  'errorCode.empty_transcription': 'मुझे कुछ सुनाई नहीं दिया। माइक के पास बोलकर फिर से कोशिश करो।',
+  'errorCode.pin_wrong': 'गलत PIN कोड',
+  'errorCode.profile_not_found': 'यह प्रोफ़ाइल नहीं मिली: शायद इसे हटा दिया गया है।',
+  'errorCode.source_not_found': 'यह स्रोत नहीं मिला: शायद इसे हटा दिया गया है।',
   'errorCode.tts_upstream_error': 'ऑडियो सेवा त्रुटि (TTS/STT)',
   'errorCode.quota_exceeded': 'कोटा समाप्त, कुछ समय बाद पुनः प्रयास करें',
   'errorCode.upstream_unavailable': 'सेवा अस्थायी रूप से अनुपलब्ध, जल्द ही पुनः प्रयास करें',
@@ -680,6 +684,8 @@ export const hi: Record<string, string> = {
     'PIN \u0915\u094B\u0921 \u092E\u0947\u0932 \u0928\u0939\u0940\u0902 \u0916\u093E\u0924\u0947',
   'profile.pinVerify':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E \u0938\u0924\u094D\u092F\u093E\u092A\u0928',
+  'profile.pinVerifyInfo': 'आगे बढ़ने के लिए माता-पिता का PIN कोड डालो।',
+  'profile.pinVerifySubmit': 'पुष्टि करें',
   'profile.pinWrong': '\u0917\u0932\u0924 PIN \u0915\u094B\u0921',
   'profile.pinRateLimited': 'PIN के बहुत सारे प्रयास हो गए। {minutes} मिनट बाद फिर कोशिश करो।',
   'profile.pinInfo':

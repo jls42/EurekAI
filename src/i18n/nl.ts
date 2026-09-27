@@ -101,6 +101,11 @@ export const nl: Record<string, string> = {
   'errorCode.project_not_found': 'Deze cursus is niet gevonden: misschien is hij verwijderd.',
   'errorCode.stale':
     'Dit profiel is ergens anders gewijzigd. Laad de pagina opnieuw en begin dan opnieuw.',
+  'errorCode.empty_transcription':
+    'Ik heb niets gehoord. Probeer het opnieuw en praat dicht bij de microfoon.',
+  'errorCode.pin_wrong': 'Onjuiste PIN-code',
+  'errorCode.profile_not_found': 'Dit profiel is niet gevonden: misschien is het verwijderd.',
+  'errorCode.source_not_found': 'Deze bron is niet gevonden: misschien is hij verwijderd.',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
   'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
   'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',
@@ -511,6 +516,8 @@ export const nl: Record<string, string> = {
   'profile.pinRequired': 'Een PIN-code is vereist voor profielen jonger dan 15 jaar',
   'profile.pinMismatch': 'PIN-codes komen niet overeen',
   'profile.pinVerify': 'Ouderlijke verificatie',
+  'profile.pinVerifyInfo': 'Voer de ouderlijke PIN-code in om verder te gaan.',
+  'profile.pinVerifySubmit': 'Bevestigen',
   'profile.pinWrong': 'Onjuiste PIN-code',
   'profile.pinRateLimited':
     'Te veel pogingen met de pincode. Probeer het over {minutes} min opnieuw.',

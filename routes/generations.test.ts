@@ -231,7 +231,7 @@ describe('POST /:pid/generations/:gid/quiz-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand answers n est pas un objet', async () => {
@@ -242,7 +242,7 @@ describe('POST /:pid/generations/:gid/quiz-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 404 quand la generation n existe pas', async () => {
@@ -253,7 +253,7 @@ describe('POST /:pid/generations/:gid/quiz-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Quiz introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('retourne 404 quand la generation n est pas un quiz', async () => {
@@ -264,7 +264,7 @@ describe('POST /:pid/generations/:gid/quiz-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Quiz introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('calcule le score correctement (2 bonnes sur 3)', async () => {
@@ -369,7 +369,7 @@ describe('POST /:pid/generations/:gid/dictation-attempt', () => {
     const res = mockRes();
     await handler(mockReq({ params: { pid, gid: dictationGid }, body: {} }), res);
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 404 quand la generation n est pas une dictée', async () => {
@@ -377,7 +377,7 @@ describe('POST /:pid/generations/:gid/dictation-attempt', () => {
     const res = mockRes();
     await handler(mockReq({ params: { pid, gid: quizGid }, body: { answers: { 0: 'x' } } }), res);
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Entrainement introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('score strict via diffDictation : accent manquant = faux, casse ignorée', async () => {
@@ -414,7 +414,7 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand answers n est pas un objet', async () => {
@@ -425,7 +425,7 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'answers requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 404 quand la generation n existe pas', async () => {
@@ -436,7 +436,7 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Exercice a trous introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('retourne 404 quand la generation n est pas fill-blank', async () => {
@@ -447,7 +447,7 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Exercice a trous introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('calcule le score avec validateFillBlankAnswer', async () => {
@@ -530,7 +530,7 @@ describe('PUT /:pid/generations/:gid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'title requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand title n est pas une string', () => {
@@ -541,7 +541,7 @@ describe('PUT /:pid/generations/:gid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'title requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand title est une chaine vide', () => {
@@ -552,7 +552,7 @@ describe('PUT /:pid/generations/:gid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'title requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 404 quand la generation n existe pas', () => {
@@ -563,7 +563,7 @@ describe('PUT /:pid/generations/:gid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Generation introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('met a jour le titre avec succes', () => {
@@ -770,7 +770,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Quiz vocal introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('retourne 400 quand l index de question est invalide', async () => {
@@ -785,7 +785,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Index de question invalide' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand le fichier audio est manquant', async () => {
@@ -800,7 +800,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Fichier audio requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('transcrit et verifie la reponse vocale avec succes', async () => {
@@ -906,7 +906,7 @@ describe('POST /:pid/generations/:gid/vocal-answer', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Quiz vocal introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('retourne un code FailedStep stable en catch (pas le message brut avec clés/URLs)', async () => {
@@ -1201,7 +1201,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Generation introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
   });
 
   it('genere le TTS batch pour un summary (toutes sections)', async () => {
@@ -1270,7 +1270,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Type non supporte pour la lecture' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 pour un type non supporte (fill-blank)', async () => {
@@ -1281,7 +1281,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Type non supporte pour la lecture' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('genere une seule section quand section=intro', async () => {
@@ -1370,7 +1370,7 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Section invalide' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne des resultats partiels quand certaines sections TTS echouent', async () => {

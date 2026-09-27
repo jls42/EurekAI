@@ -347,7 +347,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     });
 
     it('returns 400 when moderation blocks', async () => {
@@ -1607,7 +1607,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'generationId et weakQuestions requis' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('validates weakQuestions is required', async () => {
@@ -1630,7 +1630,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'generationId et weakQuestions requis' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('validates weakQuestions must be an array', async () => {
@@ -1678,7 +1678,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Quiz original introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
     });
 
     it('returns 404 when original generation is not a quiz', async () => {
@@ -1714,7 +1714,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Quiz original introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
     });
 
     it('successfully generates review quiz from original quiz', async () => {
@@ -1928,7 +1928,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'generationId et weakQuestions requis' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('returns 404 when original generation is not a quiz', async () => {
@@ -1952,7 +1952,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Quiz original introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
     });
 
     it('generates a summary generation titled "Rappel — {titre original}"', async () => {
@@ -2255,7 +2255,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     });
 
     it('returns 400 invalid_input on a wrong-typed lang WITHOUT calling the router (F2)', async () => {
@@ -2671,7 +2671,7 @@ describe('generateRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     });
 
     it('returns 400 when moderation blocks', async () => {

@@ -100,6 +100,11 @@ export const pt: Record<string, string> = {
   'errorCode.project_not_found':
     'Não foi possível encontrar este curso: talvez tenha sido apagado.',
   'errorCode.stale': 'Este perfil foi alterado noutro lado. Recarrega a página e recomeça.',
+  'errorCode.empty_transcription': 'Não ouvi nada. Tenta outra vez, a falar perto do microfone.',
+  'errorCode.pin_wrong': 'Código PIN incorreto',
+  'errorCode.profile_not_found':
+    'Não foi possível encontrar este perfil: talvez tenha sido apagado.',
+  'errorCode.source_not_found': 'Não foi possível encontrar esta fonte: talvez tenha sido apagada.',
   'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
   'errorCode.upstream_unavailable':
@@ -517,6 +522,8 @@ export const pt: Record<string, string> = {
     'Um c\u00f3digo PIN \u00e9 obrigat\u00f3rio para perfis de menores de 15 anos',
   'profile.pinMismatch': 'Os c\u00f3digos PIN n\u00e3o coincidem',
   'profile.pinVerify': 'Verifica\u00e7\u00e3o dos pais',
+  'profile.pinVerifyInfo': 'Escreve o código PIN dos pais para continuar.',
+  'profile.pinVerifySubmit': 'Confirmar',
   'profile.pinWrong': 'C\u00f3digo PIN incorreto',
   'profile.pinRateLimited': 'Demasiadas tentativas de PIN. Tenta de novo daqui a {minutes} min.',
   'profile.pinInfo':

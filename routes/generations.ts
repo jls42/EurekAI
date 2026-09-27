@@ -44,7 +44,7 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
 import { withUploadErrors } from '../helpers/upload-errors.js';
-import { rejectInvalidLang } from '../helpers/request-validation.js';
+import { INVALID_INPUT, rejectInvalidLang } from '../helpers/request-validation.js';
 import { screenUserText } from '../helpers/input-moderation.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 
@@ -56,7 +56,7 @@ const upload = multer({
 const FILL_BLANK = 'fill-blank';
 const DICTATION = 'dictation';
 const QUIZ_VOCAL = 'quiz-vocal';
-const ERR_ANSWERS_REQUIRED = 'answers requis';
+const ERR_GENERATION_NOT_FOUND = 'generation_not_found';
 const LOG_ATTEMPT_ERROR = 'attempt error';
 
 type QuestionStats = Record<number, { correct: number; wrong: number }>;
@@ -381,11 +381,11 @@ async function generateSectionAudio(ctx: SectionAudioCtx, res: Response): Promis
   const { gen, section, voiceId, ttsOpts, projectDir, pid, audioPrefix, store, gid } = ctx;
   const text = readAloudText(gen, section);
   if (text === null) {
-    res.status(400).json({ error: 'Type non supporte pour la lecture' });
+    res.status(400).json({ error: INVALID_INPUT });
     return null;
   }
   if (!text.trim()) {
-    res.status(400).json({ error: 'Texte vide pour cette section' });
+    res.status(400).json({ error: INVALID_INPUT });
     return null;
   }
 
@@ -454,12 +454,12 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
-        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
+        res.status(400).json({ error: INVALID_INPUT });
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
       if (gen?.type !== 'quiz') {
-        res.status(404).json({ error: 'Quiz introuvable' });
+        res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
         return;
       }
 
@@ -488,12 +488,12 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
-        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
+        res.status(400).json({ error: INVALID_INPUT });
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
       if (gen?.type !== FILL_BLANK) {
-        res.status(404).json({ error: 'Exercice a trous introuvable' });
+        res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
         return;
       }
 
@@ -522,12 +522,12 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
-        res.status(400).json({ error: ERR_ANSWERS_REQUIRED });
+        res.status(400).json({ error: INVALID_INPUT });
         return;
       }
       const gen = store.getGeneration(req.params.pid, req.params.gid);
       if (gen?.type !== DICTATION) {
-        res.status(404).json({ error: 'Entrainement introuvable' });
+        res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
         return;
       }
 
@@ -553,14 +553,14 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   router.put('/:pid/generations/:gid', (req, res) => {
     const { title } = req.body;
     if (!title || typeof title !== 'string') {
-      res.status(400).json({ error: 'title requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return;
     }
     const updated = store.updateGeneration(req.params.pid, req.params.gid, {
       title,
     });
     if (!updated) {
-      res.status(404).json({ error: 'Generation introuvable' });
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
       return;
     }
     res.json(updated);
@@ -573,7 +573,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     // sur la 2e tentative et le user voit un toast "supprimé" trompeur.
     const removed = store.deleteGeneration(req.params.pid, req.params.gid);
     if (!removed) {
-      res.status(404).json({ error: 'generation_not_found' });
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
       return;
     }
     // Médias (MP3, PNG) de la génération retirée : sans ce nettoyage, orphelins sur le disque.
@@ -609,18 +609,18 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     const gid = String(req.params.gid);
     const gen = store.getGeneration(pid, gid);
     if (gen?.type !== QUIZ_VOCAL) {
-      res.status(404).json({ error: 'Quiz vocal introuvable' });
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
       return null;
     }
     const quizGen = gen as QuizVocalGeneration; // NOSONAR(S4325) — type narrowing
     const questionIndex = Number(req.body.questionIndex ?? 0);
     const question = quizGen.data[questionIndex];
     if (!question) {
-      res.status(400).json({ error: 'Index de question invalide' });
+      res.status(400).json({ error: INVALID_INPUT });
       return null;
     }
     if (!req.file) {
-      res.status(400).json({ error: 'Fichier audio requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return null;
     }
     // Repli des quiz legacy sans langue figée (resolveVocalAnswerLocale) : STT + prompt de
@@ -682,12 +682,12 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     const gid = String(req.params.gid);
     const gen = store.getGeneration(pid, gid);
     if (!gen) {
-      res.status(404).json({ error: 'Generation introuvable' });
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
       return null;
     }
     const section = req.body.section || 'all';
     if (!VALID_READ_ALOUD_SECTIONS.has(section)) {
-      res.status(400).json({ error: 'Section invalide' });
+      res.status(400).json({ error: INVALID_INPUT });
       return null;
     }
     // `lang` choisit la voix (resolveVoices) et apparaît dans ses logs de repli.

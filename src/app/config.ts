@@ -54,6 +54,12 @@ const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
 const PROFILE_VOICE_DEFAULT_I18N = 'profile.voiceDefault';
 
+// Rechargement des voix sans appel optionnel `f?.()` (Lizard ne mesurait plus les méthodes
+// suivantes) ni `.call(this)` (Sonar S6676) : la seule branche est ici.
+const reloadMistralVoices = (state: AppContext): Promise<void> => {
+  return state.loadMistralVoices ? state.loadMistralVoices() : Promise.resolve();
+};
+
 export function createConfig() {
   return {
     async loadConfig(this: AppContext) {
@@ -63,17 +69,22 @@ export function createConfig() {
           fetch('/api/config/status'),
           fetch('/api/moderation-categories'),
         ]);
-        if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
+        if (statusRes.ok) {
+          const statusBody: unknown = await statusRes.json();
+          this.apiStatus = statusBody as ApiStatus;
+        }
         if (modCatsRes.ok) {
-          const modData = (await modCatsRes.json()) as ModerationCategoriesPayload;
+          const modBody: unknown = await modCatsRes.json();
+          const modData = modBody as ModerationCategoriesPayload;
           this.allModerationCategories = modData.all || [];
           this.moderationDefaults = modData.defaults || {};
         }
         // Load voices BEFORE setting configDraft so the voice list is populated
         // quand Alpine rend les selects de voix Mistral.
-        await this.loadMistralVoices?.();
+        await reloadMistralVoices(this);
         if (configRes.ok) {
-          const config = (await configRes.json()) as AppConfig;
+          const configBody: unknown = await configRes.json();
+          const config = configBody as AppConfig;
           const draft = structuredClone(config) as ConfigDraft;
           draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
           draft._ocrModel = normalizeOcrModel(config.models?.ocr);
@@ -88,7 +99,8 @@ export function createConfig() {
       try {
         const voicesRes = await fetch('/api/config/voices', withAiHeaders());
         if (!voicesRes.ok) return;
-        const raw = (await voicesRes.json()) as MistralVoice[];
+        const voicesBody: unknown = await voicesRes.json();
+        const raw = voicesBody as MistralVoice[];
         const enriched: VoicesEnrichedEntry[] = raw.map((v) => {
           const parts = (v.name || '').split(' - ');
           const langFull = v.languages?.[0] || '';
@@ -119,7 +131,8 @@ export function createConfig() {
       if (!lang || lang.length < 2) return '';
       const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
       const voice = list.find((v) => v.lang === lang);
-      const country = (voice?.langFull?.split('_')[1] || lang).toUpperCase();
+      const code = voice?.langFull?.split('_')[1] || lang;
+      const country = code.toUpperCase();
       if (!/^[A-Z]{2}$/.test(country)) return '';
       return String.fromCodePoint(
         ...[...country].map((c) => 0x1f1e6 + (c.codePointAt(0) ?? 0) - 65),
@@ -192,14 +205,19 @@ export function createConfig() {
           body: JSON.stringify(payload),
         });
         if (res.ok) {
-          const saved = (await res.json()) as AppConfig;
+          // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+          const body: unknown = await res.json();
+          const saved = body as AppConfig;
           const updated = structuredClone(saved) as ConfigDraft;
           updated._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
           updated._ocrModel = normalizeOcrModel(saved.models?.ocr);
           this.configDraft = updated;
           const statusRes = await fetch('/api/config/status');
-          if (statusRes.ok) this.apiStatus = (await statusRes.json()) as ApiStatus;
-          await this.loadMistralVoices?.();
+          if (statusRes.ok) {
+            const statusBody: unknown = await statusRes.json();
+            this.apiStatus = statusBody as ApiStatus;
+          }
+          await reloadMistralVoices(this);
           (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         } else {
@@ -227,12 +245,13 @@ export function createConfig() {
       try {
         const res = await fetch('/api/config/reset', { method: 'POST' });
         if (res.ok) {
-          const saved = (await res.json()) as AppConfig;
+          const body: unknown = await res.json();
+          const saved = body as AppConfig;
           const reset = structuredClone(saved) as ConfigDraft;
           reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
           reset._ocrModel = normalizeOcrModel(saved.models?.ocr);
           this.configDraft = reset;
-          await this.loadMistralVoices?.();
+          await reloadMistralVoices(this);
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
           this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error');
@@ -277,7 +296,8 @@ export function createConfig() {
       } else {
         this.hasMistralKey = status === 'ok';
       }
-      this.keyStorageDegraded = !(await isStorageEncryptable());
+      const encryptable = await isStorageEncryptable();
+      this.keyStorageDegraded = !encryptable;
     },
 
     openApiKeyDialog(this: AppContext, scope: 'global' | 'profile' = 'global') {
@@ -300,7 +320,8 @@ export function createConfig() {
       const key = this.apiKeyInput.trim();
       if (!key) return;
       // Hors secure context : stockage en clair → consentement explicite obligatoire.
-      if (!(await isStorageEncryptable()) && !this.apiKeyConsentClear) {
+      const encryptable = await isStorageEncryptable();
+      if (!encryptable && !this.apiKeyConsentClear) {
         this.keyStorageDegraded = true;
         return;
       }
@@ -310,7 +331,7 @@ export function createConfig() {
         await setKey({ scope, profileId, plaintext: key });
         await this.refreshKeyState(profileId);
         this.closeApiKeyDialog();
-        await this.loadMistralVoices?.();
+        await reloadMistralVoices(this);
         this.showToast(this.t('toast.keySaved'), 'success');
       };
       if (scope === 'profile' && profileId) this.requireProfilePin(profileId, () => void commit());
@@ -340,7 +361,8 @@ export function createConfig() {
           '/api/providers/mistral/validate',
           withAiHeaders({ method: 'POST' }, { keyOverride: key }),
         );
-        const data = (await res.json()) as { status: ValidateStatus };
+        const body: unknown = await res.json();
+        const data = body as { status: ValidateStatus };
         this.keyTestStatus = data.status;
       } catch {
         this.keyTestStatus = 'network';

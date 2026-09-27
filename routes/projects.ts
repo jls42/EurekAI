@@ -4,8 +4,10 @@ import type { ProfileStore } from '../profiles.js';
 import type { ProjectData } from '../types.js';
 import { subscribeGeneration, type GenerationEvent } from '../helpers/event-bus.js';
 import { logger } from '../helpers/logger.js';
+import { INVALID_INPUT } from '../helpers/request-validation.js';
 
 const SSE_HEARTBEAT_MS = 25_000;
+const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 
 // Écrit un event SSE au format spécifié par le client EventSource :
 //   event: generation
@@ -68,7 +70,7 @@ export function projectRoutes(
   router.post('/', (req, res) => {
     const { name, profileId } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'Nom requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return;
     }
     const project = store.createProject(name.trim(), profileId);
@@ -78,7 +80,7 @@ export function projectRoutes(
   router.get('/:pid', (req, res) => {
     const project = openProject(store, profileStore, req.params.pid, req.query.profileId);
     if (!project) {
-      res.status(404).json({ error: 'Projet introuvable' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     const totalCost = (project.costLog ?? []).reduce((sum, e) => sum + e.cost, 0);
@@ -88,7 +90,7 @@ export function projectRoutes(
   router.put('/:pid', (req, res) => {
     const { name } = req.body;
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
-      res.status(400).json({ error: 'Nom requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return;
     }
     store.renameProject(req.params.pid, name.trim());
@@ -121,7 +123,7 @@ export function projectRoutes(
     // au bout de quelques typos client) et le stream pousserait des heartbeats
     // dans le vide jusqu'à TCP keepalive. Code stable pour mapping i18n côté UI.
     if (!store.getProject(pid)) {
-      res.status(404).json({ error: 'project_not_found' });
+      res.status(404).json({ error: ERR_PROJECT_NOT_FOUND });
       return;
     }
     res.setHeader('Content-Type', 'text/event-stream');

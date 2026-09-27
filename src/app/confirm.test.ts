@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createConfirm } from './confirm';
+import { createToast } from './toast';
+import { buildEventKey } from '../../helpers/event-key';
 
 // Mock document for activeElement
 (globalThis as any).document = {
@@ -31,6 +33,7 @@ function makeContext(overrides: any = {}) {
     } as Record<string, boolean>,
     t: vi.fn((key: string, p?: any) => (p ? `${key}:${JSON.stringify(p)}` : key)),
     showToast: vi.fn(),
+    shownToastEventKeys: new Set<string>(),
     $nextTick: vi.fn((cb: () => void) => cb()),
     $refs: {
       confirmDialog: { showModal: vi.fn(), close: vi.fn() },
@@ -243,6 +246,30 @@ describe('createConfirm', () => {
         expect.stringContaining('toast.cancelledOne'),
         'info',
       );
+    });
+
+    // L'événement SSE `cancelled` du même gid affichait un second toast identique : le toast
+    // immédiat réserve son eventKey, la déduplication par onglet écarte celui du SSE.
+    it('une annulation par gid ne donne qu’un toast, SSE compris', () => {
+      (globalThis as any).fetch = vi.fn().mockResolvedValue({ ok: true });
+      const toast = createToast();
+      const live: any = makeContext({ toasts: [], toastCounter: 0, currentProfile: null });
+      live.refreshIcons = vi.fn();
+      live.showToast = toast.showToast.bind(live);
+      live.dismissToast = toast.dismissToast.bind(live);
+      live.pendingById = { [VALID_GID_4]: { id: VALID_GID_4, type: 'quiz', status: 'pending' } };
+
+      confirm.cancelOne.call(live, VALID_GID_4);
+      live.showToast(
+        'notif.generationCancelled',
+        'info',
+        null,
+        null,
+        buildEventKey(VALID_GID_4, 'cancelled'),
+      );
+
+      expect(live.toasts).toHaveLength(1);
+      expect(live.toasts[0].message).toContain('toast.cancelledOne');
     });
 
     it('cancel by gid: warns when fetch rejects (best-effort backend)', async () => {

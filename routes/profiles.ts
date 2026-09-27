@@ -7,8 +7,10 @@ import { extractErrorCode } from '../helpers/error-codes.js';
 import { authLimiter, pinLimiter } from '../helpers/rate-limit.js';
 import type { Profile } from '../types.js';
 
-const ERR_PROFILE_NOT_FOUND = 'Profil introuvable';
-const ERR_PIN_WRONG = 'Code PIN incorrect';
+const ERR_PROFILE_NOT_FOUND = 'profile_not_found';
+const ERR_PIN_WRONG = 'pin_wrong';
+// Refus de validation : la raison précise part dans les journaux, la réponse porte ce code.
+const ERR_INVALID_INPUT = 'invalid_input';
 const ERR_PROFILE_DELETE_PARTIAL = 'profile_delete_partial';
 
 const isValidName = (name: unknown): boolean => typeof name === 'string' && name.trim().length > 0;
@@ -84,32 +86,32 @@ const UPDATE_FIELD_VALIDATORS: ReadonlyArray<{
     | 'chatEnabled'
     | 'readingComfort';
   isValid: (v: unknown) => boolean;
-  error: string;
+  reason: string;
 }> = [
-  { field: 'name', isValid: isValidName, error: 'Nom invalide' },
-  { field: 'age', isValid: isValidAge, error: 'Age invalide (4-120)' },
-  { field: 'locale', isValid: isValidLocale, error: 'Locale invalide' },
-  { field: 'avatar', isValid: isValidAvatar, error: 'Avatar invalide' },
-  { field: 'useModeration', isValid: isValidBoolean, error: 'Modération invalide' },
+  { field: 'name', isValid: isValidName, reason: 'Nom invalide' },
+  { field: 'age', isValid: isValidAge, reason: 'Age invalide (4-120)' },
+  { field: 'locale', isValid: isValidLocale, reason: 'Locale invalide' },
+  { field: 'avatar', isValid: isValidAvatar, reason: 'Avatar invalide' },
+  { field: 'useModeration', isValid: isValidBoolean, reason: 'Modération invalide' },
   {
     field: 'moderationCategories',
     isValid: isValidModerationCategories,
-    error: 'Catégories de modération invalides',
+    reason: 'Catégories de modération invalides',
   },
-  { field: 'useConsigne', isValid: isValidBoolean, error: 'Consigne invalide' },
-  { field: 'chatEnabled', isValid: isValidBoolean, error: 'Chat invalide' },
+  { field: 'useConsigne', isValid: isValidBoolean, reason: 'Consigne invalide' },
+  { field: 'chatEnabled', isValid: isValidBoolean, reason: 'Chat invalide' },
   // Préférence de présentation — PAS dans PARENTAL_FIELDS (pas de PIN requis)
   // ni dans CREATE_PROFILE_ALLOWED_FIELDS (éditable uniquement via update).
   {
     field: 'readingComfort',
     isValid: isValidReadingComfortInput,
-    error: 'Confort de lecture invalide',
+    reason: 'Confort de lecture invalide',
   },
 ];
 
 const validateUpdateProfileInput = (fields: Record<string, unknown>): string | null => {
-  for (const { field, isValid, error } of UPDATE_FIELD_VALIDATORS) {
-    if (fields[field] !== undefined && !isValid(fields[field])) return error;
+  for (const { field, isValid, reason } of UPDATE_FIELD_VALIDATORS) {
+    if (fields[field] !== undefined && !isValid(fields[field])) return reason;
   }
   return null;
 };
@@ -176,8 +178,11 @@ const buildUpdateGuardResult = (
 ): UpdateGuardResult | null => {
   if (pinMismatch(profile, pin)) return { status: 403, body: { error: ERR_PIN_WRONG } };
   if (Object.keys(fields).length === 0) return { body: profileToPublic(profile) };
-  const validationError = validateUpdateProfileInput(fields);
-  if (validationError) return { status: 400, body: { error: validationError } };
+  const invalidReason = validateUpdateProfileInput(fields);
+  if (invalidReason) {
+    logger.warn('profiles', `PUT refused: ${invalidReason}`);
+    return { status: 400, body: { error: ERR_INVALID_INPUT } };
+  }
   if (requiresPinForParentalChange(profile, pin, fields)) {
     return { status: 403, body: { error: ERR_PIN_WRONG } };
   }
@@ -272,9 +277,10 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
     '/',
     authLimiter,
     handle((req, res) => {
-      const validationError = validateCreateProfileInput(req.body);
-      if (validationError) {
-        res.status(400).json({ error: validationError });
+      const invalidReason = validateCreateProfileInput(req.body);
+      if (invalidReason) {
+        logger.warn('profiles', `POST refused: ${invalidReason}`);
+        res.status(400).json({ error: ERR_INVALID_INPUT });
         return;
       }
       warnUnknownCreateFields(req.body);
@@ -294,7 +300,7 @@ export function profileRoutes(outputDir: string, projectStore: ProjectStore): Ro
         return;
       }
       if (!isUpdateBody(req.body)) {
-        res.status(400).json({ error: 'Payload invalide' });
+        res.status(400).json({ error: ERR_INVALID_INPUT });
         return;
       }
       const { pin, _updatedAt, ...fields } = req.body;

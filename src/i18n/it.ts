@@ -98,6 +98,10 @@ export const it: Record<string, string> = {
   'errorCode.project_not_found': 'Questo corso non si trova: forse è stato eliminato.',
   'errorCode.stale':
     'Questo profilo è stato modificato altrove. Ricarica la pagina, poi ricomincia.',
+  'errorCode.empty_transcription': 'Non ho sentito niente. Riprova parlando vicino al microfono.',
+  'errorCode.pin_wrong': 'Codice PIN errato',
+  'errorCode.profile_not_found': 'Questo profilo non si trova: forse è stato eliminato.',
+  'errorCode.source_not_found': 'Questa fonte non si trova: forse è stata eliminata.',
   'errorCode.tts_upstream_error': 'Errore del servizio audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota superata, riprova tra poco',
   'errorCode.upstream_unavailable': 'Servizio temporaneamente non disponibile, riprova presto',
@@ -509,6 +513,8 @@ export const it: Record<string, string> = {
   'profile.pinRequired': 'Un codice PIN \u00e8 richiesto per i profili sotto i 15 anni',
   'profile.pinMismatch': 'I codici PIN non corrispondono',
   'profile.pinVerify': 'Verifica genitoriale',
+  'profile.pinVerifyInfo': 'Inserisci il codice PIN genitoriale per continuare.',
+  'profile.pinVerifySubmit': 'Conferma',
   'profile.pinWrong': 'Codice PIN errato',
   'profile.pinRateLimited': 'Troppi tentativi di PIN. Riprova tra {minutes} min.',
   'profile.pinInfo':

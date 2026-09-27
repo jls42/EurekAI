@@ -81,7 +81,7 @@ export function stepByStep<G extends Generation, T = DataItemOf<G>>(gen: G) {
       if (this.currentQ <= 0) return;
       this.feedback = null;
       this.currentQ--;
-      this.onPrevReady?.();
+      if (this.onPrevReady) this.onPrevReady();
     },
 
     nextQuestion(this: StepByStepBase<T>) {
@@ -89,12 +89,12 @@ export function stepByStep<G extends Generation, T = DataItemOf<G>>(gen: G) {
       this.currentQ++;
       if (this.currentQ >= this.total()) {
         this.finished = true;
-        this.onFinish?.();
+        if (this.onFinish) this.onFinish();
       } else {
         if (this.currentQ > this.highWaterMark) {
           this.highWaterMark = this.currentQ;
         }
-        this.onNextReady?.();
+        if (this.onNextReady) this.onNextReady();
       }
     },
 

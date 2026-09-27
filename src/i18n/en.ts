@@ -96,6 +96,11 @@ export const en: Record<string, string> = {
   'errorCode.project_delete_failed': "This course can't be deleted right now. Try again.",
   'errorCode.project_not_found': "This course can't be found: it may have been deleted.",
   'errorCode.stale': 'This profile was changed somewhere else. Reload the page, then try again.',
+  'errorCode.empty_transcription':
+    "I didn't hear anything. Try again, speaking close to the microphone.",
+  'errorCode.pin_wrong': 'Incorrect PIN code',
+  'errorCode.profile_not_found': "This profile can't be found: it may have been deleted.",
+  'errorCode.source_not_found': "This source can't be found: it may have been deleted.",
   'errorCode.tts_upstream_error': 'Audio service error (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota exceeded, try again shortly',
   'errorCode.upstream_unavailable': 'Service temporarily unavailable, please retry soon',
@@ -507,6 +512,8 @@ export const en: Record<string, string> = {
   'profile.pinRequired': 'A PIN code is required for profiles under 15 years old',
   'profile.pinMismatch': 'PIN codes do not match',
   'profile.pinVerify': 'Parental verification',
+  'profile.pinVerifyInfo': 'Enter the parental PIN code to continue.',
+  'profile.pinVerifySubmit': 'Confirm',
   'profile.pinWrong': 'Incorrect PIN code',
   'profile.pinRateLimited': 'Too many PIN attempts. Try again in {minutes} min.',
   'profile.pinInfo':
