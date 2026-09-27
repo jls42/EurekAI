@@ -54,6 +54,12 @@ const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
 const PROFILE_VOICE_DEFAULT_I18N = 'profile.voiceDefault';
 
+// Rechargement des voix sans appel optionnel `f?.()` (Lizard ne mesurait plus les méthodes
+// suivantes) ni `.call(this)` (Sonar S6676) : la seule branche est ici.
+const reloadMistralVoices = (state: AppContext): Promise<void> => {
+  return state.loadMistralVoices ? state.loadMistralVoices() : Promise.resolve();
+};
+
 export function createConfig() {
   return {
     async loadConfig(this: AppContext) {
@@ -75,7 +81,7 @@ export function createConfig() {
         }
         // Load voices BEFORE setting configDraft so the voice list is populated
         // quand Alpine rend les selects de voix Mistral.
-        await this.loadMistralVoices?.call(this);
+        await reloadMistralVoices(this);
         if (configRes.ok) {
           const configBody: unknown = await configRes.json();
           const config = configBody as AppConfig;
@@ -211,7 +217,7 @@ export function createConfig() {
             const statusBody: unknown = await statusRes.json();
             this.apiStatus = statusBody as ApiStatus;
           }
-          await this.loadMistralVoices?.call(this);
+          await reloadMistralVoices(this);
           (this.$refs.settingsDialog as HTMLDialogElement | undefined)?.close();
           this.showToast(this.t('toast.settingsSaved'), 'success');
         } else {
@@ -245,7 +251,7 @@ export function createConfig() {
           reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
           reset._ocrModel = normalizeOcrModel(saved.models?.ocr);
           this.configDraft = reset;
-          await this.loadMistralVoices?.call(this);
+          await reloadMistralVoices(this);
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {
           this.showToast(this.t(TOAST_SETTINGS_ERROR), 'error');
@@ -325,7 +331,7 @@ export function createConfig() {
         await setKey({ scope, profileId, plaintext: key });
         await this.refreshKeyState(profileId);
         this.closeApiKeyDialog();
-        await this.loadMistralVoices?.call(this);
+        await reloadMistralVoices(this);
         this.showToast(this.t('toast.keySaved'), 'success');
       };
       if (scope === 'profile' && profileId) this.requireProfilePin(profileId, () => void commit());

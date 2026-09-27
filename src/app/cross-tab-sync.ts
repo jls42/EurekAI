@@ -57,7 +57,7 @@ export function handleCrossTabStorageEvent(
 ): 'bumped' | 'wrong-key' | 'drift' | 'key-synced' {
   if (event.key !== null && API_KEY_SLOTS.has(event.key)) {
     const stack = getAlpineStackEntry(doc.querySelector('[x-data="app()"]'));
-    void stack?.refreshKeyState?.call(stack);
+    if (stack?.refreshKeyState) void stack.refreshKeyState();
     return 'key-synced';
   }
   if (event.key !== NOTIFS_STORAGE_SLOT) return 'wrong-key';

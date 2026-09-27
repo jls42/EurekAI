@@ -459,6 +459,12 @@ const updateProfile = async function (
   }
 };
 
+// Rechargement des voix sans appel optionnel `f?.()` (Lizard ne mesurait plus les méthodes
+// suivantes) ni `.call(this)` (Sonar S6676) : la seule branche est ici.
+const reloadMistralVoices = (state: AppContext): Promise<void> => {
+  return state.loadMistralVoices ? state.loadMistralVoices() : Promise.resolve();
+};
+
 // Brouillon d'édition : valeurs par défaut des champs que le formulaire du profil lie.
 const toEditingProfile = (profile: Profile): EditingProfile => {
   return {
@@ -482,7 +488,7 @@ const startEditProfile = function (this: AppContext, id: string) {
   // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
   // a publié de nouvelles voix depuis le chargement initial. Non bloquant —
   // loadMistralVoices avale ses propres erreurs.
-  this.loadMistralVoices?.call(this)?.catch((e: unknown) => {
+  reloadMistralVoices(this).catch((e: unknown) => {
     console.error('voice catalog refresh failed:', e);
   });
 };
