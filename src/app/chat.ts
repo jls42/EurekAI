@@ -2,7 +2,7 @@ import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { registerGeneration } from './generate';
-import { displayedReply, withReplyFallback } from './chat-reply';
+import { displayedReply } from './chat-reply';
 import type { AppContext } from './app-context';
 import type { Generation } from '../../types';
 
@@ -60,20 +60,6 @@ function handleChatError(state: AppContext, err: ChatErrorPayload): void {
 // Méthodes extraites de createChat — `const = function` pour éviter
 // l'agglomération Lizard CCN (cf. CLAUDE.md piège connu).
 // ─────────────────────────────────────────────────────────────────────────────
-
-const loadChatHistory = async function (this: AppContext) {
-  if (!this.currentProjectId) return;
-  try {
-    const res = await fetch(this.apiBase() + '/chat');
-    if (res.ok) {
-      const body: unknown = await res.json();
-      const data = body as { messages?: AppContext['chatMessages'] };
-      this.chatMessages = withReplyFallback(this, data.messages || []);
-    }
-  } catch {
-    /* silent: offline fallback, chat vide OK */
-  }
-};
 
 // Sous-helper extrait : la branche succès/erreur du POST chat (cf.
 // handleChatSuccess / handleChatError) pour réduire le CCN de sendChatMessage. Corps typé par une
@@ -159,7 +145,6 @@ const scrollChatBottom = function () {
 
 export function createChat() {
   return {
-    loadChatHistory,
     sendChatMessage,
     clearChat,
     scrollChatBottom,

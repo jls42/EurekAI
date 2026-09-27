@@ -42,7 +42,6 @@ function makeContext(overrides: any = {}) {
       else this.generations[idx] = gen;
     },
     scrollChatBottom: chat.scrollChatBottom,
-    loadChatHistory: chat.loadChatHistory,
     sendChatMessage: chat.sendChatMessage,
     clearChat: chat.clearChat,
     ...overrides,
@@ -67,57 +66,6 @@ function mockFetchFail(status: number, data: any = {}) {
 
 beforeEach(() => {
   vi.mocked(globalThis.fetch).mockReset();
-});
-
-// --- loadChatHistory ---
-
-describe('loadChatHistory', () => {
-  it('fetches and sets chatMessages', async () => {
-    const messages = [
-      { role: 'user', content: 'hello' },
-      { role: 'assistant', content: 'hi' },
-    ];
-    mockFetchOk({ messages });
-    const ctx = makeContext();
-    await chat.loadChatHistory.call(ctx);
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1/chat');
-    expect(ctx.chatMessages).toEqual(messages);
-  });
-
-  it('returns early if no projectId', async () => {
-    const ctx = makeContext({ currentProjectId: null });
-    await chat.loadChatHistory.call(ctx);
-    expect(globalThis.fetch).not.toHaveBeenCalled();
-  });
-
-  it('handles fetch failure gracefully', async () => {
-    mockFetchFail(500);
-    const ctx = makeContext();
-    await chat.loadChatHistory.call(ctx);
-    expect(ctx.chatMessages).toEqual([]);
-  });
-
-  it('handles empty messages', async () => {
-    mockFetchOk({});
-    const ctx = makeContext();
-    await chat.loadChatHistory.call(ctx);
-    expect(ctx.chatMessages).toEqual([]);
-  });
-
-  // Tour vide enregistré avant le correctif serveur : repli lisible au lieu d'une bulle vide ;
-  // un tour vide qui a lancé une génération garde son badge « Génération déclenchée » seul.
-  it('affiche chat.emptyReply pour un tour assistant vide sans génération', async () => {
-    mockFetchOk({
-      messages: [
-        { role: 'user', content: 'hello' },
-        { role: 'assistant', content: ' ' },
-        { role: 'assistant', content: '', generatedIds: ['g1'] },
-      ],
-    });
-    const ctx = makeContext();
-    await chat.loadChatHistory.call(ctx);
-    expect(ctx.chatMessages.map((m: any) => m.content)).toEqual(['hello', 'chat.emptyReply', '']);
-  });
 });
 
 // --- sendChatMessage ---

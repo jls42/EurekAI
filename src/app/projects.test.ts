@@ -290,7 +290,7 @@ describe('selectProject', () => {
   });
 
   // Tour assistant vide enregistré avant le correctif serveur : repli lisible dès l'ouverture du
-  // projet (l'historique vient du snapshot du projet, pas de loadChatHistory). Un tour vide qui a
+  // projet (l'historique vient du snapshot du projet). Un tour vide qui a
   // lancé une génération garde son badge seul.
   it('historique avec un tour assistant vide : bulle chat.emptyReply à l’ouverture', async () => {
     mockFetchOk({

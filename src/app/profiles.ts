@@ -459,10 +459,9 @@ const updateProfile = async function (
   }
 };
 
-const startEditProfile = function (this: AppContext, id: string) {
-  const profile = this.profiles.find((p: Profile) => p.id === id);
-  if (!profile) return;
-  this.editingProfile = {
+// Brouillon d'édition : valeurs par défaut des champs que le formulaire du profil lie.
+const toEditingProfile = (profile: Profile): EditingProfile => {
+  return {
     ...profile,
     locale: profile.locale || 'fr',
     mistralVoices: {
@@ -472,12 +471,18 @@ const startEditProfile = function (this: AppContext, id: string) {
     theme: profile.theme,
     readingComfort: toEditingReadingComfort(profile.readingComfort),
   };
+};
+
+const startEditProfile = function (this: AppContext, id: string) {
+  const profile = this.profiles.find((p: Profile) => p.id === id);
+  if (!profile) return;
+  this.editingProfile = toEditingProfile(profile);
   this.showProfilePicker = true;
   this.showProfileForm = false;
   // Refresh voice catalog quand on ouvre l'éditeur : evite un hint stale si Mistral
   // a publié de nouvelles voix depuis le chargement initial. Non bloquant —
   // loadMistralVoices avale ses propres erreurs.
-  this.loadMistralVoices?.()?.catch((e: unknown) => {
+  this.loadMistralVoices?.call(this)?.catch((e: unknown) => {
     console.error('voice catalog refresh failed:', e);
   });
 };

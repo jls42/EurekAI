@@ -126,7 +126,6 @@ export interface AppContext extends AppState {
   summaryData(gen: Generation): StudyFiche;
 
   sendChatMessage(): Promise<void>;
-  loadChatHistory(): Promise<void>;
   clearChat(): Promise<void>;
   scrollChatBottom(): void;
 

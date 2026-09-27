@@ -27,6 +27,29 @@ function notifyCrossTabSyncBroken(doc: Document): void {
   doc.defaultView?.dispatchEvent(new Event(CROSS_TAB_SYNC_BROKEN_EVENT));
 }
 
+// Structure Alpine attendue absente : signalée à l'UI, et une seule fois par session en console.
+const reportCrossTabDrift = (
+  doc: Document,
+  root: Element | null,
+  stack: AlpineDataStackEntry | undefined,
+  warned: { value: boolean },
+): void => {
+  if (stack && typeof stack.crossTabSyncBroken === 'boolean') {
+    stack.crossTabSyncBroken = true;
+  }
+  notifyCrossTabSyncBroken(doc);
+  if (warned.value) return;
+  // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
+  // chemin silencieusement. Warn une fois par session si la structure
+  // attendue est absente, pour surfacer le drift.
+  console.warn('[notifications] cross-tab sync unavailable', {
+    root: !!root,
+    stack: !!stack,
+    hasField: typeof stack?.notificationsVersion === 'number',
+  });
+  warned.value = true;
+};
+
 export function handleCrossTabStorageEvent(
   event: { key: string | null },
   doc: Document,
@@ -34,7 +57,7 @@ export function handleCrossTabStorageEvent(
 ): 'bumped' | 'wrong-key' | 'drift' | 'key-synced' {
   if (event.key !== null && API_KEY_SLOTS.has(event.key)) {
     const stack = getAlpineStackEntry(doc.querySelector('[x-data="app()"]'));
-    void stack?.refreshKeyState?.();
+    void stack?.refreshKeyState?.call(stack);
     return 'key-synced';
   }
   if (event.key !== NOTIFS_STORAGE_SLOT) return 'wrong-key';
@@ -44,21 +67,7 @@ export function handleCrossTabStorageEvent(
     stack.notificationsVersion++;
     return 'bumped';
   }
-  if (stack && typeof stack.crossTabSyncBroken === 'boolean') {
-    stack.crossTabSyncBroken = true;
-  }
-  notifyCrossTabSyncBroken(doc);
-  if (!warned.value) {
-    // _x_dataStack est une API privée Alpine.js — un upgrade peut casser ce
-    // chemin silencieusement. Warn une fois par session si la structure
-    // attendue est absente, pour surfacer le drift.
-    console.warn('[notifications] cross-tab sync unavailable', {
-      root: !!root,
-      stack: !!stack,
-      hasField: typeof stack?.notificationsVersion === 'number',
-    });
-    warned.value = true;
-  }
+  reportCrossTabDrift(doc, root, stack, warned);
   return 'drift';
 }
 
