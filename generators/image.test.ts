@@ -59,9 +59,11 @@ describe('generateImage', () => {
         tools: [{ type: 'image_generation' }],
       }),
     );
+    // store: false : Mistral ne garde pas la conversation (texte de la leçon) sur ses serveurs.
     expect(client.beta.conversations.start).toHaveBeenCalledWith({
       agentId: 'agent-img',
       inputs: 'user prompt',
+      store: false,
     });
     expect(result.imageUrl).toBe('https://example.com/image.png');
     expect(client.beta.agents.delete).toHaveBeenCalledWith({ agentId: 'agent-img' });
@@ -213,5 +215,77 @@ describe('generateImage — plusieurs images renvoyées par l’agent', () => {
     );
     expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-1' });
     expect(client.files.delete).toHaveBeenCalledWith({ fileId: 'file-2' });
+  });
+});
+
+// Réponse réelle d'un réessai (historiques Mistral des 2026-09-26 et 27) : l'outil expire au bout
+// de 30 s côté Mistral, l'agent le rappelle, seule la dernière tentative produit une image. Chaque
+// appel est compté dans le coût (`usage.connectors`).
+describe('generateImage — tentatives de l’outil sans image', () => {
+  const TIMEOUT = 'Tool call timed out. Please try again.';
+  const toolCall = (result: string) => ({
+    type: 'tool.execution',
+    name: 'image_generation',
+    arguments: '{"prompt": "un volcan"}',
+    info: { result },
+  });
+  const SUCCESS = toolCall('{"url": "https://blob.example/image.jpg?sig=secret"}');
+  const imageOutput = (fileId: string) => ({
+    type: 'message.output',
+    content: [{ type: 'tool_file', fileId }],
+  });
+
+  it('journalise les tentatives sans image avec leur motif, sans l’URL signée du succès', async () => {
+    loggerWarn.mockClear();
+    const client = createClient([
+      toolCall(TIMEOUT),
+      toolCall(TIMEOUT),
+      SUCCESS,
+      imageOutput('file-1'),
+    ]);
+
+    const result = await generateImage(client, '# Content', '/tmp/project', 'pid-14');
+
+    expect(result.imageUrl).toMatch(/^\/output\/projects\/pid-14\/illustration-/);
+    expect(loggerWarn).toHaveBeenCalledTimes(1);
+    const message = String(loggerWarn.mock.calls[0][1]);
+    expect(loggerWarn.mock.calls[0][0]).toBe('image');
+    expect(message).toContain('3 appels');
+    expect(message).toContain('2 tentatives sans image');
+    expect(message).toContain(TIMEOUT);
+    expect(message).not.toContain('https://');
+    expect(message).not.toContain('sig=secret');
+  });
+
+  it('un appel, une image : aucun avertissement', async () => {
+    loggerWarn.mockClear();
+    const client = createClient([SUCCESS, imageOutput('file-1')]);
+
+    await generateImage(client, '# Content', '/tmp/project', 'pid-15');
+
+    expect(loggerWarn).not.toHaveBeenCalled();
+  });
+
+  it('autant d’images que d’appels : seul l’avertissement des images en trop', async () => {
+    loggerWarn.mockClear();
+    const client = createClient([SUCCESS, imageOutput('file-1'), SUCCESS, imageOutput('file-2')]);
+
+    await generateImage(client, '# Content', '/tmp/project', 'pid-16');
+
+    expect(loggerWarn).toHaveBeenCalledTimes(1);
+    expect(loggerWarn).toHaveBeenCalledWith('image', expect.stringContaining('2 images'));
+  });
+
+  it('motif absent ou illisible : tentatives comptées quand même', async () => {
+    loggerWarn.mockClear();
+    const noInfo = { type: 'tool.execution', name: 'image_generation', arguments: '{}' };
+    const client = createClient([noInfo, SUCCESS, imageOutput('file-1')]);
+
+    await generateImage(client, '# Content', '/tmp/project', 'pid-17');
+
+    expect(loggerWarn).toHaveBeenCalledWith(
+      'image',
+      expect.stringContaining('1 tentative sans image'),
+    );
   });
 });

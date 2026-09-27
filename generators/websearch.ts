@@ -20,9 +20,12 @@ export const webSearchEnrich = async (
   });
 
   try {
+    // store: false : Mistral ne garde pas la conversation, qui contient la requête de l'élève
+    // (l'agent est déjà supprimé ci-dessous).
     const response = await client.beta.conversations.start({
       agentId: agent.id,
       inputs: websearchInput(query, lang),
+      store: false,
     });
 
     const text = extractAllText(response.outputs);
