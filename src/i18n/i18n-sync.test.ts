@@ -82,7 +82,9 @@ describe('codes d’erreur du serveur', () => {
     readdirSync(new URL(dir, root))
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
       .map((f) => dir + f);
-  const CODE_RE = /error: [\x27\x22]([a-z][a-z_]*)[\x27\x22]/g;
+  // Code écrit dans la réponse, dans une constante ERR_* ou dans une erreur de validation typée.
+  const CODE_RE =
+    /(?:error: |const ERR_[A-Z_]+ = |ValidationError\(\d{3}, )[\x27\x22]([a-z][a-z_]*)[\x27\x22]/g;
 
   it('chaque code stable envoyé a sa clé errorCode.* (fr)', () => {
     const files = [...serverFiles('routes/'), ...serverFiles('helpers/'), 'server.ts'];
@@ -96,5 +98,22 @@ describe('codes d’erreur du serveur', () => {
       .filter((code) => !Object.hasOwn(fr, `errorCode.${code}`))
       .sort((a, b) => a.localeCompare(b));
     expect(missing, `Codes sans clé errorCode.* : ${missing.join(', ')}`).toEqual([]);
+  });
+
+  // Un refus porte un code stable (ou une clé i18n pointée), jamais un texte : « Projet
+  // introuvable », « Nom requis »… s'affichaient tels quels, en français, dans les 9 langues.
+  it('aucun refus n’envoie un texte au lieu d’un code', () => {
+    const files = [...serverFiles('routes/'), ...serverFiles('helpers/'), 'server.ts'];
+    const PAYLOAD_RE =
+      /(?:error: |const ERR_[A-Z_]+ = |ValidationError\(\d{3}, )[\x27\x22]([^\x27\x22]*)[\x27\x22]/g;
+    const STABLE = /^[a-z][a-z_]*(?:\.[a-zA-Z_]+)*$/;
+    const texts: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(new URL(file, root), 'utf-8');
+      for (const match of source.matchAll(PAYLOAD_RE)) {
+        if (!STABLE.test(match[1])) texts.push(`${file}: ${match[1]}`);
+      }
+    }
+    expect(texts).toEqual([]);
   });
 });

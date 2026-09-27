@@ -101,6 +101,11 @@ export const nl: Record<string, string> = {
   'errorCode.project_not_found': 'Deze cursus is niet gevonden: misschien is hij verwijderd.',
   'errorCode.stale':
     'Dit profiel is ergens anders gewijzigd. Laad de pagina opnieuw en begin dan opnieuw.',
+  'errorCode.empty_transcription':
+    'Ik heb niets gehoord. Probeer het opnieuw en praat dicht bij de microfoon.',
+  'errorCode.pin_wrong': 'Onjuiste PIN-code',
+  'errorCode.profile_not_found': 'Dit profiel is niet gevonden: misschien is het verwijderd.',
+  'errorCode.source_not_found': 'Deze bron is niet gevonden: misschien is hij verwijderd.',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
   'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
   'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',

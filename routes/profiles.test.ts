@@ -187,7 +187,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects age below 4 with 400', async () => {
@@ -198,7 +198,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Age invalide (4-120)' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects age above 120 with 400', async () => {
@@ -209,7 +209,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Age invalide (4-120)' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects non-number age with 400', async () => {
@@ -220,7 +220,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Age invalide (4-120)' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('requires PIN for age < 15 — missing PIN returns 400', async () => {
@@ -232,7 +232,7 @@ describe('profileRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Code PIN 4 chiffres requis pour les moins de 15 ans',
+        error: 'invalid_input',
       });
     });
 
@@ -245,7 +245,7 @@ describe('profileRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Code PIN 4 chiffres requis pour les moins de 15 ans',
+        error: 'invalid_input',
       });
     });
 
@@ -258,7 +258,7 @@ describe('profileRoutes', () => {
 
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith({
-        error: 'Code PIN 4 chiffres requis pour les moins de 15 ans',
+        error: 'invalid_input',
       });
     });
 
@@ -383,7 +383,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profil introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'profile_not_found' });
     });
 
     it('allows non-parental update without PIN for profile with PIN', async () => {
@@ -417,7 +417,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'pin_wrong' });
     });
 
     it('requires correct PIN for parental field — wrong PIN returns 403', async () => {
@@ -434,7 +434,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'pin_wrong' });
     });
 
     it('updates profile with correct PIN', async () => {
@@ -549,7 +549,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Age invalide (4-120)' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
       // Profil inchangé sur disque
       expect(store.get(created.id)!.age).toBe(20);
     });
@@ -567,7 +567,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Nom invalide' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
       expect(store.get(created.id)!.name).toBe('User');
     });
 
@@ -584,7 +584,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Nom invalide' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects PUT with non-string locale', async () => {
@@ -600,7 +600,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Locale invalide' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects PUT with null body', async () => {
@@ -616,7 +616,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Payload invalide' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects PUT with array body', async () => {
@@ -632,7 +632,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Payload invalide' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects PUT with non-array moderationCategories', async () => {
@@ -648,7 +648,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Catégories de modération invalides' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     it('rejects PUT with non-string moderationCategories entries', async () => {
@@ -664,7 +664,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(400);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Catégories de modération invalides' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     });
 
     // Client stale (onglet ouvert avant la migration 2603) : la clé 2411 est convertie, pas un 400
@@ -700,9 +700,9 @@ describe('profileRoutes', () => {
 
       const handler = getHandler(router, 'put', '/:id');
       const cases = [
-        [{ useModeration: 'false' }, 'Modération invalide'],
-        [{ useConsigne: 'true' }, 'Consigne invalide'],
-        [{ chatEnabled: 1 }, 'Chat invalide'],
+        [{ useModeration: 'false' }, 'invalid_input'],
+        [{ useConsigne: 'true' }, 'invalid_input'],
+        [{ chatEnabled: 1 }, 'invalid_input'],
       ] as const;
 
       for (const [body, error] of cases) {
@@ -787,7 +787,7 @@ describe('profileRoutes', () => {
           const res = mockRes();
           await handler(req, res);
           expect(res.status).toHaveBeenCalledWith(400);
-          expect(res.json).toHaveBeenCalledWith({ error: 'Confort de lecture invalide' });
+          expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
         }
         expect(store.get(created.id)!.readingComfort).toBeUndefined();
       });
@@ -820,7 +820,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profil introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'profile_not_found' });
     });
 
     it('requires correct PIN for profile with PIN — missing PIN returns 403', async () => {
@@ -837,7 +837,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'pin_wrong' });
     });
 
     it('requires correct PIN for profile with PIN — wrong PIN returns 403', async () => {
@@ -854,7 +854,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(403);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Code PIN incorrect' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'pin_wrong' });
     });
 
     it('deletes profile with correct PIN', async () => {
@@ -1000,7 +1000,7 @@ describe('profileRoutes', () => {
       await handler(req, res);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Profil introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'profile_not_found' });
       expect(cascadeSpy).toHaveBeenCalledWith(project1.meta.id);
       expect(projectStore.getProject(project1.meta.id)).toBeNull();
     });

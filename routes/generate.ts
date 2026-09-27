@@ -102,7 +102,7 @@ function classifyPromoteFailure(result: Exclude<PromoteResult, { kind: 'promoted
 const QUIZ_VOCAL = 'quiz-vocal' as const;
 const FILL_BLANK = 'fill-blank' as const;
 const ROUTER_MODEL = 'mistral-small-latest';
-const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 
 // Variante non-throw : retourne null quand aucune source ne matche, pour permettre aux
 // call sites internes (`buildGenContext`, `quiz-review`, `route` analysis) de répondre
@@ -492,11 +492,11 @@ function validateQuizReviewInputs(
   body: { generationId?: string; weakQuestions?: unknown; lang?: string },
 ): ValidationResult<QuizReviewValidated> {
   if (!body.generationId || !Array.isArray(body.weakQuestions)) {
-    return { ok: false, status: 400, error: 'generationId et weakQuestions requis' };
+    return { ok: false, status: 400, error: INVALID_INPUT };
   }
   const originalGen = store.getGeneration(pid, body.generationId);
   if (originalGen?.type !== 'quiz') {
-    return { ok: false, status: 404, error: 'Quiz original introuvable' };
+    return { ok: false, status: 404, error: 'generation_not_found' };
   }
   const project = store.getProject(pid);
   if (!project) {

@@ -59,3 +59,8 @@ export const MESSAGE_RULES: readonly Rule[] = [
 // TTS_DEPENDENT_AGENTS, dictée comprise) + les libellés des routes audio (lecture à voix haute, STT).
 export const TTS_AGENTS: ReadonlySet<string> = new Set([...TTS_DEPENDENT_AGENTS, 'tts', 'stt']);
 export const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|audio|speech|voice|transcrib/i;
+
+// Délai dépassé ou connexion impossible, levés par le SDK sans statut HTTP (RequestTimeoutError,
+// ConnectionError : messages fixes du SDK) : panne passagère de l'amont. Évaluée APRÈS les règles
+// audio, pour qu'un échec du TTS garde tts_upstream_error.
+export const TRANSPORT_FAILURE = /^(?:Request timed out|Unable to make request)\b/;

@@ -35,7 +35,7 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 
-const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 const CHAT_ROUTE_PATH = '/:pid/chat';
 const FILL_BLANK = 'fill-blank';
 import { extractErrorCode } from '../helpers/error-codes.js';
@@ -110,7 +110,7 @@ const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidation
   const { message, lang, ageGroup } = body ?? {};
   // Un message fait d'espaces est refusé comme un message absent : il s'enregistrait vide (trim).
   if (typeof message !== 'string' || message.trim() === '')
-    return new ChatValidationError(400, 'message requis');
+    return new ChatValidationError(400, INVALID_INPUT);
   const locale = readLocaleFields(lang, ageGroup);
   const useConsigne = readUseConsigne(body?.useConsigne);
   if (!locale || useConsigne === null) return new ChatValidationError(400, INVALID_INPUT);

@@ -1333,7 +1333,7 @@ describe('createProfiles', () => {
         vi.fn().mockResolvedValue({
           ok: false,
           statusText: 'Forbidden',
-          json: async () => ({ error: 'Code PIN incorrect' }),
+          json: async () => ({ error: 'pin_wrong' }),
         }),
       );
       const profile = { id: 'p-del', name: 'Test', hasPin: false };

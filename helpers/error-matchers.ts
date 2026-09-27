@@ -3,6 +3,7 @@ import {
   MESSAGE_RULES,
   STATUS_RULES,
   STRUCTURED_CODE_RULES,
+  TRANSPORT_FAILURE,
   TTS_AGENTS,
   TTS_SIGNATURE,
 } from './error-code-rules.js';
@@ -47,9 +48,14 @@ export function matchAudio(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'
   return null;
 }
 
+export function matchTransport(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
+  return TRANSPORT_FAILURE.test(ctx.message) ? 'upstream_unavailable' : null;
+}
+
 export const MATCHERS: readonly Matcher[] = [
   matchStatus,
   matchStructuredCode,
   matchMessage,
   matchAudio,
+  matchTransport,
 ];

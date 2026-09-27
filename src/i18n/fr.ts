@@ -101,6 +101,11 @@ export const fr: Record<string, string> = {
   'errorCode.project_delete_failed': "Impossible de supprimer ce cours pour l'instant. Réessaie.",
   'errorCode.project_not_found': 'Ce cours est introuvable : il a peut-être été supprimé.',
   'errorCode.stale': 'Ce profil a été modifié ailleurs. Recharge la page, puis recommence.',
+  'errorCode.empty_transcription':
+    "Je n'ai entendu aucune parole. Réessaie en parlant près du micro.",
+  'errorCode.pin_wrong': 'Code PIN incorrect',
+  'errorCode.profile_not_found': 'Ce profil est introuvable : il a peut-être été supprimé.',
+  'errorCode.source_not_found': 'Cette source est introuvable : elle a peut-être été supprimée.',
   'errorCode.tts_upstream_error': 'Erreur du service audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota dépassé, réessaye dans quelques instants',
   'errorCode.upstream_unavailable': 'Service momentanément indisponible, réessaye bientôt',

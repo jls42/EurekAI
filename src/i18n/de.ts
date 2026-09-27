@@ -102,6 +102,12 @@ export const de: Record<string, string> = {
   'errorCode.project_not_found': 'Dieser Kurs wurde nicht gefunden: Vielleicht wurde er gelöscht.',
   'errorCode.stale':
     'Dieses Profil wurde woanders geändert. Lade die Seite neu und fang dann noch einmal an.',
+  'errorCode.empty_transcription':
+    'Ich habe nichts gehört. Versuch es noch einmal und sprich nah am Mikrofon.',
+  'errorCode.pin_wrong': 'Falscher PIN-Code',
+  'errorCode.profile_not_found':
+    'Dieses Profil wurde nicht gefunden: Vielleicht wurde es gelöscht.',
+  'errorCode.source_not_found': 'Diese Quelle wurde nicht gefunden: Vielleicht wurde sie gelöscht.',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
   'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
   'errorCode.upstream_unavailable':

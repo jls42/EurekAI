@@ -163,7 +163,7 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne 400 quand le message est manquant', async () => {
@@ -178,7 +178,7 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'message requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 quand le message n est pas une string', async () => {
@@ -193,7 +193,7 @@ describe('POST /:pid/chat', () => {
     await handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'message requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   // Un message fait d'espaces passait la validation et s'enregistrait vide (`trim()`).
@@ -206,7 +206,7 @@ describe('POST /:pid/chat', () => {
     await handler(mockReq({ params: { pid: project.meta.id }, body: { message: '  \n ' } }), res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'message requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
     expect(chatWithSources).not.toHaveBeenCalled();
     expect(store.getProject(project.meta.id)!.chat?.messages ?? []).toHaveLength(0);
   });
@@ -898,7 +898,7 @@ describe('GET /:pid/chat', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('retourne des messages vides quand il n y a pas de chat', () => {
@@ -954,7 +954,7 @@ describe('DELETE /:pid/chat', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   it('efface les messages du chat', async () => {

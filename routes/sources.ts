@@ -65,7 +65,7 @@ import {
   readLocaleFields,
 } from '../helpers/request-validation.js';
 
-const ERR_PROJECT_NOT_FOUND = 'Projet introuvable';
+const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 
 function pendingModeration(): Source['moderation'] {
   return { status: 'pending', categories: {} };
@@ -653,7 +653,7 @@ const runSttPipeline = async (
   const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
   const { text, elapsed } = sttResult;
   if (!text || text.trim().length === 0) {
-    res.status(400).json({ error: 'Transcription vide — aucune parole detectee' });
+    res.status(400).json({ error: 'empty_transcription' });
     return null;
   }
   return { text, elapsed, persisted };
@@ -895,7 +895,7 @@ type UploadRequest = { files: Express.Multer.File[]; lang: string; allowDuplicat
 const readUploadRequest = (req: Request, res: Response): UploadRequest | null => {
   const files = (req.files as Express.Multer.File[] | undefined) ?? [];
   if (files.length === 0) {
-    res.status(400).json({ error: 'Aucun fichier envoye' });
+    res.status(400).json({ error: INVALID_INPUT });
     return null;
   }
   const lang = readBodyLang(req, res);
@@ -964,7 +964,7 @@ const registerTextRoute = (
     }
     const { text } = req.body;
     if (isBlankString(text)) {
-      res.status(400).json({ error: 'Texte requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return;
     }
     const lang = readBodyLang(req, res);
@@ -1010,7 +1010,7 @@ const registerVoiceRoute = (
       }
       const file = req.file;
       if (!file) {
-        res.status(400).json({ error: 'Fichier audio requis' });
+        res.status(400).json({ error: INVALID_INPUT });
         return;
       }
       const lang = readBodyLang(req, res);
@@ -1069,7 +1069,7 @@ const registerDeleteRoute = (router: Router, store: ProjectStore): void => {
   router.delete('/:pid/sources/:sid', (req, res) => {
     const result = store.deleteSource(req.params.pid, req.params.sid);
     if (!result) {
-      res.status(404).json({ error: 'Projet ou source introuvable' });
+      res.status(404).json({ error: 'source_not_found' });
       return;
     }
     res.json({ ok: true, consigne: result.consigne ?? null });
@@ -1144,7 +1144,7 @@ const registerModerateRoute = (router: Router): void => {
     if (!resolved) return;
     const { text } = req.body;
     if (!text) {
-      res.status(400).json({ error: 'text requis' });
+      res.status(400).json({ error: INVALID_INPUT });
       return;
     }
     try {

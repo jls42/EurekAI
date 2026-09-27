@@ -99,6 +99,11 @@ export const es: Record<string, string> = {
   'errorCode.project_not_found': 'No se encuentra este curso: quizá se ha borrado.',
   'errorCode.stale':
     'Este perfil se ha modificado en otro lugar. Recarga la página y vuelve a empezar.',
+  'errorCode.empty_transcription':
+    'No he oído nada. Vuelve a intentarlo hablando cerca del micrófono.',
+  'errorCode.pin_wrong': 'Código PIN incorrecto',
+  'errorCode.profile_not_found': 'No se encuentra este perfil: quizá se ha borrado.',
+  'errorCode.source_not_found': 'No se encuentra esta fuente: quizá se ha borrado.',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',

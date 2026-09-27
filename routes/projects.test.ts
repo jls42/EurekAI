@@ -97,7 +97,7 @@ describe('POST /', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 si le nom est une chaine vide', () => {
@@ -108,7 +108,7 @@ describe('POST /', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 si le nom ne contient que des espaces', () => {
@@ -119,7 +119,7 @@ describe('POST /', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 si le nom n est pas une string', () => {
@@ -130,7 +130,7 @@ describe('POST /', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('cree un projet et retourne son meta', () => {
@@ -196,7 +196,7 @@ describe('GET /:pid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(404);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
   });
 
   // Projet orphelin (sans profil, listé pour tous les profils) : rattaché DÉFINITIVEMENT au
@@ -275,7 +275,7 @@ describe('GET /:pid', () => {
       const res = open('inexistant', kid.id);
 
       expect(res.status).toHaveBeenCalledWith(404);
-      expect(res.json).toHaveBeenCalledWith({ error: 'Projet introuvable' });
+      expect(res.json).toHaveBeenCalledWith({ error: 'project_not_found' });
     });
   });
 
@@ -379,7 +379,7 @@ describe('PUT /:pid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 si le nom est une chaine vide', () => {
@@ -391,7 +391,7 @@ describe('PUT /:pid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('retourne 400 si le nom ne contient que des espaces', () => {
@@ -403,7 +403,7 @@ describe('PUT /:pid', () => {
     handler(req, res);
 
     expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: 'Nom requis' });
+    expect(res.json).toHaveBeenCalledWith({ error: 'invalid_input' });
   });
 
   it('renomme le projet et retourne ok', () => {

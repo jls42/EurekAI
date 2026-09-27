@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { SDKError } from '@mistralai/mistralai/models/errors';
+import { ConnectionError, RequestTimeoutError, SDKError } from '@mistralai/mistralai/models/errors';
 import { extractErrorCode } from './error-codes.js';
 import { httpStatusOf } from './error-code-resolution.js';
 import type { FailedStepCode } from '../types.js';
@@ -136,6 +136,26 @@ describe('extractErrorCode', () => {
     // Faux positifs historiques de la regex `too.?long`
     expect(extractErrorCode(new Error('filename too long for filesystem'))).toBe('internal_error');
     expect(extractErrorCode(new Error('image too large to upload'))).toBe('internal_error');
+  });
+
+  // Délai dépassé ou connexion impossible, levés par le SDK sans statut HTTP : panne passagère de
+  // l'amont, pas une erreur interne (vécu : agent image expiré à 120 s, « Erreur interne du serveur »).
+  it('mappe un délai dépassé ou une connexion impossible du SDK vers upstream_unavailable', () => {
+    const timeout = new RequestTimeoutError('Request timed out', {
+      cause: new Error('TimeoutError'),
+    });
+    const lost = new ConnectionError('Unable to make request', {
+      cause: new Error('fetch failed'),
+    });
+    expect(extractErrorCode(timeout, 'image')).toBe('upstream_unavailable');
+    expect(extractErrorCode(lost, 'summary')).toBe('upstream_unavailable');
+  });
+
+  it('garde tts_upstream_error pour un délai dépassé pendant le TTS', () => {
+    const timeout = new RequestTimeoutError('Request timed out', { cause: new Error('x') });
+    expect(extractErrorCode(Object.assign(timeout, { stage: 'tts' }), 'podcast')).toBe(
+      'tts_upstream_error',
+    );
   });
 
   // La dictée lit chaque mot en audio : un échec de son TTS se classe comme celui du podcast
