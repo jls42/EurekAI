@@ -160,6 +160,10 @@ export interface AppContext extends AppState {
   // Clé Mistral navigateur (cf. src/app/api-key.ts + config.ts)
   mistralReady(): boolean;
   ttsReady(): boolean;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
+  usesTts(type: string): boolean;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
+  ttsBlocked(type: string): boolean;
   refreshKeyState(profileId?: string): Promise<void>;
   openApiKeyDialog(scope?: 'global' | 'profile'): void;
   closeApiKeyDialog(): void;

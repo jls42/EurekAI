@@ -11,6 +11,7 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 vi.mock('./api-key', () => ({
   setKey: vi.fn(() => Promise.resolve()),
@@ -66,6 +67,8 @@ function makeContext(overrides: any = {}) {
     currentProfile: null as { id: string } | null,
     mistralReady: config.mistralReady,
     ttsReady: config.ttsReady,
+    usesTts: config.usesTts,
+    ttsBlocked: config.ttsBlocked,
     refreshKeyState: config.refreshKeyState,
     openApiKeyDialog: config.openApiKeyDialog,
     closeApiKeyDialog: config.closeApiKeyDialog,
@@ -593,6 +596,37 @@ describe('clé Mistral navigateur (méthodes config)', () => {
     const ctx = makeContext({ apiStatus: { mistral: false }, hasMistralKey: true });
     expect(config.mistralReady.call(ctx)).toBe(true);
     expect(config.ttsReady.call(ctx)).toBe(true);
+  });
+
+  // Source unique des types qui exigent le TTS (TTS_DEPENDENT_AGENTS) : la dictée lit chaque mot
+  // en audio, elle manquait aux listes codées en dur des boutons de génération.
+  it('usesTts / ttsBlocked : podcast, quiz vocal et dictée grisés sans TTS', () => {
+    const noTts = makeContext({ apiStatus: { mistral: false }, hasMistralKey: false });
+    const withTts = makeContext({ apiStatus: { mistral: true } });
+    for (const type of ['podcast', 'quiz-vocal', 'dictation']) {
+      expect(config.usesTts.call(noTts, type)).toBe(true);
+      expect(config.ttsBlocked.call(noTts, type)).toBe(true);
+      expect(config.ttsBlocked.call(withTts, type)).toBe(false);
+    }
+    expect(config.usesTts.call(noTts, 'summary')).toBe(false);
+    expect(config.ttsBlocked.call(noTts, 'summary')).toBe(false);
+  });
+
+  it('gabarits : aucune liste de types TTS en dur, dictée grisée sans TTS', () => {
+    const partial = (name: string) =>
+      readFileSync(new URL(`../partials/${name}.html`, import.meta.url), 'utf-8');
+    const sources = partial('view-sources');
+    const dashboard = partial('view-dashboard');
+    for (const html of [sources, dashboard]) {
+      expect(html).not.toContain("['podcast','quiz-vocal']");
+      expect(html).toContain(':disabled="ttsBlocked(cat.key)"');
+      expect(html).toContain(":title=\"ttsBlocked(cat.key) ? t('gen.needsTts') : ''\"");
+    }
+    expect(dashboard).not.toContain("gen.type === 'podcast' || gen.type === 'quiz-vocal'");
+    expect(dashboard).toContain('usesTts(gen.type)');
+    const dictation = partial('view-dictation');
+    expect(dictation).toContain(':disabled="sources.length === 0 || !ttsReady()"');
+    expect(dictation).toContain(":title=\"!ttsReady() ? t('gen.needsTts') : ''\"");
   });
 
   it('refreshKeyState : ok → hasMistralKey true, non dégradé', async () => {

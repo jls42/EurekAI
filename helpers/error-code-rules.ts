@@ -1,4 +1,5 @@
 import type { FailedStepCode } from '../types.js';
+import { TTS_DEPENDENT_AGENTS } from '../generators/auto-agents.js';
 
 export type Rule = Readonly<{
   pattern: RegExp;
@@ -54,5 +55,7 @@ export const MESSAGE_RULES: readonly Rule[] = [
   },
 ];
 
-export const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
+// Agents dont l'échec peut venir de la pile audio : les générations qui exigent le TTS (source unique
+// TTS_DEPENDENT_AGENTS, dictée comprise) + les libellés des routes audio (lecture à voix haute, STT).
+export const TTS_AGENTS: ReadonlySet<string> = new Set([...TTS_DEPENDENT_AGENTS, 'tts', 'stt']);
 export const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|audio|speech|voice|transcrib/i;

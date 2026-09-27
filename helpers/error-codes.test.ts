@@ -138,6 +138,14 @@ describe('extractErrorCode', () => {
     expect(extractErrorCode(new Error('image too large to upload'))).toBe('internal_error');
   });
 
+  // La dictée lit chaque mot en audio : un échec de son TTS se classe comme celui du podcast
+  // (TTS_AGENTS l'oubliait → internal_error).
+  it('mappe un échec TTS de la dictée vers tts_upstream_error', () => {
+    expect(extractErrorCode(Object.assign(new Error('x'), { stage: 'tts' }), 'dictation')).toBe(
+      'tts_upstream_error',
+    );
+  });
+
   it('mappe vers tts_upstream_error seulement avec signature positive', () => {
     // Tag explicite posé par le generator
     expect(extractErrorCode(Object.assign(new Error('x'), { stage: 'tts' }), 'podcast')).toBe(

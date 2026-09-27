@@ -3,7 +3,11 @@ import { normalizeSummaryData } from './helpers';
 import { pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
-import { AUTO_AGENTS_SET, AUTO_AGENT_TYPES } from '../../generators/auto-agents';
+import {
+  AUTO_AGENTS_SET,
+  AUTO_AGENT_TYPES,
+  TTS_DEPENDENT_AGENTS,
+} from '../../generators/auto-agents';
 import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
 import type { AppContext, GenerateExtraBody } from './app-context';
 import type { FailedStepCode, Generation } from '../../types';
@@ -142,11 +146,11 @@ export function populateAutoPlan(
   plannedTypes: string[],
   controller: AbortController,
 ): void {
-  const ttsTypes = new Set(['podcast', 'quiz-vocal']);
   state.loading.auto = false;
   delete state.abortControllers.auto;
   for (const step of plan) {
-    if (ttsTypes.has(step.agent) && !state.ttsReady()) continue;
+    // Sans TTS, les générations audio (podcast, quiz vocal, dictée) sont écartées du plan.
+    if (TTS_DEPENDENT_AGENTS.has(step.agent) && !state.ttsReady()) continue;
     // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
     // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
     if (!AUTO_AGENTS_SET.has(step.agent)) continue;

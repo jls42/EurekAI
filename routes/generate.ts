@@ -51,7 +51,11 @@ import { deleteMediaFiles } from '../helpers/generation-media.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
-import { AUTO_AGENTS_SET, type AutoAgentType } from '../generators/auto-agents.js';
+import {
+  AUTO_AGENTS_SET,
+  TTS_DEPENDENT_AGENTS,
+  type AutoAgentType,
+} from '../generators/auto-agents.js';
 import { buildExclusionContext } from '../helpers/diversity.js';
 import { consigneMarkdownHeader } from '../prompts.js';
 import { autoTitle } from '../helpers/auto-title.js';
@@ -1310,12 +1314,6 @@ const executePlan = async (
   });
 };
 
-const TTS_DEPENDENT_AGENTS: ReadonlySet<AutoAgentType> = new Set<AutoAgentType>([
-  'podcast',
-  QUIZ_VOCAL,
-  DICTATION,
-]);
-
 const splitByTtsAvailability = <T extends { agent: AutoAgentType }>(
   plan: T[],
   ttsAvailable: boolean,
@@ -1442,8 +1440,8 @@ const registerMediaGenerationRoutes = (
       trackedType: FILL_BLANK,
     }),
   );
-  // Dictée : auto-routable (AUTO_AGENT_TYPES) et TTS-dépendante (référencée
-  // dans TTS_DEPENDENT_AGENTS).
+  // Dictée : auto-routable (AUTO_AGENT_TYPES) et TTS-dépendante (TTS_DEPENDENT_AGENTS,
+  // generators/auto-agents.ts).
   router.post(
     '/:pid/generate/dictation',
     handleGeneration(

@@ -16,6 +16,10 @@ const VALID_AGENTS = AUTO_AGENTS_SET;
 
 const MAX_PLAN_LENGTH = MAX_AUTO_PLAN_LENGTH;
 const SUBSTANTIAL_MATERIAL_CHARS = 350;
+// Formats audio injectés pour du contenu substantiel, dans l'ordre de priorité : podcast/quiz-vocal
+// avant dictation (la plus coûteuse en TTS, 1 lecture par mot) — sur budget serré, la dictée cède sa
+// place aux deux autres. Mêmes éléments que TTS_DEPENDENT_AGENTS (verrou : router.test.ts).
+const AUDIO_ENRICHMENT_ORDER = ['podcast', 'quiz-vocal', 'dictation'];
 
 function stripNonSourcePreamble(markdown: string): string {
   const sourceStart = markdown.indexOf('# Source ');
@@ -66,9 +70,7 @@ function enrichPlanForLearning(
   // Budget post-truncation : n'injecte que ce qui rentre sans évincer un agent déjà choisi
   // par le LLM. Si le LLM a explicitement demandé `image` pour du contenu visuel
   // (carte, anatomie, schéma), on ne la sacrifie pas au profit d'un format audio opportuniste.
-  // Ordre = priorité d'injection : podcast/quiz-vocal avant dictation (la plus coûteuse en TTS,
-  // 1 lecture par mot) — sur budget serré, la dictée cède sa place aux deux autres formats audio.
-  const candidates = ['podcast', 'quiz-vocal', 'dictation'].filter((a) => !seen.has(a));
+  const candidates = AUDIO_ENRICHMENT_ORDER.filter((a) => !seen.has(a));
   const available = MAX_PLAN_LENGTH - plan.length;
   for (const agent of candidates.slice(0, Math.max(0, available))) {
     insertBeforeImageOrAppend(plan, {

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { routeRequest, normalizePlan } from './router.js';
+import { TTS_DEPENDENT_AGENTS } from './auto-agents.js';
 import { logger } from '../helpers/logger.js';
 
 const validPlan = {
@@ -264,6 +265,14 @@ describe('normalizePlan', () => {
       'quiz-vocal',
       'dictation',
     ]);
+  });
+
+  // Les formats audio injectés suivent la source unique des types qui exigent le TTS : un nouveau
+  // générateur audio doit rejoindre l'ordre d'enrichissement, ou en être écarté volontairement ici.
+  it("l'enrichissement audio injecte exactement les types qui exigent le TTS", () => {
+    const result = normalizePlan([{ agent: 'summary', reason: 'r1' }], 'fr', 'a'.repeat(500));
+    const injected = result.slice(1).map((s) => s.agent);
+    expect(new Set(injected)).toEqual(new Set(TTS_DEPENDENT_AGENTS));
   });
 
   it('does not force audio formats for genuinely short material', () => {
