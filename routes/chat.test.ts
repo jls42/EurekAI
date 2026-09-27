@@ -196,6 +196,21 @@ describe('POST /:pid/chat', () => {
     expect(res.json).toHaveBeenCalledWith({ error: 'message requis' });
   });
 
+  // Un message fait d'espaces passait la validation et s'enregistrait vide (`trim()`).
+  it('retourne 400 quand le message ne contient que des espaces, sans rien enregistrer', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const project = store.createProject('Test');
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+
+    await handler(mockReq({ params: { pid: project.meta.id }, body: { message: '  \n ' } }), res);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    expect(res.json).toHaveBeenCalledWith({ error: 'message requis' });
+    expect(chatWithSources).not.toHaveBeenCalled();
+    expect(store.getProject(project.meta.id)!.chat?.messages ?? []).toHaveLength(0);
+  });
+
   it('retourne 403 quand le chat est desactive pour le profil', async () => {
     const profile = profileStore.create('Kid', 8, '0', 'fr');
     // enfant => chatEnabled defaults to false
@@ -635,6 +650,72 @@ describe('POST /:pid/chat', () => {
 
     const updated = store.getProject(project.meta.id);
     const assistantMsg = updated!.chat!.messages.find((m) => m.role === 'assistant');
+    expect(assistantMsg!.generatedIds).toHaveLength(1);
+  });
+
+  // L'API refuse un tour assistant vide (400 « Assistant message must have either content or
+  // tool_calls », mesuré) : une seule réponse vide enregistrée bloquait le chat du projet à vie.
+  it("n'envoie pas à l'API un tour vide déjà enregistré : le chat bloqué répond de nouveau", async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    (chatWithSources as any).mockImplementationOnce(
+      async (_client: unknown, msgs: Array<{ role: string; content: string }>) => {
+        if (msgs.some((m) => m.content.trim() === '')) {
+          throw new Error(
+            'API error occurred: Status 400 Body: Assistant message must have either content or tool_calls',
+          );
+        }
+        return { reply: 'Re-bonjour !', toolCalls: [] };
+      },
+    );
+    const project = store.createProject('Test');
+    const pid = project.meta.id;
+    addSource(pid);
+    const at = new Date().toISOString();
+    store.appendChatMessage(pid, { role: 'user', content: 'Salut', timestamp: at });
+    store.appendChatMessage(pid, { role: 'assistant', content: '', timestamp: at });
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+
+    await handler(mockReq({ params: { pid }, body: { message: 'Bonjour' } }), res);
+
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: 'Re-bonjour !' }));
+    const sent = (chatWithSources as any).mock.calls[0][1];
+    expect(sent).toEqual([
+      { role: 'user', content: 'Salut' },
+      { role: 'user', content: 'Bonjour' },
+    ]);
+  });
+
+  it("n'enregistre pas une réponse vide qui n'a rien généré", async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    (chatWithSources as any).mockResolvedValueOnce({ reply: '', toolCalls: [] });
+    const project = store.createProject('Test');
+    addSource(project.meta.id);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+
+    await handler(mockReq({ params: { pid: project.meta.id }, body: { message: 'Bonjour' } }), res);
+
+    expect(res.json).toHaveBeenCalledWith(expect.objectContaining({ reply: '' }));
+    const roles = store.getProject(project.meta.id)!.chat!.messages.map((m) => m.role);
+    expect(roles).toEqual(['user']);
+  });
+
+  it('enregistre une réponse vide qui a lancé une génération (ses generatedIds)', async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    (chatWithSources as any).mockResolvedValueOnce({ reply: '', toolCalls: ['generate_quiz'] });
+    const project = store.createProject('Test');
+    addSource(project.meta.id);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+
+    await handler(mockReq({ params: { pid: project.meta.id }, body: { message: 'Quiz' } }), res);
+
+    const assistantMsg = store
+      .getProject(project.meta.id)!
+      .chat!.messages.find((m) => m.role === 'assistant');
+    expect(assistantMsg!.content).toBe('');
     expect(assistantMsg!.generatedIds).toHaveLength(1);
   });
 

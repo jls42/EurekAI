@@ -342,6 +342,8 @@ export const nl: Record<string, string> = {
   'chat.placeholder': 'Stel een vraag over je cursussen...',
   'chat.errorReply': 'Oeps, er ging iets mis. Probeer het opnieuw!',
   'chat.connectionError': 'Oeps, ik kon niet antwoorden. Controleer je verbinding.',
+  'chat.emptyReply':
+    'Ik wist deze keer niet wat ik moest antwoorden. Kun je je vraag anders stellen?',
 
   'podcast.heading': 'Podcasts',
   'podcast.new': 'Nieuwe podcast',

@@ -103,6 +103,21 @@ describe('loadChatHistory', () => {
     await chat.loadChatHistory.call(ctx);
     expect(ctx.chatMessages).toEqual([]);
   });
+
+  // Tour vide enregistré avant le correctif serveur : repli lisible au lieu d'une bulle vide ;
+  // un tour vide qui a lancé une génération garde son badge « Génération déclenchée » seul.
+  it('affiche chat.emptyReply pour un tour assistant vide sans génération', async () => {
+    mockFetchOk({
+      messages: [
+        { role: 'user', content: 'hello' },
+        { role: 'assistant', content: ' ' },
+        { role: 'assistant', content: '', generatedIds: ['g1'] },
+      ],
+    });
+    const ctx = makeContext();
+    await chat.loadChatHistory.call(ctx);
+    expect(ctx.chatMessages.map((m: any) => m.content)).toEqual(['hello', 'chat.emptyReply', '']);
+  });
 });
 
 // --- sendChatMessage ---
@@ -120,6 +135,21 @@ describe('sendChatMessage', () => {
     expect(ctx.chatMessages[1].role).toBe('assistant');
     expect(ctx.chatMessages[1].content).toBe('Hello back!');
     expect(ctx.chatLoading).toBe(false);
+  });
+
+  it('réponse vide sans génération : bulle chat.emptyReply au lieu d’une bulle vide', async () => {
+    mockFetchOk({ reply: '', generatedIds: [] });
+    const ctx = makeContext({ chatInput: 'Hello' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.chatMessages[1].content).toBe('chat.emptyReply');
+  });
+
+  it('réponse vide qui a lancé une génération : pas de repli, le badge suffit', async () => {
+    mockFetchOk({ reply: '', generatedIds: ['g1'] });
+    const ctx = makeContext({ chatInput: 'Hello' });
+    await chat.sendChatMessage.call(ctx);
+    expect(ctx.chatMessages[1].content).toBe('');
+    expect(ctx.chatMessages[1].generatedIds).toEqual(['g1']);
   });
 
   it('sends correct request body with locale, ageGroup and useConsigne', async () => {

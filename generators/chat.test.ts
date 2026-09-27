@@ -137,4 +137,122 @@ describe('chatWithSources', () => {
     const call = client.chat.complete.mock.calls[0][0];
     expect(call.messages[0].content).toContain('COURSE DOCUMENTS');
   });
+
+  // Scénarios mesurés sur l'API réelle (mistral-large-latest, 2026-09-27) : le modèle enchaîne ses
+  // appels d'outils (un par tour), rappelle un outil déjà lancé, et renvoie son texte en morceaux
+  // quand toolChoice vaut 'none'.
+  describe("boucle d'outils", () => {
+    // Réponses rendues dans l'ordre. `seen` garde une COPIE des messages de chaque appel :
+    // chatWithSources modifie son tableau en place, mock.calls n'en garderait que la référence.
+    const scriptedClient = (...responses: Array<{ content?: unknown; toolCalls?: unknown[] }>) => {
+      const seen: Array<{ messages: any[]; toolChoice?: string }> = [];
+      const complete = vi.fn((req: any) => {
+        seen.push({ messages: [...req.messages], toolChoice: req.toolChoice });
+        return Promise.resolve({ choices: [{ message: responses.shift() }] });
+      });
+      return { client: { chat: { complete } } as any, seen, complete };
+    };
+    const call = (id: string, name: string) => ({ id, function: { name, arguments: '{}' } });
+    const toolAnswers = (msgs: any[]) =>
+      msgs.filter((m) => m.role === 'tool').map((m) => m.toolCallId);
+
+    it('traite un outil appelé au 2e tour et rend le texte du tour final', async () => {
+      const { client, complete } = scriptedClient(
+        { content: '', toolCalls: [call('t1', 'generate_quiz')] },
+        { content: '', toolCalls: [call('t2', 'generate_flashcards')] },
+        { content: 'Ton quiz et tes flashcards arrivent !' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.toolCalls).toEqual(['generate_quiz', 'generate_flashcards']);
+      expect(result.reply).toBe('Ton quiz et tes flashcards arrivent !');
+      expect(complete).toHaveBeenCalledTimes(3);
+    });
+
+    it('répond à un outil rappelé à un tour suivant sans le relancer', async () => {
+      const { client, seen } = scriptedClient(
+        { content: 'Je te prépare un quiz !', toolCalls: [call('t1', 'generate_quiz')] },
+        { content: 'Le quiz cuit…', toolCalls: [call('t2', 'generate_quiz')] },
+        { content: 'Le quiz est prêt !' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.toolCalls).toEqual(['generate_quiz']);
+      expect(result.reply).toBe('Le quiz est prêt !');
+      expect(toolAnswers(seen[2].messages)).toEqual(['t1', 't2']);
+    });
+
+    it('au-delà de 3 appels : le tour assistant ne garde que les appels traités, puis texte forcé', async () => {
+      const { client, seen } = scriptedClient(
+        {
+          content: '',
+          toolCalls: [
+            call('t1', 'generate_summary'),
+            call('t2', 'generate_quiz'),
+            call('t3', 'generate_flashcards'),
+            call('t4', 'generate_fill-blank'),
+          ],
+        },
+        { content: 'Tout est lancé !' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.toolCalls).toEqual([
+        'generate_summary',
+        'generate_quiz',
+        'generate_flashcards',
+      ]);
+      const assistant = seen[1].messages.find((m) => m.role === 'assistant');
+      expect(assistant.toolCalls.map((t: any) => t.id)).toEqual(['t1', 't2', 't3']);
+      expect(toolAnswers(seen[1].messages)).toEqual(['t1', 't2', 't3']);
+      expect(seen[1].toolChoice).toBe('none');
+    });
+
+    it('arrête après 3 tours d’outils : 4 appels au plus, le dernier en texte forcé', async () => {
+      const { client, seen, complete } = scriptedClient(
+        { content: '', toolCalls: [call('t1', 'generate_quiz')] },
+        { content: '', toolCalls: [call('t2', 'generate_quiz')] },
+        { content: '', toolCalls: [call('t3', 'generate_quiz')] },
+        { content: 'Fini.' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(complete).toHaveBeenCalledTimes(4);
+      expect(seen.map((s) => s.toolChoice)).toEqual(['auto', 'auto', 'auto', 'none']);
+      expect(result.toolCalls).toEqual(['generate_quiz']);
+      expect(result.reply).toBe('Fini.');
+    });
+
+    it('extrait le texte d’une réponse en morceaux (le raisonnement est ignoré)', async () => {
+      const { client } = scriptedClient(
+        { content: '', toolCalls: [call('t1', 'generate_quiz')] },
+        {
+          content: [
+            { type: 'thinking', thinking: [{ type: 'text', text: 'réflexion' }] },
+            { type: 'text', text: 'Voici ' },
+            { type: 'text', text: 'ton quiz !' },
+          ],
+        },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.reply).toBe('Voici ton quiz !');
+    });
+
+    it('garde le dernier texte non vide quand le tour final est vide', async () => {
+      const { client } = scriptedClient(
+        { content: 'Je te génère un quiz !', toolCalls: [call('t1', 'generate_quiz')] },
+        { content: '' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.reply).toBe('Je te génère un quiz !');
+    });
+  });
 });

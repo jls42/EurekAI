@@ -427,6 +427,7 @@ export const hi: Record<string, string> = {
     '\u0905\u0930\u0947, \u0915\u0941\u091B \u0917\u0932\u0924 \u0939\u094B \u0917\u092F\u093E\u0964 \u092B\u093F\u0930 \u0938\u0947 \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u0947\u0902!',
   'chat.connectionError':
     '\u0905\u0930\u0947, \u092E\u0948\u0902 \u091C\u0935\u093E\u092C \u0928\u0939\u0940\u0902 \u0926\u0947 \u0938\u0915\u093E\u0964 \u0905\u092A\u0928\u093E \u0915\u0928\u0947\u0915\u094D\u0936\u0928 \u091C\u093E\u0901\u091A\u0947\u0902\u0964',
+  'chat.emptyReply': 'इस बार मुझे जवाब नहीं सूझा। क्या तुम अपना सवाल दूसरे तरीके से पूछ सकते हो?',
 
   'podcast.heading': 'Podcast',
   'podcast.new': '\u0928\u092F\u093E Podcast',

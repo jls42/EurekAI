@@ -1,5 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
+import type { AssistantMessage } from '@mistralai/mistralai/models/components';
 import { chatSystem, chatDocsLabel } from '../prompts.js';
+import { getContent } from '../helpers/index.js';
 import type { AgeGroup } from '../types.js';
 
 const TOOLS = [
@@ -42,6 +44,74 @@ export interface ChatResult {
   toolCalls: string[];
 }
 
+// Plafonds d'un message : 3 générations (plafond historique) et 3 tours d'outils, soit 4 appels LLM
+// au plus. Le modèle enchaîne parfois ses appels, un outil par tour (« d'abord un quiz, puis des
+// flashcards », mesuré) : ignorer l'appel du 2e tour laissait une réponse vide, que l'API refuse
+// ensuite dans l'historique, ou annonçait une génération jamais lancée.
+const MAX_TOOL_CALLS = 3;
+const MAX_TOOL_ROUNDS = 3;
+
+type ChatMessages = Parameters<Mistral['chat']['complete']>[0]['messages'];
+type ChatResponse = Awaited<ReturnType<Mistral['chat']['complete']>>;
+type ToolChoiceMode = 'auto' | 'none';
+
+interface ChatTurnArgs {
+  client: Mistral;
+  model: string;
+  apiMessages: ChatMessages;
+}
+
+interface ToolLoop {
+  apiMessages: ChatMessages;
+  triggered: string[];
+}
+
+const completeTurn = (args: ChatTurnArgs, toolChoice: ToolChoiceMode): Promise<ChatResponse> => {
+  return args.client.chat.complete({
+    model: args.model,
+    messages: args.apiMessages,
+    tools: TOOLS,
+    toolChoice,
+  });
+};
+
+const firstMessage = (response: ChatResponse): AssistantMessage => {
+  return response.choices[0].message!; // NOSONAR(S4325) — message always present on a non-streaming choice
+};
+
+// Répond à chaque appel gardé (l'API exige autant de réponses que d'appels : 400 « Not the same
+// number of function calls and responses », mesuré) et ne renvoie dans le tour assistant que ces
+// appels. Un outil lancé à un tour précédent reçoit sa réponse sans être relancé (le modèle rappelle
+// parfois l'outil qu'il vient de lancer, mesuré) ; dans un même tour, un doublon reste une demande
+// explicite (« deux quiz »).
+const answerToolCalls = (message: AssistantMessage, loop: ToolLoop): void => {
+  const calls = (message.toolCalls ?? []).slice(0, MAX_TOOL_CALLS - loop.triggered.length);
+  const earlier = new Set(loop.triggered);
+  loop.apiMessages.push({ ...message, role: 'assistant', toolCalls: calls });
+  for (const tc of calls) {
+    const fnName = tc.function.name;
+    if (!earlier.has(fnName)) loop.triggered.push(fnName);
+    loop.apiMessages.push({
+      role: 'tool',
+      toolCallId: tc.id,
+      name: fnName,
+      content: JSON.stringify({ status: 'triggered', type: fnName.replace('generate_', '') }),
+    });
+  }
+};
+
+// Le dernier appel possible force une réponse texte : sans lui, le tour final pouvait encore appeler
+// un outil, et son texte vide finissait dans l'historique.
+const nextToolChoice = (round: number, triggeredCount: number): ToolChoiceMode => {
+  return round < MAX_TOOL_ROUNDS && triggeredCount < MAX_TOOL_CALLS ? 'auto' : 'none';
+};
+
+// Dernier texte non vide : un tour final vide n'efface pas l'annonce d'un tour précédent.
+const latestText = (response: ChatResponse, previous: string): string => {
+  const text = getContent(response);
+  return text.trim() === '' ? previous : text;
+};
+
 export async function chatWithSources(
   client: Mistral,
   messages: Array<{ role: string; content: string }>,
@@ -52,57 +122,21 @@ export async function chatWithSources(
 ): Promise<ChatResult> {
   const docsLabel = chatDocsLabel(lang);
   const systemContent = `${chatSystem(lang, ageGroup)}\n\n--- ${docsLabel} ---\n${sourceContext.slice(0, 200000)}`;
-
-  type ChatMessages = Parameters<typeof client.chat.complete>[0]['messages'];
   const apiMessages: ChatMessages = [
     { role: 'system', content: systemContent },
     ...messages.map((m) => ({ role: m.role, content: m.content })),
   ] as ChatMessages;
+  const turn: ChatTurnArgs = { client, model, apiMessages };
+  const loop: ToolLoop = { apiMessages, triggered: [] };
 
-  const response = await client.chat.complete({
-    model,
-    messages: apiMessages,
-    tools: TOOLS,
-    toolChoice: 'auto',
-  });
-
-  const choice = response.choices![0]; // NOSONAR(S4325) — choices always present in non-streaming response
-  const message = choice.message!; // NOSONAR(S4325) — message always present on non-streaming choice
-  const toolCalls: string[] = [];
-
-  // Handle tool calls (max 3)
-  if (message.toolCalls && message.toolCalls.length > 0) {
-    apiMessages.push({ ...message, role: 'assistant' });
-
-    const calls = message.toolCalls.slice(0, 3);
-    for (const tc of calls) {
-      const fnName = tc.function.name;
-      toolCalls.push(fnName);
-      apiMessages.push({
-        role: 'tool',
-        toolCallId: tc.id,
-        name: fnName,
-        content: JSON.stringify({ status: 'triggered', type: fnName.replace('generate_', '') }),
-      });
-    }
-
-    // Get the final response after tool results
-    const finalResponse = await client.chat.complete({
-      model,
-      messages: apiMessages,
-      tools: TOOLS,
-    });
-
-    const finalContent = finalResponse.choices![0].message!.content; // NOSONAR(S4325) — choices/message always present in non-streaming response
-    return {
-      reply: typeof finalContent === 'string' ? finalContent : '',
-      toolCalls,
-    };
+  let response = await completeTurn(turn, 'auto');
+  let reply = getContent(response);
+  for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
+    const message = firstMessage(response);
+    if (!message.toolCalls?.length || loop.triggered.length >= MAX_TOOL_CALLS) break;
+    answerToolCalls(message, loop);
+    response = await completeTurn(turn, nextToolChoice(round, loop.triggered.length));
+    reply = latestText(response, reply);
   }
-
-  const content = message.content;
-  return {
-    reply: typeof content === 'string' ? content : '',
-    toolCalls,
-  };
+  return { reply, toolCalls: loop.triggered };
 }

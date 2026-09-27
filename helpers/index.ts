@@ -211,12 +211,23 @@ async function fetchWithLightpanda(url: string): Promise<string> {
   return text.trim();
 }
 
+// Texte d'un morceau de réponse : seuls les morceaux texte comptent (`type` est optionnel dans le
+// SDK) ; raisonnement (`thinking`), images et références sont ignorés.
+const chunkText = (chunk: unknown): string => {
+  if (!chunk || typeof chunk !== 'object') return '';
+  const { type, text } = chunk as { type?: unknown; text?: unknown };
+  return (type === undefined || type === 'text') && typeof text === 'string' ? text : '';
+};
+
 /** Extract text content from a Mistral chat completion response choice. */
 export function getContent(response: {
   choices?: Array<{ message?: { content?: unknown } }>;
 }): string {
   const content = response.choices?.[0]?.message?.content;
-  return typeof content === 'string' ? content : '';
+  if (typeof content === 'string') return content;
+  // Mesuré (mistral-large-latest, 2026-09-27) : avec toolChoice 'none', le texte arrive en tableau
+  // de morceaux `[{ type: 'text', text }]`.
+  return Array.isArray(content) ? content.map(chunkText).join('') : '';
 }
 
 /** Retire les blocs ```json ``` autour du JSON retourne par les LLMs */

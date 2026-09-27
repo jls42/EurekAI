@@ -359,6 +359,8 @@ export const fr: Record<string, string> = {
   'chat.placeholder': 'Pose une question sur tes cours...',
   'chat.errorReply': "Oups, une erreur s'est produite. Réessaie !",
   'chat.connectionError': "Oups, je n'ai pas pu répondre. Vérifie ta connexion.",
+  'chat.emptyReply':
+    "Je n'ai pas su quoi répondre cette fois. Tu peux poser ta question autrement ?",
 
   // Podcast view
   'podcast.heading': 'Podcasts',

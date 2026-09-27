@@ -348,6 +348,8 @@ export const de: Record<string, string> = {
   'chat.placeholder': 'Stell eine Frage zu deinen Kursen...',
   'chat.errorReply': 'Ups, etwas ist schiefgelaufen. Versuch es nochmal!',
   'chat.connectionError': 'Ups, ich konnte nicht antworten. Pr\u00fcfe deine Verbindung.',
+  'chat.emptyReply':
+    'Diesmal wusste ich nicht, was ich antworten soll. Kannst du deine Frage anders stellen?',
 
   'podcast.heading': 'Podcasts',
   'podcast.new': 'Neuer Podcast',

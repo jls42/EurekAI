@@ -344,6 +344,8 @@ export const pt: Record<string, string> = {
   'chat.placeholder': 'Fa\u00e7a uma pergunta sobre seus cursos...',
   'chat.errorReply': 'Ops, algo deu errado. Tente novamente!',
   'chat.connectionError': 'Ops, n\u00e3o consegui responder. Verifique sua conex\u00e3o.',
+  'chat.emptyReply':
+    'Desta vez não soube o que responder. Podes fazer a tua pergunta de outra forma?',
 
   'podcast.heading': 'Podcasts',
   'podcast.new': 'Novo podcast',
