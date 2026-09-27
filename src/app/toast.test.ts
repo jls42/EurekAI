@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createToast } from './toast.js';
 
 function makeContext() {
@@ -251,5 +252,39 @@ describe('createToast', () => {
       const persisted = JSON.parse(storage['sf-profile-notifications']);
       expect(persisted['profile-1'][0].projectId).toBe('proj-xyz');
     });
+  });
+});
+
+// Alpine appelle toute fonction que renvoie l'expression d'une directive évaluée hors événement
+// (x-show, x-if, x-text, :attr…) : `x-show="toast.retryFn"` relançait l'action dès l'affichage
+// du toast d'erreur (vécu : image régénérée 29 ms après son échec), puis à chaque nouvel échec.
+describe('gabarits : aucune fonction évaluée par une directive Alpine', () => {
+  const partials = new URL('../partials/', import.meta.url);
+  const templates = [
+    ...readdirSync(partials)
+      .filter((name) => name.endsWith('.html'))
+      .map((name) => new URL(name, partials)),
+    new URL('../index.html', import.meta.url),
+  ];
+  // \x22 = guillemet : un guillemet dans une regex littérale fausse la mesure de Lizard.
+  const BINDING = /\s(x-show|x-if|x-text|x-html|:[\w.-]+|x-bind:[\w.-]+)=\x22([^\x22]*)\x22/g;
+  const PROPERTY_PATH = /^[\w$]+(?:\??\.[\w$]+)*$/;
+  const FUNCTION_NAME = /(?:^fn|Fn|Callback|Handler)$/;
+
+  it('ne lie jamais une directive à une référence de fonction brute', () => {
+    const offenders = templates.flatMap((file) => {
+      const html = readFileSync(file, 'utf-8');
+      return [...html.matchAll(BINDING)]
+        .filter(([, , expr]) => PROPERTY_PATH.test(expr.trim()))
+        .filter(([, , expr]) => FUNCTION_NAME.test(expr.trim().split(/\??\./).pop() ?? ''))
+        .map(([, directive, expr]) => `${file.pathname.split('/').pop()}: ${directive}="${expr}"`);
+    });
+    expect(offenders).toEqual([]);
+  });
+
+  it('le bouton « Réessayer » teste la présence du réessai et ne l’appelle qu’au clic', () => {
+    const html = readFileSync(new URL('../partials/toasts.html', import.meta.url), 'utf-8');
+    expect(html).toContain('x-show="!!toast.retryFn"');
+    expect(html).toContain('@click="toast.retryFn(); dismissToast(toast.id)"');
   });
 });
