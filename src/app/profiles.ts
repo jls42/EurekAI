@@ -38,27 +38,15 @@ type MistralVoicesPartial = { host?: string; guest?: string } | null | undefined
 const LS_PROFILE_ID = 'sf-profileId';
 const TOAST_ERROR = 'toast.error';
 
-// Codes stables FailedStepCode + erreurs profiles connues pour lesquels on a une
-// traduction i18n via `errorCode.<code>`. Tout autre code retourne le code brut
-// (mieux que rien — debug-friendly pour l'admin, mais pas user-friendly).
-// Ajout d'un code = clé `errorCode.<code>` dans les 9 fichiers i18n.
+// Code stable du serveur traduit par sa clé `errorCode.<code>` dès qu'elle existe : le dictionnaire
+// fait foi (une liste blanche recopiée ici laissait `stale` s'afficher brut). Code sans clé : le code
+// brut (debug-friendly). Tout code envoyé par le serveur a sa clé, verrou : i18n-sync.test.ts.
 // Cf. CLAUDE.md "Codes d'erreur API".
-const I18N_KNOWN_ERROR_CODES = new Set([
-  'internal_error',
-  'no_sources',
-  'auth_required',
-  'quota_exceeded',
-  'upstream_unavailable',
-  'tts_upstream_error',
-  'context_length_exceeded',
-  'llm_invalid_json',
-  'profile_delete_partial',
-  'rate_limited',
-]);
-
 export function mapServerErrorCode(state: AppContext, raw: unknown): string {
   if (typeof raw !== 'string' || !raw) return '';
-  return I18N_KNOWN_ERROR_CODES.has(raw) ? state.t('errorCode.' + raw) : raw;
+  const key = 'errorCode.' + raw;
+  const translated = state.t(key);
+  return translated === key ? raw : translated;
 }
 
 // Fenêtre de pinLimiter (helpers/rate-limit.ts) : délai affiché quand Retry-After manque ou est

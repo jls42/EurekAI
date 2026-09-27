@@ -244,6 +244,24 @@ describe('chatWithSources', () => {
       expect(result.reply).toBe('Voici ton quiz !');
     });
 
+    // Mesuré (2026-09-27) : le modèle a appelé un « outil » nommé « ### 3. **Quiz… ». Un nom
+    // inconnu reçoit sa réponse (l'API exige autant de réponses que d'appels) sans être compté :
+    // il ne doit ni prendre une place du plafond, ni se dire « triggered ».
+    it('répond à un outil au nom inconnu sans le compter ni le lancer', async () => {
+      const { client, seen } = scriptedClient(
+        { content: '', toolCalls: [call('t1', '### 3. **Quiz'), call('t2', 'generate_quiz')] },
+        { content: 'Ton quiz arrive !' },
+      );
+
+      const result = await chatWithSources(client, messages, sourceContext);
+
+      expect(result.toolCalls).toEqual(['generate_quiz']);
+      expect(seen[1].toolChoice).toBe('auto');
+      const answers = seen[1].messages.filter((m) => m.role === 'tool');
+      expect(answers.map((m) => m.toolCallId)).toEqual(['t1', 't2']);
+      expect(JSON.parse(answers[0].content).status).toBe('unknown_tool');
+    });
+
     it('garde le dernier texte non vide quand le tour final est vide', async () => {
       const { client } = scriptedClient(
         { content: 'Je te génère un quiz !', toolCalls: [call('t1', 'generate_quiz')] },

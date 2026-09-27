@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fr } from './fr';
 import { en } from './en';
 import { es } from './es';
@@ -69,4 +70,31 @@ describe('i18n dictionaries sync', () => {
       });
     });
   }
+});
+
+// Tout code d'erreur stable renvoyé par le serveur (`{ error: 'code' }`) a sa traduction
+// `errorCode.<code>` : sans elle, le toast affichait le code brut à l'enfant (`stale`,
+// `project_not_found`…). Lit les sources du serveur (routes, helpers, server.ts) ; les autres
+// langues suivent par le test de synchronisation ci-dessus.
+describe('codes d’erreur du serveur', () => {
+  const root = new URL('../../', import.meta.url);
+  const serverFiles = (dir: string): string[] =>
+    readdirSync(new URL(dir, root))
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .map((f) => dir + f);
+  const CODE_RE = /error: [\x27\x22]([a-z][a-z_]*)[\x27\x22]/g;
+
+  it('chaque code stable envoyé a sa clé errorCode.* (fr)', () => {
+    const files = [...serverFiles('routes/'), ...serverFiles('helpers/'), 'server.ts'];
+    const codes = new Set<string>();
+    for (const file of files) {
+      const source = readFileSync(new URL(file, root), 'utf-8');
+      for (const match of source.matchAll(CODE_RE)) codes.add(match[1]);
+    }
+    expect(codes.size).toBeGreaterThan(10);
+    const missing = [...codes]
+      .filter((code) => !Object.hasOwn(fr, `errorCode.${code}`))
+      .sort((a, b) => a.localeCompare(b));
+    expect(missing, `Codes sans clé errorCode.* : ${missing.join(', ')}`).toEqual([]);
+  });
 });

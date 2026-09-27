@@ -20,7 +20,7 @@
       <div class="flex-1 min-w-0">
         <p class="text-sm font-medium" x-text="toast.message"></p>
         <button
-          x-show="toast.retryFn"
+          x-show="!!toast.retryFn"
           @click="toast.retryFn(); dismissToast(toast.id)"
           class="mt-1 text-sm font-bold underline focus-ring rounded"
           x-text="t('common.retry')"

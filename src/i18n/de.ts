@@ -92,6 +92,16 @@ export const de: Record<string, string> = {
   'errorCode.invalid_api_key':
     'API-Schlüssel hat ein ungültiges Format: prüfe ihn in den Einstellungen',
   'errorCode.unsupported_provider': 'KI-Anbieter wird nicht unterstützt',
+  'errorCode.duplicate_gid': 'Diese Generierung läuft bereits.',
+  'errorCode.generation_not_found':
+    'Dieser Inhalt wurde nicht gefunden: Vielleicht wurde er gelöscht.',
+  'errorCode.pending_not_found': 'Diese Generierung läuft nicht mehr.',
+  'errorCode.invalid_json': 'Unlesbare Anfrage. Lade die Seite neu und versuch es noch einmal.',
+  'errorCode.project_delete_failed':
+    'Dieser Kurs kann gerade nicht gelöscht werden. Versuch es noch einmal.',
+  'errorCode.project_not_found': 'Dieser Kurs wurde nicht gefunden: Vielleicht wurde er gelöscht.',
+  'errorCode.stale':
+    'Dieses Profil wurde woanders geändert. Lade die Seite neu und fang dann noch einmal an.',
   'errorCode.tts_upstream_error': 'Fehler im Audiodienst (TTS/STT)',
   'errorCode.quota_exceeded': 'Kontingent \u00fcberschritten, versuche es gleich erneut',
   'errorCode.upstream_unavailable':

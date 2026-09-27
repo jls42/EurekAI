@@ -91,6 +91,15 @@ export const pt: Record<string, string> = {
   'errorCode.auth_required': 'Chave API Mistral ausente ou invalida',
   'errorCode.invalid_api_key': 'Chave API com formato inválido: verifica-a nas Configurações',
   'errorCode.unsupported_provider': 'Fornecedor de IA não suportado',
+  'errorCode.duplicate_gid': 'Esta geração já está em curso.',
+  'errorCode.generation_not_found':
+    'Não foi possível encontrar este conteúdo: talvez tenha sido apagado.',
+  'errorCode.pending_not_found': 'Esta geração já não está em curso.',
+  'errorCode.invalid_json': 'Pedido ilegível. Recarrega a página e tenta de novo.',
+  'errorCode.project_delete_failed': 'Não é possível apagar este curso por agora. Tenta de novo.',
+  'errorCode.project_not_found':
+    'Não foi possível encontrar este curso: talvez tenha sido apagado.',
+  'errorCode.stale': 'Este perfil foi alterado noutro lado. Recarrega a página e recomeça.',
   'errorCode.tts_upstream_error': 'Erro do servi\u00e7o de \u00e1udio (TTS/STT)',
   'errorCode.quota_exceeded': 'Quota excedida, tente novamente em breve',
   'errorCode.upstream_unavailable':
