@@ -72,8 +72,8 @@
         <button
           type="button"
           @click="generate(cat.key)"
-          :disabled="(['podcast','quiz-vocal'].includes(cat.key) && !ttsReady())"
-          :title="['podcast','quiz-vocal'].includes(cat.key) && !ttsReady() ? t('gen.needsTts') : ''"
+          :disabled="ttsBlocked(cat.key)"
+          :title="ttsBlocked(cat.key) ? t('gen.needsTts') : ''"
           :aria-label="t('a11y.generateCategory', { category: t(cat.labelKey) })"
           class="px-4 min-h-touch rounded-button font-semibold text-body-sm flex items-center gap-2 btn-lift focus-ring bg-white shadow-card disabled:opacity-50"
           :style="'color:' + cat.color"
@@ -166,11 +166,9 @@
               ></span>
             </template>
             <!-- Beta audio badge : livré en statut "beta audio" pour hi/ar jusqu'à validation native -->
-            <template
-              x-if="(gen.type === 'podcast' || gen.type === 'quiz-vocal') && (gen.lang === 'hi' || gen.lang === 'ar')"
-            >
+            <template x-if="usesTts(gen.type) && (gen.lang === 'hi' || gen.lang === 'ar')">
               <span
-                class="ml-auto text-xs px-2 py-0.5 rounded-badge font-bold bg-warning-light text-warning-dark"
+                class="ms-auto text-xs px-2 py-0.5 rounded-badge font-bold bg-warning-light text-warning-dark"
                 x-text="t('gen.betaAudio')"
               ></span>
             </template>

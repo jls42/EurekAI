@@ -11,11 +11,22 @@ function readMessage(err: unknown): string {
   return String(err);
 }
 
+/**
+ * Statut HTTP d'une erreur : `statusCode` (erreurs HTTP du SDK Mistral, `MistralError`), sinon
+ * `status` (autres bibliothèques, erreurs maison). Le SDK n'expose jamais `status` : le lire seul
+ * rendait inertes le réessai applicatif (`mistral-retry.ts`) et STATUS_RULES.
+ */
+export function httpStatusOf(err: unknown): number | undefined {
+  const obj = readObject(err);
+  if (typeof obj.statusCode === 'number') return obj.statusCode;
+  return typeof obj.status === 'number' ? obj.status : undefined;
+}
+
 function buildContext(err: unknown, agent: string | undefined): ErrContext {
   const obj = readObject(err);
   return {
     message: readMessage(err),
-    status: obj.status,
+    status: httpStatusOf(err),
     code: obj.code,
     stage: obj.stage,
     agent,

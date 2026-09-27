@@ -99,6 +99,8 @@ export const ar: Record<string, string> = {
   'notif.crossTabSyncInactive': 'مزامنة التبويبات غير نشطة',
   'errorCode.no_sources': 'لا يوجد مصدر متاح',
   'errorCode.auth_required': 'مفتاح API Mistral مفقود أو غير صالح',
+  'errorCode.invalid_api_key': 'صيغة مفتاح API غير صحيحة: تحقّق منه في الإعدادات',
+  'errorCode.unsupported_provider': 'مزوّد الذكاء الاصطناعي غير مدعوم',
   'errorCode.tts_upstream_error': 'خطأ في خدمة الصوت (TTS/STT)',
   'errorCode.quota_exceeded': 'تم تجاوز الحصة، أعد المحاولة لاحقا',
   'errorCode.upstream_unavailable': 'الخدمة غير متاحة مؤقتا، أعد المحاولة قريبا',
@@ -421,6 +423,7 @@ export const ar: Record<string, string> = {
     '\u0639\u0641\u0648\u0627\u064b\u060c \u062d\u062f\u062b \u062e\u0637\u0623. \u062d\u0627\u0648\u0644 \u0645\u0631\u0629 \u0623\u062e\u0631\u0649!',
   'chat.connectionError':
     '\u0639\u0641\u0648\u0627\u064b\u060c \u0644\u0645 \u0623\u062a\u0645\u0643\u0651\u0646 \u0645\u0646 \u0627\u0644\u0631\u062f. \u062a\u062d\u0642\u0651\u0642 \u0645\u0646 \u0627\u062a\u0635\u0627\u0644\u0643.',
+  'chat.emptyReply': 'لم أعرف بماذا أجيب هذه المرة. هل يمكنك طرح سؤالك بطريقة أخرى؟',
 
   'podcast.heading': '\u0628\u0648\u062f\u0643\u0627\u0633\u062a',
   'podcast.new': '\u0628\u0648\u062f\u0643\u0627\u0633\u062a \u062c\u062f\u064a\u062f',

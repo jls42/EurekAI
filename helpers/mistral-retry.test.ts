@@ -1,5 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { SDKError } from '@mistralai/mistralai/models/errors';
 import { callWithRetry } from './mistral-retry.js';
+import { logger } from './logger.js';
+
+// Vraie erreur HTTP du SDK installé : le statut est dans `statusCode`, jamais dans `status`. Les
+// anciens tests fabriquaient `{ status }` à la main et validaient une branche que les vraies
+// erreurs n'atteignaient jamais (réessai applicatif inerte).
+const sdkError = (statusCode: number): SDKError => {
+  const body = '{"message":"upstream"}';
+  return new SDKError('API error occurred', {
+    request: new Request('https://api.mistral.ai/v1/chat/completions'),
+    response: new Response(body, {
+      status: statusCode,
+      headers: { 'content-type': 'application/json' },
+    }),
+    body,
+  });
+};
 
 describe('callWithRetry', () => {
   beforeEach(() => {
@@ -7,6 +24,7 @@ describe('callWithRetry', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
 
   it('returns value on first success without retrying', async () => {
@@ -16,20 +34,55 @@ describe('callWithRetry', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  // Statuts transitoires : un seul échec puis succès au 2e appel.
-  it.each([
-    [429, 'rate limited'],
-    [408, 'request timeout'],
-    [503, 'service unavail'],
-  ])('retries on HTTP %i then succeeds', async (status, message) => {
+  // Transitoires que le SDK ne rejoue pas (ses retryCodes : 429, 500, 502, 503, 504) : 408, et
+  // les autres 5xx, dont ceux de Cloudflare placé devant l'API (520 à 529).
+  it.each([408, 520, 529])('rejoue un %i (statut que le SDK ne rejoue pas)', async (status) => {
+    const fn = vi.fn().mockRejectedValueOnce(sdkError(status)).mockResolvedValueOnce('ok');
+    const p = callWithRetry('test', fn);
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  // Déjà rejoués par le SDK avec son backoff (≤ 120 s) : les rejouer ici multiplierait l'attente.
+  it.each([429, 500, 502, 503, 504])(
+    'ne rejoue pas un %i, déjà rejoué par le SDK',
+    async (status) => {
+      const err = sdkError(status);
+      const fn = vi.fn().mockRejectedValue(err);
+      const p = callWithRetry('test', fn);
+      await expect(p).rejects.toBe(err);
+      expect(fn).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  // Erreurs déterministes (client) : aucun retry, l'erreur remonte telle quelle.
+  it.each([400, 401, 403, 422])('fails fast on HTTP %i', async (status) => {
+    const err = sdkError(status);
+    const fn = vi.fn().mockRejectedValue(err);
+    const p = callWithRetry('test', fn);
+    await expect(p).rejects.toBe(err);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('lit encore `status` en repli (erreur qui ne vient pas du SDK)', async () => {
     const fn = vi
       .fn()
-      .mockRejectedValueOnce(Object.assign(new Error(message), { status }))
+      .mockRejectedValueOnce(Object.assign(new Error('gateway'), { status: 520 }))
       .mockResolvedValueOnce('ok');
     const p = callWithRetry('test', fn);
     await vi.runAllTimersAsync();
     await expect(p).resolves.toBe('ok');
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('journalise le vrai statut de l’erreur', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const fn = vi.fn().mockRejectedValueOnce(sdkError(520)).mockResolvedValueOnce('ok');
+    const p = callWithRetry('chat', fn);
+    await vi.runAllTimersAsync();
+    await p;
+    expect(warn).toHaveBeenCalledWith('chat', 'attempt 1 failed (status 520), retrying in 1000ms');
   });
 
   it('retries on undici `TypeError: unusable` (SDK clone bug)', async () => {
@@ -41,20 +94,6 @@ describe('callWithRetry', () => {
     await vi.runAllTimersAsync();
     await expect(p).resolves.toBe('ok');
     expect(fn).toHaveBeenCalledTimes(2);
-  });
-
-  // Erreurs déterministes (client) : aucun retry, l'erreur remonte telle quelle.
-  it.each([
-    [400, 'bad request'],
-    [401, 'unauthorized'],
-    [403, 'forbidden'],
-    [422, 'invalid'],
-  ])('fails fast on HTTP %i', async (status, message) => {
-    const err = Object.assign(new Error(message), { status });
-    const fn = vi.fn().mockRejectedValue(err);
-    const p = callWithRetry('test', fn);
-    await expect(p).rejects.toBe(err);
-    expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it('fails fast on SyntaxError (invalid JSON from LLM)', async () => {
@@ -74,7 +113,7 @@ describe('callWithRetry', () => {
   });
 
   it('rethrows the last error after MAX_ATTEMPTS retryable failures', async () => {
-    const err = Object.assign(new Error('still 503'), { status: 503 });
+    const err = sdkError(520);
     const fn = vi.fn().mockRejectedValue(err);
     const p = callWithRetry('test', fn);
     p.catch(() => {}); // surface eventual rejection safely
@@ -84,7 +123,7 @@ describe('callWithRetry', () => {
   });
 
   it('uses exponential backoff (1s, 2s) before capping', async () => {
-    const err = Object.assign(new Error('503'), { status: 503 });
+    const err = sdkError(520);
     const fn = vi.fn().mockRejectedValue(err);
     const p = callWithRetry('test', fn);
     p.catch(() => {});

@@ -6,6 +6,7 @@ import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
 import { setKey, clearKey, loadActiveKey, isStorageEncryptable, purgeKeyring } from './api-key';
 import { withAiHeaders } from './ai-fetch';
+import { TTS_DEPENDENT_AGENTS } from '../../generators/auto-agents';
 
 interface ConfigDraft extends AppConfig {
   _mainModel?: string;
@@ -255,6 +256,14 @@ export function createConfig() {
     },
     ttsReady(this: AppContext): boolean {
       return this.mistralReady();
+    },
+    // Génération qui exige le TTS (source unique TTS_DEPENDENT_AGENTS : podcast, quiz vocal, dictée).
+    usesTts(this: AppContext, type: string): boolean {
+      return TTS_DEPENDENT_AGENTS.has(type);
+    },
+    // Bouton de génération grisé : type audio sans TTS disponible (infobulle gen.needsTts).
+    ttsBlocked(this: AppContext, type: string): boolean {
+      return this.usesTts(type) && !this.ttsReady();
     },
 
     // Charge la clé active (profil > global) en mémoire et synchronise les flags réactifs.

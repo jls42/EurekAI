@@ -88,6 +88,8 @@ export const es: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Sincronización entre pestañas inactiva',
   'errorCode.no_sources': 'Ninguna fuente disponible',
   'errorCode.auth_required': 'Clave API Mistral faltante o invalida',
+  'errorCode.invalid_api_key': 'Clave API con formato incorrecto: revísala en Configuración',
+  'errorCode.unsupported_provider': 'Proveedor de IA no compatible',
   'errorCode.tts_upstream_error': 'Error del servicio de audio (TTS/STT)',
   'errorCode.quota_exceeded': 'Cuota superada, int\u00e9ntalo en unos instantes',
   'errorCode.upstream_unavailable': 'Servicio no disponible temporalmente, reint\u00e9ntalo pronto',
@@ -342,6 +344,7 @@ export const es: Record<string, string> = {
   'chat.placeholder': 'Haz una pregunta sobre tus cursos...',
   'chat.errorReply': '\u00a1Ups, algo sali\u00f3 mal. Int\u00e9ntalo de nuevo!',
   'chat.connectionError': 'Ups, no pude responder. Verifica tu conexi\u00f3n.',
+  'chat.emptyReply': 'Esta vez no supe qué responder. ¿Puedes hacer tu pregunta de otra forma?',
 
   'podcast.heading': 'Podcasts',
   'podcast.new': 'Nuevo podcast',

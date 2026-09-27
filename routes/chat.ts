@@ -108,7 +108,8 @@ const readUseConsigne = (value: unknown): boolean | null => {
 // message.
 const parseChatBody = (body: RawChatBody | undefined): ChatBody | ChatValidationError => {
   const { message, lang, ageGroup } = body ?? {};
-  if (!message || typeof message !== 'string')
+  // Un message fait d'espaces est refusé comme un message absent : il s'enregistrait vide (trim).
+  if (typeof message !== 'string' || message.trim() === '')
     return new ChatValidationError(400, 'message requis');
   const locale = readLocaleFields(lang, ageGroup);
   const useConsigne = readUseConsigne(body?.useConsigne);
@@ -301,6 +302,15 @@ async function processChatToolCalls(
   return { generatedIds, generations, failedTools, failedCost };
 }
 
+// Tour enregistré au contenu vide : réponse vide d'avant le correctif, ou réponse vide qui a lancé
+// une génération (gardée pour ses generatedIds).
+const hasContent = (m: { content?: unknown }): boolean => {
+  return typeof m.content === 'string' && m.content.trim() !== '';
+};
+
+// Les tours vides ne partent jamais à l'API : elle refuse un tour assistant vide (400 « Assistant
+// message must have either content or tool_calls », mesuré), et un seul tour vide enregistré
+// bloquait tout le chat du projet. Deux tours `user` consécutifs, eux, sont acceptés (mesuré).
 const appendUserAndBuildHistory = (
   store: ProjectStore,
   pid: string,
@@ -313,7 +323,7 @@ const appendUserAndBuildHistory = (
     content: message.trim(),
     timestamp: new Date().toISOString(),
   };
-  const history = [...existing, userMsg].slice(-50).map((m) => ({
+  const history = [...existing.filter(hasContent), userMsg].slice(-50).map((m) => ({
     role: m.role,
     content: m.content,
   }));
@@ -413,12 +423,15 @@ const runToolCallPhase = async (args: RunToolCallPhaseArgs): Promise<ToolPhaseRe
   );
 };
 
+// Réponse vide qui n'a rien lancé : rien à afficher ni à rejouer (le front montre un repli). Avec
+// une génération, le tour est gardé pour ses generatedIds ; l'historique l'écarte de l'API.
 const appendAssistantMessage = (
   store: ProjectStore,
   pid: string,
   reply: string,
   generatedIds: string[],
 ): void => {
+  if (reply.trim() === '' && generatedIds.length === 0) return;
   const assistantMsg: ChatMessage = {
     role: 'assistant',
     content: reply,

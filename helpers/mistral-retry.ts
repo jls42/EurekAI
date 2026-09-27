@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { httpStatusOf } from './error-code-resolution.js';
 
 const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 1000;
@@ -10,27 +11,35 @@ const MAX_BACKOFF_MS = 4000;
 // chaque invocation recrée un undici Request neuf côté SDK, contournant le bug.
 const SDK_CLONE_BUG = /unusable/i;
 
-// cf. CLAUDE.md "Pièges Lizard"
-const isRetryableStatus = (status: unknown): boolean => {
-  if (status === 408 || status === 429) return true;
-  if (typeof status !== 'number') return false;
-  return status >= 500 && status < 600;
+/**
+ * Codes que le SDK rejoue déjà lui-même sur toutes ses opérations (`retryCodes` du SDK 2.7.0,
+ * mesuré), avec le backoff de RETRY_CONFIG (`mistral-client-factory.ts`, ≤ 120 s). Les rejouer ici
+ * empilerait 3 tentatives applicatives sur ce backoff : jusqu'à ~6 min d'attente sur un 429
+ * persistant. Verrou au bump du SDK : `mistral-client-factory.contract.test.ts`.
+ */
+export const SDK_RETRIED_STATUSES: ReadonlySet<number> = new Set([429, 500, 502, 503, 504]);
+
+// Transitoires que le SDK ne rejoue pas : 408 et les autres 5xx, dont ceux de Cloudflare placé
+// devant l'API (520 à 529). cf. CLAUDE.md "Pièges Lizard"
+const isRetryableStatus = (status: number | undefined): boolean => {
+  if (status === undefined || SDK_RETRIED_STATUSES.has(status)) return false;
+  return status === 408 || (status >= 500 && status < 600);
 };
 
-// Retry ciblé : transitoires upstream (429 + 5xx) + bug SDK connu.
-// Les déterministes (400 body, 401/403 auth, 422 validation) sont fail-fast :
-// retry inutile = burn quota + latence user inacceptable.
+// Retry ciblé : transitoires que le SDK ne couvre pas + bug SDK connu. Les déterministes
+// (400 body, 401/403 auth, 422 validation) sont fail-fast : retry inutile = burn quota + latence
+// user inacceptable. Statut lu par httpStatusOf (`statusCode` des erreurs du SDK).
 const isRetryable = (err: unknown): boolean => {
   if (!err || typeof err !== 'object') return false;
   if (err instanceof TypeError && SDK_CLONE_BUG.test(err.message)) return true;
-  return isRetryableStatus((err as { status?: unknown }).status);
+  return isRetryableStatus(httpStatusOf(err));
 };
 
 const describeError = (err: unknown): string => {
+  const status = httpStatusOf(err);
+  if (status !== undefined) return `status ${status}`;
   if (!err || typeof err !== 'object') return String(err);
-  const o = err as { name?: string; status?: unknown };
-  if (typeof o.status === 'number') return `status ${o.status}`;
-  return o.name ?? 'unknown';
+  return (err as { name?: string }).name ?? 'unknown';
 };
 
 export async function callWithRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {

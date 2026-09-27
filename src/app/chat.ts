@@ -2,6 +2,7 @@ import { getLocale } from '../i18n/index';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { registerGeneration } from './generate';
+import { displayedReply, withReplyFallback } from './chat-reply';
 import type { AppContext } from './app-context';
 import type { Generation } from '../../types';
 
@@ -19,7 +20,7 @@ interface ChatErrorPayload {
 function handleChatSuccess(state: AppContext, data: ChatSuccessPayload): void {
   state.chatMessages.push({
     role: 'assistant',
-    content: data.reply,
+    content: displayedReply(state, data.reply, data.generatedIds),
     timestamp: new Date().toISOString(),
     generatedIds: data.generatedIds,
   });
@@ -67,7 +68,7 @@ const loadChatHistory = async function (this: AppContext) {
     if (res.ok) {
       const body: unknown = await res.json();
       const data = body as { messages?: AppContext['chatMessages'] };
-      this.chatMessages = data.messages || [];
+      this.chatMessages = withReplyFallback(this, data.messages || []);
     }
   } catch {
     /* silent: offline fallback, chat vide OK */

@@ -289,6 +289,27 @@ describe('selectProject', () => {
     );
   });
 
+  // Tour assistant vide enregistré avant le correctif serveur : repli lisible dès l'ouverture du
+  // projet (l'historique vient du snapshot du projet, pas de loadChatHistory). Un tour vide qui a
+  // lancé une génération garde son badge seul.
+  it('historique avec un tour assistant vide : bulle chat.emptyReply à l’ouverture', async () => {
+    mockFetchOk({
+      id: 'p1',
+      sources: [],
+      results: { generations: [] },
+      chat: {
+        messages: [
+          { role: 'user', content: 'hello' },
+          { role: 'assistant', content: '' },
+          { role: 'assistant', content: '', generatedIds: ['g1'] },
+        ],
+      },
+    });
+    const ctx = makeContext();
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.chatMessages.map((m: any) => m.content)).toEqual(['hello', 'chat.emptyReply', '']);
+  });
+
   // Le profil courant accompagne l'ouverture : le serveur y rattache un projet orphelin.
   it('envoie le profil courant qui ouvre le projet (profileId encodé)', async () => {
     mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });

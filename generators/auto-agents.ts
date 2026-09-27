@@ -19,3 +19,13 @@ export type AutoAgentType = (typeof AUTO_AGENT_TYPES)[number];
 export const AUTO_AGENTS_SET: ReadonlySet<string> = new Set(AUTO_AGENT_TYPES);
 
 export const MAX_AUTO_PLAN_LENGTH = AUTO_AGENT_TYPES.length;
+
+// Agents qui exigent le TTS (Voxtral) : podcast, quiz vocal et dictée (une lecture audio par mot).
+// Source unique du serveur (tri de /generate/auto, codes d'erreur TTS) et du navigateur (boutons
+// grisés sans TTS, plan auto). Typé `string` comme AUTO_AGENTS_SET, pour tester tout type de
+// génération ; `new Set<AutoAgentType>` garde des entrées valides.
+export const TTS_DEPENDENT_AGENTS: ReadonlySet<string> = new Set<AutoAgentType>([
+  'podcast',
+  'quiz-vocal',
+  'dictation',
+]);

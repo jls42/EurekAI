@@ -89,6 +89,9 @@ export const nl: Record<string, string> = {
   'notif.crossTabSyncInactive': 'Synchronisatie tussen tabbladen inactief',
   'errorCode.no_sources': 'Geen bron beschikbaar',
   'errorCode.auth_required': 'Mistral API-sleutel ontbreekt of ongeldig',
+  'errorCode.invalid_api_key':
+    'API-sleutel heeft een ongeldig formaat: controleer hem in Instellingen',
+  'errorCode.unsupported_provider': 'AI-aanbieder niet ondersteund',
   'errorCode.tts_upstream_error': 'Fout in audioservice (TTS/STT)',
   'errorCode.quota_exceeded': 'Quotum overschreden, probeer het zo opnieuw',
   'errorCode.upstream_unavailable': 'Service tijdelijk niet beschikbaar, probeer het snel opnieuw',
@@ -342,6 +345,8 @@ export const nl: Record<string, string> = {
   'chat.placeholder': 'Stel een vraag over je cursussen...',
   'chat.errorReply': 'Oeps, er ging iets mis. Probeer het opnieuw!',
   'chat.connectionError': 'Oeps, ik kon niet antwoorden. Controleer je verbinding.',
+  'chat.emptyReply':
+    'Ik wist deze keer niet wat ik moest antwoorden. Kun je je vraag anders stellen?',
 
   'podcast.heading': 'Podcasts',
   'podcast.new': 'Nieuwe podcast',

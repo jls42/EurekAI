@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
+import { SDKError } from '@mistralai/mistralai/models/errors';
 import { extractErrorCode } from './error-codes.js';
+import { httpStatusOf } from './error-code-resolution.js';
 import type { FailedStepCode } from '../types.js';
 
 // Exhaustiveness check compile-time : toute addition à FailedStepCode casse tsc ici
@@ -136,6 +138,14 @@ describe('extractErrorCode', () => {
     expect(extractErrorCode(new Error('image too large to upload'))).toBe('internal_error');
   });
 
+  // La dictée lit chaque mot en audio : un échec de son TTS se classe comme celui du podcast
+  // (TTS_AGENTS l'oubliait → internal_error).
+  it('mappe un échec TTS de la dictée vers tts_upstream_error', () => {
+    expect(extractErrorCode(Object.assign(new Error('x'), { stage: 'tts' }), 'dictation')).toBe(
+      'tts_upstream_error',
+    );
+  });
+
   it('mappe vers tts_upstream_error seulement avec signature positive', () => {
     // Tag explicite posé par le generator
     expect(extractErrorCode(Object.assign(new Error('x'), { stage: 'tts' }), 'podcast')).toBe(
@@ -210,5 +220,26 @@ describe('extractErrorCode', () => {
 
     const err2 = Object.assign(new Error('quota apparently hit'), { status: 529 });
     expect(extractErrorCode(err2)).toBe('upstream_unavailable');
+  });
+
+  // Même règle sur une VRAIE erreur du SDK installé : son statut est dans `statusCode` (jamais
+  // `status`). Sans le lire, le message « Status 503 … rate limit » tombait sur la regex quota.
+  it('vraie SDKError : le statut vient de statusCode et prime sur le corps', () => {
+    const sdkError = (statusCode: number, body: string) =>
+      new SDKError('API error occurred', {
+        request: new Request('https://api.mistral.ai/v1/chat/completions'),
+        response: new Response(body, {
+          status: statusCode,
+          headers: { 'content-type': 'application/json' },
+        }),
+        body,
+      });
+    expect(extractErrorCode(sdkError(503, '{"message":"rate limit on upstream"}'))).toBe(
+      'upstream_unavailable',
+    );
+    expect(extractErrorCode(sdkError(401, '{"message":"Unauthorized"}'))).toBe('auth_required');
+    expect(httpStatusOf(sdkError(429, '{}'))).toBe(429);
+    expect(httpStatusOf(Object.assign(new Error('x'), { status: 404 }))).toBe(404);
+    expect(httpStatusOf(new Error('no status'))).toBeUndefined();
   });
 });

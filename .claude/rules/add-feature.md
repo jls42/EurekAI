@@ -14,6 +14,7 @@
 12. Ajouter le CSS icon-chip dans `src/styles/main.css` + variables dans `src/styles/theme.css`
 13. Ajouter dans `generators/router.ts` VALID_AGENTS si eligible pour le routeur auto
 14. Ajouter dans `generators/chat.ts` TOOLS + `routes/chat.ts` si le chat doit pouvoir le generer
+15. Si le generateur appelle le TTS : l'ajouter a `TTS_DEPENDENT_AGENTS` (`generators/auto-agents.ts`) — bouton grise sans TTS, plan auto filtre, echec TTS classe `tts_upstream_error` (`TTS_AGENTS` en derive) — et a `AUDIO_ENRICHMENT_ORDER` (`generators/router.ts`), sinon le verrou de `router.test.ts` echoue
 
 ## Ajouter une source
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHelpers } from './helpers';
+import { fr } from '../i18n/fr';
 import type { EventKey } from '../../helpers/event-bus.js';
 
 const helpers = createHelpers();
@@ -962,6 +963,15 @@ describe('resolveError', () => {
     expect(callWith<string>(helpers.resolveError, ctx, 'internal_error')).toBe(
       'Erreur interne du serveur',
     );
+  });
+
+  // Codes de resolveClient / requireKeyMiddleware (400) : sans clé errorCode.*, le toast affichait
+  // le code brut. Dictionnaire fr réel ; i18n-sync impose la même clé aux 8 autres langues.
+  it.each(['invalid_api_key', 'unsupported_provider'])('traduit le code serveur %s', (code) => {
+    const ctx = { t: (k: string) => fr[k] ?? k };
+    const text = callWith<string>(helpers.resolveError, ctx, code);
+    expect(text).not.toBe(code);
+    expect(text).toBe(fr[`errorCode.${code}`]);
   });
 
   it('falls back to pass-through when stable code has no errorCode.* key', () => {

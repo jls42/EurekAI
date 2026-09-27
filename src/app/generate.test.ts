@@ -42,6 +42,7 @@ const defaultLoading = {
   'quiz-vocal': false,
   image: false,
   'fill-blank': false,
+  dictation: false,
   auto: false,
   all: false,
   voice: false,
@@ -1124,6 +1125,26 @@ describe('generateAuto — additional coverage', () => {
     // Loading for podcast and quiz-vocal should never have been set
     expect(ctx.loading.podcast).toBe(false);
     expect(ctx.loading['quiz-vocal']).toBe(false);
+  });
+
+  // La dictée lit chaque mot en audio (TTS) : sans TTS, l'auto l'écarte comme le podcast.
+  it('écarte aussi la dictée quand le TTS est indisponible', async () => {
+    mockFetchOk({
+      plan: [
+        { agent: 'summary', reason: 'overview' },
+        { agent: 'dictation', reason: 'words' },
+      ],
+      context: 'test context',
+    });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    await gen.generateAuto.call(ctx);
+
+    const callUrls = vi.mocked(globalThis.fetch).mock.calls.map((c) => c[0]);
+    expect(callUrls).toHaveLength(2);
+    expect(callUrls[1]).toContain('/generate/summary');
+    expect(ctx.loading.dictation).toBe(false);
   });
 
   it('does NOT skip TTS types when ttsAvailable is true', async () => {

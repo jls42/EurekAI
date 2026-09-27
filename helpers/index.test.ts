@@ -11,6 +11,7 @@ import {
   parseWebInput,
   fetchPageContent,
   assertSafeFetchUrl,
+  getContent,
 } from './index.js';
 
 // IPs fixtures pour mock DNS — pas de vrai trafic.
@@ -18,6 +19,31 @@ import {
 const PUBLIC_IPV4 = '93.184.215.14'; // example.com (RFC2606 doc)
 const PRIVATE_IPV4 = '10.0.0.5'; // RFC1918
 /* eslint-enable sonarjs/no-hardcoded-ip */
+
+describe('getContent', () => {
+  const response = (content: unknown) => ({ choices: [{ message: { content } }] });
+
+  it('rend une réponse en chaîne telle quelle', () => {
+    expect(getContent(response('{"a":1}'))).toBe('{"a":1}');
+  });
+
+  // Mesuré (mistral-large-latest, 2026-09-27) : avec toolChoice 'none', le texte arrive en
+  // tableau de morceaux `[{ type: 'text', text }]`, qu'une lecture « chaîne seulement » vidait.
+  it('concatène les morceaux de texte d’une réponse en tableau, raisonnement ignoré', () => {
+    const chunks = [
+      { type: 'thinking', thinking: [{ type: 'text', text: 'réflexion' }] },
+      { type: 'text', text: 'Bon' },
+      { text: 'jour' },
+    ];
+    expect(getContent(response(chunks))).toBe('Bonjour');
+  });
+
+  it('rend une chaîne vide sans contenu exploitable', () => {
+    expect(getContent(response(null))).toBe('');
+    expect(getContent(response([{ type: 'image_url', imageUrl: 'x' }, null, 42]))).toBe('');
+    expect(getContent({ choices: [] })).toBe('');
+  });
+});
 
 describe('stripJsonMarkdown', () => {
   it('retire les blocs ```json ```', () => {

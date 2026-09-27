@@ -1,4 +1,5 @@
 import type { FailedStepCode } from '../types.js';
+import { TTS_DEPENDENT_AGENTS } from '../generators/auto-agents.js';
 
 export type Rule = Readonly<{
   pattern: RegExp;
@@ -38,7 +39,8 @@ export const STRUCTURED_CODE_RULES: readonly Rule[] = [
 export const MESSAGE_RULES: readonly Rule[] = [
   // Clé API locale non définie (env var manquante, côté serveur EurekAI).
   { pattern: /api[_ ]?key.*(non.?defin|not.?defin|missing|not.?set)/i, code: 'auth_required' },
-  // Codes HTTP d'auth dans le message brut (SDK sans status structuré).
+  // Codes HTTP d'auth dans le message brut : repli pour une erreur sans statut structuré (le statut
+  // des erreurs du SDK, `statusCode`, est lu par httpStatusOf et passe d'abord par STATUS_RULES).
   { pattern: /\b401\b|\b403\b/, code: 'auth_required' },
   // Mots-clés d'échec d'authentification (unauthorized/forbidden/invalid key).
   { pattern: /\bunauthori[sz]ed\b|\bforbidden\b|invalid[_ ]?api[_ ]?key/i, code: 'auth_required' },
@@ -53,5 +55,7 @@ export const MESSAGE_RULES: readonly Rule[] = [
   },
 ];
 
-export const TTS_AGENTS = new Set(['podcast', 'quiz-vocal', 'tts', 'stt']);
+// Agents dont l'échec peut venir de la pile audio : les générations qui exigent le TTS (source unique
+// TTS_DEPENDENT_AGENTS, dictée comprise) + les libellés des routes audio (lecture à voix haute, STT).
+export const TTS_AGENTS: ReadonlySet<string> = new Set([...TTS_DEPENDENT_AGENTS, 'tts', 'stt']);
 export const TTS_SIGNATURE = /\btts\b|\bstt\b|voxtral|audio|speech|voice|transcrib/i;

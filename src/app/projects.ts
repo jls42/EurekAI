@@ -1,6 +1,7 @@
 import { normalizeSummaryData } from './helpers';
 import { openingProfileQuery } from './project-snapshot';
 import { resumeProjectModeration } from './moderation-gate';
+import { withReplyFallback } from './chat-reply';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
@@ -170,7 +171,7 @@ const hydrateProjectFields = function (state: AppContext, project: ProjectData, 
   state.generations = generations;
   state.consigne = project.consigne ?? null;
   state.useConsigne = localStorage.getItem(`consigne-dismissed-${id}`) !== 'true';
-  state.chatMessages = chatMessages;
+  state.chatMessages = withReplyFallback(state, chatMessages);
 };
 
 const startSseStreamSafely = function (state: AppContext, id: string): void {
