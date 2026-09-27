@@ -4,10 +4,13 @@
 // chaque requête). Sérialisation, parsing zod et accesseurs sont donc ceux de la version installée :
 // un bump du SDK qui casserait la capture d'usage (accesseur recréé à chaque lecture, champ
 // renommé, réponse rejetée) échoue ici, alors que tracked-client.test.ts tourne sur un faux client.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildTrackedClient } from './mistral-client-factory.js';
 import { runWithUsageTracking } from './usage-context.js';
 import { calculateTotalCost } from './cost-calc.js';
+import { SDK_RETRIED_STATUSES } from './mistral-retry.js';
+import { extractErrorCode, httpStatusOf } from './error-code-resolution.js';
+import { logger } from './logger.js';
 
 interface SentRequest {
   method: string;
@@ -311,5 +314,75 @@ describe('client suivi — contrat du SDK installé', () => {
     ]);
     // (187 + 292) × 0,5/M + 464 × 1,5/M = 0,0009355 $ de tokens, + 0,10 $ pour l'image.
     expect(calculateTotalCost(usage)).toBeCloseTo(0.1009355, 5);
+  });
+});
+
+// Deux couches de réessai : le SDK rejoue ses `retryCodes`, callWithRetry (mistral-retry.ts) rejoue
+// les transitoires qu'il ignore. Au bump du SDK, un code retiré de ses `retryCodes` ne serait plus
+// rejoué du tout, un code ajouté serait rejoué deux fois : ces tests échouent dans les deux cas.
+describe('client suivi — répartition des réessais entre le SDK et l’application', () => {
+  // Statuts rendus dans l'ordre (200 = réponse de chat valide), requêtes comptées.
+  const stubStatuses = (statuses: number[]): (() => number) => {
+    let calls = 0;
+    const fakeFetch = (): Promise<Response> => {
+      const status = statuses[Math.min(calls, statuses.length - 1)];
+      calls++;
+      if (status === 200) return Promise.resolve(jsonResponse(CHAT_RESPONSE));
+      const body = '{"object":"error","message":"upstream"}';
+      const headers = { 'content-type': 'application/json' };
+      return Promise.resolve(new Response(body, { status, headers }));
+    };
+    vi.stubGlobal('fetch', vi.fn(fakeFetch));
+    return () => calls;
+  };
+  const chatOnce = () =>
+    newClient().chat.complete({
+      model: 'mistral-small-latest',
+      messages: [{ role: 'user', content: 'Réponds uniquement par le mot : ok' }],
+    });
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    // Jitter du backoff du SDK (jusqu'à 1 s) : à 0, son premier réessai part sans délai.
+    vi.spyOn(Math, 'random').mockReturnValue(0);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it.each([...SDK_RETRIED_STATUSES])(
+    '%i : rejoué par le SDK, jamais par l’application',
+    async (status) => {
+      const fetches = stubStatuses([status, 200]);
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      const p = chatOnce();
+      await vi.runAllTimersAsync();
+      const result = await p;
+      expect(result.choices[0].message?.content).toBe('ok');
+      expect(fetches()).toBe(2);
+      expect(warn).not.toHaveBeenCalledWith('chat', expect.stringContaining('attempt'));
+    },
+  );
+
+  it.each([408, 520])('%i : ignoré par le SDK, rejoué par l’application', async (status) => {
+    const fetches = stubStatuses([status, 200]);
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = chatOnce();
+    await vi.runAllTimersAsync();
+    await p;
+    expect(fetches()).toBe(2);
+    expect(warn).toHaveBeenCalledWith(
+      'chat',
+      `attempt 1 failed (status ${status}), retrying in 1000ms`,
+    );
+  });
+
+  it('401 : ni rejoué, ni mal classé (statut lu dans statusCode)', async () => {
+    const fetches = stubStatuses([401]);
+    const error: unknown = await chatOnce().catch((e: unknown) => e);
+    expect(fetches()).toBe(1);
+    expect(httpStatusOf(error)).toBe(401);
+    expect(extractErrorCode(error)).toBe('auth_required');
   });
 });

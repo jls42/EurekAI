@@ -169,9 +169,10 @@ function wrapTts(client: Mistral, onUsage: UsageCallback): void {
   speech.complete = wrapped as typeof speech.complete;
 }
 
-// Limite connue : `conversations.start` est rejoué sur 429/5xx (backoff du SDK puis callWithRetry).
+// Limite connue : `conversations.start` est rejoué par le backoff du SDK (429, 500, 502, 503, 504),
+// puis par callWithRetry sur les transitoires que le SDK ignore (408, autres 5xx dont 52x).
 // Seule la réponse finale porte un `usage` : les frais d'outils d'une tentative échouée (ex. une
-// image générée, 0,10 $, avant un 5xx) ne sont pas captés.
+// image générée, 0,10 $, avant un 5xx) ne sont pas captés, et une image peut être facturée deux fois.
 function wrapAgent(client: Mistral, onUsage: UsageCallback): void {
   const conversations = client.beta.conversations;
   const orig = conversations.start.bind(conversations);

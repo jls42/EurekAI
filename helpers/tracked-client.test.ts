@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { SDKError } from '@mistralai/mistralai/models/errors';
 import { trackClient } from './tracked-client.js';
 import { logger } from './logger.js';
 import type { ApiUsage } from './pricing.js';
@@ -236,14 +237,23 @@ describe('trackClient', () => {
     expect(captured[0].inputCharacters).toBe(0);
   });
 
-  it('retries on 503 and calls onUsage once with final usage', async () => {
+  // 520 (Cloudflare) : rejoué par callWithRetry, le SDK ne le rejouant pas (un 503 l'est déjà par
+  // le SDK, jamais par l'application). Vraie erreur du SDK : statut dans `statusCode`.
+  it('retries on 520 and calls onUsage once with final usage', async () => {
     vi.useFakeTimers();
     try {
       const client = makeFakeClient();
       const mockComplete = client.chat.complete;
+      const body = '{"message":"upstream"}';
       mockComplete
         .mockReset()
-        .mockRejectedValueOnce(Object.assign(new Error('upstream'), { status: 503 }))
+        .mockRejectedValueOnce(
+          new SDKError('API error occurred', {
+            request: new Request('https://api.mistral.ai/v1/chat/completions'),
+            response: new Response(body, { status: 520 }),
+            body,
+          }),
+        )
         .mockResolvedValueOnce({
           model: 'mistral-large-2512',
           usage: { promptTokens: 10, completionTokens: 20, totalTokens: 30 },
