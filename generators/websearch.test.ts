@@ -35,9 +35,11 @@ describe('webSearchEnrich', () => {
         tools: [{ type: 'web_search' }],
       }),
     );
+    // store: false : Mistral ne garde pas la conversation (requête de l'élève) sur ses serveurs.
     expect(client.beta.conversations.start).toHaveBeenCalledWith({
       agentId: 'agent-1',
       inputs: 'formatted query',
+      store: false,
     });
     expect(result.text).toBe('Search result text here');
     expect(typeof result.elapsed).toBe('number');

@@ -71,6 +71,39 @@ const discardExtraImages = async (client: Mistral, extra: ImageResult[]): Promis
   }
 };
 
+// Appel de l'outil d'image : une sortie `tool.execution` par appel, qu'il ait produit une image
+// ou non.
+const isImageToolCall = (output: unknown): boolean => {
+  const o = (output || {}) as { type?: unknown; name?: unknown };
+  return o.type === 'tool.execution' && o.name === 'image_generation';
+};
+
+// Motif d'un appel (`info.result`), vide s'il est absent ou s'il contient une URL : le résultat
+// d'un appel réussi porte l'URL signée de l'image, qui ne doit jamais finir dans les journaux.
+const toolCallReason = (output: unknown): string => {
+  const result = (output as { info?: { result?: unknown } }).info?.result;
+  if (typeof result !== 'string' || /https?:/i.test(result)) return '';
+  return result.slice(0, 120);
+};
+
+// L'agent rappelle l'outil quand un appel échoue. Vécu les 2026-09-26 et 27 : « Tool call timed
+// out. Please try again. » au bout de 30 s côté Mistral (8 appels sur 20), toujours une seule
+// image au final. Chaque appel est compté dans le coût (`usage.connectors`) : les tentatives sans
+// image sont journalisées avec leur motif, puisque la conversation n'est plus stockée chez
+// Mistral (store: false).
+const warnFailedToolCalls = (outputs: unknown[], images: number): void => {
+  const calls = outputs.filter(isImageToolCall);
+  const failed = calls.length - images;
+  if (failed <= 0) return;
+  const reasons = [...new Set(calls.map(toolCallReason).filter(Boolean))];
+  const detail = reasons.length > 0 ? ` (${reasons.join(' | ')})` : '';
+  const s = failed > 1 ? 's' : '';
+  logger.warn(
+    'image',
+    `${calls.length} appels à l'outil d'image pour ${images} image : ${failed} tentative${s} sans image, comptée${s} dans le coût${detail}`,
+  );
+};
+
 // Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec sa voisine et ne
 // la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
 const downloadAndSaveImage = async (
@@ -119,8 +152,16 @@ export const generateImage = async (
 
   try {
     const prompt = imageUser(lang, markdown);
-    const response = await client.beta.conversations.start({ agentId: agent.id, inputs: prompt });
-    const [imageRef, ...extra] = extractImageRefs(response.outputs);
+    // store: false : Mistral ne garde pas la conversation, qui contient le texte de la leçon
+    // (l'agent et l'image générée sont déjà supprimés chez Mistral).
+    const response = await client.beta.conversations.start({
+      agentId: agent.id,
+      inputs: prompt,
+      store: false,
+    });
+    const refs = extractImageRefs(response.outputs);
+    warnFailedToolCalls(response.outputs, refs.length);
+    const [imageRef, ...extra] = refs;
 
     if (!imageRef) {
       console.error('    Image outputs:', JSON.stringify(response.outputs, null, 2).slice(0, 2000));
