@@ -538,6 +538,8 @@ export const fr: Record<string, string> = {
   'profile.pinRequired': 'Un code PIN est requis pour les profils de moins de 15 ans',
   'profile.pinMismatch': 'Les codes PIN ne correspondent pas',
   'profile.pinVerify': 'Vérification parentale',
+  'profile.pinVerifyInfo': 'Saisis le code PIN parental pour continuer.',
+  'profile.pinVerifySubmit': 'Valider',
   'profile.pinWrong': 'Code PIN incorrect',
   'profile.pinRateLimited': "Trop d'essais de code PIN. Réessaie dans {minutes} min.",
   'profile.pinInfo':

@@ -12,7 +12,7 @@
     >
       Verify PIN
     </h2>
-    <p class="text-body-sm text-text-secondary mb-4" x-text="t('profile.pinInfo')"></p>
+    <p class="text-body-sm text-text-secondary mb-4" x-text="t('profile.pinVerifyInfo')"></p>
     <input
       type="password"
       inputmode="numeric"
@@ -34,7 +34,7 @@
         @click="submitPinVerify()"
         :disabled="!/^\d{4}$/.test(pinVerifyInput)"
         class="flex-1 min-h-touch rounded-button font-semibold text-body-sm bg-primary-dark text-text-inverted hover:bg-primary-dark/90 transition-colors card-lift btn-press focus-ring disabled:opacity-50"
-        x-text="t('common.save')"
+        x-text="t('profile.pinVerifySubmit')"
       ></button>
     </div>
   </div>

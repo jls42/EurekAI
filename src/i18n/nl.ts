@@ -511,6 +511,8 @@ export const nl: Record<string, string> = {
   'profile.pinRequired': 'Een PIN-code is vereist voor profielen jonger dan 15 jaar',
   'profile.pinMismatch': 'PIN-codes komen niet overeen',
   'profile.pinVerify': 'Ouderlijke verificatie',
+  'profile.pinVerifyInfo': 'Voer de ouderlijke PIN-code in om verder te gaan.',
+  'profile.pinVerifySubmit': 'Bevestigen',
   'profile.pinWrong': 'Onjuiste PIN-code',
   'profile.pinRateLimited':
     'Te veel pogingen met de pincode. Probeer het over {minutes} min opnieuw.',

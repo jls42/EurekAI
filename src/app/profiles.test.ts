@@ -11,6 +11,7 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 vi.mock('./profile-locale', () => ({
   getProfileLocale: vi.fn((_id: string, fallback: string) => fallback),
@@ -1690,5 +1691,19 @@ describe('createProfiles', () => {
       expect(mapServerErrorCode(ctx as any, 'stale')).not.toBe('stale');
       expect(mapServerErrorCode(ctx as any, 'code_inconnu')).toBe('code_inconnu');
     });
+  });
+});
+
+// Le dialogue du PIN ne sert qu'à VÉRIFIER le code (révéler une source, Réglages, Espace parent) :
+// il reprenait le texte de la création (« Il sera demandé pour modifier ou supprimer le profil »)
+// et un bouton « Sauvegarder ».
+describe('dialogue du PIN (vérification)', () => {
+  const html = readFileSync(new URL('../partials/dialog-pin.html', import.meta.url), 'utf-8');
+
+  it('explique la vérification et valide, sans les textes de la création du PIN', () => {
+    expect(html).toContain("t('profile.pinVerifyInfo')");
+    expect(html).toContain("t('profile.pinVerifySubmit')");
+    expect(html).not.toContain("t('profile.pinInfo')");
+    expect(html).not.toContain("t('common.save')");
   });
 });

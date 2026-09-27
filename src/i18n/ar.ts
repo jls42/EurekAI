@@ -668,6 +668,8 @@ export const ar: Record<string, string> = {
     '\u0631\u0645\u0632\u0627 PIN \u063a\u064a\u0631 \u0645\u062a\u0637\u0627\u0628\u0642\u064a\u0646',
   'profile.pinVerify':
     '\u0627\u0644\u062a\u062d\u0642\u0651\u0642 \u0627\u0644\u0648\u0627\u0644\u062f\u064a',
+  'profile.pinVerifyInfo': 'أدخل رمز PIN الوالدي للمتابعة.',
+  'profile.pinVerifySubmit': 'تأكيد',
   'profile.pinWrong': '\u0631\u0645\u0632 PIN \u063a\u064a\u0631 \u0635\u062d\u064a\u062d',
   'profile.pinRateLimited': 'محاولات كثيرة لرمز PIN. أعد المحاولة بعد {minutes} دقيقة.',
   'profile.pinInfo':

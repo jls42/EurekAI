@@ -680,6 +680,8 @@ export const hi: Record<string, string> = {
     'PIN \u0915\u094B\u0921 \u092E\u0947\u0932 \u0928\u0939\u0940\u0902 \u0916\u093E\u0924\u0947',
   'profile.pinVerify':
     '\u092E\u093E\u0924\u093E-\u092A\u093F\u0924\u093E \u0938\u0924\u094D\u092F\u093E\u092A\u0928',
+  'profile.pinVerifyInfo': 'आगे बढ़ने के लिए माता-पिता का PIN कोड डालो।',
+  'profile.pinVerifySubmit': 'पुष्टि करें',
   'profile.pinWrong': '\u0917\u0932\u0924 PIN \u0915\u094B\u0921',
   'profile.pinRateLimited': 'PIN के बहुत सारे प्रयास हो गए। {minutes} मिनट बाद फिर कोशिश करो।',
   'profile.pinInfo':
