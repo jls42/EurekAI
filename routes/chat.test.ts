@@ -745,6 +745,40 @@ describe('POST /:pid/chat', () => {
     expect(result.generations).toEqual([]);
   });
 
+  it("lance les outils en parallèle et rend les résultats dans l'ordre des appels", async () => {
+    const { chatWithSources } = await import('../generators/chat.js');
+    const { generateSummary } = await import('../generators/summary.js');
+    const { generateQuiz } = await import('../generators/quiz.js');
+    (chatWithSources as any).mockResolvedValueOnce({
+      reply: 'Voici',
+      toolCalls: ['generate_summary', 'generate_quiz'],
+    });
+    // La fiche ne se termine qu'une fois le quiz lancé : en séquentiel, le quiz n'aurait jamais
+    // démarré (test bloqué). Elle finit donc après le quiz, mais reste première dans la réponse.
+    let releaseSummary = (): void => {};
+    const quizStarted = new Promise<void>((resolve) => {
+      releaseSummary = resolve;
+    });
+    (generateSummary as any).mockImplementationOnce(async () => {
+      await quizStarted;
+      return { title: 'T', summary: 'S', key_points: ['a'], vocabulary: [] };
+    });
+    (generateQuiz as any).mockImplementationOnce(async () => {
+      releaseSummary();
+      return [{ question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 }];
+    });
+    const project = store.createProject('Test');
+    addSource(project.meta.id);
+    const handler = getHandler(router, 'post', '/:pid/chat');
+    const res = mockRes();
+
+    await handler(mockReq({ params: { pid: project.meta.id }, body: { message: 'Tout' } }), res);
+
+    const result = res.json.mock.calls[0][0];
+    expect(result.generations.map((g: { type: string }) => g.type)).toEqual(['summary', 'quiz']);
+    expect(result.generatedIds).toEqual(result.generations.map((g: { id: string }) => g.id));
+  });
+
   it('genere un fill-blank via tool call', async () => {
     const { chatWithSources } = await import('../generators/chat.js');
     (chatWithSources as any).mockResolvedValueOnce({

@@ -6,7 +6,7 @@ export function createGenerations() {
     startEditTitle(this: AppContext, gen: Generation) {
       this.editingTitle = gen.id;
       this.editTitleValue = gen.title;
-      this.$nextTick(() => {
+      void this.$nextTick(() => {
         const input = document.querySelector('input[x-ref="titleInput"]') as HTMLInputElement;
         if (input) input.focus();
       });

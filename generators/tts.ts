@@ -60,12 +60,9 @@ export const concatMp3 = async (segments: Buffer[]): Promise<Buffer> => {
   const tmpDir = await mkdtemp(join(tmpdir(), 'eurekai-mp3-'));
 
   try {
-    const segmentPaths: string[] = [];
-    for (let i = 0; i < segments.length; i++) {
-      const p = join(tmpDir, `seg_${i}.mp3`);
-      await writeFile(p, segments[i]);
-      segmentPaths.push(p);
-    }
+    // Fichiers distincts, écrits en parallèle ; la liste de concaténation garde l'ordre des segments.
+    const segmentPaths = segments.map((_, i) => join(tmpDir, `seg_${i}.mp3`));
+    await Promise.all(segmentPaths.map((p, i) => writeFile(p, segments[i])));
 
     const listPath = join(tmpDir, 'list.txt');
     await writeFile(listPath, segmentPaths.map((f) => `file '${f}'`).join('\n'));
@@ -107,13 +104,16 @@ const textToSpeechWithRetry = async (
   ttsOptions: TtsOptions,
 ): Promise<Buffer> => {
   let lastErr: unknown;
+  // Réessai : chaque tentative attend l'échec de la précédente, puis le délai de backoff.
   for (let attempt = 0; attempt < MAX_TTS_RETRIES; attempt++) {
     try {
-      return await textToSpeech(text, voiceId, ttsOptions);
+      // eslint-disable-next-line no-await-in-loop -- réessai séquentiel par nature
+      return await textToSpeech(text, voiceId, ttsOptions); // NOSONAR(S9382) — réessai séquentiel
     } catch (e) {
       lastErr = e;
       if (attempt < MAX_TTS_RETRIES - 1) {
-        await delay(TTS_RETRY_BASE_DELAY_MS * Math.pow(2, attempt));
+        // eslint-disable-next-line no-await-in-loop -- backoff entre deux tentatives
+        await delay(TTS_RETRY_BASE_DELAY_MS * Math.pow(2, attempt)); // NOSONAR(S9382) — backoff
       }
     }
   }
@@ -127,9 +127,12 @@ export const generateAudio = async (
 ): Promise<Buffer> => {
   const segments: Buffer[] = [];
 
+  // Un appel TTS à la fois : un Promise.all enverrait toutes les répliques du podcast d'un coup,
+  // soumises à la limite de débit de la clé Mistral.
   for (const line of script) {
     const voiceId = line.speaker === 'host' ? voices.host : voices.guest;
-    const audioBytes = await textToSpeechWithRetry(line.text, voiceId, ttsOptions);
+    // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. ci-dessus
+    const audioBytes = await textToSpeechWithRetry(line.text, voiceId, ttsOptions); // NOSONAR(S9382) — un appel TTS à la fois
     segments.push(audioBytes);
   }
 

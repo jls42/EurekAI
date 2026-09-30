@@ -91,6 +91,15 @@ export default [
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
 
+      // Équivalents locaux des règles SonarCloud sur les promesses, activées sans préavis le
+      // 2026-09-30 (81 issues, quality gate de main au rouge) : S9383 (bug) = no-floating-promises,
+      // S9382 = no-await-in-loop, S7503 = require-await (mêmes messages, mêmes lignes, mesuré).
+      // Une promesse volontairement non attendue s'écrit `void f()`, seulement si f gère ses
+      // erreurs ; une boucle séquentielle voulue porte sa raison + eslint-disable ET NOSONAR séparés.
+      '@typescript-eslint/no-floating-promises': 'error',
+      'no-await-in-loop': 'error',
+      '@typescript-eslint/require-await': 'error',
+
       // Legacy noise — warn le temps du refactor progressif
       '@typescript-eslint/no-explicit-any': 'warn',
       'sonarjs/cognitive-complexity': 'warn',
@@ -113,6 +122,11 @@ export default [
       'sonarjs/no-duplicate-string': 'off',
       'sonarjs/publicly-writable-directories': 'off',
       'sonarjs/no-clear-text-protocols': 'off',
+      // Mocks `async () => valeur` et étapes de test enchaînées : idiomatiques ici, et Sonar
+      // n'applique pas S7503/S9382 aux tests. no-floating-promises reste actif (un
+      // `expect(…).resolves` non attendu passerait en silence).
+      '@typescript-eslint/require-await': 'off',
+      'no-await-in-loop': 'off',
     },
   },
   {

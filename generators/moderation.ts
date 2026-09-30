@@ -109,7 +109,9 @@ export async function moderateContent(
   const chunks = chunkText(text);
   let categories: Record<string, boolean> = {};
 
+  // Morceau par morceau : arrêt au premier morceau signalé ou illisible, sans modérer la suite.
   for (const chunk of chunks) {
+    // eslint-disable-next-line no-await-in-loop -- arrêt au premier morceau bloquant, cf. ci-dessus
     const response = await client.classifiers.moderate({
       // Id daté épinglé, jamais `-latest` : rationale et faits mesurés dans helpers/moderation-model.ts.
       model: MODERATION_MODEL,

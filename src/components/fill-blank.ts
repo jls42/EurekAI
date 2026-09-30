@@ -71,14 +71,14 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       } else {
         this.answer = '';
         this.feedback = null;
-        this.$nextTick(() => {
+        void this.$nextTick(() => {
           (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
         });
       }
     },
 
     onFinish(this: FillBlankContext) {
-      this.submitFullAttempt();
+      void this.submitFullAttempt();
     },
 
     async submitFullAttempt(this: FillBlankContext) {
@@ -114,7 +114,7 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       this.answer = '';
       this.showHint = false;
       this.retryWrong(wrong);
-      this.$nextTick(() => {
+      void this.$nextTick(() => {
         (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },
@@ -125,7 +125,7 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       this.answer = '';
       this.showHint = false;
       this.resetAll();
-      this.$nextTick(() => {
+      void this.$nextTick(() => {
         (this.$refs.blankInput as HTMLInputElement | undefined)?.focus();
       });
     },

@@ -597,15 +597,19 @@ const processUploadBatch = async (
   const duplicates: DuplicateUpload[] = [];
   const existing = buildExistingHashMap(store, pid);
   const seen = new Map<string, string>();
+  // Un fichier à la fois : `seen` repère un doublon du lot parmi les fichiers déjà importés (il
+  // dépend des tours précédents), et un seul OCR part à la fois vers Mistral.
   for (const file of files) {
-    const hash = await hashFileContent(file.path);
+    // eslint-disable-next-line no-await-in-loop -- dédup intra-lot séquentielle, cf. ci-dessus
+    const hash = await hashFileContent(file.path); // NOSONAR(S9382) — dédup intra-lot séquentielle
     const dupId = findDuplicateId(hash, existing, seen);
     if (!allowDuplicates && dupId && hash) {
       tryUnlinkOrphan(file.path);
       duplicates.push({ filename: file.originalname, contentHash: hash, existingSourceId: dupId });
       continue;
     }
-    const outcome = await attemptFileUpload(store, client, file, pid, modCats, hash);
+    // eslint-disable-next-line no-await-in-loop -- un OCR à la fois, dédup intra-lot, cf. ci-dessus
+    const outcome = await attemptFileUpload(store, client, file, pid, modCats, hash); // NOSONAR(S9382) — un OCR à la fois
     if (outcome.source) {
       results.push(outcome.source);
       if (hash) seen.set(hash, outcome.source.id);
@@ -839,10 +843,12 @@ const collectWebSources = async (
   const sources: Source[] = [];
   const failures: WebSourceFailure[] = [];
   const now = new Date().toISOString();
+  // Une URL à la fois : leur nombre n'est pas borné (toutes celles que l'utilisateur colle), et en
+  // parallèle autant de scrapings et d'appels à l'agent de recherche Mistral partiraient ensemble.
   for (const url of urls) {
-    const outcome = await trackWebSource(store, pid, `URL scrape: ${url}`, () =>
-      scrapeUrl(client, url, scrapeMode, lang, ageGroup, modCats, now),
-    );
+    const scrape = () => scrapeUrl(client, url, scrapeMode, lang, ageGroup, modCats, now);
+    // eslint-disable-next-line no-await-in-loop -- nombre d'URL non borné, cf. ci-dessus
+    const outcome = await trackWebSource(store, pid, `URL scrape: ${url}`, scrape); // NOSONAR(S9382) — nombre d'URL non borné
     pushOutcome(outcome, sources, failures);
   }
   if (searchQuery) {

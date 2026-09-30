@@ -922,8 +922,12 @@ const buildQuizVocalAudioUrls = async (
     flow: QUIZ_VOCAL,
   }).host;
   const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
+  // Un appel TTS à la fois : limite de débit de la clé Mistral ; et sur un échec, plus rien ne
+  // tourne quand runWithMediaLedger supprime les MP3 déjà écrits (avec un Promise.all, les autres
+  // appels en écriraient encore après ce nettoyage).
   for (const [i, question] of data.entries()) {
-    const audioBuffer = await ttsQuestion(question, hostVoice, ttsOpts, ctx.lang);
+    // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. ci-dessus
+    const audioBuffer = await ttsQuestion(question, hostVoice, ttsOpts, ctx.lang); // NOSONAR(S9382) — un appel TTS à la fois
     audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `quiz-vocal-q${i}`));
     logger.info(QUIZ_VOCAL, `Q${i + 1} audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
   }
@@ -950,8 +954,10 @@ const buildDictationAudioUrls = async (
     flow: DICTATION,
   }).host;
   const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
+  // Un appel TTS à la fois, pour les mêmes raisons que buildQuizVocalAudioUrls.
   for (const [i, item] of data.entries()) {
-    const audioBuffer = await textToSpeech(item.word, hostVoice, ttsOpts);
+    // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. buildQuizVocalAudioUrls
+    const audioBuffer = await textToSpeech(item.word, hostVoice, ttsOpts); // NOSONAR(S9382) — un appel TTS à la fois
     audioUrls.push(saveAudioFile(audioBuffer, projectDir, ctx.pid, `dictation-w${i}`));
   }
   return audioUrls;

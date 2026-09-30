@@ -192,7 +192,7 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
     state.openGens[genId] = true;
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
   startSseStreamSafely(state, id);
 };
 

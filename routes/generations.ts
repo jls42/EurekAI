@@ -300,11 +300,14 @@ const generateBatchAudio = async (
   const audioUrls: Record<string, string> = {};
   const failedSections: FailedSection[] = [];
   const audioPrefix = readAloudPrefix(gen.id);
+  // Un appel TTS à la fois : un Promise.all enverrait toutes les sections d'un coup, soumises à la
+  // limite de débit de la clé Mistral.
   for (const s of batchSectionsFor(d)) {
     const txt = sectionText(d, s);
     if (!txt) continue;
     try {
-      const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts);
+      // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. ci-dessus
+      const buf = await textToSpeech(txt.slice(0, 5000), voiceId, ttsOpts); // NOSONAR(S9382) — un appel TTS à la fois
       audioUrls[s] = saveAudioFile(buf, projectDir, pid, `${audioPrefix}${s}`);
     } catch (err) {
       logger.error('tts', `section ${s} failed:`, err);
@@ -356,9 +359,12 @@ async function generateFlashcardsAudio(
 ): Promise<Buffer> {
   const silenceBuffer = cards.length > 1 ? await generateSilence(1200) : null;
   const segments: Buffer[] = [];
+  // Un appel TTS à la fois, comme generateBatchAudio (limite de débit de la clé Mistral).
   for (let i = 0; i < cards.length; i++) {
-    const q = await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts);
-    const a = await textToSpeech(cards[i].answer.slice(0, 5000), voices.guest, ttsOpts);
+    // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. ci-dessus
+    const q = await textToSpeech(cards[i].question.slice(0, 5000), voices.host, ttsOpts); // NOSONAR(S9382) — un appel TTS à la fois
+    // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. ci-dessus
+    const a = await textToSpeech(cards[i].answer.slice(0, 5000), voices.guest, ttsOpts); // NOSONAR(S9382) — un appel TTS à la fois
     const cardSegments = silenceBuffer && i < cards.length - 1 ? [q, a, silenceBuffer] : [q, a];
     segments.push(...cardSegments);
   }
@@ -450,7 +456,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   };
 
   // --- Quiz attempt (save score) ---
-  router.post('/:pid/generations/:gid/quiz-attempt', async (req, res) => {
+  router.post('/:pid/generations/:gid/quiz-attempt', (req, res) => {
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {
@@ -484,7 +490,7 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
   });
 
   // --- Fill-blank attempt (save score) ---
-  router.post('/:pid/generations/:gid/fill-blank-attempt', async (req, res) => {
+  router.post('/:pid/generations/:gid/fill-blank-attempt', (req, res) => {
     try {
       const { answers } = req.body;
       if (!answers || typeof answers !== 'object') {

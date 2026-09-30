@@ -44,15 +44,18 @@ const describeError = (err: unknown): string => {
 
 export async function callWithRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
   let lastError: unknown;
+  // Réessai : chaque tentative attend l'échec de la précédente, puis le délai de backoff.
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
+      // eslint-disable-next-line no-await-in-loop -- réessai séquentiel par nature
       return await fn();
     } catch (e) {
       lastError = e;
       if (!isRetryable(e) || attempt === MAX_ATTEMPTS) break;
       const delay = Math.min(BASE_BACKOFF_MS * 2 ** (attempt - 1), MAX_BACKOFF_MS);
       logger.warn(label, `attempt ${attempt} failed (${describeError(e)}), retrying in ${delay}ms`);
-      await new Promise((r) => setTimeout(r, delay));
+      // eslint-disable-next-line no-await-in-loop -- backoff entre deux tentatives
+      await new Promise((r) => setTimeout(r, delay)); // NOSONAR(S9382) — backoff entre deux tentatives
     }
   }
   throw lastError ?? new Error(`callWithRetry: no attempt executed for ${label}`);

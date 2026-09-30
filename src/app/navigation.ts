@@ -10,11 +10,11 @@ export function createNavigation() {
       if (document.startViewTransition && !prefersReducedMotion) {
         document.startViewTransition(() => {
           this.activeView = view;
-          this.$nextTick(() => this.refreshIcons());
+          void this.$nextTick(() => this.refreshIcons());
         });
       } else {
         this.activeView = view;
-        this.$nextTick(() => this.refreshIcons());
+        void this.$nextTick(() => this.refreshIcons());
       }
       window.scrollTo(0, 0);
     },
@@ -27,7 +27,7 @@ export function createNavigation() {
       this.theme = this.theme === 'dark' ? 'light' : 'dark';
       document.documentElement.dataset.theme = this.theme;
       localStorage.setItem('sf-theme', this.theme);
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
     },
   };
 }

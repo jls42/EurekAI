@@ -306,7 +306,7 @@ export function createConfig() {
       this.apiKeyConsentClear = false;
       this.keyTestStatus = '';
       this.showApiKeyDialog = true;
-      this.$nextTick(() => {
+      void this.$nextTick(() => {
         (this.$refs.apiKeyDialog as HTMLDialogElement | undefined)?.showModal();
         this.refreshIcons();
       });

@@ -245,61 +245,103 @@ const CHAT_TOOL_EXECUTORS = new Map<string, ChatToolExecutor>([
   ],
 ]);
 
+interface ChatToolResults {
+  generatedIds: string[];
+  generations: Generation[];
+  failedTools: string[];
+  failedCost: number;
+}
+
+// Issue d'un outil : génération enregistrée, échec (coût de l'usage capté) ou outil inconnu ignoré.
+type ChatToolOutcome =
+  | { kind: 'generated'; gen: Generation }
+  | { kind: 'failed'; call: string; cost: number }
+  | { kind: 'skipped' };
+
+// Génération réussie : son coût suivi lui est rattaché, puis elle est enregistrée dans le projet.
+const saveToolGeneration = (
+  store: ProjectStore,
+  pid: string,
+  type: string,
+  tracked: { result: Generation; usage: ApiUsage[] },
+): Generation => {
+  const gen = tracked.result;
+  const persisted = persistUsage(
+    store,
+    pid,
+    `POST /api/projects/${pid}/chat/tool/${type}`,
+    tracked.usage,
+  );
+  if (persisted) {
+    gen.usage = persisted.usage;
+    gen.estimatedCost = persisted.cost;
+    gen.costBreakdown = persisted.costBreakdown;
+  }
+  store.addGeneration(pid, gen);
+  logger.info('chat', `tool ${type} generated`);
+  return gen;
+};
+
+// Échec : l'usage capté avant l'erreur reste facturé (libellé `…/failed`).
+const failedToolCost = (store: ProjectStore, pid: string, call: string, err: unknown): number => {
+  const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
+  if (!failedUsage?.length) return 0;
+  const persisted = persistUsage(
+    store,
+    pid,
+    `POST /api/projects/${pid}/chat/tool/${call}/failed`,
+    failedUsage,
+  );
+  return persisted ? persisted.cost : 0;
+};
+
+// Un outil du chat ; ne rejette jamais (l'échec est journalisé et rendu comme issue).
+const runChatToolCall = async (
+  call: string,
+  ctx: ToolCallCtx,
+  store: ProjectStore,
+  pid: string,
+): Promise<ChatToolOutcome> => {
+  try {
+    const type = call.replace('generate_', '');
+    const executor = CHAT_TOOL_EXECUTORS.get(type);
+    if (!executor) return { kind: 'skipped' };
+    const tracked = await runWithUsageTracking(() => executor(ctx));
+    return { kind: 'generated', gen: saveToolGeneration(store, pid, type, tracked) };
+  } catch (err) {
+    const cost = failedToolCost(store, pid, call, err);
+    logger.error('chat', `tool ${call} failed:`, err);
+    return { kind: 'failed', call, cost };
+  }
+};
+
+// Outils indépendants (au plus MAX_TOOL_CALLS générations de texte, comme « Tout générer ») :
+// lancés en parallèle, résultats rendus dans l'ordre des appels.
 async function processChatToolCalls(
   toolCalls: string[],
   ctx: ToolCallCtx,
   store: ProjectStore,
   pid: string,
-): Promise<{
-  generatedIds: string[];
-  generations: Generation[];
-  failedTools: string[];
-  failedCost: number;
-}> {
-  const generatedIds: string[] = [];
-  const generations: Generation[] = [];
-  const failedTools: string[] = [];
-  let failedCost = 0;
-
-  for (const call of toolCalls) {
-    try {
-      const type = call.replace('generate_', '');
-      const executor = CHAT_TOOL_EXECUTORS.get(type);
-      if (executor) {
-        const { result: gen, usage } = await runWithUsageTracking(() => executor(ctx));
-        const persisted = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/chat/tool/${type}`,
-          usage,
-        );
-        if (persisted) {
-          gen.usage = persisted.usage;
-          gen.estimatedCost = persisted.cost;
-          gen.costBreakdown = persisted.costBreakdown;
-        }
-        store.addGeneration(pid, gen);
-        generatedIds.push(gen.id);
-        generations.push(gen);
-        logger.info('chat', `tool ${type} generated`);
-      }
-    } catch (err) {
-      const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-      if (failedUsage?.length) {
-        const persisted = persistUsage(
-          store,
-          pid,
-          `POST /api/projects/${pid}/chat/tool/${call}/failed`,
-          failedUsage,
-        );
-        if (persisted) failedCost += persisted.cost;
-      }
-      logger.error('chat', `tool ${call} failed:`, err);
-      failedTools.push(call);
+): Promise<ChatToolResults> {
+  const outcomes = await Promise.all(
+    toolCalls.map((call) => runChatToolCall(call, ctx, store, pid)),
+  );
+  const results: ChatToolResults = {
+    generatedIds: [],
+    generations: [],
+    failedTools: [],
+    failedCost: 0,
+  };
+  for (const outcome of outcomes) {
+    if (outcome.kind === 'generated') {
+      results.generatedIds.push(outcome.gen.id);
+      results.generations.push(outcome.gen);
+    } else if (outcome.kind === 'failed') {
+      results.failedTools.push(outcome.call);
+      results.failedCost += outcome.cost;
     }
   }
-
-  return { generatedIds, generations, failedTools, failedCost };
+  return results;
 }
 
 // Tour enregistré au contenu vide : réponse vide d'avant le correctif, ou réponse vide qui a lancé

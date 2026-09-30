@@ -45,10 +45,10 @@ export function _applyUploadSuccess(
   for (const s of newSources) addCostDelta(ctx, s.estimatedCost, 'sources/upload');
   file.file = null;
   file.status = 'done';
-  ctx.$nextTick(() => ctx.refreshIcons());
+  void ctx.$nextTick(() => ctx.refreshIcons());
   if (newSources.some((s: Source) => s.moderation?.status === 'pending')) {
     setTimeout(() => {
-      if (_isSessionActive(ctx, session)) ctx.refreshModeration();
+      if (_isSessionActive(ctx, session)) void ctx.refreshModeration();
     }, 2000);
   }
 }
@@ -63,7 +63,7 @@ export async function _handleUploadHttpError(
   if (resolved === null) return 'ignored';
   file.status = 'error';
   file.errorMsg = resolved;
-  ctx.$nextTick(() => ctx.refreshIcons());
+  void ctx.$nextTick(() => ctx.refreshIcons());
   ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
   return 'failed';
 }
@@ -78,7 +78,7 @@ export function _handleUploadException(
   console.error('[sources:upload]', file.name, e);
   file.status = 'error';
   file.errorMsg = ctx.t('sources.uploadError.generic');
-  ctx.$nextTick(() => ctx.refreshIcons());
+  void ctx.$nextTick(() => ctx.refreshIcons());
   ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
   return 'failed';
 }
@@ -96,7 +96,7 @@ export async function _uploadSingleFile(
   const forced = file.status === 'duplicate';
   file.status = 'uploading';
   file.errorMsg = null;
-  this.$nextTick(() => this.refreshIcons());
+  void this.$nextTick(() => this.refreshIcons());
 
   const formData = new FormData();
   formData.append('files', file.file, file.name);
@@ -128,7 +128,7 @@ async function _handleUploadResponse(
   if (!_isSessionActive(ctx, session)) return 'ignored';
   if (_responseHasDuplicate(payload, file.name)) {
     file.status = 'duplicate';
-    ctx.$nextTick(() => ctx.refreshIcons());
+    void ctx.$nextTick(() => ctx.refreshIcons());
     return 'duplicate';
   }
   _applyUploadSuccess(ctx, session, file, _extractSources(payload));
@@ -161,7 +161,7 @@ export function _createUploadSession(
     errorMsg: null as string | null,
   }));
   ctx.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
-  ctx.$nextTick(() => ctx.refreshIcons());
+  void ctx.$nextTick(() => ctx.refreshIcons());
   return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
 }
 
@@ -171,10 +171,12 @@ export async function _runUploadLoop(
 ): Promise<{ applied: number; interrupted: boolean }> {
   let applied = 0;
   let interrupted = false;
+  // Un fichier à la fois : arrêt dès qu'une réponse est ignorée (projet changé pendant l'import).
   for (const fileEntry of session.files) {
     // Pré-check client : un doublon déjà détecté n'est PAS uploadé (zéro coût OCR). L'utilisateur le
     // force via « Importer quand même » (retryFile) qui rappelle _uploadSingleFile avec allowDuplicates.
     if (fileEntry.status === 'duplicate') continue;
+    // eslint-disable-next-line no-await-in-loop -- arrêt dès qu'une réponse est ignorée, cf. ci-dessus
     const result = await _uploadSingleFile.call(ctx, session, fileEntry.id);
     if (result === 'ignored') {
       interrupted = true;
@@ -195,10 +197,13 @@ export async function _markClientDuplicates(
   session: UploadSession,
 ): Promise<void> {
   const seen = new Set<string>();
+  // Un fichier à la fois : `seen` repère les doublons du lot dans l'ordre, et le calcul s'arrête dès
+  // que la session n'est plus active.
   for (const f of session.files) {
     if (!f.file) continue;
     f.status = 'hashing';
-    ctx.$nextTick(() => ctx.refreshIcons());
+    void ctx.$nextTick(() => ctx.refreshIcons());
+    // eslint-disable-next-line no-await-in-loop -- doublons du lot repérés dans l'ordre, cf. ci-dessus
     const hash = await hashFile(f.file);
     if (!_isSessionActive(ctx, session)) return;
     const existing = findExistingDuplicate(hash, f.name, ctx.sources);
@@ -210,7 +215,7 @@ export async function _markClientDuplicates(
       if (hash) seen.add(hash);
     }
   }
-  ctx.$nextTick(() => ctx.refreshIcons());
+  void ctx.$nextTick(() => ctx.refreshIcons());
 }
 
 function _notifyDuplicates(ctx: AppContext, session: UploadSession): void {
@@ -232,7 +237,7 @@ export function _maybeFinalizeUpload(
 
 export function _scheduleConsigneRefresh(this: AppContext, projectId: string) {
   setTimeout(() => {
-    if (this.currentProjectId === projectId) this.refreshConsigne();
+    if (this.currentProjectId === projectId) void this.refreshConsigne();
   }, 3000);
 }
 
@@ -243,7 +248,7 @@ export function _maybeCleanupSession(this: AppContext, sessionId: string) {
     session.cleanupScheduled = true;
     setTimeout(() => {
       this.uploadSessions = this.uploadSessions.filter((s: UploadSession) => s.id !== sessionId);
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
     }, 3000);
   }
 }
@@ -293,11 +298,11 @@ const handleAddTextResponse = async function (
   state.textInput = '';
   state.showTextInput = false;
   state.showToast(state.t('toast.textAdded'), 'success');
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
   // Projet seulement : la session est déjà retirée (finally de runAddText) quand la relecture part,
   // et c'est elle qui enchaîne sur la consigne détectée en fond (followConsigneDetection).
   setTimeout(() => {
-    if (state.currentProjectId === session.projectId) state.refreshModeration();
+    if (state.currentProjectId === session.projectId) void state.refreshModeration();
   }, 2000);
 };
 
@@ -330,7 +335,7 @@ export function createSources() {
   return {
     handleDrop(this: AppContext, e: DragEvent) {
       this.dragging = false;
-      this.handleFiles(e.dataTransfer?.files);
+      void this.handleFiles(e.dataTransfer?.files);
     },
 
     async handleFiles(this: AppContext, fileList: FileList | undefined | null) {
@@ -372,7 +377,7 @@ export function createSources() {
       } else {
         _maybeCleanupSession.call(this, sessionId);
       }
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
     },
 
     async addText(this: AppContext) {
@@ -394,7 +399,7 @@ export function createSources() {
       this.viewSourcePanY = 0;
       const dialog = document.querySelector('[x-ref="sourceDialog"]') as HTMLDialogElement;
       if (dialog) dialog.showModal();
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
     },
 
     zoomIn(this: AppContext) {
@@ -530,7 +535,7 @@ const runRevealSourceContent = (state: AppContext, src: Source): void => {
   state.requireProfilePin(profileId, () => {
     if (state.viewSource?.id !== src.id || state.revealedSourceIds.includes(src.id)) return;
     state.revealedSourceIds.push(src.id);
-    state.$nextTick(() => state.refreshIcons());
+    void state.$nextTick(() => state.refreshIcons());
   });
 };
 
@@ -580,7 +585,7 @@ const runRefreshModeration = async function (state: AppContext, retries: number)
     if (!res.ok || state.currentProjectId !== projectId) return;
     const project: unknown = await res.json();
     mergeSourceModerations(state, (project as { sources: Source[] }).sources);
-    state.$nextTick(() => state.refreshIcons());
+    void state.$nextTick(() => state.refreshIcons());
     continueModerationFollowUp(state, projectId, retries);
   } catch (e) {
     console.error('[sources] refreshModeration failed:', e);

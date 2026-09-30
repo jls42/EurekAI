@@ -356,7 +356,7 @@ const selectProfile = async function (this: AppContext, id: string) {
   // Charge la clé Mistral du profil AVANT loadProjects (déchiffrement IndexedDB async,
   // doit être résolu avant les fetchs IA). Reste après les resets synchrones.
   await this.refreshKeyState(id);
-  this.loadProjects();
+  void this.loadProjects();
 };
 
 const createProfile = async function (this: AppContext) {
@@ -388,12 +388,12 @@ const createProfile = async function (this: AppContext) {
   }
 };
 
-const deleteProfile = async function (this: AppContext, id: string) {
+const deleteProfile = function (this: AppContext, id: string) {
   const profile = this.profiles.find((p: Profile) => p.id === id);
   if (!profile) return;
   const target = deleteConfirmMessage(this, id);
   if (profile.hasPin) {
-    this.requirePin(async (pin: string) => {
+    this.requirePin((pin: string) => {
       this.confirmDelete(target, () => executeDeleteProfile(this, id, pin));
     });
     return;
@@ -570,7 +570,7 @@ const autoSaveProfile = function (this: AppContext, immediate?: boolean) {
     if (this.currentProfile?.id === id && locale) this.setLocale(locale, true);
   };
   if (immediate) {
-    doSave();
+    void doSave();
     return;
   }
   this._autoSaveTimer = setTimeout(doSave, 500);
@@ -584,7 +584,7 @@ const toggleModerationCategory = function (this: AppContext, cat: string) {
     const idx = cats.indexOf(cat);
     if (idx >= 0) cats.splice(idx, 1);
     else cats.push(cat);
-    this.autoSaveParental();
+    void this.autoSaveParental();
   });
 };
 
@@ -641,7 +641,7 @@ const resetProfileDefaults = function (this: AppContext) {
   this.showToast(this.t('toast.profileReset'), 'success');
 };
 
-const saveEditProfile = async function (this: AppContext) {
+const saveEditProfile = function (this: AppContext) {
   this.autoSaveProfile(true);
   this.editingProfile = null;
 };
@@ -655,7 +655,7 @@ const requirePin = function (this: AppContext, callback: (pin: string) => void) 
   this.pinVerifyInput = '';
   this.pinVerifyCallback = callback;
   this.showPinDialog = true;
-  this.$nextTick(() => {
+  void this.$nextTick(() => {
     (this.$refs.pinDialog as HTMLDialogElement | undefined)?.showModal();
     this.refreshIcons();
   });

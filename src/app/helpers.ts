@@ -196,7 +196,7 @@ const generationsByType = function (this: AppContext, type: string) {
 
 const toggleGen = function (this: AppContext, id: string) {
   this.openGens[id] = !this.openGens[id];
-  this.$nextTick(() => this.refreshIcons());
+  void this.$nextTick(() => this.refreshIcons());
 };
 
 const apiBase = function (this: AppContext) {

@@ -62,7 +62,7 @@ const applyDetectedConsigne = (state: AppContext, body: unknown): void => {
     visible ? 'success' : 'info',
   );
   if (!visible) return;
-  state.$nextTick(() => {
+  void state.$nextTick(() => {
     (state.$refs.consigneDialog as HTMLDialogElement | undefined)?.showModal();
     state.refreshIcons();
   });
@@ -126,7 +126,7 @@ export function createConsigne() {
           const project = snapshot as ProjectData;
           if (project.consigne) {
             this.consigne = project.consigne;
-            this.$nextTick(() => this.refreshIcons());
+            void this.$nextTick(() => this.refreshIcons());
           }
         }
       } catch {
@@ -169,7 +169,7 @@ export function createConsigne() {
         this.showToast(this.t('toast.consigneError'), 'error');
       } finally {
         this.consigneLoading = false;
-        this.$nextTick(() => this.refreshIcons());
+        void this.$nextTick(() => this.refreshIcons());
       }
     },
   };

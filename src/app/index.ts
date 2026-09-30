@@ -78,7 +78,7 @@ export function app() {
         this.openApiKeyDialog('global');
       }
 
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
     },
   };
 }

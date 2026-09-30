@@ -252,7 +252,7 @@ const restoreOrPlay = function (this: QuizVocalContext) {
     return;
   }
   this.feedback = null;
-  this.$nextTick(() => this.playQuestion());
+  void this.$nextTick(() => this.playQuestion());
 };
 
 const onFinish = function () {
@@ -266,7 +266,7 @@ const resetVocalQuiz = function (this: QuizVocalContext) {
   // et le bouton micro (x-if="!feedback && !isCurrentAnswered()") ne réapparaît pas.
   this.storedFeedback = {};
   this.resetAll();
-  this.$nextTick(() => this.playQuestion());
+  void this.$nextTick(() => this.playQuestion());
 };
 
 export function quizVocalComponent(gen: QuizVocalGeneration) {

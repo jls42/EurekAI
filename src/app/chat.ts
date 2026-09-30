@@ -80,7 +80,7 @@ const sendChatMessage = async function (this: AppContext) {
   this.chatInput = '';
   this.chatMessages.push({ role: 'user', content: msg, timestamp: new Date().toISOString() });
   this.chatLoading = true;
-  this.$nextTick(() => this.scrollChatBottom());
+  void this.$nextTick(() => this.scrollChatBottom());
 
   try {
     const res = await fetch(
@@ -108,7 +108,7 @@ const sendChatMessage = async function (this: AppContext) {
     this.showToast(this.t('toast.chatError'), 'error');
   } finally {
     this.chatLoading = false;
-    this.$nextTick(() => {
+    void this.$nextTick(() => {
       this.scrollChatBottom();
       this.refreshIcons();
     });
