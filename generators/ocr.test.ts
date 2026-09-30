@@ -39,7 +39,7 @@ describe('ocrFile', () => {
       purpose: 'ocr',
     });
     expect(client.ocr.process).toHaveBeenCalledWith({
-      model: 'mistral-ocr-4-0',
+      model: 'mistral-ocr-4-1',
       document: { fileId: 'file-123', type: 'file' },
       confidenceScoresGranularity: 'page',
       includeBlocks: false,
@@ -54,7 +54,7 @@ describe('ocrFile', () => {
     await ocrFile(client, '/tmp/test.pdf', 'test.pdf');
 
     expect(client.ocr.process).toHaveBeenCalledWith(
-      expect.objectContaining({ model: 'mistral-ocr-4-0' }),
+      expect.objectContaining({ model: 'mistral-ocr-4-1' }),
     );
   });
 

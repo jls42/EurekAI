@@ -156,7 +156,7 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
 3. Assertions (croiser avec les `grep` ci-dessus, ne rien hardcoder) :
    - `ocr` (les `option.value`) = exactement les valeurs de `OCR_MODELS` (ordre actuel : OCR 4 puis OCR 3).
    - Les labels OCR montrent le **nom produit** (`OCR_MODEL_LABELS` : "OCR 4" / "OCR 3"), PAS l'ID brut ; OCR 4 affiche 4 USD, OCR 3 affiche 2 USD (signe dollar dans l'UI), les deux avec l'unite pages (`1000`).
-   - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-0`).
+   - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-1`).
    - L'option `DEFAULT_OCR_MODEL` (OCR 4) porte le suffixe recommande (texte i18n `settings.recommended`).
    - Labels modele principal : en USD par M tokens (entree / sortie) : `mistral-large` → 0.50 / 1.50, `mistral-medium` → 1.50 / 7.50, `mistral-small` → 0.15 / 0.60.
    - `tts` affiche 16 USD par M caracteres.
@@ -269,14 +269,14 @@ Glisser/uploader le meme fichier via l'UI → statut **`'duplicate'`** par fichi
 
 ## Phase 2quinquies — check-models : surveillance modeles (Feature B, PR #42)
 
-Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alias ↔ versions, independants de l'ordre, + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) sur `WATCHED_MODELS` (5 alias `-latest` resolus par l'app, recopies dans `WATCHED_ALIASES`, + `OCR_MODELS` et `MODERATION_MODEL` importes des sources uniques). Alertes : modele surveille **absent** de `/v1/models`, **alias ambigu**, groupe **deprecie/retire**, **defaut epingle en retard** sur l'alias de sa generation (sauf retard assume `OCR_DEFAULT_ACCEPTED_LAG`). Informations : retard assume, nouvelle generation (`-latest`), modele non suivi dans la famille moderation. Script, pas d'UI.
+Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alias ↔ versions, independants de l'ordre, + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) sur `WATCHED_MODELS` (5 alias `-latest` resolus par l'app, recopies dans `WATCHED_ALIASES`, + `OCR_MODELS` et `MODERATION_MODEL` importes des sources uniques). Alertes : modele surveille **absent** de `/v1/models`, **alias ambigu**, groupe **deprecie/retire**, **defaut epingle en retard** sur l'alias de sa generation (sauf retard assume : `acceptedLag` d'une entree de `TRACKED_DEFAULTS`, aucun depuis la v1.7.6). Informations : retard assume, nouvelle generation (`-latest`), modele non suivi dans la famille moderation. Script, pas d'UI.
 
 1. **Path nominal** (avec cle) — rend l'overview via Lightpanda (1-2 s mesure, budget timeout 120s) :
    ```bash
    timeout 120 npx tsx --env-file=.env scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` (**toujours** non bloquant).
-   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-26 : `8 modèles surveillés OK` + `ℹ épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 ...`. Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés (table Legacy indisponible ou partielle)` = controle PARTIEL (table Legacy non lue, vide, ou partielle : `table Legacy partielle : N modèles lus...` ou `sentinelle(s) absente(s) ...`, rendu Lightpanda tronque) : a remonter aussi, ce n'est pas un OK complet.
+   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-30 : `8 modèles surveillés OK`, sans ligne `ℹ` (defaut OCR 4.1, OCR 4.0 retire le 2026-09-30). Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés (table Legacy indisponible ou partielle)` = controle PARTIEL (table Legacy non lue, vide, ou partielle : `table Legacy partielle : N modèles lus...` ou `sentinelle(s) absente(s) ...`, rendu Lightpanda tronque) : a remonter aussi, ce n'est pas un OK complet.
 2. **Path skip** (sans cle) :
    ```bash
    env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"
@@ -478,7 +478,7 @@ Quand l'app change et que le skill commence a echouer :
 - **Nouveau champ secret a ne pas leak** : ajouter au grep "Pas de fuite secrets" dans `security-tests.sh`.
 - **N generations paralleles (Phase 2ter)** ancree sur `src/app/pending-utils.ts` (`pendingOfTypeExists`) + `body.gid` (UUID v4). Si le contrat gid ou la liberation de `loading[type]` change, mettre a jour la phase.
 - **Dedup sources (Phase 2quater)** ancree sur le contrat `/sources/upload` (array nu en full success, objet `{sources,duplicates?}` sinon, 200 sur lot 100% doublons, `allowDuplicates==='true'` strict) + `contentHash`. Si le contrat reponse evolue, mettre a jour la phase.
-- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda, `WATCHED_MODELS` = alias recopies + OCR_MODELS/MODERATION_MODEL importes des sources uniques, `OCR_DEFAULT_ACCEPTED_LAG`) + son cablage dans `check-deps.sh` (cle exportee, `run_bounded` et ses traps INT/TERM/HUP, `|| true`). Si le script devient bloquant, change de source, de liste surveillee ou de libelles de sortie, mettre a jour la phase.
+- **check-models (Phase 2quinquies)** ancree sur `scripts/check-models.ts` (exit 0 toujours, croisement API + overview Lightpanda, `WATCHED_MODELS` = alias recopies + OCR_MODELS/MODERATION_MODEL importes des sources uniques, retards assumes `acceptedLag` de `TRACKED_DEFAULTS`) + son cablage dans `check-deps.sh` (cle exportee, `run_bounded` et ses traps INT/TERM/HUP, `|| true`). Si le script devient bloquant, change de source, de liste surveillee ou de libelles de sortie, mettre a jour la phase.
 - **Moderation (Phase 2sexies)** ancree sur `helpers/moderation-model.ts` (taxonomie du modele epingle). Si `MODERATION_MODEL` change, la taxonomie et la table legacy changent avec lui : mettre a jour les assertions A-C (nombre de categories, cles legacy).
 
 Ouvrir une PR `chore(release-test): update for <changement>` quand cette maintenance est faite.

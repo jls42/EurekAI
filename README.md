@@ -135,7 +135,7 @@ Chaque source importée affiche son [score de confiance OCR, sa modération et s
 
 EurekAI accepte 4 types de sources, modérées selon le profil (modération activée par défaut pour les profils enfant et ado) :
 
-- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4 (`mistral-ocr-4-0`) par défaut** (meilleure qualité), **OCR 3 (`mistral-ocr-2512`) en option** dans les Réglages (moins cher, ~½ du coût) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité. La copie du document envoyée à Mistral pour l'OCR est supprimée dès la fin du traitement, même en cas d'échec.
+- **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4.1** (`mistral-ocr-4-1`) par défaut, **OCR 3** (`mistral-ocr-2512`) en option dans les Réglages (moins cher, ~½ du coût ; lit mieux l'écriture manuscrite) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité. La copie du document envoyée à Mistral pour l'OCR est supprimée dès la fin du traitement, même en cas d'échec.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
 - **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
 - **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
@@ -242,8 +242,8 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 | Modèle | Utilisation | Pourquoi |
 |---|---|---|
 | `mistral-large-latest` | Fiche, Flashcards, Podcast, Quiz, Textes à trous, Chat, Vérification quiz vocal, Agent Image, Agent Web Search, Détection consigne | Meilleur multilingual + suivi d'instructions |
-| `mistral-ocr-4-0` (OCR 4, défaut) | OCR de documents — qualité supérieure | Texte imprimé, tableaux, écriture manuscrite ($4 / 1000 pages) |
-| `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages) |
+| `mistral-ocr-4-1` (OCR 4.1, défaut) | OCR de documents | Texte imprimé, tableaux, écriture manuscrite ($4 / 1000 pages) |
+| `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages), lit mieux l'écriture manuscrite |
 | `voxtral-mini-latest` | Reconnaissance vocale (STT) | STT multilingue, optimisé avec `language="fr"` |
 | `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
 | `mistral-moderation-2603` | Modération de contenu | 6 catégories bloquées pour enfant/ado (dont `jailbreaking`) |
