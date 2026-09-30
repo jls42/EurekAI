@@ -48,8 +48,8 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'voxtral-mini-tts': { inputPerMillion: 16, outputPerMillion: 0, unit: 'characters' },
   'voxtral-mini': { inputPerMillion: 50, outputPerMillion: 0, unit: 'audio-seconds' },
   // OCR 4.x ($4/1000 pages) : 'mistral-ocr-4' plus long que 'mistral-ocr' → gagne le greedy-prefix
-  // pour mistral-ocr-4-0 (défaut) ET mistral-ocr-4-1 (même billing_model_name `mistral-ocr-4` sur
-  // /v1/models).
+  // pour mistral-ocr-4-1 (défaut depuis la v1.7.6) comme pour l'ancien mistral-ocr-4-0, retiré le
+  // 2026-09-30 (même billing_model_name `mistral-ocr-4` sur /v1/models).
   'mistral-ocr-4': { inputPerMillion: 4000, outputPerMillion: 0, unit: 'pages' },
   'mistral-ocr': { inputPerMillion: 2000, outputPerMillion: 0, unit: 'pages' },
   // Moderation 2 (mistral-moderation-2603) GRATUITE : « Free » sur docs.mistral.ai/inference/pricing,

@@ -4,7 +4,7 @@
  */
 
 /** Modèles OCR proposés. Ordre = ordre d'affichage du dropdown ; OCR 4 = recommandé/défaut. */
-export const OCR_MODELS = ['mistral-ocr-4-0', 'mistral-ocr-2512'] as const;
+export const OCR_MODELS = ['mistral-ocr-4-1', 'mistral-ocr-2512'] as const;
 
 export type OcrModel = (typeof OCR_MODELS)[number];
 
@@ -13,20 +13,24 @@ export type OcrModel = (typeof OCR_MODELS)[number];
  * envoyée à l'API reste l'ID technique (clé de cet objet) — ne jamais persister le label.
  */
 export const OCR_MODEL_LABELS: Record<OcrModel, string> = {
-  'mistral-ocr-4-0': 'OCR 4',
+  'mistral-ocr-4-1': 'OCR 4',
   'mistral-ocr-2512': 'OCR 3',
 };
 
 /**
- * Défaut **OCR 4.0** (`mistral-ocr-4-0`, $4/1000 pages), épinglé VOLONTAIREMENT. Les alias
- * `mistral-ocr-latest` et `mistral-ocr-4` (alias de génération) pointent désormais sur
- * `mistral-ocr-4-1` (OCR 4.1 : publié 2026-07-16, GA 2026-08-31, même prix $4/1000). 4.0 est gardé
- * après une évaluation mesurée le 2026-09-26 (11 photos de leçons réelles, 1 passage par photo jugé
- * contre l'image, contre-expertise aveugle sur les 4 litigieuses, stabilité vérifiée sur 3 passages
- * pour les 5 décisives) : 4.1 perd de façon stable du texte proche des figures (consigne
- * d'exercice, légende de carte à 9 entrées, annotation manuscrite) que 4.0 conserve — détail dans
- * la description de la PR du passage à Moderation 2. OCR 4.0 n'est pas déprécié au 2026-09-26.
- * Ce retard est déclaré dans OCR_DEFAULT_ACCEPTED_LAG ci-dessous.
+ * Défaut **OCR 4.1** (`mistral-ocr-4-1`, $4/1000 pages). OCR 4.0 (`mistral-ocr-4-0`), défaut
+ * jusqu'en v1.7.5, a été déprécié le 2026-09-29 et retiré le 2026-09-30 (changelog Mistral, fiche du
+ * modèle, table Legacy de docs.mistral.ai/models/overview ; `/v1/models` ne l'indiquait pas encore).
+ * Un `mistral-ocr-4-0` persisté dans config.json n'est plus dans OCR_MODELS : `normalizeOcrModel` le
+ * ramène sur ce défaut au démarrage (migration persistée) comme à `saveConfig`.
+ *
+ * Choix mesuré le 2026-09-30 (critères écrits avant la mesure, `output/ocr-corpus/2026-09-30/`) :
+ * 16 photos de leçons réelles, vrai chemin `ocrFile`, 3 passages par modèle, jury à l'aveugle qui
+ * inventorie la photo avant de lire les transcriptions, contre-expertise des photos où les modèles
+ * diffèrent. OCR 4.1 omet moins d'éléments importants qu'OCR 3 ; OCR 3 fait moins d'erreurs de sens
+ * (écriture manuscrite surtout) et il est déterministe, alors que 4.1 varie d'un passage à l'autre.
+ * La règle fixée d'avance (OCR 3 seulement s'il omet strictement moins, sans plus d'erreurs) désigne
+ * 4.1. Les deux modèles perdent le texte des cartes (légendes, libellés).
  *
  * Toujours épingler l'id major-minor, JAMAIS `mistral-ocr-4` ni `mistral-ocr-latest` : un alias
  * mouvant changerait le modèle (donc le texte extrait) sans évaluation.
@@ -34,32 +38,19 @@ export const OCR_MODEL_LABELS: Record<OcrModel, string> = {
  * OCR 3 (`mistral-ocr-2512`, $2/1000) reste sélectionnable en opt-in (moins cher) — **également
  * courant** : la doc Mistral (docs.mistral.ai/models/overview) le liste en section « Premier »
  * (« OCR 3 remains available for existing integrations and production workloads »), PAS en
- * Legacy/Deprecated (seuls `mistral-ocr-2505`/`2503` y figurent), et l'API `/v1/models` renvoie
- * `deprecation: null`. Aucune date de retrait connue pour `mistral-ocr-2512`. Ne JAMAIS le renommer
- * `mistral-ocr-3-0` (synonyme listé par `/v1/models`) : l'id est persisté dans config.json, et
- * `normalizeOcrModel` rabattrait alors les configs existantes sur le défaut OCR 4, deux fois plus cher.
+ * Legacy/Deprecated, et l'API `/v1/models` renvoie `deprecation: null`. Aucune date de retrait
+ * connue pour `mistral-ocr-2512`. Ne JAMAIS le renommer `mistral-ocr-3-0` (synonyme listé par
+ * `/v1/models`) : l'id est persisté dans config.json, et `normalizeOcrModel` rabattrait alors les
+ * configs existantes sur le défaut OCR 4, deux fois plus cher.
  */
-export const DEFAULT_OCR_MODEL: OcrModel = 'mistral-ocr-4-0';
-
-/**
- * Retard ASSUMÉ du défaut sur sa génération, lié à UN candidat précis. Lu par
- * scripts/check-models.ts : tant que la dernière mineure d'OCR 4 est exactement `candidate`, il
- * affiche une information (« épinglage volontaire ») ; toute AUTRE mineure (ex. `mistral-ocr-4-2`)
- * redevient une alerte à évaluer. À retirer quand DEFAULT_OCR_MODEL change.
- */
-export const OCR_DEFAULT_ACCEPTED_LAG = {
-  candidate: 'mistral-ocr-4-1',
-  since: '2026-09-26',
-  reason:
-    'OCR 4.1 évalué sur 11 leçons réelles : perd des légendes et consignes proches des figures',
-} as const;
+export const DEFAULT_OCR_MODEL: OcrModel = 'mistral-ocr-4-1';
 
 /**
  * Normalise une valeur de modèle OCR (config disque, payload client, alias legacy) vers un
- * `OcrModel` valide. L'alias legacy `mistral-ocr-latest` ET toute valeur inconnue / absente
- * retombent sur le défaut (OCR 4.0) — épingle le défaut explicitement plutôt que de laisser
- * un alias mouvant suivre silencieusement une nouvelle version (il sert déjà OCR 4.1 ; cf. piège
- * modération 2026-06).
+ * `OcrModel` valide. L'alias legacy `mistral-ocr-latest`, un modèle retiré (`mistral-ocr-4-0`) ET
+ * toute valeur inconnue / absente retombent sur le défaut (OCR 4.1) — épingle le défaut
+ * explicitement plutôt que de laisser un alias mouvant suivre silencieusement une nouvelle version
+ * (cf. piège modération 2026-06).
  *
  * Signature `unknown` + guard `typeof` : sous `strict: true`, passer `string | undefined`
  * à `Array.includes` ne typecheck pas.

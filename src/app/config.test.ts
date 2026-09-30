@@ -418,7 +418,7 @@ describe('saveSettings', () => {
     const sentBody = JSON.parse(putCall[1].body as string);
     expect(sentBody.models.summary).toBe('mistral-large-latest');
     // _ocrModel absent → normalisé vers le défaut OCR 4 (modèle courant)
-    expect(sentBody.models.ocr).toBe('mistral-ocr-4-0');
+    expect(sentBody.models.ocr).toBe('mistral-ocr-4-1');
     expect(sentBody._mainModel).toBeUndefined();
     expect(sentBody.mistralVoices).toBeUndefined();
     expect(sentBody.mistralVoicesSource).toBeUndefined();

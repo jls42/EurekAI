@@ -10,7 +10,7 @@ const { lightpandaFetch } = vi.hoisted(() => ({
 vi.mock('@lightpanda/browser', () => ({ lightpanda: { fetch: lightpandaFetch } }));
 
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
-import { DEFAULT_OCR_MODEL, OCR_DEFAULT_ACCEPTED_LAG, OCR_MODELS } from '../helpers/ocr-models.js';
+import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 import {
   analyzeModels,
   collectFindings,
@@ -155,11 +155,19 @@ const REAL_MODELS = [
 const LAG_40 = alertOf(
   "défaut épinglé mistral-ocr-4-0 en retard sur sa génération : mistral-ocr-4 → mistral-ocr-4-1 — mettre à jour l'épinglage",
 );
+// Retard assumé réellement livré du 2026-09-26 au retrait d'OCR 4.0 (v1.7.2 à v1.7.5) : donnée de test
+// du mécanisme, plus la configuration livrée (le défaut est OCR 4.1 depuis la v1.7.6).
+const LAG_41_ACCEPTED = {
+  candidate: 'mistral-ocr-4-1',
+  since: '2026-09-26',
+  reason:
+    'OCR 4.1 évalué sur 11 leçons réelles : perd des légendes et consignes proches des figures',
+} as const;
 const ACCEPTED_40 = infoOf(
-  `épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 depuis 2026-09-26 (${OCR_DEFAULT_ACCEPTED_LAG.reason}) — réévaluer à la prochaine mineure`,
+  `épinglage volontaire : mistral-ocr-4-0 conservé face à mistral-ocr-4-1 depuis 2026-09-26 (${LAG_41_ACCEPTED.reason}) — réévaluer à la prochaine mineure`,
 );
-// Défaut OCR 4.0 suivi AVEC le retard assumé (configuration livrée), puis variantes.
-const PINNED_40_ACCEPTED = { pinned: 'mistral-ocr-4-0', acceptedLag: OCR_DEFAULT_ACCEPTED_LAG };
+// Défaut OCR 4.0 suivi AVEC le retard assumé (configuration livrée jusqu'en v1.7.5), puis variantes.
+const PINNED_40_ACCEPTED = { pinned: 'mistral-ocr-4-0', acceptedLag: LAG_41_ACCEPTED };
 const OCR_40_CATALOG = [...family(['mistral-ocr-4-0']), ...family(OCR_41)];
 const FAMILY_HINT = 'évaluer (taxonomie, prix) avant de changer MODERATION_MODEL';
 
@@ -606,7 +614,7 @@ describe('findUntrackedFamilyModels (veille de famille modération)', () => {
 describe('OCR 3 (mistral-ocr-2512) exclu des règles de retard et de famille', () => {
   it('a newer mistral-ocr-2605 in the catalogue raises nothing about OCR 3', () => {
     const catalog = [...REAL_MODELS, ...family(['mistral-ocr-2605'])];
-    expect(collectFindings(catalog, REAL_LEGACY)).toEqual([ACCEPTED_40]);
+    expect(collectFindings(catalog, REAL_LEGACY)).toEqual([]);
   });
 });
 
@@ -630,11 +638,36 @@ describe('acceptance on the real /v1/models snapshot (2026-09-25)', () => {
     expect(collectFindings(REAL_MODELS, REAL_LEGACY, [{ pinned: 'mistral-ocr-4-1' }])).toEqual([]);
   });
 
-  it('shipped sources (NO-GO 2026-09-26: 4.0 kept + acceptance) → the informative line, any order', () => {
-    // Change de valeur attendue si DEFAULT_OCR_MODEL ou OCR_DEFAULT_ACCEPTED_LAG change : voulu.
+  it('shipped sources (2026-09-30: default OCR 4.1, no accepted lag) → nothing, any order', () => {
+    // Change de valeur attendue si DEFAULT_OCR_MODEL ou les retards assumés de TRACKED_DEFAULTS
+    // changent : voulu.
+    expect(DEFAULT_OCR_MODEL).toBe('mistral-ocr-4-1');
     for (const list of [REAL_MODELS, [...REAL_MODELS].reverse()]) {
-      expect(collectFindings(list, REAL_LEGACY)).toEqual([ACCEPTED_40]);
+      expect(collectFindings(list, REAL_LEGACY)).toEqual([]);
     }
+  });
+
+  it('real Legacy row of 2026-09-30 (OCR 4.0 retired the day after its deprecation) → alert', () => {
+    // Ligne réelle de docs.mistral.ai/models/overview, rendue par Lightpanda le 2026-09-30, alors que
+    // /v1/models renvoyait encore `deprecation: null` pour mistral-ocr-4-0.
+    const row =
+      '| [OCR 4.0 ↗](https://docs.mistral.ai/models/ocr-4-0) | `4.0` | mistral\\-ocr\\-4\\-0 | 9/29/20269/30/2026 | [OCR 4.1](https://docs.mistral.ai/models/ocr-4-1) |';
+    const legacy = parseLegacyTable(`${REAL_LEGACY_MD}\n${row}`);
+    expect(legacy.get('mistral-ocr-4-0')).toEqual({
+      apiId: 'mistral-ocr-4-0',
+      deprecation: '9/29/2026',
+      retirement: '9/30/2026',
+      alternative: 'OCR 4.1',
+    });
+    // Surveillé tant qu'il figurait dans OCR_MODELS (jusqu'en v1.7.5) ; l'API le disait courant.
+    expect(analyzeModels(REAL_MODELS, legacy, ['mistral-ocr-4-0'])).toEqual([
+      alertOf(
+        'mistral-ocr-4-0 en fin de vie · déprécié 9/29/2026 · retiré 9/30/2026 · → remplacer par OCR 4.1',
+      ),
+    ]);
+    // Retiré d'OCR_MODELS depuis : plus surveillé, plus d'alerte.
+    expect(WATCHED_MODELS).not.toContain('mistral-ocr-4-0');
+    expect(collectFindings(REAL_MODELS, legacy)).toEqual([]);
   });
 });
 
@@ -736,11 +769,10 @@ describe('main (orchestration, non bloquant)', () => {
     ]);
   });
 
-  it('on the real snapshot: OK + exactly the voluntary-pin information', async () => {
+  it('on the real snapshot: OK and nothing else (default OCR 4.1, no accepted lag)', async () => {
     const lines = await run({ data: REAL_MODELS });
     expect(lines).toEqual([
       `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`,
-      `  ℹ ${ACCEPTED_40.message}`,
     ]);
   });
 

@@ -97,15 +97,26 @@ describe('initConfig', () => {
     expect(onDisk.mistralVoicesSource).toBeUndefined();
   });
 
-  it('migration OCR : alias legacy mistral-ocr-latest normalisé vers le défaut (OCR 4) + persisté', () => {
+  it('migration OCR : alias legacy mistral-ocr-latest normalisé vers le défaut (OCR 4.1) + persisté', () => {
     writeFileSync(
       join(tempDir, 'config.json'),
       JSON.stringify({ models: { ocr: 'mistral-ocr-latest' } }),
     );
     initConfig(tempDir);
-    expect(getConfig().models.ocr).toBe('mistral-ocr-4-0');
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-1');
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
-    expect(onDisk.models.ocr).toBe('mistral-ocr-4-0');
+    expect(onDisk.models.ocr).toBe('mistral-ocr-4-1');
+  });
+
+  it("migration OCR : OCR 4.0 retiré le 2026-09-30 (défaut jusqu'en v1.7.5) → OCR 4.1 + persisté", () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({ models: { ocr: 'mistral-ocr-4-0' } }),
+    );
+    initConfig(tempDir);
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-1');
+    const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
+    expect(onDisk.models.ocr).toBe('mistral-ocr-4-1');
   });
 
   it('migration OCR : OCR 3 explicite (opt-in) préservé sans réécriture', () => {
@@ -348,14 +359,25 @@ describe('saveConfig', () => {
     );
   });
 
-  it('rejette un models.ocr legacy/alias POST et normalise vers le défaut (OCR 4)', () => {
+  it('rejette un models.ocr legacy/alias POST et normalise vers le défaut (OCR 4.1)', () => {
     initConfig(tempDir);
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     saveConfig({ models: { ocr: 'mistral-ocr-latest' } as any });
-    expect(getConfig().models.ocr).toBe('mistral-ocr-4-0');
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-1');
     expect(warnSpy).toHaveBeenCalledWith(
       'config',
       expect.stringContaining("rejected legacy/unknown OCR model 'mistral-ocr-latest'"),
+    );
+  });
+
+  it('rejette OCR 4.0 retiré POSTé par un onglet resté ouvert et garde le défaut OCR 4.1', () => {
+    initConfig(tempDir);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({ models: { ocr: 'mistral-ocr-4-0' } as any });
+    expect(getConfig().models.ocr).toBe('mistral-ocr-4-1');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      expect.stringContaining("rejected legacy/unknown OCR model 'mistral-ocr-4-0'"),
     );
   });
 

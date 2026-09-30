@@ -30,7 +30,7 @@
 import { pathToFileURL } from 'node:url';
 import { lightpanda } from '@lightpanda/browser';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
-import { DEFAULT_OCR_MODEL, OCR_DEFAULT_ACCEPTED_LAG, OCR_MODELS } from '../helpers/ocr-models.js';
+import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 
 // Alias `-latest` RÉSOLUS par l'app à l'exécution (défauts config/générateurs, Réglages, routeur,
 // STT, TTS). Ni `mistral-ocr-latest` ni `mistral-moderation-latest` : l'app envoie des versions
@@ -65,7 +65,7 @@ interface LegacyEntry {
   alternative?: string;
 }
 
-/** Retard assumé d'un défaut épinglé, lié à UN candidat précis (cf. OCR_DEFAULT_ACCEPTED_LAG). */
+/** Retard assumé d'un défaut épinglé, lié à UN candidat précis (champ `acceptedLag` ci-dessous). */
 interface AcceptedLag {
   candidate: string;
   since: string;
@@ -93,9 +93,9 @@ interface Finding {
 
 // OCR 3 (`mistral-ocr-2512`, opt-in économique) est ancien PAR CHOIX : exclu EXPLICITEMENT des règles
 // de retard comme de la veille de famille (test dédié) — seul le défaut OCR est suivi.
-const TRACKED_DEFAULTS: readonly TrackedDefault[] = [
-  { pinned: DEFAULT_OCR_MODEL, acceptedLag: OCR_DEFAULT_ACCEPTED_LAG },
-];
+// Retard assumé : ajouter `acceptedLag: { candidate, since, reason }` à l'entrée (ex. OCR 4.0 gardé face
+// à OCR 4.1 du 2026-09-26 au retrait de 4.0 le 2026-09-30) ; aucun aujourd'hui.
+const TRACKED_DEFAULTS: readonly TrackedDefault[] = [{ pinned: DEFAULT_OCR_MODEL }];
 
 // Épinglés SANS alias listé par /v1/models (ni génération ni `-latest` à suivre) : veille de famille,
 // indépendante du schéma de nommage (daté `2603`, major-minor `3-0`…) — remplace toute règle YYMM.
@@ -544,7 +544,7 @@ const reportFindings = (findings: readonly Finding[], legacyChecked: boolean): v
     );
     for (const f of alerts) console.log(`  - ${f.message}`);
     console.log(
-      '  → mettre à jour la version épinglée (helpers/ocr-models.ts, helpers/moderation-model.ts) après vérif prix (scripts/update-pricing.ts), statut GA, compat et qualité — ou documenter un retard assumé (OCR_DEFAULT_ACCEPTED_LAG) ; alias -latest déprécié → épingler la version courante.',
+      '  → mettre à jour la version épinglée (helpers/ocr-models.ts, helpers/moderation-model.ts) après vérif prix (scripts/update-pricing.ts), statut GA, compat et qualité — ou documenter un retard assumé (`acceptedLag` dans TRACKED_DEFAULTS) ; alias -latest déprécié → épingler la version courante.',
     );
   }
   for (const f of findings.filter((x) => x.level === 'info')) console.log(`  ℹ ${f.message}`);
