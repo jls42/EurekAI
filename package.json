@@ -41,7 +41,7 @@
     "linkedom": "^0.18.12",
     "lucide": "^1.0.0",
     "marked": "^18.0.2",
-    "multer": "^2.3.0",
+    "multer": "^2.4.0",
     "tsx": "^4.22.4"
   },
   "overrides": {
