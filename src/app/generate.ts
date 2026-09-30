@@ -65,19 +65,27 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
   addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
 }
 
+// Corps d'une réponse de generateAll : la génération sur un succès, sinon null (échec journalisé).
+const readGenerateResponse = async (r: Response): Promise<Generation | null> => {
+  if (r.ok) {
+    const gen: Generation = await r.json();
+    return gen;
+  }
+  const err = await r.json().catch(() => ({}));
+  console.error(`generateAll failed (${r.status}):`, err.error || r.statusText);
+  return null;
+};
+
+// Corps indépendants, lus en parallèle ; générations enregistrées dans l'ordre des réponses.
 export async function aggregateGenerateResults(
   responses: Response[],
   state: AppContext,
 ): Promise<number> {
+  const generations = await Promise.all(responses.map(readGenerateResponse));
   let failures = 0;
-  for (const r of responses) {
-    if (r.ok) {
-      registerGeneration(state, await r.json());
-    } else {
-      failures++;
-      const err = await r.json().catch(() => ({}));
-      console.error(`generateAll failed (${r.status}):`, err.error || r.statusText);
-    }
+  for (const gen of generations) {
+    if (gen) registerGeneration(state, gen);
+    else failures++;
   }
   return failures;
 }
@@ -270,7 +278,7 @@ export async function runAutoStep(
   } finally {
     state.loading[type] = false;
     delete state.abortControllers[type];
-    state.$nextTick(() => state.refreshIcons());
+    void state.$nextTick(() => state.refreshIcons());
   }
 }
 
@@ -409,7 +417,7 @@ export function applyVoiceResult(
   }
   if (result.costDelta) addCostDelta(state, result.costDelta, 'read-aloud');
   showVoiceToast(state, result.failedSections);
-  state.$nextTick(() => {
+  void state.$nextTick(() => {
     const audioEl = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
     if (audioEl) {
       audioEl.load();
@@ -494,7 +502,7 @@ const cleanupGenerateState = function (
     delete state.abortControllers[type];
     delete state.abortControllersByGid[gid];
   }
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
 };
 
 const fetchSingleGenerate = async function (
@@ -537,7 +545,7 @@ const cleanupGenerateAllPending = function (state: AppContext): void {
     if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
     delete state.abortControllers[type];
   }
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
 };
 
 // Pré-contrôle (ensureGenerationAllowed) AVANT tout état de chargement. projectId lu ici, en accès
@@ -576,7 +584,7 @@ const cleanupGenerateAutoPending = function (state: AppContext, plannedTypes: st
     if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
     delete state.abortControllers[type];
   }
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
 };
 
 // Sous-helper d'orchestration : route → plan → steps. Sépare la logique métier
@@ -741,7 +749,7 @@ export function createGenerate() {
       for (let i = idx + 1; i < order.length; i++) {
         if (gen[`_audioUrl_${order[i]}`]) {
           gen._activeAudioSection = order[i];
-          this.$nextTick(() => {
+          void this.$nextTick(() => {
             const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
             if (a) {
               a.load();
@@ -780,10 +788,10 @@ export function createGenerate() {
         gen._activeAudioSection =
           this._audioSectionOrder.find((s: string) => gen[`_audioUrl_${s}`]) || 'intro';
       } else {
-        this.generateVoice(gen, section || undefined);
+        void this.generateVoice(gen, section || undefined);
         return;
       }
-      this.$nextTick(() => {
+      void this.$nextTick(() => {
         const a = document.querySelector(`audio[data-gen-id="${gen.id}"]`) as HTMLAudioElement;
         if (a) {
           a.load();

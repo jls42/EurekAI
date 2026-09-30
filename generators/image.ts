@@ -59,16 +59,16 @@ const deleteRemoteImage = async (client: Mistral, fileId: string): Promise<void>
 
 // Images au-delà de la première (seule gardée) : leurs fichiers sont supprimés chez Mistral, comme
 // celui de la première après son téléchargement ; l'avertissement trace le surcoût (chaque appel
-// de l'outil est facturé, cf. le coût de la génération).
+// de l'outil est facturé, cf. le coût de la génération). Suppressions indépendantes, en parallèle :
+// deleteRemoteImage journalise son propre échec et ne rejette jamais.
 const discardExtraImages = async (client: Mistral, extra: ImageResult[]): Promise<void> => {
   if (extra.length === 0) return;
   logger.warn(
     'image',
     `${extra.length + 1} images reçues de l'agent, seule la première est gardée`,
   );
-  for (const ref of extra) {
-    if (ref.type === 'fileId') await deleteRemoteImage(client, ref.value);
-  }
+  const fileIds = extra.filter((ref) => ref.type === 'fileId').map((ref) => ref.value);
+  await Promise.all(fileIds.map((fileId) => deleteRemoteImage(client, fileId)));
 };
 
 // Appel de l'outil d'image : une sortie `tool.execution` par appel, qu'il ait produit une image

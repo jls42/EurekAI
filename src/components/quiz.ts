@@ -86,7 +86,7 @@ const restoreState = function (this: QuizContext) {
 };
 
 const onFinish = function (this: QuizContext) {
-  this.submitAttempt();
+  void this.submitAttempt();
 };
 
 const submitAttempt = async function (this: QuizContext) {

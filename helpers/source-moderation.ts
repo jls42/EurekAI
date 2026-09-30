@@ -254,13 +254,28 @@ const resumeProjectAtBoot = async (
   const categories = activeModerationCategories(moderationProfileOf(project, profileStore));
   if (!categories) return 0;
   let resumed = 0;
+  // Une par une : isStillPending relit la source juste avant son tour, ce qui n'a de sens que si
+  // les modérations précédentes sont terminées (une source vérifiée entre-temps n'est pas refacturée).
   for (const source of project.sources.filter(isPending)) {
     if (!isStillPending(store, pid, source.id)) continue;
-    await moderateSourceOnce(store, client, pid, source, categories);
+    // eslint-disable-next-line no-await-in-loop -- reprise une par une, cf. ci-dessus
+    await moderateSourceOnce(store, client, pid, source, categories); // NOSONAR(S9382) — reprise une par une
     resumed++;
   }
   return resumed;
 };
+
+// Échec d'un projet journalisé et compté 0 : la reprise continue avec les projets suivants.
+const resumeProjectOrZero = (
+  store: SourceModerationStore,
+  profileStore: Pick<ProfileStore, 'get'>,
+  client: Mistral,
+  pid: string,
+): Promise<number> =>
+  resumeProjectAtBoot(store, profileStore, client, pid).catch((e: unknown) => {
+    logger.error('moderation', `boot resume failed for project ${pid}`, e);
+    return 0;
+  });
 
 /**
  * Démarrage : sources restées `pending` (modération interrompue par l'arrêt du process) des
@@ -275,13 +290,11 @@ export const resumeModerationAtBoot = async (
 ): Promise<number> => {
   let resumed = 0;
   try {
+    // Projets un par un, comme leurs sources : au démarrage, une seule modération à la fois part
+    // vers Mistral avec la clé d'environnement.
     for (const meta of store.listProjects()) {
-      resumed += await resumeProjectAtBoot(store, profileStore, client, meta.id).catch(
-        (e: unknown) => {
-          logger.error('moderation', `boot resume failed for project ${meta.id}`, e);
-          return 0;
-        },
-      );
+      // eslint-disable-next-line no-await-in-loop -- reprise une par une, cf. ci-dessus
+      resumed += await resumeProjectOrZero(store, profileStore, client, meta.id); // NOSONAR(S9382) — reprise une par une
     }
   } catch (e) {
     logger.error('moderation', 'boot resume failed', e);

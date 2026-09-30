@@ -11,6 +11,7 @@ export async function collectStream(
   } else {
     const reader = (stream as ReadableStream<Uint8Array>).getReader();
     while (true) {
+      // eslint-disable-next-line no-await-in-loop -- lecture d'un flux : chaque read() suit le précédent
       const { done, value } = await reader.read();
       if (done) break;
       chunks.push(Buffer.from(value));

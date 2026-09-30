@@ -20,7 +20,7 @@ export function createI18n() {
         this.currentProfile.locale = lang;
         setProfileLocale(this.currentProfile.id, lang);
         if (!this.currentProfile.hasPin) {
-          this.updateProfile(this.currentProfile.id, { locale: lang });
+          void this.updateProfile(this.currentProfile.id, { locale: lang });
         }
       } else if (this.currentProfile) {
         this.currentProfile.locale = lang;

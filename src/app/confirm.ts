@@ -160,7 +160,7 @@ const confirmAction = function (
 // l'ouverture et la fermeture du dialog (ex: liste rerendered).
 const restoreConfirmTriggerFocus = function (state: AppContext): void {
   if (!state.confirmTrigger) return;
-  state.$nextTick(() => {
+  void state.$nextTick(() => {
     try {
       state.confirmTrigger?.focus();
     } catch {

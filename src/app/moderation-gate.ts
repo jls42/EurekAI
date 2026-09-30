@@ -62,7 +62,7 @@ const applyModerationResponse = async (
   if (state.currentProjectId !== projectId) return false;
   const entries = (body as { sources?: unknown } | null)?.sources;
   mergeSourceModerations(state, Array.isArray(entries) ? (entries as ModerationEntry[]) : []);
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
   return true;
 };
 

@@ -71,7 +71,7 @@ export function createRecorder() {
         this.selectedIds.push(source.id);
         addCostDelta(this, source.estimatedCost, 'sources/voice');
         this.showToast(this.t('toast.voiceTranscribed'), 'success');
-        this.$nextTick(() => this.refreshIcons());
+        void this.$nextTick(() => this.refreshIcons());
         setTimeout(() => this.refreshModeration(), 2000);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);

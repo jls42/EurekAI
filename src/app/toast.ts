@@ -71,7 +71,7 @@ export function createToast() {
       }
       const id = ++this.toastCounter;
       this.toasts.push({ id, message, type, retryFn, action });
-      this.$nextTick(() => this.refreshIcons());
+      void this.$nextTick(() => this.refreshIcons());
       if (!(type === 'error' && retryFn)) {
         setTimeout(() => this.dismissToast(id), action ? 8000 : 5000);
       }

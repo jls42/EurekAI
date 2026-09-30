@@ -78,7 +78,7 @@ const applyWebsearchResult = (state: AppContext, result: WebsearchResponse): voi
   if (failures.length > 0) {
     console.warn('[websearch] partial failures:', failures);
   }
-  state.$nextTick(() => state.refreshIcons());
+  void state.$nextTick(() => state.refreshIcons());
   setTimeout(() => state.refreshModeration(), 2000);
 };
 

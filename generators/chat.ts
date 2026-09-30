@@ -140,11 +140,13 @@ export async function chatWithSources(
 
   let response = await completeTurn(turn, 'auto');
   let reply = getContent(response);
+  // Tours d'outils séquentiels par nature : chaque tour lit les appels de la réponse précédente.
   for (let round = 1; round <= MAX_TOOL_ROUNDS; round++) {
     const message = firstMessage(response);
     if (!message.toolCalls?.length || loop.triggered.length >= MAX_TOOL_CALLS) break;
     answerToolCalls(message, loop);
-    response = await completeTurn(turn, nextToolChoice(round, loop.triggered.length));
+    // eslint-disable-next-line no-await-in-loop -- le tour suivant dépend de cette réponse
+    response = await completeTurn(turn, nextToolChoice(round, loop.triggered.length)); // NOSONAR(S9382) — tour suivant dépendant
     reply = latestText(response, reply);
   }
   return { reply, toolCalls: loop.triggered };
