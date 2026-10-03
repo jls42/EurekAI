@@ -68,6 +68,7 @@ export const ar: Record<string, string> = {
   'a11y.viewCategory': 'عرض: {category}',
   'a11y.generateCategory': 'إنشاء: {category}',
   'a11y.cancelGeneration': 'إلغاء: {type}',
+  'a11y.toastRepeated': 'عدد المرات: {count}',
   'a11y.fillBlankAnswer':
     '\u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629',
   'a11y.selectSource':
@@ -725,6 +726,8 @@ export const ar: Record<string, string> = {
   'profile.backToProfiles': 'رجوع',
 
   'toast.error': '\u062e\u0637\u0623: {error}',
+  'toast.typedError': '{type}: {error}',
+  'toast.repeatBadge': '×{count}',
   'toast.uploadError':
     '\u062a\u0639\u0630\u0651\u0631 \u0631\u0641\u0639 {filename}. \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.',
   'sources.uploadError.generic':

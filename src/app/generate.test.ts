@@ -388,7 +388,12 @@ describe('generate', () => {
     mockFetchFail(500, { error: 'Server error' });
     const ctx = makeContext();
     await gen.generate.call(ctx, 'summary');
-    expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+    // Échec nommé par son type : deux types en échec ne sont pas regroupés dans le même toast.
+    expect(ctx.t).toHaveBeenCalledWith('toast.typedError', {
+      type: 'gen.summary',
+      error: 'Server error',
+    });
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.typedError', 'error', expect.any(Function));
     expect(ctx.generations).toHaveLength(0);
     expect(ctx.loading.summary).toBe(false);
   });
@@ -520,7 +525,7 @@ describe('generate', () => {
       mockFetchFail(500, { error: 'upstream_unavailable' });
       const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
       await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
-      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.error')![2];
+      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.typedError')![2];
 
       mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
       await retry();
@@ -533,9 +538,11 @@ describe('generate', () => {
       vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error('offline'));
       const ctx = makeContext({ sources: [{ id: 's1' }, { id: 's2' }], selectedIds: ['s1'] });
       await gen.generateSimplified.call(ctx, { id: 'g1', sourceIds: ['s2'] } as any);
-      const retry = ctx.showToast.mock.calls.find(
-        (c: any[]) => c[0] === 'toast.generationError',
-      )![2];
+      expect(ctx.t).toHaveBeenCalledWith('toast.typedError', {
+        type: 'gen.summary',
+        error: 'toast.generationError',
+      });
+      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.typedError')![2];
 
       mockFetchOk({ id: 'g-falc', type: 'summary', data: {} });
       await retry();
@@ -550,7 +557,7 @@ describe('generate', () => {
     mockFetchFail(400, { error: 'moderation.blocked' });
     const ctx = makeContext();
     await gen.generate.call(ctx, 'summary');
-    expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', null);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.typedError', 'error', null);
   });
 
   it.each(['moderation.pending', 'moderation.error'])(
@@ -559,7 +566,7 @@ describe('generate', () => {
       mockFetchFail(409, { error });
       const ctx = makeContext();
       await gen.generate.call(ctx, 'summary');
-      expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.typedError', 'error', expect.any(Function));
     },
   );
 
@@ -579,7 +586,7 @@ describe('generate', () => {
     await gen.generate.call(ctx, 'summary');
 
     const toastCall = ctx.showToast.mock.calls.find(
-      (c: any[]) => c[0] === 'toast.error' && c[1] === 'error',
+      (c: any[]) => c[0] === 'toast.typedError' && c[1] === 'error',
     );
     const retryFn = toastCall![2];
 

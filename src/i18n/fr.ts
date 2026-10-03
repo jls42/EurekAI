@@ -62,6 +62,7 @@ export const fr: Record<string, string> = {
   'a11y.viewCategory': 'Voir : {category}',
   'a11y.generateCategory': 'Générer : {category}',
   'a11y.cancelGeneration': 'Annuler : {type}',
+  'a11y.toastRepeated': '{count} fois',
   'a11y.fillBlankAnswer': 'Réponse à compléter',
   'a11y.selectSource': 'Sélectionner cette source',
   'a11y.editTitle': 'Modifier le titre',
@@ -581,6 +582,9 @@ export const fr: Record<string, string> = {
   'profile.backToProfiles': 'Retour',
 
   'toast.error': 'Erreur: {error}',
+  // Espace insécable avant « : » : le deux-points ne passe pas seul à la ligne sur un téléphone.
+  'toast.typedError': '{type} : {error}',
+  'toast.repeatBadge': '×{count}',
   'toast.uploadError': "Impossible d'envoyer {filename}. Réessaye.",
   'sources.uploadError.generic': "L'envoi a échoué. Réessaye.",
   'toast.chatErrorMsg': 'Erreur chat: {error}',

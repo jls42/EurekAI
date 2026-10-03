@@ -20,6 +20,7 @@ const TOAST_GENERATION_ERROR = 'toast.generationError';
 // Refus de modération (contenu signalé) : réessayer produirait le même refus, pas de bouton.
 const MODERATION_BLOCKED = 'moderation.blocked';
 const TOAST_ERROR = 'toast.error';
+const TOAST_TYPED_ERROR = 'toast.typedError';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 const I18N_GEN_PREFIX = 'gen.';
@@ -339,6 +340,12 @@ export function showAutoResult(
   }
 }
 
+// Échec d'une génération nommé par son type (« Quiz : … ») : les toasts identiques étant regroupés,
+// deux types en échec restent deux toasts, chacun avec son « Réessayer ».
+const typedErrorMessage = (state: AppContext, type: string, error: string): string => {
+  return state.t(TOAST_TYPED_ERROR, { type: state.t(I18N_GEN_PREFIX + type), error });
+};
+
 // Réessai = même génération, surcharges comprises (version facile à lire : registre et sources
 // de la fiche d'origine) ; aucun sur un refus de modération.
 export function handleGenerateHttpError(
@@ -349,11 +356,8 @@ export function handleGenerateHttpError(
   extraBody?: GenerateExtraBody,
 ): void {
   const retry = err.error === MODERATION_BLOCKED ? null : () => state.generate(type, extraBody);
-  state.showToast(
-    state.t(TOAST_ERROR, { error: state.resolveError(err.error || res.statusText) }),
-    'error',
-    retry,
-  );
+  const error = state.resolveError(err.error || res.statusText);
+  state.showToast(typedErrorMessage(state, type, error), 'error', retry);
 }
 
 export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
@@ -379,7 +383,8 @@ export function handleGenerateError(
 ): void {
   if (e instanceof Error && e.name === 'AbortError') return;
   console.error('[generate]', type, e);
-  state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type, extraBody));
+  const message = typedErrorMessage(state, type, state.t(TOAST_GENERATION_ERROR));
+  state.showToast(message, 'error', () => state.generate(type, extraBody));
 }
 
 // Toast dispatché par code pour les partial-fails (action user vs warning vs partial générique),

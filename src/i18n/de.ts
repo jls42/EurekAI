@@ -59,6 +59,7 @@ export const de: Record<string, string> = {
   'a11y.viewCategory': 'Anzeigen: {category}',
   'a11y.generateCategory': 'Generieren: {category}',
   'a11y.cancelGeneration': 'Abbrechen: {type}',
+  'a11y.toastRepeated': '{count}-mal',
   'a11y.fillBlankAnswer': 'Antwort eingeben',
   'a11y.selectSource': 'Diese Quelle auswählen',
   'a11y.editTitle': 'Titel bearbeiten',
@@ -566,6 +567,8 @@ export const de: Record<string, string> = {
   'profile.backToProfiles': 'Zurueck',
 
   'toast.error': 'Fehler: {error}',
+  'toast.typedError': '{type}: {error}',
+  'toast.repeatBadge': '×{count}',
   'toast.uploadError': '{filename} konnte nicht hochgeladen werden. Versuch es erneut.',
   'sources.uploadError.generic': 'Upload fehlgeschlagen. Versuch es nochmal.',
   'toast.chatErrorMsg': 'Chat-Fehler: {error}',
