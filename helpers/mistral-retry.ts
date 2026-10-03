@@ -5,11 +5,22 @@ const MAX_ATTEMPTS = 3;
 const BASE_BACKOFF_MS = 1000;
 const MAX_BACKOFF_MS = 4000;
 
-// Bug SDK Mistral 2.2.0 : undici request.clone() échoue avec `TypeError: unusable`
-// lors des retries internes du SDK → l'exception remonte et l'appel échoue à vie.
+// Bug du SDK Mistral (vu dès 2.2.0, mesuré le 2026-10-03 avec 2.7.0 et Node 22.18) : quand l'API
+// répond 429 ou 503 avant d'avoir reçu tout le corps de la requête (HTTPS, gros corps), le
+// réessai interne du SDK échoue sur `request.clone()` d'undici (`TypeError: unusable`).
+// Le SDK enveloppe ce TypeError dans un UnexpectedClientError (`cause`), qui n'est pas un
+// TypeError : sans lecture de la cause, aucun réessai (18 quiz en échec d'affilée ce jour-là).
 // Le caller passe un closure qui re-invoque la méthode SDK à chaque tentative ;
 // chaque invocation recrée un undici Request neuf côté SDK, contournant le bug.
 const SDK_CLONE_BUG = /unusable/i;
+
+const isCloneBugTypeError = (e: unknown): boolean => {
+  return e instanceof TypeError && SDK_CLONE_BUG.test(e.message);
+};
+
+const isSdkCloneBug = (err: object): boolean => {
+  return isCloneBugTypeError(err) || isCloneBugTypeError((err as { cause?: unknown }).cause);
+};
 
 /**
  * Codes que le SDK rejoue déjà lui-même sur toutes ses opérations (`retryCodes` du SDK 2.7.0,
@@ -31,7 +42,7 @@ const isRetryableStatus = (status: number | undefined): boolean => {
 // user inacceptable. Statut lu par httpStatusOf (`statusCode` des erreurs du SDK).
 const isRetryable = (err: unknown): boolean => {
   if (!err || typeof err !== 'object') return false;
-  if (err instanceof TypeError && SDK_CLONE_BUG.test(err.message)) return true;
+  if (isSdkCloneBug(err)) return true;
   return isRetryableStatus(httpStatusOf(err));
 };
 

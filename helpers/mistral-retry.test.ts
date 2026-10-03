@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SDKError } from '@mistralai/mistralai/models/errors';
+import { SDKError, UnexpectedClientError } from '@mistralai/mistralai/models/errors';
 import { callWithRetry } from './mistral-retry.js';
 import { logger } from './logger.js';
 
@@ -85,7 +85,27 @@ describe('callWithRetry', () => {
     expect(warn).toHaveBeenCalledWith('chat', 'attempt 1 failed (status 520), retrying in 1000ms');
   });
 
-  it('retries on undici `TypeError: unusable` (SDK clone bug)', async () => {
+  // Forme réelle du bug de clonage (SDK 2.7.0, mesurée le 2026-10-03) : le SDK enveloppe le
+  // `TypeError: unusable` d'undici dans un UnexpectedClientError, qui n'est pas un TypeError. Le
+  // test précédent rejetait un TypeError nu : il passait alors que le réessai ne s'appliquait
+  // jamais aux vraies erreurs (18 quiz en échec d'affilée).
+  it('rejoue le bug de clonage du SDK, enveloppé dans un UnexpectedClientError', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const cloneBug = new UnexpectedClientError('Unexpected HTTP client error', {
+      cause: new TypeError('unusable'),
+    });
+    const fn = vi.fn().mockRejectedValueOnce(cloneBug).mockResolvedValueOnce('ok');
+    const p = callWithRetry('chat', fn);
+    await vi.runAllTimersAsync();
+    await expect(p).resolves.toBe('ok');
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(warn).toHaveBeenCalledWith(
+      'chat',
+      'attempt 1 failed (UnexpectedClientError), retrying in 1000ms',
+    );
+  });
+
+  it('rejoue aussi le TypeError « unusable » nu', async () => {
     const fn = vi
       .fn()
       .mockRejectedValueOnce(new TypeError('Body is unusable: already read'))
@@ -94,6 +114,16 @@ describe('callWithRetry', () => {
     await vi.runAllTimersAsync();
     await expect(p).resolves.toBe('ok');
     expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('ne rejoue pas un UnexpectedClientError d’une autre cause', async () => {
+    const err = new UnexpectedClientError('Unexpected HTTP client error', {
+      cause: new TypeError('cannot read property x of undefined'),
+    });
+    const fn = vi.fn().mockRejectedValue(err);
+    const p = callWithRetry('test', fn);
+    await expect(p).rejects.toBe(err);
+    expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it('fails fast on SyntaxError (invalid JSON from LLM)', async () => {

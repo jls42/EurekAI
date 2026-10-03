@@ -385,4 +385,29 @@ describe('client suivi — répartition des réessais entre le SDK et l’applic
     expect(httpStatusOf(error)).toBe(401);
     expect(extractErrorCode(error)).toBe('auth_required');
   });
+
+  // Bug de clonage du SDK (mesuré le 2026-10-03, Node 22.18) : quand l'API répond 429 ou 503 avant
+  // d'avoir reçu tout le corps de la requête (HTTPS, gros corps), le réessai du SDK lève
+  // `TypeError: unusable` sur `request.clone()`, qu'il enveloppe dans un UnexpectedClientError. Ce
+  // TypeError levé par fetch suit le même chemin dans le SDK (erreur permanente puis enveloppe) :
+  // au bump, une enveloppe qui changerait de forme ne serait plus rejouée par l'application.
+  it('bug de clonage : enveloppé par le SDK, rejoué par l’application', async () => {
+    let calls = 0;
+    const fakeFetch = (): Promise<Response> => {
+      calls++;
+      if (calls === 1) return Promise.reject(new TypeError('unusable'));
+      return Promise.resolve(jsonResponse(CHAT_RESPONSE));
+    };
+    vi.stubGlobal('fetch', vi.fn(fakeFetch));
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const p = chatOnce();
+    await vi.runAllTimersAsync();
+    const result = await p;
+    expect(result.choices[0].message?.content).toBe('ok');
+    expect(calls).toBe(2);
+    expect(warn).toHaveBeenCalledWith(
+      'chat',
+      'attempt 1 failed (UnexpectedClientError), retrying in 1000ms',
+    );
+  });
 });
