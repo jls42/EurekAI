@@ -585,6 +585,7 @@ export const fr: Record<string, string> = {
   // Espace insécable avant « : » : le deux-points ne passe pas seul à la ligne sur un téléphone.
   'toast.typedError': '{type} : {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}\u00a0: déjà {count} en préparation, patiente un peu\u00a0!',
   'toast.uploadError': "Impossible d'envoyer {filename}. Réessaye.",
   'sources.uploadError.generic': "L'envoi a échoué. Réessaye.",
   'toast.chatErrorMsg': 'Erreur chat: {error}',

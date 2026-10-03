@@ -90,6 +90,14 @@ describe('resetSession', () => {
     expect(ctx.pendingById).toEqual({});
   });
 
+  it('vide les réservations de l’anti-flood (launchingByType)', () => {
+    const ctx = makeCtx({ launchingByType: { quiz: 2 } });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.launchingByType).toEqual({});
+  });
+
   it('vide toasts + reset toastCounter + reset shownToastEventKeys', () => {
     const set = new Set(['generation:gid-1:completed' as EventKey]);
     const ctx = makeCtx({

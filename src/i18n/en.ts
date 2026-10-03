@@ -553,6 +553,7 @@ export const en: Record<string, string> = {
   'toast.error': 'Error: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: {count} already in progress, wait a moment!',
   'toast.uploadError': 'Could not upload {filename}. Try again.',
   'sources.uploadError.generic': 'Upload failed. Try again.',
   'toast.chatErrorMsg': 'Chat error: {error}',

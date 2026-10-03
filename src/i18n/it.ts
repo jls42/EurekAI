@@ -554,6 +554,7 @@ export const it: Record<string, string> = {
   'toast.error': 'Errore: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': "{type}: già {count} in preparazione, aspetta un po'!",
   'toast.uploadError': 'Impossibile caricare {filename}. Riprova.',
   'sources.uploadError.generic': 'Caricamento fallito. Riprova.',
   'toast.chatErrorMsg': 'Errore chat: {error}',

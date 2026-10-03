@@ -728,6 +728,7 @@ export const ar: Record<string, string> = {
   'toast.error': '\u062e\u0637\u0623: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: {count} قيد التحضير بالفعل، انتظر قليلا!',
   'toast.uploadError':
     '\u062a\u0639\u0630\u0651\u0631 \u0631\u0641\u0639 {filename}. \u0623\u0639\u062f \u0627\u0644\u0645\u062d\u0627\u0648\u0644\u0629.',
   'sources.uploadError.generic':

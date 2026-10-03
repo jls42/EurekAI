@@ -739,6 +739,7 @@ export const hi: Record<string, string> = {
   'toast.error': '\u0924\u094D\u0930\u0941\u091F\u093F: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: {count} पहले से तैयार हो रहे हैं, थोड़ा रुको!',
   'toast.uploadError':
     '{filename} \u0905\u092A\u0932\u094B\u0921 \u0928\u0939\u0940\u0902 \u0939\u094B \u0938\u0915\u093E\u0964 \u0926\u094B\u092C\u093E\u0930\u093E \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u094B\u0964',
   'sources.uploadError.generic':

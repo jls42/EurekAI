@@ -71,6 +71,7 @@ function makeContext(overrides: any = {}) {
     abortControllers: {},
     abortControllersByGid: {},
     pendingById: {},
+    launchingByType: {},
     shownToastEventKeys: new Set<string>(),
     notificationsVersion: 0,
     upsertGenerationById(gen: any) {
@@ -321,6 +322,95 @@ describe('generate', () => {
     await gen.generate.call(ctx, 'summary');
     // Feature C : plus de verrou loading[type] — re-cliquer lance une génération de plus.
     expect(globalThis.fetch).toHaveBeenCalled();
+  });
+
+  // Vécu le 2026-10-03 : ~18 appuis en 3 s d'une enfant sur « Quiz » → 18 générations.
+  describe('anti-flood : au plus 3 générations du même type en cours', () => {
+    const pending = (type: string, status = 'pending') => ({
+      id: crypto.randomUUID(),
+      type,
+      status,
+      startedAt: '2026-10-03T19:15:23.000Z',
+      sourceIds: [],
+    });
+    const byId = (...entries: Array<ReturnType<typeof pending>>) =>
+      Object.fromEntries(entries.map((e) => [e.id, e]));
+    const busyToasts = (ctx: ReturnType<typeof makeContext>) =>
+      ctx.showToast.mock.calls.filter((c: any[]) => c[0] === 'toast.generationBusy');
+
+    it('3 générations du type en cours : rien n’est lancé, message doux', async () => {
+      const ctx = makeContext({
+        pendingById: byId(pending('quiz'), pending('quiz'), pending('quiz')),
+      });
+      await gen.generate.call(ctx, 'quiz');
+
+      expect(globalThis.fetch).not.toHaveBeenCalled();
+      expect(ctx.t).toHaveBeenCalledWith('toast.generationBusy', { type: 'gen.quiz', count: 3 });
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.generationBusy', 'info');
+      expect(Object.keys(ctx.pendingById)).toHaveLength(3);
+    });
+
+    it('ne compte ni les autres types ni les générations terminées', async () => {
+      const ctx = makeContext({
+        pendingById: byId(
+          pending('summary'),
+          pending('summary'),
+          pending('summary'),
+          pending('quiz', 'failed'),
+          pending('quiz', 'cancelled'),
+        ),
+      });
+      mockFetchOk({ id: 'g1', type: 'quiz', data: {} });
+      await gen.generate.call(ctx, 'quiz');
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(busyToasts(ctx)).toHaveLength(0);
+    });
+
+    it('rafale de 5 appuis : 3 générations lancées, 2 messages', async () => {
+      const ctx = makeContext();
+      await Promise.all(Array.from({ length: 5 }, () => gen.generate.call(ctx, 'quiz')));
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(3);
+      expect(busyToasts(ctx)).toHaveLength(2);
+      expect(ctx.launchingByType).toEqual({});
+    });
+
+    it('le pending optimiste prend le relais de la réservation', async () => {
+      const ctx = makeContext();
+      let reservedDuringFetch: unknown;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        reservedDuringFetch = { ...ctx.launchingByType };
+        return { ok: true, json: async () => ({ id: 'g1', type: 'quiz', data: {} }) } as any;
+      });
+      await gen.generate.call(ctx, 'quiz');
+
+      expect(reservedDuringFetch).toEqual({});
+    });
+
+    it('une génération en échec ne compte plus : son réessai part', async () => {
+      const ctx = makeContext({ pendingById: byId(pending('quiz'), pending('quiz')) });
+      mockFetchFail(500, { error: 'internal_error' });
+      await gen.generate.call(ctx, 'quiz');
+      const retry = ctx.showToast.mock.calls.find((c: any[]) => c[0] === 'toast.typedError')![2];
+
+      mockFetchOk({ id: 'g1', type: 'quiz', data: {} });
+      await retry();
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(busyToasts(ctx)).toHaveLength(0);
+    });
+
+    it('refus de modération : la réservation est rendue', async () => {
+      const ctx = makeContext({
+        currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+        sources: [{ id: 's1', moderation: { status: 'unsafe' } }],
+      });
+      await gen.generate.call(ctx, 'quiz');
+
+      expect(ctx.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+      expect(ctx.launchingByType).toEqual({});
+    });
   });
 
   it('shows moderation toast if blocked and moderation enabled', async () => {
@@ -690,6 +780,37 @@ describe('vérification des sources avant la génération', () => {
 
     expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
     expect(ctx.pendingById).toEqual({});
+  });
+
+  // La vérification (jusqu'à 8 s) précède le pending optimiste : sans réservation synchrone, aucun
+  // pending n'existe encore pendant une rafale et tous les appuis passent.
+  it('anti-flood : rafale pendant une vérification en attente → 3 générations au plus', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+    });
+    let release!: () => void;
+    const verified = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+      if (String(input).endsWith('/sources/moderate')) {
+        await verified;
+        const moderation = { status: 'safe', categories: {} };
+        return { ok: true, json: async () => ({ sources: [{ id: 's1', moderation }] }) } as any;
+      }
+      return { ok: true, json: async () => ({ id: crypto.randomUUID(), type: 'quiz' }) } as any;
+    });
+
+    const taps = Array.from({ length: 5 }, () => gen.generate.call(ctx, 'quiz'));
+    expect(ctx.launchingByType).toEqual({ quiz: 3 });
+    release();
+    await Promise.all(taps);
+
+    expect(urls().filter((u) => u.endsWith('/generate/quiz'))).toHaveLength(3);
+    const busy = ctx.showToast.mock.calls.filter((c: any[]) => c[0] === 'toast.generationBusy');
+    expect(busy).toHaveLength(2);
+    expect(ctx.launchingByType).toEqual({});
   });
 
   it('generateAuto : vérification avant l’analyse de route', async () => {

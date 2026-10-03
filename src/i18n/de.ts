@@ -569,6 +569,7 @@ export const de: Record<string, string> = {
   'toast.error': 'Fehler: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: schon {count} in Vorbereitung, warte kurz!',
   'toast.uploadError': '{filename} konnte nicht hochgeladen werden. Versuch es erneut.',
   'sources.uploadError.generic': 'Upload fehlgeschlagen. Versuch es nochmal.',
   'toast.chatErrorMsg': 'Chat-Fehler: {error}',

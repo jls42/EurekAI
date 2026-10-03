@@ -558,6 +558,7 @@ export const nl: Record<string, string> = {
   'toast.error': 'Fout: {error}',
   'toast.typedError': '{type}: {error}',
   'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: er zijn er al {count} in voorbereiding, wacht even!',
   'toast.uploadError': '{filename} kon niet worden geladen. Probeer het opnieuw.',
   'sources.uploadError.generic': 'Uploaden mislukt. Probeer opnieuw.',
   'toast.chatErrorMsg': 'Chatfout: {error}',

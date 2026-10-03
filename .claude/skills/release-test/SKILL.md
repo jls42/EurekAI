@@ -228,6 +228,17 @@ Assertions :
    Assert `disabled === false` (le bouton n'est PAS verrouille) et `label`/`hasIcon` toujours presents (pas de bascule "loading"). Regression si le bouton se grise/passe en spinner.
 3. Re-cliquer ce bouton pendant le pending → **2e** `POST /generate/<type>` part (chip supplementaire). Compter les chips de pending du type : doit etre `>= 2`.
 
+### C — Anti-flood : au plus 3 generations du meme type en cours (Chrome, rafale 2026-10-03)
+
+Source : `MAX_PARALLEL_PER_TYPE`, `countPendingOfType` (`src/app/pending-utils.ts`), `reserveLaunch` / `acquireSingleLaunch` (`src/app/generate.ts`).
+
+1. Vider le journal reseau, puis cliquer **5 fois de suite**, le plus vite possible, sur un generateur **lent** (Quiz vocal ou Podcast) de la vue Sources.
+2. Assertions :
+   - exactement **3** `POST /generate/<type>` (`read_network_requests`, filtre `/generate/`) et **3** chips de pending du type ;
+   - un **seul** toast info « <Type> : deja 3 en preparation, patiente un peu ! » avec un badge **`×2`** (2 appuis refuses, regroupes) ;
+   - apres la fin des 3 generations, un nouveau clic relance bien une generation (la reservation est rendue).
+3. Regression si un 4e POST part (reservation ignoree pendant le pre-controle de moderation) ou si 2 toasts identiques s'empilent (regroupement casse).
+
 ## Phase 2quater — Dedup re-import sources (Feature A, PR #42)
 
 Couvre : re-importer un fichier deja importe → detecte comme doublon (sha256 `contentHash`, garde serveur), **200** (pas 500) quand le lot ne contient QUE des doublons, **pas de double facturation OCR**, et `allowDuplicates` force le re-import. **Chainer apres Phase 2bis B** (reutilise la fixture deja uploadee → 0 OCR pour le check de rejet).
