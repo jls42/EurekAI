@@ -726,22 +726,36 @@ export function podcastRetryUser(lang = 'fr'): string {
 }
 
 // ── Consigne (detection) ────────────────────────────────────────────
-// Centralise (Phase 1A.2) le prompt inline historique de generators/consigne.ts.
-// Texte strictement verbatim — la valeur retournee est identique a
-// `CONSIGNE_SYSTEM_INLINE + langInstruction(lang)` precedemment dans le generator.
+// Consigne EXPLICITE seulement (mesuré le 2026-10-04, output/consigne-corpus/2026-10-04/, hors
+// git) : l'ancien prompt cherchait aussi « des objectifs d'apprentissage » (toute leçon en a) et
+// demandait un « résumé » → consigne « trouvée » dans des leçons qui n'en ont pas, points du
+// professeur mêlés au contenu des autres sources, méta-description en guise de texte. Les points
+// sont recopiés fidèlement : ils deviennent la priorité des générations (consigneMarkdownHeader,
+// qui laisse le reste des documents en complément) et la liste que l'élève relit.
 
 export function consigneSystem(lang = 'fr'): string {
-  return `Tu es un assistant pedagogique expert. Analyse les documents fournis et determine s'ils contiennent des consignes de revision, un programme de controle, des objectifs d'apprentissage, ou des indications du type "Je sais ma lecon si je sais...".
+  return `Tu es un assistant pedagogique. Ta tache : retrouver, dans les documents d'un eleve, la consigne de revision que son enseignant lui a donnee pour une evaluation.
+
+Une consigne de revision est un texte adresse a l'eleve qui lui dit ce qu'il doit savoir ou reviser, souvent sous forme de liste : "Je sais ma lecon si je sais...", "Pour le controle, je dois savoir...", "A apprendre pour l'evaluation...", "Programme du controle".
+Le contenu de la lecon, ses exercices et ses questions ne sont pas une consigne de revision. Si les documents ne contiennent aucun texte de ce type, found vaut false.
+
+Si une consigne est presente :
+- keyTopics contient les points de la consigne, UNIQUEMENT eux, dans leur ordre, un element par point, recopies fidelement : ne les resume pas, ne les regroupe pas, n'ajoute aucun sujet pris ailleurs dans les documents. S'il y a plusieurs consignes, liste les points de chacune.
+- text reprend l'en-tete de la consigne tel qu'il est ecrit (evaluation, date, titre de la lecon), en une ligne.
+
+EXEMPLE — documents contenant cette consigne :
+"Controle du vendredi 14 novembre. Je sais ma lecon sur les fractions si je sais : - lire et ecrire une fraction ; - placer une fraction sur une droite graduee."
+Reponse : {"found": true, "text": "Controle du vendredi 14 novembre. Je sais ma lecon sur les fractions si je sais :", "keyTopics": ["lire et ecrire une fraction", "placer une fraction sur une droite graduee"]}
 
 Format attendu :
-{"found": true/false, "text": "resume des consignes detectees", "keyTopics": ["point 1", "point 2", ...]}
+{"found": true/false, "text": "en-tete de la consigne", "keyTopics": ["point 1", "point 2", ...]}
 
-Si aucune consigne n'est detectee, reponds : {"found": false, "text": "", "keyTopics": []}
+Si aucune consigne n'est presente, reponds : {"found": false, "text": "", "keyTopics": []}
 ${jsonInstruction()}${langInstruction(lang)}`;
 }
 
 export function consigneUser(markdown: string): string {
-  return `Analyse ces documents et detecte les consignes de revision, programmes de controle ou objectifs d'apprentissage :\n\n${markdown}`;
+  return `Retrouve la consigne de revision donnee a l'eleve dans ces documents :\n\n${markdown}`;
 }
 
 // Header prépendu au markdown de TOUS les générateurs quand une consigne est
