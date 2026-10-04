@@ -281,10 +281,11 @@ describe('USER PROMPTS (router / consigne / verifyAnswer)', () => {
     expect(result).toContain('du contenu de cours');
   });
 
-  it('consigneUser : detection consignes + markdown', () => {
+  it('consigneUser : consigne donnee a l eleve + markdown, sans objectifs d apprentissage', () => {
     const result = consigneUser('mes documents');
-    expect(result).toContain('consignes de revision');
+    expect(result).toContain('consigne de revision donnee a l');
     expect(result).toContain('mes documents');
+    expect(result).not.toContain('objectifs d');
   });
 
   it('verifyAnswerUser : question + reponse eleve + interrogation binaire', () => {
@@ -352,6 +353,32 @@ describe('CONSIGNE SYSTEM', () => {
     expect(result).toContain('Reponds UNIQUEMENT en JSON valide.');
     expect(result).toContain('English');
     expect(result).not.toContain('Reponds en JSON strict');
+  });
+
+  // Mesuré le 2026-10-04 (output/consigne-corpus/2026-10-04/) : l'ancien prompt cherchait aussi
+  // « des objectifs d'apprentissage » et demandait un « résumé » → consigne trouvée dans des
+  // leçons sans consigne (0/3), points du professeur mêlés au contenu des autres sources.
+  it('consigne explicite seulement, points recopies, en-tete en text', () => {
+    const result = consigneSystem('fr');
+    expect(result).toContain('Je sais ma lecon si je sais');
+    expect(result).toContain('ne sont pas une consigne de revision');
+    expect(result).toContain('found vaut false');
+    expect(result).toContain('UNIQUEMENT eux');
+    expect(result).toContain('recopies fidelement');
+    expect(result).toContain("n'ajoute aucun sujet pris ailleurs");
+    expect(result).toContain("l'en-tete de la consigne");
+    expect(result).not.toContain('objectifs d');
+    expect(result).not.toContain('resume des consignes');
+  });
+
+  it('un seul exemple, dans un autre domaine que l histoire', () => {
+    const result = consigneSystem('fr');
+    expect(result.match(/EXEMPLE/g)).toHaveLength(1);
+    expect(result).toContain('fractions');
+  });
+
+  it('langInstruction ferme le system (inventaire .claude/rules/prompts.md)', () => {
+    expect(consigneSystem('en').endsWith(langInstruction('en'))).toBe(true);
   });
 });
 
