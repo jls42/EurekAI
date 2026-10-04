@@ -47,6 +47,9 @@ function doResetSession(ctx: AppContext): void {
     Object.keys(ctx.loading).map((k) => [k, false]),
   ) as typeof ctx.loading;
   ctx.pendingById = {};
+  // Réservations de l'anti-flood : un lancement encore en attente la rend sur cette map neuve sans
+  // jamais passer sous zéro (cf. releaseLaunch, generate.ts).
+  ctx.launchingByType = {};
   ctx.toasts = [];
   ctx.toastCounter = 0;
   ctx.shownToastEventKeys = new Set<EventKey>();

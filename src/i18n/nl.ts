@@ -59,6 +59,7 @@ export const nl: Record<string, string> = {
   'a11y.viewCategory': 'Bekijken: {category}',
   'a11y.generateCategory': 'Genereren: {category}',
   'a11y.cancelGeneration': 'Annuleren: {type}',
+  'a11y.toastRepeated': '{count} keer',
   'a11y.fillBlankAnswer': 'Antwoord invullen',
   'a11y.selectSource': 'Deze bron selecteren',
   'a11y.editTitle': 'Titel bewerken',
@@ -555,6 +556,9 @@ export const nl: Record<string, string> = {
   'profile.backToProfiles': 'Terug',
 
   'toast.error': 'Fout: {error}',
+  'toast.typedError': '{type}: {error}',
+  'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': '{type}: er zijn er al {count} in voorbereiding, wacht even!',
   'toast.uploadError': '{filename} kon niet worden geladen. Probeer het opnieuw.',
   'sources.uploadError.generic': 'Uploaden mislukt. Probeer opnieuw.',
   'toast.chatErrorMsg': 'Chatfout: {error}',

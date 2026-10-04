@@ -59,6 +59,7 @@ export const it: Record<string, string> = {
   'a11y.viewCategory': 'Vedi: {category}',
   'a11y.generateCategory': 'Genera: {category}',
   'a11y.cancelGeneration': 'Annulla: {type}',
+  'a11y.toastRepeated': '{count} volte',
   'a11y.fillBlankAnswer': 'Risposta da completare',
   'a11y.selectSource': 'Seleziona questa fonte',
   'a11y.editTitle': 'Modifica il titolo',
@@ -551,6 +552,9 @@ export const it: Record<string, string> = {
   'profile.backToProfiles': 'Indietro',
 
   'toast.error': 'Errore: {error}',
+  'toast.typedError': '{type}: {error}',
+  'toast.repeatBadge': '×{count}',
+  'toast.generationBusy': "{type}: già {count} in preparazione, aspetta un po'!",
   'toast.uploadError': 'Impossibile caricare {filename}. Riprova.',
   'sources.uploadError.generic': 'Caricamento fallito. Riprova.',
   'toast.chatErrorMsg': 'Errore chat: {error}',

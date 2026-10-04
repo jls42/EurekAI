@@ -198,8 +198,11 @@ const initGenerationState = () => ({
 // privée Alpine `_x_dataStack` casse après upgrade. Posé via event DOM.
 // notificationsVersion = compteur incrémenté à chaque appendNotification réussi
 // pour déclencher la reactivity Alpine sur la cloche header.
+// launchingByType = lancements réservés par l'anti-flood pendant le pré-contrôle de modération,
+// avant que leur pending optimiste existe (cf. reserveLaunch, generate.ts).
 const initPendingLifecycleState = () => ({
   pendingById: {} as Record<string, PendingTrackerEntry>,
+  launchingByType: {} as Record<string, number>,
   abortControllersByGid: {} as Record<string, AbortController>,
   shownToastEventKeys: new Set<EventKey>(),
   crossTabSyncBroken: false,

@@ -18,7 +18,20 @@
         class="w-5 h-5 shrink-0 mt-0.5"
       ></i>
       <div class="flex-1 min-w-0">
-        <p class="text-sm font-medium" x-text="toast.message"></p>
+        <p class="text-sm font-medium">
+          <span x-text="toast.message"></span>
+          <span
+            x-show="toast.count > 1"
+            class="ms-1 inline-block rounded-full border border-current/40 px-1.5 text-xs font-bold tabular-nums"
+            aria-hidden="true"
+            x-text="t('toast.repeatBadge', { count: toast.count })"
+          ></span>
+          <span
+            x-show="toast.count > 1"
+            class="sr-only"
+            x-text="t('a11y.toastRepeated', { count: toast.count })"
+          ></span>
+        </p>
         <button
           x-show="!!toast.retryFn"
           @click="toast.retryFn(); dismissToast(toast.id)"

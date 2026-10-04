@@ -1,6 +1,6 @@
 import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
-import { pendingOfTypeExists } from './pending-utils';
+import { countPendingOfType, MAX_PARALLEL_PER_TYPE, pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import {
@@ -20,6 +20,8 @@ const TOAST_GENERATION_ERROR = 'toast.generationError';
 // Refus de modération (contenu signalé) : réessayer produirait le même refus, pas de bouton.
 const MODERATION_BLOCKED = 'moderation.blocked';
 const TOAST_ERROR = 'toast.error';
+const TOAST_TYPED_ERROR = 'toast.typedError';
+const TOAST_GENERATION_BUSY = 'toast.generationBusy';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 const I18N_GEN_PREFIX = 'gen.';
@@ -339,6 +341,12 @@ export function showAutoResult(
   }
 }
 
+// Échec d'une génération nommé par son type (« Quiz : … ») : les toasts identiques étant regroupés,
+// deux types en échec restent deux toasts, chacun avec son « Réessayer ».
+const typedErrorMessage = (state: AppContext, type: string, error: string): string => {
+  return state.t(TOAST_TYPED_ERROR, { type: state.t(I18N_GEN_PREFIX + type), error });
+};
+
 // Réessai = même génération, surcharges comprises (version facile à lire : registre et sources
 // de la fiche d'origine) ; aucun sur un refus de modération.
 export function handleGenerateHttpError(
@@ -349,11 +357,8 @@ export function handleGenerateHttpError(
   extraBody?: GenerateExtraBody,
 ): void {
   const retry = err.error === MODERATION_BLOCKED ? null : () => state.generate(type, extraBody);
-  state.showToast(
-    state.t(TOAST_ERROR, { error: state.resolveError(err.error || res.statusText) }),
-    'error',
-    retry,
-  );
+  const error = state.resolveError(err.error || res.statusText);
+  state.showToast(typedErrorMessage(state, type, error), 'error', retry);
 }
 
 export function handleGenerateSuccess(state: AppContext, type: string, gen: Generation): void {
@@ -379,7 +384,8 @@ export function handleGenerateError(
 ): void {
   if (e instanceof Error && e.name === 'AbortError') return;
   console.error('[generate]', type, e);
-  state.showToast(state.t(TOAST_GENERATION_ERROR), 'error', () => state.generate(type, extraBody));
+  const message = typedErrorMessage(state, type, state.t(TOAST_GENERATION_ERROR));
+  state.showToast(message, 'error', () => state.generate(type, extraBody));
 }
 
 // Toast dispatché par code pour les partial-fails (action user vs warning vs partial générique),
@@ -637,6 +643,47 @@ const singleGenerateAllowed = async function (
   return ensureGenerationAllowed(state, sourceIds);
 };
 
+// Anti-flood (MAX_PARALLEL_PER_TYPE, pending-utils.ts) : pendings du type dans le projet (cet
+// onglet, autres onglets et appareils via SSE) + lancements déjà réservés. La réservation est prise
+// AVANT le pré-contrôle de modération, qui attend jusqu'à 8 s avant le pending optimiste : sans
+// elle, tous les appuis d'une rafale passeraient avant que le premier pending existe.
+const reserveLaunch = function (state: AppContext, type: string): boolean {
+  const reserved = state.launchingByType[type] ?? 0;
+  if (countPendingOfType(state.pendingById, type) + reserved >= MAX_PARALLEL_PER_TYPE) {
+    const params = { type: state.t(I18N_GEN_PREFIX + type), count: MAX_PARALLEL_PER_TYPE };
+    state.showToast(state.t(TOAST_GENERATION_BUSY, params), 'info');
+    return false;
+  }
+  state.launchingByType[type] = reserved + 1;
+  return true;
+};
+
+// Tolère la remise à zéro de resetSession pendant l'attente : jamais de compteur négatif.
+const releaseLaunch = function (state: AppContext, type: string): void {
+  const left = (state.launchingByType[type] ?? 1) - 1;
+  if (left > 0) state.launchingByType[type] = left;
+  else delete state.launchingByType[type];
+};
+
+// Rend true en GARDANT la réservation : l'appelant la rend juste avant de créer son pending
+// optimiste, dans le même bloc synchrone (aucun appui ne peut s'intercaler entre les deux).
+// Refus ou exception : réservation rendue ici.
+const acquireSingleLaunch = async function (
+  state: AppContext,
+  projectId: string,
+  type: string,
+  sourceIds?: readonly string[],
+): Promise<boolean> {
+  if (!reserveLaunch(state, type)) return false;
+  let allowed = false;
+  try {
+    allowed = await singleGenerateAllowed(state, projectId, type, sourceIds);
+  } finally {
+    if (!allowed) releaseLaunch(state, type);
+  }
+  return allowed;
+};
+
 const runSingleGenerate = async function (
   state: AppContext,
   type: string,
@@ -646,7 +693,9 @@ const runSingleGenerate = async function (
   // pré-contrôle de modération et le pending, comme la garde serveur (body.sourceIds).
   const sourceIds = extraBody?.sourceIds;
   const projectId = state.currentProjectId;
-  if (!projectId || !(await singleGenerateAllowed(state, projectId, type, sourceIds))) return;
+  if (!projectId || !(await acquireSingleLaunch(state, projectId, type, sourceIds))) return;
+  // Le pending optimiste prend le relais de la réservation anti-flood, sans intervalle.
+  releaseLaunch(state, type);
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();

@@ -14,3 +14,21 @@ export function pendingOfTypeExists(
 ): boolean {
   return Object.values(pendingById ?? {}).some((p) => p.type === type && p.status === 'pending');
 }
+
+/**
+ * Anti-flood : au plus 3 générations du même type en cours (pendings + lancements réservés, cf.
+ * `reserveLaunch` dans generate.ts). Un plafond par nombre, pas par délai : un double-clic lance
+ * toujours deux générations et un réessai après échec reste possible (le debounce retiré en #42
+ * bloquait des réessais légitimes). Vécu le 2026-10-03 : ~18 appuis en 3 s d'une enfant sur
+ * « Quiz » → 18 générations, refusées en partie par Mistral, 18 toasts d'erreur.
+ */
+export const MAX_PARALLEL_PER_TYPE = 3;
+
+/** Nombre de pendings en cours (`status: 'pending'`) pour ce type ; même filtre que ci-dessus. */
+export function countPendingOfType(
+  pendingById: Record<string, { type: string; status: string }> | undefined,
+  type: string,
+): number {
+  return Object.values(pendingById ?? {}).filter((p) => p.type === type && p.status === 'pending')
+    .length;
+}

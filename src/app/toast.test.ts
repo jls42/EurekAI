@@ -174,6 +174,97 @@ describe('createToast', () => {
     expect(ctx.toasts).toHaveLength(0);
   });
 
+  // Vécu (2026-10-03) : 18 échecs d'une rafale de quiz empilaient 18 toasts « Réessayer »
+  // identiques, jamais fermés automatiquement, sur tout l'écran d'un téléphone.
+  describe('regroupement des toasts identiques', () => {
+    const QUIZ_ERROR = 'Quiz : Erreur interne du serveur';
+
+    it('rafale de 18 échecs identiques : un seul toast, compteur 18', () => {
+      for (let i = 0; i < 18; i++) showToast(QUIZ_ERROR, 'error', vi.fn());
+
+      expect(ctx.toasts).toHaveLength(1);
+      expect(ctx.toasts[0].count).toBe(18);
+    });
+
+    it('ne regroupe ni deux messages ni deux types différents', () => {
+      showToast(QUIZ_ERROR, 'error');
+      showToast('Flashcards : Erreur interne du serveur', 'error');
+      showToast(QUIZ_ERROR, 'warning');
+
+      expect(ctx.toasts).toHaveLength(3);
+      expect(ctx.toasts.map((t: any) => t.count)).toEqual([1, 1, 1]);
+    });
+
+    it('garde le dernier réessai : « Réessayer » relance une seule fois', () => {
+      const first = vi.fn();
+      const last = vi.fn();
+      showToast(QUIZ_ERROR, 'error', first);
+      showToast(QUIZ_ERROR, 'error', last);
+
+      expect(ctx.toasts[0].retryFn).toBe(last);
+    });
+
+    it('une occurrence sans réessai ne retire pas celui du groupe (toujours persistant)', () => {
+      const retry = vi.fn();
+      showToast(QUIZ_ERROR, 'error', retry);
+      showToast(QUIZ_ERROR, 'error');
+      vi.advanceTimersByTime(10000);
+
+      expect(ctx.toasts).toHaveLength(1);
+      expect(ctx.toasts[0].retryFn).toBe(retry);
+    });
+
+    it('une erreur qui reçoit un réessai devient persistante', () => {
+      showToast(QUIZ_ERROR, 'error');
+      showToast(QUIZ_ERROR, 'error', vi.fn());
+      vi.advanceTimersByTime(10000);
+
+      expect(ctx.toasts).toHaveLength(1);
+    });
+
+    it('repousse l échéance tant que l événement se répète', () => {
+      showToast('Patiente un peu', 'info');
+      vi.advanceTimersByTime(4000);
+      showToast('Patiente un peu', 'info');
+      vi.advanceTimersByTime(4000);
+      expect(ctx.toasts).toHaveLength(1);
+
+      vi.advanceTimersByTime(1000);
+      expect(ctx.toasts).toHaveLength(0);
+    });
+
+    it('ne rafraîchit pas les icônes pour une occurrence regroupée', () => {
+      showToast('Même', 'info');
+      showToast('Même', 'info');
+
+      expect(ctx.$nextTick).toHaveBeenCalledOnce();
+    });
+
+    it('regroupe les toasts d événements distincts au même message', () => {
+      showToast('Échec de Quiz', 'error', null, null, 'generation:g1:failed');
+      showToast('Échec de Quiz', 'error', null, null, 'generation:g2:failed');
+
+      expect(ctx.toasts).toHaveLength(1);
+      expect(ctx.toasts[0].count).toBe(2);
+      expect(ctx.shownToastEventKeys.has('generation:g2:failed')).toBe(true);
+    });
+
+    // resetSession remet toastCounter à 0 : le minuteur d'un toast d'avant ne doit pas fermer le
+    // nouveau toast qui reprend son id.
+    it('un vieux minuteur ne ferme pas un nouveau toast au même id', () => {
+      showToast('Avant', 'info');
+      vi.advanceTimersByTime(3000);
+      ctx.toasts = [];
+      ctx.toastCounter = 0;
+      showToast('Après', 'info');
+      vi.advanceTimersByTime(2000);
+      expect(ctx.toasts.map((t: any) => t.message)).toEqual(['Après']);
+
+      vi.advanceTimersByTime(3000);
+      expect(ctx.toasts).toHaveLength(0);
+    });
+  });
+
   describe('eventKey idempotence (PR notifs)', () => {
     let storage: Record<string, string>;
 
@@ -286,5 +377,13 @@ describe('gabarits : aucune fonction évaluée par une directive Alpine', () => 
     const html = readFileSync(new URL('../partials/toasts.html', import.meta.url), 'utf-8');
     expect(html).toContain('x-show="!!toast.retryFn"');
     expect(html).toContain('@click="toast.retryFn(); dismissToast(toast.id)"');
+  });
+
+  it('affiche le compteur d’un toast regroupé, lisible par un lecteur d’écran', () => {
+    const html = readFileSync(new URL('../partials/toasts.html', import.meta.url), 'utf-8');
+    // \x22 = guillemet (même raison que BINDING ci-dessus).
+    expect(html.match(/x-show=\x22toast\.count > 1\x22/g)).toHaveLength(2);
+    expect(html).toContain("t('toast.repeatBadge', { count: toast.count })");
+    expect(html).toContain("t('a11y.toastRepeated', { count: toast.count })");
   });
 });
