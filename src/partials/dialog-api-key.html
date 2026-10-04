@@ -40,7 +40,7 @@
       type="password"
       x-model="apiKeyInput"
       :aria-label="t('apiKey.label')"
-      @keydown.enter="saveApiKey()"
+      @keydown.enter.prevent="saveApiKey()"
       class="input-modern w-full px-3 py-2 mb-2 font-mono text-body-sm"
       :placeholder="t('apiKey.placeholder')"
       autocomplete="off"

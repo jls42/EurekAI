@@ -104,6 +104,14 @@ const warnFailedToolCalls = (outputs: unknown[], images: number): void => {
   );
 };
 
+// Extension réelle de l'image : l'agent renvoie du JPEG, enregistré jusqu'ici en .png (servi en
+// image/png). Les octets de tête font foi ; format non reconnu → .png, l'extension historique.
+const JPEG_SIGNATURE = [0xff, 0xd8, 0xff];
+
+const imageExtension = (image: Buffer): 'jpg' | 'png' => {
+  return JPEG_SIGNATURE.every((byte, i) => image[i] === byte) ? 'jpg' : 'png';
+};
+
 // Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec sa voisine et ne
 // la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
 const downloadAndSaveImage = async (
@@ -117,7 +125,7 @@ const downloadAndSaveImage = async (
     const fileStream = await client.files.download({ fileId });
     const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
     // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
-    const imageFilename = uniqueMediaName('illustration', 'png');
+    const imageFilename = uniqueMediaName('illustration', imageExtension(imageBuffer));
     writeFileSync(join(projectDir, imageFilename), imageBuffer);
     console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
     const url = mediaUrl(pid, imageFilename);

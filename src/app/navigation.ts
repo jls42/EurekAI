@@ -8,9 +8,14 @@ export function createNavigation() {
         '(prefers-reduced-motion: reduce)',
       ).matches;
       if (document.startViewTransition && !prefersReducedMotion) {
-        document.startViewTransition(() => {
+        const transition = document.startViewTransition(() => {
           this.activeView = view;
           void this.$nextTick(() => this.refreshIcons());
+        });
+        // Transition sautée (onglet masqué, autre transition en cours) : `ready` est rejetée alors
+        // que la vue a déjà changé. Non gérée, l'erreur remontait en « Unhandled rejection ».
+        transition.ready.catch(() => {
+          // Rien à faire : la mise à jour de la vue a eu lieu, seule l'animation est perdue.
         });
       } else {
         this.activeView = view;

@@ -24,6 +24,13 @@ const mockDataset: Record<string, string> = {};
   getItem: vi.fn(),
 };
 
+// ViewTransition minimale : le callback de mise à jour tourne, `ready` suit la transition.
+const viewTransition = (ready: Promise<void> = Promise.resolve()) =>
+  vi.fn((cb: () => void) => {
+    cb();
+    return { ready, finished: Promise.resolve(), updateCallbackDone: Promise.resolve() };
+  });
+
 function makeContext(overrides: any = {}) {
   return {
     activeView: 'sources',
@@ -73,7 +80,7 @@ describe('createNavigation', () => {
     });
 
     it('uses startViewTransition if available and no reduced motion', () => {
-      const transition = vi.fn((cb: () => void) => cb());
+      const transition = viewTransition();
       (globalThis as any).document.startViewTransition = transition;
       mockMatchMedia.mockReturnValue({ matches: false });
 
@@ -83,8 +90,24 @@ describe('createNavigation', () => {
       expect(ctx.activeView).toBe('generations');
     });
 
+    // Vu au release-test (onglet en arrière-plan) : « Unhandled rejection: InvalidStateError:
+    // Transition was aborted because of invalid state. Document hidden ». Vitest fait échouer le
+    // run sur tout rejet non géré : ce test casse si le catch de `ready` disparaît.
+    it('transition sautée (onglet masqué) : rejet de `ready` géré, vue changée', async () => {
+      const aborted = new Error('Transition was aborted because of invalid state. Document hidden');
+      const ready = Promise.reject(aborted);
+      const catchSpy = vi.spyOn(ready, 'catch');
+      (globalThis as any).document.startViewTransition = viewTransition(ready);
+
+      nav.goToView.call(ctx, 'generations');
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(catchSpy).toHaveBeenCalledOnce();
+      expect(ctx.activeView).toBe('generations');
+    });
+
     it('skips startViewTransition when prefers reduced motion', () => {
-      const transition = vi.fn((cb: () => void) => cb());
+      const transition = viewTransition();
       (globalThis as any).document.startViewTransition = transition;
       mockMatchMedia.mockReturnValue({ matches: true });
 

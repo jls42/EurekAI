@@ -21,6 +21,7 @@ vi.mock('../helpers/logger.js', () => ({
 
 import { generateImage } from './image.js';
 import { writeFileSync } from 'node:fs';
+import { collectStream } from '../helpers/audio.js';
 import { runWithMediaLedger } from '../helpers/media-ledger.js';
 
 function createClient(
@@ -80,6 +81,30 @@ describe('generateImage', () => {
     expect(result.imageUrl).toMatch(
       /^\/output\/projects\/pid-2\/illustration-\d+-[0-9a-f]{8}\.png$/,
     );
+  });
+
+  // L'agent renvoie du JPEG (mesuré au release-test du 2026-10-04 : JFIF 1024×768), enregistré
+  // jusqu'ici en .png et donc servi en image/png : l'extension suit les octets de tête.
+  it('enregistre une image JPEG en .jpg', async () => {
+    const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10, 0x4a, 0x46, 0x49, 0x46]);
+    vi.mocked(collectStream).mockResolvedValueOnce(jpeg);
+    const client = createClient([{ content: [{ fileId: 'file-jpg' }] }]);
+    const result = await generateImage(client, '# Content', '/tmp/project', 'pid-jpg');
+
+    expect(result.imageUrl).toMatch(
+      /^\/output\/projects\/pid-jpg\/illustration-\d+-[0-9a-f]{8}\.jpg$/,
+    );
+    const savedPath = vi.mocked(writeFileSync).mock.calls.at(-1)?.[0];
+    expect(String(savedPath)).toMatch(/illustration-\d+-[0-9a-f]{8}\.jpg$/);
+  });
+
+  it('garde .png pour une image PNG', async () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+    vi.mocked(collectStream).mockResolvedValueOnce(png);
+    const client = createClient([{ content: [{ fileId: 'file-png' }] }]);
+    const result = await generateImage(client, '# Content', '/tmp/project', 'pid-png');
+
+    expect(result.imageUrl).toMatch(/^\/output\/projects\/pid-png\/illustration-.+\.png$/);
   });
 
   it('throws when no image found in outputs', async () => {

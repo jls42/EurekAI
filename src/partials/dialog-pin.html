@@ -13,13 +13,16 @@
       Verify PIN
     </h2>
     <p class="text-body-sm text-text-secondary mb-4" x-text="t('profile.pinVerifyInfo')"></p>
+    <!-- .prevent : submitPinVerify ferme le dialogue sur le keydown, le focus revient au bouton qui
+         l'a ouvert, et le keypress d'Entrée qui suit activait ce bouton : la demande de PIN se
+         rouvrait aussitôt après validation (vu au release-test du 2026-10-04). -->
     <input
       type="password"
       inputmode="numeric"
       maxlength="4"
       x-model="pinVerifyInput"
       :aria-label="t('profile.pinLabel')"
-      @keydown.enter="submitPinVerify()"
+      @keydown.enter.prevent="submitPinVerify()"
       class="input-modern w-full px-3 py-2 mb-4 text-center text-lg tracking-[0.5em] font-mono"
       :placeholder="t('profile.pinPlaceholder')"
       autocomplete="off"
