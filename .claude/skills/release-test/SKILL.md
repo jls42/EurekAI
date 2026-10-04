@@ -28,6 +28,9 @@ Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent qu
 - **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-lang` (cle de langue lue par l'app, `src/i18n/index.ts`) dans le `localStorage`, puis recharger.
 - **Champs PIN** : une extension de gestion de mots de passe peut bloquer `javascript_tool` quand le focus est sur le champ (erreur `chrome-extension://`) : utiliser clic + frappe, pas de JS sur ce champ.
 - **Sondes audio** : ne pas attendre les metadonnees `<audio>` en JS (delai de 45 s depasse). Mesurer les MP3 avec `ffprobe` sur `output/projects/<pid>/`.
+- **Clics manques (2026-10-04)** : une reference `find` peut viser un element masque (bouton du Tableau de bord quand la vue Sources est affichee) ou perime apres un decalage de mise en page (banniere des generations en cours) : le clic part ailleurs, sans erreur. Preferer un clic DOM sur l'element visible (`offsetParent !== null`, puis `.click()`) ou des coordonnees calculees en JS (`getBoundingClientRect()` multiplie par `1568 / innerWidth`, le cadre des captures), puis reverifier les compteurs (requetes, puces, toasts).
+- **Script JS long dans un onglet en arriere-plan** : les minuteurs y sont ralentis, un `javascript_tool` qui enchaine des `setTimeout` depasse le delai de 45 s alors qu'il s'execute jusqu'au bout. Relire l'etat ensuite plutot que relancer (un second passage doublerait les clics).
+- **Erreurs du navigateur dans le journal du serveur** : Vite y recopie les erreurs, avertissements et rejets non geres de l'onglet (`[vite] (client) [console.error] ...`, `[console.warn]`, `[Unhandled rejection] ...`). Ils s'y lisent meme quand `read_console_messages` n'etait pas encore appele (il ne voit que les messages posterieurs a son premier appel).
 
 ## Phase 0 — Boot
 
