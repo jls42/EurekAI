@@ -2,6 +2,7 @@ import type { createState } from './state';
 import type {
   Consigne,
   Generation,
+  GenerationEvent,
   PendingTrackerEntry,
   PodcastGeneration,
   PodcastLine,
@@ -261,7 +262,7 @@ export interface AppContext extends AppState {
   clearProfileNotifications(): void;
   notificationMessage(notif: PersistedNotification): string;
   formatRelativeTime(iso: string): string;
-  applyGenerationEvent(event: import('./helpers').GenerationEvent): void;
+  applyGenerationEvent(event: GenerationEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
   hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;
   mergeReconciledGenerations(generations: Generation[], cutoff: number): void;
