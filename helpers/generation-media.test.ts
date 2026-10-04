@@ -41,6 +41,7 @@ describe('uniqueMediaName', () => {
   it('préfixe-horodatage-suffixe aléatoire, extension demandée', () => {
     expect(uniqueMediaName('podcast', 'mp3')).toMatch(/^podcast-\d+-[0-9a-f]{8}\.mp3$/);
     expect(uniqueMediaName('illustration', 'png')).toMatch(/^illustration-\d+-[0-9a-f]{8}\.png$/);
+    expect(uniqueMediaName('illustration', 'jpg')).toMatch(/^illustration-\d+-[0-9a-f]{8}\.jpg$/);
   });
 
   it('deux noms produits dans la même milliseconde diffèrent', () => {
@@ -118,6 +119,11 @@ describe('mediaFileName', () => {
     [
       '/output/projects/p1/illustration-1700000000000-0123abcd.png',
       'illustration-1700000000000-0123abcd.png',
+    ],
+    // Illustration JPEG (format réel renvoyé par l'agent) : supprimée avec sa génération.
+    [
+      '/output/projects/p1/illustration-1700000000000-0123abcd.jpg',
+      'illustration-1700000000000-0123abcd.jpg',
     ],
     // Noms historiques sans suffixe aléatoire (avant les noms uniques)
     [

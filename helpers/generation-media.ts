@@ -1,10 +1,10 @@
 /**
- * Médias des générations (MP3 et PNG écrits sous `output/projects/<pid>/`) : nom unique, URL
- * publique, URLs portées par une génération et suppression sûre.
+ * Médias des générations (MP3, PNG et JPEG écrits sous `output/projects/<pid>/`) : nom unique,
+ * URL publique, URLs portées par une génération et suppression sûre.
  *
  * Toute suppression passe par `mediaFileName` : seule une URL `/output/projects/<pid>/<nom>` du
- * projet visé, au nom simple (aucun séparateur, aucune traversée) et d'extension .mp3 ou .png,
- * désigne un fichier supprimable. Une URL externe (image hébergée par Mistral), celle d'un autre
+ * projet visé, au nom simple (aucun séparateur, aucune traversée) et d'extension .mp3, .png ou
+ * .jpg, désigne un fichier supprimable. Une URL externe (image hébergée par Mistral), celle d'un autre
  * projet ou un fichier importé (`uploads/`) est ignorée.
  */
 import { randomUUID } from 'node:crypto';
@@ -14,11 +14,12 @@ import type { ProjectStore } from '../store.js';
 import type { Generation } from '../types.js';
 import { logger } from './logger.js';
 
-type MediaExtension = 'mp3' | 'png';
+// jpg : illustrations, enregistrées selon leur format réel (cf. generators/image.ts).
+type MediaExtension = 'mp3' | 'png' | 'jpg';
 
 // Noms produits par uniqueMediaName (préfixes podcast, quiz-vocal-q<i>, dictation-w<i>,
 // read-aloud-<id8>-<section>, illustration) et leurs formes historiques sans suffixe aléatoire.
-const MEDIA_FILE_NAME = /^[A-Za-z0-9][\w.-]*\.(?:mp3|png)$/;
+const MEDIA_FILE_NAME = /^[A-Za-z0-9][\w.-]*\.(?:mp3|png|jpg)$/;
 
 const mediaUrlBase = (pid: string): string => `/output/projects/${pid}/`;
 
