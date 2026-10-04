@@ -113,6 +113,8 @@ const EXTRACTORS: Record<string, (gens: Generation[]) => string[]> = {
   summary: extractSummaryKeyPoints,
 };
 
+const EXCLUSION_ITEM_PREFIX = '- ';
+
 export function buildExclusionContext(
   generations: Generation[],
   type: string,
@@ -131,9 +133,18 @@ export function buildExclusionContext(
   const header = exclusionHeader(type);
   let result = header;
   for (const item of items) {
-    const line = `\n- ${item}`;
+    const line = `\n${EXCLUSION_ITEM_PREFIX}${item}`;
     if (result.length + line.length > maxChars) break;
     result += line;
   }
   return result;
+}
+
+// Inverse de buildExclusionContext : ses items, sans l'en-tête (le podcast y lit les premières
+// répliques déjà générées pour tirer une accroche qui ouvre autrement, cf. pickPodcastHook).
+export function exclusionItems(context: string): string[] {
+  return context
+    .split('\n')
+    .filter((line) => line.startsWith(EXCLUSION_ITEM_PREFIX))
+    .map((line) => line.slice(EXCLUSION_ITEM_PREFIX.length));
 }

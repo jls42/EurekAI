@@ -41,6 +41,7 @@ Le frontend envoie via `getLocale()` et `currentProfile.ageGroup`. Ne JAMAIS har
 - **Pas de blacklist explicite** (`"pas de 'Fiche'"`) qui réinjecte les mots — préférer règle positive + exemples positifs
 - **Règle "title" summary** : `data.title` = sujet du cours uniquement, préfixe `"Fiche — "` ajouté par `helpers/auto-title.ts` pour la carte liste seulement ; la vue détail affiche `data.title` brut
 - **Retry prompt** (`generators/summary.ts`) : même discipline que le prompt initial, pas d'écho des formulations problématiques
+- **Podcast** : seul générateur en sortie structurée stricte (`PODCAST_RESPONSE_FORMAT`, `json_schema` : 6 à 8 répliques `host`/`guest`) — en `json_object`, `mistral-large-latest` rendait la moitié des premiers scripts inexploitables (mesuré le 2026-10-04) ; accroche tirée par `pickPodcastHook` parmi les débuts qu'aucun podcast précédent n'a pris (lister les accroches passées amorçait leur reprise). Mesures : `.claude/rules/prompts.md` (Contrat JSON, Bloc d'exclusions).
 - Détails complets et règles sur emphases MAJUSCULES / few-shots / retry dans `.claude/rules/prompts.md`
 
 ### Agents auto-generables

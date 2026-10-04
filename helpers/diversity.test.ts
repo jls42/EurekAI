@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildExclusionContext, diversityParams } from './diversity';
+import { buildExclusionContext, diversityParams, exclusionItems } from './diversity';
 import type { Generation } from '../types';
 
 describe('diversityParams', () => {
@@ -229,5 +229,31 @@ describe('buildExclusionContext', () => {
     const result = buildExclusionContext(gens, 'summary');
     expect(result).toContain('- P5');
     expect(result).not.toContain('- P6');
+  });
+});
+
+describe('exclusionItems', () => {
+  it('relit les items de buildExclusionContext, sans l’en-tête', () => {
+    const podcast = (text: string) => ({
+      type: 'podcast',
+      data: {
+        script: [
+          { speaker: 'host', text },
+          { speaker: 'guest', text: 'Oui ?' },
+        ],
+      },
+    });
+    const gens = [
+      podcast('Devine quoi : la lave'),
+      podcast('Un jour, un volcan'),
+    ] as unknown as Generation[];
+    expect(exclusionItems(buildExclusionContext(gens, 'podcast'))).toEqual([
+      'Devine quoi : la lave',
+      'Un jour, un volcan',
+    ]);
+  });
+
+  it('bloc vide → aucun item', () => {
+    expect(exclusionItems('')).toEqual([]);
   });
 });

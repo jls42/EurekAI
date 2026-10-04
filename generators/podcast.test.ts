@@ -1,5 +1,6 @@
-import { describe, it, expect, vi } from 'vitest';
-import { generatePodcastScript } from './podcast.js';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { generatePodcastScript, PODCAST_RESPONSE_FORMAT } from './podcast.js';
+import { logger } from '../helpers/logger.js';
 import { PODCAST_NAME_POOL, podcastRetryUser } from '../prompts.js';
 
 const validPodcast = {
@@ -126,5 +127,61 @@ describe('generatePodcastScript', () => {
     const retrySystemPrompt = client.chat.complete.mock.calls[1][0].messages[0].content;
     expect(retrySystemPrompt).toContain(result.names.host);
     expect(retrySystemPrompt).toContain(result.names.guest);
+  });
+
+  it('les deux appels demandent la sortie structurée stricte (6 à 8 répliques host/guest)', async () => {
+    const client = mockClient({ script: [] });
+    client.chat.complete
+      .mockResolvedValueOnce({ choices: [{ message: { content: '{"script": [ },' } }] })
+      .mockResolvedValueOnce({ choices: [{ message: { content: JSON.stringify(validPodcast) } }] });
+
+    await generatePodcastScript(client, 'content');
+
+    for (const [request] of client.chat.complete.mock.calls) {
+      expect(request.responseFormat).toBe(PODCAST_RESPONSE_FORMAT);
+    }
+    const schema = PODCAST_RESPONSE_FORMAT.jsonSchema?.schemaDefinition;
+    expect(PODCAST_RESPONSE_FORMAT).toMatchObject({
+      type: 'json_schema',
+      jsonSchema: { strict: true },
+    });
+    expect(schema?.properties.script).toMatchObject({ minItems: 6, maxItems: 8 });
+    expect(schema?.properties.script.items.properties.speaker.enum).toEqual(['host', 'guest']);
+  });
+
+  it('reprise refusée : le motif part dans le journal avant l’erreur', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const corrupted = { script: [{ ' ': 'host', text: 'Bonjour' }] };
+    const client = mockClient(corrupted);
+
+    await expect(generatePodcastScript(client, 'content')).rejects.toThrow(/podcast valide/);
+    expect(warn).toHaveBeenCalledWith('podcast', 'retry invalid:', expect.stringContaining('" "'));
+    warn.mockRestore();
+  });
+});
+
+describe('generatePodcastScript — accroche', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('ouvre par un début qu’aucun podcast précédent n’a pris (lu dans le bloc d’exclusions)', async () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0); // 1er début libre du pool
+    const client = mockClient(validPodcast);
+    const exclusions =
+      'Tu as deja traite les angles ci-dessous. Choisis un angle et une accroche differents :\n- Devine quoi : la lave';
+
+    await generatePodcastScript(
+      client,
+      'content',
+      'mistral-large-latest',
+      'fr',
+      'enfant',
+      exclusions,
+    );
+
+    const systemPrompt: string = client.chat.complete.mock.calls[0][0].messages[0].content;
+    expect(systemPrompt).toContain('commence par « Un jour »');
+    expect(systemPrompt).not.toContain('« Devine »');
   });
 });

@@ -11,6 +11,7 @@ import { calculateTotalCost } from './cost-calc.js';
 import { SDK_RETRIED_STATUSES } from './mistral-retry.js';
 import { extractErrorCode, httpStatusOf } from './error-code-resolution.js';
 import { logger } from './logger.js';
+import { PODCAST_RESPONSE_FORMAT } from '../generators/podcast.js';
 
 interface SentRequest {
   method: string;
@@ -206,6 +207,25 @@ describe('client suivi — contrat du SDK installé', () => {
       { promptTokens: 24, completionTokens: 2, totalTokens: 26, model: 'mistral-small-latest' },
     ]);
     expect(sent).toMatchObject([{ method: 'POST', path: '/v1/chat/completions' }]);
+  });
+
+  it('chat.complete : la sortie structurée du podcast part en json_schema strict (schemaDefinition → schema)', async () => {
+    const sent = stubFetch({ '/v1/chat/completions': CHAT_RESPONSE });
+    await newClient().chat.complete({
+      model: 'mistral-large-latest',
+      messages: [{ role: 'user', content: 'Écris le podcast' }],
+      responseFormat: PODCAST_RESPONSE_FORMAT,
+    });
+    expect(sent[0].body).toMatchObject({
+      response_format: {
+        type: 'json_schema',
+        json_schema: {
+          name: 'podcast',
+          strict: true,
+          schema: PODCAST_RESPONSE_FORMAT.jsonSchema?.schemaDefinition,
+        },
+      },
+    });
   });
 
   it('audio.transcriptions (STT) : secondes audio captées, segment à bornes nulles accepté', async () => {
