@@ -149,13 +149,18 @@ describe('generatePodcastScript', () => {
     expect(schema?.properties.script.items.properties.speaker.enum).toEqual(['host', 'guest']);
   });
 
-  it('reprise refusée : le motif part dans le journal avant l’erreur', async () => {
+  it('reprise refusée : le motif part dans le journal, jamais le texte des répliques', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    const corrupted = { script: [{ ' ': 'host', text: 'Bonjour' }] };
+    const corrupted = { script: [{ ' ': 'host', text: 'Bonjour Zoé' }, null] };
     const client = mockClient(corrupted);
 
     await expect(generatePodcastScript(client, 'content')).rejects.toThrow(/podcast valide/);
     expect(warn).toHaveBeenCalledWith('podcast', 'retry invalid:', expect.stringContaining('" "'));
+    const logged = warn.mock.calls.map((args) => args.join(' ')).join('\n');
+    expect(logged).toContain('"speakerOk":false,"textLength":11');
+    expect(logged).toContain('"null"'); // réplique null : décrite, pas d'exception
+    // Le texte vient de la leçon de l'élève (relevé par la revue de sécurité du commit).
+    expect(logged).not.toContain('Bonjour');
     warn.mockRestore();
   });
 });

@@ -77,6 +77,24 @@ function isValidPodcast(data: PodcastLine[]): boolean {
   );
 }
 
+// Forme d'une réplique refusée, SANS son texte (contenu tiré de la leçon de l'élève) : clés,
+// speaker valide, longueur du texte. Assez pour diagnostiquer un refus (clé "speaker" sortie
+// en " ", texte vide) sans journaliser le contenu.
+const describeLine = (line: unknown): unknown => {
+  if (line === null) return 'null';
+  if (typeof line !== 'object') return typeof line;
+  const { speaker, text } = line as Record<string, unknown>;
+  return {
+    keys: Object.keys(line).map((key) => key.slice(0, 20)),
+    speakerOk: speaker === 'host' || speaker === 'guest',
+    textLength: typeof text === 'string' ? text.length : null,
+  };
+};
+
+const describeScript = (script: unknown[]): string => {
+  return JSON.stringify(script.map(describeLine)).slice(0, 300);
+};
+
 // Reçoit le JSON déjà parsé : tryParseJson au 1er essai (null si tronqué → script vide → retry),
 // safeParseJson au retry (SyntaxError → llm_invalid_json). Fléchée : délimitée par Lizard.
 const parsePodcastResponse = (json: unknown): ParsedPodcastResponse => {
@@ -122,11 +140,7 @@ export async function generatePodcastScript(
 
   if (isValidPodcast(result.script)) return { ...result, names };
 
-  logger.warn(
-    'podcast',
-    'validation failed, retrying:',
-    JSON.stringify(result.script).slice(0, 200),
-  );
+  logger.warn('podcast', 'validation failed, retrying:', describeScript(result.script));
   messages.push(...retryTurns(raw, podcastRetryUser(lang)));
 
   const retry = await client.chat.complete({
@@ -140,7 +154,7 @@ export async function generatePodcastScript(
   if (!isValidPodcast(retryResult.script)) {
     // Le motif du refus se lit dans le journal : sans lui, l'échec du 2026-10-04 (reprise de
     // 704 tokens refusée) restait inexpliqué.
-    logger.warn('podcast', 'retry invalid:', JSON.stringify(retryResult.script).slice(0, 200));
+    logger.warn('podcast', 'retry invalid:', describeScript(retryResult.script));
     // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
     throw new SyntaxError(
       "Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives",
