@@ -6,8 +6,7 @@
     "scripts/check-models.ts",
     "src/env.d.ts"
   ],
-  "project": ["**/*.ts"],
-  "ignoreDependencies": ["tailwindcss"],
+  "project": ["**/*.ts", "**/*.css"],
   "ignore": [".eslintrc.cjs"],
   "ignoreExportsUsedInFile": true
 }

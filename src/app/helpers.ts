@@ -20,8 +20,6 @@ import type {
 } from '../../types';
 import type { EventKey } from '../../helpers/event-key';
 import { buildEventKey } from '../../helpers/event-key';
-
-export type { GenerationEvent } from '../../types';
 import {
   appendNotification,
   clearNotifications,
@@ -45,8 +43,7 @@ const NOTIF_GENERATION_DONE_LABEL = 'notif.generationDone';
 // depuis types.ts (source unique partagée serveur ↔ client). `generation`
 // existe uniquement sur l'arm 'completed', `failureCode` uniquement sur
 // 'failed'/'cancelled'. Vite efface l'import type — pas de coût runtime.
-// Re-export ci-dessus pour garder la rétrocompatibilité des `import` existants
-// (`from './helpers'`).
+// L'importer depuis types.ts (plus de réexport ici : knip ≥ 6.39 le signale inutilisé).
 
 // Calcul du cutoff utilisé par reconcilePendings : si lastSeenAt absent (1er load
 // post-PR), retombe sur reconcileStartedAt → zéro backfill historique.

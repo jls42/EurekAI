@@ -3,7 +3,6 @@ import type { VoiceId } from './helpers/voice-types.js';
 import type { EventKey } from './helpers/event-key.js';
 import type { ReadingComfort } from './helpers/reading-comfort.js';
 
-export type { EventKey } from './helpers/event-key.js';
 export type { ReadingComfort } from './helpers/reading-comfort.js';
 
 // --- Profiles ---
