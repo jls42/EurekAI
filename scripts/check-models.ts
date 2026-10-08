@@ -29,6 +29,7 @@
  */
 import { pathToFileURL } from 'node:url';
 import { lightpanda } from '@lightpanda/browser';
+import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 
@@ -46,6 +47,7 @@ const WATCHED_ALIASES = [
 /** Tout id que l'app envoie tel quel à l'API : alias ci-dessus + versions épinglées (sources uniques). */
 export const WATCHED_MODELS: readonly string[] = [
   ...WATCHED_ALIASES,
+  MISTRAL_LARGE_4,
   ...OCR_MODELS,
   MODERATION_MODEL,
 ];

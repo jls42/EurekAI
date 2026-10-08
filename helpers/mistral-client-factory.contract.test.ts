@@ -6,6 +6,7 @@
 // renommé, réponse rejetée) échoue ici, alors que tracked-client.test.ts tourne sur un faux client.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildTrackedClient } from './mistral-client-factory.js';
+import { MISTRAL_LARGE_4 } from './chat-models.js';
 import { runWithUsageTracking } from './usage-context.js';
 import { calculateTotalCost } from './cost-calc.js';
 import { SDK_RETRIED_STATUSES } from './mistral-retry.js';
@@ -226,6 +227,17 @@ describe('client suivi — contrat du SDK installé', () => {
         },
       },
     });
+  });
+
+  it('chat.complete : Large 4 part avec reasoning_effort none, sauf choix explicite', async () => {
+    const sent = stubFetch({ '/v1/chat/completions': CHAT_RESPONSE });
+    const client = newClient();
+    const messages = [{ role: 'user' as const, content: 'ok' }];
+    await client.chat.complete({ model: MISTRAL_LARGE_4, messages });
+    await client.chat.complete({ model: MISTRAL_LARGE_4, messages, reasoningEffort: 'high' });
+    await client.chat.complete({ model: 'mistral-large-latest', messages });
+    const efforts = sent.map((r) => (r.body as { reasoning_effort?: string }).reasoning_effort);
+    expect(efforts).toEqual(['none', 'high', undefined]);
   });
 
   it('audio.transcriptions (STT) : secondes audio captées, segment à bornes nulles accepté', async () => {

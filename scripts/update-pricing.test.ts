@@ -75,6 +75,30 @@ describe('extractPriceSnippets', () => {
     expect(extractPriceSnippets('no price here\njust text')).toEqual([]);
   });
 
+  it('reads promotional prices, list price struck first (real Large 4 card, 2026-10-08)', () => {
+    const md = [
+      'Price',
+      'i',
+      'USDEUR',
+      'Sale price',
+      '~~Original price: $1.36~~Sale price: $0.68',
+      '',
+      'Input/M Tokens',
+      '~~Original price: $0.14~~Sale price: $0.07',
+      '',
+      'Cached input/M Tokens',
+      '~~Original price: $4.18~~Sale price: $2.09',
+      '',
+      'Output/M Tokens',
+      'Speed',
+    ].join('\n');
+    expect(extractPriceSnippets(md)).toEqual([
+      'Sale price ~~Original price: $1.36~~Sale price: $0.68 Input/M Tokens',
+      'Input/M Tokens ~~Original price: $0.14~~Sale price: $0.07 Cached input/M Tokens',
+      'Cached input/M Tokens ~~Original price: $4.18~~Sale price: $2.09 Output/M Tokens',
+    ]);
+  });
+
   it('dedupes identical snippets', () => {
     const md = 'Price\n$2\n/1000 Pages\nPrice\n$2\n/1000 Pages';
     expect(extractPriceSnippets(md)).toEqual(['Price $2 /1000 Pages']);
