@@ -1,4 +1,5 @@
 import { Mistral } from '@mistralai/mistralai';
+import type { ResponseFormat } from '@mistralai/mistralai/models/components';
 import {
   getContent,
   retryTurns,
@@ -6,9 +7,15 @@ import {
   tryParseJson,
   unwrapJsonArray,
 } from '../helpers/index.js';
-import { diversityParams } from '../helpers/diversity.js';
+import { diversityParams, exclusionItems } from '../helpers/diversity.js';
 import { logger } from '../helpers/logger.js';
-import { podcastSystem, podcastUser, pickPodcastNames, podcastRetryUser } from '../prompts.js';
+import {
+  podcastSystem,
+  podcastUser,
+  pickPodcastHook,
+  pickPodcastNames,
+  podcastRetryUser,
+} from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
 
 interface ParsedPodcastResponse {
@@ -19,6 +26,44 @@ interface ParsedPodcastResponse {
 export interface PodcastResult extends ParsedPodcastResponse {
   names: PodcastSpeakers;
 }
+
+// Sortie structurée stricte plutôt que `json_object` (mesuré le 2026-10-04 sur
+// mistral-large-latest, rapport dans output/podcast-corpus/2026-10-04/, hors git) : en
+// `json_object`, 10 premiers appels sur 20 étaient inexploitables (2 sur 10 sans bloc
+// d'exclusions) — script vide `{"script": [ },` (9 tokens) ou réplique dont la clé "speaker"
+// sort en " " — et la reprise n'en rattrapait pas toujours ; en schéma strict, 0 sur 310. Le
+// schéma impose la forme au décodage : speaker host/guest, texte non vide, 6 à 8 répliques
+// (la consigne du prompt).
+// Le SDK envoie `schemaDefinition` sous `json_schema.schema` (verrou : test de contrat du SDK).
+export const PODCAST_RESPONSE_FORMAT: ResponseFormat = {
+  type: 'json_schema',
+  jsonSchema: {
+    name: 'podcast',
+    strict: true,
+    schemaDefinition: {
+      type: 'object',
+      properties: {
+        script: {
+          type: 'array',
+          minItems: 6,
+          maxItems: 8,
+          items: {
+            type: 'object',
+            properties: {
+              speaker: { type: 'string', enum: ['host', 'guest'] },
+              text: { type: 'string', minLength: 1 },
+            },
+            required: ['speaker', 'text'],
+            additionalProperties: false,
+          },
+        },
+        sourceRefs: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['script', 'sourceRefs'],
+      additionalProperties: false,
+    },
+  },
+};
 
 function isValidPodcast(data: PodcastLine[]): boolean {
   return (
@@ -31,6 +76,24 @@ function isValidPodcast(data: PodcastLine[]): boolean {
     )
   );
 }
+
+// Forme d'une réplique refusée, SANS son texte (contenu tiré de la leçon de l'élève) : clés,
+// speaker valide, longueur du texte. Assez pour diagnostiquer un refus (clé "speaker" sortie
+// en " ", texte vide) sans journaliser le contenu.
+const describeLine = (line: unknown): unknown => {
+  if (line === null) return 'null';
+  if (typeof line !== 'object') return typeof line;
+  const { speaker, text } = line as Record<string, unknown>;
+  return {
+    keys: Object.keys(line).map((key) => key.slice(0, 20)),
+    speakerOk: speaker === 'host' || speaker === 'guest',
+    textLength: typeof text === 'string' ? text.length : null,
+  };
+};
+
+const describeScript = (script: unknown[]): string => {
+  return JSON.stringify(script.map(describeLine)).slice(0, 300);
+};
 
 // Reçoit le JSON déjà parsé : tryParseJson au 1er essai (null si tronqué → script vide → retry),
 // safeParseJson au retry (SyntaxError → llm_invalid_json). Fléchée : délimitée par Lizard.
@@ -59,15 +122,16 @@ export async function generatePodcastScript(
   exclusions?: string,
 ): Promise<PodcastResult> {
   const names = pickPodcastNames();
+  const hook = pickPodcastHook(exclusionItems(exclusions ?? ''));
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
-    { role: 'system', content: podcastSystem(ageGroup, names) },
+    { role: 'system', content: podcastSystem(ageGroup, names, hook) },
     { role: 'user', content: podcastUser(markdown, lang, exclusions) },
   ];
 
   const response = await client.chat.complete({
     model,
     messages,
-    responseFormat: { type: 'json_object' },
+    responseFormat: PODCAST_RESPONSE_FORMAT,
     ...diversityParams('podcast'),
   });
 
@@ -76,22 +140,21 @@ export async function generatePodcastScript(
 
   if (isValidPodcast(result.script)) return { ...result, names };
 
-  logger.warn(
-    'podcast',
-    'validation failed, retrying:',
-    JSON.stringify(result.script).slice(0, 200),
-  );
+  logger.warn('podcast', 'validation failed, retrying:', describeScript(result.script));
   messages.push(...retryTurns(raw, podcastRetryUser(lang)));
 
   const retry = await client.chat.complete({
     model,
     messages,
-    responseFormat: { type: 'json_object' },
+    responseFormat: PODCAST_RESPONSE_FORMAT,
     ...diversityParams('podcast'),
   });
   const retryResult = parsePodcastResponse(safeParseJson(getContent(retry)));
 
   if (!isValidPodcast(retryResult.script)) {
+    // Le motif du refus se lit dans le journal : sans lui, l'échec du 2026-10-04 (reprise de
+    // 704 tokens refusée) restait inexpliqué.
+    logger.warn('podcast', 'retry invalid:', describeScript(retryResult.script));
     // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.
     throw new SyntaxError(
       "Le modele n'a pas reussi a generer un podcast valide apres 2 tentatives",

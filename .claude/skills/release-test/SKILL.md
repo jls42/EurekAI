@@ -20,6 +20,8 @@ Le skill ne touche jamais aux donnees reelles de l'user et ne reset rien. Mode p
 
 Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent que si l'user le demande explicitement.
 
+**Variante instance isolee** (le depot principal sert l'app a quelqu'un, ou la branche a tester n'y est pas) : depuis le worktree de la branche (`npm ci` deja fait), `npm run build` puis `PORT=3001 NODE_ENV=production HTTPS_KEY=... HTTPS_CERT=... npx tsx --env-file=<depot principal>/.env server.ts` en arriere-plan (la CSP de production impose HTTPS ; `BASE_URL=https://localhost:3001` pour le script securite). Ses donnees vont dans le `output/` du worktree : pas de sauvegarde a faire, et l'origine `https://localhost:3001` a son propre `localStorage` (relever ses cles `sf-*` avant de les ecraser). En fin de run : profil de test supprime, cles `sf-*` de cette origine retirees, instance arretee, `output/` et `dist/` du worktree supprimes (vecu le 2026-10-04, PR #99).
+
 ### Pieges d'automatisation connus (mesures 2026-09-26)
 
 - **`pinLimiter` = 10 PIN FAUX / 15 min par IP** sur `PUT` et `DELETE /api/profiles/:id` (seuls les refus 403 comptent : un bon PIN et une requete sans `pin` ne comptent pas). Au-dela, TOUT PIN de cette IP recoit 429 `rate_limited` jusqu'a la fin de la fenetre, bon PIN compris : le `DELETE` de nettoyage aussi. Ne jamais taper de PIN faux en dehors d'un test voulu. `authLimiter` (30 / 15 min) ne couvre plus que la creation (`POST /api/profiles`) ; la lecture et les enregistrements sans PIN n'ont que `generalLimiter`. Apres un 429 : lire `Retry-After` (`curl -i`) et attendre, ou redemarrer le serveur de dev, qui remet tous les compteurs a zero (stockage memoire) : c'est le moyen de nettoyer tout de suite apres une rafale de PIN.

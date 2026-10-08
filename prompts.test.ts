@@ -24,6 +24,7 @@ import {
   podcastSystem,
   podcastUser,
   pickPodcastNames,
+  pickPodcastHook,
   PODCAST_NAME_POOL,
   fillBlankSystem,
   fillBlankUser,
@@ -677,6 +678,71 @@ describe('pickPodcastNames', () => {
     expect(PODCAST_NAME_POOL.length).toBeGreaterThanOrEqual(10);
     // Tous uniques
     expect(new Set(PODCAST_NAME_POOL).size).toBe(PODCAST_NAME_POOL.length);
+  });
+});
+
+// ── Accroche du podcast (mesure du 2026-10-04, cf. commentaire de PODCAST_HOOKS) ──
+describe('podcastSystem accroche et conclusion', () => {
+  const names = { host: 'Camille', guest: 'Sasha' };
+
+  it("impose la forme et les premiers mots de l'accroche, sans interpeller l'autre", () => {
+    const podcast = podcastSystem(
+      'enfant',
+      names,
+      pickPodcastHook([], () => 0),
+    );
+    expect(podcast).toContain(
+      'Camille lance le sujet par une devinette, sans interpeller Sasha : sa premiere replique commence par « Devine ».',
+    );
+  });
+
+  it("n'impose plus « Tu savais que » ni « Imagine un instant » (formes reprises malgre les exclusions)", () => {
+    const podcast = podcastSystem('enfant', names);
+    expect(podcast).not.toContain('Tu savais que');
+    expect(podcast).not.toContain('Imagine un instant');
+  });
+
+  it('borne le dialogue et confie la conclusion au host (schema strict : 8 repliques au plus)', () => {
+    const podcast = podcastSystem('enfant', names);
+    expect(podcast).toContain('6 a 8 repliques AU TOTAL, conclusion comprise');
+    expect(podcast).toContain('la DERNIERE replique est celle de Camille');
+  });
+});
+
+describe('pickPodcastHook', () => {
+  const startOf = (previous: string[], rng: () => number) => pickPodcastHook(previous, rng).start;
+
+  it('sans podcast precedent, tire dans tout le pool (RNG injectable, clamp a 1)', () => {
+    expect(startOf([], () => 0)).toBe('Devine');
+    expect(startOf([], () => 1)).toBe('Écoute bien');
+  });
+
+  it('ecarte un debut deja pris, en mots entiers, sans tenir compte des accents ni de la casse', () => {
+    const previous = ['Devine quoi, Charlie : je suis une montagne', 'DEFI express : si je te dis'];
+    const starts = Array.from({ length: 20 }, (_, i) => startOf(previous, () => i / 20));
+    expect(starts).not.toContain('Devine');
+    expect(starts).not.toContain('Défi');
+    expect(starts).toContain('Un jour');
+    // « Définitivement » ne prend pas « Défi » : comparaison par mots entiers.
+    expect(startOf(['Définitivement, la lave est chaude'], () => 0.8)).toBe('Défi');
+  });
+
+  it('tous les debuts pris : repli sur le pool complet', () => {
+    const all = [
+      'Devine',
+      'Un jour',
+      'Tu connais',
+      'Vrai ou faux',
+      'Ferme les yeux',
+      'Défi',
+      'Écoute bien',
+    ];
+    expect(
+      startOf(
+        all.map((s) => `${s}, la suite`),
+        () => 0,
+      ),
+    ).toBe('Devine');
   });
 });
 

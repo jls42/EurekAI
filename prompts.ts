@@ -511,12 +511,16 @@ export const PODCAST_NAME_POOL = [
   'Valéry',
 ] as const;
 
+// Generateur aleatoire injectable (tests deterministes). Alias plutot que `() => number` en ligne
+// dans la signature : Lizard ne mesurait alors que la signature (CLAUDE.md, pieges Lizard).
+type Rng = () => number;
+
 // Tire deux prenoms distincts du pool via un RNG injectable (tests deterministes).
 // Le decalage `j >= i` garantit host != guest sans boucle retry.
 // Math.min clamp : Math.random() ne retourne jamais 1 (spec ECMAScript), mais un test
 // injectant `() => 1` produirait floor(1 * N) = N (out of bounds → undefined). Clamp
 // défensif sur l'index, peu coûteux.
-export function pickPodcastNames(rng: () => number = Math.random): PodcastSpeakers {
+export function pickPodcastNames(rng: Rng = Math.random): PodcastSpeakers {
   const N = PODCAST_NAME_POOL.length;
   const i = Math.min(Math.floor(rng() * N), N - 1);
   let j = Math.min(Math.floor(rng() * (N - 1)), N - 2);
@@ -528,9 +532,54 @@ export function pickPodcastNames(rng: () => number = Math.random): PodcastSpeake
 // default param, flagge par SonarQube comme confusing pitfall (re-cree a chaque appel).
 const DEFAULT_PODCAST_NAMES = { host: 'Alex', guest: 'Charlie' } as const;
 
+// Accroche : une forme ET ses premiers mots, tires au sort parmi ceux qu'aucun podcast precedent
+// du projet n'a utilises. Mesure le 2026-10-04 (output/podcast-corpus/2026-10-04/, hors git) :
+// avec les formes imposees « "Tu savais que...?" ou "Imagine un instant..." » et le bloc
+// d'exclusions, 11 podcasts sur 20 rouvraient comme un podcast deja genere (20 sur 20 sur une
+// autre lecon) — lister les accroches passees amorce leur reprise, prenom compris. Une forme tiree
+// au sort, sans premiers mots imposes, ne suffisait pas (jusqu'a 6 reprises sur 10, et jusqu'a 8
+// ouvertures sur 20 par un prenom) ; avec eux, 0 reprise sur 60.
+const PODCAST_HOOKS = [
+  { style: 'une devinette', start: 'Devine' },
+  { style: 'une petite histoire', start: 'Un jour' },
+  { style: 'une comparaison avec un objet de tous les jours', start: 'Tu connais' },
+  { style: 'un vrai ou faux', start: 'Vrai ou faux' },
+  { style: 'une scene a imaginer', start: 'Ferme les yeux' },
+  { style: 'un petit defi', start: 'Défi' },
+  { style: 'une invitation a bien ecouter', start: 'Écoute bien' },
+] as const;
+
+type PodcastHook = (typeof PODCAST_HOOKS)[number];
+
+// Minuscules, sans accents ni ponctuation : « Défi : … » et « defi… » s'ouvrent pareil.
+const normalizeOpening = (text: string): string =>
+  ` ${text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()} `;
+
+// `previousOpenings` : premieres repliques des podcasts deja generes (exclusionItems du bloc
+// d'exclusions). Comparaison par mots entiers (« Définitivement » ne prend pas « Défi »). Tous
+// pris → pool complet. Meme clamp que pickPodcastNames (un RNG injecte peut renvoyer 1).
+export function pickPodcastHook(
+  previousOpenings: readonly string[],
+  rng: Rng = Math.random,
+): PodcastHook {
+  const taken = previousOpenings.map(normalizeOpening);
+  const free = PODCAST_HOOKS.filter((h) => {
+    const start = normalizeOpening(h.start);
+    return !taken.some((opening) => opening.startsWith(start));
+  });
+  const pool = free.length > 0 ? free : PODCAST_HOOKS;
+  return pool[Math.min(Math.floor(rng() * pool.length), pool.length - 1)];
+}
+
 export function podcastSystem(
   ageGroup: AgeGroup = 'enfant',
   names: PodcastSpeakers = DEFAULT_PODCAST_NAMES,
+  hook: PodcastHook = PODCAST_HOOKS[0],
 ): string {
   return `Ecris un script de mini-podcast educatif en JSON strict.
 
@@ -540,12 +589,12 @@ PERSONNAGES (distincts, formulations variees) :
 Interpelle l'autre par son prenom une seule fois au maximum sur l'ensemble du dialogue, integre au fil d'une phrase (pas en accroche, pas en debut de replique). Exemple : "Tu peux me redire pourquoi ${names.host} ?". Varie les formulations pour eviter que les repliques se ressemblent.
 
 Format : {"script": [{"speaker": "host", "text": "..."}, {"speaker": "guest", "text": "..."}], "sourceRefs": ["Source 2", "Source 5"]}
-6-8 repliques. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
+6 a 8 repliques AU TOTAL, conclusion comprise. Ton ludique, engageant, naturel. ${ageInstruction(ageGroup)}
 
 STRUCTURE :
-- Accroche : ${names.host} pose le sujet de maniere intrigante ("Tu savais que...?" ou "Imagine un instant...").
+- Accroche : ${names.host} lance le sujet par ${hook.style}, sans interpeller ${names.guest} : sa premiere replique commence par « ${hook.start} ».
 - Developpement : alternance ${names.host}/${names.guest} avec progression logique. ${names.guest} relance par des questions, ${names.host} repond avec des exemples concrets.
-- Conclusion : resume fun ou anecdote marquante a retenir.
+- Conclusion : la DERNIERE replique est celle de ${names.host}, un resume fun ou une anecdote marquante a retenir.
 
 ${sourceRefsInstruction('podcast')}
 ATTENTION : ne mentionne JAMAIS les sources dans le dialogue du podcast. Les personnages parlent comme s'ils connaissaient le sujet par eux-memes, sans evoquer leur documentation. Les sourceRefs sont des metadonnees JSON separees du script, pas du contenu parle.
