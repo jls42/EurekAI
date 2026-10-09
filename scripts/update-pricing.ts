@@ -31,7 +31,9 @@ const PRICE_UNIT = /tokens|pages|char|\/M\b|\/1000|\/min|per (1k|min|million)/i;
 // `Price` / `i` / `Free` ; page tarifs : `Classifier APIs` / `Free`) → équivaut à $0. Ligne entière
 // exigée : l'infobulle « Free for a limited amount of time. » ne matche pas.
 const FREE_LINE = /^(free|gratuit)$/i;
-const DOLLAR_LINE = /^\$\d/;
+// Prix en promotion : tarif public barré en tête de ligne, `~~Original price: $1.36~~Sale price: $0.68`
+// (fiche de Large 4 à son lancement, rendu du 2026-10-08) ; sans ce préfixe, « aucun prix rendu ».
+const DOLLAR_LINE = /^(?:~~Original price: )?\$\d/;
 
 const isPriceLine = (line = ''): boolean => FREE_LINE.test(line) || DOLLAR_LINE.test(line);
 

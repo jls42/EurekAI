@@ -9,6 +9,7 @@ const { lightpandaFetch } = vi.hoisted(() => ({
 }));
 vi.mock('@lightpanda/browser', () => ({ lightpanda: { fetch: lightpandaFetch } }));
 
+import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 import {
@@ -124,7 +125,8 @@ const OCR_41 = ['mistral-ocr-latest', 'mistral-ocr-4', 'mistral-ocr-4-1'];
 
 // Instantané COMPLET de GET /v1/models du 2026-09-25 (53 entrées, ordre réel, champs id / aliases /
 // deprecation) : `family` reproduit EXACTEMENT chaque entrée à partir de son groupe (vérifié sur la
-// capture). À rafraîchir quand une source unique (OCR_MODELS, MODERATION_MODEL) change de version.
+// capture). À rafraîchir quand une source unique (OCR_MODELS, MODERATION_MODEL, MISTRAL_LARGE_4)
+// change de version.
 const REAL_MODELS = [
   ['codestral-2508', 'codestral-latest', 'mistral-code-latest', 'mistral-code-fim-latest'],
   ['mistral-small-2603', 'mistral-small-latest', 'mistral-vibe-cli-fast', 'magistral-small-latest'],
@@ -150,6 +152,9 @@ const REAL_MODELS = [
     'voxtral-mini-realtime-latest',
   ],
   ['voxtral-mini-tts-2603', 'voxtral-mini-tts-latest'],
+  // Large 4 (sorti le 2026-10-06, surveillé depuis qu'il est proposé dans les Réglages) : ses 2
+  // entrées réelles du 2026-10-08, en fin de liste ; le reste est l'instantané du 2026-09-25.
+  ['mistral-large-4', 'mistral-large-4-0'],
 ].flatMap((ids) => family(ids));
 
 const LAG_40 = alertOf(
@@ -618,9 +623,9 @@ describe('OCR 3 (mistral-ocr-2512) exclu des règles de retard et de famille', (
   });
 });
 
-describe('acceptance on the real /v1/models snapshot (2026-09-25)', () => {
-  it('fixture: 53 entries, every watched model present', () => {
-    expect(REAL_MODELS).toHaveLength(53);
+describe('acceptance on the real /v1/models snapshot (2026-09-25, Large 4 du 2026-10-08)', () => {
+  it('fixture: 55 entries, every watched model present', () => {
+    expect(REAL_MODELS).toHaveLength(55);
     expect(findMissing(REAL_MODELS)).toEqual([]);
   });
 
@@ -672,13 +677,14 @@ describe('acceptance on the real /v1/models snapshot (2026-09-25)', () => {
 });
 
 describe('WATCHED_MODELS (sources uniques)', () => {
-  it('is the 5 resolved -latest aliases + OCR_MODELS + MODERATION_MODEL', () => {
+  it('is the 5 resolved -latest aliases + Large 4 + OCR_MODELS + MODERATION_MODEL', () => {
     expect(WATCHED_MODELS).toEqual([
       'mistral-large-latest',
       'mistral-medium-latest',
       'mistral-small-latest',
       'voxtral-mini-latest',
       'voxtral-mini-tts-latest',
+      MISTRAL_LARGE_4,
       ...OCR_MODELS,
       MODERATION_MODEL,
     ]);

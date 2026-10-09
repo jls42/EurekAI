@@ -2,6 +2,7 @@ import type { Mistral } from '@mistralai/mistralai';
 import type { ApiUsage, ToolCalls } from './pricing.js';
 import { resolvePricing, resolveToolPricing } from './pricing.js';
 import { callWithRetry } from './mistral-retry.js';
+import { withReasoningDefault } from './chat-models.js';
 import { logger } from './logger.js';
 
 type UsageCallback = (usage: ApiUsage) => void;
@@ -138,7 +139,9 @@ export function trackClient(client: Mistral, onUsage: UsageCallback): void {
 function wrapChatComplete(client: Mistral, onUsage: UsageCallback): void {
   const orig = client.chat.complete.bind(client.chat);
   client.chat.complete = async (request, options) => {
-    const response = await callWithRetry('chat', () => orig(request, options));
+    // Réflexion coupée pour les modèles qui raisonnent par défaut (Large 4, cf. chat-models.ts).
+    const sent = withReasoningDefault(request);
+    const response = await callWithRetry('chat', () => orig(sent, options));
     // cast requis : SDK usage.promptAudioSeconds est number|null, tsc refuse l'assignation directe au type local number (faux positif S4325, moteur TS Sonar plus permissif que tsc)
     onUsage(extractUsage(response as UsageExtractableResponse, request as RequestWithModel)); // NOSONAR(S4325)
     return response;

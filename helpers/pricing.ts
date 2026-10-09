@@ -43,6 +43,11 @@ export interface ToolPricing {
 /** Model pricing keyed by prefix — `mistral-large-2512` matches `mistral-large`. */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   'mistral-large': { inputPerMillion: 0.5, outputPerMillion: 1.5, unit: 'tokens' },
+  // Large 4 (mistral-large-4-0, option des Réglages) : plus long que 'mistral-large' → gagne le
+  // greedy-prefix. Tarif PUBLIC de sa fiche (vérifié le 2026-10-08) : lancé le 2026-10-06 à -50 %
+  // « pendant 2 semaines » (changelog, sans date de fin), promo NON reportée → le coût affiché est
+  // surestimé jusqu'à sa fin. Entrée en cache (0,14 $/M) comptée au tarif d'entrée, comme partout.
+  'mistral-large-4': { inputPerMillion: 1.36, outputPerMillion: 4.18, unit: 'tokens' },
   'mistral-medium': { inputPerMillion: 1.5, outputPerMillion: 7.5, unit: 'tokens' },
   'mistral-small': { inputPerMillion: 0.15, outputPerMillion: 0.6, unit: 'tokens' },
   'voxtral-mini-tts': { inputPerMillion: 16, outputPerMillion: 0, unit: 'characters' },
@@ -69,6 +74,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
  */
 export const PRICING_SOURCES: Record<string, string> = {
   'mistral-large': 'https://docs.mistral.ai/models/mistral-large-3-25-12',
+  'mistral-large-4': 'https://docs.mistral.ai/models/mistral-large-4-0',
   'mistral-medium': 'https://docs.mistral.ai/models/mistral-medium-3-5-26-04',
   'mistral-small': 'https://docs.mistral.ai/models/mistral-small-4-0-26-03',
   'voxtral-mini-tts': 'https://docs.mistral.ai/models/voxtral-tts-26-03',

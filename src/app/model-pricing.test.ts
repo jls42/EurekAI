@@ -10,6 +10,10 @@ describe('modelPriceLabel', () => {
     expect(modelPriceLabel('mistral-large-latest', t)).toBe('$0.50 / $1.50 settings.perMTokens');
   });
 
+  it('formats token pricing for Large 4 (its own price, not Large 3)', () => {
+    expect(modelPriceLabel('mistral-large-4-0', t)).toBe('$1.36 / $4.18 settings.perMTokens');
+  });
+
   it('formats token pricing for medium', () => {
     expect(modelPriceLabel('mistral-medium-latest', t)).toBe('$1.50 / $7.50 settings.perMTokens');
   });

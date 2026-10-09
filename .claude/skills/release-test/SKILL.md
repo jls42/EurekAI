@@ -163,7 +163,7 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
    - Les labels OCR montrent le **nom produit** (`OCR_MODEL_LABELS` : "OCR 4" / "OCR 3"), PAS l'ID brut ; OCR 4 affiche 4 USD, OCR 3 affiche 2 USD (signe dollar dans l'UI), les deux avec l'unite pages (`1000`).
    - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-1`).
    - L'option `DEFAULT_OCR_MODEL` (OCR 4) porte le suffixe recommande (texte i18n `settings.recommended`).
-   - Labels modele principal : en USD par M tokens (entree / sortie) : `mistral-large` → 0.50 / 1.50, `mistral-medium` → 1.50 / 7.50, `mistral-small` → 0.15 / 0.60.
+   - Labels modele principal : en USD par M tokens (entree / sortie) : `mistral-large` → 0.50 / 1.50, `mistral-large-4-0` → 1.36 / 4.18 (option, tarif public hors promotion), `mistral-medium` → 1.50 / 7.50, `mistral-small` → 0.15 / 0.60.
    - `tts` affiche 16 USD par M caracteres.
    - **AUCUN** label/span ne contient `tarif indisponible` / `price unavailable` (regression `modelPriceLabel` → `priceUnknown`, ex. unite `audio-seconds` non geree).
 4. Screenshot du dialog (preuve visuelle des tarifs).

@@ -24,6 +24,16 @@ describe('resolvePricing', () => {
     expect(resolvePricing('mistral-large-latest')).toEqual(MODEL_PRICING['mistral-large']);
   });
 
+  it('resolves Large 4 (pinned id and alias) to its own pricing (longer prefix wins)', () => {
+    expect(resolvePricing('mistral-large-4-0')).toEqual(MODEL_PRICING['mistral-large-4']);
+    expect(resolvePricing('mistral-large-4')).toEqual(MODEL_PRICING['mistral-large-4']);
+    expect(MODEL_PRICING['mistral-large-4']).toEqual({
+      inputPerMillion: 1.36,
+      outputPerMillion: 4.18,
+      unit: 'tokens',
+    });
+  });
+
   it('resolves voxtral-mini-tts-2603 to TTS pricing (longer prefix wins)', () => {
     const p = resolvePricing('voxtral-mini-tts-2603');
     expect(p).toEqual(MODEL_PRICING['voxtral-mini-tts']);
