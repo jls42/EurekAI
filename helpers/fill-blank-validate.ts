@@ -8,8 +8,8 @@ import type { FillBlankItem } from '../types.js';
  * ligature œ, exposant ᵉ) et une faute de frappe sur les MOTS. Un nombre, une date, un siècle ou un
  * chiffre romain doit être exact (« 1788 » n'est pas « 1789 », « XIVe » n'est pas « XVe » : la
  * tolérance de frappe les acceptait), mais toutes ses écritures se valent : « 9 » = « neuf »,
- * « XVe » = « 15e » = « quinzième », « -3000 » = « 3000 av. J.-C. » — sauf quand la phrase ou
- * l'indice impose une écriture (« en chiffres romains », « en lettres »). Chaque écriture d'une
+ * « XVe » = « 15e » = « quinzième », « -3000 » = « 3000 av. J.-C. » — sauf quand la phrase (pas
+ * l'indice, caché) impose une écriture (« en chiffres romains », « en lettres »). Chaque écriture d'une
  * réponse compte : `answer`, ses parenthèses (« XVe (quinzième) ») et `accepted`.
  */
 
@@ -329,10 +329,12 @@ const ROMAN_NOTATION = /\bchiffres? romains?\b|\bnumeration romaine\b|\blettres?
 const WORD_NOTATION = /\ben (?:toutes )?lettres\b/;
 const DIGIT_NOTATION = /\ben chiffres?\b/;
 
-// Écriture imposée par la phrase ou l'indice : « 15 » ne vaut plus « XV » quand on demande les
-// chiffres romains. « Empire romain » n'impose rien.
+// Écriture imposée par la PHRASE : « 15 » ne vaut plus « XV » quand elle demande les chiffres
+// romains. Jamais par l'indice, caché tant que l'enfant ne l'ouvre pas (vécu au release-test du
+// 2026-10-10 : « Écris-le en chiffres romains » dans l'indice faisait refuser « 5e »).
+// « Empire romain » n'impose rien.
 const imposedFamily = (key: FillBlankKey): Family | null => {
-  const context = normalizeAnswer(`${key.sentence ?? ''} ${key.hint ?? ''}`);
+  const context = normalizeAnswer(key.sentence ?? '');
   if (ROMAN_NOTATION.test(context)) return 'r';
   if (WORD_NOTATION.test(context)) return 'w';
   return DIGIT_NOTATION.test(context) ? 'a' : null;

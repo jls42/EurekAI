@@ -16,6 +16,9 @@ vi.mock('./fill-blank-validate', () => ({
 
 import { validateAnswer, isExactSpelling } from './fill-blank-validate';
 
+// Touche Entrée simulée : handleKey annule son action par défaut.
+const enterKey = () => ({ key: 'Enter', preventDefault: vi.fn() }) as unknown as KeyboardEvent;
+
 function createFillBlank(exercises: any[]) {
   const gen = {
     id: 'gen-fb-1',
@@ -26,7 +29,8 @@ function createFillBlank(exercises: any[]) {
   comp.showToast = vi.fn();
   comp.t = vi.fn((key: string) => key);
   comp.$nextTick = vi.fn((cb: () => void) => cb());
-  comp.$refs = { blankInput: { focus: vi.fn() } };
+  // nextButton visible (offsetParent non nul) : focusNextButton le focalise sans attendre d'image.
+  comp.$refs = { blankInput: { focus: vi.fn() }, nextButton: { offsetParent: {}, focus: vi.fn() } };
   return comp;
 }
 
@@ -101,6 +105,27 @@ describe('fillBlankComponent', () => {
   });
 
   describe('checkAnswer()', () => {
+    it('donne le focus à « Suivante » (le champ désactivé l’a perdu : Entrée passe à la suite)', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.answer = 'mer';
+      comp.checkAnswer();
+      expect(comp.$refs.nextButton.focus).toHaveBeenCalled();
+    });
+
+    it('réessaie à l’image suivante tant que « Suivante » est masqué par la transition', () => {
+      const frames: Array<() => void> = [];
+      vi.stubGlobal('requestAnimationFrame', (cb: () => void) => frames.push(cb));
+      const comp = createFillBlank(sampleExercises);
+      comp.$refs.nextButton.offsetParent = null;
+      comp.answer = 'ciel';
+      comp.checkAnswer();
+      expect(comp.$refs.nextButton.focus).not.toHaveBeenCalled();
+      comp.$refs.nextButton.offsetParent = {};
+      frames.shift()?.();
+      expect(comp.$refs.nextButton.focus).toHaveBeenCalled();
+      vi.unstubAllGlobals();
+    });
+
     it('bonne reponse incremente le score', () => {
       const comp = createFillBlank(sampleExercises);
       comp.answer = 'ciel';
@@ -153,10 +178,18 @@ describe('fillBlankComponent', () => {
   });
 
   describe('handleKey()', () => {
+    it('Entrée : preventDefault, sinon son keypress activerait « Suivante », qui prend le focus', () => {
+      const comp = createFillBlank(sampleExercises);
+      comp.answer = 'ciel';
+      const key = enterKey();
+      comp.handleKey(key);
+      expect(key.preventDefault).toHaveBeenCalled();
+    });
+
     it('checkAnswer sur Enter quand reponse non vide et pas de feedback', () => {
       const comp = createFillBlank(sampleExercises);
       comp.answer = 'ciel';
-      comp.handleKey({ key: 'Enter' } as KeyboardEvent);
+      comp.handleKey(enterKey());
       expect(comp.feedback).not.toBeNull();
     });
 
@@ -164,7 +197,7 @@ describe('fillBlankComponent', () => {
       const comp = createFillBlank(sampleExercises);
       comp.answer = 'ciel';
       comp.checkAnswer();
-      comp.handleKey({ key: 'Enter' } as KeyboardEvent);
+      comp.handleKey(enterKey());
       expect(comp.currentQ).toBe(1);
       expect(comp.feedback).toBeNull();
     });
@@ -179,7 +212,7 @@ describe('fillBlankComponent', () => {
     it('ne fait rien si answer est vide et pas de feedback', () => {
       const comp = createFillBlank(sampleExercises);
       comp.answer = '   ';
-      comp.handleKey({ key: 'Enter' } as KeyboardEvent);
+      comp.handleKey(enterKey());
       expect(comp.feedback).toBeNull();
     });
   });
@@ -327,7 +360,7 @@ describe('fillBlankComponent', () => {
       comp.highWaterMark = 1;
       comp.currentQ = 0;
       comp.answer = 'test';
-      comp.handleKey({ key: 'Enter' });
+      comp.handleKey(enterKey());
       expect(comp.feedback).toBeNull();
     });
   });

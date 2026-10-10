@@ -224,6 +224,19 @@ describe('nombres, écritures et accepted', () => {
     expect(validateAnswer(child, key)).toBe(false);
   });
 
+  it("l'indice, caché tant que l'enfant ne l'ouvre pas, n'impose aucune écriture", () => {
+    // Exercice réel du release-test du 2026-10-10 : « 5e » était refusé à cause de l'indice.
+    const key = {
+      answer: 'Ve',
+      accepted: ['5e', 'cinquième'],
+      sentence: "La chute de l'Empire romain d'Occident a lieu en 476, au ___ siècle.",
+      hint: "Écris-le en chiffres romains : c'est le siècle qui suit le IVe.",
+    };
+    expect(validateAnswer('5e', key)).toBe(true);
+    expect(validateAnswer('cinquième', key)).toBe(true);
+    expect(validateAnswer('IVe', key)).toBe(false);
+  });
+
   it("« Empire romain » n'impose pas les chiffres romains", () => {
     const key = { answer: 'Ve', sentence: "L'Empire romain d'Occident tombe au ___ siècle." };
     expect(validateAnswer('5e', key)).toBe(true);
