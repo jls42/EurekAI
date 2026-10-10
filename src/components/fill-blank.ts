@@ -43,8 +43,8 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       const idx = this.currentIndex();
       const ex = this.currentExercise();
       if (idx === undefined || !ex) return;
-      const correct = validateAnswer(this.answer, ex.answer);
-      const misspelled = correct && !isExactSpelling(this.answer, ex.answer);
+      const correct = validateAnswer(this.answer, ex);
+      const misspelled = correct && !isExactSpelling(this.answer, ex);
       this.answers[idx] = this.answer;
       this.results[idx] = correct;
       if (correct) this.score++;
@@ -66,7 +66,7 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
         this.answer = this.answers[idx];
         const ex = this.items()[idx];
         const correct = this.results[idx];
-        const misspelled = correct && !isExactSpelling(this.answers[idx], ex?.answer ?? '');
+        const misspelled = correct && !isExactSpelling(this.answers[idx], ex ?? '');
         this.feedback = { correct, correctAnswer: ex?.answer, misspelled };
       } else {
         this.answer = '';

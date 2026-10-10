@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { exclusionHeader } from '../prompts.js';
+import { normalizeAnswer } from './fill-blank-validate.js';
 import type { Generation } from '../types.js';
 
 const PARAMS: Record<string, { temperature: number; presencePenalty: number }> = {
@@ -160,23 +161,10 @@ export function previousItems(generations: Generation[], type: string): string[]
   return EXTRACTORS[type](generations.filter((g) => g.type === type));
 }
 
-// Article de tête d'une réponse de texte à trous (le prompt l'inclut dans la réponse). \x27 et
-// \x60 plutôt que l'apostrophe et l'accent grave dans les regex : Lizard ne voyait plus answerKey.
-const LEADING_ARTICLE = /^(?:(?:de )?[dl]\x27\s*|(?:les|le|la|une|un|des|du|de la)\s+)/;
-
-// Clé de comparaison d'une réponse : sans casse, accents, apostrophe typographique ni article de
-// tête (« l’Histoire », « l'histoire » et « histoire » ; « un volcan » et « volcan »).
-export const answerKey = (answer: string): string => {
-  const plain = answer
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[’\x60]/g, "'")
-    .replace(/[^a-z0-9\x27 ]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return plain.replace(LEADING_ARTICLE, '');
-};
+// Clé de comparaison d'une réponse : la normalisation du correcteur des textes à trous (casse,
+// accents, typographie des tablettes et article de tête ignorés : « l’Histoire », « l'histoire » et
+// « histoire » ; « un volcan » et « volcan »).
+export const answerKey = (answer: string): string => normalizeAnswer(answer);
 
 // Textes à trous dont la réponse n'a pas encore servi d'abord, les autres ensuite : chaque groupe
 // garde l'ordre du modèle (du plus simple au plus difficile).

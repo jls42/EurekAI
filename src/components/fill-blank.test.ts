@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { fillBlankComponent } from './fill-blank';
 
+// Le composant passe l'exercice entier (accepted, phrase) ; le mock ne lit que sa réponse.
+type Key = string | { answer: string };
+const answerOf = (key: Key): string => (typeof key === 'string' ? key : key.answer);
+
 vi.mock('./fill-blank-validate', () => ({
-  validateAnswer: vi.fn((userAnswer: string, correctAnswer: string) => {
-    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+  validateAnswer: vi.fn((userAnswer: string, key: Key) => {
+    return userAnswer.trim().toLowerCase() === answerOf(key).trim().toLowerCase();
   }),
-  isExactSpelling: vi.fn((userAnswer: string, correctAnswer: string) => {
-    return userAnswer.trim().toLowerCase() === correctAnswer.trim().toLowerCase();
+  isExactSpelling: vi.fn((userAnswer: string, key: Key) => {
+    return userAnswer.trim().toLowerCase() === answerOf(key).trim().toLowerCase();
   }),
 }));
 
@@ -117,11 +121,14 @@ describe('fillBlankComponent', () => {
       expect(comp.feedback).toEqual({ correct: false, correctAnswer: 'ciel', misspelled: false });
     });
 
-    it('appelle validateAnswer avec la bonne reponse', () => {
+    it("appelle validateAnswer avec l'exercice entier (accepted et phrase compris)", () => {
       const comp = createFillBlank(sampleExercises);
       comp.answer = 'Ciel';
       comp.checkAnswer();
-      expect(validateAnswer).toHaveBeenCalledWith('Ciel', 'ciel');
+      expect(validateAnswer).toHaveBeenCalledWith(
+        'Ciel',
+        expect.objectContaining({ answer: 'ciel' }),
+      );
     });
 
     it('enregistre la reponse au bon index avec queue', () => {

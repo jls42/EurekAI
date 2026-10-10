@@ -445,6 +445,53 @@ describe('FILL_BLANK', () => {
   it('fillBlankUser inclut le count', () => {
     expect(fillBlankUser('content', 20)).toContain('20');
   });
+
+  // Mesures des 2026-10-09 et 2026-10-10 (output/fill-blank-corpus/, hors git) : réponses justes
+  // refusées (synonyme, réponse longue, nombre écrit autrement), indices qui donnent la réponse.
+  it('une réponse : le mot du contenu, une seule écriture, les autres dans accepted', () => {
+    const system = fillBlankSystem('enfant');
+    expect(system).toContain('JAMAIS un synonyme');
+    expect(system).toContain('UNE SEULE bonne reponse');
+    expect(system).toContain('sans parenthese ni alternative');
+    expect(system).toContain('accepted : les autres ecritures justes de la MEME reponse');
+    expect(system).toContain('"accepted":["8 pattes"]');
+    expect(fillBlankUser('content', 10)).toContain('"accepted": []');
+    expect(fillBlankRetryUser(10)).toContain('answer, accepted, hint');
+  });
+
+  it("l'indice mène à la réponse complète sans la donner (famille, calcul, encadrement, dessin)", () => {
+    const system = fillBlankSystem('enfant');
+    expect(system).toContain('mene a la reponse COMPLETE');
+    expect(system).toContain('ni un mot de sa famille');
+    expect(system).toContain('JAMAIS le resultat, un encadrement');
+  });
+});
+
+describe('FIDELITE AU CONTENU', () => {
+  const contentPrompts = [
+    ['quizSystem', quizSystem('enfant')],
+    ['quizVocalSystem', quizVocalSystem('enfant', 'fr')],
+    ['quizReviewSystem', quizReviewSystem('enfant')],
+    ['fillBlankSystem', fillBlankSystem('enfant')],
+    ['flashcardsSystem', flashcardsSystem('enfant')],
+  ];
+
+  it.each(contentPrompts)('%s : rien d’inventé, règle des siècles comprise', (_name, system) => {
+    expect(system).toContain('FIDELITE AU CONTENU');
+    expect(system).toContain('AUCUN chiffre, AUCUNE date, AUCUNE duree');
+    expect(system).toContain('son nombre de centaines + 1');
+  });
+
+  it.each(contentPrompts.slice(0, 3))(
+    '%s : des distracteurs faux, jamais vrais mais moins précis',
+    (_name, system) => {
+      expect(system).toContain("FAUSSE d'apres le contenu ET dans la realite");
+    },
+  );
+
+  it('les comparaisons pour un enfant restent exactes', () => {
+    expect(ageInstruction('enfant')).toContain('seulement si elles sont exactes');
+  });
 });
 
 describe('WEBSEARCH', () => {

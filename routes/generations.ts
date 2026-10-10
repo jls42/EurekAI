@@ -224,9 +224,10 @@ const scoreFillBlankAttempt = (
   const results: Record<number, boolean> = {};
   for (const [qiStr, childAnswer] of Object.entries(answers)) {
     const qi = Number(qiStr);
-    const correctAnswer = fbGen.data[qi]?.answer;
-    if (!correctAnswer) continue;
-    const { match } = validateFillBlankAnswer(String(childAnswer), correctAnswer);
+    const exercise = fbGen.data[qi];
+    if (!exercise?.answer) continue;
+    // L'exercice entier : ses autres écritures (accepted) et l'écriture qu'impose sa phrase.
+    const { match } = validateFillBlankAnswer(String(childAnswer), exercise);
     results[qi] = match;
     if (match) score++;
     bumpQuestionStat(stats.questionStats, qi, match);
