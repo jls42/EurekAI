@@ -60,6 +60,7 @@ vi.mock('../generators/flashcards.js', () => ({
 }));
 
 vi.mock('../generators/quiz.js', () => ({
+  QUIZ_DEFAULT_COUNT: 15,
   generateQuiz: vi
     .fn()
     .mockResolvedValue([
@@ -127,6 +128,7 @@ vi.mock('../generators/image.js', () => ({
 }));
 
 vi.mock('../generators/fill-blank.js', () => ({
+  FILL_BLANK_DEFAULT_COUNT: 10,
   generateFillBlank: vi
     .fn()
     .mockResolvedValue([
@@ -3973,6 +3975,231 @@ describe('generateRoutes', () => {
   });
   // --- Médias d'une génération qui n'aboutit pas ---
   // saveAudioFile N'EST PAS mocké : les MP3 sont réellement écrits dans le dossier du projet.
+  // Lancés ensemble, deux générations du même type ne se voyaient pas dans le bloc d'exclusions et
+  // reprenaient le même 1er élément (mesuré le 2026-10-07) : elles passent l'une après l'autre.
+  describe('file par projet et par type (lancements simultanés)', () => {
+    const GID_A = '11111111-1111-4111-8111-111111111111';
+    const GID_B = '22222222-2222-4222-8222-222222222222';
+    const question = (q: string) => ({
+      question: q,
+      choices: ['a', 'b', 'c', 'd'],
+      correct: 0,
+      explanation: 'e',
+    });
+    const blank = (answer: string) => ({
+      sentence: `On parle de ___ (${answer}).`,
+      answer,
+      hint: 'h',
+      category: 'vocabulaire',
+    });
+
+    // Projet avec une source, sans modération (aucun profil) : la génération part tout de suite.
+    const projectWithSource = (): string => {
+      const pid = store.createProject('File').meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'lecon.txt',
+        markdown: 'Contenu',
+        uploadedAt: new Date().toISOString(),
+      });
+      return pid;
+    };
+
+    // 1er appel du générateur retenu jusqu'à `release()` : la 1re génération reste en cours.
+    const holdFirstCall = (mock: any, value: unknown): (() => void) => {
+      let release!: () => void;
+      mock.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve(value);
+          }),
+      );
+      return () => release();
+    };
+
+    it("deux quiz : le second attend la fin du premier et l'a dans son bloc d'exclusions", async () => {
+      const { generateQuiz } = await import('../generators/quiz.js');
+      const quiz = vi.mocked(generateQuiz);
+      const pid = projectWithSource();
+      const release = holdFirstCall(quiz, [question('Q-premier')]);
+      quiz.mockResolvedValueOnce([question('Q-second')]);
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz');
+      const [resA, resB] = [mockRes(), mockRes()];
+
+      const first = handler(mockReq({ params: { pid }, body: { gid: GID_A } }), resA);
+      await vi.waitFor(() => expect(quiz).toHaveBeenCalledTimes(1));
+      const second = handler(mockReq({ params: { pid }, body: { gid: GID_B } }), resB);
+      await vi.waitFor(() => expect(store.pendingStatus(pid, GID_B)).toBe('pending'));
+      await new Promise((r) => setTimeout(r, 20));
+      expect(quiz).toHaveBeenCalledTimes(1); // le second est en file
+
+      release();
+      await Promise.all([first, second]);
+      expect(quiz).toHaveBeenCalledTimes(2);
+      expect(quiz.mock.calls[1][6]).toContain('Q-premier');
+      expect(resB.json.mock.calls[0][0].data[0].question).toBe('Q-second');
+    });
+
+    it('types différents : un quiz et un texte à trous partent ensemble', async () => {
+      const { generateQuiz } = await import('../generators/quiz.js');
+      const { generateFillBlank } = await import('../generators/fill-blank.js');
+      const pid = projectWithSource();
+      const release = holdFirstCall(vi.mocked(generateQuiz), [question('Q')]);
+
+      const quizDone = getHandler(
+        router,
+        'post',
+        '/:pid/generate/quiz',
+      )(mockReq({ params: { pid }, body: { gid: GID_A } }), mockRes());
+      await vi.waitFor(() => expect(generateQuiz).toHaveBeenCalledTimes(1));
+      const blankDone = getHandler(
+        router,
+        'post',
+        '/:pid/generate/fill-blank',
+      )(mockReq({ params: { pid }, body: { gid: GID_B } }), mockRes());
+      await vi.waitFor(() => expect(generateFillBlank).toHaveBeenCalledTimes(1)); // sans attendre le quiz
+
+      release();
+      await Promise.all([quizDone, blankDone]);
+    });
+
+    it('annulée pendant son attente : aucun appel à Mistral, 409 cancelled', async () => {
+      const { generateQuiz } = await import('../generators/quiz.js');
+      const quiz = vi.mocked(generateQuiz);
+      const pid = projectWithSource();
+      const release = holdFirstCall(quiz, [question('Q-premier')]);
+      const handler = getHandler(router, 'post', '/:pid/generate/quiz');
+      const resB = mockRes();
+
+      const first = handler(mockReq({ params: { pid }, body: { gid: GID_A } }), mockRes());
+      await vi.waitFor(() => expect(quiz).toHaveBeenCalledTimes(1));
+      const second = handler(mockReq({ params: { pid }, body: { gid: GID_B } }), resB);
+      await vi.waitFor(() => expect(store.pendingStatus(pid, GID_B)).toBe('pending'));
+      store.markPendingCancelled(pid, GID_B);
+
+      release();
+      await Promise.all([first, second]);
+      expect(quiz).toHaveBeenCalledTimes(1);
+      expect(resB.status).toHaveBeenCalledWith(409);
+      expect(resB.json).toHaveBeenCalledWith({ error: 'cancelled', gid: GID_B });
+    });
+
+    it("mode Auto : l'étape quiz attend le quiz en cours et l'a dans son bloc d'exclusions", async () => {
+      const { generateQuiz } = await import('../generators/quiz.js');
+      const { routeRequest } = await import('../generators/router.js');
+      const quiz = vi.mocked(generateQuiz);
+      vi.mocked(routeRequest).mockResolvedValueOnce({
+        plan: [{ agent: 'quiz', reason: 'r' }],
+        context: 'c',
+      } as any);
+      const pid = projectWithSource();
+      const release = holdFirstCall(quiz, [question('Q-manuel')]);
+      quiz.mockResolvedValueOnce([question('Q-auto')]);
+      const resAuto = mockRes();
+
+      const manual = getHandler(
+        router,
+        'post',
+        '/:pid/generate/quiz',
+      )(mockReq({ params: { pid }, body: { gid: GID_A } }), mockRes());
+      await vi.waitFor(() => expect(quiz).toHaveBeenCalledTimes(1));
+      const auto = getHandler(
+        router,
+        'post',
+        '/:pid/generate/auto',
+      )(mockReq({ params: { pid }, body: {} }), resAuto);
+      await new Promise((r) => setTimeout(r, 30));
+      expect(quiz).toHaveBeenCalledTimes(1); // l'étape quiz du mode Auto est en file
+
+      release();
+      await Promise.all([manual, auto]);
+      expect(quiz).toHaveBeenCalledTimes(2);
+      expect(quiz.mock.calls[1][6]).toContain('Q-manuel');
+      expect(resAuto.json.mock.calls[0][0].generations[0].data[0].question).toBe('Q-auto');
+    });
+
+    it("textes à trous déjà générés : 5 exercices de plus, réponses inédites d'abord, coupés au nombre demandé", async () => {
+      const { generateFillBlank } = await import('../generators/fill-blank.js');
+      const fill = vi.mocked(generateFillBlank);
+      const pid = projectWithSource();
+      store.addGeneration(pid, {
+        id: 'g-old',
+        type: 'fill-blank',
+        title: 't',
+        createdAt: new Date().toISOString(),
+        data: [blank('l’Histoire'), blank('une frise')],
+      } as any);
+      // Le modèle reprend le terme central en tête, comme mesuré.
+      const answers = ["L'histoire", 'frise', 'un siècle', 'la préhistoire', 'un archéologue'];
+      fill.mockResolvedValueOnce(answers.map(blank) as any);
+      const res = mockRes();
+
+      await getHandler(
+        router,
+        'post',
+        '/:pid/generate/fill-blank',
+      )(mockReq({ params: { pid }, body: { count: 3 } }), res);
+
+      expect(fill.mock.calls[0][5]).toBe(8); // 3 demandés + 5
+      const data = res.json.mock.calls[0][0].data as Array<{ answer: string }>;
+      expect(data.map((d) => d.answer)).toEqual(['un siècle', 'la préhistoire', 'un archéologue']);
+    });
+
+    it("quiz déjà générés : 10 questions de plus, les inédites d'abord, coupées au nombre demandé", async () => {
+      const { generateQuiz } = await import('../generators/quiz.js');
+      const quiz = vi.mocked(generateQuiz);
+      const pid = projectWithSource();
+      store.addGeneration(pid, {
+        id: 'q-old',
+        type: 'quiz',
+        title: 't',
+        createdAt: new Date().toISOString(),
+        data: [question("Qu'est-ce que l'Histoire ?")],
+      } as any);
+      // Le modèle repose la question déjà posée en tête, comme mesuré avec une consigne.
+      quiz.mockResolvedValueOnce([
+        question("Qu'est-ce que l’histoire ?"),
+        question('Que montre une frise ?'),
+        question('Quand commence la Préhistoire ?'),
+      ] as any);
+      const res = mockRes();
+
+      await getHandler(
+        router,
+        'post',
+        '/:pid/generate/quiz',
+      )(mockReq({ params: { pid }, body: { count: 2 } }), res);
+
+      expect(quiz.mock.calls[0][5]).toBe(12); // 2 demandées + 10
+      expect(quiz.mock.calls[0][6]).toContain('autre fait ou un autre angle');
+      const data = res.json.mock.calls[0][0].data as Array<{ question: string }>;
+      expect(data.map((d) => d.question)).toEqual([
+        'Que montre une frise ?',
+        'Quand commence la Préhistoire ?',
+      ]);
+    });
+
+    it('textes à trous sans série précédente : nombre demandé tel quel, ordre du modèle', async () => {
+      const { generateFillBlank } = await import('../generators/fill-blank.js');
+      const fill = vi.mocked(generateFillBlank);
+      const pid = projectWithSource();
+      fill.mockResolvedValueOnce([blank('la lave'), blank('un volcan')] as any);
+      const res = mockRes();
+
+      await getHandler(
+        router,
+        'post',
+        '/:pid/generate/fill-blank',
+      )(mockReq({ params: { pid }, body: { count: 2 } }), res);
+
+      expect(fill.mock.calls[0][5]).toBe(2);
+      expect(res.json.mock.calls[0][0].data.map((d: { answer: string }) => d.answer)).toEqual([
+        'la lave',
+        'un volcan',
+      ]);
+    });
+  });
+
   describe('médias des générations échouées ou non promues', () => {
     const projectDirOf = (pid: string) => join(tmpDir, 'projects', pid);
     const mediaFiles = (pid: string) =>

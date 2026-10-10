@@ -46,6 +46,7 @@ import {
   feedbackAgeInstruction,
   vocalRewriteRules,
   quizVocalSystem,
+  exclusionHeader,
 } from './prompts.js';
 import { logger } from './helpers/logger.js';
 import type { AgeGroup } from './types.js';
@@ -920,5 +921,15 @@ describe('imageUser', () => {
     const result = imageUser('en', md);
     expect(result).not.toContain('# Source 1');
     expect(result).toContain('Important content');
+  });
+});
+
+describe('exclusionHeader quiz (consigne : même point, autre question)', () => {
+  it("permet le même point avec un autre fait (consigne) ; le quiz vocal n'est pas touché (non mesuré)", () => {
+    expect(exclusionHeader('quiz')).toContain(
+      'ou sur le meme point avec un autre fait ou un autre angle',
+    );
+    expect(exclusionHeader('quiz')).not.toContain("porter sur d'autres points du contenu");
+    expect(exclusionHeader('quiz-vocal')).toContain("porter sur d'autres points du contenu");
   });
 });

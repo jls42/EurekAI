@@ -24,13 +24,16 @@ function isValidFillBlank(data: FillBlankItem[]): boolean {
   );
 }
 
+// Nombre d'exercices quand l'appelant n'en demande pas (repris par la route pour en ajouter).
+export const FILL_BLANK_DEFAULT_COUNT = 10;
+
 export async function generateFillBlank(
   client: Mistral,
   markdown: string,
   model = 'mistral-large-latest',
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
-  count = 10,
+  count = FILL_BLANK_DEFAULT_COUNT,
   exclusions?: string,
 ): Promise<FillBlankItem[]> {
   const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [

@@ -107,7 +107,11 @@ const EXCLUSION_HEADERS: Record<string, string> = {
   // « differentes de celles-ci » (déclaratif) et PAS « propose-en d'autres » : le
   // pronom de quantité se lit « proposes-en davantage » → le LLM dépasse le count
   // demandé (13 items pour 10, mesuré en conditions réelles).
-  quiz: "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
+  // Quiz : « ou sur le meme point avec un autre fait ou un autre angle ». « porter sur d'autres
+  // points du contenu » contredisait la consigne (priorite a ses points) : le 2e quiz reprenait les
+  // memes questions. Mesure le 2026-10-07 (output/parallele-corpus/, hors git) avec 10 questions de
+  // plus et les inedites d'abord (routes/generate.ts) ; l'en-tete seul ne suffisait pas.
+  quiz: 'Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci : sur un autre point du contenu, ou sur le meme point avec un autre fait ou un autre angle :',
   'quiz-vocal':
     "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
   flashcards:
