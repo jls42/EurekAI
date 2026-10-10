@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { buildExclusionContext, diversityParams, exclusionItems } from './diversity';
+import {
+  answerKey,
+  buildExclusionContext,
+  diversityParams,
+  exclusionItems,
+  hasExclusionContext,
+  preferUnseenQuestions,
+  preferUnusedAnswers,
+  previousItems,
+} from './diversity';
 import type { Generation } from '../types';
 
 describe('diversityParams', () => {
@@ -255,5 +264,79 @@ describe('exclusionItems', () => {
 
   it('bloc vide → aucun item', () => {
     expect(exclusionItems('')).toEqual([]);
+  });
+});
+
+describe('hasExclusionContext / previousItems', () => {
+  it('les types à bloc d’exclusions passent en file, pas l’image ni une clé du prototype', () => {
+    for (const type of [
+      'quiz',
+      'quiz-vocal',
+      'flashcards',
+      'fill-blank',
+      'dictation',
+      'podcast',
+      'summary',
+    ]) {
+      expect(hasExclusionContext(type)).toBe(true);
+    }
+    expect(hasExclusionContext('image')).toBe(false);
+    expect(hasExclusionContext('constructor')).toBe(false);
+  });
+
+  it('relit les éléments déjà générés du seul type demandé', () => {
+    const gens = [
+      { type: 'fill-blank', data: [{ answer: 'la lave' }, { answer: 'un volcan' }] },
+      { type: 'quiz', data: [{ question: 'Q ?' }] },
+    ] as unknown as Generation[];
+    expect(previousItems(gens, 'fill-blank')).toEqual(['la lave', 'un volcan']);
+    expect(previousItems(gens, 'image')).toEqual([]);
+  });
+});
+
+describe('answerKey / preferUnusedAnswers', () => {
+  it('compare sans casse, accents, apostrophe typographique ni article de tête', () => {
+    expect(answerKey('l’Histoire')).toBe('histoire');
+    expect(answerKey("L'histoire")).toBe('histoire');
+    expect(answerKey('un volcan')).toBe('volcan');
+    expect(answerKey('de la lave')).toBe('lave');
+    expect(answerKey("de l'eau")).toBe('eau');
+    expect(answerKey('la Préhistoire.')).toBe('prehistoire');
+    expect(answerKey('lave')).toBe('lave'); // pas d'article : rien à retirer
+  });
+
+  it('réponses inédites d’abord, chaque groupe dans l’ordre du modèle', () => {
+    const items = [
+      { answer: "L'histoire" },
+      { answer: 'un siècle' },
+      { answer: 'une frise' },
+      { answer: 'la préhistoire' },
+    ];
+    const used = new Set(['histoire', 'frise']);
+    expect(preferUnusedAnswers(items, used).map((i) => i.answer)).toEqual([
+      'un siècle',
+      'la préhistoire',
+      "L'histoire",
+      'une frise',
+    ]);
+  });
+});
+
+describe('preferUnseenQuestions', () => {
+  it('une question déjà posée (60 % de mots communs, sans casse ni accents) passe après les inédites', () => {
+    const items = [
+      { question: "Qu'est-ce que l’HISTOIRE ?" },
+      { question: 'Que montre une frise chronologique ?' },
+      { question: 'Quand commence la Préhistoire ?' },
+    ];
+    const previous = [
+      "Qu'est-ce que l'histoire ?",
+      'Quand commence la préhistoire selon les historiens ?',
+    ];
+    expect(preferUnseenQuestions(items, previous).map((i) => i.question)).toEqual([
+      'Que montre une frise chronologique ?',
+      'Quand commence la Préhistoire ?',
+      "Qu'est-ce que l’HISTOIRE ?",
+    ]);
   });
 });

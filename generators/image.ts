@@ -8,8 +8,9 @@ import { recordMediaUrl } from '../helpers/media-ledger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
 
+// 'download' : URL signée renvoyée par l'outil, à télécharger (elle expire, cf. downloadUrlImage).
 interface ImageResult {
-  type: 'url' | 'fileId';
+  type: 'url' | 'fileId' | 'download';
   value: string;
 }
 
@@ -30,11 +31,8 @@ export function parseChunkRef(c: Record<string, unknown>): ImageResult | null {
   return null;
 }
 
-// Toutes les images de la réponse, dans l'ordre et sans doublon : l'agent peut appeler l'outil
-// plusieurs fois malgré la consigne « une SEULE image » (vécu le 2026-09-26 : 2 appels
-// `image_generation` facturés pour une illustration), et chaque fichier généré reste stocké chez
-// Mistral tant qu'on ne le supprime pas.
-export const extractImageRefs = (outputs: unknown[]): ImageResult[] => {
+// Images citées par les morceaux du message final (format de l'outil jusqu'en octobre 2026).
+const chunkRefs = (outputs: unknown[]): ImageResult[] => {
   const refs: ImageResult[] = [];
   for (const output of outputs) {
     const content = (output as Record<string, unknown>).content;
@@ -86,6 +84,49 @@ const toolCallReason = (output: unknown): string => {
   return result.slice(0, 120);
 };
 
+// Forme d'une réponse pour le journal (type de chaque sortie, outil, nature du contenu), sans son
+// texte : il porterait l'URL signée d'une image.
+const describeOutput = (output: unknown): string => {
+  const o = (output || {}) as { type?: unknown; name?: unknown; content?: unknown; info?: unknown };
+  const name = typeof o.name === 'string' ? `:${o.name}` : '';
+  let content = '';
+  if (Array.isArray(o.content)) content = `[${o.content.length} morceau(x)]`;
+  else if (typeof o.content === 'string') content = '(texte)';
+  return `${String(o.type)}${name}${content}${o.info ? '(info)' : ''}`;
+};
+
+const describeOutputs = (outputs: unknown[]): string => {
+  return outputs.map(describeOutput).join(' | ');
+};
+
+// Format de l'outil mesuré le 2026-10-10 : l'image n'est plus un fichier de l'API Files cité par le
+// message final (devenu un simple texte), mais une URL signée temporaire dans le résultat de
+// l'appel, `info.result` = `{"url": "https://…blob.core.windows.net/…"}`. Toute illustration
+// échouait (« Aucune image generee par l'agent »).
+const toolResultUrl = (output: unknown): string | null => {
+  if (!isImageToolCall(output)) return null;
+  const result = (output as { info?: { result?: unknown } }).info?.result;
+  if (typeof result !== 'string') return null;
+  try {
+    const parsed: unknown = JSON.parse(result);
+    const url = (parsed as { url?: unknown } | null)?.url;
+    return typeof url === 'string' ? url : null;
+  } catch {
+    return null;
+  }
+};
+
+// Toutes les images de la réponse, dans l'ordre et sans doublon : l'agent peut appeler l'outil
+// plusieurs fois malgré la consigne « une SEULE image » (vécu le 2026-09-26 : 2 appels
+// `image_generation` facturés pour une illustration). Morceaux du message d'abord ; à défaut, URLs
+// des appels de l'outil. Jamais les deux : une même image serait comptée deux fois.
+export const extractImageRefs = (outputs: unknown[]): ImageResult[] => {
+  const fromChunks = chunkRefs(outputs);
+  if (fromChunks.length > 0) return fromChunks;
+  const urls = outputs.map(toolResultUrl).filter((url): url is string => url !== null);
+  return [...new Set(urls)].map((value): ImageResult => ({ type: 'download', value }));
+};
+
 // L'agent rappelle l'outil quand un appel échoue. Vécu les 2026-09-26 et 27 : « Tool call timed
 // out. Please try again. » au bout de 30 s côté Mistral (8 appels sur 20), toujours une seule
 // image au final. Chaque appel est compté dans le coût (`usage.connectors`) : les tentatives sans
@@ -112,6 +153,17 @@ const imageExtension = (image: Buffer): 'jpg' | 'png' => {
   return JPEG_SIGNATURE.every((byte, i) => image[i] === byte) ? 'jpg' : 'png';
 };
 
+const saveImageBuffer = (imageBuffer: Buffer, projectDir: string, pid: string): string => {
+  // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
+  const imageFilename = uniqueMediaName('illustration', imageExtension(imageBuffer));
+  writeFileSync(join(projectDir, imageFilename), imageBuffer);
+  console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
+  const url = mediaUrl(pid, imageFilename);
+  // Registre de la génération (media-ledger) : image supprimée si la génération n'aboutit pas.
+  recordMediaUrl(url);
+  return url;
+};
+
 // Flèche (pas `async function`) : Lizard agglomérait cette déclaration avec sa voisine et ne
 // la mesurait pas (cf. CLAUDE.md « Pièges Lizard »).
 const downloadAndSaveImage = async (
@@ -124,17 +176,50 @@ const downloadAndSaveImage = async (
     console.log(`    Image fileId: ${fileId}, downloading...`);
     const fileStream = await client.files.download({ fileId });
     const imageBuffer = await collectStream(fileStream as Parameters<typeof collectStream>[0]);
-    // Nom unique : deux illustrations générées dans la même milliseconde ne s'écrasent plus.
-    const imageFilename = uniqueMediaName('illustration', imageExtension(imageBuffer));
-    writeFileSync(join(projectDir, imageFilename), imageBuffer);
-    console.log(`    Image saved: ${imageFilename} (${(imageBuffer.length / 1024).toFixed(0)} KB)`);
-    const url = mediaUrl(pid, imageFilename);
-    // Registre de la génération (media-ledger) : image supprimée si la génération n'aboutit pas.
-    recordMediaUrl(url);
-    return url;
+    return saveImageBuffer(imageBuffer, projectDir, pid);
   } finally {
     await deleteRemoteImage(client, fileId);
   }
+};
+
+// URL signée de l'outil : téléchargée et enregistrée comme une image de l'API Files (elle expire,
+// et l'enfant ne charge aucune image hors de l'app). Seul le stockage Azure de Mistral est accepté
+// (« mistralaiblackforestprod » le 2026-10-10), en HTTPS, sans redirection, 15 Mo au plus.
+const IMAGE_HOST = /^mistral[a-z0-9-]*\.blob\.core\.windows\.net$/;
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+const imageDownloadUrl = (raw: string): string => {
+  const parsed = new URL(raw);
+  if (parsed.protocol !== 'https:' || !IMAGE_HOST.test(parsed.hostname)) {
+    throw new Error(`Hôte d'image refusé : ${parsed.hostname}`);
+  }
+  return parsed.href;
+};
+
+const downloadUrlImage = async (raw: string, projectDir: string, pid: string): Promise<string> => {
+  const url = imageDownloadUrl(raw);
+  const allowedUrls = [url];
+  if (allowedUrls.includes(url)) {
+    const res = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(30_000) });
+    if (!res.ok) throw new Error(`Téléchargement de l'image : HTTP ${res.status}`);
+    const imageBuffer = Buffer.from(await res.arrayBuffer());
+    if (imageBuffer.length === 0 || imageBuffer.length > MAX_IMAGE_BYTES) {
+      throw new Error(`Image de ${imageBuffer.length} octets refusée`);
+    }
+    return saveImageBuffer(imageBuffer, projectDir, pid);
+  }
+  throw new Error("URL d'image refusée");
+};
+
+const resolveImageUrl = async (
+  client: Mistral,
+  ref: ImageResult,
+  projectDir: string,
+  pid: string,
+): Promise<string> => {
+  if (ref.type === 'url') return ref.value;
+  if (ref.type === 'download') return downloadUrlImage(ref.value, projectDir, pid);
+  return downloadAndSaveImage(client, ref.value, projectDir, pid);
 };
 
 // Arrow function (pas `function` declaration) pour contourner un crash du
@@ -172,15 +257,17 @@ export const generateImage = async (
     const [imageRef, ...extra] = refs;
 
     if (!imageRef) {
-      console.error('    Image outputs:', JSON.stringify(response.outputs, null, 2).slice(0, 2000));
+      // Forme de la réponse seulement : son texte brut contiendrait l'URL signée d'une image et
+      // le long prompt de l'outil (qui masquait, tronqué à 2000 caractères, la suite de la réponse).
+      logger.error(
+        'image',
+        `aucune image dans la réponse de l'agent : ${describeOutputs(response.outputs)}`,
+      );
       throw new Error("Aucune image generee par l'agent");
     }
 
     try {
-      const imageUrl =
-        imageRef.type === 'url'
-          ? imageRef.value
-          : await downloadAndSaveImage(client, imageRef.value, projectDir, pid);
+      const imageUrl = await resolveImageUrl(client, imageRef, projectDir, pid);
       return { imageUrl, prompt };
     } finally {
       await discardExtraImages(client, extra);

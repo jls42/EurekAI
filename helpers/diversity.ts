@@ -1,5 +1,6 @@
 import { randomInt } from 'node:crypto';
 import { exclusionHeader } from '../prompts.js';
+import { normalizeAnswer } from './fill-blank-validate.js';
 import type { Generation } from '../types.js';
 
 const PARAMS: Record<string, { temperature: number; presencePenalty: number }> = {
@@ -148,3 +149,63 @@ export function exclusionItems(context: string): string[] {
     .filter((line) => line.startsWith(EXCLUSION_ITEM_PREFIX))
     .map((line) => line.slice(EXCLUSION_ITEM_PREFIX.length));
 }
+
+// Types dont le prompt reçoit un bloc d'exclusions. Deux générations simultanées d'un de ces types
+// sur un même projet ne s'y voyaient pas : elles passent l'une après l'autre (withSameTypeQueue,
+// routes/generate.ts). `Object.hasOwn` : un type hostile comme `constructor` n'est pas un extracteur.
+export const hasExclusionContext = (type: string): boolean => Object.hasOwn(EXTRACTORS, type);
+
+// Éléments déjà générés pour ce type (questions, réponses, mots…), ceux que reprend le bloc.
+export function previousItems(generations: Generation[], type: string): string[] {
+  if (!hasExclusionContext(type)) return [];
+  return EXTRACTORS[type](generations.filter((g) => g.type === type));
+}
+
+// Clé de comparaison d'une réponse : la normalisation du correcteur des textes à trous (casse,
+// accents, typographie des tablettes et article de tête ignorés : « l’Histoire », « l'histoire » et
+// « histoire » ; « un volcan » et « volcan »).
+export const answerKey = (answer: string): string => normalizeAnswer(answer);
+
+// Textes à trous dont la réponse n'a pas encore servi d'abord, les autres ensuite : chaque groupe
+// garde l'ordre du modèle (du plus simple au plus difficile).
+export const preferUnusedAnswers = <T extends { answer?: unknown }>(
+  items: T[],
+  usedKeys: ReadonlySet<string>,
+): T[] => {
+  const isUsed = (item: T): boolean =>
+    typeof item.answer === 'string' && usedKeys.has(answerKey(item.answer));
+  return [...items.filter((item) => !isUsed(item)), ...items.filter(isUsed)];
+};
+
+// Mots d'une question (3 lettres et plus, sans casse ni accents), pour la comparer aux précédentes.
+const questionWords = (text: string): Set<string> => {
+  const plain = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+  return new Set(plain.split(' ').filter((word) => word.length > 2));
+};
+
+// Même question : au moins 60 % de mots en commun (indice de Jaccard), seuil de la mesure.
+const SAME_QUESTION_JACCARD = 0.6;
+
+const jaccard = (a: ReadonlySet<string>, b: ReadonlySet<string>): number => {
+  const common = [...a].filter((word) => b.has(word)).length;
+  return common / Math.max(1, a.size + b.size - common);
+};
+
+// Questions de quiz encore jamais posées d'abord, les autres ensuite (ordre du modèle conservé).
+export const preferUnseenQuestions = <T extends { question?: unknown }>(
+  items: T[],
+  previous: readonly string[],
+): T[] => {
+  const previousWords = previous.map(questionWords);
+  const isSeen = (item: T): boolean => {
+    if (typeof item.question !== 'string') return false;
+    const words = questionWords(item.question);
+    return previousWords.some((p) => jaccard(words, p) >= SAME_QUESTION_JACCARD);
+  };
+  return [...items.filter((item) => !isSeen(item)), ...items.filter(isSeen)];
+};

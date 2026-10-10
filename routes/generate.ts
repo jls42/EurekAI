@@ -14,21 +14,22 @@ import { Router, Request, Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { Mistral } from '@mistralai/mistralai';
 import type {
-  Source,
-  Generation,
-  QuizQuestion,
-  QuizGeneration,
   AgeGroup,
+  Consigne,
+  DictationItem,
   FailedStep,
   FailedStepCode,
-  Consigne,
-  TrackedGenerationType,
+  FillBlankItem,
+  Generation,
+  ModerationStatus,
   PendingTrackerEntry,
   PromoteErrorOutcome,
   PromoteErrorResponse,
+  QuizGeneration,
+  QuizQuestion,
+  Source,
   SummaryRegister,
-  DictationItem,
-  ModerationStatus,
+  TrackedGenerationType,
 } from '../types.js';
 import type { ProjectStore, PromoteResult } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
@@ -39,12 +40,17 @@ import { generateSummary, generateRemediationSummary } from '../generators/summa
 import { generateDictation, DICTATION_DEFAULT_WORDS } from '../generators/dictation.js';
 import { textToSpeech } from '../generators/tts-provider.js';
 import { generateFlashcards } from '../generators/flashcards.js';
-import { generateQuiz, generateQuizVocal, generateQuizReview } from '../generators/quiz.js';
+import {
+  generateQuiz,
+  generateQuizVocal,
+  generateQuizReview,
+  QUIZ_DEFAULT_COUNT,
+} from '../generators/quiz.js';
 import { generatePodcastScript, createPodcastGeneration } from '../generators/podcast.js';
 import { generateAudio } from '../generators/tts.js';
 import { ttsQuestion, createQuizVocalGeneration } from '../generators/quiz-vocal.js';
 import { generateImage } from '../generators/image.js';
-import { generateFillBlank } from '../generators/fill-blank.js';
+import { generateFillBlank, FILL_BLANK_DEFAULT_COUNT } from '../generators/fill-blank.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { runWithMediaLedger } from '../helpers/media-ledger.js';
 import { deleteMediaFiles } from '../helpers/generation-media.js';
@@ -56,7 +62,15 @@ import {
   TTS_DEPENDENT_AGENTS,
   type AutoAgentType,
 } from '../generators/auto-agents.js';
-import { buildExclusionContext } from '../helpers/diversity.js';
+import {
+  answerKey,
+  buildExclusionContext,
+  hasExclusionContext,
+  preferUnseenQuestions,
+  preferUnusedAnswers,
+  previousItems,
+} from '../helpers/diversity.js';
+import { withKeyedLock } from '../helpers/keyed-lock.js';
 import { consigneMarkdownHeader } from '../prompts.js';
 import { autoTitle } from '../helpers/auto-title.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
@@ -675,6 +689,34 @@ const runGeneratorAndPersist = async (
   respondNotPromoted(res, pid, gid, promoteResult);
 };
 
+// Même projet, même type (avec bloc d'exclusions) : une génération après l'autre. Lancées ensemble,
+// aucune ne voyait l'autre dans son bloc et elles reprenaient le même 1er élément (mesuré le
+// 2026-10-07, output/parallele-corpus/, hors git). Les types différents restent en parallèle.
+const withSameTypeQueue = <T>(pid: string, type: string, fn: AsyncThunk<T>): Promise<T> => {
+  if (!hasExclusionContext(type)) return fn();
+  return withKeyedLock(`generate:${pid}:${type}`, fn);
+};
+
+// Tour d'une génération mise en file : annulée pendant l'attente → aucun appel à Mistral ; sinon
+// projet relu, pour que le bloc d'exclusions voie les générations terminées entre-temps.
+const runQueuedGeneration = async (
+  store: ProjectStore,
+  generatorFn: GeneratorFn,
+  ctx: GenContext,
+  pid: string,
+  gid: string,
+  options: HandleGenerationOptions | undefined,
+  res: Response,
+): Promise<void> => {
+  const status = store.pendingStatus(pid, gid);
+  if (status !== 'pending') {
+    respondNotPromoted(res, pid, gid, { kind: status === 'cancelled' ? 'cancelled' : 'missing' });
+    return;
+  }
+  const project = store.getProject(pid) ?? ctx.project;
+  await runGeneratorAndPersist(store, generatorFn, { ...ctx, project }, pid, gid, options, res);
+};
+
 const handleGenerationFailure = (
   store: ProjectStore,
   pid: string,
@@ -726,16 +768,16 @@ const handleGeneration = (
         return;
       }
     }
+    const ctx: GenContext = { ...result.ctx, req, res, client: resolved.client };
+    const type = options?.trackedType;
     try {
-      await runGeneratorAndPersist(
-        store,
-        generatorFn,
-        { ...result.ctx, req, res, client: resolved.client },
-        pid,
-        gid,
-        options,
-        res,
-      );
+      if (type) {
+        await withSameTypeQueue(pid, type, () =>
+          runQueuedGeneration(store, generatorFn, ctx, pid, gid, options, res),
+        );
+      } else {
+        await runGeneratorAndPersist(store, generatorFn, ctx, pid, gid, options, res);
+      }
     } catch (e) {
       handleGenerationFailure(store, pid, gid, e, options, res);
     }
@@ -819,17 +861,61 @@ const buildFlashcardsGeneration = async (ctx: GenContext): Promise<Generation> =
   return makeGen('flashcards', data, ctx);
 };
 
-const buildQuizGeneration = async (ctx: GenContext): Promise<Generation> => {
-  const exclusions = buildExclusionContext(ctx.project.results.generations, 'quiz');
-  const data = await generateQuiz(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.quiz,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    exclusions,
+// Quiz et textes à trous, quand des séries du même type existent : quelques éléments de plus, puis
+// les inédits d'abord, coupés au nombre demandé (generateFreshQuiz, generateFreshFillBlank).
+const EXTRA_WHEN_PREVIOUS = { quiz: 10, [FILL_BLANK]: 5 } as const;
+
+interface FreshRequest {
+  client: Mistral;
+  markdown: string;
+  model: string;
+  lang: string;
+  ageGroup: AgeGroup;
+  count?: number;
+  generations: Generation[];
+}
+
+// Alias plutôt que des types fonction écrits dans la signature : Lizard y couperait generateFresh.
+type GenerateCount<T> = (count: number) => Promise<T[]>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+type FreshFirst<T> = (items: T[]) => T[]; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+const generateFresh = async <T>(
+  count: number,
+  extra: number,
+  generate: GenerateCount<T>,
+  freshFirst: FreshFirst<T>,
+): Promise<T[]> => {
+  if (extra === 0) return generate(count);
+  const items = await generate(count + extra);
+  return freshFirst(items).slice(0, count);
+};
+
+// Quiz : même l'un après l'autre, une consigne concentre les questions sur ses points et le 2e quiz
+// reprenait les mêmes (4 sur 8 avec la même 1re question, recouvrement 0,76 ; mesuré le 2026-10-07,
+// output/parallele-corpus/, hors git). Quand des quiz existent : 10 questions de plus, les inédites
+// d'abord, puis coupe au nombre demandé → en direct, 0 sur 8 et recouvrement 0,06 (0,45 avec 5 de
+// plus : avec une consigne, le modèle repose surtout les mêmes questions sur ses points).
+const generateFreshQuiz = (r: FreshRequest): Promise<QuizQuestion[]> => {
+  const previous = previousItems(r.generations, 'quiz');
+  const exclusions = buildExclusionContext(r.generations, 'quiz');
+  return generateFresh(
+    r.count ?? QUIZ_DEFAULT_COUNT,
+    previous.length > 0 ? EXTRA_WHEN_PREVIOUS.quiz : 0,
+    (n) => generateQuiz(r.client, r.markdown, r.model, r.lang, r.ageGroup, n, exclusions),
+    (items) => preferUnseenQuestions(items, previous),
   );
+};
+
+const buildQuizGeneration = async (ctx: GenContext): Promise<Generation> => {
+  const data = await generateFreshQuiz({
+    client: ctx.client,
+    markdown: ctx.markdown,
+    model: ctx.config.models.quiz,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+    count: ctx.count,
+    generations: ctx.project.results.generations,
+  });
   return makeGen('quiz', data, ctx);
 };
 
@@ -1010,21 +1096,36 @@ const buildImageGeneration = async (store: ProjectStore, ctx: GenContext): Promi
   return makeGen('image', data, ctx);
 };
 
+// Textes à trous : même l'un après l'autre, le bloc d'exclusions laissait reprendre les mêmes
+// réponses — le prompt veut les termes CLE du cours, du plus simple au plus difficile, et le terme
+// central de la leçon revenait en tête (mesuré le 2026-10-07, output/parallele-corpus/, hors git).
+// Quand des séries existent : EXTRA_WHEN_PREVIOUS exercices de plus, ceux dont la réponse n'a pas
+// encore servi d'abord, puis coupe au nombre demandé.
+const generateFreshFillBlank = (r: FreshRequest): Promise<FillBlankItem[]> => {
+  const used = new Set(previousItems(r.generations, FILL_BLANK).map(answerKey));
+  const exclusions = buildExclusionContext(r.generations, FILL_BLANK);
+  return generateFresh(
+    r.count ?? FILL_BLANK_DEFAULT_COUNT,
+    used.size > 0 ? EXTRA_WHEN_PREVIOUS[FILL_BLANK] : 0,
+    (n) => generateFillBlank(r.client, r.markdown, r.model, r.lang, r.ageGroup, n, exclusions),
+    (items) => preferUnusedAnswers(items, used),
+  );
+};
+
 const buildFillBlankGeneration = async (ctx: GenContext): Promise<Generation> => {
   logger.info(
     FILL_BLANK,
     `sources: ${ctx.project.sources.length}, markdown: ${ctx.markdown.length} chars, lang: ${ctx.lang}, ageGroup: ${ctx.ageGroup}`,
   );
-  const exclusions = buildExclusionContext(ctx.project.results.generations, FILL_BLANK);
-  const data = await generateFillBlank(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.quiz,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    exclusions,
-  );
+  const data = await generateFreshFillBlank({
+    client: ctx.client,
+    markdown: ctx.markdown,
+    model: ctx.config.models.quiz,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+    count: ctx.count,
+    generations: ctx.project.results.generations,
+  });
   return makeGen(FILL_BLANK, data, ctx);
 };
 
@@ -1066,28 +1167,28 @@ const buildAutoFlashcards = async (ctx: AutoCtx): Promise<Generation> => {
 };
 
 const buildAutoQuiz = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateQuiz(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.quiz,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    buildExclusionContext(ctx.generations, 'quiz'),
-  );
+  const data = await generateFreshQuiz({
+    client: ctx.client,
+    markdown: ctx.markdown,
+    model: ctx.config.models.quiz,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+    count: ctx.count,
+    generations: ctx.generations,
+  });
   return makeGen('quiz', data, ctx);
 };
 
 const buildAutoFillBlank = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateFillBlank(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.quiz,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    buildExclusionContext(ctx.generations, FILL_BLANK),
-  );
+  const data = await generateFreshFillBlank({
+    client: ctx.client,
+    markdown: ctx.markdown,
+    model: ctx.config.models.quiz,
+    lang: ctx.lang,
+    ageGroup: ctx.ageGroup,
+    count: ctx.count,
+    generations: ctx.generations,
+  });
   return makeGen(FILL_BLANK, data, ctx);
 };
 
@@ -1222,6 +1323,24 @@ const runStepBody = async (
   return { ok: false, agent: step.agent, code };
 };
 
+// Même règle que runQueuedGeneration pour une étape du mode Auto.
+const runQueuedStep = async (
+  step: { agent: AutoAgentType },
+  executor: AutoExecutor,
+  autoCtx: AutoCtx,
+  st: ProjectStore,
+  pid: string,
+  gid: string,
+): Promise<StepOutcome> => {
+  const status = st.pendingStatus(pid, gid);
+  if (status !== 'pending') {
+    const kind = status === 'cancelled' ? 'cancelled' : 'missing';
+    return { ok: false, agent: step.agent, code: pickAutoStepFailureCode({ kind }) };
+  }
+  const generations = st.getProject(pid)?.results.generations ?? autoCtx.generations;
+  return runStepBody(step, executor, { ...autoCtx, generations }, st, pid, gid);
+};
+
 const runStepCatch = (
   err: unknown,
   step: { agent: AutoAgentType },
@@ -1262,7 +1381,9 @@ const runStep = async (
     return { ok: false, agent: step.agent, code: 'internal_error' };
   }
   try {
-    return await runStepBody(step, executor, autoCtx, st, pid, gid);
+    return await withSameTypeQueue(pid, step.agent, () =>
+      runQueuedStep(step, executor, autoCtx, st, pid, gid),
+    );
   } catch (err) {
     return runStepCatch(err, step, st, pid, gid);
   }

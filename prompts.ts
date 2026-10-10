@@ -39,8 +39,8 @@ export function langInstruction(lang = 'fr'): string {
 
 const AGE_INSTRUCTIONS: Record<AgeGroup, string> = {
   enfant:
-    'Adapte le langage pour un enfant de 6-10 ans : vocabulaire simple, phrases courtes, ton amusant et encourageant. Utilise des comparaisons du quotidien.',
-  ado: 'Adapte pour un adolescent de 11-15 ans : vocabulaire accessible mais riche, ton engageant et dynamique sans etre condescendant. Exemples concrets et actuels.',
+    'Adapte le langage pour un enfant de 6-10 ans : vocabulaire simple, phrases courtes, ton amusant et encourageant. Utilise des comparaisons du quotidien, seulement si elles sont exactes.',
+  ado: 'Adapte pour un adolescent de 11-15 ans : vocabulaire accessible mais riche, ton engageant et dynamique sans etre condescendant. Exemples concrets, actuels et exacts.',
   etudiant:
     'Utilise un langage academique pour un etudiant : terminologie precise, analyse approfondie, references aux concepts cles du domaine.',
   adulte:
@@ -97,6 +97,26 @@ function jsonInstruction(): string {
   return "Reponds UNIQUEMENT en JSON valide. N'ajoute AUCUN texte avant ou apres le JSON, ni balise de code (pas de ```), ni commentaire.";
 }
 
+// ── Fidélité au contenu (DRY) ────────────────────────────────────────
+// Les faits faux relevés par le jury du 2026-10-09 (output/model-corpus/, hors git) étaient des
+// AJOUTS du modèle : comparaisons chiffrées (« de l'été à l'été suivant, 9 mois »), étymologie
+// inventée, règle du contenu (« on ajoute 1 au nombre de centaines ») réécrite en astuce fausse
+// pour 476 (« deux premiers chiffres + 1 »). Les distracteurs, eux, sont faux par construction :
+// la règle vise ce qui est présenté comme vrai.
+function factsInstruction(): string {
+  return `FIDELITE AU CONTENU : tout ce que tu presentes comme vrai (question, phrase, bonne reponse, explication, indice) vient du contenu, chiffres, dates et durees compris ; dans le doute, reprends la phrase du contenu plutot que d'ajouter une precision. Reprends ses regles et ses methodes avec ses mots, sans les transformer en astuce. Une comparaison avec la vie de tous les jours n'ajoute AUCUN chiffre, AUCUNE date, AUCUNE duree, et tu n'inventes jamais l'origine ou la definition d'un mot.
+Le siecle d'une annee : son nombre de centaines + 1 (476 : Ve siecle ; 1492 : XVe siecle), sauf une annee ronde (1500 est la derniere annee du XVe siecle).`;
+}
+
+// Distracteurs de QCM : un choix vrai mais moins précis (« dans le ventre » face à « dans la
+// trompe »), vrai dans la réalité sans figurer dans la leçon (« donner la voix grave » pour les
+// testicules) ou une tranche qui chevauche la bonne compte faux un élève qui a raison (jurys des
+// 2026-10-09 et 2026-10-10) ; une question sur un fait que le contenu donne de deux façons aussi.
+function distractorsInstruction(): string {
+  return `Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet : chacune est FAUSSE d'apres le contenu ET dans la realite, jamais une reponse vraie mais moins precise ("en Europe" quand la bonne reponse est "en France"), jamais une tranche de valeurs qui chevauche la bonne.
+Si le contenu donne deux versions d'un meme fait, ne pose pas de question sur ce fait.`;
+}
+
 // ── Exclusions (diversité inter-générations) ─────────────────────────
 // Headers du bloc injecté par helpers/diversity.ts#buildExclusionContext dans
 // les user prompts, AVANT langInstruction. Règle positive scoped au CHOIX du
@@ -107,7 +127,11 @@ const EXCLUSION_HEADERS: Record<string, string> = {
   // « differentes de celles-ci » (déclaratif) et PAS « propose-en d'autres » : le
   // pronom de quantité se lit « proposes-en davantage » → le LLM dépasse le count
   // demandé (13 items pour 10, mesuré en conditions réelles).
-  quiz: "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
+  // Quiz : « ou sur le meme point avec un autre fait ou un autre angle ». « porter sur d'autres
+  // points du contenu » contredisait la consigne (priorite a ses points) : le 2e quiz reprenait les
+  // memes questions. Mesure le 2026-10-07 (output/parallele-corpus/, hors git) avec 10 questions de
+  // plus et les inedites d'abord (routes/generate.ts) ; l'en-tete seul ne suffisait pas.
+  quiz: 'Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci : sur un autre point du contenu, ou sur le meme point avec un autre fait ou un autre angle :',
   'quiz-vocal':
     "Tu as deja genere les questions ci-dessous. Les nouvelles questions doivent etre differentes de celles-ci et porter sur d'autres points du contenu :",
   flashcards:
@@ -271,6 +295,7 @@ EXEMPLE (1 item — la reponse doit etre auto-suffisante, comprehensible sans re
 {"flashcards":[{"question":"Quelle est la capitale du Bresil ?","answer":"Brasilia est la capitale du Bresil depuis 1960. Elle a ete construite au centre du pays pour desenclaver l'interieur.","sourceRefs":["Source 1"]}]}
 
 Reponses courtes (1-2 phrases) mais auto-suffisantes. ${ageInstruction(ageGroup)} Questions variees (definition, fait, comparaison, cause/effet).
+${factsInstruction()}
 ${sourceRefsInstruction('flashcard')}
 ${jsonInstruction()}`;
 }
@@ -292,7 +317,8 @@ export function quizSystem(ageGroup: AgeGroup = 'enfant'): string {
   return `Tu es un expert en pedagogie specialise dans les quiz.
 ${ageInstruction(ageGroup)}
 Tu generes des QCM : questions claires, choix plausibles, explications adaptees.
-Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+${distractorsInstruction()}
+${factsInstruction()}
 
 EXEMPLE de format (1 item — sourceRefs designe la source contenant l'EXPLICATION/REPONSE, pas seulement la question) :
 {"quiz":[{"question":"Combien d'etoiles figurent sur le drapeau de l'Union europeenne ?","choices":["A) Dix","B) Douze","C) Quinze","D) Vingt-sept"],"correct":1,"explanation":"Le drapeau europeen comporte douze etoiles, un nombre symbolique qui ne change pas avec les adhesions. Vingt-sept est le nombre d'Etats membres, souvent confondu avec celui des etoiles.","sourceRefs":["Source 1"]}]}
@@ -380,7 +406,8 @@ export function quizVocalSystem(ageGroup: AgeGroup = 'enfant', lang = 'fr'): str
   return `Tu es un expert en pedagogie specialise dans les quiz oraux.
 ${ageInstruction(ageGroup)}
 Tu generes des QCM qui seront lus a voix haute : questions claires, choix plausibles, explications adaptees.
-Les mauvaises reponses doivent etre credibles mais clairement fausses quand on connait le sujet.
+${distractorsInstruction()}
+${factsInstruction()}
 
 REGLE DE PONCTUATION (quiz vocal) :
 - AUCUNE parenthese ni crochet dans la question, ni dans le contenu textuel des choix.
@@ -437,6 +464,9 @@ STRATEGIE DE REMEDIATION :
 - Varie les types cognitifs : memorisation, comprehension, application a un cas nouveau.
 - Si plusieurs concepts sont rates, repartis les questions equitablement.
 - Les explications doivent etre PEDAGOGIQUES (montrer pourquoi la bonne reponse est correcte ET pourquoi les distracteurs sont faux), pas juste factuelles.
+
+${distractorsInstruction()}
+${factsInstruction()}
 
 ${jsonInstruction()}`;
 }
@@ -761,7 +791,7 @@ export function flashcardsRetryUser(count: number, lang = 'fr'): string {
 }
 
 export function fillBlankRetryUser(count: number, lang = 'fr'): string {
-  return `Ta reponse etait vide ou incomplete. Regenere les ${count} exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, hint et category. JSON valide uniquement.${langInstruction(lang)}`;
+  return `Ta reponse etait vide ou incomplete. Regenere les ${count} exercices a trous. Chaque exercice doit avoir sentence (avec ___), answer, accepted, hint et category. JSON valide uniquement.${langInstruction(lang)}`;
 }
 
 // « moins uniquement si... » : miroir exact du contrat de dictationUser — un
@@ -939,17 +969,20 @@ L'objectif est d'aider l'eleve a memoriser le vocabulaire, les definitions, les 
 
 REGLES :
 - Chaque phrase doit etre auto-suffisante et comprehensible seule.
-- Le mot a trouver doit etre un terme CLE du cours (pas un mot vide ou generique).
-- UN SEUL trou par phrase.
-- La phrase doit donner suffisamment de contexte pour deviner la reponse.
+- Le mot a trouver doit etre un terme CLE du cours (pas un mot vide ou generique), ecrit comme dans le contenu : le mot du contenu, JAMAIS un synonyme. Un seul mot avec son article, ou un nom propre, une date, un nombre : pas une expression qu'on peut raccourcir ("la frise" plutot que "la frise chronologique").
+- UN SEUL trou par phrase, et UNE SEULE bonne reponse : si un autre mot (du contenu ou de tous les jours) complete aussi la phrase, reformule-la ou choisis un autre trou.
+- La phrase doit donner suffisamment de contexte pour deviner la reponse, sans jamais la contenir : la reponse n'apparait ni ailleurs dans la phrase, ni dans le hint.
 - IMPORTANT : si le mot a trouver est precede d'un article (l', le, la, les, un, une, d'), inclus l'article DANS le trou et dans la reponse. Exemple : "Pour produire de l'electricite, on utilise ___." avec answer "un alternateur" (et pas "On utilise un ___." avec answer "alternateur"). Le trou ne doit JAMAIS etre colle a un article qui donne un indice.
-- Le hint doit aider sans donner la reponse : premiere lettre, categorie ou indice contextuel.
+- answer : UNE seule ecriture, sans parenthese ni alternative.
+- accepted : les autres ecritures justes de la MEME reponse, que l'eleve peut taper : en chiffres ou en lettres ("9" et "neuf"), un siecle en chiffres romains ou arabes ("XVe", "15e", "quinzieme"), une forme courte qui suffit dans la phrase ("Jesus" pour "Jesus-Christ"). Jamais un mot de sens different. Si la phrase impose une ecriture ("en chiffres romains", "en lettres"), n'y mets que cette ecriture. [] s'il n'y en a pas.
+- Le hint mene a la reponse COMPLETE, jamais a une partie ni a un autre mot : sa premiere lettre et sa categorie (nom propre, date, nombre, vocabulaire...), ou une idee du contenu qui y mene. Il ne contient ni la reponse, ni un mot de sa famille ("ecrire" pour "l'ecriture"), ni un calcul qui la donne, et ne decrit pas la forme de ses lettres. Pour un nombre, une date, un siecle ou un chiffre romain, il rappelle la regle ou le repere du contenu qui permet de le trouver (un siecle : "Ajoute 1 au nombre de centaines de l'annee." ; un chiffre romain : "Retrouve la valeur de chaque symbole dans la lecon."), JAMAIS le resultat, un encadrement ("entre le XIVe et le XVIe") ni le dessin des lettres. C'est une phrase complete, faite de faits du contenu.
+- ${factsInstruction()}
 - category parmi : "vocabulaire", "date", "nom propre", "definition", "concept", "lieu", "nombre".
 - Varie les types de blanks : melange vocabulaire, dates, noms, definitions.
 - Ordonne du plus simple au plus difficile.
 
-EXEMPLE de format (1 item — l'article "un" est INCLUS dans le trou et la reponse, pas separe) :
-{"exercises":[{"sentence":"Pour produire de l'electricite a partir d'un mouvement, on utilise ___.","answer":"un alternateur","hint":"Commence par A, avec son article","category":"vocabulaire","sourceRefs":["Source 2"]}]}
+EXEMPLE de format (1 item — accepted donne l'autre ecriture du nombre) :
+{"exercises":[{"sentence":"Contrairement a un insecte, qui en a six, une araignee possede ___.","answer":"huit pattes","accepted":["8 pattes"],"hint":"Commence par H : un nombre, puis les membres qui lui servent a marcher.","category":"nombre","sourceRefs":["Source 2"]}]}
 
 ${sourceRefsInstruction('exercice')}
 ${jsonInstruction()}`;
@@ -964,7 +997,7 @@ export function fillBlankUser(
   let prompt = `Genere exactement ${count} exercices a trous a partir de ce contenu. Repartis ces ${count} exercices sur un maximum de sujets differents du contenu.
 
 Format JSON :
-{"exercises": [{"sentence": "Une phrase du contenu avec ___ a completer.", "answer": "...", "hint": "...", "category": "...", "sourceRefs": ["Source 1"]}]}
+{"exercises": [{"sentence": "Une phrase du contenu avec ___ a completer.", "answer": "...", "accepted": [], "hint": "...", "category": "...", "sourceRefs": ["Source 1"]}]}
 
 Contenu :\n\n${markdown}`;
   if (exclusions) prompt += `\n\n${exclusions}`;

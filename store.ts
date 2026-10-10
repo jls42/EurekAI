@@ -23,6 +23,9 @@ import { emitGenerationEvent } from './helpers/event-bus.js';
 import { buildEventKey, type EventKey } from './helpers/event-key.js';
 import { logger } from './helpers/logger.js';
 
+// Alias : un type indexé écrit dans la signature cachait la méthode à Lizard.
+type PendingStatus = PendingTrackerEntry['status'];
+
 // Résultat d'une tentative de promotion d'un pending vers une Generation finale.
 // Permet au handler HTTP de répondre 200 (promoted) ou 409 (cancelled/failed/missing)
 // avec une sémantique non ambiguë — pas de réponse 200 fantôme si un cancel a gagné
@@ -406,6 +409,13 @@ export class ProjectStore {
   // Modèle détaillé et invariants : voir CLAUDE.md "Pending generations &
   // notifications". Ici, le store applique seulement les transitions atomiques
   // tracker → generations[] et tracker pending → terminal.
+
+  // Statut d'une entrée du tracker (null si absente) : une génération mise en file derrière une
+  // autre du même type peut avoir été annulée pendant son attente (cf. withSameTypeQueue).
+  pendingStatus(projectId: string, generationId: string): PendingStatus | null {
+    const tracker = this.getProject(projectId)?.results.pendingTracker ?? [];
+    return tracker.find((e) => e.id === generationId)?.status ?? null;
+  }
 
   addPendingEntry(projectId: string, entry: PendingTrackerEntry): boolean {
     const data = this.getProject(projectId);
