@@ -34,6 +34,30 @@ describe('sanitizeRenderedHtml', () => {
     expect(sanitizeRenderedHtml(html)).toBe('<a rel="noopener noreferrer">x</a>');
   });
 
+  // Liens conservés : relatifs (ancre, chemin, requête), sans protocole, http(s), mailto, tel.
+  it.each([
+    '#section',
+    '/fiche',
+    './image.png',
+    '../lecon',
+    '?page=2',
+    'lecon.html',
+    'HTTPS://EXAMPLE.COM',
+    'mailto:prof@ecole.fr',
+    'tel:0102030405',
+  ])('conserve le lien %s', (url) => {
+    expect(sanitizeRenderedHtml(`<a href="${url}">x</a>`)).toBe(
+      `<a href="${url}" rel="noopener noreferrer">x</a>`,
+    );
+  });
+
+  // Tout autre protocole explicite est retiré.
+  it.each(['ftp://example.com/fichier', 'file:///etc/passwd'])('bloque le lien %s', (url) => {
+    expect(sanitizeRenderedHtml(`<a href="${url}">x</a>`)).toBe(
+      '<a rel="noopener noreferrer">x</a>',
+    );
+  });
+
   it('supprime les balises iframe, style, object, embed', () => {
     expect(sanitizeRenderedHtml('<iframe src="evil.com"></iframe>')).toBe('');
     expect(sanitizeRenderedHtml('<style>body{display:none}</style>')).not.toContain('<style');

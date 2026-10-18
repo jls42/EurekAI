@@ -32,6 +32,13 @@ function decodeUrlEntities(value: string): string {
     .trim();
 }
 
+// Ancre, chemin ou requête : aucun protocole à examiner (`//hôte` garde celui de la page).
+const RELATIVE_URL_PREFIXES = ['#', '/', './', '../', '?'];
+
+const isRelativeUrl = (url: string): boolean => {
+  return RELATIVE_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
+};
+
 function isSafeUrl(value: string): boolean {
   if (!value) return true;
   const normalized = decodeUrlEntities(value)
@@ -39,17 +46,7 @@ function isSafeUrl(value: string): boolean {
     .replaceAll(/[\u0000-\u0020\u007F]+/g, '')
     .toLowerCase();
 
-  if (!normalized) return true;
-  if (
-    normalized.startsWith('#') ||
-    normalized.startsWith('/') ||
-    normalized.startsWith('./') ||
-    normalized.startsWith('../') ||
-    normalized.startsWith('?')
-  ) {
-    return true;
-  }
-
+  if (!normalized || isRelativeUrl(normalized)) return true;
   if (UNSAFE_PROTOCOL_RE.test(normalized)) return false;
   if (!EXPLICIT_PROTOCOL_RE.test(normalized)) return true;
   return /^(?:https?:|mailto:|tel:)/i.test(normalized);
