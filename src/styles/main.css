@@ -94,8 +94,9 @@
 }
 
 /* ====== Base styles ====== */
+/* Unlayered: beats Tailwind utilities (utilities layer) without !important. */
 [x-cloak] {
-  display: none !important;
+  display: none;
 }
 
 body {
@@ -108,9 +109,11 @@ body {
     radial-gradient(ellipse 60% 50% at 10% 5%, var(--body-gradient-1), transparent),
     radial-gradient(ellipse 50% 40% at 90% 8%, var(--body-gradient-2), transparent);
   background-attachment: fixed;
-  transition:
-    background-color 300ms ease,
-    color 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 300ms ease,
+      color 300ms ease;
+  }
 }
 
 h1,
@@ -140,7 +143,9 @@ h6 {
   transform: scale(0.95);
 }
 .btn-press {
-  transition: transform var(--transition-fast) ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform var(--transition-fast) ease;
+  }
 }
 
 .shadow-card {
@@ -244,9 +249,11 @@ h6 {
   cursor: pointer;
   border: none;
   padding: 0;
-  transition:
-    background 150ms ease,
-    transform 150ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background 150ms ease,
+      transform 150ms ease;
+  }
 }
 .source-badge:hover {
   background: var(--color-primary);
@@ -281,15 +288,19 @@ h6 {
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
   border: 1px solid var(--glass-border);
-  transition:
-    background-color 300ms ease,
-    border-color 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      background-color 300ms ease,
+      border-color 300ms ease;
+  }
 }
 .glass-dark {
   background: var(--glass-dark-bg);
   backdrop-filter: blur(20px) saturate(160%);
   -webkit-backdrop-filter: blur(20px) saturate(160%);
-  transition: background-color 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: background-color 300ms ease;
+  }
 }
 @supports not (backdrop-filter: blur(20px)) {
   .glass {
@@ -302,9 +313,11 @@ h6 {
 
 /* ====== Card lift ====== */
 .card-lift {
-  transition:
-    box-shadow 300ms ease,
-    transform 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      box-shadow 300ms ease,
+      transform 300ms ease;
+  }
 }
 .card-lift:hover {
   transform: translateY(-2px);
@@ -312,9 +325,11 @@ h6 {
 }
 
 .btn-lift {
-  transition:
-    transform 300ms ease,
-    box-shadow 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      transform 300ms ease,
+      box-shadow 300ms ease;
+  }
 }
 .btn-lift:hover {
   transform: translateY(-2px);
@@ -379,10 +394,12 @@ h6 {
   font-size: 16px;
   line-height: 1.6;
   color: var(--color-text-primary);
-  transition:
-    border-color 200ms ease,
-    box-shadow 200ms ease,
-    background-color 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      border-color 200ms ease,
+      box-shadow 200ms ease,
+      background-color 300ms ease;
+  }
 }
 .input-modern:focus {
   outline: none;
@@ -407,7 +424,9 @@ h6 {
   }
 }
 .animate-slide-up {
-  animation: slide-up 0.4s ease-out both;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: slide-up 0.4s ease-out both;
+  }
 }
 
 /* Flip card */
@@ -415,8 +434,10 @@ h6 {
   perspective: 800px;
 }
 .flip-card-inner {
-  transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
   transform-style: preserve-3d;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: transform 600ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
 }
 .flip-card.flipped .flip-card-inner {
   transform: rotateY(180deg);
@@ -492,19 +513,29 @@ h6 {
   }
 }
 .animate-toast-in {
-  animation: toast-in 300ms ease-out;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: toast-in 300ms ease-out;
+  }
 }
 .animate-toast-out {
-  animation: toast-out 300ms ease-in forwards;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: toast-out 300ms ease-in forwards;
+  }
 }
 .animate-bounce-icon {
-  animation: bounce-icon 1.2s ease-in-out infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: bounce-icon 1.2s ease-in-out infinite;
+  }
 }
 .animate-correct {
-  animation: correct-pulse 400ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: correct-pulse 400ms ease;
+  }
 }
 .animate-wrong {
-  animation: wrong-shake 400ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: wrong-shake 400ms ease;
+  }
 }
 .animate-pulse-bar {
   background: linear-gradient(
@@ -514,7 +545,9 @@ h6 {
     var(--color-pulse-bg) 100%
   );
   background-size: 200% 100%;
-  animation: pulse-bar 2s linear infinite;
+  @media (prefers-reduced-motion: no-preference) {
+    animation: pulse-bar 2s linear infinite;
+  }
 }
 
 /* ====== Dialog ====== */
@@ -530,21 +563,25 @@ dialog[open] {
 
 ::view-transition-old(root),
 ::view-transition-new(root) {
-  animation-duration: 0.3s;
+  @media (prefers-reduced-motion: no-preference) {
+    animation-duration: 0.3s;
+  }
 }
 
+/* Site animations only run under no-preference (see each rule). This resets the Tailwind utilities and
+   Alpine transitions, which live in the utilities layer: unlayered, it needs no !important. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    transition-duration: 0.01ms;
   }
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
-    animation-duration: 0s !important;
+    animation-duration: 0s;
   }
 }
 
@@ -590,10 +627,12 @@ dialog[open] {
   border: 1px solid var(--color-sidebar-border);
   border-radius: 2rem;
   box-shadow: var(--shadow-float);
-  transition:
-    width 300ms cubic-bezier(0.4, 0, 0.2, 1),
-    background-color 300ms ease,
-    border-color 300ms ease;
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      width 300ms cubic-bezier(0.4, 0, 0.2, 1),
+      background-color 300ms ease,
+      border-color 300ms ease;
+  }
 }
 
 /* Sidebar tooltip */
@@ -611,8 +650,10 @@ dialog[open] {
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 150ms ease;
   z-index: 100;
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 150ms ease;
+  }
 }
 .sidebar-tooltip::before {
   content: '';
@@ -676,10 +717,12 @@ dialog[open] {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  transition: all 200ms ease;
   border: 2px solid transparent;
   cursor: pointer;
   background: var(--color-chip-bg);
+  @media (prefers-reduced-motion: no-preference) {
+    transition: all 200ms ease;
+  }
 }
 @media (min-width: 640px) {
   .category-chip {
@@ -720,10 +763,6 @@ dialog[open] {
   border-radius: 1.25rem;
   box-shadow: var(--shadow-card);
   overflow: hidden;
-  transition:
-    box-shadow 300ms ease,
-    transform 300ms ease,
-    background-color 300ms ease;
   /* Confort de lecture par profil (défauts = comportement actuel, surchargés via
      setProperty par src/app/profiles.ts). Volontairement sur les cartes de contenu
      pédagogique uniquement — jamais body/nav/pickers. Les h1..h6 gardent Sora et
@@ -732,6 +771,12 @@ dialog[open] {
   letter-spacing: var(--reading-letter-spacing);
   word-spacing: var(--reading-word-spacing);
   line-height: var(--reading-line-height);
+  @media (prefers-reduced-motion: no-preference) {
+    transition:
+      box-shadow 300ms ease,
+      transform 300ms ease,
+      background-color 300ms ease;
+  }
 }
 .gen-card:hover {
   transform: translateY(-2px);
@@ -790,9 +835,6 @@ dialog[open] {
 .header-bar {
   color: var(--color-text-primary);
 }
-.header-bar .text-white {
-  color: inherit !important;
-}
 [data-theme='dark'] .header-bar {
   background: var(--glass-dark-bg);
   border-color: var(--glass-border);
@@ -808,85 +850,86 @@ dialog[open] {
   color: transparent;
 }
 
-/* ====== Dark mode overrides for hardcoded Tailwind classes ====== */
+/* ====== Dark mode overrides for hardcoded Tailwind classes ======
+   Unlayered: they beat Tailwind utilities (utilities layer) without !important. */
 [data-theme='dark'] .bg-white,
 [data-theme='dark'] .bg-surface {
-  background-color: var(--color-surface) !important;
+  background-color: var(--color-surface);
 }
 [data-theme='dark'] .bg-gray-50,
 [data-theme='dark'] .hover\:bg-gray-50:hover {
-  background-color: var(--color-surface-hover) !important;
+  background-color: var(--color-surface-hover);
 }
 [data-theme='dark'] .bg-gray-100 {
-  background-color: rgba(61, 100, 160, 0.2) !important;
+  background-color: rgba(61, 100, 160, 0.2);
 }
 [data-theme='dark'] .bg-gray-200 {
-  background-color: rgba(61, 100, 160, 0.25) !important;
+  background-color: rgba(61, 100, 160, 0.25);
 }
 [data-theme='dark'] .hover\:bg-gray-100:hover {
-  background-color: rgba(61, 100, 160, 0.25) !important;
+  background-color: rgba(61, 100, 160, 0.25);
 }
 [data-theme='dark'] .hover\:bg-white\/60:hover {
-  background-color: rgba(30, 45, 77, 0.6) !important;
+  background-color: rgba(30, 45, 77, 0.6);
 }
 [data-theme='dark'] .border-gray-100 {
-  border-color: var(--color-border-light) !important;
+  border-color: var(--color-border-light);
 }
 [data-theme='dark'] .border-gray-200 {
-  border-color: var(--color-border-default) !important;
+  border-color: var(--color-border-default);
 }
 [data-theme='dark'] .border-gray-200\/50 {
-  border-color: var(--color-border-light) !important;
+  border-color: var(--color-border-light);
 }
 [data-theme='dark'] .border-gray-300 {
-  border-color: var(--color-border-default) !important;
+  border-color: var(--color-border-default);
 }
 [data-theme='dark'] .bg-blue-50 {
-  background-color: rgba(var(--color-gen-summary-rgb), 0.12) !important;
+  background-color: rgba(var(--color-gen-summary-rgb), 0.12);
 }
 [data-theme='dark'] .bg-blue-100 {
-  background-color: rgba(var(--color-gen-summary-rgb), 0.15) !important;
+  background-color: rgba(var(--color-gen-summary-rgb), 0.15);
 }
 [data-theme='dark'] .text-blue-700 {
-  color: var(--color-gen-summary) !important;
+  color: var(--color-gen-summary);
 }
 [data-theme='dark'] .bg-green-100 {
-  background-color: rgba(88, 204, 2, 0.15) !important;
+  background-color: rgba(88, 204, 2, 0.15);
 }
 [data-theme='dark'] .text-green-700 {
-  color: var(--color-success) !important;
+  color: var(--color-success);
 }
 [data-theme='dark'] .bg-orange-50,
 [data-theme='dark'] .bg-orange-100 {
-  background-color: rgba(var(--color-gen-flashcards-rgb), 0.12) !important;
+  background-color: rgba(var(--color-gen-flashcards-rgb), 0.12);
 }
 [data-theme='dark'] .text-orange-700 {
-  color: var(--color-gen-flashcards) !important;
+  color: var(--color-gen-flashcards);
 }
 [data-theme='dark'] .bg-purple-50 {
-  background-color: rgba(var(--color-gen-quiz-rgb), 0.12) !important;
+  background-color: rgba(var(--color-gen-quiz-rgb), 0.12);
 }
 [data-theme='dark'] .bg-teal-50,
 [data-theme='dark'] .bg-teal-100 {
-  background-color: rgba(var(--color-gen-podcast-rgb), 0.12) !important;
+  background-color: rgba(var(--color-gen-podcast-rgb), 0.12);
 }
 [data-theme='dark'] .text-teal-700 {
-  color: var(--color-gen-podcast) !important;
+  color: var(--color-gen-podcast);
 }
 [data-theme='dark'] .hover\:bg-blue-50:hover {
-  background-color: rgba(var(--color-gen-summary-rgb), 0.15) !important;
+  background-color: rgba(var(--color-gen-summary-rgb), 0.15);
 }
 [data-theme='dark'] .hover\:bg-orange-50:hover {
-  background-color: rgba(var(--color-gen-flashcards-rgb), 0.15) !important;
+  background-color: rgba(var(--color-gen-flashcards-rgb), 0.15);
 }
 [data-theme='dark'] .hover\:bg-teal-50:hover {
-  background-color: rgba(var(--color-gen-podcast-rgb), 0.15) !important;
+  background-color: rgba(var(--color-gen-podcast-rgb), 0.15);
 }
 [data-theme='dark'] .bg-white\/40 {
-  background-color: var(--color-category-bg) !important;
+  background-color: var(--color-category-bg);
 }
 [data-theme='dark'] .bg-black\/40 {
-  background-color: rgba(0, 0, 0, 0.6) !important;
+  background-color: rgba(0, 0, 0, 0.6);
 }
 [data-theme='dark'] dialog {
   background-color: var(--color-surface);
@@ -900,11 +943,11 @@ dialog[open] {
 
 /* Dark mode: keep toast backgrounds dark for white text readability */
 [data-theme='dark'] .bg-danger-dark {
-  background-color: #cc3333 !important;
+  background-color: #cc3333;
 }
 [data-theme='dark'] .bg-success-dark {
-  background-color: #3ea300 !important;
+  background-color: #3ea300;
 }
 [data-theme='dark'] .bg-primary-dark {
-  background-color: #0a8ad0 !important;
+  background-color: #0a8ad0;
 }

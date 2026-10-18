@@ -28,11 +28,11 @@ export default defineConfig(async () => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Codacy ne resout pas les types du plugin Vite.
       tailwindcss(),
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call -- Codacy ne resout pas les types du plugin Vite.
-      handlebars({ partialDirectory: resolve(__dirname, 'src/partials') }),
+      handlebars({ partialDirectory: resolve(import.meta.dirname, 'src/partials') }),
     ],
     root: 'src',
-    resolve: { alias: { '@helpers': resolve(__dirname, 'helpers') } },
-    publicDir: resolve(__dirname, 'public/assets'),
+    resolve: { alias: { '@helpers': resolve(import.meta.dirname, 'helpers') } },
+    publicDir: resolve(import.meta.dirname, 'public/assets'),
     build: { outDir: '../dist' },
     server: {
       port: 5173,

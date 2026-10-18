@@ -127,6 +127,9 @@ export default [
       // `expect(…).resolves` non attendu passerait en silence).
       '@typescript-eslint/require-await': 'off',
       'no-await-in-loop': 'off',
+      // Valeurs recopiées, jamais calculées (paramètres, tarifs, scores) : toBe exact voulu ;
+      // toBeCloseTo (2 décimales par défaut) laisserait passer 0 pour 0,005.
+      'sonarjs/no-floating-point-equality': 'off',
     },
   },
   {

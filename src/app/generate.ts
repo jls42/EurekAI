@@ -441,13 +441,7 @@ export function applyVoiceResult(
 // ─────────────────────────────────────────────────────────────────────────────
 
 type TrackedType =
-  | 'summary'
-  | 'flashcards'
-  | 'quiz'
-  | 'podcast'
-  | 'quiz-vocal'
-  | 'image'
-  | 'fill-blank';
+  'summary' | 'flashcards' | 'quiz' | 'podcast' | 'quiz-vocal' | 'image' | 'fill-blank';
 
 // Pending optimiste : mêmes sources que la génération envoyée (celles de la fiche pour la
 // version facile à lire, sinon la sélection).

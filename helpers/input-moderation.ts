@@ -12,8 +12,7 @@ import { moderationRejection, type ModerationRejection } from './moderation-http
 
 /** Issue : accepté (résultat de modération, absent sans vérification) ou refus à renvoyer. */
 export type TextScreening =
-  | { ok: true; moderation?: ModerationResult }
-  | { ok: false; rejection: ModerationRejection };
+  { ok: true; moderation?: ModerationResult } | { ok: false; rejection: ModerationRejection };
 
 /**
  * `categories` null : aucune vérification (modération inactive), accepté sans appel. Sinon

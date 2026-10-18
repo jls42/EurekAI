@@ -20,8 +20,7 @@ const IDB_STORE = 'keys';
 const MASTER_KEY_ID = 'master-v1';
 
 export type KeyRecord =
-  | { encrypted: true; iv: string; ct: string }
-  | { encrypted: false; value: string };
+  { encrypted: true; iv: string; ct: string } | { encrypted: false; value: string };
 
 type ProviderKeyring = Map<string, KeyRecord>;
 type ProfileKeyrings = Map<string, ProviderKeyring>;

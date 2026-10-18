@@ -428,9 +428,7 @@ export interface GenerationEventTerminal extends GenerationEventBase {
 }
 
 export type GenerationEvent =
-  | GenerationEventPending
-  | GenerationEventCompleted
-  | GenerationEventTerminal;
+  GenerationEventPending | GenerationEventCompleted | GenerationEventTerminal;
 
 export interface CostEntry {
   timestamp: string;

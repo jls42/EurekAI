@@ -704,8 +704,7 @@ describe('GET /:pid/events (SSE)', () => {
 
     handler(req, res);
     const errorHandler = res.on.mock.calls.find((call: unknown[]) => call[0] === 'error')?.[1] as
-      | ((err: Error) => void)
-      | undefined;
+      ((err: Error) => void) | undefined;
     errorHandler?.(new Error('ECONNRESET'));
 
     expect(warnSpy).toHaveBeenCalledWith(
