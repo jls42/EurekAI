@@ -977,3 +977,22 @@ describe('pruneTracker cap (50 entries)', () => {
     expect(found!.results.pendingTracker!.length).toBeLessThanOrEqual(50);
   });
 });
+
+describe('pendingStatus', () => {
+  it('suit une entrée du tracker : pending, puis cancelled ; null si absente', () => {
+    const p = store.createProject('File');
+    const gid = '33333333-3333-4333-8333-333333333333';
+    expect(store.pendingStatus(p.meta.id, gid)).toBeNull();
+    store.addPendingEntry(p.meta.id, {
+      id: gid,
+      type: 'quiz',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    expect(store.pendingStatus(p.meta.id, gid)).toBe('pending');
+    store.markPendingCancelled(p.meta.id, gid);
+    expect(store.pendingStatus(p.meta.id, gid)).toBe('cancelled');
+    expect(store.pendingStatus('projet-inconnu', gid)).toBeNull();
+  });
+});

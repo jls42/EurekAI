@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 vi.mock('../helpers/audio.js', () => ({
   collectStream: vi.fn().mockResolvedValue(Buffer.from('png-data')),
@@ -23,6 +23,7 @@ import { generateImage } from './image.js';
 import { writeFileSync } from 'node:fs';
 import { collectStream } from '../helpers/audio.js';
 import { runWithMediaLedger } from '../helpers/media-ledger.js';
+import { logger } from '../helpers/logger.js';
 
 function createClient(
   outputs: any[] = [{ content: [{ imageUrl: 'https://example.com/image.png' }] }],
@@ -312,5 +313,60 @@ describe('generateImage — tentatives de l’outil sans image', () => {
       'image',
       expect.stringContaining('1 tentative sans image'),
     );
+  });
+});
+
+// Format réel de l'outil au release-test du 2026-10-10 : URL signée dans le résultat de l'appel,
+// message final en simple texte, plus aucun fichier dans l'API Files.
+describe("generateImage — URL signée de l'outil (format d'octobre 2026)", () => {
+  const SIGNED =
+    'https://mistralaiblackforestprod.blob.core.windows.net/images/blackforest/38de/img.jpeg?sig=abc';
+  const outputsWith = (url: string) => [
+    { type: 'tool.execution', name: 'image_generation', info: { result: JSON.stringify({ url }) } },
+    {
+      type: 'message.output',
+      role: 'assistant',
+      content: "Voici une illustration du cycle de l'eau.",
+    },
+  ];
+  const jpeg = Uint8Array.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("télécharge l'image et l'enregistre dans le projet (jamais l'URL signée, qui expire)", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(jpeg, { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createClient(outputsWith(SIGNED));
+    const result = await generateImage(client, '# Contenu', '/tmp/project', 'pid-url');
+    expect(fetchMock).toHaveBeenCalledWith(SIGNED, expect.objectContaining({ redirect: 'error' }));
+    expect(result.imageUrl).toMatch(
+      /^\/output\/projects\/pid-url\/illustration-\d+-[0-9a-f]{8}\.jpg$/,
+    );
+    expect(writeFileSync).toHaveBeenCalled();
+    expect(client.files.download).not.toHaveBeenCalled();
+  });
+
+  it('refuse un autre hôte que le stockage de Mistral, sans le contacter', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const client = createClient(outputsWith('https://evil.example.com/img.jpeg'));
+    await expect(generateImage(client, '# Contenu', '/tmp/project', 'pid-x')).rejects.toThrow(
+      "Hôte d'image refusé",
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sans image, journalise la forme de la réponse, jamais son texte ni une URL', async () => {
+    const client = createClient([
+      { type: 'message.output', content: 'Pas d’image ici : https://x.example/y' },
+    ]);
+    await expect(generateImage(client, '# Contenu', '/tmp/project', 'pid-y')).rejects.toThrow(
+      "Aucune image generee par l'agent",
+    );
+    const [, message] = vi.mocked(logger.error).mock.calls.at(-1) ?? [];
+    expect(message).toContain('message.output(texte)');
+    expect(message).not.toContain('https');
   });
 });

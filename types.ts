@@ -177,6 +177,9 @@ export interface ImageGeneration extends GenerationMeta {
 export interface FillBlankItem {
   sentence: string;
   answer: string;
+  // Autres écritures justes de la même réponse (« 15e » pour « XVe », « Jésus » pour « Jésus-Christ ») ;
+  // absent des exercices générés avant son ajout. Lu par helpers/fill-blank-validate.ts.
+  accepted?: string[];
   hint: string;
   category: string;
   sourceRefs?: string[];

@@ -464,6 +464,44 @@ describe('POST /:pid/generations/:gid/fill-blank-attempt', () => {
     expect(result.attempt.total).toBe(3);
   });
 
+  it("corrige avec l'exercice entier : accepted, écritures d'un nombre, écriture imposée", async () => {
+    const gen = {
+      id: crypto.randomUUID(),
+      title: 'Siecles',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'fill-blank' as const,
+      data: [
+        {
+          sentence: 'La naissance de ___',
+          answer: 'Jésus-Christ',
+          accepted: ['Jésus'],
+          hint: 'J',
+          category: 'nom propre',
+        },
+        { sentence: '1492 est au ___ siecle.', answer: 'XVe', hint: 'Un siecle', category: 'date' },
+        {
+          sentence: 'En chiffres romains, 15 s ecrit ___.',
+          answer: 'XV',
+          hint: 'Deux lettres',
+          category: 'nombre',
+        },
+      ],
+    };
+    store.addGeneration(pid, gen);
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/fill-blank-attempt');
+    const req = mockReq({
+      params: { pid, gid: gen.id },
+      body: { answers: { 0: 'Jésus', 1: '15e', 2: '15' } },
+    });
+    const res = mockRes();
+
+    await handler(req, res);
+
+    const result = res.json.mock.calls[0][0];
+    expect(result.results).toEqual({ 0: true, 1: true, 2: false });
+  });
+
   it('retourne les resultats par question', async () => {
     const handler = getHandler(router, 'post', '/:pid/generations/:gid/fill-blank-attempt');
     const answers = { 0: 'ciel', 1: 'terre', 2: 'lune' };

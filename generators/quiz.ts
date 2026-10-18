@@ -92,6 +92,9 @@ async function generateQuizWithRetry(
   return retryValid;
 }
 
+// Nombre de questions quand l'appelant n'en demande pas (repris par la route pour en ajouter).
+export const QUIZ_DEFAULT_COUNT = 15;
+
 export async function generateQuiz(
   client: Mistral,
   markdown: string,
@@ -101,7 +104,7 @@ export async function generateQuiz(
   count?: number,
   exclusions?: string,
 ): Promise<QuizQuestion[]> {
-  const effectiveCount = count ?? 15;
+  const effectiveCount = count ?? QUIZ_DEFAULT_COUNT;
   return generateQuizWithRetry(
     client,
     quizSystem(ageGroup),

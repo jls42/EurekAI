@@ -19,7 +19,22 @@ interface FillBlankContext extends Omit<StepByStepBase<FillBlankItem>, 'feedback
   retryWrongExercises(): void;
   resetExercise(): void;
   handleKey(e: KeyboardEvent): void;
+  focusNextButton(): void;
 }
+
+// « Suivante » reçoit le focus après la correction (le champ, désactivé, l'a perdu) : Entrée passe
+// ainsi à la suite. Le bouton n'est visible qu'une fois lancée la transition du bloc de correction
+// (x-show) et focus() échoue sans bruit sur un élément masqué : nouvel essai à chaque image.
+const focusWhenVisible = (el: HTMLElement | undefined, tries: number): void => {
+  if (!el || tries <= 0) return;
+  if (el.offsetParent !== null) {
+    el.focus();
+    return;
+  }
+  requestAnimationFrame(() => {
+    focusWhenVisible(el, tries - 1);
+  });
+};
 
 export function fillBlankComponent(gen: FillBlankGeneration) {
   return {
@@ -43,12 +58,19 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
       const idx = this.currentIndex();
       const ex = this.currentExercise();
       if (idx === undefined || !ex) return;
-      const correct = validateAnswer(this.answer, ex.answer);
-      const misspelled = correct && !isExactSpelling(this.answer, ex.answer);
+      const correct = validateAnswer(this.answer, ex);
+      const misspelled = correct && !isExactSpelling(this.answer, ex);
       this.answers[idx] = this.answer;
       this.results[idx] = correct;
       if (correct) this.score++;
       this.feedback = { correct, correctAnswer: ex.answer, misspelled };
+      this.focusNextButton();
+    },
+
+    focusNextButton(this: FillBlankContext) {
+      void this.$nextTick(() => {
+        focusWhenVisible(this.$refs.nextButton as HTMLElement | undefined, 10);
+      });
     },
 
     onNextReady(this: FillBlankContext) {
@@ -66,8 +88,9 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
         this.answer = this.answers[idx];
         const ex = this.items()[idx];
         const correct = this.results[idx];
-        const misspelled = correct && !isExactSpelling(this.answers[idx], ex?.answer ?? '');
+        const misspelled = correct && !isExactSpelling(this.answers[idx], ex ?? '');
         this.feedback = { correct, correctAnswer: ex?.answer, misspelled };
+        this.focusNextButton();
       } else {
         this.answer = '';
         this.feedback = null;
@@ -132,6 +155,10 @@ export function fillBlankComponent(gen: FillBlankGeneration) {
 
     handleKey(this: FillBlankContext, e: KeyboardEvent) {
       if (e.key !== 'Enter') return;
+      // Le bouton « Suivante » prend le focus dès la correction (le champ est alors désactivé) :
+      // sans preventDefault, le keypress de cette même touche l'activerait, et l'enfant passerait
+      // à l'exercice suivant sans voir sa correction.
+      e.preventDefault();
       if (this.isReviewing()) return;
       if (this.feedback) {
         this.nextQuestion();

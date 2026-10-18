@@ -207,8 +207,11 @@
                     </div>
                   </div>
                   <div x-show="!isReviewing()" class="text-center mt-3">
+                    <!-- Focus donné par focusNextButton à la correction (Entrée passe à la suite). Clic sans
+                         correction ignoré : un 2e Entrée pendant la transition sauterait un exercice. -->
                     <button
-                      @click="nextQuestion()"
+                      x-ref="nextButton"
+                      @click="feedback && nextQuestion()"
                       class="bg-primary-dark text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm btn-press focus-ring inline-flex items-center gap-2"
                     >
                       <span x-text="t('step.next')"></span>
