@@ -123,4 +123,23 @@ describe('generateFillBlank — une réponse, ses écritures, jamais donnée par
     await expect(generateFillBlank(client, 'content')).rejects.toThrow(SyntaxError);
     expect(client.chat.complete).toHaveBeenCalledTimes(2);
   });
+
+  // Indice réel du 2026-10-10 (output/fill-blank-corpus/, hors git) : « écrire » livre « l'écriture ».
+  it("écarte un exercice dont l'indice reprend la famille de la réponse", async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    const family = {
+      sentence:
+        "L'Histoire commence quand les hommes inventent ___ vers 3000 ans avant Jésus-Christ.",
+      answer: "l'écriture",
+      hint: "Commence par L' : c'est ce qui permet d'écrire des mots sur du papier ou de la pierre.",
+      category: 'vocabulaire',
+    };
+    const client = mockClient([century, family]);
+    const result = await generateFillBlank(client, 'content');
+    expect(result.map((item) => item.answer)).toEqual(['XVe']);
+    expect(warn).toHaveBeenCalledWith(
+      'fill-blank',
+      "1 exercise(s) dropped: hint from the answer's word family",
+    );
+  });
 });

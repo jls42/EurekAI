@@ -5,6 +5,7 @@ import {
   validateAnswer,
   isExactSpelling,
   answerLeaks,
+  hintSharesFamily,
   splitAlternatives,
   type FillBlankKey,
 } from './fill-blank-validate.js';
@@ -321,5 +322,33 @@ describe('answerLeaks', () => {
       answerLeaks({ answer: 'neuf', sentence: 'Elle dure ___ mois.', hint: 'Entre 8 et 10' }),
     ).toBe(true);
     expect(answerLeaks({ ...century, hint: 'On ajoute 1 au nombre de centaines.' })).toBe(false);
+  });
+});
+
+// Indices réels jugés le 2026-10-10 (output/fill-blank-corpus/, hors git).
+describe('hintSharesFamily', () => {
+  it.each([
+    ["l'écriture", "Commence par L' : c'est ce qui permet d'écrire des mots sur du papier."],
+    ["l'invention de l'écriture", 'Avant, les hommes ne savaient pas écrire leurs idées.'],
+    ['la Révolution française', "C'est le moment où le peuple s'est révolté contre le roi."],
+  ])('voit la famille de « %s » dans l’indice', (answer, hint) => {
+    expect(hintSharesFamily({ answer, hint })).toBe(true);
+  });
+
+  it('ignore la consigne de première lettre que le prompt demande', () => {
+    // « Commence » et « commerce » partagent « comme » : sans cette règle, l'exercice partirait.
+    const commerce = { answer: 'le commerce', hint: "Commence par L : l'échange de marchandises." };
+    expect(hintSharesFamily(commerce)).toBe(false);
+  });
+
+  it('laisse les nombres à answerLeaks et garde les indices sans rapport', () => {
+    const century = { answer: 'XVe', accepted: ['15e', 'quinzième'] };
+    expect(hintSharesFamily({ ...century, hint: 'Ajoute 1 au nombre de centaines.' })).toBe(false);
+    const traces = {
+      answer: 'traces',
+      hint: "Commence par T : ce que les gens ont fabriqué ou écrit et qu'on retrouve aujourd'hui.",
+    };
+    expect(hintSharesFamily(traces)).toBe(false);
+    expect(hintSharesFamily({ answer: "l'écriture" })).toBe(false);
   });
 });

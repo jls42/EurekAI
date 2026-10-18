@@ -7,7 +7,12 @@ import {
   unwrapJsonArray,
 } from '../helpers/index.js';
 import { diversityParams } from '../helpers/diversity.js';
-import { acceptedForms, answerLeaks, splitAlternatives } from '../helpers/fill-blank-validate.js';
+import {
+  acceptedForms,
+  answerLeaks,
+  hintSharesFamily,
+  splitAlternatives,
+} from '../helpers/fill-blank-validate.js';
 import { logger } from '../helpers/logger.js';
 import { fillBlankSystem, fillBlankUser, fillBlankRetryUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
@@ -37,17 +42,20 @@ const withSingleAnswer = (item: FillBlankItem): FillBlankItem => {
   return { ...item, answer, accepted };
 };
 
+const warnDropped = (count: number, reason: string): void => {
+  if (count > 0) logger.warn(FILL_BLANK, `${count} exercise(s) dropped: ${reason}`);
+};
+
 // Exercice qui donne sa réponse dans la phrase ou l'indice : il ne vérifie plus rien (8 sur 60 avec
-// Large 4, mesure du 2026-10-09) → écarté.
+// Large 4, mesure du 2026-10-09) → écarté. De même quand l'indice reprend un mot de sa famille
+// (« ce qui permet d'écrire » pour « l'écriture ») : le prompt l'interdit, sans effet suffisant.
+// Mesure du 2026-10-18 sur 285 exercices jugés : 12 indices fautifs sur 14 écartés, 5 à tort sur 216.
 const usableExercises = (data: FillBlankItem[]): FillBlankItem[] => {
   const items = data.map(withSingleAnswer);
-  const kept = items.filter((item) => !answerLeaks(item));
-  if (kept.length < items.length) {
-    logger.warn(
-      FILL_BLANK,
-      `${items.length - kept.length} exercise(s) dropped: answer in sentence or hint`,
-    );
-  }
+  const leakFree = items.filter((item) => !answerLeaks(item));
+  const kept = leakFree.filter((item) => !hintSharesFamily(item));
+  warnDropped(items.length - leakFree.length, 'answer in sentence or hint');
+  warnDropped(leakFree.length - kept.length, "hint from the answer's word family");
   return kept;
 };
 

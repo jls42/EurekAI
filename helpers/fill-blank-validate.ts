@@ -485,3 +485,40 @@ export function answerLeaks(key: FillBlankKey): boolean {
     );
   });
 }
+
+// ── Indice qui reprend la famille de la réponse ──────────────────────
+
+// Consigne de première lettre que le prompt demande (« Commence par L : ») : pas un mot de la famille.
+const FIRST_LETTER_CLAUSE = /^\s*commence par\b[^:]*:/i;
+const FAMILY_WORD = /^[a-z]{4,}$/;
+const FAMILY_MIN_PREFIX = 4;
+const FAMILY_MIN_SHARE = 0.6;
+
+// Mots d'au moins 4 lettres, sans accents ni casse, hors nombres (un nombre relève d'answerLeaks).
+const familyWords = (text: string): string[] => {
+  return tokenize(text, false)
+    .map((token) => token.bare)
+    .filter((word) => FAMILY_WORD.test(word) && wordValue(word) === undefined);
+};
+
+const commonPrefixLength = (a: string, b: string): number => {
+  let length = 0;
+  while (length < a.length && length < b.length && a[length] === b[length]) length++;
+  return length;
+};
+
+// Même famille : un début commun d'au moins 4 lettres, qui couvre au moins 60 % du plus court des
+// deux mots (« écrire » / « écriture » : « écri »). Un mot de la réponse elle-même compte aussi.
+const sameFamily = (a: string, b: string): boolean => {
+  const prefix = commonPrefixLength(a, b);
+  return prefix >= FAMILY_MIN_PREFIX && prefix >= FAMILY_MIN_SHARE * Math.min(a.length, b.length);
+};
+
+/** Vrai quand l'indice reprend un mot de la famille de la réponse (« ce qui permet d'écrire » pour « l'écriture »). */
+export function hintSharesFamily(key: FillBlankKey): boolean {
+  const answerWords = formsOf(key).flatMap(familyWords);
+  const hint = (key.hint ?? '').replace(FIRST_LETTER_CLAUSE, ' ');
+  return familyWords(hint).some((word) =>
+    answerWords.some((answerWord) => sameFamily(word, answerWord)),
+  );
+}
