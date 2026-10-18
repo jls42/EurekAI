@@ -442,12 +442,14 @@ const createDynamicUpload = (store: ProjectStore) =>
         cb(null, `${randomUUID()}-${file.originalname}`);
       },
     }),
+    // eslint-disable-next-line sonarjs/content-length -- limite bornée volontaire (voir NOSONAR S5693)
     limits: { fileSize: 20 * 1024 * 1024, files: 10, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (20 Mo, 10 fichiers) : c'est le garde-fou anti-DoS upload
   });
 
 const createMemoryUpload = () =>
   multer({
     storage: multer.memoryStorage(),
+    // eslint-disable-next-line sonarjs/content-length -- limite bornée volontaire (voir NOSONAR S5693)
     limits: { fileSize: 25 * 1024 * 1024, files: 1, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (25 Mo, 1 fichier) : c'est le garde-fou anti-DoS upload
   });
 

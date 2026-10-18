@@ -669,9 +669,7 @@ export class ProjectStore {
 
   private normalizeModeration(
     moderation:
-      | Source['moderation']
-      | { safe?: boolean; categories?: Record<string, boolean> }
-      | undefined,
+      Source['moderation'] | { safe?: boolean; categories?: Record<string, boolean> } | undefined,
   ): ModerationResult | undefined {
     if (!moderation) return undefined;
     if ('status' in moderation && moderation.status) {

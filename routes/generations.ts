@@ -50,6 +50,7 @@ import { activeModerationCategories, moderationProfileOf } from '../helpers/mode
 
 const upload = multer({
   storage: multer.memoryStorage(),
+  // eslint-disable-next-line sonarjs/content-length -- limite bornée volontaire (voir NOSONAR S5693)
   limits: { fileSize: 10 * 1024 * 1024, ...MULTIPART_FIELD_LIMITS }, // NOSONAR(S5693) — limite bornée volontaire (10 Mo) anti-DoS
 });
 

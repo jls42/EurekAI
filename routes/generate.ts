@@ -802,8 +802,7 @@ interface AutoCtx {
 }
 
 type StepOutcome =
-  | { ok: true; gen: Generation }
-  | { ok: false; agent: AutoAgentType; code: FailedStepCode };
+  { ok: true; gen: Generation } | { ok: false; agent: AutoAgentType; code: FailedStepCode };
 
 const makeGen = (
   type: string,
