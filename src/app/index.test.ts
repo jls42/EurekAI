@@ -49,7 +49,27 @@ vi.mock('lucide', () => ({
   icons: {},
 }));
 
+import { readFileSync } from 'node:fs';
 import { app } from './index.js';
+import { createState } from './state';
+import { createI18n } from './i18n';
+import { createHelpers } from './helpers';
+import { createNavigation } from './navigation';
+import { createToast } from './toast';
+import { createSession } from './session';
+import { createPendingsStream } from './sse-pendings';
+import { createConfirm } from './confirm';
+import { createProfiles } from './profiles';
+import { createProjects } from './projects';
+import { createConfig } from './config';
+import { createSources } from './sources';
+import { createRecorder } from './recorder';
+import { createWebsearch } from './websearch';
+import { createConsigne } from './consigne';
+import { createGenerate } from './generate';
+import { createGenerations } from './generations';
+import { createChat } from './chat';
+import { createRender } from './render';
 
 describe('app', () => {
   beforeEach(() => {
@@ -363,5 +383,85 @@ describe('app() — état composé', () => {
     expect(a.projectUploadSessions().map((s) => s.id)).toEqual(['s1']);
     a.currentProjectId = 'p2';
     expect(a.projectUploadSessions().map((s) => s.id)).toEqual(['s2']);
+  });
+
+  // `uploading` (getter de createState) valait false en permanence dans l'app réelle depuis #14 :
+  // bloc « Générer » jamais masqué pendant un import, « Ajouter » (texte) jamais désactivé.
+  it("isUploading() suit l'import du cours affiché sur l'objet composé", () => {
+    const a = app();
+    const file = {
+      id: 'f1',
+      name: 'a.pdf',
+      file: null,
+      status: 'uploading' as const,
+      errorMsg: null,
+    };
+    a.uploadSessions = [{ id: 's1', projectId: 'p1', cleanupScheduled: false, files: [file] }];
+    a.currentProjectId = 'p1';
+    expect(a.isUploading()).toBe(true);
+    a.currentProjectId = 'p2';
+    expect(a.isUploading()).toBe(false);
+  });
+});
+
+// Aucune fabrique ne doit exposer d'accesseur : app() compose l'état par `...createX()`, et un
+// spread copie la VALEUR d'un getter, pas le getter (vécu : `uploading` figé à false depuis #14,
+// un getter `projectUploadSessions` figé à [] le 2026-10-21). Parcourir l'objet app() seul ne
+// suffit pas : le spread y a déjà effacé le getter. Chaque fabrique est donc parcourue elle-même,
+// et leur liste est relue dans index.ts (une fabrique ajoutée sans être listée ici fait échouer).
+describe('app() — aucune fabrique n’expose d’accesseur (get/set)', () => {
+  const factories: Record<string, () => object> = {
+    createState,
+    createI18n,
+    createHelpers,
+    createNavigation,
+    createToast,
+    createSession,
+    createPendingsStream,
+    createConfirm,
+    createProfiles,
+    createProjects,
+    createConfig,
+    createSources,
+    createRecorder,
+    createWebsearch,
+    createConsigne,
+    createGenerate,
+    createGenerations,
+    createChat,
+    createRender,
+  };
+
+  const accessorsOf = (obj: object): string[] => {
+    return Object.entries(Object.getOwnPropertyDescriptors(obj))
+      .filter(([, descriptor]) => descriptor.get !== undefined || descriptor.set !== undefined)
+      .map(([name]) => name);
+  };
+
+  it('la liste couvre toutes les fabriques composées par app() (index.ts)', () => {
+    const source = readFileSync(new URL('./index.ts', import.meta.url), 'utf-8');
+    const composed = [...source.matchAll(/\.\.\.(create\w+)\(\)/g)].map((m) => m[1]);
+    const byName = (a: string, b: string) => a.localeCompare(b);
+    expect(composed.length).toBeGreaterThan(0);
+    expect([...composed].sort(byName)).toEqual(Object.keys(factories).sort(byName));
+  });
+
+  it.each(Object.keys(factories))('%s() : aucun accesseur', (name) => {
+    expect(accessorsOf(factories[name]())).toEqual([]);
+  });
+
+  it('objet app() : aucun accesseur', () => {
+    expect(accessorsOf(app())).toEqual([]);
+  });
+
+  // Le test attrape bien le cas qu'il doit signaler (getter d'une fabrique, effacé par le spread).
+  it('détecte un getter de fabrique, invisible sur l’objet composé', () => {
+    const factory = () => ({
+      get busy() {
+        return true;
+      },
+    });
+    expect(accessorsOf(factory())).toEqual(['busy']);
+    expect(accessorsOf({ ...factory() })).toEqual([]);
   });
 });

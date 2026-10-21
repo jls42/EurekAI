@@ -375,6 +375,30 @@ describe('createConfirm', () => {
       warnMock.mockRestore();
     });
 
+    // Échec du POST /cancel après un changement de cours : le pending du cours quitté n'apparaît
+    // pas dans le cours affiché (il revient au retour, relu du serveur), ni son toast d'échec.
+    it('cancel by gid: 5xx après un changement de cours → aucune restauration dans le cours affiché', async () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (globalThis as any).fetch = vi.fn(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.pendingById = {};
+        return { ok: false, status: 500 };
+      });
+      ctx.abortControllersByGid = { [VALID_GID_1]: ctrl };
+      ctx.pendingById = { [VALID_GID_1]: { id: VALID_GID_1, type: 'summary', status: 'pending' } };
+
+      confirm.cancelOne.call(ctx, VALID_GID_1);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(ctx.pendingById).toEqual({});
+      expect(ctx.showToast).not.toHaveBeenCalledWith(
+        expect.stringContaining('toast.cancelFailed'),
+        'error',
+      );
+      warnMock.mockRestore();
+    });
+
     it('skips POST /cancel when gid is not a valid UUID v4 (SSRF defense)', () => {
       // Garde-fou : si un gid frauduleux atterrit dans pendingById (extension
       // hostile, bug de sérialisation), la validation regex bloque le fetch

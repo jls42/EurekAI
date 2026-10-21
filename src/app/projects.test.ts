@@ -45,6 +45,9 @@ function makeContext(overrides: any = {}) {
     chatMessages: [],
     chatInput: '',
     uploadSessions: [] as any[],
+    autoRuns: {} as Record<string, any>,
+    loading: {} as Record<string, boolean>,
+    abortControllers: {} as Record<string, AbortController>,
     useConsigne: true,
     t: vi.fn((key: string) => key),
     showToast: vi.fn(),
@@ -305,6 +308,26 @@ describe('selectProject', () => {
     );
   });
 
+  // Auto lancé sur ce cours avant d'en changer, encore en analyse : puce « Auto — analyse… »
+  // rétablie et annulable ; sans elle, le bouton Auto redevenait cliquable (second Auto).
+  it('retour sur un cours dont l’Auto analyse encore : puce rétablie, annulable', async () => {
+    mockFetchOk({ id: 'p1', sources: [{ id: 's1' }], results: { generations: [] } });
+    const controller = new AbortController();
+    const ctx = makeContext({ autoRuns: { p1: { controller, analysing: true } } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.loading.auto).toBe(true);
+    expect(ctx.abortControllers.auto).toBe(controller);
+  });
+
+  it('retour sur un cours dont l’Auto envoie ses étapes : pas de puce d’analyse', async () => {
+    mockFetchOk({ id: 'p1', sources: [{ id: 's1' }], results: { generations: [] } });
+    const controller = new AbortController();
+    const ctx = makeContext({ autoRuns: { p1: { controller, analysing: false } } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.loading.auto).toBeUndefined();
+    expect(ctx.abortControllers.auto).toBeUndefined();
+  });
+
   // Tour assistant vide enregistré avant le correctif serveur : repli lisible dès l'ouverture du
   // projet (l'historique vient du snapshot du projet). Un tour vide qui a
   // lancé une génération garde son badge seul.
@@ -481,6 +504,25 @@ describe('deleteProject', () => {
     expect(ctx.uploadSessions.map((s: { id: string }) => s.id)).toEqual(['s2']);
   });
 
+  // resetSession épargne un Auto en cours : la suppression de son cours l'arrête explicitement.
+  it('aborts the Auto of the deleted project (no step sent), keeps the others', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+    const deleted = new AbortController();
+    const other = new AbortController();
+    const ctx = makeContext({
+      currentProjectId: 'p1',
+      projects: [{ id: 'p1' }, { id: 'p2' }],
+      autoRuns: {
+        p1: { controller: deleted, analysing: true },
+        p2: { controller: other, analysing: false },
+      },
+    });
+    await proj.deleteProject.call(ctx, 'p1');
+    expect(deleted.signal.aborted).toBe(true);
+    expect(other.signal.aborted).toBe(false);
+    expect(Object.keys(ctx.autoRuns)).toEqual(['p2']);
+  });
+
   it('resets state if current project deleted', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
     // Pre-condition : la map namespacée a une entrée pour le profil courant
@@ -570,6 +612,8 @@ describe('resetState', () => {
       consigne: { text: 'test' },
       chatMessages: [{ role: 'user', content: 'hi' }],
       chatInput: 'typing...',
+      textInput: 'texte déjà envoyé',
+      webQuery: 'les volcans',
     });
     proj.resetState.call(ctx);
     expect(ctx.sources).toEqual([]);
@@ -584,6 +628,9 @@ describe('resetState', () => {
     expect(ctx.chatMessages).toEqual([]);
     expect(ctx.chatInput).toBe('');
     expect(ctx.uploadSessions).toEqual([]);
+    // Saisies du cours quitté : elles réapparaissaient dans le cours suivant.
+    expect(ctx.textInput).toBe('');
+    expect(ctx.webQuery).toBe('');
   });
 
   it('keeps uploadSessions: an import continues in the background after a project change', () => {

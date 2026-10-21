@@ -238,6 +238,65 @@ describe('sendChatMessage', () => {
   });
 });
 
+// Cours changé pendant la réponse : le serveur a enregistré l'échange dans son cours (relu au
+// retour). Jusqu'en v1.7.11, la réponse, ses générations et son coût s'affichaient dans le chat du
+// cours ouvert entre-temps, et un refus retirait la dernière bulle de CE chat.
+describe('sendChatMessage — cours changé pendant la réponse', () => {
+  // Changement de cours (resetState + resetSession) : chat du cours suivant, déjà en attente.
+  const switchCourse = (ctx: any) => {
+    ctx.currentProjectId = 'pid-2';
+    ctx.chatMessages = [{ role: 'user', content: 'question du cours pid-2' }];
+    ctx.chatLoading = true;
+  };
+
+  it('réponse, générations et coût ignorés dans le chat du cours affiché', async () => {
+    const ctx = makeContext({ chatInput: 'Hello', currentProject: { totalCost: 0 } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx);
+      const generations = [{ id: 'g1', type: 'quiz' }];
+      return { ok: true, json: async () => ({ reply: 'Ok', generations, costDelta: 0.1 }) } as any;
+    });
+
+    await chat.sendChatMessage.call(ctx);
+
+    expect(ctx.chatMessages).toEqual([{ role: 'user', content: 'question du cours pid-2' }]);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.currentProject.totalCost).toBe(0);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    expect(ctx.chatLoading).toBe(true);
+  });
+
+  it('refus de modération : la bulle du cours affiché n’est pas retirée', async () => {
+    const ctx = makeContext({ chatInput: 'Hello' });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx);
+      return {
+        ok: false,
+        status: 400,
+        json: async () => ({ error: 'chat.moderationBlocked' }),
+      } as any;
+    });
+
+    await chat.sendChatMessage.call(ctx);
+
+    expect(ctx.chatMessages).toEqual([{ role: 'user', content: 'question du cours pid-2' }]);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('panne réseau : aucune bulle d’erreur ni toast dans le cours affiché', async () => {
+    const ctx = makeContext({ chatInput: 'Hello' });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx);
+      throw new TypeError('Failed to fetch');
+    });
+
+    await chat.sendChatMessage.call(ctx);
+
+    expect(ctx.chatMessages).toEqual([{ role: 'user', content: 'question du cours pid-2' }]);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+});
+
 // --- clearChat ---
 
 describe('clearChat', () => {

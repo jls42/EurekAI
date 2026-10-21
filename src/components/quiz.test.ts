@@ -615,6 +615,63 @@ describe('quizComponent', () => {
       await promise;
       expect(comp.reviewing).toBe(false);
     });
+
+    // Règle « ça continue même si on change de page » (2026-10-21) : la remédiation part vers le
+    // cours du quiz (corps et cours capturés au clic) et ne s'affiche que sur ce cours ; le serveur
+    // enregistre les deux générations, relues au retour.
+    describe('cours changé', () => {
+      const moderated = { id: 'p1', ageGroup: 'enfant', useModeration: true };
+
+      it('pendant la vérification de modération : les deux générations partent vers le cours du quiz', async () => {
+        const comp = createQuiz(sampleQuestions, { sourceIds: ['s-quiz'] });
+        comp.currentProfile = moderated;
+        comp.sources = [{ id: 's-quiz', moderation: { status: 'pending' } }];
+        comp.answers = { 0: 0 };
+        global.fetch = vi.fn((url: string) => {
+          if (url.endsWith('/sources/moderate')) {
+            comp.currentProjectId = 'proj-2';
+            comp.currentProfile = { id: 'p2', ageGroup: 'adulte', useModeration: false };
+            const moderation = { status: 'safe', categories: {} };
+            return Promise.resolve({
+              ok: true,
+              json: () => Promise.resolve({ sources: [{ id: 's-quiz', moderation }] }),
+            });
+          }
+          const gen = url.includes('remediation-summary') ? summaryGen : quizGen;
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(gen) });
+        }) as any;
+
+        await comp.remediate();
+
+        const calls = (global.fetch as any).mock.calls as [string, RequestInit][];
+        expect(calls.map(([url]) => url)).toEqual([
+          '/api/projects/proj-1/sources/moderate',
+          '/api/projects/proj-1/generate/remediation-summary',
+          '/api/projects/proj-1/generate/quiz-review',
+        ]);
+        // Âge du profil qui a cliqué, pas celui du profil affiché ensuite.
+        expect(JSON.parse(calls[1][1].body as string).ageGroup).toBe('enfant');
+        expect(registerGeneration).not.toHaveBeenCalled();
+        expect(comp.showToast).not.toHaveBeenCalledWith('toast.remediationGenerated', 'success');
+        expect(comp.reviewing).toBe(false);
+      });
+
+      it('pendant les générations : ni enregistrement ni toast dans le cours affiché', async () => {
+        const comp = createQuiz(sampleQuestions);
+        comp.answers = { 0: 0 };
+        global.fetch = vi.fn((url: string) => {
+          comp.currentProjectId = 'proj-2';
+          if (url.includes('remediation-summary')) return Promise.reject(new Error('network'));
+          return Promise.resolve({ ok: true, json: () => Promise.resolve(quizGen) });
+        }) as any;
+
+        await comp.remediate();
+
+        expect(registerGeneration).not.toHaveBeenCalled();
+        expect(comp.showToast).not.toHaveBeenCalled();
+        expect(comp.reviewing).toBe(false);
+      });
+    });
   });
 
   describe('onFinish()', () => {

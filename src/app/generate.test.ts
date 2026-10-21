@@ -10,8 +10,12 @@
    @typescript-eslint/unbound-method
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createGenerate } from './generate';
+import { setKey, _resetActiveKey } from './api-key';
+import { createSession } from './session';
+import { createConfirm } from './confirm';
+import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -63,6 +67,7 @@ const genBindings = {
 function makeContext(overrides: any = {}) {
   return {
     currentProjectId: 'pid-1',
+    currentProject: { meta: { id: 'pid-1', name: 'Histoire' }, totalCost: 0 } as any,
     currentProfile: { id: 'p1', chatEnabled: true, ageGroup: 'enfant', useModeration: false },
     sources: [],
     generations: [],
@@ -72,6 +77,7 @@ function makeContext(overrides: any = {}) {
     abortControllersByGid: {},
     pendingById: {},
     launchingByType: {},
+    autoRuns: {} as Record<string, any>,
     shownToastEventKeys: new Set<string>(),
     notificationsVersion: 0,
     upsertGenerationById(gen: any) {
@@ -117,6 +123,28 @@ function mockFetchOk(data: any) {
     json: async () => data,
   } as any);
 }
+
+// Clé Mistral active (comme après selectProfile → refreshKeyState) ; remise à zéro après chaque test.
+const activateKey = (plaintext: string) => {
+  const data = new Map<string, string>();
+  const storage = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      data.set(k, v);
+    },
+  };
+  return setKey({ scope: 'global', plaintext }, storage);
+};
+
+// Clé envoyée par le N-ième appel fetch (en-tête X-EurekAI-AI-Key), null sans en-tête.
+const sentKey = (call: number): string | null => {
+  const init = vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit;
+  return new Headers(init.headers).get('X-EurekAI-AI-Key');
+};
+
+afterEach(() => {
+  _resetActiveKey();
+});
 
 function mockFetchFail(status: number, data: any = {}) {
   return vi.mocked(globalThis.fetch).mockResolvedValueOnce({
@@ -767,19 +795,68 @@ describe('vérification des sources avant la génération', () => {
     expect(ctx.loading.summary).toBe(false);
   });
 
-  it('projet changé pendant la vérification : aucune génération', async () => {
+  // Inversé le 2026-10-21 (règle « ça continue même si on change de page ») : jusqu'en v1.7.11,
+  // changer de cours pendant la vérification (jusqu'à 10 s) perdait la génération sans un mot.
+  // Elle part vers son cours avec le corps du clic (le serveur refait la garde), sans rien poser
+  // sur l'écran affiché.
+  it('projet changé pendant la vérification : envoyée vers son cours, rien sur l’écran affiché', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+      selectedIds: ['s1'],
+      generateCount: 20,
+    });
+    mockVerification('safe', () => {
+      ctx.currentProjectId = 'pid-2';
+      ctx.selectedIds = [];
+      ctx.generateCount = 10;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    const sent = JSON.parse(
+      (vi.mocked(globalThis.fetch).mock.calls[1][1] as RequestInit).body as string,
+    );
+    expect(sent).toMatchObject({ sourceIds: ['s1'], count: 20 });
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.launchingByType).toEqual({});
+    expect(ctx.showToast).not.toHaveBeenCalledWith(
+      'toast.generationDone',
+      'success',
+      null,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  // Changement de profil pendant la vérification : la génération part avec la clé du profil qui a
+  // cliqué, jamais avec celle du profil devenu actif (refreshKeyState de selectProfile).
+  it('profil changé pendant la vérification : clé capturée au clic', async () => {
+    await activateKey('sk-profil-a');
     const ctx = makeContext({
       currentProfile: moderatedProfile,
       sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
     });
-    mockVerification('safe', () => {
-      ctx.currentProjectId = 'pid-2';
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = null;
+      await activateKey('sk-profil-b');
+      const moderation = { status: 'safe', categories: {} };
+      return { ok: true, json: async () => ({ sources: [{ id: 's1', moderation }] }) } as any;
     });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
 
     await gen.generate.call(ctx, 'summary');
 
-    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
-    expect(ctx.pendingById).toEqual({});
+    expect(urls()[1]).toBe('/api/projects/pid-1/generate/summary');
+    expect(sentKey(1)).toBe('sk-profil-a');
   });
 
   // La vérification (jusqu'à 8 s) précède le pending optimiste : sans réservation synchrone, aucun
@@ -1429,6 +1506,213 @@ describe('generateAuto — per-type progress', () => {
 
     // Generation should NOT be registered since project switched
     expect(ctx.generations).toHaveLength(0);
+    // Ajouté le 2026-10-21 : l'étape réussie compte (l'Auto continue vers son cours) et la fin est
+    // annoncée par un toast qui nomme ce cours, au lieu de s'arrêter sans un mot.
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoDoneIn', { project: 'Histoire' });
+  });
+});
+
+// Règle du propriétaire (2026-10-21) : « on lance un truc, ça continue même si on change de page ».
+// Jusqu'en v1.7.11, resetSession (changement de cours ou de profil) abortait l'analyse Auto en vol :
+// le serveur la facturait et aucune étape ne partait.
+describe('generateAuto — continue vers son cours quand on change de cours ou de profil', () => {
+  const session = createSession();
+  const confirm = createConfirm();
+  const urls = () => vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+  const sentBody = (call: number) =>
+    JSON.parse((vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit).body as string);
+  // Changement de cours tel que selectProject le fait (resetSession, puis le cours suivant).
+  const switchCourse = (ctx: any, projectId: string | null) => {
+    ctx.currentProjectId = projectId;
+    session.resetSession.call(ctx);
+  };
+  // Réponse qui n'arrive jamais, rejetée en AbortError quand son signal est aborté (vrai fetch).
+  const pendingUntilAbort = (_url: unknown, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('Aborted', 'AbortError'));
+      });
+    });
+  const plan = (...agents: string[]) => ({ plan: agents.map((agent) => ({ agent })) });
+
+  it('cours changé pendant l’analyse : rien n’est annulé, étapes vers le cours d’origine avec le corps et la clé du clic, toast final qui le nomme', async () => {
+    await activateKey('sk-profil-a');
+    const ctx = makeContext({
+      apiStatus: { ttsAvailable: false },
+      selectedIds: ['s1'],
+      generateCount: 20,
+    });
+    let routeSignal: AbortSignal | null | undefined;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async (_url, init) => {
+      routeSignal = init?.signal;
+      switchCourse(ctx, 'pid-2');
+      ctx.selectedIds = [];
+      await activateKey('sk-profil-b');
+      return {
+        ok: true,
+        json: async () => ({ ...plan('summary', 'quiz'), costDelta: 0.01 }),
+      } as any;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    mockFetchOk({ id: 'g2', type: 'quiz' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(routeSignal?.aborted).toBe(false);
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+      '/api/projects/pid-1/generate/quiz',
+    ]);
+    expect([sentKey(0), sentKey(1), sentKey(2)]).toEqual([
+      'sk-profil-a',
+      'sk-profil-a',
+      'sk-profil-a',
+    ]);
+    expect(sentBody(1)).toMatchObject({ sourceIds: ['s1'], count: 20 });
+    // Rien sur l'écran du cours affiché : ni générations, ni chargement, ni coût, ni toast d'étape.
+    expect(ctx.generations).toEqual([]);
+    expect([ctx.loading.auto, ctx.loading.summary, ctx.loading.quiz]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(ctx.currentProject.totalCost).toBe(0);
+    const stepToasts = ctx.showToast.mock.calls.filter(
+      (c: any[]) => c[0] === 'toast.generationDone',
+    );
+    expect(stepToasts).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoDoneIn', { project: 'Histoire' });
+    expect(ctx.autoRuns).toEqual({});
+  });
+
+  it('cours changé pendant une étape : l’étape n’est pas annulée, l’état du cours affiché reste intact', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    mockFetchOk(plan('summary'));
+    let stepSignal: AbortSignal | null | undefined;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async (_url, init) => {
+      stepSignal = init?.signal;
+      switchCourse(ctx, 'pid-2');
+      // Le cours pid-2 a sa propre fiche en cours : la fin de l'étape de pid-1 n'y touche pas.
+      ctx.loading.summary = true;
+      return { ok: true, json: async () => ({ id: 'g1', type: 'summary' }) } as any;
+    });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(stepSignal?.aborted).toBe(false);
+    expect(ctx.loading.summary).toBe(true);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+  });
+
+  it('cours changé pendant la vérification de modération : l’analyse part vers le cours d’origine', async () => {
+    const ctx = makeContext({
+      currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+      apiStatus: { ttsAvailable: false },
+    });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      const moderation = { status: 'safe', categories: {} };
+      return { ok: true, json: async () => ({ sources: [{ id: 's1', moderation }] }) } as any;
+    });
+    mockFetchOk(plan('summary'));
+    mockFetchOk({ id: 'g1', type: 'summary' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(ctx.loading.auto).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+  });
+
+  it('échec de l’analyse hors écran : toast qui nomme le cours, sans « Réessayer »', async () => {
+    const ctx = makeContext();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      return { ok: false, status: 503, statusText: 'Error', json: async () => ({}) } as any;
+    });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoFailedIn', 'error');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoFailedIn', { project: 'Histoire' });
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+  });
+
+  it('étapes en partie en échec hors écran : toast partiel qui nomme le cours', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      return { ok: true, json: async () => plan('summary', 'quiz') } as any;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    mockFetchFail(500, { error: 'internal_error' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoPartialIn', 'warning');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoPartialIn', {
+      project: 'Histoire',
+      count: 1,
+      total: 2,
+    });
+  });
+
+  it('retour sur le cours pendant l’analyse : puce rétablie, cancelOne(auto) l’annule (aucune étape)', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    expect(ctx.loading.auto).toBe(true);
+
+    switchCourse(ctx, 'pid-2');
+    expect(ctx.loading.auto).toBe(false);
+    switchCourse(ctx, 'pid-1');
+    restoreAutoAnalysis(ctx, 'pid-1'); // comme applyProjectSnapshot au retour
+    expect(ctx.loading.auto).toBe(true);
+    confirm.cancelOne.call(ctx, 'auto');
+    await run;
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/route']);
+    expect(ctx.loading.auto).toBe(false);
+    expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.autoFailedIn', 'error');
+  });
+
+  it('un second clic Auto sur le même cours pendant qu’il tourne est sans effet', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+
+    await gen.generateAuto.call(ctx);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    ctx.autoRuns['pid-1'].controller.abort();
+    await run;
+  });
+
+  it('cours supprimé pendant l’analyse : Auto arrêté, ni étape ni toast', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+
+    switchCourse(ctx, null);
+    abortAutoRun(ctx, 'pid-1'); // comme deleteProject
+    await run;
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/route']);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    expect(ctx.autoRuns).toEqual({});
   });
 });
 
@@ -1670,6 +1954,70 @@ describe('generateVoice', () => {
     mockFetchOk({ audioUrls: { intro: '/audio/retry2.mp3' } });
     await retryFn();
     expect(genObj._audioUrl_intro).toBe('/audio/retry2.mp3');
+  });
+});
+
+// La lecture à voix haute est enregistrée dans la génération par le serveur (relue à l'ouverture
+// du cours) : sa réponse ne s'applique qu'au cours affiché, sur l'objet génération à jour.
+describe('generateVoice — cours changé pendant la lecture', () => {
+  const summary = () =>
+    asGenerationUI({ id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false });
+
+  it('autre cours affiché : ni audio, ni coût, ni toast sur l’écran affiché', async () => {
+    const ctx = makeContext();
+    const genObj = summary();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = 'pid-2';
+      return { ok: true, json: async () => ({ audioUrl: '/a.mp3', costDelta: 0.02 }) } as any;
+    });
+
+    await gen.generateVoice.call(ctx, genObj);
+
+    expect(genObj._audioUrl_all).toBeUndefined();
+    expect(ctx.currentProject.totalCost).toBe(0);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    expect(genObj._generatingVoice_all).toBe(false);
+  });
+
+  it('refus ou panne alors qu’un autre cours est affiché : aucun toast', async () => {
+    const ctx = makeContext();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = 'pid-2';
+      throw new Error('network');
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await gen.generateVoice.call(ctx, summary());
+
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('retour sur le cours : audio posé sur la génération relue, nouveau clic sans 2e requête', async () => {
+    const ctx = makeContext();
+    const before = summary();
+    const after = summary(); // même génération, relue du serveur au retour sur le cours
+    let respond!: (value: unknown) => void;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          respond = resolve;
+        }) as any,
+    );
+
+    const reading = gen.generateVoice.call(ctx, before);
+    ctx.generations = [after];
+    await gen.generateVoice.call(ctx, after); // clic sur l'objet neuf pendant la lecture
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(after._generatingVoice_all).toBe(true);
+
+    respond({ ok: true, json: async () => ({ audioUrl: '/a.mp3' }) });
+    await reading;
+
+    expect(after._audioUrl_all).toBe('/a.mp3');
+    expect(after._generatingVoice_all).toBe(false);
+    expect(before._generatingVoice_all).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.audioDone', 'success');
   });
 });
 

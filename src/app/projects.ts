@@ -2,6 +2,7 @@ import { normalizeSummaryData } from './helpers';
 import { openingProfileQuery } from './project-snapshot';
 import { resumeProjectModeration } from './moderation-gate';
 import { withReplyFallback } from './chat-reply';
+import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
@@ -184,7 +185,9 @@ const startSseStreamSafely = function (state: AppContext, id: string): void {
   });
 };
 
-// Orchestrateur léger : hydrate + ouvre les dernières gens par type + démarre SSE.
+// Orchestrateur léger : hydrate + ouvre les dernières gens par type + démarre SSE. Retour sur un
+// cours dont l'Auto analyse encore (lancé avant un changement de cours) : puce « Auto — analyse… »
+// rétablie, annulable, et bouton Auto désactivé (isGenerating) au lieu d'en permettre un second.
 const applyProjectSnapshot = function (state: AppContext, project: ProjectData, id: string): void {
   hydrateProjectFields(state, project, id);
   normalizeGenerations(state, state.generations);
@@ -192,6 +195,7 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
     state.openGens[genId] = true;
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
+  restoreAutoAnalysis(state, id);
   void state.$nextTick(() => state.refreshIcons());
   startSseStreamSafely(state, id);
 };
@@ -253,6 +257,8 @@ const deleteProject = async function (this: AppContext, id: string) {
   this.projects = this.projects.filter((p) => p.id !== id);
   // Import en cours vers ce cours : sa session disparaît, la boucle s'arrête au fichier suivant.
   this.uploadSessions = this.uploadSessions.filter((s) => s.projectId !== id);
+  // Auto en cours sur ce cours : arrêté (resetSession l'épargnerait), aucune étape n'est envoyée.
+  abortAutoRun(this, id);
   if (this.currentProjectId === id) {
     this.currentProjectId = null;
     this.currentProject = null;
@@ -275,6 +281,10 @@ const resetState = function (this: AppContext) {
   this.activeView = 'dashboard';
   this.showTextInput = false;
   this.showWebInput = false;
+  // Saisies d'un texte ou d'une recherche : propres au cours quitté (déjà envoyées, elles
+  // réapparaissaient dans le cours suivant).
+  this.textInput = '';
+  this.webQuery = '';
   this.consigne = null;
   this.chatMessages = [];
   this.chatInput = '';

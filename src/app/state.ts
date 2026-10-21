@@ -72,9 +72,9 @@ const initialTheme = (): 'dark' | 'light' => {
 };
 
 // Sections du state Alpine extraites en helpers pour rester sous le seuil
-// Codacy "Method has X lines of code". Le getter `uploading` reste inline dans
-// createState() car le spread `{...initSourceState()}` perd la sémantique
-// getter (copie la valeur retournée, pas le descripteur).
+// Codacy "Method has X lines of code". Aucun getter ici : un spread (`...initSourceState()`, puis
+// `...createState()` dans app()) copie la VALEUR d'un getter, pas le descripteur. L'état calculé
+// lu par un gabarit est une méthode (`isUploading()`, `projectUploadSessions()` : sources.ts).
 
 const initProfileState = () => ({
   profiles: [] as Profile[],
@@ -103,6 +103,10 @@ type UploadSession = {
   // Nom du cours au lancement : le toast de fin d'un import en arrière-plan le cite, même si un
   // autre profil (donc une autre liste de projets) est affiché entre-temps.
   projectName?: string;
+  // Langue et clé Mistral capturées au lancement (captureAiKey, '' = clé d'env) : les fichiers
+  // restants partent avec celles du profil qui a lancé l'import, même après un changement de profil.
+  lang?: string;
+  aiKey?: string;
   cleanupScheduled: boolean;
   files: Array<{
     id: string;
@@ -111,6 +115,14 @@ type UploadSession = {
     status: 'pending' | 'hashing' | 'uploading' | 'done' | 'duplicate' | 'error';
     errorMsg: string | null;
   }>;
+};
+
+// Génération automatique en cours sur un cours : son contrôleur (épargné par resetSession, aborté
+// par une annulation explicite ou la suppression du cours) et sa phase (analyse de route, puis
+// étapes) ; `analysing` rétablit la puce « Auto — analyse… » au retour sur le cours.
+type AutoRun = {
+  controller: AbortController;
+  analysing: boolean;
 };
 
 const initSourceState = () => ({
@@ -203,9 +215,12 @@ const initGenerationState = () => ({
 // pour déclencher la reactivity Alpine sur la cloche header.
 // launchingByType = lancements réservés par l'anti-flood pendant le pré-contrôle de modération,
 // avant que leur pending optimiste existe (cf. reserveLaunch, generate.ts).
+// autoRuns = générations automatiques en cours, par cours : elles continuent quand on change de
+// cours ou de profil (ni resetSession ni resetState ne les touchent, cf. auto-runs.ts).
 const initPendingLifecycleState = () => ({
   pendingById: {} as Record<string, PendingTrackerEntry>,
   launchingByType: {} as Record<string, number>,
+  autoRuns: {} as Record<string, AutoRun>,
   abortControllersByGid: {} as Record<string, AbortController>,
   shownToastEventKeys: new Set<EventKey>(),
   crossTabSyncBroken: false,
@@ -290,20 +305,6 @@ export function createState() {
     ...initProfileState(),
     ...initProjectState(),
     ...initSourceState(),
-    get uploading(): boolean {
-      // 'hashing' = pré-check en cours → encore "en upload". 'duplicate' = en attente de décision
-      // utilisateur (Importer quand même / Ignorer) → PAS bloquant, exclu pour ne pas figer l'UI.
-      // Imports du cours affiché seulement : ceux d'un autre cours continuent en arrière-plan.
-      // ATTENTION (constaté le 2026-10-21) : le `...createState()` de app() (src/app/index.ts) fige
-      // ce getter à sa valeur initiale (false) dans l'app réelle, depuis #14 : non corrigé ici.
-      return this.uploadSessions.some(
-        (s) =>
-          s.projectId === this.currentProjectId &&
-          s.files.some(
-            (f) => f.status === 'pending' || f.status === 'hashing' || f.status === 'uploading',
-          ),
-      );
-    },
     ...initVoiceState(),
     ...initConsigneState(),
     ...initGenerationState(),

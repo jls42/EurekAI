@@ -1,4 +1,5 @@
 import type { AppContext } from './app-context';
+import type { PendingTrackerEntry } from '../../types';
 import { pendingOfTypeExists } from './pending-utils';
 import { buildEventKey } from '../../helpers/event-key';
 
@@ -54,6 +55,26 @@ function buildCancelWhitelist(pid: string, gids: string[]): string[] {
     .map((g) => '/api/projects/' + safePid + '/generations/' + encodeURIComponent(g) + '/cancel');
 }
 
+// POST /cancel en échec (réseau down / 5xx) : pending restauré + toast, sur le cours de l'annulation
+// seulement — changé entre-temps, ce pending ne doit pas apparaître dans un autre cours (il revient
+// de lui-même au retour, relu du serveur). Race possible entre POST cancel échoué et SSE
+// `completed` : si la gen est arrivée en `state.generations` entre-temps, ne pas restaurer le
+// pending (toast trompeur "annulation échouée" alors que la gen a bel et bien complété).
+const restoreAfterFailedCancel = (
+  state: AppContext,
+  pid: string,
+  gid: string,
+  snapshot: PendingTrackerEntry | undefined,
+  label: string,
+): void => {
+  if (state.currentProjectId !== pid) return;
+  if (state.generations.some((g) => g.id === gid)) return;
+  if (snapshot && !state.pendingById[gid]) {
+    state.pendingById[gid] = snapshot;
+  }
+  state.showToast(state.t('toast.cancelFailed', { type: label }), 'error');
+};
+
 // Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
 // UI optimiste avec rollback sur erreur HTTP : retire de pendingById
 // immédiatement (feedback instantané), puis si le POST /cancel échoue (réseau
@@ -94,17 +115,7 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   const allowedUrls = buildCancelWhitelist(pid, [gid, ...Object.keys(state.pendingById)]);
   postCancel(pid, gid, allowedUrls)
     .then((ok) => {
-      if (ok) return;
-      // Race possible entre POST cancel échoué et SSE `completed` : si la gen
-      // est arrivée en `state.generations` entre-temps, ne pas restaurer le
-      // pending (toast trompeur "annulation échouée" alors que la gen a bel
-      // et bien complété). Vérifier d'abord generations[], puis pendingById.
-      const completedSinceCancel = state.generations.some((g) => g.id === gid);
-      if (completedSinceCancel) return;
-      if (snapshot && !state.pendingById[gid]) {
-        state.pendingById[gid] = snapshot;
-      }
-      state.showToast(state.t('toast.cancelFailed', { type: label }), 'error');
+      if (!ok) restoreAfterFailedCancel(state, pid, gid, snapshot, label);
     })
     .catch((err: unknown) => {
       // postCancel ne reject jamais (tous les chemins return un boolean), mais

@@ -6,6 +6,7 @@ globalThis.fetch = vi.fn();
 function makeContext(overrides: any = {}) {
   return {
     currentProjectId: 'pid-1',
+    currentProject: null as any,
     webQuery: '  photosynthesis  ',
     showWebInput: true,
     sources: [] as any[],
@@ -277,6 +278,72 @@ describe('createWebsearch', () => {
       });
       await promise;
       expect(ctx.loading.websearch).toBe(false);
+    });
+  });
+
+  // Cours changé pendant la recherche : le serveur a enregistré les sources dans le cours de la
+  // recherche (relues au retour). Jusqu'en v1.7.11, elles étaient ajoutées et sélectionnées dans le
+  // cours affiché, avec leur coût.
+  describe('searchWeb — cours changé pendant la recherche', () => {
+    it('réponse ignorée : ni sources, ni sélection, ni coût, ni toast dans le cours affiché', async () => {
+      ctx.currentProject = { totalCost: 0 };
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.webQuery = 'requête du cours pid-2';
+        return { ok: true, json: async () => ({ id: 's1', estimatedCost: 0.02 }) } as any;
+      });
+
+      await ws.searchWeb.call(ctx);
+      vi.advanceTimersByTime(2000);
+
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.selectedIds).toEqual([]);
+      expect(ctx.currentProject.totalCost).toBe(0);
+      expect(ctx.webQuery).toBe('requête du cours pid-2');
+      expect(ctx.showToast).not.toHaveBeenCalled();
+      expect(ctx.refreshModeration).not.toHaveBeenCalled();
+    });
+
+    it('refus ou panne alors qu’un autre cours est affiché : aucun toast', async () => {
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        return { ok: false, status: 502, statusText: 'Bad Gateway', json: async () => ({}) } as any;
+      });
+      await ws.searchWeb.call(ctx);
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-3';
+        throw new TypeError('Failed to fetch');
+      });
+      ctx.currentProjectId = 'pid-1';
+      await ws.searchWeb.call(ctx);
+
+      expect(ctx.showToast).not.toHaveBeenCalled();
+    });
+
+    it('le chargement d’une recherche du cours affiché n’est pas libéré par celle du cours quitté', async () => {
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.loading.websearch = true; // recherche lancée dans pid-2
+        return { ok: true, json: async () => ({ id: 's1' }) } as any;
+      });
+
+      await ws.searchWeb.call(ctx);
+
+      expect(ctx.loading.websearch).toBe(true);
+    });
+
+    it('cours rouvert pendant la recherche : sources déjà relues, pas de doublon', async () => {
+      ctx.sources = [{ id: 's1' }];
+      ctx.selectedIds = ['s1'];
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: 's1' }),
+      } as any);
+
+      await ws.searchWeb.call(ctx);
+
+      expect(ctx.sources).toEqual([{ id: 's1' }]);
+      expect(ctx.selectedIds).toEqual(['s1']);
     });
   });
 });

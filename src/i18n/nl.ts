@@ -449,6 +449,12 @@ export const nl: Record<string, string> = {
   'toast.importDoneIn': 'Import voltooid in "{project}": {n} bron(nen) toegevoegd.',
   'toast.importErrorsIn':
     'Import in "{project}": {n} bestand(en) mislukt, probeer opnieuw in dat project.',
+  'toast.autoDoneIn': 'Magie voltooid in "{project}"!',
+  'toast.autoPartialIn': 'Magie in "{project}": {count} van {total} generaties gelukt.',
+  'toast.autoFailedIn':
+    'Automatische generatie in "{project}" mislukt. Probeer het opnieuw in dat project.',
+  'toast.voiceAddedIn': 'Stem getranscribeerd en toegevoegd aan "{project}".',
+  'toast.voiceErrorIn': 'De opgenomen stem voor "{project}" kon niet worden toegevoegd: {error}',
   'toast.textAdded': 'Tekst toegevoegd!',
   'toast.sourceDeleted': 'Bron verwijderd',
   'toast.courseCreated': 'Cursus aangemaakt!',

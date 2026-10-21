@@ -92,6 +92,19 @@ describe('createConsigne', () => {
       // Should not throw
       expect(ctx.consigne).toBeNull();
     });
+
+    // La consigne d'un cours quitté pendant la relecture ne s'affiche pas dans le cours suivant.
+    it('cours changé pendant la relecture : consigne lue ignorée', async () => {
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        return { ok: true, json: async () => ({ consigne: FOUND }) } as any;
+      });
+
+      await consigne.refreshConsigne.call(ctx);
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/pid-1');
+      expect(ctx.consigne).toBeNull();
+    });
   });
 
   describe('detectConsigne', () => {
@@ -255,9 +268,14 @@ describe('createConsigne', () => {
       expect(ctx.showToast).toHaveBeenLastCalledWith('toast.error', 'error', expect.any(Function));
     });
 
-    it('projet changé pendant la détection : réponse ignorée', async () => {
+    // Dernière assertion inversée le 2026-10-21 : le drapeau appartient au cours AFFICHÉ
+    // (resetSession le remet à zéro au changement de cours). La fin de la détection du cours quitté
+    // ne le touche plus : elle réactivait les boutons pendant la détection du cours suivant.
+    it('projet changé pendant la détection : réponse ignorée, drapeau du cours affiché intact', async () => {
       vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
         ctx.currentProjectId = 'pid-2';
+        // resetSession, puis le cours pid-2 lance sa propre détection.
+        ctx.consigneLoading = true;
         return { ok: true, json: async () => ({ consigne: FOUND, costDelta: 0.5 }) } as any;
       });
 
@@ -266,6 +284,28 @@ describe('createConsigne', () => {
       expect(ctx.consigne).toBeNull();
       expect(ctx.currentProject.totalCost).toBe(0);
       expect(ctx.showToast).toHaveBeenCalledTimes(1); // seulement « analyse en cours »
+      expect(ctx.consigneLoading).toBe(true);
+    });
+
+    it('panne réseau alors qu’un autre cours est affiché : aucun toast d’erreur', async () => {
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        ctx.currentProjectId = 'pid-2';
+        throw new TypeError('Failed to fetch');
+      });
+
+      await consigne.detectConsigne.call(ctx);
+
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.consigneError', 'error');
+    });
+
+    it('fin de la détection sur son cours : boutons réactivés', async () => {
+      vi.mocked(globalThis.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ consigne: null, costDelta: 0 }),
+      } as any);
+
+      await consigne.detectConsigne.call(ctx);
+
       expect(ctx.consigneLoading).toBe(false);
     });
   });

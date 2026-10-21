@@ -1,5 +1,5 @@
 import { addCostDelta } from './cost-utils';
-import { withAiHeaders } from './ai-fetch';
+import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { hashFile, findExistingDuplicate } from './source-dedup';
 import { mergeSourceModerations, requestSourceModeration } from './moderation-gate';
 import { syncConsigneAfterDelete } from './consigne';
@@ -118,13 +118,15 @@ export async function _uploadSingleFile(
 
   const formData = new FormData();
   formData.append('files', file.file, file.name);
-  formData.append('lang', this.locale);
+  // Langue et clé du lancement de l'import (même après un changement de profil), sinon celles
+  // affichées (session créée sans elles).
+  formData.append('lang', session.lang ?? this.locale);
   if (forced) formData.append('allowDuplicates', 'true');
 
   try {
     const res = await fetch(
       `/api/projects/${session.projectId}/sources/upload`,
-      withAiHeaders({ method: 'POST', body: formData }),
+      withAiHeaders({ method: 'POST', body: formData }, { keyOverride: session.aiKey }),
     );
     if (!_isSessionAlive(this, session)) return 'ignored';
     return await _handleUploadResponse(this, session, file, res);
@@ -183,6 +185,10 @@ export function _createUploadSession(
     id: sessionId,
     projectId,
     projectName,
+    // Capturées au lancement : les fichiers restants partent avec la langue et la clé du profil
+    // qui a lancé l'import, même s'il a changé entre-temps (clé '' = clé d'env, jamais l'active).
+    lang: ctx.locale,
+    aiKey: captureAiKey(),
     files,
     cleanupScheduled: false,
   });
@@ -314,6 +320,18 @@ export function _maybeCleanupSession(this: AppContext, sessionId: string) {
   }
 }
 
+// Statuts d'un fichier encore en cours d'import : 'hashing' = pré-check en cours. 'duplicate' = en
+// attente de décision (Importer quand même / Ignorer) → PAS bloquant, exclu pour ne pas figer l'UI.
+const UPLOADING_STATUSES: ReadonlySet<UploadFile['status']> = new Set([
+  'pending',
+  'hashing',
+  'uploading',
+]);
+
+const sessionIsUploading = (session: UploadSession): boolean => {
+  return session.files.some((f: UploadFile) => UPLOADING_STATUSES.has(f.status));
+};
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers extraits de createSources.addText pour rester sous CCN 8 (Lizard).
 // ─────────────────────────────────────────────────────────────────────────────
@@ -399,6 +417,15 @@ export function createSources() {
     projectUploadSessions(this: AppContext): UploadSession[] {
       return this.uploadSessions.filter(
         (s: UploadSession) => s.projectId === this.currentProjectId,
+      );
+    },
+
+    // Import du cours affiché en cours : bloc « Générer » masqué, « Ajouter » (texte) désactivé.
+    // MÉTHODE : le getter `uploading` de createState était figé à false dans l'app réelle depuis #14
+    // (`...createState()` copie la valeur d'un getter) ; ni l'un ni l'autre ne réagissaient.
+    isUploading(this: AppContext): boolean {
+      return this.uploadSessions.some(
+        (s: UploadSession) => s.projectId === this.currentProjectId && sessionIsUploading(s),
       );
     },
 

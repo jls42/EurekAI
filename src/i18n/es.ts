@@ -448,6 +448,12 @@ export const es: Record<string, string> = {
   'toast.importDoneIn': 'Importación terminada en «{project}»: {n} fuente(s) agregada(s).',
   'toast.importErrorsIn':
     'Importación en «{project}»: {n} archivo(s) con error, reinténtalos en ese proyecto.',
+  'toast.autoDoneIn': '¡Magia completada en «{project}»!',
+  'toast.autoPartialIn': 'Magia en «{project}»: {count} de {total} generaciones completadas.',
+  'toast.autoFailedIn':
+    'La generación automática de «{project}» falló. Inténtalo de nuevo en ese proyecto.',
+  'toast.voiceAddedIn': 'Voz transcrita y agregada a «{project}».',
+  'toast.voiceErrorIn': 'No se pudo agregar la voz grabada para «{project}»: {error}',
   'toast.textAdded': '\u00a1Texto agregado!',
   'toast.sourceDeleted': 'Fuente eliminada',
   'toast.courseCreated': '\u00a1Curso creado!',

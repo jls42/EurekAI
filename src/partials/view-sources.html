@@ -11,7 +11,7 @@
 
   <!-- CTA: Generate from sources (visible when sources exist) -->
   <div
-    x-show="sources.length > 0 && !uploading && !isLoading('voice') && !isLoading('websearch')"
+    x-show="sources.length > 0 && !isUploading() && !isLoading('voice') && !isLoading('websearch')"
     class="mb-5 bg-gradient-to-br from-primary-light/60 to-accent-light/40 border border-primary/20 rounded-card p-4 animate-slide-up"
   >
     <div class="flex items-center gap-3 mb-3">
@@ -155,7 +155,7 @@
         ></button>
         <button
           @click="addText()"
-          :disabled="!textInput.trim() || uploading"
+          :disabled="!textInput.trim() || isUploading()"
           class="bg-primary-dark text-text-inverted px-5 min-h-touch rounded-button font-semibold text-body-sm disabled:opacity-50 btn-press focus-ring"
           x-text="t('common.add')"
         ></button>
@@ -486,7 +486,7 @@
 
   <!-- Empty sources -->
   <div
-    x-show="sources.length === 0 && !uploading && projectUploadSessions().length === 0"
+    x-show="sources.length === 0 && !isUploading() && projectUploadSessions().length === 0"
     class="text-center py-8"
   >
     <div

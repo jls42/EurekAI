@@ -564,6 +564,12 @@ export const hi: Record<string, string> = {
   'toast.importDoneIn': '"{project}" में आयात पूरा: {n} स्रोत जोड़े गए।',
   'toast.importErrorsIn':
     '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.autoDoneIn': '"{project}" में जादू पूरा हुआ!',
+  'toast.autoPartialIn': '"{project}" में जादू: {total} में से {count} जनरेशन सफल रहे।',
+  'toast.autoFailedIn':
+    '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.voiceAddedIn': 'आवाज़ लिखी गई और "{project}" में जोड़ी गई।',
+  'toast.voiceErrorIn': '"{project}" के लिए रिकॉर्ड की गई आवाज़ नहीं जोड़ी जा सकी: {error}',
   'toast.textAdded':
     '\u091F\u0947\u0915\u094D\u0938\u094D\u091F \u091C\u094B\u0921\u093C\u093E \u0917\u092F\u093E!',
   'toast.sourceDeleted':

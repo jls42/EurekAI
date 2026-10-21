@@ -45,10 +45,17 @@ export const websearchErrorCode = (body: unknown, res: Response): string => {
 };
 
 // Refus du serveur : toast traduit (resolveError), requête gardée pour que l'enfant la corrige.
-const showWebsearchError = async (state: AppContext, res: Response): Promise<void> => {
-  const body: unknown = await res.json().catch(() => null);
+const showWebsearchError = (state: AppContext, res: Response, body: unknown): void => {
   const error = state.resolveError(websearchErrorCode(body, res));
   state.showToast(state.t('toast.error', { error }), 'error');
+};
+
+// Corps d'une réponse : celui d'un succès doit se lire (sinon exception, toast d'erreur), celui
+// d'un refus peut manquer (page HTML d'un proxy).
+const readWebsearchBody = async (res: Response): Promise<unknown> => {
+  if (!res.ok) return res.json().catch(() => null);
+  const body: unknown = await res.json();
+  return body;
 };
 
 // Corps de la requête : lang et ageGroup toujours envoyés (âge par défaut sans profil courant).
@@ -59,11 +66,17 @@ const websearchPayload = (state: AppContext, query: string) => ({
   scrapeMode: state.scrapeMode,
 });
 
-// Sources ajoutées et sélectionnées (coût compté), requête vidée, toast de succès ; les échecs
-// d'un succès partiel restent en console.
-const applyWebsearchResult = (state: AppContext, result: WebsearchResponse): void => {
+// Sources ajoutées et sélectionnées (coût compté), sans doublon si le cours a été rouvert pendant
+// la recherche (sources déjà relues du serveur) ; requête vidée, toast de succès ; les échecs d'un
+// succès partiel restent en console.
+const applyWebsearchResult = (
+  state: AppContext,
+  result: WebsearchResponse,
+  projectId: string,
+): void => {
   const { sources, failures } = _extractSources(result);
-  for (const source of sources) {
+  const fresh = sources.filter((n) => !state.sources.some((s: Source) => s.id === n.id));
+  for (const source of fresh) {
     state.sources.push(source);
     state.selectedIds.push(source.id);
     addCostDelta(state, source.estimatedCost, 'sources/websearch');
@@ -79,14 +92,37 @@ const applyWebsearchResult = (state: AppContext, result: WebsearchResponse): voi
     console.warn('[websearch] partial failures:', failures);
   }
   void state.$nextTick(() => state.refreshIcons());
-  setTimeout(() => state.refreshModeration(), 2000);
+  setTimeout(() => {
+    if (state.currentProjectId === projectId) void state.refreshModeration();
+  }, 2000);
+};
+
+// Réponse appliquée au cours de la recherche seulement : changé entre-temps, le serveur a enregistré
+// les sources (relues au retour sur ce cours) ; ni sources, ni sélection, ni coût, ni toast dans le
+// cours affiché.
+const handleWebsearchResponse = async (
+  state: AppContext,
+  projectId: string,
+  res: Response,
+): Promise<void> => {
+  const body = await readWebsearchBody(res);
+  if (state.currentProjectId !== projectId) return;
+  if (res.ok) applyWebsearchResult(state, body as WebsearchResponse, projectId);
+  else showWebsearchError(state, res, body);
+};
+
+const reportWebsearchException = (state: AppContext, projectId: string, e: unknown): void => {
+  if (state.currentProjectId !== projectId) return;
+  const error = e instanceof Error ? e.message : String(e);
+  state.showToast(state.t('toast.webSearchError', { error }), 'error', () => state.searchWeb());
 };
 
 export function createWebsearch() {
   return {
     async searchWeb(this: AppContext) {
       const query = this.webQuery.trim();
-      if (!query || !this.currentProjectId) return;
+      const projectId = this.currentProjectId;
+      if (!query || !projectId) return;
       this.loading.websearch = true;
       try {
         const res = await fetch(
@@ -97,18 +133,12 @@ export function createWebsearch() {
             body: JSON.stringify(websearchPayload(this, query)),
           }),
         );
-        if (!res.ok) {
-          await showWebsearchError(this, res);
-          return;
-        }
-        // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
-        const result: unknown = await res.json();
-        applyWebsearchResult(this, result as WebsearchResponse);
+        await handleWebsearchResponse(this, projectId, res);
       } catch (e) {
-        const error = e instanceof Error ? e.message : String(e);
-        this.showToast(this.t('toast.webSearchError', { error }), 'error', () => this.searchWeb());
+        reportWebsearchException(this, projectId, e);
       } finally {
-        this.loading.websearch = false;
+        // Un autre cours affiché peut avoir sa propre recherche en cours.
+        if (this.currentProjectId === projectId) this.loading.websearch = false;
       }
     },
   };

@@ -2,7 +2,8 @@ import { getLocale } from '../i18n/index';
 import { normalizeSummaryData } from './helpers';
 import { countPendingOfType, MAX_PARALLEL_PER_TYPE, pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
-import { withAiHeaders } from './ai-fetch';
+import { captureAiKey, withAiHeaders } from './ai-fetch';
+import { endAutoRun, markAutoRunSteps, registerAutoRun } from './auto-runs';
 import {
   AUTO_AGENTS_SET,
   AUTO_AGENT_TYPES,
@@ -14,7 +15,12 @@ import type { FailedStepCode, Generation } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
 import { blockingModerationStatus, pickBlockingSource } from '@helpers/moderation-http';
 import { currentBlockedCategories } from './effective-moderation';
-import { ensureGenerationAllowed, generationSources } from './moderation-gate';
+import {
+  checkGenerationAllowed,
+  ensureGenerationAllowed,
+  generationSources,
+  type GenerationCheck,
+} from './moderation-gate';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
 // Refus de modération (contenu signalé) : réessayer produirait le même refus, pas de bouton.
@@ -24,6 +30,7 @@ const TOAST_TYPED_ERROR = 'toast.typedError';
 const TOAST_GENERATION_BUSY = 'toast.generationBusy';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
+const TOAST_AUTO_FAILED_IN = 'toast.autoFailedIn';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
 const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -46,7 +53,7 @@ type VoiceResult = {
   costDelta?: number;
 };
 
-export function postJson(body: unknown, signal: AbortSignal): RequestInit {
+export function postJson(body: unknown, signal?: AbortSignal): RequestInit {
   return {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -115,9 +122,11 @@ type AutoBody = {
 
 type AutoRoute = { plan: Array<{ agent: string }>; costDelta?: number };
 
+// Corps d'une génération, lu AU CLIC (avant le pré-contrôle de modération) : la sélection est
+// copiée, une case cochée ou un cours changé pendant l'attente ne modifie plus la demande.
 export function buildGenerateBody(state: AppContext): AutoBody {
   return {
-    sourceIds: state.selectedIds.length > 0 ? state.selectedIds : undefined,
+    sourceIds: state.selectedIds.length > 0 ? [...state.selectedIds] : undefined,
     lang: getLocale(),
     ageGroup: state.currentProfile?.ageGroup || 'enfant',
     useConsigne: state.useConsigne,
@@ -125,48 +134,120 @@ export function buildGenerateBody(state: AppContext): AutoBody {
   };
 }
 
+// Auto lancé : cours (et son nom, pour le toast de fin hors écran), corps, clé et disponibilité du
+// TTS capturés AU CLIC. Il continue vers son cours quand l'utilisateur change de cours ou de profil
+// (registre autoRuns, que resetSession épargne : auto-runs.ts) ; son état ne s'applique à l'écran
+// (chargement, puces, coût, générations, toasts) que si ce cours est affiché (autoShown).
+type AutoLaunch = {
+  projectId: string;
+  projectName: string;
+  body: AutoBody;
+  key: string;
+  ttsReady: boolean;
+  controller: AbortController;
+};
+
+const autoShown = (state: AppContext, launch: AutoLaunch): boolean => {
+  return state.currentProjectId === launch.projectId;
+};
+
+const startAutoLaunch = (state: AppContext, projectId: string): AutoLaunch => {
+  const launch: AutoLaunch = {
+    projectId,
+    projectName: state.currentProject?.meta.name ?? '',
+    body: buildGenerateBody(state),
+    key: captureAiKey(),
+    ttsReady: state.ttsReady(),
+    controller: new AbortController(),
+  };
+  registerAutoRun(state, projectId, launch.controller);
+  return launch;
+};
+
+// Échec de l'Auto alors qu'un autre cours est affiché : toast qui nomme son cours, sans réessai (il
+// relancerait l'Auto du cours affiché). Rien après une annulation ou la suppression du cours.
+const notifyAutoFailedIn = (state: AppContext, launch: AutoLaunch): void => {
+  if (launch.controller.signal.aborted) return;
+  state.showToast(state.t(TOAST_AUTO_FAILED_IN, { project: launch.projectName }), 'error');
+};
+
+const reportAutoRouteError = (state: AppContext, launch: AutoLaunch, code: string): void => {
+  if (!autoShown(state, launch)) {
+    notifyAutoFailedIn(state, launch);
+    return;
+  }
+  const error = state.resolveError(code);
+  state.showToast(state.t(TOAST_ERROR, { error }), 'error', () => state.generateAuto());
+};
+
+const reportAutoException = (state: AppContext, launch: AutoLaunch, e: unknown): void => {
+  if (e instanceof Error && e.name === 'AbortError') return;
+  console.error('[generate:auto]', e);
+  if (autoShown(state, launch)) {
+    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
+  } else {
+    notifyAutoFailedIn(state, launch);
+  }
+};
+
+// Analyse de route vers le cours de l'Auto, avec la clé capturée au clic. Coût du routage compté au
+// total du cours affiché seulement (le serveur l'a persisté dans tous les cas).
 export async function runAutoRoute(
   state: AppContext,
-  projectId: string,
-  body: AutoBody,
-  controller: AbortController,
+  launch: AutoLaunch,
 ): Promise<AutoRoute | null> {
   const routeRes = await fetch(
     // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-    '/api/projects/' + projectId + '/generate/route',
-    withAiHeaders(postJson(body, controller.signal)),
+    '/api/projects/' + launch.projectId + '/generate/route',
+    withAiHeaders(postJson(launch.body, launch.controller.signal), { keyOverride: launch.key }),
   );
   if (!routeRes.ok) {
     const err = await routeRes.json().catch(() => ({}));
-    state.showToast(
-      state.t(TOAST_ERROR, { error: state.resolveError(err.error || routeRes.statusText) }),
-      'error',
-      () => state.generateAuto(),
-    );
+    reportAutoRouteError(state, launch, err.error || routeRes.statusText);
     return null;
   }
-  const route = (await routeRes.json()) as AutoRoute;
-  if (route.costDelta) addCostDelta(state, route.costDelta, 'generate/route');
+  const body: unknown = await routeRes.json();
+  const route = body as AutoRoute;
+  if (route.costDelta && autoShown(state, launch)) {
+    addCostDelta(state, route.costDelta, 'generate/route');
+  }
   return route;
 }
 
+// Puce « Auto — analyse… » sur le cours affiché, annulable par cancelOne('auto').
+const showAutoAnalysis = (state: AppContext, launch: AutoLaunch): void => {
+  if (!autoShown(state, launch)) return;
+  state.loading.auto = true;
+  state.abortControllers.auto = launch.controller;
+};
+
+const endAutoAnalysisDisplay = (state: AppContext, launch: AutoLaunch): void => {
+  state.loading.auto = false;
+  if (state.abortControllers.auto === launch.controller) delete state.abortControllers.auto;
+};
+
+const showAutoStep = (state: AppContext, launch: AutoLaunch, type: string): void => {
+  state.loading[type] = true;
+  state.abortControllers[type] = launch.controller;
+};
+
 export function populateAutoPlan(
   state: AppContext,
+  launch: AutoLaunch,
   plan: Array<{ agent: string }>,
   plannedTypes: string[],
-  controller: AbortController,
 ): void {
-  state.loading.auto = false;
-  delete state.abortControllers.auto;
+  markAutoRunSteps(state, launch.projectId);
+  const shown = autoShown(state, launch);
+  if (shown) endAutoAnalysisDisplay(state, launch);
   for (const step of plan) {
-    // Sans TTS, les générations audio (podcast, quiz vocal, dictée) sont écartées du plan.
-    if (TTS_DEPENDENT_AGENTS.has(step.agent) && !state.ttsReady()) continue;
+    // Sans TTS au lancement, les générations audio (podcast, quiz vocal, dictée) sont écartées.
+    if (TTS_DEPENDENT_AGENTS.has(step.agent) && !launch.ttsReady) continue;
     // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
     // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
     if (!AUTO_AGENTS_SET.has(step.agent)) continue;
     plannedTypes.push(step.agent);
-    state.loading[step.agent] = true;
-    state.abortControllers[step.agent] = controller;
+    if (shown) showAutoStep(state, launch, step.agent);
   }
 }
 
@@ -220,11 +301,26 @@ const parseStepErrorDetail = async (
   return { code: 'internal_error', detail: raw.slice(0, 200) || fallback };
 };
 
-// Sous-helper extrait : si res.ok, register + toast success + return 'success'.
-// Sinon parse le code d'erreur normalisé. Sépare la branche succès/échec du
-// runAutoStep orchestrateur pour rester sous CCN 8.
+// eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts applyGenerationEvent) : dédup
+// tab-locale du toast UI + persistance notif via showToast → appendNotification (toast.ts). Le
+// HTTP devient un chemin de persistance complet quand SSE est down.
+const showAutoStepDone = (state: AppContext, type: string, gen: Generation): void => {
+  registerGeneration(state, gen);
+  state.showToast(
+    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
+    'success',
+    null,
+    { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
+    buildEventKey(gen.id, 'completed'),
+  );
+};
+
+// Sous-helper extrait : si res.ok, génération montrée sur le cours affiché et 'success' (compté
+// pour le toast final, même hors écran). Sinon parse le code d'erreur normalisé. Sépare la branche
+// succès/échec du runAutoStep orchestrateur pour rester sous CCN 8.
 const handleAutoStepResponse = async function (
   state: AppContext,
+  launch: AutoLaunch,
   type: string,
   res: Response,
 ): Promise<StepResult> {
@@ -236,40 +332,40 @@ const handleAutoStepResponse = async function (
     // quota_exceeded → wait, etc.) au lieu d'un générique 'partialGenerated'.
     return { kind: 'failed', code };
   }
-  const gen = await res.json();
-  registerGeneration(state, gen);
-  // eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts
-  // applyGenerationEvent) : dédup tab-locale du toast UI + persistance
-  // notif via showToast → appendNotification (toast.ts). Le HTTP
-  // devient un chemin de persistance complet quand SSE est down.
-  state.showToast(
-    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
-    'success',
-    null,
-    { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
-    buildEventKey(gen.id, 'completed'),
-  );
+  const gen: Generation = await res.json();
+  // Autre cours affiché : le serveur a enregistré la génération, elle apparaît au retour sur son
+  // cours (sa notification aussi, par reconcilePendings) ; un toast ici écrirait la notification
+  // sous le profil et le cours AFFICHÉS.
+  if (autoShown(state, launch)) showAutoStepDone(state, type, gen);
   return 'success';
+};
+
+// Fin d'une étape : chargement et contrôleur du type libérés sur le cours de l'Auto seulement (un
+// autre cours affiché peut avoir sa propre génération de ce type en cours).
+const finishAutoStep = (state: AppContext, launch: AutoLaunch, type: string): void => {
+  if (autoShown(state, launch)) {
+    state.loading[type] = false;
+    if (state.abortControllers[type] === launch.controller) delete state.abortControllers[type];
+  }
+  void state.$nextTick(() => state.refreshIcons());
 };
 
 export async function runAutoStep(
   state: AppContext,
+  launch: AutoLaunch,
   type: string,
-  projectId: string,
-  body: AutoBody,
-  controller: AbortController,
   allowedUrls: string[],
 ): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
   // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + encodeURIComponent(projectId) + '/generate/' + type;
+  const url = '/api/projects/' + encodeURIComponent(launch.projectId) + '/generate/' + type;
   try {
     // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
     // par Codacy `rule-node-ssrf` ; AUTO_AGENT_TYPES borne la liste finie de routes.
     if (allowedUrls.includes(url)) {
-      const res = await fetch(url, withAiHeaders(postJson(body, controller.signal)));
-      if (state.currentProjectId !== projectId) return 'aborted';
-      return await handleAutoStepResponse(state, type, res);
+      const init = postJson(launch.body, launch.controller.signal);
+      const res = await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
+      return await handleAutoStepResponse(state, launch, type, res);
     }
     return { kind: 'failed', code: 'internal_error' };
   } catch (e: unknown) {
@@ -278,27 +374,23 @@ export async function runAutoStep(
     console.error(`auto: ${type} error:`, msg);
     return { kind: 'failed', code: 'internal_error' };
   } finally {
-    state.loading[type] = false;
-    delete state.abortControllers[type];
-    void state.$nextTick(() => state.refreshIcons());
+    finishAutoStep(state, launch, type);
   }
 }
 
 export async function runAutoSteps(
   state: AppContext,
+  launch: AutoLaunch,
   plannedTypes: string[],
-  projectId: string,
-  body: AutoBody,
-  controller: AbortController,
 ): Promise<{ failures: number; codes: FailedStepCode[] }> {
-  const safeProjectId = encodeURIComponent(projectId);
+  const safeProjectId = encodeURIComponent(launch.projectId);
   const allowedUrls = AUTO_AGENT_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
   let failures = 0;
   const codes: FailedStepCode[] = [];
   const promises = plannedTypes.map(async (type) => {
-    const result = await runAutoStep(state, type, projectId, body, controller, allowedUrls);
+    const result = await runAutoStep(state, launch, type, allowedUrls);
     if (typeof result === 'object' && result.kind === 'failed') {
       failures++;
       codes.push(result.code);
@@ -340,6 +432,38 @@ export function showAutoResult(
     });
   }
 }
+
+// Auto terminé pendant qu'un autre cours est affiché : un toast nomme son cours (comme l'import en
+// arrière-plan) ; les générations sont enregistrées côté serveur et apparaissent au retour. Rien
+// après une annulation ou la suppression du cours.
+const notifyBackgroundAuto = (
+  state: AppContext,
+  launch: AutoLaunch,
+  failures: number,
+  planned: number,
+): void => {
+  if (launch.controller.signal.aborted) return;
+  const project = launch.projectName;
+  if (planned > 0 && failures === 0) {
+    state.showToast(state.t('toast.autoDoneIn', { project }), 'success');
+  } else if (failures < planned) {
+    const params = { project, count: planned - failures, total: planned };
+    state.showToast(state.t('toast.autoPartialIn', params), 'warning');
+  } else {
+    notifyAutoFailedIn(state, launch);
+  }
+};
+
+const showAutoOutcome = (
+  state: AppContext,
+  launch: AutoLaunch,
+  failures: number,
+  planned: number,
+  codes: FailedStepCode[],
+): void => {
+  if (autoShown(state, launch)) showAutoResult(state, failures, planned, codes);
+  else notifyBackgroundAuto(state, launch, failures, planned);
+};
 
 // Échec d'une génération nommé par son type (« Quiz : … ») : les toasts identiques étant regroupés,
 // deux types en échec restent deux toasts, chacun avec son « Réessayer ».
@@ -505,24 +629,55 @@ const cleanupGenerateState = function (
   void state.$nextTick(() => state.refreshIcons());
 };
 
-const fetchSingleGenerate = async function (
+// Génération lancée : cours, type, corps (sélection, consigne, nombre, langue, âge, surcharges de la
+// version facile à lire) et clé capturés AU CLIC, avant le pré-contrôle de modération (jusqu'à
+// 10 s) : un changement de cours pendant l'attente n'abandonne plus la génération.
+type SingleLaunch = {
+  projectId: string;
+  type: string;
+  body: AutoBody & GenerateExtraBody;
+  // Sources du pending optimiste : celles de la fiche d'origine (version facile à lire), sinon la
+  // sélection au clic.
+  pendingSourceIds: string[];
+  extraBody?: GenerateExtraBody;
+  key: string;
+};
+
+const captureSingleLaunch = (
+  state: AppContext,
   projectId: string,
   type: string,
-  body: AutoBody,
+  extraBody?: GenerateExtraBody,
+): SingleLaunch => {
+  return {
+    projectId,
+    type,
+    // extraBody surcharge le body standard (ex: register/sourceIds pour la version FALC d'une
+    // fiche existante) sans dupliquer le lifecycle.
+    body: { ...buildGenerateBody(state), ...extraBody },
+    pendingSourceIds: [...(extraBody?.sourceIds ?? state.selectedIds)],
+    extraBody,
+    key: captureAiKey(),
+  };
+};
+
+const fetchSingleGenerate = async function (
+  launch: SingleLaunch,
   gid: string,
-  signal: AbortSignal,
+  signal?: AbortSignal,
 ): Promise<Response | null> {
-  const safeProjectId = encodeURIComponent(projectId);
+  const safeProjectId = encodeURIComponent(launch.projectId);
   // SINGLE_GENERATE_TYPES (= agents auto, dictée incluse) : chaque type a son
   // endpoint de génération unitaire /generate/<type> (cf. generation-types.ts).
   const allowedUrls = SINGLE_GENERATE_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
-  const url = '/api/projects/' + safeProjectId + '/generate/' + type;
+  const url = '/api/projects/' + safeProjectId + '/generate/' + launch.type;
   // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
   // par Codacy `rule-node-ssrf` (même pattern que confirm.ts).
   if (allowedUrls.includes(url)) {
-    return await fetch(url, withAiHeaders(postJson({ ...body, gid }, signal)));
+    const init = postJson({ ...launch.body, gid }, signal);
+    return await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
   }
   return null;
 };
@@ -575,66 +730,70 @@ const runGenerateAll = async function (state: AppContext): Promise<void> {
   }
 };
 
-const cleanupGenerateAutoPending = function (state: AppContext, plannedTypes: string[]): void {
-  state.loading.auto = false;
-  delete state.abortControllers.auto;
-  // Les types individuels se nettoient dans leurs propres finally ; ceci
-  // attrape les cas d'abort précoce avant que les promises démarrent.
-  for (const type of plannedTypes) {
-    if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
-    delete state.abortControllers[type];
+// Fin de l'Auto : retiré du registre ; chargement et contrôleurs libérés sur son cours seulement.
+// Les types individuels se nettoient dans leurs propres finally ; la boucle attrape les cas
+// d'abort précoce avant que les promises démarrent.
+const cleanupGenerateAutoPending = function (
+  state: AppContext,
+  launch: AutoLaunch,
+  plannedTypes: string[],
+): void {
+  endAutoRun(state, launch.projectId, launch.controller);
+  if (autoShown(state, launch)) {
+    endAutoAnalysisDisplay(state, launch);
+    for (const type of plannedTypes) {
+      if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
+      if (state.abortControllers[type] === launch.controller) delete state.abortControllers[type];
+    }
   }
   void state.$nextTick(() => state.refreshIcons());
 };
 
-// Sous-helper d'orchestration : route → plan → steps. Sépare la logique métier
-// du try/catch/finally de runGenerateAuto pour rester sous CCN 8.
+// Sous-helper d'orchestration : route → plan → steps → toast final, vers le cours de l'Auto même
+// si l'écran a changé entre-temps. Sépare la logique métier du try/catch/finally de runGenerateAuto
+// pour rester sous CCN 8.
 const orchestrateAutoSteps = async function (
   state: AppContext,
-  projectId: string,
-  controller: AbortController,
+  launch: AutoLaunch,
   plannedTypes: string[],
 ): Promise<void> {
-  const body = buildGenerateBody(state);
-  const route = await runAutoRoute(state, projectId, body, controller);
+  const route = await runAutoRoute(state, launch);
   if (!route) return;
-  if (state.currentProjectId !== projectId) return;
-  populateAutoPlan(state, route.plan, plannedTypes, controller);
-  const { failures, codes } = await runAutoSteps(state, plannedTypes, projectId, body, controller);
-  if (state.currentProjectId !== projectId) return;
-  showAutoResult(state, failures, plannedTypes.length, codes);
+  populateAutoPlan(state, launch, route.plan, plannedTypes);
+  const { failures, codes } = await runAutoSteps(state, launch, plannedTypes);
+  showAutoOutcome(state, launch, failures, plannedTypes.length, codes);
 };
 
-// Pré-contrôle AVANT l'analyse de route et les étapes (ensureGenerationAllowed).
+// Pré-contrôle AVANT l'analyse de route et les étapes (checkGenerationAllowed), sur un lancement
+// déjà capturé : cours changé pendant la vérification → l'Auto continue vers son cours (le serveur
+// refait la garde). Un seul Auto à la fois par cours : un nouveau clic pendant qu'il tourne (double
+// appui pendant la vérification, retour sur le cours) est sans effet.
 const runGenerateAuto = async function (state: AppContext): Promise<void> {
   const projectId = state.currentProjectId;
-  if (!projectId || !(await ensureGenerationAllowed(state))) return;
-  state.loading.auto = true;
-  const controller = new AbortController();
-  state.abortControllers.auto = controller;
+  if (!projectId || state.autoRuns[projectId]) return;
+  const launch = startAutoLaunch(state, projectId);
   const plannedTypes: string[] = [];
   try {
-    await orchestrateAutoSteps(state, projectId, controller, plannedTypes);
+    const outcome = await checkGenerationAllowed(state);
+    if (outcome === 'refused') return;
+    showAutoAnalysis(state, launch);
+    await orchestrateAutoSteps(state, launch, plannedTypes);
   } catch (e: unknown) {
-    if (e instanceof Error && e.name === 'AbortError') return;
-    console.error('[generate:auto]', e);
-    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
+    reportAutoException(state, launch, e);
   } finally {
-    cleanupGenerateAutoPending(state, plannedTypes);
+    cleanupGenerateAutoPending(state, launch, plannedTypes);
   }
 };
 
 // Cible sûre, puis pré-contrôle de modération asynchrone (sources en attente ou en erreur
 // vérifiées), AVANT le pending optimiste : un cancel pendant la vérification ne peut pas manquer
 // sa cible.
-const singleGenerateAllowed = async function (
+const singleGenerateCheck = async function (
   state: AppContext,
-  projectId: string,
-  type: string,
-  sourceIds?: readonly string[],
-): Promise<boolean> {
-  if (!isSingleGenerateTargetSafe(projectId, type)) return false;
-  return ensureGenerationAllowed(state, sourceIds);
+  launch: SingleLaunch,
+): Promise<GenerationCheck> {
+  if (!isSingleGenerateTargetSafe(launch.projectId, launch.type)) return 'refused';
+  return checkGenerationAllowed(state, launch.extraBody?.sourceIds);
 };
 
 // Anti-flood (MAX_PARALLEL_PER_TYPE, pending-utils.ts) : pendings du type dans le projet (cet
@@ -659,54 +818,38 @@ const releaseLaunch = function (state: AppContext, type: string): void {
   else delete state.launchingByType[type];
 };
 
-// Rend true en GARDANT la réservation : l'appelant la rend juste avant de créer son pending
-// optimiste, dans le même bloc synchrone (aucun appui ne peut s'intercaler entre les deux).
+// Rend `allowed` ou `moved` en GARDANT la réservation : l'appelant la rend juste avant de créer son
+// pending optimiste, dans le même bloc synchrone (aucun appui ne peut s'intercaler entre les deux).
 // Refus ou exception : réservation rendue ici.
 const acquireSingleLaunch = async function (
   state: AppContext,
-  projectId: string,
-  type: string,
-  sourceIds?: readonly string[],
-): Promise<boolean> {
-  if (!reserveLaunch(state, type)) return false;
-  let allowed = false;
+  launch: SingleLaunch,
+): Promise<GenerationCheck> {
+  if (!reserveLaunch(state, launch.type)) return 'refused';
+  let outcome: GenerationCheck = 'refused';
   try {
-    allowed = await singleGenerateAllowed(state, projectId, type, sourceIds);
+    outcome = await singleGenerateCheck(state, launch);
   } finally {
-    if (!allowed) releaseLaunch(state, type);
+    if (outcome === 'refused') releaseLaunch(state, launch.type);
   }
-  return allowed;
+  return outcome;
 };
 
-const runSingleGenerate = async function (
+// Génération sur le cours affiché : pending optimiste (puce annulable), réponse appliquée tant que
+// ce cours reste affiché ; après un changement de cours, le serveur la termine et l'enregistre.
+const sendGenerateWithPending = async function (
   state: AppContext,
-  type: string,
-  extraBody?: GenerateExtraBody,
+  launch: SingleLaunch,
 ): Promise<void> {
-  // Sources de la fiche d'origine pour la version facile à lire : c'est sur elles que portent le
-  // pré-contrôle de modération et le pending, comme la garde serveur (body.sourceIds).
-  const sourceIds = extraBody?.sourceIds;
-  const projectId = state.currentProjectId;
-  if (!projectId || !(await acquireSingleLaunch(state, projectId, type, sourceIds))) return;
-  // Le pending optimiste prend le relais de la réservation anti-flood, sans intervalle.
-  releaseLaunch(state, type);
+  const { projectId, type, extraBody } = launch;
   // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
   // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
   const gid = crypto.randomUUID();
   const controller = new AbortController();
-  setupGeneratePending(state, type, gid, controller, sourceIds);
+  setupGeneratePending(state, type, gid, controller, launch.pendingSourceIds);
   try {
-    const res = await fetchSingleGenerate(
-      projectId,
-      type,
-      // extraBody surcharge le body standard (ex: register/sourceIds pour la
-      // version FALC d'une fiche existante) sans dupliquer le lifecycle.
-      { ...buildGenerateBody(state), ...extraBody },
-      gid,
-      controller.signal,
-    );
-    if (!res) return;
-    if (state.currentProjectId !== projectId) return;
+    const res = await fetchSingleGenerate(launch, gid, controller.signal);
+    if (!res || state.currentProjectId !== projectId) return;
     await dispatchGenerateResponse(state, type, gid, res, extraBody);
   } catch (e: unknown) {
     if (state.currentProjectId !== projectId) return;
@@ -714,6 +857,139 @@ const runSingleGenerate = async function (
     handleGenerateError(state, type, e, extraBody);
   } finally {
     cleanupGenerateState(state, type, gid, projectId);
+  }
+};
+
+// Cours changé pendant le pré-contrôle : la génération part quand même vers son cours, sans rien
+// poser sur l'écran affiché (pending, chargement, toast) ; le serveur refait la garde de modération
+// et enregistre le résultat, visible au retour sur le cours. Jusqu'en v1.7.11 : perdue sans un mot.
+const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<void> {
+  try {
+    await fetchSingleGenerate(launch, crypto.randomUUID());
+  } catch (e: unknown) {
+    console.warn('[generate] envoi vers un cours quitté impossible', launch.type, e);
+  }
+};
+
+const runSingleGenerate = async function (
+  state: AppContext,
+  type: string,
+  extraBody?: GenerateExtraBody,
+): Promise<void> {
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
+  // Sources de la fiche d'origine pour la version facile à lire : c'est sur elles que portent le
+  // pré-contrôle de modération et le pending, comme la garde serveur (body.sourceIds).
+  const launch = captureSingleLaunch(state, projectId, type, extraBody);
+  const outcome = await acquireSingleLaunch(state, launch);
+  if (outcome === 'refused') return;
+  // Le pending optimiste prend le relais de la réservation anti-flood, sans intervalle.
+  releaseLaunch(state, type);
+  if (outcome === 'moved') await sendGenerateInBackground(launch);
+  else await sendGenerateWithPending(state, launch);
+};
+
+// Lectures à voix haute en cours, par cours, génération et section : un retour sur le cours (objet
+// génération neuf, relu du serveur) ne relance pas une lecture déjà demandée (TTS facturé deux fois).
+const readAloudInFlight = new Set<string>();
+
+type ReadAloudFlight = { projectId: string | null; busyKey: string; id: string };
+
+const readAloudFlight = (
+  state: AppContext,
+  gen: GenerationUI,
+  section?: string,
+): ReadAloudFlight => {
+  const key = section || 'all';
+  const projectId = state.currentProjectId;
+  return { projectId, busyKey: `_generatingVoice_${key}`, id: `${projectId}:${gen.id}:${key}` };
+};
+
+// Génération à mettre à jour à la réponse : celle du cours affiché qui porte cet id (objet neuf
+// après un retour sur le cours), null si ce cours n'est plus affiché. L'audio est de toute façon
+// enregistré dans la génération côté serveur (relu à l'ouverture du cours).
+const readAloudTarget = (
+  state: AppContext,
+  gen: GenerationUI,
+  flight: ReadAloudFlight,
+): GenerationUI | null => {
+  if (state.currentProjectId !== flight.projectId) return null;
+  const current = state.generations.find((g) => g.id === gen.id) as GenerationUI | undefined;
+  return current ?? gen;
+};
+
+// Réponse appliquée au cours affiché seulement : audio, coût, toast (jamais sur l'écran d'un autre
+// cours). Code d'un refus traduit (rate_limited, auth_required, tts_upstream_error…), jamais brut.
+const handleReadAloudResponse = async function (
+  state: AppContext,
+  gen: GenerationUI,
+  flight: ReadAloudFlight,
+  res: Response,
+  section?: string,
+): Promise<void> {
+  if (res.ok) {
+    const result: unknown = await res.json();
+    const target = readAloudTarget(state, gen, flight);
+    if (target) applyVoiceResult(state, target, result as VoiceResult, section);
+    return;
+  }
+  const err: { error?: string } = await res.json().catch(() => ({}));
+  const target = readAloudTarget(state, gen, flight);
+  if (!target) return;
+  const error = state.resolveError(err.error || res.statusText);
+  state.showToast(state.t(TOAST_ERROR, { error }), 'error', () =>
+    state.generateVoice(target, section),
+  );
+};
+
+const reportReadAloudException = (
+  state: AppContext,
+  gen: GenerationUI,
+  flight: ReadAloudFlight,
+  e: unknown,
+  section?: string,
+): void => {
+  console.error('Voice generation error:', e);
+  const target = readAloudTarget(state, gen, flight);
+  if (!target) return;
+  state.showToast(state.t('toast.audioError'), 'error', () => state.generateVoice(target, section));
+};
+
+// Indicateur « en cours » retiré de l'objet de départ ET de celui du cours affiché (même id).
+const endReadAloud = (state: AppContext, gen: GenerationUI, flight: ReadAloudFlight): void => {
+  gen[flight.busyKey] = false;
+  const current = readAloudTarget(state, gen, flight);
+  if (current) current[flight.busyKey] = false;
+};
+
+const runGenerateVoice = async function (
+  state: AppContext,
+  gen: GenerationUI,
+  section?: string,
+): Promise<void> {
+  const flight = readAloudFlight(state, gen, section);
+  if (gen[flight.busyKey]) return;
+  gen[flight.busyKey] = true;
+  // Déjà demandée avant un retour sur le cours : l'indicateur suffit, la réponse attendue l'appliquera.
+  if (readAloudInFlight.has(flight.id)) return;
+  readAloudInFlight.add(flight.id);
+  try {
+    const body: Record<string, unknown> = { lang: getLocale() };
+    if (section) body.section = section;
+    const res = await fetch(
+      state.apiBase() + '/generations/' + gen.id + '/read-aloud',
+      withAiHeaders({
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    );
+    await handleReadAloudResponse(state, gen, flight, res, section);
+  } catch (e) {
+    reportReadAloudException(state, gen, flight, e, section);
+  } finally {
+    readAloudInFlight.delete(flight.id);
+    endReadAloud(state, gen, flight);
   }
 };
 
@@ -847,37 +1123,7 @@ export function createGenerate() {
     },
 
     async generateVoice(this: AppContext, gen: GenerationUI, section?: string) {
-      const key = section || 'all';
-      const busyKey = `_generatingVoice_${key}`;
-      if (gen[busyKey]) return;
-      gen[busyKey] = true;
-      try {
-        const body: Record<string, unknown> = { lang: getLocale() };
-        if (section) body.section = section;
-        const res = await fetch(
-          this.apiBase() + '/generations/' + gen.id + '/read-aloud',
-          withAiHeaders({
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          }),
-        );
-        if (res.ok) {
-          applyVoiceResult(this, gen, await res.json(), section);
-        } else {
-          // Code stable traduit (rate_limited, auth_required, tts_upstream_error…), jamais brut.
-          const err = await res.json().catch(() => ({}));
-          const error = this.resolveError(err.error || res.statusText);
-          this.showToast(this.t(TOAST_ERROR, { error }), 'error', () =>
-            this.generateVoice(gen, section),
-          );
-        }
-      } catch (e) {
-        console.error('Voice generation error:', e);
-        this.showToast(this.t('toast.audioError'), 'error', () => this.generateVoice(gen, section));
-      } finally {
-        gen[busyKey] = false;
-      }
+      await runGenerateVoice(this, gen, section);
     },
   };
 }

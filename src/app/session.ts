@@ -1,5 +1,6 @@
 import type { AppContext } from './app-context';
 import type { EventKey } from '../../helpers/event-bus';
+import { autoRunControllers } from './auto-runs';
 
 // Reset agressif du state RAM lié à la session courante (toasts, loading,
 // abort controllers, pendings optimistes). À invoquer dès qu'on change de
@@ -14,6 +15,27 @@ import type { EventKey } from '../../helpers/event-bus';
 // Le ledger seenEventKeys et la liste `notifications` (localStorage scopés
 // profileId) ne sont PAS touchés — ils sont la mémoire persistante du profil
 // et doivent être replay quand on revient sur un profil.
+//
+// Ce qui CONTINUE vers son cours (règle « on lance un truc, ça continue même si on change de
+// page ») : l'Auto en cours (contrôleur épargné, cf. auto-runs.ts), l'import (sources.ts) et
+// l'enregistrement vocal, arrêté ici puis envoyé vers le cours où il a commencé (recorder.ts).
+
+// AbortController.abort() est idempotent par spec et ne throw jamais — pas de try/catch défensif
+// (cf. CLAUDE.md "no empty catch"). Les contrôleurs d'un Auto en cours sont épargnés.
+const abortAllExcept = (
+  controllers: Record<string, AbortController>,
+  spared: Set<AbortController>,
+): void => {
+  for (const controller of Object.values(controllers)) {
+    if (!spared.has(controller)) controller.abort();
+  }
+};
+
+// Jamais d'enregistrement qui survit à un changement de cours ou de profil : arrêté ici, il part
+// vers le cours où il a commencé (onstop, recorder.ts). Contexte partiel des tests toléré.
+const stopActiveRecording = (ctx: AppContext): void => {
+  if (ctx.recording && typeof ctx.stopRecording === 'function') ctx.stopRecording();
+};
 
 // Codacy `no-unused-vars` natif flagge le `this: AppContext` binding comme
 // paramètre non utilisé (la règle ignore que TypeScript résout le binding au
@@ -28,15 +50,11 @@ function doResetSession(ctx: AppContext): void {
   if (typeof ctx.stopPendingsStream === 'function') {
     ctx.stopPendingsStream();
   }
-  // AbortController.abort() est idempotent par spec et ne throw jamais —
-  // pas de try/catch défensif (cf. CLAUDE.md "no empty catch").
-  for (const controller of Object.values(ctx.abortControllers)) {
-    controller.abort();
-  }
+  stopActiveRecording(ctx);
+  const spared = autoRunControllers(ctx);
+  abortAllExcept(ctx.abortControllers, spared);
   ctx.abortControllers = {};
-  for (const controller of Object.values(ctx.abortControllersByGid)) {
-    controller.abort();
-  }
+  abortAllExcept(ctx.abortControllersByGid, spared);
   ctx.abortControllersByGid = {};
   // Reset toutes les clés à false sans bracket-write user-typed (warning
   // Codacy "Generic Object Injection Sink"). `Object.fromEntries` produit
@@ -53,9 +71,11 @@ function doResetSession(ctx: AppContext): void {
   ctx.toasts = [];
   ctx.toastCounter = 0;
   ctx.shownToastEventKeys = new Set<EventKey>();
-  // chatLoading vit hors de loading{} (flag dédié) — un chat envoyé sur
-  // profil A puis switch vers profil B garderait l'input désactivé sinon.
+  // chatLoading et consigneLoading vivent hors de loading{} (flags dédiés) — un chat ou une
+  // détection de consigne lancé sur le cours A garderait sinon, dans le cours B, l'input désactivé
+  // ou les boutons sur « Analyse… ».
   ctx.chatLoading = false;
+  ctx.consigneLoading = false;
   // Reset confirm dialog en vol pour éviter qu'un callback orphelin
   // s'exécute sur le nouveau contexte (le user vient de switcher).
   ctx.confirmCallback = null;

@@ -13,6 +13,7 @@ import type {
 } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
 import type { PersistedNotification } from './notifications';
+import type { VoiceTarget } from './recorder';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -77,6 +78,7 @@ export interface AppContext extends AppState {
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
   projectUploadSessions(): AppState['uploadSessions'];
+  isUploading(): boolean;
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
@@ -111,7 +113,9 @@ export interface AppContext extends AppState {
   toggleRecording(): Promise<void>;
   startRecording(): Promise<void>;
   stopRecording(): void;
-  uploadVoice(blob: Blob): Promise<void>;
+  // target : destination capturée au début de l'enregistrement (cours, clé, langue) ; absente =
+  // cours affiché.
+  uploadVoice(blob: Blob, target?: VoiceTarget): Promise<void>;
 
   checkMobile(): void;
   toggleTheme(): void;
