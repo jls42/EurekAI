@@ -561,6 +561,9 @@ export const hi: Record<string, string> = {
   'toast.profileReset': 'प्राथमिकताएं रीसेट की गईं',
   'toast.sourcesAdded':
     '\u0938\u094D\u0930\u094B\u0924 \u091C\u094B\u0921\u093C\u0947 \u0917\u090F!',
+  'toast.importDoneIn': '"{project}" में आयात पूरा: {n} स्रोत जोड़े गए।',
+  'toast.importErrorsIn':
+    '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
   'toast.textAdded':
     '\u091F\u0947\u0915\u094D\u0938\u094D\u091F \u091C\u094B\u0921\u093C\u093E \u0917\u092F\u093E!',
   'toast.sourceDeleted':

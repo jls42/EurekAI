@@ -309,7 +309,7 @@
   </div>
 
   <!-- Upload sessions -->
-  <template x-for="session in uploadSessions" :key="session.id">
+  <template x-for="session in projectUploadSessions()" :key="session.id">
     <div class="mb-4 bg-surface rounded-card shadow-card p-4 space-y-1.5">
       <template x-for="file in session.files" :key="file.id">
         <div class="flex items-center gap-3 py-1" :title="file.errorMsg || ''">
@@ -486,7 +486,7 @@
 
   <!-- Empty sources -->
   <div
-    x-show="sources.length === 0 && !uploading && uploadSessions.length === 0"
+    x-show="sources.length === 0 && !uploading && projectUploadSessions().length === 0"
     class="text-center py-8"
   >
     <div

@@ -346,3 +346,22 @@ describe('init', () => {
     expect(a.openSourceDialog).not.toHaveBeenCalled();
   });
 });
+
+// Objet RÉELLEMENT donné à Alpine : le `...createState()` de app() fige les getters à leur valeur
+// initiale. Un état calculé lu par un gabarit doit donc être une méthode ; vécu le 2026-10-21 :
+// un getter `projectUploadSessions` valait `[]` en permanence (liste d'import jamais affichée),
+// alors que les tests de createState() seul passaient.
+describe('app() — état composé', () => {
+  it("projectUploadSessions() suit le cours affiché sur l'objet composé", () => {
+    const a = app();
+    expect(typeof a.projectUploadSessions).toBe('function');
+    a.uploadSessions = [
+      { id: 's1', projectId: 'p1', cleanupScheduled: false, files: [] },
+      { id: 's2', projectId: 'p2', cleanupScheduled: false, files: [] },
+    ];
+    a.currentProjectId = 'p1';
+    expect(a.projectUploadSessions().map((s) => s.id)).toEqual(['s1']);
+    a.currentProjectId = 'p2';
+    expect(a.projectUploadSessions().map((s) => s.id)).toEqual(['s2']);
+  });
+});

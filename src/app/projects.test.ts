@@ -451,6 +451,20 @@ describe('deleteProject', () => {
     expect(ctx.currentProjectId).toBe('p2');
   });
 
+  it('drops the upload sessions of the deleted project (its import stops), keeps the others', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+    const ctx = makeContext({
+      currentProjectId: 'p2',
+      projects: [{ id: 'p1' }, { id: 'p2' }],
+      uploadSessions: [
+        { id: 's1', projectId: 'p1', cleanupScheduled: false, files: [] },
+        { id: 's2', projectId: 'p2', cleanupScheduled: false, files: [] },
+      ],
+    });
+    await proj.deleteProject.call(ctx, 'p1');
+    expect(ctx.uploadSessions.map((s: { id: string }) => s.id)).toEqual(['s2']);
+  });
+
   it('resets state if current project deleted', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
     // Pre-condition : la map namespacée a une entrée pour le profil courant
@@ -556,11 +570,10 @@ describe('resetState', () => {
     expect(ctx.uploadSessions).toEqual([]);
   });
 
-  it('clears uploadSessions', () => {
-    const ctx = makeContext({
-      uploadSessions: [{ id: 'sess1', projectId: 'p1', cleanupScheduled: false, files: [] }],
-    });
+  it('keeps uploadSessions: an import continues in the background after a project change', () => {
+    const sessions = [{ id: 'sess1', projectId: 'p1', cleanupScheduled: false, files: [] }];
+    const ctx = makeContext({ uploadSessions: sessions });
     proj.resetState.call(ctx);
-    expect(ctx.uploadSessions).toEqual([]);
+    expect(ctx.uploadSessions).toEqual(sessions);
   });
 });

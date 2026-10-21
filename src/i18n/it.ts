@@ -442,6 +442,9 @@ export const it: Record<string, string> = {
   'toast.profileUpdated': 'Profilo aggiornato',
   'toast.profileReset': 'Preferenze ripristinate',
   'toast.sourcesAdded': 'Fonti aggiunte!',
+  'toast.importDoneIn': 'Importazione completata in «{project}»: fonti aggiunte: {n}.',
+  'toast.importErrorsIn':
+    'Importazione in «{project}»: file con errore: {n}, riprova in quel progetto.',
   'toast.textAdded': 'Testo aggiunto!',
   'toast.sourceDeleted': 'Fonte eliminata',
   'toast.courseCreated': 'Corso creato!',

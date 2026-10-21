@@ -446,6 +446,9 @@ export const nl: Record<string, string> = {
   'toast.profileUpdated': 'Profiel bijgewerkt',
   'toast.profileReset': 'Voorkeuren hersteld',
   'toast.sourcesAdded': 'Bronnen toegevoegd!',
+  'toast.importDoneIn': 'Import voltooid in "{project}": {n} bron(nen) toegevoegd.',
+  'toast.importErrorsIn':
+    'Import in "{project}": {n} bestand(en) mislukt, probeer opnieuw in dat project.',
   'toast.textAdded': 'Tekst toegevoegd!',
   'toast.sourceDeleted': 'Bron verwijderd',
   'toast.courseCreated': 'Cursus aangemaakt!',

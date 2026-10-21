@@ -552,6 +552,8 @@ export const ar: Record<string, string> = {
   'toast.profileReset': 'تم إعادة ضبط التفضيلات',
   'toast.sourcesAdded':
     '\u062a\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0635\u0627\u062f\u0631!',
+  'toast.importDoneIn': 'اكتمل الاستيراد في «{project}»: أُضيف {n} مصدر.',
+  'toast.importErrorsIn': 'الاستيراد في «{project}»: {n} ملف به خطأ، أعد المحاولة في ذلك المشروع.',
   'toast.textAdded': '\u062a\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0646\u0635!',
   'toast.sourceDeleted':
     '\u062a\u0645\u0651 \u062d\u0630\u0641 \u0627\u0644\u0645\u0635\u062f\u0631',

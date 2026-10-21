@@ -76,6 +76,7 @@ export interface AppContext extends AppState {
 
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
+  projectUploadSessions(): AppState['uploadSessions'];
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;

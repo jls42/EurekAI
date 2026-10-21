@@ -100,6 +100,9 @@ const initProjectState = () => ({
 type UploadSession = {
   id: string;
   projectId: string;
+  // Nom du cours au lancement : le toast de fin d'un import en arrière-plan le cite, même si un
+  // autre profil (donc une autre liste de projets) est affiché entre-temps.
+  projectName?: string;
   cleanupScheduled: boolean;
   files: Array<{
     id: string;
@@ -290,10 +293,15 @@ export function createState() {
     get uploading(): boolean {
       // 'hashing' = pré-check en cours → encore "en upload". 'duplicate' = en attente de décision
       // utilisateur (Importer quand même / Ignorer) → PAS bloquant, exclu pour ne pas figer l'UI.
-      return this.uploadSessions.some((s) =>
-        s.files.some(
-          (f) => f.status === 'pending' || f.status === 'hashing' || f.status === 'uploading',
-        ),
+      // Imports du cours affiché seulement : ceux d'un autre cours continuent en arrière-plan.
+      // ATTENTION (constaté le 2026-10-21) : le `...createState()` de app() (src/app/index.ts) fige
+      // ce getter à sa valeur initiale (false) dans l'app réelle, depuis #14 : non corrigé ici.
+      return this.uploadSessions.some(
+        (s) =>
+          s.projectId === this.currentProjectId &&
+          s.files.some(
+            (f) => f.status === 'pending' || f.status === 'hashing' || f.status === 'uploading',
+          ),
       );
     },
     ...initVoiceState(),

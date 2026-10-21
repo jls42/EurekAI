@@ -237,6 +237,7 @@ describe('createState', () => {
 
   it('uploading is true when a file is pending', () => {
     const state = createState();
+    state.currentProjectId = 'p1';
     state.uploadSessions = [
       {
         id: '1',
@@ -250,6 +251,7 @@ describe('createState', () => {
 
   it('uploading is true when a file is uploading', () => {
     const state = createState();
+    state.currentProjectId = 'p1';
     state.uploadSessions = [
       {
         id: '1',
@@ -259,6 +261,21 @@ describe('createState', () => {
       },
     ] as any;
     expect(state.uploading).toBe(true);
+  });
+
+  it("uploading ignores another project's import (it continues in the background)", () => {
+    const state = createState();
+    state.currentProjectId = 'p2';
+    state.uploadSessions = [
+      {
+        id: '1',
+        projectId: 'p1',
+        cleanupScheduled: false,
+        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'uploading', errorMsg: null }],
+      },
+      { id: '2', projectId: 'p2', cleanupScheduled: false, files: [] },
+    ] as any;
+    expect(state.uploading).toBe(false);
   });
 
   it('uploading is false when all files are error', () => {

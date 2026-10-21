@@ -244,6 +244,8 @@ const deleteProject = async function (this: AppContext, id: string) {
     return;
   }
   this.projects = this.projects.filter((p) => p.id !== id);
+  // Import en cours vers ce cours : sa session disparaît, la boucle s'arrête au fichier suivant.
+  this.uploadSessions = this.uploadSessions.filter((s) => s.projectId !== id);
   if (this.currentProjectId === id) {
     this.currentProjectId = null;
     this.currentProject = null;
@@ -258,7 +260,8 @@ const deleteProject = async function (this: AppContext, id: string) {
 const resetState = function (this: AppContext) {
   this.sources = [];
   this.selectedIds = [];
-  this.uploadSessions = [];
+  // uploadSessions gardées : un import continue en arrière-plan vers son cours (cf. sources.ts,
+  // _isSessionAlive) ; seules celles du cours affiché sont montrées (projectUploadSessions).
   this.generations = [];
   this.openGens = {};
   this.editingTitle = null;
