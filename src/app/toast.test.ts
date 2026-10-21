@@ -386,4 +386,20 @@ describe('gabarits : aucune fonction évaluée par une directive Alpine', () => 
     expect(html).toContain("t('toast.repeatBadge', { count: toast.count })");
     expect(html).toContain("t('a11y.toastRepeated', { count: toast.count })");
   });
+
+  it('chaque type de toast pose son texte inversé sur l’aplat -dark de sa teinte (contraste AA)', () => {
+    // Vécu le 2026-10-21 : le toast d'avertissement mettait le texte principal sur `bg-warning` ;
+    // en thème sombre, #e8edf5 sur #ffd84d = 1,18:1 (illisible). Aplat -dark + text-inverted :
+    // 13,89:1 en sombre, 6,00:1 en clair, comme succès, erreur et info.
+    const html = readFileSync(new URL('../partials/toasts.html', import.meta.url), 'utf-8');
+    const pairs = [
+      ...html.matchAll(/\x27(bg-[\w-]+) (text-[\w-]+)\x27: toast\.type === \x27(\w+)\x27/g),
+    ];
+    const types = pairs.map((m) => m[3]).sort((a, b) => a.localeCompare(b));
+    expect(types).toEqual(['error', 'info', 'success', 'warning']);
+    for (const [, bg, text] of pairs) {
+      expect(bg).toMatch(/-dark$/);
+      expect(text).toBe('text-text-inverted');
+    }
+  });
 });
