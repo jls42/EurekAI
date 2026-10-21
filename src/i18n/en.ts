@@ -205,7 +205,7 @@ export const en: Record<string, string> = {
   'settings.ttsHint':
     'Podcast, vocal quiz, dictation and read-aloud. TTS 3 (preview): native voices in more languages, but isolated dictation words are pronounced less reliably.',
   'settings.perMinute': 'per minute',
-  'settings.preview': 'preview',
+  'settings.preview': 'Preview',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Add your first sources',

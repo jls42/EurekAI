@@ -217,7 +217,7 @@ export const fr: Record<string, string> = {
   'settings.ttsHint':
     'Podcast, quiz vocal, dictée et lecture à voix haute. TTS 3 (préversion) : voix natives dans plus de langues, mais mots isolés de la dictée moins bien prononcés.',
   'settings.perMinute': 'par minute',
-  'settings.preview': 'préversion',
+  'settings.preview': 'Préversion',
 
   // Dashboard
   'dashboard.subtitle': 'Tableau de bord',

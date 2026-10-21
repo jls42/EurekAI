@@ -211,7 +211,7 @@ export const nl: Record<string, string> = {
   'settings.ttsHint':
     'Podcast, mondelinge quiz, dictee en voorlezen. TTS 3 (previewversie): eigen stemmen in meer talen, maar losse dicteewoorden worden minder goed uitgesproken.',
   'settings.perMinute': 'per minuut',
-  'settings.preview': 'previewversie',
+  'settings.preview': 'Previewversie',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',

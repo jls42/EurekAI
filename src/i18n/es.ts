@@ -211,7 +211,7 @@ export const es: Record<string, string> = {
   'settings.ttsHint':
     'Pódcast, quiz vocal, dictado y lectura en voz alta. TTS 3 (versión preliminar): voces nativas en más idiomas, pero pronuncia peor las palabras sueltas del dictado.',
   'settings.perMinute': 'por minuto',
-  'settings.preview': 'versión preliminar',
+  'settings.preview': 'Versión preliminar',
 
   'dashboard.subtitle': 'Panel',
   'dashboard.addFirstSources': 'Agrega tus primeras fuentes',

@@ -208,7 +208,7 @@ export const it: Record<string, string> = {
   'settings.ttsHint':
     'Podcast, quiz vocale, dettato e lettura ad alta voce. TTS 3 (anteprima): voci native in più lingue, ma pronuncia peggio le parole isolate del dettato.',
   'settings.perMinute': 'al minuto',
-  'settings.preview': 'anteprima',
+  'settings.preview': 'Anteprima',
 
   'dashboard.subtitle': 'Pannello',
   'dashboard.addFirstSources': 'Aggiungi le tue prime fonti',
