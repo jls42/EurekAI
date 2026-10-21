@@ -2056,6 +2056,26 @@ describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', ()
     expect(ctx.autoRuns).toEqual({});
   });
 
+  it('retour sur le cours pendant les étapes de son Auto : « Tout annuler » arrête aussi celles en file', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    switchCourse(ctx, 'pid-2');
+    switchCourse(ctx, 'pid-1'); // retour : le contrôleur de l'Auto n'est plus dans abortControllers
+
+    confirm.cancelGeneration.call(ctx);
+    // Sans l'arrêt de l'Auto, chaque étape en vol qui se termine libérait sa voie, et l'étape
+    // suivante partait (vécu à la recette du 2026-10-21 : un texte à trous généré après l'annulation).
+    for (const finish of held.finishers.splice(0)) finish();
+    await nextMacrotask();
+    expect(stepUrls()).toEqual(planUrls('pid-1').slice(0, 3));
+
+    await run;
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.autoRuns).toEqual({});
+  });
+
   it('moins de 3 étapes : toutes partent ensemble, sans attendre', async () => {
     const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
     vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {

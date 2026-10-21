@@ -1,6 +1,7 @@
 import type { AppContext } from './app-context';
 import type { PendingTrackerEntry } from '../../types';
 import { pendingOfTypeExists } from './pending-utils';
+import { abortAutoRun } from './auto-runs';
 import { buildEventKey } from '../../helpers/event-key';
 
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
@@ -253,6 +254,10 @@ const cancelGeneration = function (this: AppContext) {
     controller.abort();
   }
   this.abortControllers = {};
+  // 3. L'Auto du cours affiché, dans toutes ses phases : revenu sur le cours pendant ses étapes, son
+  //    contrôleur n'est plus dans abortControllers (resetSession ne garde que le registre autoRuns),
+  //    et ses étapes encore en file partaient après « Tout annuler » (recette du 2026-10-21).
+  if (this.currentProjectId) abortAutoRun(this, this.currentProjectId);
   for (const key of Object.keys(this.loading)) {
     this.loading[key] = false;
   }

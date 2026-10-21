@@ -16,6 +16,7 @@ function makeContext(overrides: any = {}) {
     abortControllers: {} as Record<string, AbortController>,
     abortControllersByGid: {} as Record<string, AbortController>,
     pendingById: {} as Record<string, any>,
+    autoRuns: {} as Record<string, { controller: AbortController; analysing: boolean }>,
     generations: [] as any[],
     currentProjectId: 'pid-1',
     loading: {
@@ -437,6 +438,21 @@ describe('createConfirm', () => {
       ctx.abortControllers = {};
       confirm.cancelGeneration.call(ctx);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledGeneration', 'info');
+    });
+
+    it('arrête l’Auto du cours affiché, même absent de abortControllers, jamais celui d’un autre cours', () => {
+      const shown = new AbortController();
+      const other = new AbortController();
+      ctx.autoRuns = {
+        'pid-1': { controller: shown, analysing: false },
+        'pid-2': { controller: other, analysing: false },
+      };
+
+      confirm.cancelGeneration.call(ctx);
+
+      expect(shown.signal.aborted).toBe(true);
+      expect(other.signal.aborted).toBe(false);
+      expect(Object.keys(ctx.autoRuns)).toEqual(['pid-2']);
     });
 
     it('appelle cancelPendingByGid pour chaque gid présent dans pendingById', () => {
