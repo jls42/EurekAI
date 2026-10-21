@@ -495,6 +495,8 @@ export interface AppConfig {
     podcast: string;
     translate: string;
     ocr: string;
+    /** Modèle de transcription (STT), id de STT_MODELS (helpers/stt-models.ts). */
+    stt: string;
     quizVerify: string;
     chat: string;
   };

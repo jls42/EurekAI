@@ -291,6 +291,57 @@ describe('server bootstrap', () => {
     expect(res.jsonMock).toHaveBeenCalledWith({ error: 'auth_required' });
   });
 
+  // Cache complet (la sélection filtre au moment de chaque appel TTS), réponse filtrée : le parent
+  // ne peut choisir qu'une voix que le modèle configuré accepte. Voxtral TTS (2603, speech v1)
+  // refuse les voix pvc en HTTP 400.
+  const CATALOG = [
+    { id: 'marie', name: 'Marie - Neutral', languages: ['fr_fr'], slug: 'fr_marie_neutral' },
+    { id: 'pvc-es', name: 'Ana - Cheerful', languages: ['es_es'], slug: 'voice_3141' },
+    { id: 'ma-voix', name: 'Ma voix', languages: ['fr_fr'], custom: true },
+  ];
+
+  it.each([
+    ['config sans ttsModel (défaut)', {}, ['marie', 'ma-voix']],
+    ['Voxtral TTS', { ttsModel: 'voxtral-mini-tts-2603' }, ['marie', 'ma-voix']],
+    ['alias pas encore migré', { ttsModel: 'voxtral-mini-tts-latest' }, ['marie', 'ma-voix']],
+    ['TTS 3', { ttsModel: 'voxtral-mini-tts-3-0' }, ['marie', 'pvc-es', 'ma-voix']],
+  ])(
+    'voix (%s) : réponse filtrée par le modèle, catalogue complet en cache',
+    async (_l, cfg, ids) => {
+      await importServer();
+      // Le préchauffage du démarrage consomme la première réponse de listVoices et remplit le cache.
+      await vi.waitFor(() => expect(state.setVoiceCache).toHaveBeenCalledWith([]));
+      const { getConfig } = await import('./config.js');
+      vi.mocked(getConfig).mockReturnValue(cfg as ReturnType<typeof getConfig>);
+      // `as never` : le mock hoisté est typé par son défaut (`[]`).
+      state.listVoices.mockResolvedValueOnce(CATALOG as never);
+      const res = responseMock();
+      try {
+        const req = { headers: {}, query: {} } as unknown as Request;
+        await getMethodHandler('get', '/api/config/voices')(req, res, vi.fn());
+      } finally {
+        vi.mocked(getConfig).mockImplementation(() => ({}) as ReturnType<typeof getConfig>);
+      }
+      expect(state.setVoiceCache).toHaveBeenLastCalledWith(CATALOG);
+      const listed = res.jsonMock.mock.calls[0][0] as { id: string }[];
+      expect(listed.map((v) => v.id)).toEqual(ids);
+    },
+  );
+
+  it('voix filtrées par langue : même filtre par modèle, cache intact', async () => {
+    await importServer();
+    await vi.waitFor(() => expect(state.setVoiceCache).toHaveBeenCalledWith([]));
+    state.setVoiceCache.mockClear();
+    const spanish = CATALOG.filter((v) => v.languages[0] === 'es_es');
+    state.listVoices.mockResolvedValueOnce(spanish as never);
+    const res = responseMock();
+    const req = { headers: {}, query: { lang: 'es' } } as unknown as Request;
+    await getMethodHandler('get', '/api/config/voices')(req, res, vi.fn());
+    // Liste partielle (une langue) : jamais écrite dans le cache.
+    expect(state.setVoiceCache).not.toHaveBeenCalled();
+    expect(res.jsonMock).toHaveBeenCalledWith([]);
+  });
+
   it('masque les details des payloads JSON invalides', async () => {
     await importServer();
 

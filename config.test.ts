@@ -24,13 +24,21 @@ import {
   setVoiceCache,
 } from './config.js';
 import { logger } from './helpers/logger.js';
-import { asVoiceId } from './helpers/voice-types.js';
+import { asVoiceId, type MistralVoice } from './helpers/voice-types.js';
 import type { AppConfig } from './types.js';
 
 let tempDir: string;
 
 const FALLBACK_HOST = '2f62b1af-aea3-4079-9d10-7ca665ee7243';
 const FALLBACK_GUEST = 'e0580ce5-e63c-4cbe-88c8-a983b80c5f1f';
+
+// Modèles épinglés (helpers/stt-models.ts, helpers/tts-models.ts) : défauts et options.
+const VOXTRAL_TTS = 'voxtral-mini-tts-2603';
+const VOXTRAL_TTS_3 = 'voxtral-mini-tts-3-0';
+const TRANSCRIBE_2 = 'voxtral-mini-2602';
+const SMALL_TRANSCRIBE_3 = 'voxtral-small-transcribe-3-0';
+
+const readDisk = () => JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
 
 beforeEach(() => {
   tempDir = mkdtempSync(join(tmpdir(), 'eurekai-config-'));
@@ -50,7 +58,10 @@ describe('initConfig', () => {
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('mistral-large-latest');
     expect(cfg.models.quizVerify).toBe('mistral-large-latest');
-    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    // Ids épinglés, plus d'alias mouvant (`voxtral-mini-latest` codé en dur, `voxtral-mini-tts-latest`
+    // par défaut jusqu'en v1.7.11).
+    expect(cfg.models.stt).toBe(TRANSCRIBE_2);
+    expect(cfg.ttsModel).toBe(VOXTRAL_TTS);
     expect(cfg).not.toHaveProperty('mistralVoices');
     expect(cfg).not.toHaveProperty('mistralVoicesSource');
   });
@@ -68,11 +79,84 @@ describe('initConfig', () => {
     const cfg = getConfig() as AppConfig & { ttsProvider?: string; voices?: unknown };
     expect(cfg.ttsProvider).toBeUndefined();
     expect(cfg.voices).toBeUndefined();
-    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(cfg.ttsModel).toBe(VOXTRAL_TTS);
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.ttsProvider).toBeUndefined();
     expect(onDisk.voices).toBeUndefined();
-    expect(onDisk.ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(onDisk.ttsModel).toBe(VOXTRAL_TTS);
+  });
+
+  // L'alias défaut jusqu'en v1.7.11 doit pointer sur Voxtral 3 un mois après sa GA (guide de
+  // migration de Mistral) : modèle, voix acceptées et tarif changeraient en silence.
+  it.each([
+    ['alias voxtral-mini-tts-latest (défaut jusqu’en v1.7.11)', 'voxtral-mini-tts-latest'],
+    ['valeur inconnue', 'voxtral-custom'],
+  ])('migration TTS : %s → Voxtral TTS épinglé, persisté et journalisé', (_label, legacy) => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ ttsModel: legacy }));
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS);
+    expect(readDisk().ttsModel).toBe(VOXTRAL_TTS);
+    expect(infoSpy).toHaveBeenCalledWith(
+      'config',
+      `migration: ttsModel '${legacy}' -> '${VOXTRAL_TTS}'`,
+    );
+  });
+
+  it.each([
+    ['alias voxtral-mini-latest (codé en dur jusqu’en v1.7.11)', 'voxtral-mini-latest'],
+    ['valeur inconnue', 'garbage'],
+  ])('migration STT : %s → Transcribe 2 épinglé, persisté et journalisé', (_label, legacy) => {
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: { stt: legacy } }));
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(getConfig().models.stt).toBe(TRANSCRIBE_2);
+    expect(readDisk().models.stt).toBe(TRANSCRIBE_2);
+    expect(infoSpy).toHaveBeenCalledWith(
+      'config',
+      `migration: stt model '${legacy}' -> '${TRANSCRIBE_2}'`,
+    );
+  });
+
+  it('options TTS 3 et Small Transcribe 3 (opt-in) préservées sans réécriture du fichier', () => {
+    const content = JSON.stringify({
+      models: { stt: SMALL_TRANSCRIBE_3 },
+      ttsModel: VOXTRAL_TTS_3,
+    });
+    writeFileSync(join(tempDir, 'config.json'), content);
+    initConfig(tempDir);
+    expect(getConfig().models.stt).toBe(SMALL_TRANSCRIBE_3);
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS_3);
+    expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe(content);
+  });
+
+  it('config.json d’avant le choix STT (sans models.stt) : défaut par fusion, sans réécriture', () => {
+    const content = JSON.stringify({ models: { summary: 'custom' }, ttsModel: VOXTRAL_TTS });
+    writeFileSync(join(tempDir, 'config.json'), content);
+    initConfig(tempDir);
+    expect(getConfig().models.stt).toBe(TRANSCRIBE_2);
+    expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe(content);
+  });
+
+  // Chaque migration tourne même quand une précédente a déjà changé quelque chose (un `||`
+  // court-circuiterait les suivantes et laisserait un alias sur disque jusqu'au boot suivant).
+  it('migrations cumulées : alias TTS, OCR et STT tous normalisés et persistés au même boot', () => {
+    writeFileSync(
+      join(tempDir, 'config.json'),
+      JSON.stringify({
+        ttsModel: 'voxtral-mini-tts-latest',
+        models: { ocr: 'mistral-ocr-latest', stt: 'voxtral-mini-latest' },
+      }),
+    );
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    const expected = { ttsModel: VOXTRAL_TTS, ocr: 'mistral-ocr-4-1', stt: TRANSCRIBE_2 };
+    const cfg = getConfig();
+    expect({ ttsModel: cfg.ttsModel, ocr: cfg.models.ocr, stt: cfg.models.stt }).toEqual(expected);
+    const onDisk = readDisk();
+    expect({ ttsModel: onDisk.ttsModel, ocr: onDisk.models.ocr, stt: onDisk.models.stt }).toEqual(
+      expected,
+    );
   });
 
   it('migration one-time: supprime les anciennes voix globales du config.json', () => {
@@ -144,7 +228,8 @@ describe('initConfig', () => {
     writeFileSync(join(tempDir, 'config.json'), '{invalid json');
     initConfig(tempDir);
     expect(getConfig().models.summary).toBe('mistral-large-latest');
-    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS);
+    expect(getConfig().models.stt).toBe(TRANSCRIBE_2);
     expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe('{invalid json');
     expect(errSpy).toHaveBeenCalledWith(
       'config',
@@ -161,12 +246,12 @@ describe('initConfig', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => {});
     initConfig(tempDir);
     expect(existsSync(backupPath)).toBe(false);
-    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     expect(existsSync(backupPath)).toBe(true);
     expect(readFileSync(backupPath, 'utf-8')).toBe(corruptContent);
-    expect(JSON.parse(readFileSync(configPath, 'utf-8')).ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(JSON.parse(readFileSync(configPath, 'utf-8')).ttsModel).toBe(VOXTRAL_TTS_3);
     writeFileSync(backupPath, 'this should NOT be overwritten');
-    saveConfig({ ttsModel: 'other' });
+    saveConfig({ ttsModel: VOXTRAL_TTS });
     expect(readFileSync(backupPath, 'utf-8')).toBe('this should NOT be overwritten');
   });
 
@@ -183,11 +268,11 @@ describe('initConfig', () => {
     expect(existsSync(configPath)).toBe(false);
 
     // 1er save: fichier absent, pas de backup, flag doit reset malgré tout
-    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     expect(existsSync(backupPath)).toBe(false);
 
     // 2e save sur fichier désormais valide : ne doit pas être backup'é
-    saveConfig({ ttsModel: 'other' });
+    saveConfig({ ttsModel: VOXTRAL_TTS });
     expect(existsSync(backupPath)).toBe(false);
   });
 
@@ -209,7 +294,7 @@ describe('initConfig', () => {
     vi.spyOn(logger, 'warn').mockImplementation(() => {});
     initConfig(tempDir);
     expect(getConfig().models.summary).toBe('mistral-large-latest'); // DEFAULT
-    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     expect(existsSync(backupPath)).toBe(true);
     expect(readFileSync(backupPath, 'utf-8')).toBe(shapeInvalid);
   });
@@ -220,7 +305,7 @@ describe('initConfig', () => {
     writeFileSync(configPath, '"just a string"');
     vi.spyOn(logger, 'warn').mockImplementation(() => {});
     initConfig(tempDir);
-    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     expect(existsSync(backupPath)).toBe(true);
   });
 
@@ -233,25 +318,27 @@ describe('initConfig', () => {
     vi.spyOn(logger, 'error').mockImplementation(() => {});
     vi.spyOn(logger, 'info').mockImplementation(() => {});
     initConfig(tempDir);
-    saveConfig({ ttsModel: 'voxtral-mini-tts-latest' });
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     // Le backup d'origine est préservé, pas écrasé
     expect(readFileSync(backupPath, 'utf-8')).toBe('original-corrupt-from-previous-cycle');
   });
 
   it('migration partielle: voices seul legacy → removed, ttsModel intouché', () => {
+    // TTS 3 (option, ≠ défaut) : seule valeur qui distingue « gardé tel quel » de « remis au défaut ».
     writeFileSync(
       join(tempDir, 'config.json'),
       JSON.stringify({
         voices: { host: { id: 'x', name: 'x' }, guest: { id: 'y', name: 'y' } },
-        ttsModel: 'voxtral-mini-tts-latest',
+        ttsModel: VOXTRAL_TTS_3,
       }),
     );
     initConfig(tempDir);
     const cfg = getConfig() as AppConfig & { voices?: unknown };
     expect(cfg.voices).toBeUndefined();
-    expect(cfg.ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(cfg.ttsModel).toBe(VOXTRAL_TTS_3);
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.voices).toBeUndefined();
+    expect(onDisk.ttsModel).toBe(VOXTRAL_TTS_3);
   });
 
   it("migration partielle: ttsModel 'eleven_*' seul → reset", () => {
@@ -260,7 +347,7 @@ describe('initConfig', () => {
       JSON.stringify({ ttsModel: 'eleven_multilingual_v2' }),
     );
     initConfig(tempDir);
-    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS);
   });
 
   it('idempotent double-boot: aucune réécriture quand config est déjà migré', () => {
@@ -294,7 +381,7 @@ describe('initConfig', () => {
   it('shape hostile: saved = array au top-level → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify([1, 2, 3]));
     initConfig(tempDir);
-    expect(getConfig().ttsModel).toBe('voxtral-mini-tts-latest');
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS);
   });
 });
 
@@ -346,18 +433,31 @@ describe('saveConfig', () => {
     );
   });
 
-  it("rejette ttsModel legacy 'eleven_*' POST et preserve la valeur courante", () => {
+  it('accepte un ttsModel de TTS_MODELS (option TTS 3) et le persiste', () => {
     initConfig(tempDir);
-    saveConfig({ ttsModel: 'voxtral-custom' });
-    expect(getConfig().ttsModel).toBe('voxtral-custom');
-    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    saveConfig({ ttsModel: 'eleven_v3' });
-    expect(getConfig().ttsModel).toBe('voxtral-custom');
-    expect(warnSpy).toHaveBeenCalledWith(
-      'config',
-      expect.stringContaining("rejected legacy ttsModel 'eleven_v3'"),
-    );
+    saveConfig({ ttsModel: VOXTRAL_TTS_3 });
+    expect(getConfig().ttsModel).toBe(VOXTRAL_TTS_3);
+    expect(readDisk().ttsModel).toBe(VOXTRAL_TTS_3);
   });
+
+  // Onglet resté ouvert ou client automatisé entre deux démarrages : la valeur est ignorée, le
+  // choix courant (déjà épinglé) gardé, jamais remis au défaut. Un id libre (`voxtral-custom`,
+  // accepté jusqu'en v1.7.11) ne part plus vers l'API.
+  it.each(['eleven_v3', 'voxtral-mini-tts-latest', 'voxtral-custom'])(
+    'rejette le ttsModel %s POSTé et garde la valeur courante',
+    (rejected) => {
+      initConfig(tempDir);
+      saveConfig({ ttsModel: VOXTRAL_TTS_3 });
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      saveConfig({ ttsModel: rejected });
+      expect(getConfig().ttsModel).toBe(VOXTRAL_TTS_3);
+      expect(readDisk().ttsModel).toBe(VOXTRAL_TTS_3);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'config',
+        `rejected legacy/unknown ttsModel '${rejected}' at saveConfig, keeping current value '${VOXTRAL_TTS_3}'`,
+      );
+    },
+  );
 
   it('rejette un models.ocr legacy/alias POST et normalise vers le défaut (OCR 4.1)', () => {
     initConfig(tempDir);
@@ -379,6 +479,39 @@ describe('saveConfig', () => {
       'config',
       expect.stringContaining("rejected legacy/unknown OCR model 'mistral-ocr-4-0'"),
     );
+  });
+
+  it('accepte Small Transcribe 3 (opt-in) via saveConfig et le persiste', () => {
+    initConfig(tempDir);
+    saveConfig({ models: { stt: SMALL_TRANSCRIBE_3 } as any });
+    expect(getConfig().models.stt).toBe(SMALL_TRANSCRIBE_3);
+    expect(readDisk().models.stt).toBe(SMALL_TRANSCRIBE_3);
+  });
+
+  // Même régime que l'OCR : un alias mouvant ou un id inconnu est remplacé par le défaut épinglé.
+  it.each(['voxtral-mini-latest', 'voxtral-mini-transcribe-3', 'garbage'])(
+    'rejette un models.stt %s POSTé et normalise vers le défaut (Transcribe 2)',
+    (rejected) => {
+      initConfig(tempDir);
+      saveConfig({ models: { stt: SMALL_TRANSCRIBE_3 } as any });
+      const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+      saveConfig({ models: { stt: rejected } as any });
+      expect(getConfig().models.stt).toBe(TRANSCRIBE_2);
+      expect(readDisk().models.stt).toBe(TRANSCRIBE_2);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'config',
+        `rejected legacy/unknown STT model '${rejected}' at saveConfig, using '${TRANSCRIBE_2}'`,
+      );
+    },
+  );
+
+  it('un client qui ne connaît pas models.stt (onglet d’avant la mise à jour) garde le choix STT', () => {
+    initConfig(tempDir);
+    saveConfig({ models: { stt: SMALL_TRANSCRIBE_3 } as any });
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({ models: { summary: 'mistral-medium-latest', ocr: 'mistral-ocr-2512' } as any });
+    expect(getConfig().models.stt).toBe(SMALL_TRANSCRIBE_3);
+    expect(warnSpy).not.toHaveBeenCalled();
   });
 
   it('accepte OCR 3 explicite (opt-in) via saveConfig', () => {
@@ -449,6 +582,11 @@ describe('resetConfig', () => {
 });
 
 describe('resolveVoices', () => {
+  // TTS 3 accepte toutes les voix : ces tests isolent la logique de résolution sur des voix sans
+  // slug ni caractère personnel (forme inconnue, que Voxtral TTS écarte). Le filtrage par modèle
+  // est couvert par le describe « voix acceptées par le modèle TTS » ci-dessous.
+  const model = VOXTRAL_TTS_3;
+
   // Helper de test pour réduire le boilerplate — les tests ici exercent la logique
   // de résolution (profileVoices override, bucket lang, fallback EN), pas les
   // comportements flow/profileId qui sont couverts dans helpers/voice-selection.test.ts.
@@ -461,6 +599,7 @@ describe('resolveVoices', () => {
       lang,
       profileId: undefined,
       flow: 'podcast',
+      model,
     });
 
   it('fallback interne quand cache vide', () => {
@@ -587,7 +726,7 @@ describe('resolveVoices', () => {
       },
     ]);
     const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
-    resolveVoices({ lang: 'fr', profileId: undefined, flow: 'podcast' });
+    resolveVoices({ lang: 'fr', profileId: undefined, flow: 'podcast', model });
     const matched = warnSpy.mock.calls.some(
       (c) =>
         c[0] === 'voice-selection' &&
@@ -611,9 +750,9 @@ describe('resolveVoices', () => {
       { id: asVoiceId('d'), name: 'Dan - Happy', languages: ['de_de'] },
       { id: asVoiceId('e'), name: 'Eve - Neutral', languages: ['de_de'] },
     ]);
-    const podcast = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'podcast' });
-    const quizVocal = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'quiz-vocal' });
-    const readAloud = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'read-aloud' });
+    const podcast = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'podcast', model });
+    const quizVocal = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'quiz-vocal', model });
+    const readAloud = resolveVoices({ lang: 'de', profileId: 'p1', flow: 'read-aloud', model });
     expect(podcast).toEqual(quizVocal);
     expect(quizVocal).toEqual(readAloud);
   });
@@ -635,7 +774,7 @@ describe('resolveVoices', () => {
       },
     ]);
     const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
-    resolveVoices({ lang: 'hi', profileId: undefined, flow: 'read-aloud' });
+    resolveVoices({ lang: 'hi', profileId: undefined, flow: 'read-aloud', model });
     const matched = infoSpy.mock.calls.some(
       (c) =>
         c[0] === 'voice-selection' &&
@@ -648,8 +787,119 @@ describe('resolveVoices', () => {
   });
 });
 
+// Voxtral TTS (2603, « speech v1 ») refuse les voix pvc en HTTP 400 (code 3051) ; le catalogue en
+// renvoie depuis le 2026-10-20 (presets Voxtral 3, seules voix natives es, pt, it, nl, de, hi, ar).
+describe('resolveVoices : voix acceptées par le modèle TTS', () => {
+  const voice = (id: string, name: string, language: string, slug?: string): MistralVoice => ({
+    id: asVoiceId(id),
+    name,
+    languages: [language],
+    slug,
+    custom: false,
+  });
+  // Formes réelles du catalogue : presets Voxtral 2 (ivc) en anglais et en français, voix
+  // personnelle (ivc, sans slug), presets Voxtral 3 (pvc) seuls dans les autres langues.
+  const IVC_VOICES: MistralVoice[] = [
+    voice('jane-confident', 'Jane - Confident', 'en_gb', 'gb_jane_confident'),
+    voice('oliver-curious', 'Oliver - Curious', 'en_gb', 'gb_oliver_curious'),
+    voice('marie-excited', 'Marie - Excited', 'fr_fr', 'fr_marie_excited'),
+    voice('marie-curious', 'Marie - Curious', 'fr_fr', 'fr_marie_curious'),
+    { ...voice('ma-voix', 'Ma voix', 'fr_fr'), custom: true },
+  ];
+  const PVC_LANGUAGES = ['es_es', 'pt_br', 'it_it', 'nl_nl', 'de_de', 'hi_in', 'ar_sa'];
+  const PVC_VOICES: MistralVoice[] = PVC_LANGUAGES.flatMap((language, i) => [
+    voice(`pvc-${language}-a`, 'Ana - Cheerful', language, `voice_${3130 + 2 * i}`),
+    voice(`pvc-${language}-b`, 'Bruno - Neutral', language, `voice_${3131 + 2 * i}`),
+  ]);
+  const IVC_IDS = new Set<string>(IVC_VOICES.map((v) => v.id));
+  const UI_LANGS = ['fr', 'en', 'es', 'pt', 'it', 'nl', 'de', 'hi', 'ar'];
+  const PROFILE_WARN = 'profile voice pvc-es_es-a not supported by voxtral-mini-tts-2603';
+  // Warns de l'override du profil seulement : la sélection dynamique, calculée à chaque appel, peut
+  // en émettre d'autres (bucket d'un seul personnage, comme la paire Marie en français).
+  const profileVoiceWarns = (spy: { mock: { calls: unknown[][] } }) =>
+    spy.mock.calls.filter((call) => String(call[1]).startsWith('profile voice'));
+
+  beforeEach(() => {
+    setVoiceCache([...IVC_VOICES, ...PVC_VOICES]);
+  });
+
+  it('Voxtral TTS ne choisit qu’une voix ivc du cache, dans les 9 langues et pour tout profil', () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    for (const lang of UI_LANGS) {
+      for (const profileId of [undefined, 'p1', 'p2', 'p3']) {
+        const { host, guest } = resolveVoices({
+          lang,
+          profileId,
+          flow: 'podcast',
+          model: VOXTRAL_TTS,
+        });
+        const refused = [host, guest].filter((id) => !IVC_IDS.has(id));
+        expect(refused, `${lang} ${profileId}`).toEqual([]);
+      }
+    }
+  });
+
+  it('espagnol : TTS 3 prend les voix natives pvc, Voxtral TTS retombe sur la paire anglaise', () => {
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const args = { lang: 'es', profileId: undefined, flow: 'podcast' as const };
+    const tts3 = resolveVoices({ ...args, model: VOXTRAL_TTS_3 });
+    expect(new Set([tts3.host, tts3.guest])).toEqual(new Set(['pvc-es_es-a', 'pvc-es_es-b']));
+    expect(resolveVoices({ ...args, model: VOXTRAL_TTS })).toEqual({
+      host: 'jane-confident',
+      guest: 'oliver-curious',
+    });
+  });
+
+  it('override pvc du profil + Voxtral TTS : ignoré (un seul warn), sélection dynamique', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    vi.spyOn(logger, 'info').mockImplementation(() => {});
+    const voices = resolveVoices({
+      // host : voix pvc du catalogue ; guest : voix absente du cache (supprimée), gardée.
+      profileVoices: { host: asVoiceId('pvc-es_es-a'), guest: asVoiceId('voix-supprimee') },
+      lang: 'es',
+      profileId: undefined,
+      flow: 'quiz-vocal',
+      model: VOXTRAL_TTS,
+    });
+    expect(voices).toEqual({ host: 'jane-confident', guest: 'voix-supprimee' });
+    expect(profileVoiceWarns(warnSpy)).toEqual([
+      ['voice-selection', `${PROFILE_WARN} (flow=quiz-vocal), using dynamic selection`],
+    ]);
+  });
+
+  it('override pvc du profil + TTS 3 : gardé, sans warn', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const profileVoices = { host: asVoiceId('pvc-es_es-a'), guest: asVoiceId('pvc-es_es-b') };
+    const voices = resolveVoices({
+      profileVoices,
+      lang: 'es',
+      profileId: undefined,
+      flow: 'podcast',
+      model: VOXTRAL_TTS_3,
+    });
+    expect(voices).toEqual(profileVoices);
+    expect(profileVoiceWarns(warnSpy)).toEqual([]);
+  });
+
+  it('override ivc ou absent du cache + Voxtral TTS : gardé tel quel, sans warn', () => {
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    // Absent du cache : catalogue pas encore chargé ou voix supprimée, impossible d'en juger.
+    const profileVoices = { host: asVoiceId('marie-curious'), guest: asVoiceId('voix-inconnue') };
+    const voices = resolveVoices({
+      profileVoices,
+      lang: 'fr',
+      profileId: undefined,
+      flow: 'read-aloud',
+      model: VOXTRAL_TTS,
+    });
+    expect(voices).toEqual(profileVoices);
+    expect(profileVoiceWarns(warnSpy)).toEqual([]);
+  });
+});
+
 describe('migration legacy ttsModel observability', () => {
-  it('logger.info trace le mapping eleven_* -> voxtral-mini-tts-latest', () => {
+  it('logger.info trace le mapping eleven_* -> voxtral-mini-tts-2603', () => {
     const configPath = join(tempDir, 'config.json');
     writeFileSync(
       configPath,
@@ -661,7 +911,7 @@ describe('migration legacy ttsModel observability', () => {
       (c) =>
         c[0] === 'config' &&
         typeof c[1] === 'string' &&
-        c[1].includes("ttsModel 'eleven_multilingual_v2' -> 'voxtral-mini-tts-latest'"),
+        c[1].includes("ttsModel 'eleven_multilingual_v2' -> 'voxtral-mini-tts-2603'"),
     );
     expect(matched).toBe(true);
     infoSpy.mockRestore();

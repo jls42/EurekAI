@@ -230,6 +230,12 @@ export const hi: Record<string, string> = {
   'settings.perMChars': 'प्रति M वर्ण',
   'settings.priceUnknown': 'मूल्य अनुपलब्ध',
   'settings.ocrHint': 'OCR 3: किफायती। OCR 4: बेहतर गुणवत्ता, 2× लागत।',
+  'settings.stt': 'प्रतिलेखन',
+  'settings.sttHint': 'आवाज़ से इनपुट और मौखिक Quiz के मौखिक उत्तर।',
+  'settings.ttsHint':
+    'पॉडकास्ट, मौखिक Quiz, श्रुतलेख और ज़ोर से पढ़ना। TTS 3 (पूर्वावलोकन): ज़्यादा भाषाओं की अपनी आवाज़ें, पर श्रुतलेख के अकेले शब्दों का उच्चारण कम सटीक।',
+  'settings.perMinute': 'प्रति मिनट',
+  'settings.preview': 'पूर्वावलोकन',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':

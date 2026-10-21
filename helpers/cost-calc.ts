@@ -1,5 +1,5 @@
 import type { ApiUsage, BillingUnit, ModelPricing, GenerationUsage, ToolCalls } from './pricing.js';
-import { resolvePricing, resolveToolPricing } from './pricing.js';
+import { resolvePricing, resolveToolPricing, usdPerMinute } from './pricing.js';
 
 const QUANTITY_BY_UNIT = {
   tokens: (usage: ApiUsage) => (usage.promptTokens ?? 0) + (usage.completionTokens ?? 0),
@@ -137,7 +137,7 @@ const audioBreakdown = (usage: ApiUsage, pricing: ModelPricing): string[] => {
   return [
     costLine(
       `${usage.promptAudioSeconds.toFixed(1)}s audio`,
-      `$${((pricing.inputPerMillion / 1_000_000) * 60).toFixed(4)}/min`,
+      `$${usdPerMinute(pricing).toFixed(4)}/min`,
       (usage.promptAudioSeconds * pricing.inputPerMillion) / 1_000_000,
     ),
   ];

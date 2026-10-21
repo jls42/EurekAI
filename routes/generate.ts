@@ -38,7 +38,7 @@ import { getConfig, resolveVoices, getModelLimits } from '../config.js';
 import { resolveClient } from '../helpers/mistral-client-factory.js';
 import { generateSummary, generateRemediationSummary } from '../generators/summary.js';
 import { generateDictation, DICTATION_DEFAULT_WORDS } from '../generators/dictation.js';
-import { textToSpeech } from '../generators/tts-provider.js';
+import { textToSpeech, ttsOptionsFor } from '../generators/tts-provider.js';
 import { generateFlashcards } from '../generators/flashcards.js';
 import {
   generateQuiz,
@@ -934,6 +934,7 @@ const buildPodcastGeneration = async (
   );
   logger.info('podcast', `Script OK: ${podcastResult.script.length} lines`);
   logger.info('podcast', 'Generating audio...');
+  const ttsOpts = ttsOptionsFor(ctx.config, ctx.client);
   const audioBuffer = await generateAudio(
     podcastResult.script,
     resolveVoices({
@@ -941,8 +942,9 @@ const buildPodcastGeneration = async (
       lang: ctx.lang,
       profileId: ctx.profileId,
       flow: 'podcast',
+      model: ttsOpts.model,
     }),
-    { model: ctx.config.ttsModel, mistralClient: ctx.client },
+    ttsOpts,
   );
   const audioUrl = saveAudioFile(audioBuffer, store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
   logger.info('podcast', `Audio OK: ${(audioBuffer.length / 1024).toFixed(0)} KB`);
@@ -1000,13 +1002,14 @@ const buildQuizVocalAudioUrls = async (
   logger.info(QUIZ_VOCAL, 'Generating TTS for each question...');
   const audioUrls: string[] = [];
   const projectDir = store.getProjectDir(ctx.pid);
+  const ttsOpts = ttsOptionsFor(ctx.config, ctx.client);
   const hostVoice = resolveVoices({
     profileVoices: ctx.profileVoices,
     lang: ctx.lang,
     profileId: ctx.profileId,
     flow: QUIZ_VOCAL,
+    model: ttsOpts.model,
   }).host;
-  const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
   // Un appel TTS à la fois : limite de débit de la clé Mistral ; et sur un échec, plus rien ne
   // tourne quand runWithMediaLedger supprime les MP3 déjà écrits (avec un Promise.all, les autres
   // appels en écriraient encore après ce nettoyage).
@@ -1032,13 +1035,14 @@ const buildDictationAudioUrls = async (
   logger.info(DICTATION, 'Generating TTS for each word...');
   const audioUrls: string[] = [];
   const projectDir = store.getProjectDir(ctx.pid);
+  const ttsOpts = ttsOptionsFor(ctx.config, ctx.client);
   const hostVoice = resolveVoices({
     profileVoices: ctx.profileVoices,
     lang: ctx.lang,
     profileId: ctx.profileId,
     flow: DICTATION,
+    model: ttsOpts.model,
   }).host;
-  const ttsOpts = { model: ctx.config.ttsModel, mistralClient: ctx.client } as const;
   // Un appel TTS à la fois, pour les mêmes raisons que buildQuizVocalAudioUrls.
   for (const [i, item] of data.entries()) {
     // eslint-disable-next-line no-await-in-loop -- un appel TTS à la fois, cf. buildQuizVocalAudioUrls
@@ -1200,6 +1204,7 @@ const buildAutoPodcast = async (ctx: AutoCtx): Promise<Generation> => {
     ctx.ageGroup,
     buildExclusionContext(ctx.generations, 'podcast'),
   );
+  const ttsOpts = ttsOptionsFor(ctx.config, ctx.client);
   const audioBuffer = await generateAudio(
     podcastResult.script,
     resolveVoices({
@@ -1207,8 +1212,9 @@ const buildAutoPodcast = async (ctx: AutoCtx): Promise<Generation> => {
       lang: ctx.lang,
       profileId: ctx.profileId,
       flow: 'podcast',
+      model: ttsOpts.model,
     }),
-    { model: ctx.config.ttsModel, mistralClient: ctx.client },
+    ttsOpts,
   );
   const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
   return {

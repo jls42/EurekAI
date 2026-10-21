@@ -244,6 +244,7 @@ const initSettingsState = () => ({
       podcast: '',
       translate: '',
       ocr: '',
+      stt: '',
       quizVerify: '',
       chat: '',
     },

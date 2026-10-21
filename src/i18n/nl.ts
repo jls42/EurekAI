@@ -206,6 +206,12 @@ export const nl: Record<string, string> = {
   'settings.perMChars': 'per M tekens',
   'settings.priceUnknown': 'prijs niet beschikbaar',
   'settings.ocrHint': 'OCR 3: voordelig. OCR 4: betere kwaliteit, 2× de kosten.',
+  'settings.stt': 'Transcriptie',
+  'settings.sttHint': 'Spraakinvoer en mondelinge antwoorden in de mondelinge quiz.',
+  'settings.ttsHint':
+    'Podcast, mondelinge quiz, dictee en voorlezen. TTS 3 (previewversie): eigen stemmen in meer talen, maar losse dicteewoorden worden minder goed uitgesproken.',
+  'settings.perMinute': 'per minuut',
+  'settings.preview': 'previewversie',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',

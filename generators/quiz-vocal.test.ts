@@ -4,7 +4,8 @@ vi.mock('./tts-provider.js', () => ({
   textToSpeech: vi.fn().mockResolvedValue(Buffer.from('question-audio')),
 }));
 
-import { ttsQuestion, transcribeAudio, verifyAnswer } from './quiz-vocal.js';
+// Transcription des réponses orales : generators/stt.ts, seul appel STT de l'app (stt.test.ts).
+import { ttsQuestion, verifyAnswer } from './quiz-vocal.js';
 import { textToSpeech } from './tts-provider.js';
 import type { TtsOptions } from './tts-provider.js';
 import type { QuizQuestion } from '../types.js';
@@ -82,27 +83,6 @@ describe('quiz-vocal', () => {
         'v',
         ttsOptions,
       );
-    });
-  });
-
-  describe('transcribeAudio', () => {
-    it('calls client.audio.transcriptions.complete and returns text', async () => {
-      const client = {
-        audio: {
-          transcriptions: {
-            complete: vi.fn().mockResolvedValue({ text: 'reponse A' }),
-          },
-        },
-      } as any;
-
-      const result = await transcribeAudio(client, Buffer.from('audio'), 'answer.mp3');
-
-      expect(client.audio.transcriptions.complete).toHaveBeenCalledWith({
-        model: 'voxtral-mini-latest',
-        file: { fileName: 'answer.mp3', content: expect.any(Uint8Array) },
-        language: 'fr',
-      });
-      expect(result).toBe('reponse A');
     });
   });
 

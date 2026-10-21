@@ -229,6 +229,12 @@ export const ar: Record<string, string> = {
   'settings.perMChars': 'لكل مليون حرف',
   'settings.priceUnknown': 'السعر غير متوفر',
   'settings.ocrHint': 'OCR 3: اقتصادي. OCR 4: جودة أفضل، التكلفة 2×.',
+  'settings.stt': 'تحويل الكلام إلى نص',
+  'settings.sttHint': 'الإدخال الصوتي والإجابات الشفهية في الاختبار الصوتي.',
+  'settings.ttsHint':
+    'البودكاست والاختبار الصوتي والإملاء والقراءة بصوت عالٍ. TTS 3 (نسخة تجريبية): أصوات أصلية بلغات أكثر، لكن نطقه للكلمات المفردة في الإملاء أقل دقة.',
+  'settings.perMinute': 'لكل دقيقة',
+  'settings.preview': 'نسخة تجريبية',
 
   'dashboard.subtitle': '\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0651\u0645',
   'dashboard.addFirstSources':

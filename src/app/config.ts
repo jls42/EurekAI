@@ -1,6 +1,8 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
 import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
+import { normalizeSttModel, STT_MODEL_LABELS, STT_PREVIEW_MODELS } from '@helpers/stt-models';
+import { normalizeTtsModel, TTS_MODEL_LABELS, TTS_PREVIEW_MODELS } from '@helpers/tts-models';
 import { modelPriceLabel as priceLabel } from './model-pricing';
 import type { AppContext } from './app-context';
 import type { AppConfig } from '../../types';
@@ -11,6 +13,7 @@ import { TTS_DEPENDENT_AGENTS } from '../../generators/auto-agents';
 interface ConfigDraft extends AppConfig {
   _mainModel?: string;
   _ocrModel?: string;
+  _sttModel?: string;
 }
 
 type VoiceRole = 'host' | 'guest';
@@ -54,6 +57,31 @@ const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
 const PROFILE_VOICE_DEFAULT_I18N = 'profile.voiceDefault';
 
+// Noms produit des modèles épinglés (OCR, transcription, synthèse vocale). Map : un id venu d'un
+// gabarit ne résout jamais un membre hérité d'Object.prototype.
+const MODEL_LABELS: ReadonlyMap<string, string> = new Map<string, string>([
+  ...Object.entries(OCR_MODEL_LABELS),
+  ...Object.entries(STT_MODEL_LABELS),
+  ...Object.entries(TTS_MODEL_LABELS),
+]);
+
+// Modèles en Public Preview chez Mistral : signalés « préversion » dans leur option.
+const PREVIEW_MODELS: ReadonlySet<string> = new Set<string>([
+  ...STT_PREVIEW_MODELS,
+  ...TTS_PREVIEW_MODELS,
+]);
+
+// Brouillon des Réglages depuis une config serveur : sélecteurs épinglés normalisés (un id hors
+// liste laisserait un <select> sans option choisie), champs `_…` propres au brouillon.
+const toDraft = (config: AppConfig): ConfigDraft => {
+  const draft = structuredClone(config) as ConfigDraft;
+  draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
+  draft._ocrModel = normalizeOcrModel(config.models?.ocr);
+  draft._sttModel = normalizeSttModel(config.models?.stt);
+  draft.ttsModel = normalizeTtsModel(config.ttsModel);
+  return draft;
+};
+
 // Rechargement des voix sans appel optionnel `f?.()` (Lizard ne mesurait plus les méthodes
 // suivantes) ni `.call(this)` (Sonar S6676) : la seule branche est ici.
 const reloadMistralVoices = (state: AppContext): Promise<void> => {
@@ -84,11 +112,7 @@ export function createConfig() {
         await reloadMistralVoices(this);
         if (configRes.ok) {
           const configBody: unknown = await configRes.json();
-          const config = configBody as AppConfig;
-          const draft = structuredClone(config) as ConfigDraft;
-          draft._mainModel = config.models?.summary || DEFAULT_MAIN_MODEL;
-          draft._ocrModel = normalizeOcrModel(config.models?.ocr);
-          this.configDraft = draft;
+          this.configDraft = toDraft(configBody as AppConfig);
         }
       } catch (e) {
         console.error('Failed to load config:', e);
@@ -169,12 +193,14 @@ export function createConfig() {
       return priceLabel(modelId, (k: string) => this.t(k));
     },
 
-    // Libellé d'option de dropdown : "<nom> — <tarif>". Pour OCR, <nom> = nom produit lisible
-    // (OCR 3 / OCR 4) via OCR_MODEL_LABELS ; sinon l'ID technique. L'ID réel reste affiché en
-    // italique sous le sélecteur OCR (cf. dialog-settings.html, x-text configDraft._ocrModel).
+    // Libellé d'option de dropdown : "<nom> — <tarif>", suivi de « préversion » pour un modèle en
+    // Public Preview. Pour OCR, transcription et synthèse, <nom> = nom produit lisible (MODEL_LABELS) ;
+    // sinon l'ID technique. L'ID réel reste affiché en italique sous ces sélecteurs
+    // (cf. dialog-settings.html, x-text configDraft._ocrModel / _sttModel / ttsModel).
     modelOptionLabel(this: AppContext, modelId: string): string {
-      const display = (OCR_MODEL_LABELS as Record<string, string>)[modelId] ?? modelId;
-      return `${display} — ${this.modelPriceLabel(modelId)}`;
+      const display = MODEL_LABELS.get(modelId) ?? modelId;
+      const label = `${display} — ${this.modelPriceLabel(modelId)}`;
+      return PREVIEW_MODELS.has(modelId) ? `${label} · ${this.t('settings.preview')}` : label;
     },
 
     async saveSettings(this: AppContext) {
@@ -190,13 +216,14 @@ export function createConfig() {
           quizVerify: mainModel,
           chat: mainModel,
           ocr: normalizeOcrModel(draft._ocrModel),
+          stt: normalizeSttModel(draft._sttModel),
         };
-        if (draft.ttsModel?.startsWith('eleven_')) {
-          draft.ttsModel = 'voxtral-mini-tts-latest';
-        }
+        // Id de TTS_MODELS seulement (le serveur rejette tout autre : `eleven_*`, alias `-latest`).
+        draft.ttsModel = normalizeTtsModel(draft.ttsModel);
         const payload = { ...draft } as ConfigDraft & Record<string, unknown>;
         delete payload._mainModel;
         delete payload._ocrModel;
+        delete payload._sttModel;
         delete payload.mistralVoices;
         delete payload.mistralVoicesSource;
         const res = await fetch('/api/config', {
@@ -207,11 +234,7 @@ export function createConfig() {
         if (res.ok) {
           // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
           const body: unknown = await res.json();
-          const saved = body as AppConfig;
-          const updated = structuredClone(saved) as ConfigDraft;
-          updated._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
-          updated._ocrModel = normalizeOcrModel(saved.models?.ocr);
-          this.configDraft = updated;
+          this.configDraft = toDraft(body as AppConfig);
           const statusRes = await fetch('/api/config/status');
           if (statusRes.ok) {
             const statusBody: unknown = await statusRes.json();
@@ -246,11 +269,7 @@ export function createConfig() {
         const res = await fetch('/api/config/reset', { method: 'POST' });
         if (res.ok) {
           const body: unknown = await res.json();
-          const saved = body as AppConfig;
-          const reset = structuredClone(saved) as ConfigDraft;
-          reset._mainModel = saved.models?.summary || DEFAULT_MAIN_MODEL;
-          reset._ocrModel = normalizeOcrModel(saved.models?.ocr);
-          this.configDraft = reset;
+          this.configDraft = toDraft(body as AppConfig);
           await reloadMistralVoices(this);
           this.showToast(this.t('toast.settingsReset'), 'success');
         } else {

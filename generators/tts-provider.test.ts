@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- Codacy lance ESLint sans resolution des types vitest (describe/it/expect typés error) : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect, vi } from 'vitest';
-import { textToSpeech, listVoices, type TtsOptions } from './tts-provider.js';
+import { textToSpeech, listVoices, ttsOptionsFor, type TtsOptions } from './tts-provider.js';
 import { asVoiceId } from '../helpers/voice-types.js';
+import { voiceSupportsTtsModel } from '../helpers/tts-models.js';
 import type { Mistral } from '@mistralai/mistralai';
 
 function makeMistralClient(overrides: Partial<Mistral> = {}): Mistral {
@@ -15,7 +17,7 @@ function makeMistralClient(overrides: Partial<Mistral> = {}): Mistral {
 
 describe('textToSpeech', () => {
   const ttsOptions: TtsOptions = {
-    model: 'voxtral-mini-tts-latest',
+    model: 'voxtral-mini-tts-2603',
     mistralClient: {} as Mistral,
   };
 
@@ -31,7 +33,26 @@ describe('textToSpeech', () => {
     expect(result.toString()).toBe('audio-bytes');
     expect(client.audio.speech.complete).toHaveBeenCalledWith({
       input: 'bonjour',
-      model: 'voxtral-mini-tts-latest',
+      model: 'voxtral-mini-tts-2603',
+      voiceId: asVoiceId('voice-1'),
+      responseFormat: 'mp3',
+    });
+  });
+
+  // Texte réellement lu (helpers/tts-text.ts) : Voxtral TTS prononce les marqueurs de sources et
+  // TTS 3 avale un mot entre crochets (balise d'instruction) : aucun crochet ne part au TTS.
+  it('envoie le texte lisible : marqueur [Source N] retiré, crochets ôtés, mot gardé', async () => {
+    const client = makeMistralClient();
+    vi.mocked(client.audio.speech.complete).mockResolvedValue({
+      audioData: Buffer.from('audio-bytes').toString('base64'),
+    } as Awaited<ReturnType<typeof client.audio.speech.complete>>);
+    await textToSpeech('Les volcans [Source 1] crachent [chat].', asVoiceId('voice-1'), {
+      ...ttsOptions,
+      mistralClient: client,
+    });
+    expect(client.audio.speech.complete).toHaveBeenCalledWith({
+      input: 'Les volcans crachent chat.',
+      model: 'voxtral-mini-tts-2603',
       voiceId: asVoiceId('voice-1'),
       responseFormat: 'mp3',
     });
@@ -46,9 +67,9 @@ describe('textToSpeech', () => {
       textToSpeech('bonjour', asVoiceId('voice-xyz'), {
         ...ttsOptions,
         mistralClient: client,
-        model: 'voxtral-v1',
+        model: 'voxtral-mini-tts-3-0',
       }),
-    ).rejects.toThrow('mistral_tts_empty_response (voiceId=voice-xyz, model=voxtral-v1)');
+    ).rejects.toThrow('mistral_tts_empty_response (voiceId=voice-xyz, model=voxtral-mini-tts-3-0)');
   });
 
   it("attache .stage='tts' sur l'Error (contrat producteur pour matcher stable)", async () => {
@@ -67,6 +88,29 @@ describe('textToSpeech', () => {
     }
     expect(caught).toBeInstanceOf(Error);
     expect(caught?.stage).toBe('tts');
+  });
+});
+
+// Options de TOUS les appels TTS des routes : modèle de la config normalisé au point d'appel (un
+// alias ou une valeur legacy restée dans config.json ne part jamais vers l'API).
+describe('ttsOptionsFor', () => {
+  const client = makeMistralClient();
+
+  it.each(['voxtral-mini-tts-2603', 'voxtral-mini-tts-3-0'])('garde le modèle épinglé %s', (m) => {
+    expect(ttsOptionsFor({ ttsModel: m }, client)).toEqual({ model: m, mistralClient: client });
+  });
+
+  it.each([
+    ['alias mouvant voxtral-mini-tts-latest', 'voxtral-mini-tts-latest'],
+    ['id ElevenLabs legacy', 'eleven_v3'],
+    ['valeur inconnue', 'voxtral-custom'],
+    ['champ absent', undefined],
+  ])('%s → défaut Voxtral TTS (2603)', (_label, ttsModel) => {
+    const config = { ttsModel } as { ttsModel: string };
+    expect(ttsOptionsFor(config, client)).toEqual({
+      model: 'voxtral-mini-tts-2603',
+      mistralClient: client,
+    });
   });
 });
 
@@ -114,5 +158,31 @@ describe('listVoices', () => {
     } as never);
     const result = await listVoices(client, 'en');
     expect(result.map((v) => v.id)).toEqual(['en-us-1', 'en-gb-1', 'multi-1']);
+  });
+
+  // Le SDK 2.7.0 retire `kind` (ivc/pvc) : `slug` et `userId` (camelCase côté SDK, `user_id` dans
+  // l'API) portent la compatibilité d'une voix avec les modèles speech v1.
+  it('lit slug et caractère personnel (userId non nul) de chaque voix', async () => {
+    const client = makeMistralClient();
+    vi.mocked(client.audio.voices.list).mockResolvedValue({
+      items: [
+        { ...voice('marie', ['fr_fr']), slug: 'fr_marie_neutral', userId: null },
+        { ...voice('pvc-es', ['es_es']), slug: 'voice_3141', userId: null },
+        { ...voice('ma-voix', ['fr_fr']), slug: null, userId: 'user-42' },
+        voice('sans-champs', ['en_us']),
+      ],
+      total: 4,
+    } as never);
+    const result = await listVoices(client);
+    expect(result.map(({ id, slug, custom }) => ({ id, slug, custom }))).toEqual([
+      { id: 'marie', slug: 'fr_marie_neutral', custom: false },
+      { id: 'pvc-es', slug: 'voice_3141', custom: false },
+      { id: 'ma-voix', slug: undefined, custom: true },
+      { id: 'sans-champs', slug: undefined, custom: false },
+    ]);
+    // Bout à bout : preset Voxtral 2 et voix personnelle acceptés par 2603, preset pvc et voix de
+    // forme inconnue écartés.
+    const accepted = result.filter((v) => voiceSupportsTtsModel(v, 'voxtral-mini-tts-2603'));
+    expect(accepted.map((v) => v.id)).toEqual(['marie', 'ma-voix']);
   });
 });

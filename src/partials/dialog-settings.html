@@ -130,18 +130,68 @@
           </p>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ocrHint')"></p>
         </div>
-        <div class="flex min-w-0 items-center gap-2 text-body-sm text-text-secondary">
-          <span class="shrink-0 whitespace-nowrap" x-text="t('settings.tts') + ' :'"></span>
-          <span
-            class="min-w-0 truncate font-mono text-xs px-2 py-0.5 rounded-button"
-            style="background: var(--color-input-bg); border: 1px solid var(--color-input-border)"
-            >voxtral-mini-tts-latest</span
+        <div>
+          <label
+            for="cfg-stt-model"
+            class="text-sm text-text-secondary block mb-1"
+            x-text="t('settings.stt')"
+            >Transcription</label
           >
-          <span
-            class="shrink-0 whitespace-nowrap text-xs"
-            x-text="modelPriceLabel('voxtral-mini-tts-latest')"
-            >$16</span
+          <select
+            id="cfg-stt-model"
+            x-model="configDraft._sttModel"
+            class="w-full input-modern px-3 py-2 text-body-sm"
           >
+            <option
+              value="voxtral-mini-2602"
+              x-text="modelOptionLabel('voxtral-mini-2602') + ' · ' + t('settings.recommended')"
+            >
+              Voxtral Mini Transcribe 2
+            </option>
+            <option
+              value="voxtral-mini-transcribe-3-0"
+              x-text="modelOptionLabel('voxtral-mini-transcribe-3-0')"
+            >
+              Voxtral Mini Transcribe 3
+            </option>
+            <option
+              value="voxtral-small-transcribe-3-0"
+              x-text="modelOptionLabel('voxtral-small-transcribe-3-0')"
+            >
+              Voxtral Small Transcribe 3
+            </option>
+          </select>
+          <p class="text-xs italic text-text-secondary mt-1" x-text="configDraft._sttModel">
+            voxtral-mini-2602
+          </p>
+          <p class="text-xs text-text-secondary mt-1" x-text="t('settings.sttHint')"></p>
+        </div>
+        <div>
+          <label
+            for="cfg-tts-model"
+            class="text-sm text-text-secondary block mb-1"
+            x-text="t('settings.tts')"
+            >TTS</label
+          >
+          <select
+            id="cfg-tts-model"
+            x-model="configDraft.ttsModel"
+            class="w-full input-modern px-3 py-2 text-body-sm"
+          >
+            <option
+              value="voxtral-mini-tts-2603"
+              x-text="modelOptionLabel('voxtral-mini-tts-2603') + ' · ' + t('settings.recommended')"
+            >
+              Voxtral TTS
+            </option>
+            <option value="voxtral-mini-tts-3-0" x-text="modelOptionLabel('voxtral-mini-tts-3-0')">
+              Voxtral TTS 3
+            </option>
+          </select>
+          <p class="text-xs italic text-text-secondary mt-1" x-text="configDraft.ttsModel">
+            voxtral-mini-tts-2603
+          </p>
+          <p class="text-xs text-text-secondary mt-1" x-text="t('settings.ttsHint')"></p>
         </div>
       </div>
     </div>

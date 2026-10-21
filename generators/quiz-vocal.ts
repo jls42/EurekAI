@@ -19,20 +19,6 @@ export async function ttsQuestion(
   return textToSpeech(text, voiceId, ttsOptions);
 }
 
-export async function transcribeAudio(
-  client: Mistral,
-  buffer: Buffer,
-  filename: string,
-  lang = 'fr',
-): Promise<string> {
-  const result = await client.audio.transcriptions.complete({
-    model: 'voxtral-mini-latest',
-    file: { fileName: filename, content: new Uint8Array(buffer) },
-    language: lang,
-  });
-  return result.text;
-}
-
 export interface VerifyAnswerOptions {
   model?: string;
   lang?: string;

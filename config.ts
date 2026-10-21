@@ -15,6 +15,14 @@ import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
 import { DEFAULT_OCR_MODEL, normalizeOcrModel } from './helpers/ocr-models.js';
+import { DEFAULT_STT_MODEL, normalizeSttModel } from './helpers/stt-models.js';
+import {
+  DEFAULT_TTS_MODEL,
+  isTtsModel,
+  normalizeTtsModel,
+  voiceSupportsTtsModel,
+  type TtsModel,
+} from './helpers/tts-models.js';
 
 const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
 
@@ -26,10 +34,11 @@ const DEFAULT_CONFIG: AppConfig = {
     podcast: MISTRAL_LARGE_LATEST,
     translate: MISTRAL_LARGE_LATEST,
     ocr: DEFAULT_OCR_MODEL,
+    stt: DEFAULT_STT_MODEL,
     quizVerify: MISTRAL_LARGE_LATEST,
     chat: MISTRAL_LARGE_LATEST,
   },
-  ttsModel: 'voxtral-mini-tts-latest',
+  ttsModel: DEFAULT_TTS_MODEL,
 };
 
 const DEFAULT_VOICES_FALLBACK: { host: VoiceId; guest: VoiceId } = {
@@ -151,17 +160,21 @@ const removeLegacyTtsFields = (): string[] => {
   return removed;
 };
 
-const resetLegacyTtsModel = (): boolean => {
-  if (!currentConfig.ttsModel?.startsWith('eleven_')) return false;
+// Fige `ttsModel` sur un id de TTS_MODELS : `eleven_*` (ElevenLabs retiré), l'alias mouvant
+// `voxtral-mini-tts-latest` (défaut jusqu'en v1.7.11, appelé à pointer sur Voxtral 3) ou une valeur
+// inconnue → défaut épinglé (cf. helpers/tts-models.ts).
+const normalizeLegacyTtsModel = (): boolean => {
   const prev = currentConfig.ttsModel;
-  currentConfig.ttsModel = DEFAULT_CONFIG.ttsModel;
-  logger.info('config', `migration: ttsModel '${prev}' -> '${DEFAULT_CONFIG.ttsModel}'`);
+  const normalized = normalizeTtsModel(prev);
+  if (prev === normalized) return false;
+  currentConfig.ttsModel = normalized;
+  logger.info('config', `migration: ttsModel '${prev}' -> '${normalized}'`);
   return true;
 };
 
 function migrateLegacyElevenLabsFields(): boolean {
   const removed = removeLegacyTtsFields();
-  const ttsModelReset = resetLegacyTtsModel();
+  const ttsModelReset = normalizeLegacyTtsModel();
   const changed = removed.length > 0 || ttsModelReset;
   if (changed) {
     logger.info(
@@ -202,6 +215,17 @@ const normalizeLegacyOcrModel = (): boolean => {
   if (current === normalized) return false;
   currentConfig.models.ocr = normalized;
   logger.info('config', `migration: ocr model '${current}' -> '${normalized}'`);
+  return true;
+};
+
+// Même régime pour `models.stt` (cf. helpers/stt-models.ts) : alias ou valeur inconnue → défaut
+// épinglé. Un config.json sans `stt` reçoit le défaut par mergeSafe, sans migration.
+const normalizeLegacySttModel = (): boolean => {
+  const current = currentConfig.models.stt;
+  const normalized = normalizeSttModel(current);
+  if (current === normalized) return false;
+  currentConfig.models.stt = normalized;
+  logger.info('config', `migration: stt model '${current}' -> '${normalized}'`);
   return true;
 };
 
@@ -276,10 +300,15 @@ export function initConfig(outputDir: string): void {
     currentConfig = { ...DEFAULT_CONFIG };
     lastLoadFailed = false;
   }
-  const migrated = migrateLegacyElevenLabsFields();
-  const globalVoicesRemoved = removeLegacyGlobalVoiceFields();
-  const ocrNormalized = normalizeLegacyOcrModel();
-  if (migrated || globalVoicesRemoved || ocrNormalized) {
+  // Tableau évalué en entier : chaque migration tourne, même si une précédente a déjà changé
+  // quelque chose (un `||` court-circuiterait les suivantes).
+  const changed = [
+    migrateLegacyElevenLabsFields(),
+    removeLegacyGlobalVoiceFields(),
+    normalizeLegacyOcrModel(),
+    normalizeLegacySttModel(),
+  ].some(Boolean);
+  if (changed) {
     try {
       persistConfig();
     } catch (e) {
@@ -298,39 +327,41 @@ export function resetConfig(): AppConfig {
   return currentConfig;
 }
 
-export function saveConfig(partial: Partial<AppConfig>): AppConfig {
-  if (partial.models) {
-    currentConfig.models = { ...currentConfig.models, ...partial.models };
-    // Rejection legacy/alias (symétrie avec ttsModel 'eleven_*' ci-dessous) : un client stale
-    // peut POSTer 'mistral-ocr-latest' (alias mouvant) ou une valeur inconnue entre 2 restarts.
-    // On normalise vers le défaut OcrModel explicite (OCR 4) plutôt que laisser fuir un alias mouvant.
-    const requestedOcr = currentConfig.models.ocr;
-    const normalizedOcr = normalizeOcrModel(requestedOcr);
-    if (requestedOcr !== normalizedOcr) {
-      logger.warn(
-        'config',
-        `rejected legacy/unknown OCR model '${requestedOcr}' at saveConfig, using '${normalizedOcr}'`,
-      );
-      currentConfig.models.ocr = normalizedOcr;
-    }
+type ModelNormalizer = (v: unknown) => string; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- param de type documentaire, faux positif Codacy (cf. CLAUDE.md « Codacy »)
+
+// Rejection legacy/alias d'un modèle épinglé (OCR, STT) : un client stale peut POSTer un alias
+// mouvant (`mistral-ocr-latest`, `voxtral-mini-latest`) ou une valeur inconnue entre 2 restarts.
+// On normalise vers le défaut explicite plutôt que laisser fuir un alias mouvant.
+const enforcePinnedModel = (field: 'ocr' | 'stt', label: string, normalize: ModelNormalizer) => {
+  const requested = currentConfig.models[field];
+  const normalized = normalize(requested);
+  if (requested === normalized) return;
+  logger.warn(
+    'config',
+    `rejected legacy/unknown ${label} model '${requested}' at saveConfig, using '${normalized}'`,
+  );
+  currentConfig.models[field] = normalized;
+};
+
+// Rejection legacy : une UI pré-PR ou un client automatisé peut encore POSTer un ttsModel
+// 'eleven_*', l'alias `voxtral-mini-tts-latest` ou un id hors TTS_MODELS entre le boot (qui a
+// normalisé via normalizeLegacyTtsModel) et le restart suivant. Ignore la valeur, préserve le choix
+// courant (déjà épinglé), jamais de reset vers DEFAULT.
+const applyTtsModel = (requested: string): void => {
+  if (isTtsModel(requested)) {
+    currentConfig.ttsModel = requested;
+    return;
   }
-  if (partial.ttsModel) {
-    // Rejection legacy : une UI pré-PR ou client automatisé peut encore POSTer un ttsModel
-    // 'eleven_*' entre le boot (qui a nettoyé via resetLegacyTtsModel) et le restart suivant.
-    // Ignore la valeur legacy, preserve le choix courant (déjà non-legacy).
-    if (partial.ttsModel.startsWith('eleven_')) {
-      logger.warn(
-        'config',
-        `rejected legacy ttsModel '${partial.ttsModel}' at saveConfig, keeping current value '${currentConfig.ttsModel}'`,
-      );
-    } else {
-      currentConfig.ttsModel = partial.ttsModel;
-    }
-  }
-  // Même discipline que ttsModel 'eleven_*' pour les champs voix globales retirés de
-  // AppConfig. Ces champs ne sont plus typés dans Partial<AppConfig>, donc ignorés
-  // silencieusement par saveConfig (branches ci-dessus n'y touchent pas) — mais une
-  // UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilité.
+  logger.warn(
+    'config',
+    `rejected legacy/unknown ttsModel '${requested}' at saveConfig, keeping current value '${currentConfig.ttsModel}'`,
+  );
+};
+
+// Même discipline que ttsModel pour les champs voix globales retirés de AppConfig. Ces champs ne
+// sont plus typés dans Partial<AppConfig>, donc ignorés silencieusement par saveConfig — mais une
+// UI stale ou un client externe peut encore les POSTer. On log.warn pour observabilité.
+const warnLegacyVoiceFields = (partial: Partial<AppConfig>): void => {
   const legacy = partial as Partial<LegacyRuntimeConfig>;
   if (legacy.mistralVoices !== undefined) {
     logger.warn('config', "rejected legacy field 'mistralVoices' at saveConfig (cleaned at boot)");
@@ -341,6 +372,16 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
       "rejected legacy field 'mistralVoicesSource' at saveConfig (cleaned at boot)",
     );
   }
+};
+
+export function saveConfig(partial: Partial<AppConfig>): AppConfig {
+  if (partial.models) {
+    currentConfig.models = { ...currentConfig.models, ...partial.models };
+    enforcePinnedModel('ocr', 'OCR', normalizeOcrModel);
+    enforcePinnedModel('stt', 'STT', normalizeSttModel);
+  }
+  if (partial.ttsModel) applyTtsModel(partial.ttsModel);
+  warnLegacyVoiceFields(partial);
   persistConfig();
   return currentConfig;
 }
@@ -397,9 +438,12 @@ const resolveMistralDefaults = (
   lang: string,
   profileId: string | undefined,
   flow: VoiceFlow,
+  model: TtsModel,
 ): { host: VoiceId; guest: VoiceId } | null => {
+  // Le cache garde tout le catalogue ; seules les voix que le modèle accepte sont candidates
+  // (un modèle speech v1 refuse les voix pvc en 400, cf. helpers/tts-models.ts).
   const result = selectVoices({
-    voices: voiceCache,
+    voices: voiceCache.filter((v) => voiceSupportsTtsModel(v, model)),
     lang,
     profileId,
   });
@@ -432,12 +476,34 @@ export interface ResolveVoicesArgs {
   // alors que selectVoices attend `?: string`. Le typechecker garde le champ obligatoire.
   profileId: string | undefined;
   flow: VoiceFlow;
+  // Modèle TTS de l'appel (`ttsOptionsFor(...).model`) : filtre les voix candidates ET l'override.
+  model: TtsModel;
 }
 
+// Override du profil que le modèle refuse (voix pvc choisie, puis modèle speech v1 sélectionné) :
+// ignoré avec un warn, la sélection dynamique prend le relais. Voix absente du cache (catalogue pas
+// encore chargé, voix supprimée) : gardée telle quelle, faute de pouvoir en juger.
+const usableOverride = (
+  id: VoiceId | undefined,
+  model: TtsModel,
+  flow: VoiceFlow,
+): VoiceId | undefined => {
+  if (!id) return undefined;
+  const voice = voiceCache.find((v) => v.id === id);
+  if (!voice || voiceSupportsTtsModel(voice, model)) return id;
+  logger.warn(
+    VOICE_SELECTION_LOG,
+    `profile voice ${id} not supported by ${model} (flow=${flow}), using dynamic selection`,
+  );
+  return undefined;
+};
+
 export function resolveVoices(opts: ResolveVoicesArgs): { host: VoiceId; guest: VoiceId } {
-  const dynamic = resolveMistralDefaults(opts.lang, opts.profileId, opts.flow);
+  const dynamic = resolveMistralDefaults(opts.lang, opts.profileId, opts.flow, opts.model);
+  const host = usableOverride(opts.profileVoices?.host, opts.model, opts.flow);
+  const guest = usableOverride(opts.profileVoices?.guest, opts.model, opts.flow);
   return {
-    host: opts.profileVoices?.host || dynamic?.host || DEFAULT_VOICES_FALLBACK.host,
-    guest: opts.profileVoices?.guest || dynamic?.guest || DEFAULT_VOICES_FALLBACK.guest,
+    host: host || dynamic?.host || DEFAULT_VOICES_FALLBACK.host,
+    guest: guest || dynamic?.guest || DEFAULT_VOICES_FALLBACK.guest,
   };
 }

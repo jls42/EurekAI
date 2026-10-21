@@ -16,7 +16,7 @@
  */
 import { pathToFileURL } from 'node:url';
 import { lightpanda } from '@lightpanda/browser';
-import { PRICING_SOURCES, MODEL_PRICING } from '../helpers/pricing.js';
+import { PRICING_SOURCES, MODEL_PRICING, usdPerMinute } from '../helpers/pricing.js';
 
 async function renderMarkdown(url: string): Promise<string> {
   const r = await lightpanda.fetch(url, { dump: true, dumpOptions: { type: 'markdown' } });
@@ -79,7 +79,9 @@ export function extractPriceSnippets(markdown: string, anchor?: RegExp): string[
 export function formatCurrent(prefix: string): string {
   const c = MODEL_PRICING[prefix];
   if (!c) return 'NOT CONFIGURED';
-  return `${c.unit}: in=$${c.inputPerMillion}/M, out=$${c.outputPerMillion}/M`;
+  const line = `${c.unit}: in=$${c.inputPerMillion}/M, out=$${c.outputPerMillion}/M`;
+  // Les fiches STT affichent un prix par minute : le montrer à côté pour la comparaison.
+  return c.unit === 'audio-seconds' ? `${line} (= $${usdPerMinute(c).toFixed(4)}/min)` : line;
 }
 
 // Page tarifs API (forme canonique avec `/` final : sans lui, 301 ; `/pricing/#api` affiche désormais

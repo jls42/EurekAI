@@ -39,6 +39,7 @@ import { activeModerationCategories, moderationProfileOf } from '../helpers/mode
 import { selectChatSources } from '../helpers/chat-sources.js';
 import { screenUserText, type TextScreening } from '../helpers/input-moderation.js';
 import { transcribeAudio } from '../generators/stt.js';
+import { normalizeSttModel } from '../helpers/stt-models.js';
 import { webSearchEnrich } from '../generators/websearch.js';
 import { detectConsigne, type ConsigneResult } from '../generators/consigne.js';
 import { getMarkdown } from './generate.js';
@@ -654,7 +655,13 @@ const runSttPipeline = async (
   res: Response,
 ): Promise<SttPipelineResult | null> => {
   const { result: sttResult, usage } = await runWithUsageTracking(() =>
-    transcribeAudio(client, file.buffer, file.originalname || 'audio.webm', lang),
+    transcribeAudio(
+      client,
+      file.buffer,
+      file.originalname || 'audio.webm',
+      lang,
+      normalizeSttModel(getConfig().models.stt),
+    ),
   );
   const persisted = persistUsage(store, pid, `POST /api/projects/${pid}/sources/voice`, usage);
   const { text, elapsed } = sttResult;

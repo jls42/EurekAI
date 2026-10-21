@@ -212,6 +212,12 @@ export const fr: Record<string, string> = {
   'settings.perMChars': 'par M caractères',
   'settings.priceUnknown': 'tarif indisponible',
   'settings.ocrHint': 'OCR 3 : économique. OCR 4 : meilleure qualité, coût 2×.',
+  'settings.stt': 'Transcription',
+  'settings.sttHint': 'Entrée vocale et réponses orales du quiz vocal.',
+  'settings.ttsHint':
+    'Podcast, quiz vocal, dictée et lecture à voix haute. TTS 3 (préversion) : voix natives dans plus de langues, mais mots isolés de la dictée moins bien prononcés.',
+  'settings.perMinute': 'par minute',
+  'settings.preview': 'préversion',
 
   // Dashboard
   'dashboard.subtitle': 'Tableau de bord',

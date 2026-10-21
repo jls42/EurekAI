@@ -200,6 +200,12 @@ export const en: Record<string, string> = {
   'settings.perMChars': 'per M chars',
   'settings.priceUnknown': 'price unavailable',
   'settings.ocrHint': 'OCR 3: economical. OCR 4: better quality, 2× cost.',
+  'settings.stt': 'Transcription',
+  'settings.sttHint': 'Voice input and spoken answers in the vocal quiz.',
+  'settings.ttsHint':
+    'Podcast, vocal quiz, dictation and read-aloud. TTS 3 (preview): native voices in more languages, but isolated dictation words are pronounced less reliably.',
+  'settings.perMinute': 'per minute',
+  'settings.preview': 'preview',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Add your first sources',

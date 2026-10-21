@@ -305,6 +305,7 @@ describe('createState', () => {
       podcast: '',
       translate: '',
       ocr: '',
+      stt: '',
       quizVerify: '',
       chat: '',
     });

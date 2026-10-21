@@ -28,8 +28,10 @@ import type {
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
-import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
-import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
+import { verifyAnswer } from '../generators/quiz-vocal.js';
+import { transcribeAudio } from '../generators/stt.js';
+import { normalizeSttModel } from '../helpers/stt-models.js';
+import { textToSpeech, ttsOptionsFor, type TtsOptions } from '../generators/tts-provider.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { diffDictation } from '../helpers/dictation-diff.js';
@@ -148,7 +150,13 @@ const screenTranscription = async (
  */
 const runVocalAnswer = async (input: VocalAnswerInput): Promise<VocalAnswerOutcome> => {
   const { client, question, lang, ageGroup } = input;
-  const transcription = await transcribeAudio(client, input.audio, 'answer.webm', lang);
+  const { text: transcription } = await transcribeAudio(
+    client,
+    input.audio,
+    'answer.webm',
+    lang,
+    normalizeSttModel(getConfig().models.stt),
+  );
   const refusal = await screenTranscription(input, transcription);
   if (refusal) return refusal;
   const { correct, feedback } = await verifyAnswer(
@@ -422,16 +430,14 @@ function resolveReadAloudContext(
   const profile = profileId ? profileStore.get(profileId) : null;
   // Passe profileId + flow='read-aloud' pour que la rotation déterministe par profil
   // s'applique aussi ici et que les logs de fallback soient contextualisés.
+  const ttsOpts = ttsOptionsFor(config, client);
   const voices = resolveVoices({
     profileVoices: profile?.mistralVoices,
     lang: lang || profile?.locale || 'fr',
     profileId,
     flow: 'read-aloud',
+    model: ttsOpts.model,
   });
-  const ttsOpts = {
-    model: config.ttsModel,
-    mistralClient: client,
-  } as const;
   return {
     config,
     profile,
