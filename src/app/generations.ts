@@ -3,6 +3,17 @@ import type { Generation } from '../../types';
 
 export function createGenerations() {
   return {
+    // Lecture à voix haute des flashcards à jouer : celle que cet onglet vient de produire
+    // (`_audioUrl_all`, posée par applyVoiceResult), sinon celle enregistrée dans la génération
+    // (`audioUrl`, relue avec le projet) — jouée telle quelle, sans nouvel appel facturé. Lue à
+    // chaque rendu, jamais recopiée à l'affichage : une génération remplacée par sa version du
+    // serveur (réconciliation) garde son audio.
+    flashcardsAudioUrl(gen: Generation): string | undefined {
+      const fresh = (gen as { _audioUrl_all?: unknown })._audioUrl_all;
+      if (typeof fresh === 'string' && fresh) return fresh;
+      return gen.type === 'flashcards' ? gen.audioUrl : undefined;
+    },
+
     startEditTitle(this: AppContext, gen: Generation) {
       this.editingTitle = gen.id;
       this.editTitleValue = gen.title;

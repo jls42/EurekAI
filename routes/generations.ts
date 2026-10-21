@@ -36,7 +36,11 @@ import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { diffDictation } from '../helpers/dictation-diff.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
-import { cleanupDeletedGeneration, readAloudPrefix } from '../helpers/generation-media.js';
+import {
+  cleanupDeletedGeneration,
+  deleteMediaFiles,
+  readAloudPrefix,
+} from '../helpers/generation-media.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
@@ -753,7 +757,27 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     });
   }
 
-  // Sous-helper : pipeline dual-voice flashcards.
+  // Enregistre la lecture des flashcards dans leur génération (`audioUrl`, déclaré dans
+  // generationMediaUrls) : relue avec le projet, elle se rejoue sans nouvel appel facturé
+  // (changement de cours, de profil, rechargement). La génération est relue APRÈS la synthèse
+  // (`ctx.gen` date d'avant les N×2 appels TTS) ; relecture et écriture synchrones, aucune autre
+  // requête ne s'intercale. Le MP3 remplacé, s'il y en a un, est supprimé après l'écriture : son
+  // nom est unique, aucune autre génération ne le référence (un autre onglet ouvert sur le cours
+  // garde l'ancienne URL jusqu'à son rechargement). Génération supprimée pendant la synthèse : le
+  // balayage de sa suppression est déjà passé, le MP3 neuf est supprimé aussitôt → false.
+  const saveFlashcardsAudioUrl = (ctx: ReadAloudCtx, audioUrl: string): boolean => {
+    const current = store.getGeneration(ctx.pid, ctx.gid);
+    if (current?.type !== 'flashcards') {
+      deleteMediaFiles(ctx.projectDir, ctx.pid, [audioUrl]);
+      return false;
+    }
+    store.updateGeneration(ctx.pid, ctx.gid, { audioUrl });
+    deleteMediaFiles(ctx.projectDir, ctx.pid, [current.audioUrl]);
+    return true;
+  };
+
+  // Sous-helper : pipeline dual-voice flashcards. Coût persisté quelle que soit l'issue ; 404 si
+  // la génération a disparu pendant la synthèse.
   async function runFlashcardsReadAloud(ctx: ReadAloudCtx, res: Response): Promise<void> {
     const cards = ctx.gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
     const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
@@ -766,6 +790,10 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       fcUsage,
     );
     const audioUrl = saveAudioFile(audioBuffer, ctx.projectDir, ctx.pid, `${ctx.audioPrefix}all`);
+    if (!saveFlashcardsAudioUrl(ctx, audioUrl)) {
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
+      return;
+    }
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
   }
 

@@ -714,17 +714,22 @@ describe('DELETE /:pid/generations/:gid', () => {
       expect(existsSync(join(projectDir(), 'podcast-1700000000000.mp3'))).toBe(true);
     });
 
-    it('balaie la lecture à voix haute des flashcards (jamais référencée par la génération)', async () => {
+    it('supprime la lecture à voix haute des flashcards enregistrée, et celles écrites avant', async () => {
+      // Lecture d'avant son enregistrement dans la génération : retrouvée par le balayage.
+      writeMedia('read-aloud-fc-gen-1-all-1-aaaaaaaa.mp3');
       const readAloud = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
       const readRes = mockRes();
       await readAloud(mockReq({ params: { pid, gid: flashcardsGid }, body: {} }), readRes);
       const { audioUrl } = readRes.json.mock.calls[0][0];
       const name = audioUrl.split('/').pop();
       expect(existsSync(join(projectDir(), name))).toBe(true);
+      expect((store.getGeneration(pid, flashcardsGid) as FlashcardsGeneration).audioUrl).toBe(
+        audioUrl,
+      );
 
       deleteGen(flashcardsGid);
 
-      expect(existsSync(join(projectDir(), name))).toBe(false);
+      expect(readdirSync(projectDir()).filter((f) => f.startsWith('read-aloud-'))).toEqual([]);
     });
 
     it('supprime les sections lues à voix haute du summary', async () => {
@@ -1418,16 +1423,74 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(result.audioUrl).toContain('-intro');
   });
 
-  it('ne met pas a jour la generation flashcards avec audioUrl', async () => {
-    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
-    const req = mockReq({ params: { pid, gid: flashcardsGid }, body: {} });
-    const res = mockRes();
+  describe('flashcards : lecture enregistrée dans la génération', () => {
+    const TTS_USAGE = { model: 'voxtral-mini-tts-2603', inputCharacters: 1000 };
+    const projectDir = () => join(tempDir, 'projects', pid);
+    const fileOf = (url: string) => join(projectDir(), url.split('/').pop()!);
+    const readAloudFiles = () =>
+      readdirSync(projectDir()).filter((f) => f.startsWith('read-aloud-'));
+    const readFlashcards = async () => {
+      const res = mockRes();
+      await getHandler(
+        router,
+        'post',
+        '/:pid/generations/:gid/read-aloud',
+      )(mockReq({ params: { pid, gid: flashcardsGid }, body: { lang: 'fr' } }), res);
+      return res;
+    };
 
-    await handler(req, res);
+    it('URL du MP3 enregistrée au niveau de la génération (relue avec le projet), coût inchangé', async () => {
+      const { textToSpeech } = await import('../generators/tts-provider.js');
+      vi.mocked(textToSpeech).mockImplementationOnce(async () => {
+        recordUsage(TTS_USAGE);
+        return Buffer.from('fake-audio');
+      });
 
-    // Flashcards generation should NOT be updated (only summary gets audioUrl persisted)
-    const gen = store.getGeneration(pid, flashcardsGid) as FlashcardsGeneration;
-    expect((gen.data as any).audioUrl).toBeUndefined();
+      const res = await readFlashcards();
+
+      const { audioUrl, costDelta } = res.json.mock.calls[0][0];
+      // Relue depuis project.json, comme GET /projects/:pid : hors de `data` (un tableau, dont une
+      // propriété nommée ne survivrait pas à la sérialisation), les cartes intactes.
+      const project = store.getProject(pid)!;
+      const gen = project.results.generations.find((g) => g.id === flashcardsGid);
+      expect((gen as FlashcardsGeneration).audioUrl).toBe(audioUrl);
+      expect(gen!.data).toHaveLength(2);
+      expect(existsSync(fileOf(audioUrl))).toBe(true);
+      expect(project.costLog?.map((e) => e.route)).toEqual([
+        `POST /api/projects/${pid}/read-aloud/flashcards`,
+      ]);
+      expect(costDelta).toBe(project.costLog![0].cost);
+    });
+
+    it('une nouvelle lecture remplace la précédente : URL mise à jour, ancien MP3 supprimé', async () => {
+      const first = (await readFlashcards()).json.mock.calls[0][0].audioUrl;
+      const second = (await readFlashcards()).json.mock.calls[0][0].audioUrl;
+
+      expect(second).not.toBe(first);
+      expect((store.getGeneration(pid, flashcardsGid) as FlashcardsGeneration).audioUrl).toBe(
+        second,
+      );
+      expect(existsSync(fileOf(first))).toBe(false);
+      expect(readAloudFiles()).toEqual([second.split('/').pop()]);
+    });
+
+    it('génération supprimée pendant la synthèse : 404, MP3 neuf supprimé, coût persisté', async () => {
+      const { textToSpeech } = await import('../generators/tts-provider.js');
+      vi.mocked(textToSpeech).mockImplementationOnce(async () => {
+        recordUsage(TTS_USAGE);
+        store.deleteGeneration(pid, flashcardsGid);
+        return Buffer.from('fake-audio');
+      });
+
+      const res = await readFlashcards();
+
+      expect(res.status).toHaveBeenCalledWith(404);
+      expect(res.json).toHaveBeenCalledWith({ error: 'generation_not_found' });
+      expect(readAloudFiles()).toEqual([]);
+      expect(store.getProject(pid)!.costLog?.map((e) => e.route)).toEqual([
+        `POST /api/projects/${pid}/read-aloud/flashcards`,
+      ]);
+    });
   });
 
   it('passe les bons parametres TTS (provider, model, voice)', async () => {

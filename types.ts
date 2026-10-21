@@ -134,6 +134,11 @@ export interface FlashcardsGeneration extends GenerationMeta {
   type: 'flashcards';
   data: Flashcard[];
   dataEN?: Flashcard[];
+  /** MP3 de la lecture à voix haute (toutes les cartes, question puis réponse), écrit par
+   * POST …/read-aloud et rejoué sans nouvel appel. Au niveau de la génération, pas dans `data` :
+   * une propriété posée sur un tableau disparaît à la sérialisation JSON. Absent tant que la
+   * lecture n'a pas été demandée (et sur les générations lues avant son enregistrement). */
+  audioUrl?: string;
 }
 
 export interface QuizGeneration extends GenerationMeta {
