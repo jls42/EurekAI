@@ -393,6 +393,41 @@ export async function runAutoStep(
   }
 }
 
+// Étapes d'un Auto envoyées en même temps, au plus. Le serveur parle HTTP/1.1 : le navigateur
+// n'ouvre que 6 connexions par hôte, et le flux SSE du cours ouvert en garde une. Les 8 étapes
+// lancées ensemble prenaient tout le reste : depuis qu'un Auto continue quand on change de cours,
+// le chargement du cours choisi attendait 10 à 15 s (mesuré au release-test du 2026-10-21,
+// PerformanceResourceTiming). SSE + 4 étapes = 5 connexions : il en reste une pour la navigation et
+// les appels courts. Les étapes suivantes partent dès qu'une se termine.
+const MAX_PARALLEL_AUTO_STEPS = 4;
+
+// File des étapes d'un Auto et bilan, partagés par ses voies (runAutoStepLane).
+type AutoStepPool = {
+  queue: string[];
+  allowedUrls: string[];
+  failures: number;
+  codes: FailedStepCode[];
+};
+
+// Une voie : prend l'étape suivante de la file dès que la sienne est terminée, jusqu'à ce que la
+// file soit vide ou l'Auto annulé (contrôleur aborté : les étapes encore en file ne partent plus,
+// ni échec ni code, comme une étape abortée). Récursive : une étape à la fois par voie.
+const runAutoStepLane = async (
+  state: AppContext,
+  launch: AutoLaunch,
+  pool: AutoStepPool,
+): Promise<void> => {
+  if (launch.controller.signal.aborted) return;
+  const type = pool.queue.shift();
+  if (type === undefined) return;
+  const result = await runAutoStep(state, launch, type, pool.allowedUrls);
+  if (typeof result === 'object' && result.kind === 'failed') {
+    pool.failures++;
+    pool.codes.push(result.code);
+  }
+  await runAutoStepLane(state, launch, pool);
+};
+
 export async function runAutoSteps(
   state: AppContext,
   launch: AutoLaunch,
@@ -402,17 +437,10 @@ export async function runAutoSteps(
   const allowedUrls = AUTO_AGENT_TYPES.map(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
-  let failures = 0;
-  const codes: FailedStepCode[] = [];
-  const promises = plannedTypes.map(async (type) => {
-    const result = await runAutoStep(state, launch, type, allowedUrls);
-    if (typeof result === 'object' && result.kind === 'failed') {
-      failures++;
-      codes.push(result.code);
-    }
-  });
-  await Promise.all(promises);
-  return { failures, codes };
+  const pool: AutoStepPool = { queue: [...plannedTypes], allowedUrls, failures: 0, codes: [] };
+  const lanes = Math.min(MAX_PARALLEL_AUTO_STEPS, plannedTypes.length);
+  await Promise.all(Array.from({ length: lanes }, () => runAutoStepLane(state, launch, pool)));
+  return { failures: pool.failures, codes: pool.codes };
 }
 
 // Sélection priorisée du toast partial-fail : un code actionnable utilisateur

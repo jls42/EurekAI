@@ -1513,6 +1513,14 @@ describe('generateAuto — per-type progress', () => {
   });
 });
 
+// Réponse qui n'arrive jamais, rejetée en AbortError quand son signal est aborté (vrai fetch).
+const pendingUntilAbort = (_url: unknown, init?: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => {
+      reject(new DOMException('Aborted', 'AbortError'));
+    });
+  });
+
 // Règle du propriétaire (2026-10-21) : « on lance un truc, ça continue même si on change de page ».
 // Jusqu'en v1.7.11, resetSession (changement de cours ou de profil) abortait l'analyse Auto en vol :
 // le serveur la facturait et aucune étape ne partait.
@@ -1527,13 +1535,6 @@ describe('generateAuto — continue vers son cours quand on change de cours ou d
     ctx.currentProjectId = projectId;
     session.resetSession.call(ctx);
   };
-  // Réponse qui n'arrive jamais, rejetée en AbortError quand son signal est aborté (vrai fetch).
-  const pendingUntilAbort = (_url: unknown, init?: RequestInit) =>
-    new Promise<Response>((_resolve, reject) => {
-      init?.signal?.addEventListener('abort', () => {
-        reject(new DOMException('Aborted', 'AbortError'));
-      });
-    });
   const plan = (...agents: string[]) => ({ plan: agents.map((agent) => ({ agent })) });
 
   it('cours changé pendant l’analyse : rien n’est annulé, étapes vers le cours d’origine avec le corps et la clé du clic, toast final qui le nomme', async () => {
@@ -1713,6 +1714,117 @@ describe('generateAuto — continue vers son cours quand on change de cours ou d
     expect(urls()).toEqual(['/api/projects/pid-1/generate/route']);
     expect(ctx.showToast).not.toHaveBeenCalled();
     expect(ctx.autoRuns).toEqual({});
+  });
+});
+
+// Serveur en HTTP/1.1 : le navigateur n'ouvre que 6 connexions par hôte, dont une pour le flux SSE.
+// Les 8 étapes d'un Auto, lancées ensemble, faisaient attendre l'ouverture d'un autre cours 10 à
+// 15 s (release-test du 2026-10-21) : au plus 4 à la fois, les suivantes dès qu'une se termine.
+describe('generateAuto — au plus 4 étapes en même temps', () => {
+  const confirm = createConfirm();
+  const allAgents = [
+    'summary',
+    'flashcards',
+    'quiz',
+    'fill-blank',
+    'podcast',
+    'quiz-vocal',
+    'image',
+    'dictation',
+  ];
+  const isRoute = (url: unknown) => String(url).endsWith('/generate/route');
+  const routeReply = () =>
+    ({ ok: true, json: async () => ({ plan: allAgents.map((agent) => ({ agent })) }) }) as any;
+  const stepUrls = () =>
+    vi
+      .mocked(globalThis.fetch)
+      .mock.calls.map((c) => String(c[0]))
+      .filter((url) => !isRoute(url));
+  const nextMacrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it('8 étapes : jamais plus de 4 requêtes à la fois, chaque fin en libère une, toutes partent dans l’ordre', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const finishers: Array<() => void> = [];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (isRoute(url)) return routeReply();
+      inFlight++;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise<void>((resolve) => finishers.push(resolve));
+      inFlight--;
+      const type = String(url).split('/generate/')[1];
+      return { ok: true, json: async () => ({ id: 'g-' + type, type }) } as any;
+    });
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(4));
+    await nextMacrotask();
+    expect(stepUrls()).toHaveLength(4); // les 4 suivantes attendent qu'une étape se termine
+    for (let started = 5; started <= allAgents.length; started++) {
+      finishers.shift()!();
+      await vi.waitFor(() => expect(stepUrls()).toHaveLength(started));
+    }
+    for (const finish of finishers.splice(0)) finish();
+    await run;
+
+    expect(maxInFlight).toBe(4);
+    expect(stepUrls()).toEqual(allAgents.map((type) => '/api/projects/pid-1/generate/' + type));
+    expect(ctx.generations).toHaveLength(allAgents.length);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.magicDone',
+      'success',
+      null,
+      expect.objectContaining({ label: 'toast.view' }),
+    );
+  });
+
+  it('annulation (« Tout annuler ») : les 4 étapes en vol sont abortées, celles en file ne partent pas', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const signals: AbortSignal[] = [];
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
+      if (isRoute(url)) return routeReply();
+      if (init?.signal) signals.push(init.signal);
+      return pendingUntilAbort(url, init);
+    });
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(4));
+    confirm.cancelGeneration.call(ctx);
+    await run;
+
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, true, true, true]);
+    expect(stepUrls()).toEqual(
+      allAgents.slice(0, 4).map((type) => '/api/projects/pid-1/generate/' + type),
+    );
+    expect(ctx.generations).toEqual([]);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+  });
+
+  it('moins de 4 étapes : toutes partent ensemble, sans attendre', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
+      if (isRoute(url)) {
+        return {
+          ok: true,
+          json: async () => ({ plan: [{ agent: 'summary' }, { agent: 'quiz' }] }),
+        } as any;
+      }
+      return pendingUntilAbort(url, init);
+    });
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(2));
+    ctx.autoRuns['pid-1'].controller.abort();
+    await run;
+
+    expect(stepUrls()).toEqual([
+      '/api/projects/pid-1/generate/summary',
+      '/api/projects/pid-1/generate/quiz',
+    ]);
   });
 });
 

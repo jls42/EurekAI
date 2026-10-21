@@ -195,6 +195,30 @@ describe('resetSession', () => {
     expect(ctx.chatLoading).toBe(false);
     expect(ctx.consigneLoading).toBe(false);
   });
+
+  // Un message qui attend la réponse du tuteur continue vers son cours : au retour sur ce cours,
+  // applyProjectSnapshot rétablit chatLoading depuis ce registre (chat-in-flight.ts).
+  it('garde le registre des messages du chat en attente de réponse (chatInFlight)', () => {
+    const ctx = makeCtx({ chatLoading: true, chatInFlight: { 'pid-1': true } });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.chatLoading).toBe(false);
+    expect(ctx.chatInFlight).toEqual({ 'pid-1': true });
+  });
+
+  // Autre cours choisi, autre profil ou cours supprimé pendant l'ouverture d'un cours : son snapshot
+  // n'est plus attendu, sa requête est abortée (elle quitte la file du navigateur).
+  it('abandonne l’ouverture d’un cours encore en cours (requête abortée, chargement terminé)', () => {
+    const load = new AbortController();
+    const ctx = makeCtx({ projectLoading: true, projectLoadController: load });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(load.signal.aborted).toBe(true);
+    expect(ctx.projectLoadController).toBeNull();
+    expect(ctx.projectLoading).toBe(false);
+  });
 });
 
 // Régression-lock invariant CLAUDE.md "Pending generations & notifications" :

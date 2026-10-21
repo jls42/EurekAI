@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createProjects } from './projects';
+import { createSession } from './session';
 
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
 
@@ -44,6 +45,10 @@ function makeContext(overrides: any = {}) {
     consigne: null,
     chatMessages: [],
     chatInput: '',
+    chatLoading: false,
+    chatInFlight: {} as Record<string, true>,
+    projectLoading: false,
+    projectLoadController: null as AbortController | null,
     uploadSessions: [] as any[],
     autoRuns: {} as Record<string, any>,
     loading: {} as Record<string, boolean>,
@@ -58,6 +63,7 @@ function makeContext(overrides: any = {}) {
     resetSession: vi.fn(),
     resetState: proj.resetState,
     selectProject: proj.selectProject,
+    currentProjectName: proj.currentProjectName,
     sortedProjects: proj.sortedProjects,
     loadProjects: proj.loadProjects,
     createProject: proj.createProject,
@@ -354,14 +360,18 @@ describe('selectProject', () => {
     mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
     const ctx = makeContext({ currentProfile: { id: 'profil 1&x', ageGroup: 'enfant' } });
     await proj.selectProject.call(ctx, 'p1');
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1?profileId=profil%201%26x');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1?profileId=profil%201%26x', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('sans profil courant : ouverture sans profileId', async () => {
     mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
     const ctx = makeContext({ currentProfile: null });
     await proj.selectProject.call(ctx, 'p1');
-    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1');
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/projects/p1', {
+      signal: expect.any(AbortSignal),
+    });
   });
 
   it('sets activeView to sources when no sources', async () => {
@@ -383,7 +393,178 @@ describe('selectProject', () => {
       'error',
       expect.any(Function),
     );
+    // Chargement terminé : la liste des cours revient, sans indicateur resté affiché.
+    expect(ctx.projectLoading).toBe(false);
+    expect(ctx.projectLoadController).toBeNull();
     warnSpy.mockRestore();
+  });
+
+  // Mesuré au release-test du 2026-10-21 : pendant qu'un Auto occupait les connexions, le snapshot
+  // du cours choisi arrivait 10 à 15 s après le clic ; l'écran montrait l'en-tête de l'AUTRE cours
+  // et « Ajoute tes premières sources » avec 0 source (un enfant pouvait croire ses sources perdues).
+  describe('ouverture d’un cours : le cours choisi et un chargement, dès le clic', () => {
+    const projects = [
+      { id: 'p0', name: 'Ancien cours' },
+      { id: 'p1', name: 'Histoire' },
+      { id: 'p2', name: 'Sciences' },
+    ];
+    const snapshotOf = (id: string, name: string) => ({
+      meta: { id, name },
+      sources: [{ id: 's-' + id }],
+      results: { generations: [] },
+    });
+    // Réponse retenue jusqu'à `release`, ou rejetée en AbortError quand son signal est aborté.
+    const holdFetch = () => {
+      let release!: (value: unknown) => void;
+      let signal: AbortSignal | undefined;
+      vi.mocked(globalThis.fetch).mockImplementationOnce((_url, init) => {
+        signal = init?.signal ?? undefined;
+        return new Promise((resolve, reject) => {
+          release = resolve;
+          signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          );
+        }) as any;
+      });
+      return {
+        respond: (data: unknown) => release({ ok: true, json: async () => data }),
+        aborted: () => signal?.aborted === true,
+      };
+    };
+    const openCourse = () =>
+      makeContext({
+        projects,
+        currentProjectId: 'p0',
+        currentProject: snapshotOf('p0', 'Ancien cours'),
+        sources: [{ id: 's-p0' }],
+      });
+
+    it('pendant le chargement : rien de l’ancien cours, nom du cours choisi, puis son snapshot', async () => {
+      const held = holdFetch();
+      const ctx = openCourse();
+
+      const opening = proj.selectProject.call(ctx, 'p1');
+
+      expect(ctx.currentProjectId).toBe('p1');
+      expect(ctx.currentProject).toBeNull();
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.projectLoading).toBe(true);
+      expect(proj.currentProjectName.call(ctx)).toBe('Histoire');
+
+      held.respond(snapshotOf('p1', 'Histoire'));
+      await opening;
+
+      expect(ctx.projectLoading).toBe(false);
+      expect(ctx.projectLoadController).toBeNull();
+      expect(ctx.currentProject?.meta.name).toBe('Histoire');
+      expect(ctx.sources).toEqual([{ id: 's-p1' }]);
+      expect(proj.currentProjectName.call(ctx)).toBe('Histoire');
+    });
+
+    it('panne réseau pendant le chargement : chargement terminé, liste des cours et toast', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      const ctx = openCourse();
+
+      await proj.selectProject.call(ctx, 'p1');
+
+      expect(ctx.projectLoading).toBe(false);
+      expect(ctx.currentProjectId).toBeNull();
+      expect(ctx.currentProject).toBeNull();
+      expect(proj.currentProjectName.call(ctx)).toBe('');
+      expect(ctx.showToast).toHaveBeenCalledWith(
+        'toast.projectLoadError',
+        'error',
+        expect.any(Function),
+      );
+      warnSpy.mockRestore();
+    });
+
+    // resetSession (vrai) abandonne l'ouverture précédente : sa requête est abortée et quitte la
+    // file du navigateur, sans toast d'erreur.
+    it('autre cours choisi pendant le chargement : requête précédente abortée, sans toast', async () => {
+      const session = createSession();
+      const first = holdFetch();
+      const second = holdFetch();
+      const ctx = openCourse();
+      Object.assign(ctx, {
+        abortControllersByGid: {},
+        resetSession: session.resetSession,
+      });
+
+      const openingFirst = proj.selectProject.call(ctx, 'p1');
+      const openingSecond = proj.selectProject.call(ctx, 'p2');
+      await openingFirst;
+
+      expect(first.aborted()).toBe(true);
+      expect(ctx.showToast).not.toHaveBeenCalled();
+      expect(ctx.currentProjectId).toBe('p2');
+      expect(ctx.projectLoading).toBe(true);
+      expect(proj.currentProjectName.call(ctx)).toBe('Sciences');
+
+      second.respond(snapshotOf('p2', 'Sciences'));
+      await openingSecond;
+      expect(ctx.projectLoading).toBe(false);
+      expect(ctx.sources).toEqual([{ id: 's-p2' }]);
+    });
+
+    // Réponse déjà en route quand l'autre cours est choisi : ignorée, rien de ce cours ne s'affiche
+    // pendant le chargement du suivant (ni sources, ni flux SSE, ni fin du chargement).
+    it('réponse tardive d’une ouverture supplantée : ignorée', async () => {
+      const first = holdFetch();
+      const second = holdFetch();
+      const startPendingsStream = vi.fn(async () => {});
+      const ctx = makeContext({ projects, startPendingsStream });
+
+      const openingFirst = proj.selectProject.call(ctx, 'p1');
+      const openingSecond = proj.selectProject.call(ctx, 'p2');
+      first.respond(snapshotOf('p1', 'Histoire'));
+      await openingFirst;
+
+      expect(ctx.currentProjectId).toBe('p2');
+      expect(ctx.currentProject).toBeNull();
+      expect(ctx.sources).toEqual([]);
+      expect(ctx.projectLoading).toBe(true);
+      expect(startPendingsStream).not.toHaveBeenCalled();
+
+      second.respond(snapshotOf('p2', 'Sciences'));
+      await openingSecond;
+      expect(ctx.sources).toEqual([{ id: 's-p2' }]);
+      expect(startPendingsStream).toHaveBeenCalledTimes(1);
+      expect(startPendingsStream).toHaveBeenCalledWith('p2');
+    });
+
+    it('cours re-touché pendant son chargement : ni remise à zéro ni seconde requête', async () => {
+      const held = holdFetch();
+      const ctx = openCourse();
+
+      const opening = proj.selectProject.call(ctx, 'p1');
+      await proj.selectProject.call(ctx, 'p1');
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(ctx.resetSession).toHaveBeenCalledTimes(1);
+      expect(ctx.projectLoading).toBe(true);
+
+      held.respond(snapshotOf('p1', 'Histoire'));
+      await opening;
+      expect(ctx.sources).toEqual([{ id: 's-p1' }]);
+    });
+  });
+
+  // Message envoyé au tuteur, puis changement de cours avant sa réponse : au retour, l'indicateur
+  // et le champ inactif sont rétablis tant que la requête de CE cours est en vol (chat-in-flight.ts).
+  it('retour sur un cours dont un message attend la réponse du tuteur : chatLoading rétabli', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ chatInFlight: { p1: true } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.chatLoading).toBe(true);
+  });
+
+  it('retour sur un cours sans message en attente (seul un autre cours attend) : chatLoading false', async () => {
+    mockFetchOk({ id: 'p1', sources: [], results: { generations: [] } });
+    const ctx = makeContext({ chatInFlight: { p2: true } });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.chatLoading).toBe(false);
   });
 
   // Reprise à l'ouverture : profil modéré et source en attente, en erreur ou jamais vérifiée →

@@ -153,7 +153,7 @@ export const fr: Record<string, string> = {
   'common.save': 'Sauvegarder',
   'common.reset': 'Réinitialiser',
   'common.sources': 'Sources',
-  'common.loading': 'En cours...',
+  'common.loading': 'Chargement...',
   'common.generating': 'Génération...',
   'common.rename': 'Renommer',
   'common.addSources': 'Ajouter des sources',

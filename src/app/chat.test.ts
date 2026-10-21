@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createChat } from './chat';
+import { restoreChatLoading } from './chat-in-flight';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -27,6 +28,7 @@ function makeContext(overrides: any = {}) {
     chatMessages: [] as any[],
     chatInput: '',
     chatLoading: false,
+    chatInFlight: {} as Record<string, true>,
     useConsigne: true,
     t: vi.fn((key: string) => key),
     resolveError: vi.fn((code: string) => `resolved:${code}`),
@@ -294,6 +296,77 @@ describe('sendChatMessage — cours changé pendant la réponse', () => {
 
     expect(ctx.chatMessages).toEqual([{ role: 'user', content: 'question du cours pid-2' }]);
     expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  // Mesuré au release-test du 2026-10-21 : revenir sur le cours avant la réponse du tuteur laissait
+  // le champ actif, sans indicateur ; la réponse arrivait ensuite (sans doublon).
+  describe('retour sur le cours avant la réponse du tuteur', () => {
+    // Réponse retenue jusqu'à l'appel de la fonction rendue.
+    const holdReply = (reply: string) => {
+      let release!: () => void;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            release = () => resolve({ ok: true, json: async () => ({ reply }) } as any);
+          }) as any,
+      );
+      return () => release();
+    };
+    // Changement de cours puis retour (resetSession : chatLoading à false ; snapshot : historique
+    // du serveur, qui a déjà enregistré la question), puis applyProjectSnapshot.
+    const leaveAndComeBack = (ctx: any) => {
+      ctx.currentProjectId = 'pid-2';
+      ctx.chatLoading = false;
+      ctx.currentProjectId = 'pid-1';
+      ctx.chatMessages = [{ role: 'user', content: 'Hello' }];
+      restoreChatLoading(ctx, 'pid-1');
+    };
+
+    it('indicateur rétabli tant que la requête est en vol, une seule bulle de réponse', async () => {
+      const respond = holdReply('Bonjour !');
+      const ctx = makeContext({ chatInput: 'Hello' });
+
+      const sending = chat.sendChatMessage.call(ctx);
+      expect(ctx.chatInFlight).toEqual({ 'pid-1': true });
+      leaveAndComeBack(ctx);
+      expect(ctx.chatLoading).toBe(true);
+
+      respond();
+      await sending;
+
+      expect(ctx.chatMessages.map((m: any) => [m.role, m.content])).toEqual([
+        ['user', 'Hello'],
+        ['assistant', 'Bonjour !'],
+      ]);
+      expect(ctx.chatLoading).toBe(false);
+      expect(ctx.chatInFlight).toEqual({});
+    });
+
+    it('réponse arrivée pendant qu’un autre cours est affiché : un retour ne rétablit plus rien', async () => {
+      const respond = holdReply('Bonjour !');
+      const ctx = makeContext({ chatInput: 'Hello' });
+
+      const sending = chat.sendChatMessage.call(ctx);
+      ctx.currentProjectId = 'pid-2';
+      ctx.chatLoading = false;
+      respond();
+      await sending;
+      expect(ctx.chatInFlight).toEqual({});
+
+      ctx.currentProjectId = 'pid-1';
+      restoreChatLoading(ctx, 'pid-1');
+      expect(ctx.chatLoading).toBe(false);
+    });
+
+    it('panne réseau : registre vidé aussi', async () => {
+      vi.mocked(globalThis.fetch).mockRejectedValueOnce(new TypeError('Failed to fetch'));
+      const ctx = makeContext({ chatInput: 'Hello' });
+
+      await chat.sendChatMessage.call(ctx);
+
+      expect(ctx.chatInFlight).toEqual({});
+      expect(ctx.chatLoading).toBe(false);
+    });
   });
 });
 

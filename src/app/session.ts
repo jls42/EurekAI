@@ -17,7 +17,8 @@ import { autoRunControllers } from './auto-runs';
 // et doivent être replay quand on revient sur un profil.
 //
 // Ce qui CONTINUE vers son cours (règle « on lance un truc, ça continue même si on change de
-// page ») : l'Auto en cours (contrôleur épargné, cf. auto-runs.ts), l'import (sources.ts) et
+// page ») : l'Auto en cours (contrôleur épargné, cf. auto-runs.ts), l'import (sources.ts),
+// le message du chat en attente de réponse (registre chatInFlight, chat-in-flight.ts) et
 // l'enregistrement vocal, arrêté ici puis envoyé vers le cours où il a commencé (recorder.ts).
 
 // AbortController.abort() est idempotent par spec et ne throw jamais — pas de try/catch défensif
@@ -37,6 +38,15 @@ const stopActiveRecording = (ctx: AppContext): void => {
   if (ctx.recording && typeof ctx.stopRecording === 'function') ctx.stopRecording();
 };
 
+// Ouverture d'un cours encore en cours (selectProject) : supplantée par le cours suivant, un autre
+// profil ou la suppression du cours. Son snapshot n'est plus attendu (il afficherait l'ancien cours)
+// et sa requête, si elle attend encore une connexion, quitte la file. Contexte partiel toléré.
+const abandonProjectLoad = (ctx: AppContext): void => {
+  if (ctx.projectLoadController) ctx.projectLoadController.abort();
+  ctx.projectLoadController = null;
+  ctx.projectLoading = false;
+};
+
 // Codacy `no-unused-vars` natif flagge le `this: AppContext` binding comme
 // paramètre non utilisé (la règle ignore que TypeScript résout le binding au
 // niveau type). Extraction en arrow function `doResetSession(ctx)` privée +
@@ -51,6 +61,7 @@ function doResetSession(ctx: AppContext): void {
     ctx.stopPendingsStream();
   }
   stopActiveRecording(ctx);
+  abandonProjectLoad(ctx);
   const spared = autoRunControllers(ctx);
   abortAllExcept(ctx.abortControllers, spared);
   ctx.abortControllers = {};

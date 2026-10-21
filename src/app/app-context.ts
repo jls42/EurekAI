@@ -106,6 +106,8 @@ export interface AppContext extends AppState {
   goToView(view: string): void;
 
   createProject(): Promise<void>;
+  // Nom du cours affiché : son snapshot, sinon la liste des cours (ouverture en cours).
+  currentProjectName(): string;
   selectProject(id: string): Promise<void>;
   deleteProject(id: string): Promise<void>;
   openLightbox(url: string): void;

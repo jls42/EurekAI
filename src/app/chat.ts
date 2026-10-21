@@ -3,6 +3,7 @@ import { addCostDelta } from './cost-utils';
 import { withAiHeaders } from './ai-fetch';
 import { registerGeneration } from './generate';
 import { displayedReply } from './chat-reply';
+import { endChatInFlight, startChatInFlight } from './chat-in-flight';
 import type { AppContext } from './app-context';
 import type { Generation } from '../../types';
 
@@ -91,9 +92,11 @@ const reportChatConnectionError = (state: AppContext, projectId: string): void =
   state.showToast(state.t('toast.chatError'), 'error');
 };
 
-// Fin de la requête : saisie réactivée sur son cours seulement (le chat d'un autre cours affiché
-// peut avoir sa propre réponse en attente).
+// Fin de la requête : retirée du registre de son cours dans tous les cas (un retour sur ce cours ne
+// rétablit plus l'indicateur) ; saisie réactivée sur son cours seulement (le chat d'un autre cours
+// affiché peut avoir sa propre réponse en attente).
 const endChatRequest = (state: AppContext, projectId: string): void => {
+  endChatInFlight(state, projectId);
   if (state.currentProjectId !== projectId) return;
   state.chatLoading = false;
   void state.$nextTick(() => {
@@ -110,6 +113,8 @@ const sendChatMessage = async function (this: AppContext) {
   this.chatInput = '';
   this.chatMessages.push({ role: 'user', content: msg, timestamp: new Date().toISOString() });
   this.chatLoading = true;
+  // Réponse attendue sur CE cours : un retour sur lui avant la réponse rétablit l'indicateur.
+  startChatInFlight(this, projectId);
   void this.$nextTick(() => this.scrollChatBottom());
 
   try {

@@ -144,6 +144,24 @@
             </div>
           </div>
 
+          <!-- Cours choisi, en cours d'ouverture (selectProject) : son nom et un chargement, jamais
+               l'état vide « Ajoute tes premières sources » ni le contenu du cours précédent (le bloc
+               du cours ci-dessous attend son snapshot). Jusqu'à 15 s quand les étapes d'un Auto
+               occupent les connexions (release-test du 2026-10-21). -->
+          <div x-show="currentProjectId && projectLoading" class="py-16 text-center" role="status">
+            <p
+              class="font-heading font-bold text-xl title-gradient mb-3 truncate"
+              x-text="currentProjectName()"
+            ></p>
+            <p class="inline-flex items-center gap-2 text-text-secondary text-body-sm">
+              <span
+                class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent shrink-0"
+                aria-hidden="true"
+              ></span>
+              <span x-text="t('common.loading')"></span>
+            </p>
+          </div>
+
           <!-- Project selected -->
           <template x-if="currentProjectId && currentProject">
             <div>

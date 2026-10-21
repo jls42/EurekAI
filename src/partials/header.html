@@ -21,10 +21,12 @@
           EurekAI
         </h1>
       </button>
+      <!-- Cours CHOISI, dès le clic (nom tiré de la liste pendant son ouverture) : jamais le
+           précédent tant que le nouveau charge. -->
       <span
-        x-show="currentProject"
+        x-show="currentProjectName()"
         class="hidden sm:inline text-sm opacity-80 truncate max-w-[150px]"
-        x-text="currentProject?.meta?.name"
+        x-text="currentProjectName()"
       ></span>
     </div>
 

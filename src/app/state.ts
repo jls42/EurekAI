@@ -89,10 +89,16 @@ const initProfileState = () => ({
   profileAvatars: PROFILE_AVATARS,
 });
 
+// projectLoading : ouverture d'un cours en cours (selectProject), son snapshot n'est pas arrivé ;
+// l'écran montre le cours choisi et un chargement, jamais l'état vide ni le contenu du cours
+// précédent. projectLoadController : celui de cette ouverture, aborté quand une autre la supplante
+// (autre cours, autre profil, cours supprimé : resetSession).
 const initProjectState = () => ({
   projects: [] as ProjectMeta[],
   currentProjectId: null as string | null,
   currentProject: null as ProjectData | null,
+  projectLoading: false,
+  projectLoadController: null as AbortController | null,
   newProjectName: '',
   showNewProject: false,
 });
@@ -278,10 +284,13 @@ const initNavigationState = () => ({
   activeView: 'dashboard',
 });
 
+// chatInFlight : cours dont un message attend la réponse du tuteur (chat-in-flight.ts). Ni
+// resetSession ni resetState n'y touchent : au retour sur le cours, chatLoading est rétabli.
 const initChatState = () => ({
   chatMessages: [] as ChatMessage[],
   chatInput: '',
   chatLoading: false,
+  chatInFlight: {} as Record<string, true>,
 });
 
 const initDialogState = () => ({

@@ -3,6 +3,7 @@ import { openingProfileQuery } from './project-snapshot';
 import { resumeProjectModeration } from './moderation-gate';
 import { withReplyFallback } from './chat-reply';
 import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
+import { restoreChatLoading } from './chat-in-flight';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
 
@@ -187,7 +188,8 @@ const startSseStreamSafely = function (state: AppContext, id: string): void {
 
 // Orchestrateur léger : hydrate + ouvre les dernières gens par type + démarre SSE. Retour sur un
 // cours dont l'Auto analyse encore (lancé avant un changement de cours) : puce « Auto — analyse… »
-// rétablie, annulable, et bouton Auto désactivé (isGenerating) au lieu d'en permettre un second.
+// rétablie, annulable, et bouton Auto désactivé (isGenerating) au lieu d'en permettre un second ;
+// dont un message du chat attend encore sa réponse : indicateur rétabli, champ inactif.
 const applyProjectSnapshot = function (state: AppContext, project: ProjectData, id: string): void {
   hydrateProjectFields(state, project, id);
   normalizeGenerations(state, state.generations);
@@ -196,44 +198,115 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
   restoreAutoAnalysis(state, id);
+  restoreChatLoading(state, id);
   void state.$nextTick(() => state.refreshIcons());
   startSseStreamSafely(state, id);
 };
 
-const selectProject = async function (this: AppContext, id: string) {
-  // Cours déjà ouvert, re-touché dans la liste (barre latérale, onglet « Cours ») : aucune remise à
-  // zéro. Elle annulait toute action en cours (analyse Auto, import, enregistrement…) : vécu le
-  // 2026-10-21, « l'analyse Auto disparaît et rien n'arrive ». Retour à l'accueil du cours seulement.
-  if (id === this.currentProjectId && this.currentProject !== null) {
-    this.activeView = this.sources.length === 0 ? 'sources' : 'dashboard';
+// Nom du cours affiché : celui de son snapshot, sinon celui de la liste des cours, connu dès le clic
+// (ouverture en cours : l'en-tête nomme le cours CHOISI, jamais le précédent).
+const currentProjectName = function (this: AppContext): string {
+  const loaded = this.currentProject?.meta?.name;
+  if (loaded) return loaded;
+  const listed = this.projects.find((p) => p.id === this.currentProjectId);
+  return listed?.name ?? '';
+};
+
+// Cours déjà ouvert, ou en cours d'ouverture, re-touché dans la liste (barre latérale, onglet
+// « Cours ») : aucune remise à zéro. Elle annulait toute action en cours (analyse Auto, import,
+// enregistrement…) : vécu le 2026-10-21, « l'analyse Auto disparaît et rien n'arrive » ; pendant
+// l'ouverture, elle relancerait la requête du snapshot. Retour à l'accueil du cours seulement, que
+// le snapshot choisit lui-même s'il n'est pas encore arrivé.
+const retouchOpenProject = (state: AppContext, id: string): boolean => {
+  if (id !== state.currentProjectId) return false;
+  if (state.projectLoading) return true;
+  if (state.currentProject === null) return false;
+  state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
+  return true;
+};
+
+// Ouverture d'un cours, dès le clic : rien de l'ancien cours ne reste à l'écran (currentProject à
+// null : en-tête et titre au nom tiré de la liste, currentProjectName) et un chargement remplace
+// l'état vide « Ajoute tes premières sources » jusqu'au snapshot. Mesuré au release-test du
+// 2026-10-21 : 10 à 15 s d'attente quand les étapes d'un Auto occupent les connexions du
+// navigateur ; un enfant pouvait croire ses sources perdues. resetSession abandonne l'ouverture
+// précédente (cours re-choisi avant la fin du chargement).
+const beginProjectLoad = (
+  state: AppContext,
+  id: string,
+  profileId: string | undefined,
+): AbortController => {
+  state.currentProjectId = id;
+  if (profileId) setLastProjectIdForProfile(profileId, id);
+  state.resetSession();
+  state.resetState();
+  state.currentProject = null;
+  state.projectLoading = true;
+  const controller = new AbortController();
+  state.projectLoadController = controller;
+  return controller;
+};
+
+// Ouverture toujours la plus récente : un autre cours, un autre profil ou la suppression du cours
+// l'a supplantée sinon, et son snapshot afficherait un cours qui n'est plus choisi.
+const isCurrentLoad = (state: AppContext, load: AbortController): boolean => {
+  return state.projectLoadController === load;
+};
+
+// Fin du chargement (snapshot appliqué ou échec) : seulement pour l'ouverture la plus récente.
+const endProjectLoad = (state: AppContext, load: AbortController): void => {
+  if (!isCurrentLoad(state, load)) return;
+  state.projectLoadController = null;
+  state.projectLoading = false;
+};
+
+// Sans toast + reset, l'UI resterait sur un projet partiellement sélectionné (currentProjectId muté
+// + state vidé via resetState) → sources vides, generates qui partent vers
+// /api/projects/<deleted-id>/... → 404.
+const failProjectLoad = (state: AppContext, id: string): void => {
+  state.currentProjectId = null;
+  state.showToast(state.t('toast.projectLoadError'), 'error', () => state.selectProject(id));
+};
+
+// Réponse de l'ouverture la plus récente : snapshot appliqué, sauf s'il arrive après qu'une autre
+// l'a supplantée pendant la lecture du corps.
+const applyProjectResponse = async (
+  state: AppContext,
+  id: string,
+  res: Response,
+  load: AbortController,
+): Promise<void> => {
+  if (!res.ok) {
+    console.warn('[selectProject] non-ok', { id, status: res.status });
+    failProjectLoad(state, id);
     return;
   }
-  this.currentProjectId = id;
+  // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+  const snapshot: unknown = await res.json();
+  if (!isCurrentLoad(state, load)) return;
+  applyProjectSnapshot(state, snapshot as ProjectData, id);
+  // Sources en attente, en erreur ou jamais vérifiées d'un profil modéré : vérifiées en fond.
+  resumeProjectModeration(state, id);
+};
+
+const selectProject = async function (this: AppContext, id: string) {
+  if (retouchOpenProject(this, id)) return;
   const profileId = this.currentProfile?.id;
-  if (profileId) setLastProjectIdForProfile(profileId, id);
-  this.resetSession();
-  this.resetState();
+  const load = beginProjectLoad(this, id, profileId);
   try {
     // profileId : un projet encore orphelin est rattaché au profil qui l'ouvre (côté serveur).
-    const res = await fetch('/api/projects/' + id + openingProfileQuery(profileId));
-    if (!res.ok) {
-      // Sans toast + reset, l'UI reste sur un projet partiellement sélectionné
-      // (currentProjectId muté + state vidé via resetState) → sources vides,
-      // generates qui partent vers /api/projects/<deleted-id>/... → 404.
-      console.warn('[selectProject] non-ok', { id, status: res.status });
-      this.currentProjectId = null;
-      this.showToast(this.t('toast.projectLoadError'), 'error', () => this.selectProject(id));
-      return;
-    }
-    // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
-    const snapshot: unknown = await res.json();
-    applyProjectSnapshot(this, snapshot as ProjectData, id);
-    // Sources en attente, en erreur ou jamais vérifiées d'un profil modéré : vérifiées en fond.
-    resumeProjectModeration(this, id);
+    const res = await fetch('/api/projects/' + id + openingProfileQuery(profileId), {
+      signal: load.signal,
+    });
+    if (isCurrentLoad(this, load)) await applyProjectResponse(this, id, res, load);
   } catch (err) {
-    console.warn('[selectProject] failed', err);
-    this.currentProjectId = null;
-    this.showToast(this.t('toast.projectLoadError'), 'error', () => this.selectProject(id));
+    // Ouverture supplantée (requête abortée par resetSession) : rien à signaler.
+    if (isCurrentLoad(this, load)) {
+      console.warn('[selectProject] failed', err);
+      failProjectLoad(this, id);
+    }
+  } finally {
+    endProjectLoad(this, load);
   }
 };
 
@@ -296,6 +369,7 @@ export function createProjects() {
     openLightbox,
     loadProjects,
     createProject,
+    currentProjectName,
     selectProject,
     deleteProject,
     resetState,

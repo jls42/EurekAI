@@ -402,6 +402,47 @@ describe('app() — état composé', () => {
     a.currentProjectId = 'p2';
     expect(a.isUploading()).toBe(false);
   });
+
+  // Ouverture d'un cours : en-tête et chargement nomment le cours CHOISI (liste des cours) tant que
+  // son snapshot n'est pas arrivé, puis le nom du snapshot.
+  it('currentProjectName() suit le cours choisi sur l’objet composé, avant et après son snapshot', () => {
+    const a = app();
+    const meta = (id: string, name: string) => ({ id, name, createdAt: '', updatedAt: '' });
+    a.projects = [meta('p1', 'Histoire'), meta('p2', 'Sciences')];
+    expect(a.currentProjectName()).toBe('');
+    a.currentProjectId = 'p2';
+    expect(a.currentProjectName()).toBe('Sciences');
+    a.currentProject = { meta: meta('p2', 'Sciences (renommé)'), sources: [] } as any;
+    expect(a.currentProjectName()).toBe('Sciences (renommé)');
+  });
+});
+
+// Ouverture d'un cours (selectProject) : currentProject reste nul jusqu'au snapshot. Le bloc de
+// chargement vit donc HORS du bloc du cours (qui l'attend), et ce qui nomme le cours passe par
+// currentProjectName(), connu dès le clic. Jusqu'au release-test du 2026-10-21, l'en-tête gardait
+// le nom de l'AUTRE cours et le tableau de bord vide « Ajoute tes premières sources » s'affichait.
+describe('gabarits — ouverture d’un cours', () => {
+  const read = (path: string) => readFileSync(new URL(path, import.meta.url), 'utf-8');
+
+  it('chargement affiché hors du bloc du cours, avec le nom du cours choisi', () => {
+    const index = read('../index.html');
+    const loading = index.indexOf('x-show="currentProjectId && projectLoading"');
+    const course = index.indexOf('<template x-if="currentProjectId && currentProject">');
+    expect(loading).toBeGreaterThan(-1);
+    expect(course).toBeGreaterThan(loading);
+    const block = index.slice(loading, course);
+    expect(block).toContain('x-text="currentProjectName()"');
+    expect(block).toContain('x-text="t(\'common.loading\')"');
+  });
+
+  it.each(['../partials/header.html', '../partials/view-dashboard.html'])(
+    '%s : nom du cours par currentProjectName(), jamais par le seul snapshot',
+    (path) => {
+      const html = read(path);
+      expect(html).toContain('x-text="currentProjectName()"');
+      expect(html).not.toContain('currentProject?.meta?.name');
+    },
+  );
 });
 
 // Aucune fabrique ne doit exposer d'accesseur : app() compose l'état par `...createX()`, et un
