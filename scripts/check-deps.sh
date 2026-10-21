@@ -113,9 +113,10 @@ run_bounded() {
 }
 
 # Modèles Mistral : UNE seule source, scripts/check-models.ts (non bloquant). Il surveille les ids
-# réellement envoyés (alias -latest résolus + helpers/ocr-models.ts + helpers/moderation-model.ts),
-# croise /v1/models (présence, groupe ambigu, dépréciation, défaut épinglé en retard) et la table
-# Legacy de l'overview (date de retrait + remplaçant). Suppression ASSUMÉE de l'ancienne liste bash
+# réellement envoyés (alias -latest résolus + helpers/chat-models.ts, ocr-models.ts,
+# moderation-model.ts, stt-models.ts, tts-models.ts), croise /v1/models (présence, groupe ambigu,
+# dépréciation, défaut épinglé en retard, modèle de transcription ou de synthèse non suivi) et la
+# table Legacy de l'overview (date de retrait + remplaçant). Suppression ASSUMÉE de l'ancienne liste bash
 # (sonde chat/completions + `other_models`) et de la table locale `known_deprecations` : elles
 # dérivaient (ex. `✗ mistral-moderation-latest` alors que l'app envoie `mistral-moderation-2603`) et
 # l'acceptation d'un id par un endpoint ne prouve rien (/v1/moderations sert encore l'id retiré
