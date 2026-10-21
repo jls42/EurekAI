@@ -24,9 +24,9 @@ describe('stt-models', () => {
 
   it('STT_MODEL_LABELS mappe chaque id vers son nom produit', () => {
     expect(STT_MODEL_LABELS).toEqual({
-      'voxtral-mini-2602': 'Voxtral Mini Transcribe 2',
-      'voxtral-mini-transcribe-3-0': 'Voxtral Mini Transcribe 3',
-      'voxtral-small-transcribe-3-0': 'Voxtral Small Transcribe 3',
+      'voxtral-mini-2602': 'Mini Transcribe 2',
+      'voxtral-mini-transcribe-3-0': 'Mini Transcribe 3',
+      'voxtral-small-transcribe-3-0': 'Small Transcribe 3',
     });
   });
 

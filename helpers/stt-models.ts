@@ -14,13 +14,15 @@ export const STT_MODELS = [
 export type SttModel = (typeof STT_MODELS)[number];
 
 /**
- * Noms produit affichés à l'UI (table « Audio » de docs.mistral.ai/models). La valeur stockée en
- * config et envoyée à l'API reste l'id technique (clé de cet objet) — ne jamais persister le label.
+ * Noms produit affichés à l'UI (table « Audio » de docs.mistral.ai/models), sans le préfixe
+ * « Voxtral » : sous le titre « Transcription », le libellé complet tronquait l'option du sélecteur
+ * fermé (vu au release-test du 2026-10-21). La valeur stockée en config et envoyée à l'API reste
+ * l'id technique (clé de cet objet) — ne jamais persister le label.
  */
 export const STT_MODEL_LABELS: Record<SttModel, string> = {
-  'voxtral-mini-2602': 'Voxtral Mini Transcribe 2',
-  'voxtral-mini-transcribe-3-0': 'Voxtral Mini Transcribe 3',
-  'voxtral-small-transcribe-3-0': 'Voxtral Small Transcribe 3',
+  'voxtral-mini-2602': 'Mini Transcribe 2',
+  'voxtral-mini-transcribe-3-0': 'Mini Transcribe 3',
+  'voxtral-small-transcribe-3-0': 'Small Transcribe 3',
 };
 
 /**

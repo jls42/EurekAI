@@ -705,14 +705,14 @@ describe('brouillon des Réglages (toDraft) : sélecteurs épinglés normalisés
 
 describe('modelOptionLabel', () => {
   it.each([
-    ['voxtral-mini-2602', 'Voxtral Mini Transcribe 2 — $0.0030 settings.perMinute'],
+    ['voxtral-mini-2602', 'Mini Transcribe 2 — $0.0030 settings.perMinute'],
     [
       'voxtral-mini-transcribe-3-0',
-      'Voxtral Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview',
+      'Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview',
     ],
     [
       'voxtral-small-transcribe-3-0',
-      'Voxtral Small Transcribe 3 — $0.0040 settings.perMinute · settings.preview',
+      'Small Transcribe 3 — $0.0040 settings.perMinute · settings.preview',
     ],
     ['voxtral-mini-tts-2603', 'Voxtral TTS — $16 settings.perMChars'],
     ['voxtral-mini-tts-3-0', 'Voxtral TTS 3 — $13 settings.perMChars · settings.preview'],
