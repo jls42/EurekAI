@@ -2,6 +2,7 @@ import { stepByStep, type StepByStepBase } from './step-by-step';
 import { captureAiKey, withAiHeaders } from '../app/ai-fetch';
 import { registerGeneration } from '../app/generate';
 import { checkGenerationAllowed } from '../app/moderation-gate';
+import { withLongRequestSlot } from '../app/request-slots';
 import { getLocale } from '../i18n/index';
 import { parseChoiceLabel } from '@helpers/choice-labels';
 import type { AppContext } from '../app/app-context';
@@ -209,6 +210,16 @@ const postRemediationTarget = async function (
   throw new Error('invalid remediation target');
 };
 
+// Génération longue : envoyée quand une place se libère parmi les requêtes longues de l'onglet
+// (request-slots.ts, partagées avec les Auto et les générations simples). Sans annulation (la
+// remédiation n'a pas de puce) : `reviewing` reste affiché pendant l'attente.
+const sendRemediationTarget = (
+  launch: RemediationLaunch,
+  target: RemediationTarget,
+): Promise<Generation> => {
+  return withLongRequestSlot(() => postRemediationTarget(launch, target));
+};
+
 // Échec d'une cible : toast avec réessai ciblé (la chaîne se poursuit tant qu'il échoue).
 // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte `this`/params typés comme unused.
 const notifyRemediationFailure = function (
@@ -234,7 +245,7 @@ const retryRemediationTarget = async function (
   errorKey: string,
 ): Promise<void> {
   try {
-    const gen = await postRemediationTarget(launch, target);
+    const gen = await sendRemediationTarget(launch, target);
     // eslint-disable-next-line @typescript-eslint/no-unsafe-argument -- Codacy ne résout pas Generation cross-module.
     if (remediationShown(this, launch)) registerGeneration(this, gen);
   } catch (e) {
@@ -309,8 +320,8 @@ const remediate = async function (this: QuizContext) {
 
   this.reviewing = true;
   const results: RemediationResults = await Promise.allSettled([
-    postRemediationTarget(launch, 'remediation-summary'),
-    postRemediationTarget(launch, 'quiz-review'),
+    sendRemediationTarget(launch, 'remediation-summary'),
+    sendRemediationTarget(launch, 'quiz-review'),
   ]);
   this.reviewing = false;
   if (remediationShown(this, launch)) showRemediationResults.call(this, launch, results);

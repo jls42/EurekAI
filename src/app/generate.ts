@@ -4,6 +4,7 @@ import { countPendingOfType, MAX_PARALLEL_PER_TYPE, pendingOfTypeExists } from '
 import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { endAutoRun, markAutoRunSteps, registerAutoRun } from './auto-runs';
+import { MAX_LONG_REQUESTS, withLongRequestSlot } from './request-slots';
 import {
   AUTO_AGENTS_SET,
   AUTO_AGENT_TYPES,
@@ -365,6 +366,28 @@ const finishAutoStep = (state: AppContext, launch: AutoLaunch, type: string): vo
   void state.$nextTick(() => state.refreshIcons());
 };
 
+// Requête d'une étape, une fois sa place obtenue. URL composée ici, à côté du fetch : shape exact
+// `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu par Codacy `rule-node-ssrf` ;
+// AUTO_AGENT_TYPES borne la liste finie de routes.
+const sendAutoStep = async (
+  state: AppContext,
+  launch: AutoLaunch,
+  type: string,
+  allowedUrls: string[],
+): Promise<StepResult> => {
+  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
+  const url = '/api/projects/' + encodeURIComponent(launch.projectId) + '/generate/' + type;
+  if (allowedUrls.includes(url)) {
+    const init = postJson(launch.body, launch.controller.signal);
+    const res = await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
+    return await handleAutoStepResponse(state, launch, type, res);
+  }
+  return { kind: 'failed', code: 'internal_error' };
+};
+
+// Étape envoyée quand une place se libère parmi les requêtes longues de l'onglet (request-slots.ts).
+// Auto annulé pendant cette attente : l'étape sort de la file sans partir, rejet AbortError traité
+// comme une étape abortée en vol ('aborted', ni échec ni code).
 export async function runAutoStep(
   state: AppContext,
   launch: AutoLaunch,
@@ -372,17 +395,9 @@ export async function runAutoStep(
   allowedUrls: string[],
 ): Promise<StepResult> {
   if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
-  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + encodeURIComponent(launch.projectId) + '/generate/' + type;
   try {
-    // Shape exact `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu
-    // par Codacy `rule-node-ssrf` ; AUTO_AGENT_TYPES borne la liste finie de routes.
-    if (allowedUrls.includes(url)) {
-      const init = postJson(launch.body, launch.controller.signal);
-      const res = await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
-      return await handleAutoStepResponse(state, launch, type, res);
-    }
-    return { kind: 'failed', code: 'internal_error' };
+    const send = () => sendAutoStep(state, launch, type, allowedUrls);
+    return await withLongRequestSlot(send, launch.controller.signal);
   } catch (e: unknown) {
     if (e instanceof Error && e.name === 'AbortError') return 'aborted';
     const msg = e instanceof Error ? e.message : String(e);
@@ -392,14 +407,6 @@ export async function runAutoStep(
     finishAutoStep(state, launch, type);
   }
 }
-
-// Étapes d'un Auto envoyées en même temps, au plus. Le serveur parle HTTP/1.1 : le navigateur
-// n'ouvre que 6 connexions par hôte, et le flux SSE du cours ouvert en garde une. Les 8 étapes
-// lancées ensemble prenaient tout le reste : depuis qu'un Auto continue quand on change de cours,
-// le chargement du cours choisi attendait 10 à 15 s (mesuré au release-test du 2026-10-21,
-// PerformanceResourceTiming). SSE + 4 étapes = 5 connexions : il en reste une pour la navigation et
-// les appels courts. Les étapes suivantes partent dès qu'une se termine.
-const MAX_PARALLEL_AUTO_STEPS = 4;
 
 // File des étapes d'un Auto et bilan, partagés par ses voies (runAutoStepLane).
 type AutoStepPool = {
@@ -411,7 +418,8 @@ type AutoStepPool = {
 
 // Une voie : prend l'étape suivante de la file dès que la sienne est terminée, jusqu'à ce que la
 // file soit vide ou l'Auto annulé (contrôleur aborté : les étapes encore en file ne partent plus,
-// ni échec ni code, comme une étape abortée). Récursive : une étape à la fois par voie.
+// ni échec ni code, comme une étape abortée). Récursive : une étape à la fois par voie, qui attend
+// sa place parmi les requêtes longues de l'onglet (runAutoStep).
 const runAutoStepLane = async (
   state: AppContext,
   launch: AutoLaunch,
@@ -428,6 +436,12 @@ const runAutoStepLane = async (
   await runAutoStepLane(state, launch, pool);
 };
 
+// Voies d'un Auto : autant que de places pour les requêtes longues de l'onglet (MAX_LONG_REQUESTS,
+// request-slots.ts, limite GLOBALE : deux Auto à 4 étapes chacun saturaient les connexions du
+// navigateur). Seul, un Auto prend toutes les places ; avec un 2e Auto, une génération simple ou une
+// remédiation, il n'a jamais plus de MAX_LONG_REQUESTS étapes en vol ou en file, et les autres
+// passent entre ses étapes (deux Auto avancent ensemble) au lieu d'attendre que toutes les siennes
+// soient parties. Dans un Auto, les étapes partent dans l'ordre du plan.
 export async function runAutoSteps(
   state: AppContext,
   launch: AutoLaunch,
@@ -438,7 +452,7 @@ export async function runAutoSteps(
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
   const pool: AutoStepPool = { queue: [...plannedTypes], allowedUrls, failures: 0, codes: [] };
-  const lanes = Math.min(MAX_PARALLEL_AUTO_STEPS, plannedTypes.length);
+  const lanes = Math.min(MAX_LONG_REQUESTS, plannedTypes.length);
   await Promise.all(Array.from({ length: lanes }, () => runAutoStepLane(state, launch, pool)));
   return { failures: pool.failures, codes: pool.codes };
 }
@@ -878,39 +892,66 @@ const acquireSingleLaunch = async function (
   return outcome;
 };
 
-// Génération sur le cours affiché : pending optimiste (puce annulable), réponse appliquée tant que
-// ce cours reste affiché ; après un changement de cours, le serveur la termine et l'enregistre.
+// Cours changé pendant le pré-contrôle, ou pendant l'attente d'une place : la génération part quand
+// même vers son cours, à son tour parmi les requêtes longues de l'onglet (request-slots.ts), sans
+// rien poser sur l'écran affiché (pending, chargement, toast) ; le serveur refait la garde de
+// modération et enregistre le résultat, visible au retour sur le cours. Jusqu'en v1.7.11 : perdue
+// sans un mot. Gère ses erreurs : lançable sans l'attendre (`void`).
+const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<void> {
+  try {
+    await withLongRequestSlot(() => fetchSingleGenerate(launch, crypto.randomUUID()));
+  } catch (e: unknown) {
+    console.warn('[generate] envoi vers un cours quitté impossible', launch.type, e);
+  }
+};
+
+// Génération affichée par son pending. gid généré côté client = identifiant stable utilisable
+// IMMÉDIATEMENT par pendingById, abortControllersByGid et l'eventKey de la notif fallback. `sent` :
+// la requête est partie (le serveur la terminera même si son fetch est aborté ensuite).
+type SingleFlight = { gid: string; controller: AbortController; sent: boolean };
+
+// Envoi une fois la place obtenue ; réponse appliquée tant que le cours reste affiché.
+const requestWithPending = async (
+  state: AppContext,
+  launch: SingleLaunch,
+  flight: SingleFlight,
+): Promise<void> => {
+  flight.sent = true;
+  const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
+  if (!res || state.currentProjectId !== launch.projectId) return;
+  await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
+};
+
+// Génération sur le cours affiché : pending optimiste (puce annulable) dès le clic, envoi quand une
+// place se libère parmi les requêtes longues de l'onglet, réponse appliquée tant que ce cours reste
+// affiché ; après un changement de cours, le serveur la termine et l'enregistre. Pendant l'attente :
+// annulée par sa puce ou « Tout annuler » (cours affiché), rien n'est envoyé et la file avance ;
+// cours ou profil quitté (resetSession aborte aussi son contrôleur ; selectProject, selectProfile et
+// deleteProject changent le cours affiché dans le même bloc synchrone, et ce catch s'exécute après),
+// jamais partie, elle repart en arrière-plan.
 const sendGenerateWithPending = async function (
   state: AppContext,
   launch: SingleLaunch,
 ): Promise<void> {
   const { projectId, type, extraBody } = launch;
-  // gid généré côté client = identifiant stable utilisable IMMÉDIATEMENT par
-  // pendingById, abortControllersByGid et l'eventKey de la notif fallback.
-  const gid = crypto.randomUUID();
-  const controller = new AbortController();
-  setupGeneratePending(state, type, gid, controller, launch.pendingSourceIds);
+  const flight: SingleFlight = {
+    gid: crypto.randomUUID(),
+    controller: new AbortController(),
+    sent: false,
+  };
+  setupGeneratePending(state, type, flight.gid, flight.controller, launch.pendingSourceIds);
   try {
-    const res = await fetchSingleGenerate(launch, gid, controller.signal);
-    if (!res || state.currentProjectId !== projectId) return;
-    await dispatchGenerateResponse(state, type, gid, res, extraBody);
+    const request = () => requestWithPending(state, launch, flight);
+    await withLongRequestSlot(request, flight.controller.signal);
   } catch (e: unknown) {
-    if (state.currentProjectId !== projectId) return;
-    delete state.pendingById[gid];
+    if (state.currentProjectId !== projectId) {
+      if (!flight.sent) void sendGenerateInBackground(launch);
+      return;
+    }
+    delete state.pendingById[flight.gid];
     handleGenerateError(state, type, e, extraBody);
   } finally {
-    cleanupGenerateState(state, type, gid, projectId);
-  }
-};
-
-// Cours changé pendant le pré-contrôle : la génération part quand même vers son cours, sans rien
-// poser sur l'écran affiché (pending, chargement, toast) ; le serveur refait la garde de modération
-// et enregistre le résultat, visible au retour sur le cours. Jusqu'en v1.7.11 : perdue sans un mot.
-const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<void> {
-  try {
-    await fetchSingleGenerate(launch, crypto.randomUUID());
-  } catch (e: unknown) {
-    console.warn('[generate] envoi vers un cours quitté impossible', launch.type, e);
+    cleanupGenerateState(state, type, flight.gid, projectId);
   }
 };
 

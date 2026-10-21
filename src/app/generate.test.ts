@@ -16,6 +16,7 @@ import { setKey, _resetActiveKey } from './api-key';
 import { createSession } from './session';
 import { createConfirm } from './confirm';
 import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
+import { _resetLongRequestSlots, longRequestSlots, withLongRequestSlot } from './request-slots';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -144,6 +145,12 @@ const sentKey = (call: number): string | null => {
 
 afterEach(() => {
   _resetActiveKey();
+  // Aucune place des requêtes longues ne fuit, quel que soit le scénario (succès, refus, erreur,
+  // exception, annulation, changement de cours) : la file est partagée par tout l'onglet, une place
+  // perdue ferait attendre toutes les générations suivantes. File neuve pour le test suivant.
+  const left = longRequestSlots();
+  _resetLongRequestSlots();
+  expect(left).toEqual({ inFlight: 0, waiting: 0 });
 });
 
 function mockFetchFail(status: number, data: any = {}) {
@@ -1719,8 +1726,12 @@ describe('generateAuto — continue vers son cours quand on change de cours ou d
 
 // Serveur en HTTP/1.1 : le navigateur n'ouvre que 6 connexions par hôte, dont une pour le flux SSE.
 // Les 8 étapes d'un Auto, lancées ensemble, faisaient attendre l'ouverture d'un autre cours 10 à
-// 15 s (release-test du 2026-10-21) : au plus 4 à la fois, les suivantes dès qu'une se termine.
-describe('generateAuto — au plus 4 étapes en même temps', () => {
+// 15 s (release-test du 2026-10-21) ; limitées ensuite à 4 par Auto, deux Auto (deux cours) en
+// envoyaient encore 8 et bloquaient le chargement de chaque cours ouvert (mesuré le 2026-10-21 chez
+// le propriétaire). Limite GLOBALE (request-slots.ts) : au plus 3 requêtes longues pour tout
+// l'onglet, étapes Auto et générations simples confondues ; les suivantes dès qu'une se termine.
+describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', () => {
+  const session = createSession();
   const confirm = createConfirm();
   const allAgents = [
     'summary',
@@ -1733,43 +1744,88 @@ describe('generateAuto — au plus 4 étapes en même temps', () => {
     'dictation',
   ];
   const isRoute = (url: unknown) => String(url).endsWith('/generate/route');
+  const isCancel = (url: unknown) => String(url).endsWith('/cancel');
   const routeReply = () =>
     ({ ok: true, json: async () => ({ plan: allAgents.map((agent) => ({ agent })) }) }) as any;
-  const stepUrls = () =>
+  // Générations envoyées (étapes Auto et générations simples), dans l'ordre d'envoi, avec le gid de
+  // leur corps : seules les générations simples en portent un.
+  const sentGenerations = () =>
     vi
       .mocked(globalThis.fetch)
-      .mock.calls.map((c) => String(c[0]))
-      .filter((url) => !isRoute(url));
+      .mock.calls.filter(([url]) => !isRoute(url) && !isCancel(url))
+      .map(([url, init]) => ({
+        url: String(url),
+        gid: JSON.parse(String(init?.body)).gid as string | undefined,
+      }));
+  const stepUrls = () => sentGenerations().map((g) => g.url);
+  const planUrls = (projectId: string) =>
+    allAgents.map((type) => `/api/projects/${projectId}/generate/${type}`);
   const nextMacrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+  // Changement de cours tel que selectProject le fait (le cours suivant, puis resetSession).
+  const switchCourse = (ctx: any, projectId: string | null) => {
+    ctx.currentProjectId = projectId;
+    session.resetSession.call(ctx);
+  };
 
-  it('8 étapes : jamais plus de 4 requêtes à la fois, chaque fin en libère une, toutes partent dans l’ordre', async () => {
-    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+  // Générations tenues jusqu'à ce que le test les termine, la plus ancienne d'abord, ou abortées par
+  // leur signal ; compte celles en vol et le maximum atteint. Analyse de route immédiate ; annulation
+  // (POST /cancel) acceptée par le 404 du serveur, qui ne connaît pas une génération jamais envoyée.
+  const holdGenerations = () => {
     const finishers: Array<() => void> = [];
-    let inFlight = 0;
-    let maxInFlight = 0;
-    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+    const stats = { inFlight: 0, max: 0 };
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
       if (isRoute(url)) return routeReply();
-      inFlight++;
-      maxInFlight = Math.max(maxInFlight, inFlight);
-      await new Promise<void>((resolve) => finishers.push(resolve));
-      inFlight--;
+      if (isCancel(url)) return { ok: false, status: 404 } as any;
+      stats.inFlight++;
+      stats.max = Math.max(stats.max, stats.inFlight);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          finishers.push(resolve);
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      } finally {
+        stats.inFlight--;
+      }
       const type = String(url).split('/generate/')[1];
-      return { ok: true, json: async () => ({ id: 'g-' + type, type }) } as any;
+      return { ok: true, json: async () => ({ id: crypto.randomUUID(), type, data: {} }) } as any;
     });
+    return { finishers, stats, finishOldest: () => finishers.shift()!() };
+  };
+
+  // Places prises par d'autres requêtes longues de l'onglet, toutes rendues par `free`.
+  const occupySlots = (count: number) => {
+    const releases: Array<() => void> = [];
+    const requests = Array.from({ length: count }, () =>
+      withLongRequestSlot(() => new Promise<void>((resolve) => releases.push(resolve))),
+    );
+    return {
+      free: async () => {
+        await vi.waitFor(() => expect(releases).toHaveLength(count));
+        for (const release of releases) release();
+        await Promise.all(requests);
+      },
+    };
+  };
+
+  it('un Auto de 8 étapes : jamais plus de 3 requêtes à la fois, chaque fin en libère une, toutes partent dans l’ordre', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
 
     const run = gen.generateAuto.call(ctx);
-    await vi.waitFor(() => expect(stepUrls()).toHaveLength(4));
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
     await nextMacrotask();
-    expect(stepUrls()).toHaveLength(4); // les 4 suivantes attendent qu'une étape se termine
-    for (let started = 5; started <= allAgents.length; started++) {
-      finishers.shift()!();
+    expect(stepUrls()).toHaveLength(3); // les 5 suivantes attendent qu'une étape se termine
+    for (let started = 4; started <= allAgents.length; started++) {
+      held.finishOldest();
       await vi.waitFor(() => expect(stepUrls()).toHaveLength(started));
     }
-    for (const finish of finishers.splice(0)) finish();
+    for (const finish of held.finishers.splice(0)) finish();
     await run;
 
-    expect(maxInFlight).toBe(4);
-    expect(stepUrls()).toEqual(allAgents.map((type) => '/api/projects/pid-1/generate/' + type));
+    expect(held.stats.max).toBe(3);
+    expect(stepUrls()).toEqual(planUrls('pid-1'));
     expect(ctx.generations).toHaveLength(allAgents.length);
     expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
     expect(ctx.autoRuns).toEqual({});
@@ -1781,7 +1837,205 @@ describe('generateAuto — au plus 4 étapes en même temps', () => {
     );
   });
 
-  it('annulation (« Tout annuler ») : les 4 étapes en vol sont abortées, celles en file ne partent pas', async () => {
+  it('deux Auto de 8 étapes (deux cours) et deux générations simples : jamais plus de 3 requêtes à la fois, toutes partent, chaque Auto dans l’ordre de son plan', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
+    const autoSteps = (projectId: string) =>
+      sentGenerations()
+        .filter((g) => !g.gid && g.url.startsWith(`/api/projects/${projectId}/`))
+        .map((g) => g.url);
+
+    const autoA = gen.generateAuto.call(ctx); // cours pid-1
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    switchCourse(ctx, 'pid-2'); // l'Auto du cours pid-1 continue
+    const autoB = gen.generateAuto.call(ctx);
+    const singles = [gen.generate.call(ctx, 'summary'), gen.generate.call(ctx, 'quiz')];
+    // 3 étapes de pid-1 en vol ; en file : les 2 générations simples et une étape par voie de pid-2.
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 5 }));
+
+    const total = 2 * allAgents.length + singles.length;
+    while (held.finishers.length > 0) {
+      const started = stepUrls().length;
+      held.finishOldest();
+      if (started < total) await vi.waitFor(() => expect(stepUrls()).toHaveLength(started + 1));
+    }
+    await Promise.all([autoA, autoB, ...singles]);
+
+    expect(held.stats.max).toBe(3);
+    expect(stepUrls()).toHaveLength(total);
+    expect(autoSteps('pid-1')).toEqual(planUrls('pid-1'));
+    expect(autoSteps('pid-2')).toEqual(planUrls('pid-2'));
+    expect(sentGenerations().filter((g) => g.gid)).toEqual([
+      { url: '/api/projects/pid-2/generate/summary', gid: expect.any(String) },
+      { url: '/api/projects/pid-2/generate/quiz', gid: expect.any(String) },
+    ]);
+    // Les autres passent entre les étapes du 1er Auto, sans attendre qu'elles soient toutes parties.
+    const lastStepOfA = stepUrls().lastIndexOf(planUrls('pid-1').at(-1)!);
+    expect(stepUrls().findIndex((url) => url.startsWith('/api/projects/pid-2/'))).toBeLessThan(
+      lastStepOfA,
+    );
+    expect(sentGenerations().findIndex((g) => g.gid)).toBeLessThan(lastStepOfA);
+    // Cours affiché (pid-2) : ses étapes et ses deux générations ; l'Auto de pid-1 annonce sa fin.
+    expect(ctx.generations).toHaveLength(allAgents.length + singles.length);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.magicDone',
+      'success',
+      null,
+      expect.objectContaining({ label: 'toast.view' }),
+    );
+    expect(ctx.autoRuns).toEqual({});
+  });
+
+  it('génération simple annulée par sa puce pendant son attente : rien n’est envoyé, elle sort de la file et la suivante passe', async () => {
+    const ctx = makeContext();
+    const held = holdGenerations();
+    const others = occupySlots(3);
+    const summary = gen.generate.call(ctx, 'summary');
+    const quiz = gen.generate.call(ctx, 'quiz');
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 2 }));
+    // Puces affichées pendant l'attente.
+    const pendingOf = (type: string) =>
+      Object.values(ctx.pendingById).find((p: any) => p.type === type) as any;
+    const summaryGid = pendingOf('summary').id;
+    expect(pendingOf('quiz')).toBeDefined();
+    expect([ctx.loading.summary, ctx.loading.quiz]).toEqual([true, true]);
+
+    confirm.cancelOne.call(ctx, summaryGid);
+    await summary;
+
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 1 });
+    expect(ctx.pendingById[summaryGid]).toBeUndefined();
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledOne', 'info');
+    expect(ctx.showToast).not.toHaveBeenCalledWith(
+      'toast.typedError',
+      'error',
+      expect.any(Function),
+    );
+    expect(vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]))).toEqual([
+      `/api/projects/pid-1/generations/${summaryGid}/cancel`,
+    ]);
+
+    await others.free();
+    await vi.waitFor(() => expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/quiz']));
+    held.finishOldest();
+    await quiz;
+    expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/quiz']);
+    expect(ctx.loading.quiz).toBe(false);
+  });
+
+  it('cours quitté pendant l’attente : jamais partie, la génération part à son tour vers son cours, avec la clé et le corps du clic, sans rien afficher', async () => {
+    await activateKey('sk-profil-a');
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    const held = holdGenerations();
+    const others = occupySlots(3);
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(longRequestSlots().waiting).toBe(1));
+
+    switchCourse(ctx, 'pid-2');
+    ctx.selectedIds = [];
+    await activateKey('sk-profil-b');
+    await run;
+
+    expect(stepUrls()).toEqual([]);
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 1 }); // repartie en arrière-plan
+    await others.free();
+    await vi.waitFor(() => expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']));
+    expect(sentKey(0)).toBe('sk-profil-a');
+    const body = JSON.parse(String(vi.mocked(globalThis.fetch).mock.calls[0][1]?.body));
+    expect(body).toMatchObject({ sourceIds: ['s1'], count: 10 });
+    held.finishOldest();
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
+
+    // Rien sur l'écran du cours affiché : ni puce, ni chargement, ni génération, ni toast.
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  // Déjà envoyée : resetSession aborte son fetch (connexion libérée), le serveur la termine et
+  // l'enregistre. La renvoyer en ferait une seconde.
+  it('génération déjà partie puis cours quitté : pas renvoyée, sa place est rendue', async () => {
+    const ctx = makeContext();
+    holdGenerations();
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(1));
+    const signal = vi.mocked(globalThis.fetch).mock.calls[0][1]?.signal;
+
+    switchCourse(ctx, 'pid-2');
+    await run;
+    await nextMacrotask();
+
+    expect(signal?.aborted).toBe(true);
+    expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']);
+    expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 });
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('réponse en erreur ou exception réseau : la place est rendue, les générations en file partent', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ctx = makeContext();
+    const replies: Array<(outcome: 'http-error' | 'network' | 'ok') => void> = [];
+    vi.mocked(globalThis.fetch).mockImplementation(
+      (url) =>
+        new Promise((resolve, reject) => {
+          const type = String(url).split('/generate/')[1];
+          replies.push((outcome) => {
+            if (outcome === 'network') reject(new TypeError('Failed to fetch'));
+            else if (outcome === 'ok') {
+              resolve({ ok: true, json: async () => ({ id: 'g-' + type, type, data: {} }) } as any);
+            } else {
+              const error = { error: 'internal_error' };
+              resolve({
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                json: async () => error,
+              } as any);
+            }
+          });
+        }) as any,
+    );
+    const types = ['summary', 'flashcards', 'quiz', 'fill-blank', 'image'];
+    const runs = types.map((type) => gen.generate.call(ctx, type));
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 2 }));
+
+    replies[0]('http-error');
+    await vi.waitFor(() => expect(replies).toHaveLength(4));
+    replies[1]('network');
+    await vi.waitFor(() => expect(replies).toHaveLength(5));
+    for (const reply of replies.slice(2)) reply('ok');
+    await Promise.all(runs);
+
+    expect(stepUrls()).toEqual(types.map((type) => '/api/projects/pid-1/generate/' + type));
+    expect(ctx.generations.map((g: any) => g.type)).toEqual(['quiz', 'fill-blank', 'image']);
+    const errorToasts = ctx.showToast.mock.calls.filter((c: any[]) => c[0] === 'toast.typedError');
+    expect(errorToasts).toHaveLength(2);
+    errorSpy.mockRestore();
+  });
+
+  it('Auto annulé (« Tout annuler ») pendant que ses étapes attendent leur place : elles sortent de la file sans partir', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    holdGenerations();
+    const others = occupySlots(3);
+    const run = gen.generateAuto.call(ctx);
+    // Une étape par voie de l'Auto, en file derrière les 3 places prises.
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 3 }));
+
+    confirm.cancelGeneration.call(ctx);
+    await run;
+
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 0 });
+    expect(stepUrls()).toEqual([]);
+    expect(ctx.generations).toEqual([]);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+    await others.free();
+  });
+
+  it('annulation (« Tout annuler ») : les 3 étapes en vol sont abortées, celles en file ne partent pas', async () => {
     const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
     const signals: AbortSignal[] = [];
     vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
@@ -1791,20 +2045,18 @@ describe('generateAuto — au plus 4 étapes en même temps', () => {
     });
 
     const run = gen.generateAuto.call(ctx);
-    await vi.waitFor(() => expect(stepUrls()).toHaveLength(4));
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
     confirm.cancelGeneration.call(ctx);
     await run;
 
-    expect(signals.map((signal) => signal.aborted)).toEqual([true, true, true, true]);
-    expect(stepUrls()).toEqual(
-      allAgents.slice(0, 4).map((type) => '/api/projects/pid-1/generate/' + type),
-    );
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, true, true]);
+    expect(stepUrls()).toEqual(planUrls('pid-1').slice(0, 3));
     expect(ctx.generations).toEqual([]);
     expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
     expect(ctx.autoRuns).toEqual({});
   });
 
-  it('moins de 4 étapes : toutes partent ensemble, sans attendre', async () => {
+  it('moins de 3 étapes : toutes partent ensemble, sans attendre', async () => {
     const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
     vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
       if (isRoute(url)) {

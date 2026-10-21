@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createProjects } from './projects';
 import { createSession } from './session';
+import { longRequestSlots, MAX_LONG_REQUESTS, withLongRequestSlot } from './request-slots';
 
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
 
@@ -548,6 +549,36 @@ describe('selectProject', () => {
       held.respond(snapshotOf('p1', 'Histoire'));
       await opening;
       expect(ctx.sources).toEqual([{ id: 's-p1' }]);
+    });
+
+    // Mesuré le 2026-10-21 : deux Auto occupaient toutes les connexions du navigateur et le GET du
+    // cours attendait derrière leurs étapes. Les requêtes longues (générations) sont limitées à 3 et
+    // font la queue entre elles (request-slots.ts) ; l'ouverture d'un cours n'y passe jamais.
+    it('les 3 places des requêtes longues prises, d’autres en file : le GET du cours part tout de suite', async () => {
+      const releases: Array<() => void> = [];
+      const generations = Array.from({ length: MAX_LONG_REQUESTS + 2 }, () =>
+        withLongRequestSlot(() => new Promise<void>((resolve) => releases.push(resolve))),
+      );
+      expect(longRequestSlots()).toEqual({ inFlight: MAX_LONG_REQUESTS, waiting: 2 });
+      const held = holdFetch();
+      const ctx = openCourse();
+
+      const opening = proj.selectProject.call(ctx, 'p1');
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(globalThis.fetch).mock.calls[0][0]).toBe('/api/projects/p1?profileId=p1');
+      expect(longRequestSlots()).toEqual({ inFlight: MAX_LONG_REQUESTS, waiting: 2 });
+      held.respond(snapshotOf('p1', 'Histoire'));
+      await opening;
+      expect(ctx.sources).toEqual([{ id: 's-p1' }]);
+
+      // Places rendues une à une : les générations en file partent à leur tour, puis se terminent.
+      for (let finished = 0; finished < generations.length; finished++) {
+        await vi.waitFor(() => expect(releases.length).toBeGreaterThan(0));
+        releases.shift()!();
+      }
+      await Promise.all(generations);
+      expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 });
     });
   });
 

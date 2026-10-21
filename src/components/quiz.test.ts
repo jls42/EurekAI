@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { quizComponent } from './quiz';
 import { createGenerate, registerGeneration } from '../app/generate';
+import {
+  _resetLongRequestSlots,
+  longRequestSlots,
+  MAX_LONG_REQUESTS,
+  withLongRequestSlot,
+} from '../app/request-slots';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('../app/helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -55,6 +61,10 @@ describe('quizComponent', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    // Aucune place des requêtes longues de l'onglet ne fuit (remédiation et ses réessais).
+    const left = longRequestSlots();
+    _resetLongRequestSlots();
+    expect(left).toEqual({ inFlight: 0, waiting: 0 });
   });
 
   describe('etat initial', () => {
@@ -614,6 +624,33 @@ describe('quizComponent', () => {
       }
       await promise;
       expect(comp.reviewing).toBe(false);
+    });
+
+    // Requêtes longues limitées à 3 pour tout l'onglet (request-slots.ts) : la fiche de rappel et
+    // le quiz de révision y prennent chacun leur place, comme les étapes Auto et les générations.
+    it('places des requêtes longues toutes prises : les deux générations attendent leur tour, puis partent', async () => {
+      const releases: Array<() => void> = [];
+      const others = Array.from({ length: MAX_LONG_REQUESTS }, () =>
+        withLongRequestSlot(() => new Promise<void>((resolve) => releases.push(resolve))),
+      );
+      mockRemediationFetch({ ok: true, gen: summaryGen }, { ok: true, gen: quizGen });
+      const comp = createQuiz(sampleQuestions);
+      comp.answers = { 0: 0 };
+
+      const promise = comp.remediate();
+      await vi.waitFor(() => expect(longRequestSlots().waiting).toBe(2));
+      expect(global.fetch).not.toHaveBeenCalled();
+      expect(comp.reviewing).toBe(true);
+
+      releases.shift()!();
+      await promise;
+
+      expect(global.fetch).toHaveBeenCalledTimes(2);
+      expect(registerGeneration).toHaveBeenCalledWith(comp, summaryGen);
+      expect(registerGeneration).toHaveBeenCalledWith(comp, quizGen);
+      expect(comp.reviewing).toBe(false);
+      for (const release of releases) release();
+      await Promise.all(others);
     });
 
     // Règle « ça continue même si on change de page » (2026-10-21) : la remédiation part vers le

@@ -146,8 +146,9 @@
 
           <!-- Cours choisi, en cours d'ouverture (selectProject) : son nom et un chargement, jamais
                l'état vide « Ajoute tes premières sources » ni le contenu du cours précédent (le bloc
-               du cours ci-dessous attend son snapshot ; jusqu'à 15 s avant la limite de 4 étapes Auto
-               en parallèle, release-test du 2026-10-21). <output> natif plutôt que role="status"
+               du cours ci-dessous attend son snapshot ; jusqu'à 15 s quand les étapes des Auto
+               prenaient toutes les connexions, release-test du 2026-10-21, avant la limite globale des
+               requêtes longues de src/app/request-slots.ts). <output> natif plutôt que role="status"
                (Sonar Web:S6819) : contenu de phrase seulement, d'où des <span> en bloc. -->
           <output x-show="currentProjectId && projectLoading" class="block py-16 text-center">
             <span
