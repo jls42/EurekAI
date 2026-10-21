@@ -3,6 +3,7 @@ paths:
   - "src/**/*.{html,css}"
   - "src/components/*.ts"
   - "src/app/toast*.ts"
+  - "src/app/view-media*.ts"
   - "src/a11y-templates.test.ts"
   - "src/dialog-templates.test.ts"
   - "DESIGN.md"
@@ -24,6 +25,7 @@ Déplacé tel quel depuis CLAUDE.md (sections « HTML interactif » et « Design
 - Les boutons de generation dans view-sources sont dynamiques via `x-for` sur `categories` — ne pas hardcoder
 - **Nom accessible qui contient le libellé visible (WCAG 2.5.3)** : un `:aria-label` sur un bouton qui affiche du texte reprend les MÊMES expressions que ses `x-text` (bouton qui affiche `t(cat.labelKey)` → `t('a11y.generateCategory', { category: t(cat.labelKey) })` ; pastille de stats → compteur compris). Libellés de la forme « Verbe : {category} » (`a11y.generateCategory`, `a11y.viewCategory`, `a11y.cancelGeneration`), sans article : « Générer des Fiche de révision » ne s'accordait pas. Bouton icône seule : `:aria-label` explicite + `aria-hidden="true"` sur le SVG décoratif. Interrupteur : `<button type="button" role="switch" :aria-checked="String(!!x)" :aria-label="…">`. Verrou : `src/a11y-templates.test.ts`.
 - **RTL (arabe)** : `ml-*`/`mr-*` et `translate-x-*` sont PHYSIQUES → marges logiques (`ms-*`, `me-*`) et variante `rtl:` pour les translations (`translate-x-6 rtl:-translate-x-6` : Tailwind 4 la génère en `:where(:lang(ar)…, [dir=rtl], [dir=rtl] *)`, placée après la règle de base, qu'elle remplace). Sinon le curseur d'un interrupteur ou une marge part du mauvais côté.
+- **Son et changement de vue** : les vues sont en `x-show`, jamais retirées du DOM. Un `<audio>` qui joue continuait donc dans une vue cachée, sans contrôle visible : lecture d'une fiche qui se poursuivait sur la vue Flashcards (vécu au release-test du 2026-10-22, défaut présent depuis l'origine), podcast de plusieurs minutes, sons superposés. `watchViewMedia` (`src/app/view-media.ts`, posé dans `init()`) observe `activeView`, donc tous ses écrivains (`goToView`, `selectProject`, `deleteProject`). Il met en pause tout son qui joue, en gardant la position, puis émet `eurekai-view-change` sur `window`. Un composant qui programme une relecture différée l'écoute et l'annule (dictée : `@eurekai-view-change.window="stopWord()"`). Jamais de `x-if` sur une vue pour couper le son : l'état des composants (quiz en cours) serait perdu. Verrous : `src/app/view-media.test.ts`, `src/app/index.test.ts` (« observe activeView »).
 
 ## Design Context
 

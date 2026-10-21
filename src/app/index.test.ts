@@ -260,6 +260,7 @@ describe('init', () => {
     a.refreshIcons = vi.fn();
     a.openSourceDialog = vi.fn();
     a.$nextTick = vi.fn((cb: () => void) => cb());
+    a.$watch = vi.fn();
     a.theme = 'light';
     a.sources = [{ id: 'src-1', text: 'hello' }];
   });
@@ -276,6 +277,11 @@ describe('init', () => {
     expect(a.loadProfiles).toHaveBeenCalled();
     expect(a.loadConfig).toHaveBeenCalled();
     expect(a.refreshIcons).toHaveBeenCalled();
+  });
+
+  it('observe activeView : le son de la vue quittée est coupé (view-media.ts)', async () => {
+    await a.init();
+    expect(a.$watch).toHaveBeenCalledWith('activeView', expect.any(Function));
   });
 
   it('sets theme on document element dataset', async () => {

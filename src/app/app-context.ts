@@ -57,6 +57,8 @@ type NotifSpec = {
 
 export interface AppContext extends AppState {
   $nextTick(cb?: () => void): Promise<void>;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- noms de params documentaires (Codacy n'honore pas argsIgnorePattern)
+  $watch(property: string, callback: () => void): void;
   $refs: Record<string, HTMLElement | HTMLDialogElement | undefined>;
   t: TFn;
   locale: string;
