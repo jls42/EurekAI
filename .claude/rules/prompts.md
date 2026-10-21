@@ -1,6 +1,33 @@
+---
+paths:
+  - "prompts*.ts"
+  - "generators/**/*.ts"
+  - "helpers/diversity*.ts"
+  - "helpers/fill-blank-validate*.ts"
+  - "helpers/auto-title.ts"
+  - "helpers/choice-labels*.ts"
+  - "routes/generate*.ts"
+  - "routes/chat*.ts"
+  - "docs/prompts.md"
+  - "docs/inventaire-prompts.md"
+---
+
 # Prompts IA — Conventions
 
+Section « Résumé (ex-CLAUDE.md) » déplacée telle quelle depuis CLAUDE.md (section « Prompts IA (anti-leak lexical) », sauf la règle `prompts.ts` restée dans CLAUDE.md), le 2026-10-21 ; le reste du fichier est inchangé.
+
 Toutes les fonctions de prompt vivent dans `prompts.ts`. Les generators (`generators/*.ts`) les importent et composent, ils ne redefinissent pas de prompt inline.
+
+## Résumé (ex-CLAUDE.md)
+
+### Prompts IA (anti-leak lexical)
+- **Ne JAMAIS mettre de tokens méta** (`"fiche"`, `"complete"`, `"exhaustive"`, `"synthese"`) au voisinage d'un champ JSON que le LLM produit sous forme de texte libre (surtout `title`, `word`, `question`) — le LLM recycle ces mots dans ses outputs (bug historique `"— Fiche de révision COMPLÈTE"` dans les titres)
+- **Pas de blacklist explicite** (`"pas de 'Fiche'"`) qui réinjecte les mots — préférer règle positive + exemples positifs
+- **Règle "title" summary** : `data.title` = sujet du cours uniquement, préfixe `"Fiche — "` ajouté par `helpers/auto-title.ts` pour la carte liste seulement ; la vue détail affiche `data.title` brut
+- **Retry prompt** (`generators/summary.ts`) : même discipline que le prompt initial, pas d'écho des formulations problématiques
+- **Podcast** : seul générateur en sortie structurée stricte (`PODCAST_RESPONSE_FORMAT`, `json_schema` : 6 à 8 répliques `host`/`guest`) — en `json_object`, `mistral-large-latest` rendait la moitié des premiers scripts inexploitables (mesuré le 2026-10-04) ; accroche tirée par `pickPodcastHook` parmi les débuts qu'aucun podcast précédent n'a pris (lister les accroches passées amorçait leur reprise). Mesures : `.claude/rules/prompts.md` (Contrat JSON, Bloc d'exclusions).
+- **Textes à trous et quiz fiables** : correcteur `helpers/fill-blank-validate.ts`, source unique du navigateur et du score serveur, qui reçoit l'exercice entier (`accepted`, phrase, indice) : nombres, dates, siècles et chiffres romains exacts (jusqu'en v1.7.9, « 1788 » passait pour « 1789 » et « XIVe » pour « XVe »), toutes leurs écritures équivalentes (« 9 » = « neuf », « XVe » = « 15e » = « quinzième ») sauf écriture imposée par la phrase ; apostrophe ’, œ et exposant ᵉ des tablettes tolérés. Le générateur garde une écriture dans `answer` (les autres dans `accepted`) et écarte un exercice qui donne sa réponse (`answerLeaks`). `answerKey` (`helpers/diversity.ts`) délègue à `normalizeAnswer`. Prompts : `factsInstruction` (rien d'inventé, règle des siècles) et `distractorsInstruction` (distracteurs faux dans la réalité aussi). Mesures et règles : `.claude/rules/prompts.md` (Textes à trous et fidélité au contenu).
+- Détails complets et règles sur emphases MAJUSCULES / few-shots / retry dans `.claude/rules/prompts.md`
 
 ## lang + ageGroup (obligatoire)
 
