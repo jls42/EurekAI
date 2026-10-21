@@ -12,7 +12,9 @@ import type { ModerationResult, Source } from '../../types';
 
 // Plafond de sourceIds de la route (400 invalid_input au-delà).
 const MAX_VERIFIED_SOURCE_IDS = 50;
-const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
+// Id de cours sûr à placer dans une URL d'API (validation avant les barrières taint de Codacy
+// rule-node-ssrf, cf. ci-dessous) ; partagé par generate.ts et recorder.ts.
+export const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 type ModerationEntry = { id?: unknown; moderation?: ModerationResult };
 

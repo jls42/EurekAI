@@ -20,6 +20,7 @@ import {
   ensureGenerationAllowed,
   generationSources,
   type GenerationCheck,
+  PROJECT_ID_SAFE,
 } from './moderation-gate';
 
 const TOAST_GENERATION_ERROR = 'toast.generationError';
@@ -33,7 +34,6 @@ const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 const TOAST_AUTO_FAILED_IN = 'toast.autoFailedIn';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
-const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 type GenerationUI = Generation & {
   _playlistMode?: boolean;
@@ -196,11 +196,26 @@ export async function runAutoRoute(
   state: AppContext,
   launch: AutoLaunch,
 ): Promise<AutoRoute | null> {
-  const routeRes = await fetch(
-    // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-    '/api/projects/' + launch.projectId + '/generate/route',
-    withAiHeaders(postJson(launch.body, launch.controller.signal), { keyOverride: launch.key }),
-  );
+  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
+  const url = '/api/projects/' + launch.projectId + '/generate/route';
+  // Barrière taint de Codacy rule-node-ssrf, forme `if (allowedUrls.includes(url)) { fetch(url, …) }`
+  // (cf. moderation-gate.ts) : l'id du cours, capturé au clic, est validé avant de composer l'URL.
+  const allowedUrls = PROJECT_ID_SAFE.test(launch.projectId) ? [url] : [];
+  if (allowedUrls.includes(url)) {
+    const routeRes = await fetch(
+      url,
+      withAiHeaders(postJson(launch.body, launch.controller.signal), { keyOverride: launch.key }),
+    );
+    return handleAutoRouteResponse(state, launch, routeRes);
+  }
+  return null;
+}
+
+const handleAutoRouteResponse = async (
+  state: AppContext,
+  launch: AutoLaunch,
+  routeRes: Response,
+): Promise<AutoRoute | null> => {
   if (!routeRes.ok) {
     const err = await routeRes.json().catch(() => ({}));
     reportAutoRouteError(state, launch, err.error || routeRes.statusText);
@@ -212,7 +227,7 @@ export async function runAutoRoute(
     addCostDelta(state, route.costDelta, 'generate/route');
   }
   return route;
-}
+};
 
 // Puce « Auto — analyse… » sur le cours affiché, annulable par cancelOne('auto').
 const showAutoAnalysis = (state: AppContext, launch: AutoLaunch): void => {
@@ -895,12 +910,7 @@ const readAloudInFlight = new Set<string>();
 
 type ReadAloudFlight = { projectId: string | null; busyKey: string; id: string };
 
-const readAloudFlight = (
-  state: AppContext,
-  gen: GenerationUI,
-  section?: string,
-): ReadAloudFlight => {
-  const key = section || 'all';
+const readAloudFlight = (state: AppContext, gen: GenerationUI, key = 'all'): ReadAloudFlight => {
   const projectId = state.currentProjectId;
   return { projectId, busyKey: `_generatingVoice_${key}`, id: `${projectId}:${gen.id}:${key}` };
 };
@@ -962,6 +972,10 @@ const endReadAloud = (state: AppContext, gen: GenerationUI, flight: ReadAloudFli
   if (current) current[flight.busyKey] = false;
 };
 
+const readAloudIdsSafe = (flight: ReadAloudFlight, gen: GenerationUI): boolean => {
+  return PROJECT_ID_SAFE.test(flight.projectId ?? '') && PROJECT_ID_SAFE.test(gen.id);
+};
+
 const runGenerateVoice = async function (
   state: AppContext,
   gen: GenerationUI,
@@ -976,15 +990,20 @@ const runGenerateVoice = async function (
   try {
     const body: Record<string, unknown> = { lang: getLocale() };
     if (section) body.section = section;
-    const res = await fetch(
-      state.apiBase() + '/generations/' + gen.id + '/read-aloud',
-      withAiHeaders({
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      }),
-    );
-    await handleReadAloudResponse(state, gen, flight, res, section);
+    const url = '/api/projects/' + flight.projectId + '/generations/' + gen.id + '/read-aloud';
+    // Barrière taint de Codacy rule-node-ssrf (cf. runAutoRoute) : ids validés avant l'URL.
+    const allowedUrls = readAloudIdsSafe(flight, gen) ? [url] : [];
+    if (allowedUrls.includes(url)) {
+      const res = await fetch(
+        url,
+        withAiHeaders({
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }),
+      );
+      await handleReadAloudResponse(state, gen, flight, res, section);
+    }
   } catch (e) {
     reportReadAloudException(state, gen, flight, e, section);
   } finally {

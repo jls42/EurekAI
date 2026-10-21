@@ -1,5 +1,6 @@
 import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
+import { PROJECT_ID_SAFE } from './moderation-gate';
 import type { AppContext } from './app-context';
 import type { Source } from '../../types';
 
@@ -81,10 +82,16 @@ const postVoice = (target: VoiceTarget, blob: Blob): Promise<Response> => {
   const formData = new FormData();
   formData.append('audio', blob, 'recording.webm');
   formData.append('lang', target.lang);
-  return fetch(
-    '/api/projects/' + encodeURIComponent(target.projectId) + '/sources/voice',
-    withAiHeaders({ method: 'POST', body: formData }, { keyOverride: target.key }),
-  );
+  const url = '/api/projects/' + target.projectId + '/sources/voice';
+  // Barrière taint de Codacy rule-node-ssrf (cf. moderation-gate.ts) : id du cours validé avant l'URL.
+  const allowedUrls = PROJECT_ID_SAFE.test(target.projectId) ? [url] : [];
+  if (allowedUrls.includes(url)) {
+    return fetch(
+      url,
+      withAiHeaders({ method: 'POST', body: formData }, { keyOverride: target.key }),
+    );
+  }
+  return Promise.reject(new Error('invalid project id'));
 };
 
 // Échec : toast habituel sur le cours de l'enregistrement ; ailleurs, toast qui nomme ce cours.
