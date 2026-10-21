@@ -197,6 +197,13 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
 };
 
 const selectProject = async function (this: AppContext, id: string) {
+  // Cours déjà ouvert, re-touché dans la liste (barre latérale, onglet « Cours ») : aucune remise à
+  // zéro. Elle annulait toute action en cours (analyse Auto, import, enregistrement…) : vécu le
+  // 2026-10-21, « l'analyse Auto disparaît et rien n'arrive ». Retour à l'accueil du cours seulement.
+  if (id === this.currentProjectId && this.currentProject !== null) {
+    this.activeView = this.sources.length === 0 ? 'sources' : 'dashboard';
+    return;
+  }
   this.currentProjectId = id;
   const profileId = this.currentProfile?.id;
   if (profileId) setLastProjectIdForProfile(profileId, id);

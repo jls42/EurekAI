@@ -256,6 +256,22 @@ describe('createProject', () => {
 // --- selectProject ---
 
 describe('selectProject', () => {
+  it('re-touching the open project resets nothing (an Auto analysis or an import keeps running)', async () => {
+    const ctx = makeContext({
+      currentProjectId: 'p1',
+      currentProject: { meta: { id: 'p1', name: 'Histoire' } },
+      sources: [{ id: 's1' }],
+      activeView: 'quiz',
+      loading: { auto: true },
+    });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(ctx.resetSession).not.toHaveBeenCalled();
+    expect(ctx.sources).toEqual([{ id: 's1' }]); // resetState l'aurait vidé
+    expect(ctx.loading).toEqual({ auto: true });
+    expect(ctx.activeView).toBe('dashboard');
+  });
+
   it('fetches project, sets sources/generations/chat, opens latest-by-type gens', async () => {
     const projectData = {
       id: 'p1',
