@@ -1,5 +1,5 @@
 import { addCostDelta } from './cost-utils';
-import { withAiHeaders } from './ai-fetch';
+import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { hashFile, findExistingDuplicate } from './source-dedup';
 import { mergeSourceModerations, requestSourceModeration } from './moderation-gate';
 import { syncConsigneAfterDelete } from './consigne';
@@ -12,11 +12,22 @@ type UploadFile = UploadSession['files'][number];
 
 const TOAST_ERROR = 'toast.error';
 
+/**
+ * Session encore suivie : ni terminée et retirée, ni abandonnée avec son cours supprimé. Un import
+ * CONTINUE tant que sa session vit, même si l'utilisateur change de cours (comme une génération) :
+ * jusqu'en v1.7.11, changer de cours vidait les sessions et arrêtait l'import après le fichier en
+ * cours d'envoi, sans rien dire (vécu le 2026-10-21 : 2 fichiers sur plusieurs importés).
+ */
+export function _isSessionAlive(ctx: AppContext, session: UploadSession): boolean {
+  return ctx.uploadSessions.some((s: UploadSession) => s.id === session.id);
+}
+
+/**
+ * Session vivante du cours affiché : ses résultats s'appliquent à l'écran (sources, sélection, coût,
+ * toasts par fichier). Un import d'un autre cours continue sans toucher à l'écran courant.
+ */
 export function _isSessionActive(ctx: AppContext, session: UploadSession): boolean {
-  return (
-    ctx.uploadSessions.some((s: UploadSession) => s.id === session.id) &&
-    ctx.currentProjectId === session.projectId
-  );
+  return _isSessionAlive(ctx, session) && ctx.currentProjectId === session.projectId;
 }
 
 export async function _resolveHttpError(
@@ -26,10 +37,10 @@ export async function _resolveHttpError(
 ): Promise<string | null> {
   try {
     const err = await res.json();
-    if (!_isSessionActive(ctx, session)) return null;
+    if (!_isSessionAlive(ctx, session)) return null;
     return ctx.resolveError(err.error || res.statusText);
   } catch {
-    if (!_isSessionActive(ctx, session)) return null;
+    if (!_isSessionAlive(ctx, session)) return null;
     return res.statusText;
   }
 }
@@ -40,12 +51,16 @@ export function _applyUploadSuccess(
   file: UploadFile,
   newSources: Source[],
 ) {
-  ctx.sources.push(...newSources);
-  ctx.selectedIds.push(...newSources.map((s: Source) => s.id));
-  for (const s of newSources) addCostDelta(ctx, s.estimatedCost, 'sources/upload');
   file.file = null;
   file.status = 'done';
   void ctx.$nextTick(() => ctx.refreshIcons());
+  // Import d'un autre cours : rien à afficher ici, ses sources et son coût seront relus au retour.
+  if (!_isSessionActive(ctx, session)) return;
+  // Retour sur le cours pendant l'import : selectProject a pu relire la source déjà persistée.
+  const fresh = newSources.filter((n: Source) => !ctx.sources.some((s: Source) => s.id === n.id));
+  ctx.sources.push(...fresh);
+  ctx.selectedIds.push(...fresh.map((s: Source) => s.id));
+  for (const s of fresh) addCostDelta(ctx, s.estimatedCost, 'sources/upload');
   if (newSources.some((s: Source) => s.moderation?.status === 'pending')) {
     setTimeout(() => {
       if (_isSessionActive(ctx, session)) void ctx.refreshModeration();
@@ -64,7 +79,8 @@ export async function _handleUploadHttpError(
   file.status = 'error';
   file.errorMsg = resolved;
   void ctx.$nextTick(() => ctx.refreshIcons());
-  ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
+  if (_isSessionActive(ctx, session))
+    ctx.showToast(ctx.t(TOAST_ERROR, { error: resolved }), 'error');
   return 'failed';
 }
 
@@ -74,12 +90,14 @@ export function _handleUploadException(
   file: UploadFile,
   e: unknown,
 ): UploadResult {
-  if (!_isSessionActive(ctx, session)) return 'ignored';
+  if (!_isSessionAlive(ctx, session)) return 'ignored';
   console.error('[sources:upload]', file.name, e);
   file.status = 'error';
   file.errorMsg = ctx.t('sources.uploadError.generic');
   void ctx.$nextTick(() => ctx.refreshIcons());
-  ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
+  if (_isSessionActive(ctx, session)) {
+    ctx.showToast(ctx.t('toast.uploadError', { filename: file.name }), 'error');
+  }
   return 'failed';
 }
 
@@ -88,7 +106,7 @@ export async function _uploadSingleFile(
   session: UploadSession,
   fileId: string,
 ): Promise<UploadResult> {
-  if (!_isSessionActive(this, session)) return 'ignored';
+  if (!_isSessionAlive(this, session)) return 'ignored';
   const file = session.files.find((f: UploadFile) => f.id === fileId);
   if (!file?.file) return 'ignored';
 
@@ -100,15 +118,17 @@ export async function _uploadSingleFile(
 
   const formData = new FormData();
   formData.append('files', file.file, file.name);
-  formData.append('lang', this.locale);
+  // Langue et clé du lancement de l'import (même après un changement de profil), sinon celles
+  // affichées (session créée sans elles).
+  formData.append('lang', session.lang ?? this.locale);
   if (forced) formData.append('allowDuplicates', 'true');
 
   try {
     const res = await fetch(
       `/api/projects/${session.projectId}/sources/upload`,
-      withAiHeaders({ method: 'POST', body: formData }),
+      withAiHeaders({ method: 'POST', body: formData }, { keyOverride: session.aiKey }),
     );
-    if (!_isSessionActive(this, session)) return 'ignored';
+    if (!_isSessionAlive(this, session)) return 'ignored';
     return await _handleUploadResponse(this, session, file, res);
   } catch (e: unknown) {
     return _handleUploadException(this, session, file, e);
@@ -125,7 +145,7 @@ async function _handleUploadResponse(
 ): Promise<UploadResult> {
   if (!res.ok) return _handleUploadHttpError(ctx, session, file, res);
   const payload = await res.json();
-  if (!_isSessionActive(ctx, session)) return 'ignored';
+  if (!_isSessionAlive(ctx, session)) return 'ignored';
   if (_responseHasDuplicate(payload, file.name)) {
     file.status = 'duplicate';
     void ctx.$nextTick(() => ctx.refreshIcons());
@@ -160,18 +180,37 @@ export function _createUploadSession(
     status: 'pending' as const,
     errorMsg: null as string | null,
   }));
-  ctx.uploadSessions.push({ id: sessionId, projectId, files, cleanupScheduled: false });
+  const projectName = ctx.currentProject?.meta.name ?? '';
+  ctx.uploadSessions.push({
+    id: sessionId,
+    projectId,
+    projectName,
+    // Capturées au lancement : les fichiers restants partent avec la langue et la clé du profil
+    // qui a lancé l'import, même s'il a changé entre-temps (clé '' = clé d'env, jamais l'active).
+    lang: ctx.locale,
+    aiKey: captureAiKey(),
+    files,
+    cleanupScheduled: false,
+  });
   void ctx.$nextTick(() => ctx.refreshIcons());
   return ctx.uploadSessions.find((s: UploadSession) => s.id === sessionId) ?? null;
+}
+
+export interface UploadLoopOutcome {
+  applied: number;
+  failed: number;
+  interrupted: boolean;
 }
 
 export async function _runUploadLoop(
   ctx: AppContext,
   session: UploadSession,
-): Promise<{ applied: number; interrupted: boolean }> {
+): Promise<UploadLoopOutcome> {
   let applied = 0;
+  let failed = 0;
   let interrupted = false;
-  // Un fichier à la fois : arrêt dès qu'une réponse est ignorée (projet changé pendant l'import).
+  // Un fichier à la fois, même si l'utilisateur change de cours ; arrêt seulement quand la session
+  // disparaît (cours supprimé pendant l'import).
   for (const fileEntry of session.files) {
     // Pré-check client : un doublon déjà détecté n'est PAS uploadé (zéro coût OCR). L'utilisateur le
     // force via « Importer quand même » (retryFile) qui rappelle _uploadSingleFile avec allowDuplicates.
@@ -183,8 +222,9 @@ export async function _runUploadLoop(
       break;
     }
     if (result === 'applied') applied++;
+    if (result === 'failed') failed++;
   }
-  return { applied, interrupted };
+  return { applied, failed, interrupted };
 }
 
 /**
@@ -205,7 +245,12 @@ export async function _markClientDuplicates(
     void ctx.$nextTick(() => ctx.refreshIcons());
     // eslint-disable-next-line no-await-in-loop -- doublons du lot repérés dans l'ordre, cf. ci-dessus
     const hash = await hashFile(f.file);
-    if (!_isSessionActive(ctx, session)) return;
+    // Cours changé pendant le calcul : `ctx.sources` n'est plus celui du lot ; les fichiers restants
+    // partent tels quels, la garde serveur repère les doublons.
+    if (!_isSessionActive(ctx, session)) {
+      f.status = 'pending';
+      return;
+    }
     const existing = findExistingDuplicate(hash, f.name, ctx.sources);
     const intraBatch = hash ? seen.has(hash) : false;
     if (existing || intraBatch) {
@@ -223,15 +268,37 @@ function _notifyDuplicates(ctx: AppContext, session: UploadSession): void {
   if (n > 0) ctx.showToast(ctx.t('sources.duplicateWarning', { n: String(n) }), 'warning');
 }
 
+// Import terminé pendant qu'un autre cours est affiché : un toast nomme le cours (nombre de fichiers
+// ajoutés, puis en erreur) ; les détails restent dans la liste d'import de ce cours.
+const notifyBackgroundUpload = (
+  ctx: AppContext,
+  outcome: UploadLoopOutcome,
+  session: UploadSession,
+) => {
+  const project = session.projectName ?? '';
+  if (outcome.applied > 0) {
+    const params = { project, n: String(outcome.applied) };
+    ctx.showToast(ctx.t('toast.importDoneIn', params), 'success');
+  }
+  if (outcome.failed > 0) {
+    const params = { project, n: String(outcome.failed) };
+    ctx.showToast(ctx.t('toast.importErrorsIn', params), 'warning');
+  }
+};
+
 export function _maybeFinalizeUpload(
   ctx: AppContext,
-  applied: number,
-  interrupted: boolean,
-  projectId: string,
+  outcome: UploadLoopOutcome,
+  session: UploadSession,
 ): void {
-  if (applied > 0 && !interrupted && ctx.currentProjectId === projectId) {
+  if (outcome.interrupted) return;
+  if (ctx.currentProjectId !== session.projectId) {
+    notifyBackgroundUpload(ctx, outcome, session);
+    return;
+  }
+  if (outcome.applied > 0) {
     ctx.showToast(ctx.t('toast.sourcesAdded'), 'success');
-    _scheduleConsigneRefresh.call(ctx, projectId);
+    _scheduleConsigneRefresh.call(ctx, session.projectId);
   }
 }
 
@@ -252,6 +319,18 @@ export function _maybeCleanupSession(this: AppContext, sessionId: string) {
     }, 3000);
   }
 }
+
+// Statuts d'un fichier encore en cours d'import : 'hashing' = pré-check en cours. 'duplicate' = en
+// attente de décision (Importer quand même / Ignorer) → PAS bloquant, exclu pour ne pas figer l'UI.
+const UPLOADING_STATUSES: ReadonlySet<UploadFile['status']> = new Set([
+  'pending',
+  'hashing',
+  'uploading',
+]);
+
+const sessionIsUploading = (session: UploadSession): boolean => {
+  return session.files.some((f: UploadFile) => UPLOADING_STATUSES.has(f.status));
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers extraits de createSources.addText pour rester sous CCN 8 (Lizard).
@@ -333,6 +412,23 @@ const runAddText = async function (state: AppContext): Promise<void> {
 
 export function createSources() {
   return {
+    // Imports du cours affiché (liste d'avancement) : ceux d'un autre cours continuent en arrière-plan
+    // sans s'y montrer. MÉTHODE, pas getter : le `...createState()` de app() fige les getters.
+    projectUploadSessions(this: AppContext): UploadSession[] {
+      return this.uploadSessions.filter(
+        (s: UploadSession) => s.projectId === this.currentProjectId,
+      );
+    },
+
+    // Import du cours affiché en cours : bloc « Générer » masqué, « Ajouter » (texte) désactivé.
+    // MÉTHODE : le getter `uploading` de createState était figé à false dans l'app réelle depuis #14
+    // (`...createState()` copie la valeur d'un getter) ; ni l'un ni l'autre ne réagissaient.
+    isUploading(this: AppContext): boolean {
+      return this.uploadSessions.some(
+        (s: UploadSession) => s.projectId === this.currentProjectId && sessionIsUploading(s),
+      );
+    },
+
     handleDrop(this: AppContext, e: DragEvent) {
       this.dragging = false;
       void this.handleFiles(e.dataTransfer?.files);
@@ -344,10 +440,10 @@ export function createSources() {
       const session = _createUploadSession(this, fileList, projectId);
       if (!session) return;
       await _markClientDuplicates(this, session);
-      if (!_isSessionActive(this, session)) return;
-      const { applied, interrupted } = await _runUploadLoop(this, session);
-      _notifyDuplicates(this, session);
-      _maybeFinalizeUpload(this, applied, interrupted, projectId);
+      if (!_isSessionAlive(this, session)) return;
+      const outcome = await _runUploadLoop(this, session);
+      if (this.currentProjectId === projectId) _notifyDuplicates(this, session);
+      _maybeFinalizeUpload(this, outcome, session);
       _maybeCleanupSession.call(this, session.id);
     },
 

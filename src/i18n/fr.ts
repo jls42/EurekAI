@@ -153,7 +153,7 @@ export const fr: Record<string, string> = {
   'common.save': 'Sauvegarder',
   'common.reset': 'Réinitialiser',
   'common.sources': 'Sources',
-  'common.loading': 'En cours...',
+  'common.loading': 'Chargement...',
   'common.generating': 'Génération...',
   'common.rename': 'Renommer',
   'common.addSources': 'Ajouter des sources',
@@ -212,6 +212,12 @@ export const fr: Record<string, string> = {
   'settings.perMChars': 'par M caractères',
   'settings.priceUnknown': 'tarif indisponible',
   'settings.ocrHint': 'OCR 3 : économique. OCR 4 : meilleure qualité, coût 2×.',
+  'settings.stt': 'Transcription',
+  'settings.sttHint': 'Entrée vocale et réponses orales du quiz vocal.',
+  'settings.ttsHint':
+    'Podcast, quiz vocal, dictée et lecture à voix haute. TTS 3 (préversion) : voix natives dans plus de langues, mais mots isolés de la dictée moins bien prononcés.',
+  'settings.perMinute': 'par minute',
+  'settings.preview': 'Préversion',
 
   // Dashboard
   'dashboard.subtitle': 'Tableau de bord',
@@ -463,6 +469,15 @@ export const fr: Record<string, string> = {
   'toast.profileUpdated': 'Profil mis à jour',
   'toast.profileReset': 'Préférences réinitialisées',
   'toast.sourcesAdded': 'Sources ajoutées !',
+  'toast.importDoneIn': 'Import terminé dans « {project} » : {n} source(s) ajoutée(s).',
+  'toast.importErrorsIn':
+    'Import dans « {project} » : {n} fichier(s) en erreur, à reprendre dans ce projet.',
+  'toast.autoDoneIn': 'Magie terminée dans « {project} » !',
+  'toast.autoPartialIn': 'Magie dans « {project} » : {count} génération(s) sur {total} réussie(s).',
+  'toast.autoFailedIn':
+    'La génération automatique de « {project} » a échoué. Réessaye dans ce cours.',
+  'toast.voiceAddedIn': 'Voix transcrite et ajoutée à « {project} ».',
+  'toast.voiceErrorIn': "La voix enregistrée pour « {project} » n'a pas pu être ajoutée : {error}",
   'toast.textAdded': 'Texte ajouté !',
   'toast.sourceDeleted': 'Source supprimée',
   'toast.courseCreated': 'Cours créé !',

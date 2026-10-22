@@ -1,7 +1,9 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- Codacy lance ESLint sans resolution des types vitest (describe/it/expect typés error) : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect } from 'vitest';
 import {
   resolvePricing,
   resolveToolPricing,
+  usdPerMinute,
   MODEL_PRICING,
   PRICING_SOURCES,
   TOOL_PRICING,
@@ -13,6 +15,8 @@ import {
   buildCostBreakdown,
 } from './cost-calc.js';
 import type { ApiUsage } from './pricing.js';
+import { STT_MODELS } from './stt-models.js';
+import { TTS_MODELS } from './tts-models.js';
 
 describe('resolvePricing', () => {
   it('resolves mistral-large-2512 to mistral-large pricing', () => {
@@ -42,6 +46,45 @@ describe('resolvePricing', () => {
   it('resolves voxtral-mini-latest to STT pricing', () => {
     const p = resolvePricing('voxtral-mini-latest');
     expect(p).toEqual(MODEL_PRICING['voxtral-mini']);
+  });
+
+  it('resolves the pinned Transcribe 2 (voxtral-mini-2602) to voxtral-mini pricing', () => {
+    expect(resolvePricing('voxtral-mini-2602')).toEqual(MODEL_PRICING['voxtral-mini']);
+  });
+
+  // Voxtral 3 : clés plus longues que voxtral-mini / voxtral-mini-tts, pour l'id épinglé `-3-0`
+  // comme pour son alias `-3`. Sans elles, TTS 3 était compté 16 $ et Mini Transcribe 3 au tarif
+  // de Transcribe 2 ; Small Transcribe 3 n'avait aucun tarif.
+  it.each([
+    ['voxtral-mini-transcribe-3-0', 'voxtral-mini-transcribe-3'],
+    ['voxtral-mini-transcribe-3', 'voxtral-mini-transcribe-3'],
+    ['voxtral-small-transcribe-3-0', 'voxtral-small-transcribe-3'],
+    ['voxtral-mini-tts-3-0', 'voxtral-mini-tts-3'],
+  ])('resolves Voxtral 3 %s to its own pricing (%s, longer prefix wins)', (model, key) => {
+    expect(resolvePricing(model)).toEqual(MODEL_PRICING[key]);
+  });
+
+  it('TTS 3 tariff: $13/M chars (Voxtral TTS stays at $16)', () => {
+    expect(MODEL_PRICING['voxtral-mini-tts-3']).toEqual({
+      inputPerMillion: 13,
+      outputPerMillion: 0,
+      unit: 'characters',
+    });
+    expect(MODEL_PRICING['voxtral-mini-tts'].inputPerMillion).toBe(16);
+  });
+
+  // Chaque modèle proposé dans les Réglages a un tarif de la bonne unité : sans lui, son coût
+  // serait compté 0 $ (et un warn « model without pricing » à chaque appel).
+  it.each(STT_MODELS)('STT model %s is priced per audio second', (model) => {
+    const p = resolvePricing(model);
+    expect(p?.unit).toBe('audio-seconds');
+    expect(p?.inputPerMillion).toBeGreaterThan(0);
+  });
+
+  it.each(TTS_MODELS)('TTS model %s is priced per character', (model) => {
+    const p = resolvePricing(model);
+    expect(p?.unit).toBe('characters');
+    expect(p?.inputPerMillion).toBeGreaterThan(0);
   });
 
   it('resolves mistral-ocr-4-0 to OCR 4 pricing (longer prefix wins over mistral-ocr)', () => {
@@ -108,6 +151,22 @@ describe('calculateCost', () => {
     const usage: ApiUsage = { promptAudioSeconds: 60, model: 'voxtral-mini-latest' };
     // 60 * 50 / 1M = 0.003
     expect(calculateCost(usage)).toBeCloseTo(0.003, 6);
+  });
+
+  it.each([
+    ['voxtral-mini-2602', 0.003],
+    ['voxtral-mini-transcribe-3-0', 0.0035],
+    ['voxtral-small-transcribe-3-0', 0.004],
+  ])('one minute of audio with %s costs its per-minute price', (model, perMinute) => {
+    expect(calculateCost({ promptAudioSeconds: 60, model })).toBeCloseTo(perMinute, 12);
+  });
+
+  it('calculates character-based cost for TTS 3 at its own price', () => {
+    // 5000 * 13 / 1M = 0.065 (0.08 au tarif de Voxtral TTS)
+    expect(calculateCost({ inputCharacters: 5000, model: 'voxtral-mini-tts-3-0' })).toBeCloseTo(
+      0.065,
+      12,
+    );
   });
 
   it('costs $0 for moderation (Moderation 2 « Free », gratuité annoncée temporaire)', () => {
@@ -219,6 +278,21 @@ describe('buildCostBreakdown', () => {
     expect(lines[0]).toContain('60.0s audio');
   });
 
+  // Prix par minute affiché comme sur les fiches Mistral (4 décimales), chaque modèle au sien.
+  it.each([
+    ['voxtral-mini-2602', '60.0s audio × $0.0030/min = $0.0030'],
+    ['voxtral-mini-transcribe-3-0', '60.0s audio × $0.0035/min = $0.0035'],
+    ['voxtral-small-transcribe-3-0', '60.0s audio × $0.0040/min = $0.0040'],
+  ])('STT breakdown line for %s shows its per-minute price', (model, line) => {
+    expect(buildCostBreakdown([{ promptAudioSeconds: 60, model }])).toEqual([line]);
+  });
+
+  it('TTS 3 breakdown line shows $13/M', () => {
+    expect(buildCostBreakdown([{ inputCharacters: 5000, model: 'voxtral-mini-tts-3-0' }])).toEqual([
+      '5000 chars × $13/M = $0.0650',
+    ]);
+  });
+
   it('skips unknown models', () => {
     const entries: ApiUsage[] = [{ promptTokens: 100, model: 'unknown-model' }];
     expect(buildCostBreakdown(entries)).toHaveLength(0);
@@ -229,6 +303,29 @@ describe('buildCostBreakdown', () => {
       { promptTokens: 0, completionTokens: 0, model: 'mistral-large-latest' },
     ];
     expect(buildCostBreakdown(entries)).toHaveLength(0);
+  });
+});
+
+// Prix STT annoncé par minute → tarif par million de secondes, et retour (Réglages, détail du coût).
+describe('usdPerMinute', () => {
+  it('rend le prix par minute de chaque tarif audio', () => {
+    expect(usdPerMinute(MODEL_PRICING['voxtral-mini'])).toBeCloseTo(0.003, 12);
+    expect(usdPerMinute(MODEL_PRICING['voxtral-mini-transcribe-3'])).toBeCloseTo(0.0035, 12);
+    expect(usdPerMinute(MODEL_PRICING['voxtral-small-transcribe-3'])).toBeCloseTo(0.004, 12);
+  });
+
+  it('Transcribe 2 garde exactement son tarif historique (50 $ par million de secondes)', () => {
+    expect(MODEL_PRICING['voxtral-mini']).toEqual({
+      inputPerMillion: 50,
+      outputPerMillion: 0,
+      unit: 'audio-seconds',
+    });
+  });
+
+  it('inverse la conversion par minute : 60 s × tarif = prix par minute', () => {
+    expect(usdPerMinute({ inputPerMillion: 50, outputPerMillion: 0, unit: 'audio-seconds' })).toBe(
+      0.003,
+    );
   });
 });
 

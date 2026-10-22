@@ -13,6 +13,7 @@ import type {
 } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
 import type { PersistedNotification } from './notifications';
+import type { VoiceTarget } from './recorder';
 
 export type AppState = ReturnType<typeof createState>;
 
@@ -56,6 +57,8 @@ type NotifSpec = {
 
 export interface AppContext extends AppState {
   $nextTick(cb?: () => void): Promise<void>;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- noms de params documentaires (Codacy n'honore pas argsIgnorePattern)
+  $watch(property: string, callback: () => void): void;
   $refs: Record<string, HTMLElement | HTMLDialogElement | undefined>;
   t: TFn;
   locale: string;
@@ -76,6 +79,8 @@ export interface AppContext extends AppState {
 
   refreshModeration(retries?: number): Promise<void>;
   handleFiles(fileList: FileList | null | undefined): Promise<void>;
+  projectUploadSessions(): AppState['uploadSessions'];
+  isUploading(): boolean;
   handleDrop(e: DragEvent): void;
   addText(): Promise<void>;
   deleteSource(id: string): Promise<void>;
@@ -103,6 +108,8 @@ export interface AppContext extends AppState {
   goToView(view: string): void;
 
   createProject(): Promise<void>;
+  // Nom du cours affiché : son snapshot, sinon la liste des cours (ouverture en cours).
+  currentProjectName(): string;
   selectProject(id: string): Promise<void>;
   deleteProject(id: string): Promise<void>;
   openLightbox(url: string): void;
@@ -110,7 +117,9 @@ export interface AppContext extends AppState {
   toggleRecording(): Promise<void>;
   startRecording(): Promise<void>;
   stopRecording(): void;
-  uploadVoice(blob: Blob): Promise<void>;
+  // target : destination capturée au début de l'enregistrement (cours, clé, langue) ; absente =
+  // cours affiché.
+  uploadVoice(blob: Blob, target?: VoiceTarget): Promise<void>;
 
   checkMobile(): void;
   toggleTheme(): void;
@@ -154,6 +163,8 @@ export interface AppContext extends AppState {
   modelPriceLabel(modelId: string): string;
   // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
   modelOptionLabel(modelId: string): string;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
+  selectedModelLabel(modelId: string, recommendedId: string): string;
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;

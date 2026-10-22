@@ -144,6 +144,26 @@
             </div>
           </div>
 
+          <!-- Cours choisi, en cours d'ouverture (selectProject) : son nom et un chargement, jamais
+               l'état vide « Ajoute tes premières sources » ni le contenu du cours précédent (le bloc
+               du cours ci-dessous attend son snapshot ; jusqu'à 15 s quand les étapes des Auto
+               prenaient toutes les connexions, release-test du 2026-10-21, avant la limite globale des
+               requêtes longues de src/app/request-slots.ts). <output> natif plutôt que role="status"
+               (Sonar Web:S6819) : contenu de phrase seulement, d'où des <span> en bloc. -->
+          <output x-show="currentProjectId && projectLoading" class="block py-16 text-center">
+            <span
+              class="block font-heading font-bold text-xl title-gradient mb-3 truncate"
+              x-text="currentProjectName()"
+            ></span>
+            <span class="inline-flex items-center gap-2 text-text-secondary text-body-sm">
+              <span
+                class="w-4 h-4 animate-spin rounded-full border-2 border-current border-t-transparent shrink-0"
+                aria-hidden="true"
+              ></span>
+              <span x-text="t('common.loading')"></span>
+            </span>
+          </output>
+
           <!-- Project selected -->
           <template x-if="currentProjectId && currentProject">
             <div>

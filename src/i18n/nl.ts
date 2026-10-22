@@ -206,6 +206,12 @@ export const nl: Record<string, string> = {
   'settings.perMChars': 'per M tekens',
   'settings.priceUnknown': 'prijs niet beschikbaar',
   'settings.ocrHint': 'OCR 3: voordelig. OCR 4: betere kwaliteit, 2× de kosten.',
+  'settings.stt': 'Transcriptie',
+  'settings.sttHint': 'Spraakinvoer en mondelinge antwoorden in de mondelinge quiz.',
+  'settings.ttsHint':
+    'Podcast, mondelinge quiz, dictee en voorlezen. TTS 3 (previewversie): eigen stemmen in meer talen, maar losse dicteewoorden worden minder goed uitgesproken.',
+  'settings.perMinute': 'per minuut',
+  'settings.preview': 'Previewversie',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources': 'Voeg je eerste bronnen toe',
@@ -440,6 +446,15 @@ export const nl: Record<string, string> = {
   'toast.profileUpdated': 'Profiel bijgewerkt',
   'toast.profileReset': 'Voorkeuren hersteld',
   'toast.sourcesAdded': 'Bronnen toegevoegd!',
+  'toast.importDoneIn': 'Import voltooid in "{project}": {n} bron(nen) toegevoegd.',
+  'toast.importErrorsIn':
+    'Import in "{project}": {n} bestand(en) mislukt, probeer opnieuw in dat project.',
+  'toast.autoDoneIn': 'Magie voltooid in "{project}"!',
+  'toast.autoPartialIn': 'Magie in "{project}": {count} van {total} generaties gelukt.',
+  'toast.autoFailedIn':
+    'Automatische generatie in "{project}" mislukt. Probeer het opnieuw in dat project.',
+  'toast.voiceAddedIn': 'Stem getranscribeerd en toegevoegd aan "{project}".',
+  'toast.voiceErrorIn': 'De opgenomen stem voor "{project}" kon niet worden toegevoegd: {error}',
   'toast.textAdded': 'Tekst toegevoegd!',
   'toast.sourceDeleted': 'Bron verwijderd',
   'toast.courseCreated': 'Cursus aangemaakt!',

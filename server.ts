@@ -37,6 +37,7 @@ import {
   setModelLimits,
 } from './config.js';
 import { listVoices } from './generators/tts-provider.js';
+import { normalizeTtsModel, voicesForTtsModel } from './helpers/tts-models.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
@@ -185,7 +186,9 @@ app.get('/api/config/voices', aiLimiter, async (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : undefined;
     const voices = await listVoices(resolved.client, lang);
     if (!lang) setVoiceCache(voices);
-    res.json(voices);
+    // Cache complet, réponse filtrée : le parent ne peut choisir qu'une voix que le modèle TTS
+    // configuré accepte (2603 refuse les voix pvc en 400, cf. helpers/tts-models.ts).
+    res.json(voicesForTtsModel(voices, normalizeTtsModel(getConfig().ttsModel)));
   } catch (e) {
     logger.error('config', 'List voices error', e);
     res.status(502).json({ error: extractErrorCode(e, 'tts') });

@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return -- Codacy lance son propre ESLint sans résolution de types (globals/mocks vitest typés `error`, accès indexés de mock) → faux positifs ; cf. CLAUDE.md section Codacy */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { withAiHeaders } from './ai-fetch';
+import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { setKey, _resetActiveKey } from './api-key';
 import type { StorageLike } from './profile-locale';
 
@@ -50,5 +50,30 @@ describe('withAiHeaders', () => {
     expect(
       new Headers(withAiHeaders({}, { keyOverride: 'bad\r\nkey' }).headers).has('X-EurekAI-AI-Key'),
     ).toBe(false);
+  });
+});
+
+// Action longue (Auto, import, enregistrement vocal) qui continue après un changement de profil :
+// la clé est celle capturée à son lancement, jamais la clé active au moment de l'envoi.
+describe('captureAiKey', () => {
+  it('rend la clé active au moment de la capture', async () => {
+    await setKey({ scope: 'global', plaintext: 'sk-profil-a' }, makeStorage());
+    expect(captureAiKey()).toBe('sk-profil-a');
+  });
+
+  it('clé capturée envoyée même si une autre clé est devenue active depuis', async () => {
+    await setKey({ scope: 'global', plaintext: 'sk-profil-a' }, makeStorage());
+    const captured = captureAiKey();
+    await setKey({ scope: 'global', plaintext: 'sk-profil-b' }, makeStorage());
+    const h = new Headers(withAiHeaders({}, { keyOverride: captured }).headers);
+    expect(h.get('X-EurekAI-AI-Key')).toBe('sk-profil-a');
+  });
+
+  it("aucune clé à la capture : '' omet les en-têtes (clé d'env), jamais la clé active depuis", async () => {
+    const captured = captureAiKey();
+    await setKey({ scope: 'global', plaintext: 'sk-profil-b' }, makeStorage());
+    const init = { method: 'POST' };
+    expect(captured).toBe('');
+    expect(withAiHeaders(init, { keyOverride: captured })).toBe(init);
   });
 });

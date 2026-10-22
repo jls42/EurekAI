@@ -33,7 +33,8 @@ const summaryGen = (id: string, audio: { audioUrl?: string; audioUrls?: Record<s
 const quizVocalGen = (id: string, audioUrls: string[]) =>
   ({ ...meta(id), type: 'quiz-vocal', data: [], audioUrls }) as Generation;
 
-const flashcardsGen = (id: string) => ({ ...meta(id), type: 'flashcards', data: [] }) as Generation;
+const flashcardsGen = (id: string, audioUrl?: string) =>
+  ({ ...meta(id), type: 'flashcards', data: [], ...(audioUrl && { audioUrl }) }) as Generation;
 
 describe('uniqueMediaName', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -105,7 +106,13 @@ describe('generationMediaUrls', () => {
     expect(generationMediaUrls(gen)).toEqual(['https://cdn.example.com/x.png']);
   });
 
-  it.each(['flashcards', 'quiz', 'fill-blank'])('%s : aucun média persisté', (type) => {
+  it('flashcards : audioUrl de la génération (lecture à voix haute), aucune sans lecture', () => {
+    const url = '/output/projects/p/read-aloud-0123abcd-all-1-aaaaaaaa.mp3';
+    expect(generationMediaUrls(flashcardsGen('g', url))).toEqual([url]);
+    expect(generationMediaUrls(flashcardsGen('g'))).toEqual([]);
+  });
+
+  it.each(['quiz', 'fill-blank'])('%s : aucun média persisté', (type) => {
     expect(generationMediaUrls({ ...meta('g'), type, data: [] } as Generation)).toEqual([]);
   });
 });
@@ -270,6 +277,29 @@ describe('cleanupDeletedGeneration', () => {
     expect(deleteAndClean('11111111-0000-4000-8000-000000000000')).toBe(1);
     expect(existsSync(join(projectDir, 'quiz-vocal-q0-1700000000000.mp3'))).toBe(true);
     expect(existsSync(join(projectDir, 'quiz-vocal-q1-1.mp3'))).toBe(false);
+  });
+
+  it('flashcards : lecture enregistrée (audioUrl) et lectures écrites avant, toutes supprimées', () => {
+    const gid = '0123abcd-0000-4000-8000-000000000000';
+    const [, recorded] = media(
+      'read-aloud-0123abcd-all-1-aaaaaaaa.mp3',
+      'read-aloud-0123abcd-all-2-bbbbbbbb.mp3',
+    );
+    store.addGeneration(pid, flashcardsGen(gid, recorded));
+
+    expect(deleteAndClean(gid)).toBe(2);
+    expect(readdirSync(projectDir)).toEqual(['project.json']);
+  });
+
+  // Le balayage par préfixe est coupé (autre génération au même id8) : seul l'extracteur
+  // `flashcards` désigne le fichier.
+  it('flashcards : lecture enregistrée supprimée même sans balayage (id8 partagé)', () => {
+    const [recorded] = media('read-aloud-0123abcd-all-1-aaaaaaaa.mp3');
+    store.addGeneration(pid, flashcardsGen('0123abcd-0000-4000-8000-000000000000', recorded));
+    store.addGeneration(pid, flashcardsGen('0123abcd-1111-4000-8000-000000000000'));
+
+    expect(deleteAndClean('0123abcd-0000-4000-8000-000000000000')).toBe(1);
+    expect(existsSync(join(projectDir, 'read-aloud-0123abcd-all-1-aaaaaaaa.mp3'))).toBe(false);
   });
 
   it('balaie la lecture à voix haute non référencée (flashcards, ancienne section relue)', () => {

@@ -230,6 +230,12 @@ export const hi: Record<string, string> = {
   'settings.perMChars': 'प्रति M वर्ण',
   'settings.priceUnknown': 'मूल्य अनुपलब्ध',
   'settings.ocrHint': 'OCR 3: किफायती। OCR 4: बेहतर गुणवत्ता, 2× लागत।',
+  'settings.stt': 'प्रतिलेखन',
+  'settings.sttHint': 'आवाज़ से इनपुट और मौखिक Quiz के मौखिक उत्तर।',
+  'settings.ttsHint':
+    'पॉडकास्ट, मौखिक Quiz, श्रुतलेख और ज़ोर से पढ़ना। TTS 3 (पूर्वावलोकन): ज़्यादा भाषाओं की अपनी आवाज़ें, पर श्रुतलेख के अकेले शब्दों का उच्चारण कम सटीक।',
+  'settings.perMinute': 'प्रति मिनट',
+  'settings.preview': 'पूर्वावलोकन',
 
   'dashboard.subtitle': 'Dashboard',
   'dashboard.addFirstSources':
@@ -555,6 +561,15 @@ export const hi: Record<string, string> = {
   'toast.profileReset': 'प्राथमिकताएं रीसेट की गईं',
   'toast.sourcesAdded':
     '\u0938\u094D\u0930\u094B\u0924 \u091C\u094B\u0921\u093C\u0947 \u0917\u090F!',
+  'toast.importDoneIn': '"{project}" में आयात पूरा: {n} स्रोत जोड़े गए।',
+  'toast.importErrorsIn':
+    '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.autoDoneIn': '"{project}" में जादू पूरा हुआ!',
+  'toast.autoPartialIn': '"{project}" में जादू: {total} में से {count} जनरेशन सफल रहे।',
+  'toast.autoFailedIn':
+    '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.voiceAddedIn': 'आवाज़ लिखी गई और "{project}" में जोड़ी गई।',
+  'toast.voiceErrorIn': '"{project}" के लिए रिकॉर्ड की गई आवाज़ नहीं जोड़ी जा सकी: {error}',
   'toast.textAdded':
     '\u091F\u0947\u0915\u094D\u0938\u094D\u091F \u091C\u094B\u0921\u093C\u093E \u0917\u092F\u093E!',
   'toast.sourceDeleted':

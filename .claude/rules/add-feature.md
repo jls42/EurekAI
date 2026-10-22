@@ -1,3 +1,19 @@
+---
+paths:
+  - "generators/**/*.ts"
+  - "routes/generate*.ts"
+  - "routes/sources*.ts"
+  - "types.ts"
+  - "src/app/state*.ts"
+  - "src/main.ts"
+  - "src/index.html"
+  - "src/partials/view-*.html"
+---
+
+# Ajouter un générateur, une source ou un agent auto
+
+Section « Agents auto-generables » déplacée telle quelle depuis CLAUDE.md, le 2026-10-21 ; le reste du fichier est inchangé.
+
 ## Ajouter un generateur
 
 1. Creer `generators/mon_generateur.ts` avec signature `(client, markdown, model?, lang?, ageGroup?, count?) -> data`
@@ -21,3 +37,7 @@
 1. Creer le generateur dans `generators/` si besoin
 2. Ajouter la route dans `routes/sources.ts`
 3. Ajouter l'UI dans `src/partials/view-sources.html` + `src/app/sources.ts`
+
+## Agents auto-generables
+- **Source unique de vérité** : `generators/auto-agents.ts` exporte `AUTO_AGENTS_SET` et `MAX_AUTO_PLAN_LENGTH` — utilisés par `router.ts` (`VALID_AGENTS`) ET `routes/generate.ts` (`AUTO_EXECUTABLE`) — ainsi que `TTS_DEPENDENT_AGENTS` (types qui exigent le TTS, cf. section TTS). Ne jamais dupliquer la liste. L'ordre d'enrichissement audio du routeur (`AUDIO_ENRICHMENT_ORDER`, `generators/router.ts`) a les mêmes éléments que `TTS_DEPENDENT_AGENTS` (verrou : `router.test.ts`).
+- **Politique `normalizePlan`** : choix du modèle prime, enrichment audio (podcast/quiz-vocal) budget-aware — on ne tronque jamais un agent explicitement choisi par le LLM (`image` pour contenu visuel p.ex.)

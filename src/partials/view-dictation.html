@@ -49,9 +49,11 @@
         <!-- Expanded content -->
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
           <!-- Interactive step-by-step dictation -->
+          <!-- Vue quittée : le mot s'arrête et sa relecture différée est annulée (view-media.ts). -->
           <div
             x-data="dictationComponent(gen)"
             x-init="$watch('openGens', () => { if (!openGens[gen.id]) stopWord() })"
+            @eurekai-view-change.window="stopWord()"
           >
             <!-- Lecteur du mot courant (caché : piloté par les boutons) -->
             <audio

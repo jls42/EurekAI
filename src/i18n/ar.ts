@@ -229,6 +229,12 @@ export const ar: Record<string, string> = {
   'settings.perMChars': 'لكل مليون حرف',
   'settings.priceUnknown': 'السعر غير متوفر',
   'settings.ocrHint': 'OCR 3: اقتصادي. OCR 4: جودة أفضل، التكلفة 2×.',
+  'settings.stt': 'تحويل الكلام إلى نص',
+  'settings.sttHint': 'الإدخال الصوتي والإجابات الشفهية في الاختبار الصوتي.',
+  'settings.ttsHint':
+    'البودكاست والاختبار الصوتي والإملاء والقراءة بصوت عالٍ. TTS 3 (نسخة تجريبية): أصوات أصلية بلغات أكثر، لكن نطقه للكلمات المفردة في الإملاء أقل دقة.',
+  'settings.perMinute': 'لكل دقيقة',
+  'settings.preview': 'نسخة تجريبية',
 
   'dashboard.subtitle': '\u0644\u0648\u062d\u0629 \u0627\u0644\u062a\u062d\u0643\u0651\u0645',
   'dashboard.addFirstSources':
@@ -546,6 +552,13 @@ export const ar: Record<string, string> = {
   'toast.profileReset': 'تم إعادة ضبط التفضيلات',
   'toast.sourcesAdded':
     '\u062a\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0635\u0627\u062f\u0631!',
+  'toast.importDoneIn': 'اكتمل الاستيراد في «{project}»: أُضيف {n} مصدر.',
+  'toast.importErrorsIn': 'الاستيراد في «{project}»: {n} ملف به خطأ، أعد المحاولة في ذلك المشروع.',
+  'toast.autoDoneIn': 'اكتمل السحر في «{project}»!',
+  'toast.autoPartialIn': 'السحر في «{project}»: نجح {count} من أصل {total} من التوليدات.',
+  'toast.autoFailedIn': 'فشل التوليد التلقائي في «{project}». أعد المحاولة في ذلك المشروع.',
+  'toast.voiceAddedIn': 'تم نسخ الصوت وإضافته إلى «{project}».',
+  'toast.voiceErrorIn': 'تعذّرت إضافة الصوت المسجَّل لـ«{project}»: {error}',
   'toast.textAdded': '\u062a\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0646\u0635!',
   'toast.sourceDeleted':
     '\u062a\u0645\u0651 \u062d\u0630\u0641 \u0627\u0644\u0645\u0635\u062f\u0631',

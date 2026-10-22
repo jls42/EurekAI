@@ -16,6 +16,7 @@ function makeContext(overrides: any = {}) {
     abortControllers: {} as Record<string, AbortController>,
     abortControllersByGid: {} as Record<string, AbortController>,
     pendingById: {} as Record<string, any>,
+    autoRuns: {} as Record<string, { controller: AbortController; analysing: boolean }>,
     generations: [] as any[],
     currentProjectId: 'pid-1',
     loading: {
@@ -375,6 +376,30 @@ describe('createConfirm', () => {
       warnMock.mockRestore();
     });
 
+    // Échec du POST /cancel après un changement de cours : le pending du cours quitté n'apparaît
+    // pas dans le cours affiché (il revient au retour, relu du serveur), ni son toast d'échec.
+    it('cancel by gid: 5xx après un changement de cours → aucune restauration dans le cours affiché', async () => {
+      const ctrl = { abort: vi.fn() } as unknown as AbortController;
+      const warnMock = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      (globalThis as any).fetch = vi.fn(async () => {
+        ctx.currentProjectId = 'pid-2';
+        ctx.pendingById = {};
+        return { ok: false, status: 500 };
+      });
+      ctx.abortControllersByGid = { [VALID_GID_1]: ctrl };
+      ctx.pendingById = { [VALID_GID_1]: { id: VALID_GID_1, type: 'summary', status: 'pending' } };
+
+      confirm.cancelOne.call(ctx, VALID_GID_1);
+      await new Promise((r) => setTimeout(r, 0));
+
+      expect(ctx.pendingById).toEqual({});
+      expect(ctx.showToast).not.toHaveBeenCalledWith(
+        expect.stringContaining('toast.cancelFailed'),
+        'error',
+      );
+      warnMock.mockRestore();
+    });
+
     it('skips POST /cancel when gid is not a valid UUID v4 (SSRF defense)', () => {
       // Garde-fou : si un gid frauduleux atterrit dans pendingById (extension
       // hostile, bug de sérialisation), la validation regex bloque le fetch
@@ -413,6 +438,44 @@ describe('createConfirm', () => {
       ctx.abortControllers = {};
       confirm.cancelGeneration.call(ctx);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledGeneration', 'info');
+    });
+
+    it('un seul toast pour toutes les générations en cours, aucun par type (SSE compris)', () => {
+      const gids = [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333',
+      ];
+      const types = ['quiz', 'summary', 'podcast'];
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.pendingById = Object.fromEntries(
+        gids.map((id, i) => [id, { id, type: types[i], status: 'pending' }]),
+      );
+
+      confirm.cancelGeneration.call(ctx);
+
+      // Cinq toasts d'un coup au release-test du 2026-10-22 (un par génération, plus le global).
+      expect(ctx.showToast.mock.calls).toEqual([['toast.cancelledGeneration', 'info']]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      for (const gid of gids) {
+        expect(ctx.shownToastEventKeys.has(buildEventKey(gid, 'cancelled')), gid).toBe(true);
+      }
+    });
+
+    it('arrête l’Auto du cours affiché, même absent de abortControllers, jamais celui d’un autre cours', () => {
+      const shown = new AbortController();
+      const other = new AbortController();
+      ctx.autoRuns = {
+        'pid-1': { controller: shown, analysing: false },
+        'pid-2': { controller: other, analysing: false },
+      };
+
+      confirm.cancelGeneration.call(ctx);
+
+      expect(shown.signal.aborted).toBe(true);
+      expect(other.signal.aborted).toBe(false);
+      expect(Object.keys(ctx.autoRuns)).toEqual(['pid-2']);
     });
 
     it('appelle cancelPendingByGid pour chaque gid présent dans pendingById', () => {

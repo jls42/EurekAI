@@ -5,9 +5,12 @@
 // Garde une source de vérité unique pour la regex : toute divergence entre les deux
 // call-sites recrée la régression "pastilles manquantes sur format dégradé".
 
+import { SOURCE_MARKER_RE } from '@helpers/source-markers';
+
 // Stratégie multi-passes pour éviter tout risque de backtracking catastrophique
 // (règle SonarQube typescript:S5852) :
-//   1. Regex simple `\[Source([^\]]+)\]` — classe négée, linéaire par construction.
+//   1. Regex simple `\[Source([^\]]+)\]` (SOURCE_MARKER_RE, helpers/source-markers.ts, partagée
+//      avec le texte lu à voix haute) — classe négée, linéaire par construction.
 //   2. Parse manuel du contenu capturé via split(',') + trim + extraction numérique.
 // Couvre les formats :
 //   [Source N]                  canonique simple
@@ -15,7 +18,6 @@
 //   [Source N, M]               dégradé "liste de numéros"
 //   [Source N, Source M]        dégradé "préfixe répété dans liste"
 //   [Source N,M]                espaces absents
-const SOURCE_MARKER_RE = /\[Source([^\]]+)\]/gi;
 
 /** Extract all numeric IDs from the inner content of a [Source ...] bracket. */
 function parseInnerToNums(inner: string): number[] {

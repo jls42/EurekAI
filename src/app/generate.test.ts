@@ -10,8 +10,13 @@
    @typescript-eslint/unbound-method
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createGenerate } from './generate';
+import { setKey, _resetActiveKey } from './api-key';
+import { createSession } from './session';
+import { createConfirm } from './confirm';
+import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
+import { _resetLongRequestSlots, longRequestSlots, withLongRequestSlot } from './request-slots';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -63,6 +68,7 @@ const genBindings = {
 function makeContext(overrides: any = {}) {
   return {
     currentProjectId: 'pid-1',
+    currentProject: { meta: { id: 'pid-1', name: 'Histoire' }, totalCost: 0 } as any,
     currentProfile: { id: 'p1', chatEnabled: true, ageGroup: 'enfant', useModeration: false },
     sources: [],
     generations: [],
@@ -72,6 +78,7 @@ function makeContext(overrides: any = {}) {
     abortControllersByGid: {},
     pendingById: {},
     launchingByType: {},
+    autoRuns: {} as Record<string, any>,
     shownToastEventKeys: new Set<string>(),
     notificationsVersion: 0,
     upsertGenerationById(gen: any) {
@@ -117,6 +124,34 @@ function mockFetchOk(data: any) {
     json: async () => data,
   } as any);
 }
+
+// Clé Mistral active (comme après selectProfile → refreshKeyState) ; remise à zéro après chaque test.
+const activateKey = (plaintext: string) => {
+  const data = new Map<string, string>();
+  const storage = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      data.set(k, v);
+    },
+  };
+  return setKey({ scope: 'global', plaintext }, storage);
+};
+
+// Clé envoyée par le N-ième appel fetch (en-tête X-EurekAI-AI-Key), null sans en-tête.
+const sentKey = (call: number): string | null => {
+  const init = vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit;
+  return new Headers(init.headers).get('X-EurekAI-AI-Key');
+};
+
+afterEach(() => {
+  _resetActiveKey();
+  // Aucune place des requêtes longues ne fuit, quel que soit le scénario (succès, refus, erreur,
+  // exception, annulation, changement de cours) : la file est partagée par tout l'onglet, une place
+  // perdue ferait attendre toutes les générations suivantes. File neuve pour le test suivant.
+  const left = longRequestSlots();
+  _resetLongRequestSlots();
+  expect(left).toEqual({ inFlight: 0, waiting: 0 });
+});
 
 function mockFetchFail(status: number, data: any = {}) {
   return vi.mocked(globalThis.fetch).mockResolvedValueOnce({
@@ -767,19 +802,68 @@ describe('vérification des sources avant la génération', () => {
     expect(ctx.loading.summary).toBe(false);
   });
 
-  it('projet changé pendant la vérification : aucune génération', async () => {
+  // Inversé le 2026-10-21 (règle « ça continue même si on change de page ») : jusqu'en v1.7.11,
+  // changer de cours pendant la vérification (jusqu'à 10 s) perdait la génération sans un mot.
+  // Elle part vers son cours avec le corps du clic (le serveur refait la garde), sans rien poser
+  // sur l'écran affiché.
+  it('projet changé pendant la vérification : envoyée vers son cours, rien sur l’écran affiché', async () => {
+    const ctx = makeContext({
+      currentProfile: moderatedProfile,
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+      selectedIds: ['s1'],
+      generateCount: 20,
+    });
+    mockVerification('safe', () => {
+      ctx.currentProjectId = 'pid-2';
+      ctx.selectedIds = [];
+      ctx.generateCount = 10;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
+
+    await gen.generate.call(ctx, 'summary');
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    const sent = JSON.parse(
+      (vi.mocked(globalThis.fetch).mock.calls[1][1] as RequestInit).body as string,
+    );
+    expect(sent).toMatchObject({ sourceIds: ['s1'], count: 20 });
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.launchingByType).toEqual({});
+    expect(ctx.showToast).not.toHaveBeenCalledWith(
+      'toast.generationDone',
+      'success',
+      null,
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+    );
+  });
+
+  // Changement de profil pendant la vérification : la génération part avec la clé du profil qui a
+  // cliqué, jamais avec celle du profil devenu actif (refreshKeyState de selectProfile).
+  it('profil changé pendant la vérification : clé capturée au clic', async () => {
+    await activateKey('sk-profil-a');
     const ctx = makeContext({
       currentProfile: moderatedProfile,
       sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
     });
-    mockVerification('safe', () => {
-      ctx.currentProjectId = 'pid-2';
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = null;
+      await activateKey('sk-profil-b');
+      const moderation = { status: 'safe', categories: {} };
+      return { ok: true, json: async () => ({ sources: [{ id: 's1', moderation }] }) } as any;
     });
+    mockFetchOk({ id: 'g1', type: 'summary', data: {} });
 
     await gen.generate.call(ctx, 'summary');
 
-    expect(urls()).toEqual(['/api/projects/pid-1/sources/moderate']);
-    expect(ctx.pendingById).toEqual({});
+    expect(urls()[1]).toBe('/api/projects/pid-1/generate/summary');
+    expect(sentKey(1)).toBe('sk-profil-a');
   });
 
   // La vérification (jusqu'à 8 s) précède le pending optimiste : sans réservation synchrone, aucun
@@ -1429,6 +1513,597 @@ describe('generateAuto — per-type progress', () => {
 
     // Generation should NOT be registered since project switched
     expect(ctx.generations).toHaveLength(0);
+    // Ajouté le 2026-10-21 : l'étape réussie compte (l'Auto continue vers son cours) et la fin est
+    // annoncée par un toast qui nomme ce cours, au lieu de s'arrêter sans un mot.
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoDoneIn', { project: 'Histoire' });
+  });
+});
+
+// Réponse qui n'arrive jamais, rejetée en AbortError quand son signal est aborté (vrai fetch).
+const pendingUntilAbort = (_url: unknown, init?: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener('abort', () => {
+      reject(new DOMException('Aborted', 'AbortError'));
+    });
+  });
+
+// Règle du propriétaire (2026-10-21) : « on lance un truc, ça continue même si on change de page ».
+// Jusqu'en v1.7.11, resetSession (changement de cours ou de profil) abortait l'analyse Auto en vol :
+// le serveur la facturait et aucune étape ne partait.
+describe('generateAuto — continue vers son cours quand on change de cours ou de profil', () => {
+  const session = createSession();
+  const confirm = createConfirm();
+  const urls = () => vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+  const sentBody = (call: number) =>
+    JSON.parse((vi.mocked(globalThis.fetch).mock.calls[call][1] as RequestInit).body as string);
+  // Changement de cours tel que selectProject le fait (resetSession, puis le cours suivant).
+  const switchCourse = (ctx: any, projectId: string | null) => {
+    ctx.currentProjectId = projectId;
+    session.resetSession.call(ctx);
+  };
+  const plan = (...agents: string[]) => ({ plan: agents.map((agent) => ({ agent })) });
+
+  it('cours changé pendant l’analyse : rien n’est annulé, étapes vers le cours d’origine avec le corps et la clé du clic, toast final qui le nomme', async () => {
+    await activateKey('sk-profil-a');
+    const ctx = makeContext({
+      apiStatus: { ttsAvailable: false },
+      selectedIds: ['s1'],
+      generateCount: 20,
+    });
+    let routeSignal: AbortSignal | null | undefined;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async (_url, init) => {
+      routeSignal = init?.signal;
+      switchCourse(ctx, 'pid-2');
+      ctx.selectedIds = [];
+      await activateKey('sk-profil-b');
+      return {
+        ok: true,
+        json: async () => ({ ...plan('summary', 'quiz'), costDelta: 0.01 }),
+      } as any;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    mockFetchOk({ id: 'g2', type: 'quiz' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(routeSignal?.aborted).toBe(false);
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+      '/api/projects/pid-1/generate/quiz',
+    ]);
+    expect([sentKey(0), sentKey(1), sentKey(2)]).toEqual([
+      'sk-profil-a',
+      'sk-profil-a',
+      'sk-profil-a',
+    ]);
+    expect(sentBody(1)).toMatchObject({ sourceIds: ['s1'], count: 20 });
+    // Rien sur l'écran du cours affiché : ni générations, ni chargement, ni coût, ni toast d'étape.
+    expect(ctx.generations).toEqual([]);
+    expect([ctx.loading.auto, ctx.loading.summary, ctx.loading.quiz]).toEqual([
+      false,
+      false,
+      false,
+    ]);
+    expect(ctx.currentProject.totalCost).toBe(0);
+    const stepToasts = ctx.showToast.mock.calls.filter(
+      (c: any[]) => c[0] === 'toast.generationDone',
+    );
+    expect(stepToasts).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoDoneIn', { project: 'Histoire' });
+    expect(ctx.autoRuns).toEqual({});
+  });
+
+  it('cours changé pendant une étape : l’étape n’est pas annulée, l’état du cours affiché reste intact', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    mockFetchOk(plan('summary'));
+    let stepSignal: AbortSignal | null | undefined;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async (_url, init) => {
+      stepSignal = init?.signal;
+      switchCourse(ctx, 'pid-2');
+      // Le cours pid-2 a sa propre fiche en cours : la fin de l'étape de pid-1 n'y touche pas.
+      ctx.loading.summary = true;
+      return { ok: true, json: async () => ({ id: 'g1', type: 'summary' }) } as any;
+    });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(stepSignal?.aborted).toBe(false);
+    expect(ctx.loading.summary).toBe(true);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+  });
+
+  it('cours changé pendant la vérification de modération : l’analyse part vers le cours d’origine', async () => {
+    const ctx = makeContext({
+      currentProfile: { id: 'p1', ageGroup: 'enfant', useModeration: true },
+      sources: [{ id: 's1', moderation: { status: 'pending', categories: {} } }],
+      apiStatus: { ttsAvailable: false },
+    });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      const moderation = { status: 'safe', categories: {} };
+      return { ok: true, json: async () => ({ sources: [{ id: 's1', moderation }] }) } as any;
+    });
+    mockFetchOk(plan('summary'));
+    mockFetchOk({ id: 'g1', type: 'summary' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(urls()).toEqual([
+      '/api/projects/pid-1/sources/moderate',
+      '/api/projects/pid-1/generate/route',
+      '/api/projects/pid-1/generate/summary',
+    ]);
+    expect(ctx.loading.auto).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+  });
+
+  it('échec de l’analyse hors écran : toast qui nomme le cours, sans « Réessayer »', async () => {
+    const ctx = makeContext();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      return { ok: false, status: 503, statusText: 'Error', json: async () => ({}) } as any;
+    });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoFailedIn', 'error');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoFailedIn', { project: 'Histoire' });
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
+  });
+
+  it('étapes en partie en échec hors écran : toast partiel qui nomme le cours', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      switchCourse(ctx, 'pid-2');
+      return { ok: true, json: async () => plan('summary', 'quiz') } as any;
+    });
+    mockFetchOk({ id: 'g1', type: 'summary' });
+    mockFetchFail(500, { error: 'internal_error' });
+
+    await gen.generateAuto.call(ctx);
+
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoPartialIn', 'warning');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoPartialIn', {
+      project: 'Histoire',
+      count: 1,
+      total: 2,
+    });
+  });
+
+  it('retour sur le cours pendant l’analyse : puce rétablie, cancelOne(auto) l’annule (aucune étape)', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    expect(ctx.loading.auto).toBe(true);
+
+    switchCourse(ctx, 'pid-2');
+    expect(ctx.loading.auto).toBe(false);
+    switchCourse(ctx, 'pid-1');
+    restoreAutoAnalysis(ctx, 'pid-1'); // comme applyProjectSnapshot au retour
+    expect(ctx.loading.auto).toBe(true);
+    confirm.cancelOne.call(ctx, 'auto');
+    await run;
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/route']);
+    expect(ctx.loading.auto).toBe(false);
+    expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.autoFailedIn', 'error');
+  });
+
+  it('un second clic Auto sur le même cours pendant qu’il tourne est sans effet', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+
+    await gen.generateAuto.call(ctx);
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    ctx.autoRuns['pid-1'].controller.abort();
+    await run;
+  });
+
+  it('cours supprimé pendant l’analyse : Auto arrêté, ni étape ni toast', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(pendingUntilAbort);
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+
+    switchCourse(ctx, null);
+    abortAutoRun(ctx, 'pid-1'); // comme deleteProject
+    await run;
+
+    expect(urls()).toEqual(['/api/projects/pid-1/generate/route']);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    expect(ctx.autoRuns).toEqual({});
+  });
+});
+
+// Serveur en HTTP/1.1 : le navigateur n'ouvre que 6 connexions par hôte, dont une pour le flux SSE.
+// Les 8 étapes d'un Auto, lancées ensemble, faisaient attendre l'ouverture d'un autre cours 10 à
+// 15 s (release-test du 2026-10-21) ; limitées ensuite à 4 par Auto, deux Auto (deux cours) en
+// envoyaient encore 8 et bloquaient le chargement de chaque cours ouvert (mesuré le 2026-10-21 chez
+// le propriétaire). Limite GLOBALE (request-slots.ts) : au plus 3 requêtes longues pour tout
+// l'onglet, étapes Auto et générations simples confondues ; les suivantes dès qu'une se termine.
+describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', () => {
+  const session = createSession();
+  const confirm = createConfirm();
+  const allAgents = [
+    'summary',
+    'flashcards',
+    'quiz',
+    'fill-blank',
+    'podcast',
+    'quiz-vocal',
+    'image',
+    'dictation',
+  ];
+  const isRoute = (url: unknown) => String(url).endsWith('/generate/route');
+  const isCancel = (url: unknown) => String(url).endsWith('/cancel');
+  const routeReply = () =>
+    ({ ok: true, json: async () => ({ plan: allAgents.map((agent) => ({ agent })) }) }) as any;
+  // Générations envoyées (étapes Auto et générations simples), dans l'ordre d'envoi, avec le gid de
+  // leur corps : seules les générations simples en portent un.
+  const sentGenerations = () =>
+    vi
+      .mocked(globalThis.fetch)
+      .mock.calls.filter(([url]) => !isRoute(url) && !isCancel(url))
+      .map(([url, init]) => ({
+        url: String(url),
+        gid: JSON.parse(String(init?.body)).gid as string | undefined,
+      }));
+  const stepUrls = () => sentGenerations().map((g) => g.url);
+  const planUrls = (projectId: string) =>
+    allAgents.map((type) => `/api/projects/${projectId}/generate/${type}`);
+  const nextMacrotask = () => new Promise((resolve) => setTimeout(resolve, 0));
+  // Changement de cours tel que selectProject le fait (le cours suivant, puis resetSession).
+  const switchCourse = (ctx: any, projectId: string | null) => {
+    ctx.currentProjectId = projectId;
+    session.resetSession.call(ctx);
+  };
+
+  // Générations tenues jusqu'à ce que le test les termine, la plus ancienne d'abord, ou abortées par
+  // leur signal ; compte celles en vol et le maximum atteint. Analyse de route immédiate ; annulation
+  // (POST /cancel) acceptée par le 404 du serveur, qui ne connaît pas une génération jamais envoyée.
+  const holdGenerations = () => {
+    const finishers: Array<() => void> = [];
+    const stats = { inFlight: 0, max: 0 };
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
+      if (isRoute(url)) return routeReply();
+      if (isCancel(url)) return { ok: false, status: 404 } as any;
+      stats.inFlight++;
+      stats.max = Math.max(stats.max, stats.inFlight);
+      try {
+        await new Promise<void>((resolve, reject) => {
+          finishers.push(resolve);
+          init?.signal?.addEventListener('abort', () => {
+            reject(new DOMException('Aborted', 'AbortError'));
+          });
+        });
+      } finally {
+        stats.inFlight--;
+      }
+      const type = String(url).split('/generate/')[1];
+      return { ok: true, json: async () => ({ id: crypto.randomUUID(), type, data: {} }) } as any;
+    });
+    return { finishers, stats, finishOldest: () => finishers.shift()!() };
+  };
+
+  // Places prises par d'autres requêtes longues de l'onglet, toutes rendues par `free`.
+  const occupySlots = (count: number) => {
+    const releases: Array<() => void> = [];
+    const requests = Array.from({ length: count }, () =>
+      withLongRequestSlot(() => new Promise<void>((resolve) => releases.push(resolve))),
+    );
+    return {
+      free: async () => {
+        await vi.waitFor(() => expect(releases).toHaveLength(count));
+        for (const release of releases) release();
+        await Promise.all(requests);
+      },
+    };
+  };
+
+  it('un Auto de 8 étapes : jamais plus de 3 requêtes à la fois, chaque fin en libère une, toutes partent dans l’ordre', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    await nextMacrotask();
+    expect(stepUrls()).toHaveLength(3); // les 5 suivantes attendent qu'une étape se termine
+    for (let started = 4; started <= allAgents.length; started++) {
+      held.finishOldest();
+      await vi.waitFor(() => expect(stepUrls()).toHaveLength(started));
+    }
+    for (const finish of held.finishers.splice(0)) finish();
+    await run;
+
+    expect(held.stats.max).toBe(3);
+    expect(stepUrls()).toEqual(planUrls('pid-1'));
+    expect(ctx.generations).toHaveLength(allAgents.length);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.magicDone',
+      'success',
+      null,
+      expect.objectContaining({ label: 'toast.view' }),
+    );
+  });
+
+  it('deux Auto de 8 étapes (deux cours) et deux générations simples : jamais plus de 3 requêtes à la fois, toutes partent, chaque Auto dans l’ordre de son plan', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
+    const autoSteps = (projectId: string) =>
+      sentGenerations()
+        .filter((g) => !g.gid && g.url.startsWith(`/api/projects/${projectId}/`))
+        .map((g) => g.url);
+
+    const autoA = gen.generateAuto.call(ctx); // cours pid-1
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    switchCourse(ctx, 'pid-2'); // l'Auto du cours pid-1 continue
+    const autoB = gen.generateAuto.call(ctx);
+    const singles = [gen.generate.call(ctx, 'summary'), gen.generate.call(ctx, 'quiz')];
+    // 3 étapes de pid-1 en vol ; en file : les 2 générations simples et une étape par voie de pid-2.
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 5 }));
+
+    const total = 2 * allAgents.length + singles.length;
+    while (held.finishers.length > 0) {
+      const started = stepUrls().length;
+      held.finishOldest();
+      if (started < total) await vi.waitFor(() => expect(stepUrls()).toHaveLength(started + 1));
+    }
+    await Promise.all([autoA, autoB, ...singles]);
+
+    expect(held.stats.max).toBe(3);
+    expect(stepUrls()).toHaveLength(total);
+    expect(autoSteps('pid-1')).toEqual(planUrls('pid-1'));
+    expect(autoSteps('pid-2')).toEqual(planUrls('pid-2'));
+    expect(sentGenerations().filter((g) => g.gid)).toEqual([
+      { url: '/api/projects/pid-2/generate/summary', gid: expect.any(String) },
+      { url: '/api/projects/pid-2/generate/quiz', gid: expect.any(String) },
+    ]);
+    // Les autres passent entre les étapes du 1er Auto, sans attendre qu'elles soient toutes parties.
+    const lastStepOfA = stepUrls().lastIndexOf(planUrls('pid-1').at(-1)!);
+    expect(stepUrls().findIndex((url) => url.startsWith('/api/projects/pid-2/'))).toBeLessThan(
+      lastStepOfA,
+    );
+    expect(sentGenerations().findIndex((g) => g.gid)).toBeLessThan(lastStepOfA);
+    // Cours affiché (pid-2) : ses étapes et ses deux générations ; l'Auto de pid-1 annonce sa fin.
+    expect(ctx.generations).toHaveLength(allAgents.length + singles.length);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoDoneIn', 'success');
+    expect(ctx.showToast).toHaveBeenCalledWith(
+      'toast.magicDone',
+      'success',
+      null,
+      expect.objectContaining({ label: 'toast.view' }),
+    );
+    expect(ctx.autoRuns).toEqual({});
+  });
+
+  it('génération simple annulée par sa puce pendant son attente : rien n’est envoyé, elle sort de la file et la suivante passe', async () => {
+    const ctx = makeContext();
+    const held = holdGenerations();
+    const others = occupySlots(3);
+    const summary = gen.generate.call(ctx, 'summary');
+    const quiz = gen.generate.call(ctx, 'quiz');
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 2 }));
+    // Puces affichées pendant l'attente.
+    const pendingOf = (type: string) =>
+      Object.values(ctx.pendingById).find((p: any) => p.type === type) as any;
+    const summaryGid = pendingOf('summary').id;
+    expect(pendingOf('quiz')).toBeDefined();
+    expect([ctx.loading.summary, ctx.loading.quiz]).toEqual([true, true]);
+
+    confirm.cancelOne.call(ctx, summaryGid);
+    await summary;
+
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 1 });
+    expect(ctx.pendingById[summaryGid]).toBeUndefined();
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledOne', 'info');
+    expect(ctx.showToast).not.toHaveBeenCalledWith(
+      'toast.typedError',
+      'error',
+      expect.any(Function),
+    );
+    expect(vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]))).toEqual([
+      `/api/projects/pid-1/generations/${summaryGid}/cancel`,
+    ]);
+
+    await others.free();
+    await vi.waitFor(() => expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/quiz']));
+    held.finishOldest();
+    await quiz;
+    expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/quiz']);
+    expect(ctx.loading.quiz).toBe(false);
+  });
+
+  it('cours quitté pendant l’attente : jamais partie, la génération part à son tour vers son cours, avec la clé et le corps du clic, sans rien afficher', async () => {
+    await activateKey('sk-profil-a');
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    const held = holdGenerations();
+    const others = occupySlots(3);
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(longRequestSlots().waiting).toBe(1));
+
+    switchCourse(ctx, 'pid-2');
+    ctx.selectedIds = [];
+    await activateKey('sk-profil-b');
+    await run;
+
+    expect(stepUrls()).toEqual([]);
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 1 }); // repartie en arrière-plan
+    await others.free();
+    await vi.waitFor(() => expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']));
+    expect(sentKey(0)).toBe('sk-profil-a');
+    const body = JSON.parse(String(vi.mocked(globalThis.fetch).mock.calls[0][1]?.body));
+    expect(body).toMatchObject({ sourceIds: ['s1'], count: 10 });
+    held.finishOldest();
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
+
+    // Rien sur l'écran du cours affiché : ni puce, ni chargement, ni génération, ni toast.
+    expect(ctx.pendingById).toEqual({});
+    expect(ctx.loading.summary).toBe(false);
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  // Déjà envoyée : resetSession aborte son fetch (connexion libérée), le serveur la termine et
+  // l'enregistre. La renvoyer en ferait une seconde.
+  it('génération déjà partie puis cours quitté : pas renvoyée, sa place est rendue', async () => {
+    const ctx = makeContext();
+    holdGenerations();
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(1));
+    const signal = vi.mocked(globalThis.fetch).mock.calls[0][1]?.signal;
+
+    switchCourse(ctx, 'pid-2');
+    await run;
+    await nextMacrotask();
+
+    expect(signal?.aborted).toBe(true);
+    expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']);
+    expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 });
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('réponse en erreur ou exception réseau : la place est rendue, les générations en file partent', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const ctx = makeContext();
+    const replies: Array<(outcome: 'http-error' | 'network' | 'ok') => void> = [];
+    vi.mocked(globalThis.fetch).mockImplementation(
+      (url) =>
+        new Promise((resolve, reject) => {
+          const type = String(url).split('/generate/')[1];
+          replies.push((outcome) => {
+            if (outcome === 'network') reject(new TypeError('Failed to fetch'));
+            else if (outcome === 'ok') {
+              resolve({ ok: true, json: async () => ({ id: 'g-' + type, type, data: {} }) } as any);
+            } else {
+              const error = { error: 'internal_error' };
+              resolve({
+                ok: false,
+                status: 500,
+                statusText: 'Error',
+                json: async () => error,
+              } as any);
+            }
+          });
+        }) as any,
+    );
+    const types = ['summary', 'flashcards', 'quiz', 'fill-blank', 'image'];
+    const runs = types.map((type) => gen.generate.call(ctx, type));
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 2 }));
+
+    replies[0]('http-error');
+    await vi.waitFor(() => expect(replies).toHaveLength(4));
+    replies[1]('network');
+    await vi.waitFor(() => expect(replies).toHaveLength(5));
+    for (const reply of replies.slice(2)) reply('ok');
+    await Promise.all(runs);
+
+    expect(stepUrls()).toEqual(types.map((type) => '/api/projects/pid-1/generate/' + type));
+    expect(ctx.generations.map((g: any) => g.type)).toEqual(['quiz', 'fill-blank', 'image']);
+    const errorToasts = ctx.showToast.mock.calls.filter((c: any[]) => c[0] === 'toast.typedError');
+    expect(errorToasts).toHaveLength(2);
+    errorSpy.mockRestore();
+  });
+
+  it('Auto annulé (« Tout annuler ») pendant que ses étapes attendent leur place : elles sortent de la file sans partir', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    holdGenerations();
+    const others = occupySlots(3);
+    const run = gen.generateAuto.call(ctx);
+    // Une étape par voie de l'Auto, en file derrière les 3 places prises.
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 3 }));
+
+    confirm.cancelGeneration.call(ctx);
+    await run;
+
+    expect(longRequestSlots()).toEqual({ inFlight: 3, waiting: 0 });
+    expect(stepUrls()).toEqual([]);
+    expect(ctx.generations).toEqual([]);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+    await others.free();
+  });
+
+  it('annulation (« Tout annuler ») : les 3 étapes en vol sont abortées, celles en file ne partent pas', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const signals: AbortSignal[] = [];
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
+      if (isRoute(url)) return routeReply();
+      if (init?.signal) signals.push(init.signal);
+      return pendingUntilAbort(url, init);
+    });
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    confirm.cancelGeneration.call(ctx);
+    await run;
+
+    expect(signals.map((signal) => signal.aborted)).toEqual([true, true, true]);
+    expect(stepUrls()).toEqual(planUrls('pid-1').slice(0, 3));
+    expect(ctx.generations).toEqual([]);
+    expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
+    expect(ctx.autoRuns).toEqual({});
+    // Seul le toast d'annulation : « Magie terminée ! » le suivait (release-test du 2026-10-22).
+    expect(ctx.showToast.mock.calls.map((call: any[]) => call[0])).toEqual([
+      'toast.cancelledGeneration',
+    ]);
+  });
+
+  it('retour sur le cours pendant les étapes de son Auto : « Tout annuler » arrête aussi celles en file', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: true } });
+    const held = holdGenerations();
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(3));
+    switchCourse(ctx, 'pid-2');
+    switchCourse(ctx, 'pid-1'); // retour : le contrôleur de l'Auto n'est plus dans abortControllers
+
+    confirm.cancelGeneration.call(ctx);
+    // Sans l'arrêt de l'Auto, chaque étape en vol qui se termine libérait sa voie, et l'étape
+    // suivante partait (vécu à la recette du 2026-10-21 : un texte à trous généré après l'annulation).
+    for (const finish of held.finishers.splice(0)) finish();
+    await nextMacrotask();
+    expect(stepUrls()).toEqual(planUrls('pid-1').slice(0, 3));
+
+    await run;
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast.mock.calls.map((call: any[]) => call[0])).toEqual([
+      'toast.cancelledGeneration',
+    ]);
+  });
+
+  it('moins de 3 étapes : toutes partent ensemble, sans attendre', async () => {
+    const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
+    vi.mocked(globalThis.fetch).mockImplementation(async (url, init) => {
+      if (isRoute(url)) {
+        return {
+          ok: true,
+          json: async () => ({ plan: [{ agent: 'summary' }, { agent: 'quiz' }] }),
+        } as any;
+      }
+      return pendingUntilAbort(url, init);
+    });
+
+    const run = gen.generateAuto.call(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(2));
+    ctx.autoRuns['pid-1'].controller.abort();
+    await run;
+
+    expect(stepUrls()).toEqual([
+      '/api/projects/pid-1/generate/summary',
+      '/api/projects/pid-1/generate/quiz',
+    ]);
   });
 });
 
@@ -1670,6 +2345,70 @@ describe('generateVoice', () => {
     mockFetchOk({ audioUrls: { intro: '/audio/retry2.mp3' } });
     await retryFn();
     expect(genObj._audioUrl_intro).toBe('/audio/retry2.mp3');
+  });
+});
+
+// La lecture à voix haute est enregistrée dans la génération par le serveur (relue à l'ouverture
+// du cours) : sa réponse ne s'applique qu'au cours affiché, sur l'objet génération à jour.
+describe('generateVoice — cours changé pendant la lecture', () => {
+  const summary = () =>
+    asGenerationUI({ id: 'g1', type: 'summary', data: {} as any, _generatingVoice_all: false });
+
+  it('autre cours affiché : ni audio, ni coût, ni toast sur l’écran affiché', async () => {
+    const ctx = makeContext();
+    const genObj = summary();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = 'pid-2';
+      return { ok: true, json: async () => ({ audioUrl: '/a.mp3', costDelta: 0.02 }) } as any;
+    });
+
+    await gen.generateVoice.call(ctx, genObj);
+
+    expect(genObj._audioUrl_all).toBeUndefined();
+    expect(ctx.currentProject.totalCost).toBe(0);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    expect(genObj._generatingVoice_all).toBe(false);
+  });
+
+  it('refus ou panne alors qu’un autre cours est affiché : aucun toast', async () => {
+    const ctx = makeContext();
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      ctx.currentProjectId = 'pid-2';
+      throw new Error('network');
+    });
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    await gen.generateVoice.call(ctx, summary());
+
+    expect(ctx.showToast).not.toHaveBeenCalled();
+    errorSpy.mockRestore();
+  });
+
+  it('retour sur le cours : audio posé sur la génération relue, nouveau clic sans 2e requête', async () => {
+    const ctx = makeContext();
+    const before = summary();
+    const after = summary(); // même génération, relue du serveur au retour sur le cours
+    let respond!: (value: unknown) => void;
+    vi.mocked(globalThis.fetch).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          respond = resolve;
+        }) as any,
+    );
+
+    const reading = gen.generateVoice.call(ctx, before);
+    ctx.generations = [after];
+    await gen.generateVoice.call(ctx, after); // clic sur l'objet neuf pendant la lecture
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(after._generatingVoice_all).toBe(true);
+
+    respond({ ok: true, json: async () => ({ audioUrl: '/a.mp3' }) });
+    await reading;
+
+    expect(after._audioUrl_all).toBe('/a.mp3');
+    expect(after._generatingVoice_all).toBe(false);
+    expect(before._generatingVoice_all).toBe(false);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.audioDone', 'success');
   });
 });
 

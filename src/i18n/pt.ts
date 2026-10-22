@@ -206,6 +206,12 @@ export const pt: Record<string, string> = {
   'settings.perMChars': 'por M caracteres',
   'settings.priceUnknown': 'preço indisponível',
   'settings.ocrHint': 'OCR 3: económico. OCR 4: melhor qualidade, custo 2×.',
+  'settings.stt': 'Transcrição',
+  'settings.sttHint': 'Entrada de voz e respostas orais do quiz vocal.',
+  'settings.ttsHint':
+    'Podcast, quiz vocal, ditado e leitura em voz alta. TTS 3 (versão prévia): vozes nativas em mais idiomas, mas pronuncia pior as palavras isoladas do ditado.',
+  'settings.perMinute': 'por minuto',
+  'settings.preview': 'Versão prévia',
 
   'dashboard.subtitle': 'Painel',
   'dashboard.addFirstSources': 'Adicione suas primeiras fontes',
@@ -444,6 +450,14 @@ export const pt: Record<string, string> = {
   'toast.profileUpdated': 'Perfil atualizado',
   'toast.profileReset': 'Preferencias redefinidas',
   'toast.sourcesAdded': 'Fontes adicionadas!',
+  'toast.importDoneIn': 'Importação concluída em «{project}»: {n} fonte(s) adicionada(s).',
+  'toast.importErrorsIn':
+    'Importação em «{project}»: {n} arquivo(s) com erro, tente de novo nesse projeto.',
+  'toast.autoDoneIn': 'Magia concluída em «{project}»!',
+  'toast.autoPartialIn': 'Magia em «{project}»: {count} de {total} gerações concluídas.',
+  'toast.autoFailedIn': 'A geração automática de «{project}» falhou. Tente de novo nesse projeto.',
+  'toast.voiceAddedIn': 'Voz transcrita e adicionada a «{project}».',
+  'toast.voiceErrorIn': 'Não foi possível adicionar a voz gravada para «{project}»: {error}',
   'toast.textAdded': 'Texto adicionado!',
   'toast.sourceDeleted': 'Fonte exclu\u00edda',
   'toast.courseCreated': 'Curso criado!',

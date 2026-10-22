@@ -156,6 +156,17 @@ describe('formatCurrent', () => {
     expect(formatCurrent('mistral-moderation')).toBe('tokens: in=$0/M, out=$0/M');
   });
 
+  // Les fiches STT affichent un prix par minute : il figure à côté du tarif par million de secondes.
+  it('adds the per-minute price for an audio-seconds prefix (STT model cards)', () => {
+    expect(formatCurrent('voxtral-mini')).toBe('audio-seconds: in=$50/M, out=$0/M (= $0.0030/min)');
+    expect(formatCurrent('voxtral-mini-transcribe-3')).toContain('(= $0.0035/min)');
+    expect(formatCurrent('voxtral-small-transcribe-3')).toContain('(= $0.0040/min)');
+  });
+
+  it('no per-minute suffix for other units (TTS 3 per character)', () => {
+    expect(formatCurrent('voxtral-mini-tts-3')).toBe('characters: in=$13/M, out=$0/M');
+  });
+
   it('returns NOT CONFIGURED for an unknown prefix', () => {
     expect(formatCurrent('nope')).toBe('NOT CONFIGURED');
   });

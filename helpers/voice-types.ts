@@ -20,4 +20,8 @@ export interface MistralVoice {
   gender?: string;
   tags?: string[];
   createdAt?: string;
+  /** Slug du preset (`fr_marie_neutral`, `voice_3141`) ; absent pour une voix personnelle. */
+  slug?: string;
+  /** Voix clonée par le compte (`userId` non nul dans l'API), pas un preset Mistral. */
+  custom?: boolean;
 }

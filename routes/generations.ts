@@ -28,13 +28,19 @@ import type {
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
 import { getConfig, resolveVoices } from '../config.js';
-import { transcribeAudio, verifyAnswer } from '../generators/quiz-vocal.js';
-import { textToSpeech, type TtsOptions } from '../generators/tts-provider.js';
+import { verifyAnswer } from '../generators/quiz-vocal.js';
+import { transcribeAudio } from '../generators/stt.js';
+import { normalizeSttModel } from '../helpers/stt-models.js';
+import { textToSpeech, ttsOptionsFor, type TtsOptions } from '../generators/tts-provider.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { validateFillBlankAnswer } from '../helpers/fill-blank-validate.js';
 import { diffDictation } from '../helpers/dictation-diff.js';
 import { saveAudioFile } from '../helpers/audio-files.js';
-import { cleanupDeletedGeneration, readAloudPrefix } from '../helpers/generation-media.js';
+import {
+  cleanupDeletedGeneration,
+  deleteMediaFiles,
+  readAloudPrefix,
+} from '../helpers/generation-media.js';
 import { concatMp3, generateSilence } from '../generators/tts.js';
 import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
@@ -148,7 +154,13 @@ const screenTranscription = async (
  */
 const runVocalAnswer = async (input: VocalAnswerInput): Promise<VocalAnswerOutcome> => {
   const { client, question, lang, ageGroup } = input;
-  const transcription = await transcribeAudio(client, input.audio, 'answer.webm', lang);
+  const { text: transcription } = await transcribeAudio(
+    client,
+    input.audio,
+    'answer.webm',
+    lang,
+    normalizeSttModel(getConfig().models.stt),
+  );
   const refusal = await screenTranscription(input, transcription);
   if (refusal) return refusal;
   const { correct, feedback } = await verifyAnswer(
@@ -422,16 +434,14 @@ function resolveReadAloudContext(
   const profile = profileId ? profileStore.get(profileId) : null;
   // Passe profileId + flow='read-aloud' pour que la rotation déterministe par profil
   // s'applique aussi ici et que les logs de fallback soient contextualisés.
+  const ttsOpts = ttsOptionsFor(config, client);
   const voices = resolveVoices({
     profileVoices: profile?.mistralVoices,
     lang: lang || profile?.locale || 'fr',
     profileId,
     flow: 'read-aloud',
+    model: ttsOpts.model,
   });
-  const ttsOpts = {
-    model: config.ttsModel,
-    mistralClient: client,
-  } as const;
   return {
     config,
     profile,
@@ -747,7 +757,27 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
     });
   }
 
-  // Sous-helper : pipeline dual-voice flashcards.
+  // Enregistre la lecture des flashcards dans leur génération (`audioUrl`, déclaré dans
+  // generationMediaUrls) : relue avec le projet, elle se rejoue sans nouvel appel facturé
+  // (changement de cours, de profil, rechargement). La génération est relue APRÈS la synthèse
+  // (`ctx.gen` date d'avant les N×2 appels TTS) ; relecture et écriture synchrones, aucune autre
+  // requête ne s'intercale. Le MP3 remplacé, s'il y en a un, est supprimé après l'écriture : son
+  // nom est unique, aucune autre génération ne le référence (un autre onglet ouvert sur le cours
+  // garde l'ancienne URL jusqu'à son rechargement). Génération supprimée pendant la synthèse : le
+  // balayage de sa suppression est déjà passé, le MP3 neuf est supprimé aussitôt → false.
+  const saveFlashcardsAudioUrl = (ctx: ReadAloudCtx, audioUrl: string): boolean => {
+    const current = store.getGeneration(ctx.pid, ctx.gid);
+    if (current?.type !== 'flashcards') {
+      deleteMediaFiles(ctx.projectDir, ctx.pid, [audioUrl]);
+      return false;
+    }
+    store.updateGeneration(ctx.pid, ctx.gid, { audioUrl });
+    deleteMediaFiles(ctx.projectDir, ctx.pid, [current.audioUrl]);
+    return true;
+  };
+
+  // Sous-helper : pipeline dual-voice flashcards. Coût persisté quelle que soit l'issue ; 404 si
+  // la génération a disparu pendant la synthèse.
   async function runFlashcardsReadAloud(ctx: ReadAloudCtx, res: Response): Promise<void> {
     const cards = ctx.gen.data as Array<{ question: string; answer: string }>; // NOSONAR(S4325) — type narrowing
     const { result: audioBuffer, usage: fcUsage } = await runWithUsageTracking(() =>
@@ -760,6 +790,10 @@ export function generationCrudRoutes(store: ProjectStore, profileStore: ProfileS
       fcUsage,
     );
     const audioUrl = saveAudioFile(audioBuffer, ctx.projectDir, ctx.pid, `${ctx.audioPrefix}all`);
+    if (!saveFlashcardsAudioUrl(ctx, audioUrl)) {
+      res.status(404).json({ error: ERR_GENERATION_NOT_FOUND });
+      return;
+    }
     res.json({ audioUrl, ...(fcCost && { costDelta: fcCost.cost }) });
   }
 

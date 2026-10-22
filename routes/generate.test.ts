@@ -105,7 +105,9 @@ vi.mock('../generators/quiz-vocal.js', () => ({
   createQuizVocalGeneration: (fields: unknown) => fields,
 }));
 
-vi.mock('../generators/tts-provider.js', () => ({
+// Seul l'appel à l'API est simulé : ttsOptionsFor (modèle de la config normalisé) reste le vrai.
+vi.mock('../generators/tts-provider.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../generators/tts-provider.js')>()),
   textToSpeech: vi.fn().mockResolvedValue(Buffer.from('fake-word-audio')),
 }));
 
@@ -211,6 +213,9 @@ function mockRes() {
   res.json = vi.fn(() => res);
   return res;
 }
+
+// Alias plutôt qu'un type fonction écrit dans la signature : Lizard perdrait le corps du helper.
+type AsyncStep = () => Promise<void>;
 
 // --- Test data ---
 
@@ -1529,7 +1534,9 @@ describe('generateRoutes', () => {
       // flow='podcast' doit etre propage pour contextualiser les logs de fallback
       // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
       const { resolveVoices } = await import('../config.js');
-      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'podcast' }));
+      expect(resolveVoices).toHaveBeenCalledWith(
+        expect.objectContaining({ flow: 'podcast', model: 'voxtral-mini-tts-2603' }),
+      );
     });
   });
 
@@ -1559,7 +1566,9 @@ describe('generateRoutes', () => {
       // flow='quiz-vocal' doit etre propage pour contextualiser les logs de fallback
       // dans resolveMistralDefaults (le seed de rotation est profileId+langMatched, pas flow).
       const { resolveVoices } = await import('../config.js');
-      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'quiz-vocal' }));
+      expect(resolveVoices).toHaveBeenCalledWith(
+        expect.objectContaining({ flow: 'quiz-vocal', model: 'voxtral-mini-tts-2603' }),
+      );
     });
   });
 
@@ -2164,7 +2173,9 @@ describe('generateRoutes', () => {
       const handler = getHandler(router, 'post', '/:pid/generate/dictation');
       await handler(mockReq({ params: { pid }, body: {} }), mockRes());
 
-      expect(resolveVoices).toHaveBeenCalledWith(expect.objectContaining({ flow: 'dictation' }));
+      expect(resolveVoices).toHaveBeenCalledWith(
+        expect.objectContaining({ flow: 'dictation', model: 'voxtral-mini-tts-2603' }),
+      );
     });
 
     it('400 no_sources sans source (avant addPendingEntry)', async () => {
@@ -2243,6 +2254,99 @@ describe('generateRoutes', () => {
         10,
         '',
       );
+    });
+  });
+
+  // Modèle TTS des Réglages : normalisé au point d'appel (ttsOptionsFor), le même pour la sélection
+  // des voix (resolveVoices) et pour chaque appel TTS, dans toutes les générations audio.
+  describe('modèle TTS des Réglages (podcast, quiz vocal, dictée, étape auto)', () => {
+    // getConfig est lu plusieurs fois par requête : config remplacée le temps d'un appel, puis
+    // implémentation d'origine rétablie (clearAllMocks ne vide que l'historique des appels).
+    const withTtsModel = async (ttsModel: string, run: AsyncStep) => {
+      const { getConfig } = await import('../config.js');
+      const previous = vi.mocked(getConfig).getMockImplementation();
+      if (!previous) throw new Error('getConfig mocké sans implémentation');
+      vi.mocked(getConfig).mockReturnValue({ ...previous(), ttsModel });
+      try {
+        await run();
+      } finally {
+        vi.mocked(getConfig).mockImplementation(previous);
+      }
+    };
+    const projectWithSource = () => {
+      const pid = store.createProject('Test').meta.id;
+      store.addSource(pid, {
+        id: 'src-1',
+        filename: 'mots.txt',
+        markdown: 'toujours école',
+        uploadedAt: new Date().toISOString(),
+      });
+      return pid;
+    };
+    // Modèle reçu par resolveVoices, options reçues par chaque appel TTS (3e argument des trois).
+    const ttsWiring = async (type: string) => {
+      const { resolveVoices } = await import('../config.js');
+      const { generateAudio } = await import('../generators/tts.js');
+      const { ttsQuestion } = await import('../generators/quiz-vocal.js');
+      const { textToSpeech } = await import('../generators/tts-provider.js');
+      const calls: Record<string, unknown[][]> = {
+        podcast: vi.mocked(generateAudio).mock.calls,
+        'quiz-vocal': vi.mocked(ttsQuestion).mock.calls,
+        dictation: vi.mocked(textToSpeech).mock.calls,
+      };
+      return {
+        voiceModels: vi.mocked(resolveVoices).mock.calls.map(([args]) => args.model),
+        ttsOptions: calls[type].map((call) => call[2]),
+      };
+    };
+
+    it.each([
+      ['podcast', 'voxtral-mini-tts-3-0', 'voxtral-mini-tts-3-0'],
+      ['podcast', 'voxtral-mini-tts-latest', 'voxtral-mini-tts-2603'],
+      ['quiz-vocal', 'voxtral-mini-tts-3-0', 'voxtral-mini-tts-3-0'],
+      ['quiz-vocal', 'voxtral-mini-tts-latest', 'voxtral-mini-tts-2603'],
+      ['dictation', 'voxtral-mini-tts-3-0', 'voxtral-mini-tts-3-0'],
+      ['dictation', 'voxtral-mini-tts-latest', 'voxtral-mini-tts-2603'],
+    ])('%s, config %s : voix et TTS sur %s', async (type, configured, expected) => {
+      const pid = projectWithSource();
+      const res = mockRes();
+      await withTtsModel(configured, async () => {
+        await getHandler(
+          router,
+          'post',
+          `/:pid/generate/${type}`,
+        )(mockReq({ params: { pid }, body: {} }), res);
+      });
+
+      expect(res.json.mock.calls[0][0].type).toBe(type);
+      const { voiceModels, ttsOptions } = await ttsWiring(type);
+      expect(voiceModels).toEqual([expected]);
+      expect(ttsOptions.length).toBeGreaterThan(0);
+      for (const options of ttsOptions) {
+        expect(options).toEqual({ model: expected, mistralClient: mockClient });
+      }
+    });
+
+    it('étape podcast du mode Auto : même modèle normalisé', async () => {
+      const { routeRequest } = await import('../generators/router.js');
+      vi.mocked(routeRequest).mockResolvedValueOnce({
+        plan: [{ agent: 'podcast', reason: 'audio' }],
+        context: 'Podcast context',
+      } as any);
+      const pid = projectWithSource();
+      const res = mockRes();
+      await withTtsModel('voxtral-mini-tts-3-0', async () => {
+        await getHandler(
+          router,
+          'post',
+          '/:pid/generate/auto',
+        )(mockReq({ params: { pid }, body: { lang: 'fr' } }), res);
+      });
+
+      expect(res.json.mock.calls[0][0].generations[0].type).toBe('podcast');
+      const { voiceModels, ttsOptions } = await ttsWiring('podcast');
+      expect(voiceModels).toEqual(['voxtral-mini-tts-3-0']);
+      expect(ttsOptions).toEqual([{ model: 'voxtral-mini-tts-3-0', mistralClient: mockClient }]);
     });
   });
 

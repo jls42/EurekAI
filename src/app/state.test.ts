@@ -57,7 +57,8 @@ describe('createState', () => {
     const state = createState();
     expect(state.sources).toEqual([]);
     expect(state.selectedIds).toEqual([]);
-    expect(state.uploading).toBe(false);
+    // Plus de getter `uploading` (figé par `...createState()`) : méthode isUploading(), sources.ts.
+    expect('uploading' in state).toBe(false);
     expect(state.dragging).toBe(false);
     expect(state.viewSource).toBeNull();
     // Aucune source révélée au démarrage : le contenu masqué l'est jusqu'au PIN parental.
@@ -229,65 +230,12 @@ describe('createState', () => {
     expect(state.theme).toBe('light');
   });
 
-  it('uploadSessions defaults to empty array and uploading is false', () => {
+  // Les cas de l'ancien getter `uploading` sont devenus ceux de la méthode isUploading()
+  // (sources.test.ts) : le getter était figé à false dans l'objet donné à Alpine depuis #14.
+  it('uploadSessions defaults to empty array, autoRuns to an empty registry', () => {
     const state = createState();
     expect(state.uploadSessions).toEqual([]);
-    expect(state.uploading).toBe(false);
-  });
-
-  it('uploading is true when a file is pending', () => {
-    const state = createState();
-    state.uploadSessions = [
-      {
-        id: '1',
-        projectId: 'p1',
-        cleanupScheduled: false,
-        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'pending', errorMsg: null }],
-      },
-    ] as any;
-    expect(state.uploading).toBe(true);
-  });
-
-  it('uploading is true when a file is uploading', () => {
-    const state = createState();
-    state.uploadSessions = [
-      {
-        id: '1',
-        projectId: 'p1',
-        cleanupScheduled: false,
-        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'uploading', errorMsg: null }],
-      },
-    ] as any;
-    expect(state.uploading).toBe(true);
-  });
-
-  it('uploading is false when all files are error', () => {
-    const state = createState();
-    state.uploadSessions = [
-      {
-        id: '1',
-        projectId: 'p1',
-        cleanupScheduled: false,
-        files: [{ id: 'f1', name: 'a.pdf', file: null, status: 'error', errorMsg: 'fail' }],
-      },
-    ] as any;
-    expect(state.uploading).toBe(false);
-  });
-
-  it('uploading is false when mix of done and error', () => {
-    const state = createState();
-    state.uploadSessions = [
-      {
-        id: '1',
-        projectId: 'p1',
-        cleanupScheduled: false,
-        files: [
-          { id: 'f1', name: 'a.pdf', file: null, status: 'done', errorMsg: null },
-          { id: 'f2', name: 'b.pdf', file: null, status: 'error', errorMsg: 'fail' },
-        ],
-      },
-    ] as any;
-    expect(state.uploading).toBe(false);
+    expect(state.autoRuns).toEqual({});
   });
 
   it('viewSourceZoom defaults to 1 and viewSourceRotation to 0', () => {
@@ -305,6 +253,7 @@ describe('createState', () => {
       podcast: '',
       translate: '',
       ocr: '',
+      stt: '',
       quizVerify: '',
       chat: '',
     });

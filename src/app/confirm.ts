@@ -1,5 +1,7 @@
 import type { AppContext } from './app-context';
+import type { PendingTrackerEntry } from '../../types';
 import { pendingOfTypeExists } from './pending-utils';
+import { abortAutoRun } from './auto-runs';
 import { buildEventKey } from '../../helpers/event-key';
 
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
@@ -54,13 +56,36 @@ function buildCancelWhitelist(pid: string, gids: string[]): string[] {
     .map((g) => '/api/projects/' + safePid + '/generations/' + encodeURIComponent(g) + '/cancel');
 }
 
+// POST /cancel en échec (réseau down / 5xx) : pending restauré + toast, sur le cours de l'annulation
+// seulement — changé entre-temps, ce pending ne doit pas apparaître dans un autre cours (il revient
+// de lui-même au retour, relu du serveur). Race possible entre POST cancel échoué et SSE
+// `completed` : si la gen est arrivée en `state.generations` entre-temps, ne pas restaurer le
+// pending (toast trompeur "annulation échouée" alors que la gen a bel et bien complété).
+const restoreAfterFailedCancel = (
+  state: AppContext,
+  pid: string,
+  gid: string,
+  snapshot: PendingTrackerEntry | undefined,
+  label: string,
+): void => {
+  if (state.currentProjectId !== pid) return;
+  if (state.generations.some((g) => g.id === gid)) return;
+  if (snapshot && !state.pendingById[gid]) {
+    state.pendingById[gid] = snapshot;
+  }
+  state.showToast(state.t('toast.cancelFailed', { type: label }), 'error');
+};
+
 // Cancel un pending par gid : abort le fetch côté client + POST /cancel HTTP.
 // UI optimiste avec rollback sur erreur HTTP : retire de pendingById
 // immédiatement (feedback instantané), puis si le POST /cancel échoue (réseau
 // down / 5xx serveur), restaure l'entrée pending + toast erreur. Sans rollback,
 // l'utilisateur croirait que c'est annulé alors que le backend continue, et
 // recevrait plus tard un event SSE 'completed' pour un gid disparu côté UI.
-function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
+// Sans toast de confirmation : « Tout annuler » l'appelle pour chaque génération et n'en affiche
+// qu'un en tout (cinq toasts d'un coup au release-test du 2026-10-22) ; la puce ✕ passe par
+// cancelPendingByGid, qui nomme le type annulé.
+const cancelPendingSilently = (state: AppContext, gid: string, type: string): void => {
   const controller = state.abortControllersByGid[gid];
   const hadLocalController = Boolean(controller);
   if (controller) {
@@ -84,9 +109,8 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     state.loading[type] = false;
   }
   const label = state.t('gen.' + type) || type;
-  state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
-  // L'événement SSE `cancelled` de ce gid afficherait le même toast : il est marqué comme déjà vu
-  // dans l'onglet. Sa notification persistée reste écrite par le SSE (source de vérité serveur).
+  // L'événement SSE `cancelled` de ce gid afficherait un toast : il est marqué comme déjà vu dans
+  // l'onglet. Sa notification persistée reste écrite par le SSE (source de vérité serveur).
   state.shownToastEventKeys.add(buildEventKey(gid, 'cancelled'));
 
   const pid = state.currentProjectId;
@@ -94,17 +118,7 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
   const allowedUrls = buildCancelWhitelist(pid, [gid, ...Object.keys(state.pendingById)]);
   postCancel(pid, gid, allowedUrls)
     .then((ok) => {
-      if (ok) return;
-      // Race possible entre POST cancel échoué et SSE `completed` : si la gen
-      // est arrivée en `state.generations` entre-temps, ne pas restaurer le
-      // pending (toast trompeur "annulation échouée" alors que la gen a bel
-      // et bien complété). Vérifier d'abord generations[], puis pendingById.
-      const completedSinceCancel = state.generations.some((g) => g.id === gid);
-      if (completedSinceCancel) return;
-      if (snapshot && !state.pendingById[gid]) {
-        state.pendingById[gid] = snapshot;
-      }
-      state.showToast(state.t('toast.cancelFailed', { type: label }), 'error');
+      if (!ok) restoreAfterFailedCancel(state, pid, gid, snapshot, label);
     })
     .catch((err: unknown) => {
       // postCancel ne reject jamais (tous les chemins return un boolean), mais
@@ -112,6 +126,13 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
       // sans recourir au `void` operator interdit par sonarjs/void-use.
       console.error('[cancel] unexpected postCancel error', err);
     });
+};
+
+// Puce ✕ d'une génération : annulation, puis un toast qui nomme son type.
+function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
+  cancelPendingSilently(state, gid, type);
+  const label = state.t('gen.' + type) || type;
+  state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,10 +252,11 @@ const cancelOne = function (this: AppContext, key: string) {
 };
 
 const cancelGeneration = function (this: AppContext) {
-  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque)
+  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque), sans un toast par
+  //    génération : un seul toast pour tout, à la fin.
   for (const gid of Object.keys(this.pendingById)) {
     const entry = this.pendingById[gid];
-    cancelPendingByGid(this, gid, entry.type);
+    cancelPendingSilently(this, gid, entry.type);
   }
   // 2. Cancel les transients résiduels (auto/voice/websearch via abort
   //    controller par type seulement)
@@ -242,6 +264,10 @@ const cancelGeneration = function (this: AppContext) {
     controller.abort();
   }
   this.abortControllers = {};
+  // 3. L'Auto du cours affiché, dans toutes ses phases : revenu sur le cours pendant ses étapes, son
+  //    contrôleur n'est plus dans abortControllers (resetSession ne garde que le registre autoRuns),
+  //    et ses étapes encore en file partaient après « Tout annuler » (recette du 2026-10-21).
+  if (this.currentProjectId) abortAutoRun(this, this.currentProjectId);
   for (const key of Object.keys(this.loading)) {
     this.loading[key] = false;
   }

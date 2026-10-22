@@ -43,7 +43,8 @@
         {{> gen-card-header icon="layers" chipClass="icon-chip-flashcards"
         colorClass="gen-flashcards"}}
         <div x-show="openGens[gen.id]" x-transition class="px-4 pb-4 border-t border-gray-100">
-          <!-- Audio controls -->
+          <!-- Audio controls : la lecture enregistrée (flashcardsAudioUrl) se joue par le lecteur,
+               sans nouvel appel ; le bouton la produit, ou la refait (appel facturé). -->
           <div class="flex min-w-0 flex-col gap-3 mb-4 sm:flex-row sm:items-center">
             <button
               @click="generateVoice(gen)"
@@ -52,11 +53,11 @@
             >
               <i data-lucide="volume-2" class="w-5 h-5"></i>
               <span
-                x-show="!gen._generatingVoice_all && !gen._audioUrl_all"
+                x-show="!gen._generatingVoice_all && !flashcardsAudioUrl(gen)"
                 x-text="t('common.generateAudio')"
               ></span>
               <span
-                x-show="!gen._generatingVoice_all && gen._audioUrl_all"
+                x-show="!gen._generatingVoice_all && flashcardsAudioUrl(gen)"
                 x-text="t('common.regenerateAudio')"
               ></span>
               <span
@@ -66,11 +67,11 @@
               ></span>
             </button>
             <audio
-              x-show="gen._audioUrl_all"
+              x-show="flashcardsAudioUrl(gen)"
               controls
               preload="metadata"
               class="w-full min-w-0 max-w-full sm:flex-1 sm:min-w-[18rem] sm:max-w-xl"
-              :src="gen._audioUrl_all"
+              :src="flashcardsAudioUrl(gen)"
               :data-gen-id="gen.id"
             ></audio>
           </div>

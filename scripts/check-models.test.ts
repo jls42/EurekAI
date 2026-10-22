@@ -12,9 +12,12 @@ vi.mock('@lightpanda/browser', () => ({ lightpanda: { fetch: lightpandaFetch } }
 import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
+import { DEFAULT_STT_MODEL, STT_MODELS } from '../helpers/stt-models.js';
+import { DEFAULT_TTS_MODEL, TTS_MODELS } from '../helpers/tts-models.js';
 import {
   analyzeModels,
   collectFindings,
+  FAMILY_WATCHES,
   fetchModels,
   findLaggingDefaults,
   findMissing,
@@ -23,6 +26,7 @@ import {
   main,
   parseLegacyTable,
   resolveGroup,
+  TRACKED_DEFAULTS,
   WATCHED_MODELS,
 } from './check-models.js';
 
@@ -125,8 +129,8 @@ const OCR_41 = ['mistral-ocr-latest', 'mistral-ocr-4', 'mistral-ocr-4-1'];
 
 // Instantané COMPLET de GET /v1/models du 2026-09-25 (53 entrées, ordre réel, champs id / aliases /
 // deprecation) : `family` reproduit EXACTEMENT chaque entrée à partir de son groupe (vérifié sur la
-// capture). À rafraîchir quand une source unique (OCR_MODELS, MODERATION_MODEL, MISTRAL_LARGE_4)
-// change de version.
+// capture). À rafraîchir quand une source unique (OCR_MODELS, MODERATION_MODEL, MISTRAL_LARGE_4,
+// STT_MODELS, TTS_MODELS) change de version.
 const REAL_MODELS = [
   ['codestral-2508', 'codestral-latest', 'mistral-code-latest', 'mistral-code-fim-latest'],
   ['mistral-small-2603', 'mistral-small-latest', 'mistral-vibe-cli-fast', 'magistral-small-latest'],
@@ -155,7 +159,144 @@ const REAL_MODELS = [
   // Large 4 (sorti le 2026-10-06, surveillé depuis qu'il est proposé dans les Réglages) : ses 2
   // entrées réelles du 2026-10-08, en fin de liste ; le reste est l'instantané du 2026-09-25.
   ['mistral-large-4', 'mistral-large-4-0'],
+  // Voxtral 3 (sorti le 2026-10-20, surveillé depuis que STT_MODELS et TTS_MODELS le proposent) :
+  // ses 6 entrées réelles du 2026-10-21, sans `capabilities` comme le reste de cet instantané (les
+  // veilles par capacité y restent muettes : REAL_MODELS_2026_10_21 les met à l'épreuve).
+  ['voxtral-mini-transcribe-3', 'voxtral-mini-transcribe-3-0'],
+  ['voxtral-small-transcribe-3', 'voxtral-small-transcribe-3-0'],
+  ['voxtral-mini-tts-3-0', 'voxtral-mini-tts-3'],
 ].flatMap((ids) => family(ids));
+
+// Les 14 capacités de GET /v1/models, dans l'ordre réel de la réponse du 2026-10-21.
+const CAPABILITY_KEYS = [
+  'completion_chat',
+  'function_calling',
+  'reasoning',
+  'completion_fim',
+  'fine_tuning',
+  'vision',
+  'ocr',
+  'classification',
+  'moderation',
+  'audio',
+  'audio_transcription',
+  'audio_transcription_realtime',
+  'audio_speech',
+  'unified_resources',
+] as const;
+type Capability = (typeof CAPABILITY_KEYS)[number];
+
+// Objet `capabilities` COMPLET, comme l'API le renvoie : les 14 clés, `true` pour celles nommées.
+const caps = (...enabled: Capability[]): Record<string, boolean> => {
+  return Object.fromEntries(CAPABILITY_KEYS.map((k) => [k, enabled.includes(k)]));
+};
+
+// Entrées d'un groupe, avec l'objet `capabilities` que tous ses frères partagent (vrai pour les 24
+// groupes de la capture du 2026-10-21).
+const familyWithCaps = (
+  ids: string[],
+  capabilities: Record<string, boolean>,
+  deprecation: string | null = null,
+) => {
+  return family(ids, deprecation).map((m) => ({ ...m, capabilities }));
+};
+
+// Instantané COMPLET de GET /v1/models du 2026-10-21, lendemain de l'arrivée de Voxtral 3 (62
+// entrées en 24 groupes, ordre réel) : id, aliases, deprecation et capabilities reproduits à
+// l'identique, vérifiés entrée par entrée contre la capture. OCR 4.0 n'y est plus (retiré le
+// 2026-09-30). Le nom ne dit rien du rôle : `voxtral-mini-2602` transcrit sans « transcribe » dans
+// son id, `voxtral-small-2507` (affiché « Voxtral Small Transcribe ») n'a que `audio`.
+const REAL_GROUPS_2026_10_21: [string[], Record<string, boolean>][] = [
+  [
+    ['codestral-2508', 'codestral-latest', 'mistral-code-latest', 'mistral-code-fim-latest'],
+    caps('completion_chat', 'function_calling', 'completion_fim'),
+  ],
+  [['glm-5-2', 'zai-glm-5-2'], caps('completion_chat', 'function_calling', 'reasoning')],
+  [
+    ['zai-glm-5-3', 'zai-glm-5', 'zai-glm-latest'],
+    caps('completion_chat', 'function_calling', 'reasoning'),
+  ],
+  [
+    ['labs-leanstral-1-5-1', 'labs-leanstral-1-5'],
+    caps('completion_chat', 'function_calling', 'reasoning', 'vision', 'unified_resources'),
+  ],
+  [
+    ['ministral-14b-2512', 'ministral-14b-latest'],
+    caps('completion_chat', 'function_calling', 'fine_tuning', 'vision'),
+  ],
+  [
+    ['ministral-3b-2512', 'ministral-3b-latest'],
+    caps('completion_chat', 'function_calling', 'fine_tuning', 'vision'),
+  ],
+  [
+    ['ministral-8b-2512', 'ministral-8b-latest'],
+    caps('completion_chat', 'function_calling', 'fine_tuning', 'vision'),
+  ],
+  [
+    ['mistral-large-4', 'mistral-large-4-0'],
+    caps('completion_chat', 'function_calling', 'reasoning', 'vision', 'unified_resources'),
+  ],
+  [
+    ['mistral-large-2512', 'mistral-large-latest'],
+    caps('completion_chat', 'function_calling', 'fine_tuning', 'vision'),
+  ],
+  [MEDIUM, caps('completion_chat', 'function_calling', 'reasoning', 'vision')],
+  [
+    [
+      'mistral-small-2603',
+      'mistral-small-latest',
+      'mistral-vibe-cli-fast',
+      'magistral-small-latest',
+    ],
+    caps('completion_chat', 'function_calling', 'reasoning', 'vision'),
+  ],
+  [
+    ['voxtral-small-2507', 'voxtral-small-latest'],
+    caps('completion_chat', 'function_calling', 'audio'),
+  ],
+  [['codestral-embed', 'codestral-embed-2505'], caps()],
+  [['mistral-embed-2312', 'mistral-embed'], caps()],
+  [['mistral-moderation-2603'], caps('classification', 'moderation')],
+  [
+    ['mistral-ocr-2512', 'mistral-ocr-3-0', 'mistral-ocr-3'],
+    caps('function_calling', 'vision', 'ocr'),
+  ],
+  [OCR_41, caps('function_calling', 'vision', 'ocr')],
+  [['voxtral-mini-2602', 'voxtral-mini-latest'], caps('audio_transcription')],
+  [['voxtral-mini-transcribe-3', 'voxtral-mini-transcribe-3-0'], caps('audio_transcription')],
+  [
+    [
+      'voxtral-mini-transcribe-realtime-2602',
+      'voxtral-mini-realtime-2602',
+      'voxtral-mini-realtime-latest',
+    ],
+    caps('audio_transcription_realtime'),
+  ],
+  [
+    ['voxtral-mini-transcribe-realtime-3', 'voxtral-mini-transcribe-realtime-3-0'],
+    caps('audio_transcription_realtime'),
+  ],
+  [['voxtral-small-transcribe-3', 'voxtral-small-transcribe-3-0'], caps('audio_transcription')],
+  [
+    ['voxtral-mini-tts-2603', 'voxtral-mini-tts-latest'],
+    caps('function_calling', 'fine_tuning', 'audio_speech'),
+  ],
+  [['voxtral-mini-tts-3-0', 'voxtral-mini-tts-3'], caps('audio_speech')],
+];
+const REAL_MODELS_2026_10_21 = REAL_GROUPS_2026_10_21.flatMap(([ids, c]) => {
+  return familyWithCaps(ids, c);
+});
+
+// Informations des veilles par capacité (texte exact du script).
+const STT_HINT = "mesurer (WER, langues, prix) puis l'ajouter à STT_MODELS (helpers/stt-models.ts)";
+const TTS_HINT =
+  "vérifier (compatibilité des voix, écoute, prix) puis l'ajouter à TTS_MODELS (helpers/tts-models.ts)";
+const sttInfo = (id: string) => {
+  return infoOf(`modèle non suivi avec la capacité audio_transcription : ${id} — ${STT_HINT}`);
+};
+const ttsInfo = (id: string) => {
+  return infoOf(`modèle non suivi avec la capacité audio_speech : ${id} — ${TTS_HINT}`);
+};
 
 const LAG_40 = alertOf(
   "défaut épinglé mistral-ocr-4-0 en retard sur sa génération : mistral-ocr-4 → mistral-ocr-4-1 — mettre à jour l'épinglage",
@@ -409,6 +550,18 @@ describe('analyzeModels', () => {
     expect(analyzeModels(REAL_MODELS, REAL_LEGACY)).toEqual([]);
   });
 
+  it('alerts on a pinned TTS model listed Legacy (hypothetical row), now that TTS_MODELS is watched', () => {
+    // Ligne HYPOTHÉTIQUE (dates inventées) : Voxtral TTS retiré au profit de Voxtral TTS 3.
+    const row =
+      '| [Voxtral TTS ↗](u) | `26.03` | voxtral\\-mini\\-tts\\-2603 | 11/20/202612/31/2026 | [Voxtral TTS 3](u) |';
+    const legacy = parseLegacyTable(`${REAL_LEGACY_MD}\n${row}`);
+    expect(analyzeModels(REAL_MODELS_2026_10_21, legacy)).toEqual([
+      alertOf(
+        'voxtral-mini-tts-2603 en fin de vie · déprécié 11/20/2026 · retiré 12/31/2026 · → remplacer par Voxtral TTS 3',
+      ),
+    ]);
+  });
+
   it('tolerates a missing aliases/deprecation shape (no false diagnostic)', () => {
     expect(analyzeModels([{ id: 'x' }])).toEqual([]);
     expect(analyzeModels([])).toEqual([]);
@@ -573,6 +726,52 @@ describe('findLaggingDefaults', () => {
   });
 });
 
+describe('TRACKED_DEFAULTS (défaut STT suivi, défaut TTS volontairement absent)', () => {
+  it('tracks the OCR and STT defaults, never the TTS default', () => {
+    const pinned = TRACKED_DEFAULTS.map((t) => t.pinned);
+    expect(pinned).toEqual([DEFAULT_OCR_MODEL, DEFAULT_STT_MODEL]);
+    expect(pinned).not.toContain(DEFAULT_TTS_MODEL);
+  });
+
+  it('a dated STT default (voxtral-mini-2602) is inert on the real snapshot', () => {
+    expect(
+      findLaggingDefaults(REAL_MODELS_2026_10_21, REAL_LEGACY, [{ pinned: 'voxtral-mini-2602' }]),
+    ).toEqual([]);
+  });
+
+  it('a major-minor STT default would be tracked cleanly: silent today, alert on a newer minor', () => {
+    const majorMinor = [
+      { pinned: 'voxtral-mini-transcribe-3-0' },
+      { pinned: 'voxtral-small-transcribe-3-0' },
+    ];
+    expect(findLaggingDefaults(REAL_MODELS_2026_10_21, REAL_LEGACY, majorMinor)).toEqual([]);
+    const models = [
+      ...family(['voxtral-mini-transcribe-3-0']),
+      ...family(['voxtral-mini-transcribe-3', 'voxtral-mini-transcribe-3-1']),
+    ];
+    expect(
+      findLaggingDefaults(models, new Map(), [{ pinned: 'voxtral-mini-transcribe-3-0' }]),
+    ).toEqual([
+      alertOf(
+        "défaut épinglé voxtral-mini-transcribe-3-0 en retard sur sa génération : voxtral-mini-transcribe-3 → voxtral-mini-transcribe-3-1 — mettre à jour l'épinglage",
+      ),
+    ]);
+  });
+
+  it('why not the TTS default: pinned to tts-3-0, the -latest rule would call the OLDER 2603 new', () => {
+    // voxtral-mini-tts-latest pointe encore voxtral-mini-tts-2603 (instantané réel du 2026-10-21).
+    expect(
+      findLaggingDefaults(REAL_MODELS_2026_10_21, REAL_LEGACY, [
+        { pinned: 'voxtral-mini-tts-3-0' },
+      ]),
+    ).toEqual([
+      infoOf(
+        "nouvelle génération disponible : voxtral-mini-tts-latest → voxtral-mini-tts-2603 (défaut épinglé voxtral-mini-tts-3-0) — évaluer prix/compat avant de changer l'épinglage",
+      ),
+    ]);
+  });
+});
+
 describe('findUntrackedFamilyModels (veille de famille modération)', () => {
   it('reports a model outside the pinned group even with a new naming scheme (3-0)', () => {
     const models = [...family([MODERATION_MODEL]), ...family(['mistral-moderation-3-0'])];
@@ -616,6 +815,95 @@ describe('findUntrackedFamilyModels (veille de famille modération)', () => {
   });
 });
 
+describe('findUntrackedFamilyModels (veille par capacité : transcription, synthèse vocale)', () => {
+  it('follows the single sources: MODERATION_MODEL by family, STT_MODELS and TTS_MODELS by capability', () => {
+    const shape = FAMILY_WATCHES.map((w) => {
+      return { family: w.family, capability: w.capability, tracked: w.tracked };
+    });
+    expect(shape).toEqual([
+      { family: 'mistral-moderation', tracked: [MODERATION_MODEL] },
+      { capability: 'audio_transcription', tracked: STT_MODELS },
+      { capability: 'audio_speech', tracked: TTS_MODELS },
+    ]);
+  });
+
+  it('reports a model by its capability alone, whatever its name (voxtral-speech-4-0)', () => {
+    const models = familyWithCaps(['voxtral-speech-4-0'], caps('audio_speech'));
+    expect(findUntrackedFamilyModels(models)).toEqual([ttsInfo('voxtral-speech-4-0')]);
+  });
+
+  it('ignores a model whose capability is absent, false or not strictly true', () => {
+    const models = [
+      ...family(['voxtral-mini-tts-9-0']),
+      ...familyWithCaps(['voxtral-mini-tts-9-1'], caps()),
+      { id: 'voxtral-mini-tts-9-2', capabilities: { audio_speech: 'true' } },
+      { id: 'voxtral-mini-tts-9-3', capabilities: { audio_speech: 1 } },
+    ];
+    expect(findUntrackedFamilyModels(models)).toEqual([]);
+  });
+
+  it('ignores realtime transcription and audio chat (exact capability key, not the name)', () => {
+    const audioChat = new Set(['voxtral-small-2507', 'voxtral-small-latest']);
+    const models = REAL_MODELS_2026_10_21.filter((m) => {
+      return m.id.includes('realtime') || audioChat.has(m.id);
+    });
+    expect(models).toHaveLength(7);
+    expect(findUntrackedFamilyModels(models, REAL_LEGACY)).toEqual([]);
+    // Témoin : le même nom AVEC `audio_transcription` est signalé, le filtre est la clé exacte.
+    const flagged = familyWithCaps(
+      ['voxtral-mini-transcribe-realtime-3-0'],
+      caps('audio_transcription', 'audio_transcription_realtime'),
+    );
+    expect(findUntrackedFamilyModels(flagged)).toEqual([
+      sttInfo('voxtral-mini-transcribe-realtime-3-0'),
+    ]);
+  });
+
+  it('groups siblings into ONE line (alias + major-minor), whatever the list order', () => {
+    const models = familyWithCaps(
+      ['voxtral-speech-latest', 'voxtral-speech-4', 'voxtral-speech-4-0'],
+      caps('audio_speech'),
+    );
+    for (const list of [models, [...models].reverse()]) {
+      expect(findUntrackedFamilyModels(list)).toEqual([ttsInfo('voxtral-speech-4-0')]);
+    }
+  });
+
+  it('excludes the groups of EVERY tracked id, siblings included', () => {
+    const transcription = caps('audio_transcription');
+    const models = [
+      ...familyWithCaps(['voxtral-mini-2602', 'voxtral-mini-latest'], transcription),
+      ...familyWithCaps(
+        ['voxtral-mini-transcribe-3', 'voxtral-mini-transcribe-3-0'],
+        transcription,
+      ),
+      ...familyWithCaps(['voxtral-large-transcribe-4-0'], transcription),
+    ];
+    // Suivis par un frère seulement (l'alias de 2602, la forme courte de 3-0) : groupes exclus.
+    const watch = {
+      capability: 'audio_transcription',
+      tracked: ['voxtral-mini-latest', 'voxtral-mini-transcribe-3'],
+      hint: STT_HINT,
+    };
+    expect(findUntrackedFamilyModels(models, new Map(), [watch])).toEqual([
+      sttInfo('voxtral-large-transcribe-4-0'),
+    ]);
+  });
+
+  it('ignores a model with the capability that is listed Legacy or deprecated on the API side', () => {
+    // voxtral-mini-2507 (Voxtral Mini Transcribe) : ligne réelle de la table Legacy (retiré 5/31/2026).
+    const listed = familyWithCaps(['voxtral-mini-2507'], caps('audio_transcription'));
+    expect(findUntrackedFamilyModels(listed)).toEqual([sttInfo('voxtral-mini-2507')]);
+    expect(findUntrackedFamilyModels(listed, REAL_LEGACY)).toEqual([]);
+    const deprecated = familyWithCaps(
+      ['voxtral-mini-tts-2510'],
+      caps('audio_speech'),
+      '2026-12-31',
+    );
+    expect(findUntrackedFamilyModels(deprecated)).toEqual([]);
+  });
+});
+
 describe('OCR 3 (mistral-ocr-2512) exclu des règles de retard et de famille', () => {
   it('a newer mistral-ocr-2605 in the catalogue raises nothing about OCR 3', () => {
     const catalog = [...REAL_MODELS, ...family(['mistral-ocr-2605'])];
@@ -623,9 +911,9 @@ describe('OCR 3 (mistral-ocr-2512) exclu des règles de retard et de famille', (
   });
 });
 
-describe('acceptance on the real /v1/models snapshot (2026-09-25, Large 4 du 2026-10-08)', () => {
-  it('fixture: 55 entries, every watched model present', () => {
-    expect(REAL_MODELS).toHaveLength(55);
+describe('acceptance on the real /v1/models snapshot (2026-09-25, Large 4 du 2026-10-08, Voxtral 3 du 2026-10-21)', () => {
+  it('fixture: 61 entries, every watched model present', () => {
+    expect(REAL_MODELS).toHaveLength(61);
     expect(findMissing(REAL_MODELS)).toEqual([]);
   });
 
@@ -676,23 +964,78 @@ describe('acceptance on the real /v1/models snapshot (2026-09-25, Large 4 du 202
   });
 });
 
+// Arrivée de Voxtral 3 (2026-10-20) : la v1.7.11 n'a rien signalé (alias Voxtral surveillés
+// inchangés, veille de famille limitée à la modération). Test d'acceptation des veilles par capacité.
+describe('acceptance on the real /v1/models snapshot of 2026-10-21 (arrivée de Voxtral 3)', () => {
+  // Veilles réglées comme la v1.7.11 : l'app envoyait les alias Voxtral, seuls modèles audio suivis.
+  // Dérivées des FAMILY_WATCHES livrées (mêmes capacités, mêmes indices) : seul `tracked` change.
+  const V1711_TRACKED: ReadonlyMap<string, readonly string[]> = new Map([
+    ['audio_transcription', ['voxtral-mini-latest']],
+    ['audio_speech', ['voxtral-mini-tts-latest']],
+  ]);
+  const v1711Watches = FAMILY_WATCHES.map((w) => {
+    return { ...w, tracked: V1711_TRACKED.get(w.capability ?? '') ?? w.tracked };
+  });
+
+  it('fixture: 62 entries, every watched model present', () => {
+    expect(REAL_MODELS_2026_10_21).toHaveLength(62);
+    expect(findMissing(REAL_MODELS_2026_10_21)).toEqual([]);
+  });
+
+  it('v1.7.11 stayed silent: Voxtral aliases current, family watch on moderation only', () => {
+    const voxtralAliases = ['voxtral-mini-latest', 'voxtral-mini-tts-latest'];
+    expect(findMissing(REAL_MODELS_2026_10_21, voxtralAliases)).toEqual([]);
+    expect(analyzeModels(REAL_MODELS_2026_10_21, REAL_LEGACY, voxtralAliases)).toEqual([]);
+    const moderationOnly = FAMILY_WATCHES.filter((w) => w.capability === undefined);
+    expect(findUntrackedFamilyModels(REAL_MODELS_2026_10_21, REAL_LEGACY, moderationOnly)).toEqual(
+      [],
+    );
+  });
+
+  it('watches tracking what v1.7.11 tracked → exactly the 3 Voxtral 3 models, any order', () => {
+    expect(v1711Watches.map((w) => w.tracked)).toEqual([
+      [MODERATION_MODEL],
+      ['voxtral-mini-latest'],
+      ['voxtral-mini-tts-latest'],
+    ]);
+    // Frères regroupés (`-3` + `-3-0` : une ligne) ; rien pour le temps réel (2602, 3-0) ni pour
+    // voxtral-small-2507 (`audio` seul).
+    for (const list of [REAL_MODELS_2026_10_21, [...REAL_MODELS_2026_10_21].reverse()]) {
+      expect(findUntrackedFamilyModels(list, REAL_LEGACY, v1711Watches)).toEqual([
+        sttInfo('voxtral-mini-transcribe-3-0'),
+        sttInfo('voxtral-small-transcribe-3-0'),
+        ttsInfo('voxtral-mini-tts-3-0'),
+      ]);
+    }
+  });
+
+  it('shipped sources (STT_MODELS, TTS_MODELS) → no information, nothing at all, any order', () => {
+    for (const list of [REAL_MODELS_2026_10_21, [...REAL_MODELS_2026_10_21].reverse()]) {
+      expect(findUntrackedFamilyModels(list, REAL_LEGACY)).toEqual([]);
+      expect(collectFindings(list, REAL_LEGACY)).toEqual([]);
+    }
+  });
+});
+
 describe('WATCHED_MODELS (sources uniques)', () => {
-  it('is the 5 resolved -latest aliases + Large 4 + OCR_MODELS + MODERATION_MODEL', () => {
+  it('is the 3 resolved chat -latest aliases + Large 4 + OCR, moderation, STT and TTS sources', () => {
     expect(WATCHED_MODELS).toEqual([
       'mistral-large-latest',
       'mistral-medium-latest',
       'mistral-small-latest',
-      'voxtral-mini-latest',
-      'voxtral-mini-tts-latest',
       MISTRAL_LARGE_4,
       ...OCR_MODELS,
       MODERATION_MODEL,
+      ...STT_MODELS,
+      ...TTS_MODELS,
     ]);
   });
 
   it('no longer watches the moving aliases the app does not send', () => {
     expect(WATCHED_MODELS).not.toContain('mistral-moderation-latest');
     expect(WATCHED_MODELS).not.toContain('mistral-ocr-latest');
+    expect(WATCHED_MODELS).not.toContain('voxtral-mini-latest');
+    expect(WATCHED_MODELS).not.toContain('voxtral-mini-tts-latest');
   });
 });
 
@@ -766,6 +1109,15 @@ describe('main (orchestration, non bloquant)', () => {
     expect(lines[0]).toContain('modèles à vérifier');
     expect(lines).toContain(`  - ${MODERATION_MODEL} en fin de vie · déprécié 2027-01-01`);
     expect(lines.at(-1)).toContain('mettre à jour la version épinglée');
+    // Le pied de message cite chaque source unique épinglée, STT et TTS comprises.
+    expect(lines.at(-1)).toContain(
+      'helpers/ocr-models.ts, helpers/moderation-model.ts, helpers/stt-models.ts, helpers/tts-models.ts',
+    );
+  });
+
+  it('alerts on a deprecated pinned STT model, now sent as is', async () => {
+    const lines = await run({ data: watchedData(DEFAULT_STT_MODEL) });
+    expect(lines).toContain(`  - ${DEFAULT_STT_MODEL} en fin de vie · déprécié 2027-01-01`);
   });
 
   it('never says OK on an empty model list (silent API)', async () => {
@@ -777,6 +1129,26 @@ describe('main (orchestration, non bloquant)', () => {
 
   it('on the real snapshot: OK and nothing else (default OCR 4.1, no accepted lag)', async () => {
     const lines = await run({ data: REAL_MODELS });
+    expect(lines).toEqual([
+      `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`,
+    ]);
+  });
+
+  it('on the real snapshot of 2026-10-21 (Voxtral 3, capabilities): OK and nothing else', async () => {
+    const lines = await run({ data: REAL_MODELS_2026_10_21 });
+    expect(lines).toEqual([
+      `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`,
+    ]);
+  });
+
+  it('tolerates an unexpected capabilities shape from the API (null, string): no information', async () => {
+    const lines = await run({
+      data: [
+        ...watchedData(),
+        { id: 'voxtral-mini-tts-9-0', capabilities: null },
+        { id: 'voxtral-mini-tts-9-1', capabilities: 'audio_speech' },
+      ],
+    });
     expect(lines).toEqual([
       `check-models: ${WATCHED_MODELS.length} modèles surveillés OK (aucun absent, ambigu, déprécié, retiré ni en retard non assumé).`,
     ]);

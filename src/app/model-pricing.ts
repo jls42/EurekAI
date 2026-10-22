@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy lance ESLint sans resolution de types : resolvePricing() est error-typé et le param type-only de TranslateFn est vu unused (faux positifs) ; couvert par lint:ci local type-aware */
-import { resolvePricing } from '@helpers/pricing';
+import { resolvePricing, usdPerMinute } from '@helpers/pricing';
 
 /** Fonction de traduction minimale (clé → texte). Compatible avec le `t` d'AppContext. */
 type TranslateFn = (key: string) => string;
@@ -20,9 +20,9 @@ export function modelPriceLabel(modelId: string, t: TranslateFn): string {
     case 'characters':
       return `$${pricing.inputPerMillion} ${t('settings.perMChars')}`;
     case 'audio-seconds':
-      // STT (voxtral-mini) n'est exposé dans aucun sélecteur Réglages → pas de libellé tarifaire.
-      // S'il l'était un jour, ajouter une clé i18n dédiée plutôt que retomber sur priceUnknown.
-      return t('settings.priceUnknown');
+      // Prix STT annoncé par minute (sélecteur « Transcription ») : 4 décimales, comme la ligne de
+      // coût (« $0.0035/min », helpers/cost-calc.ts).
+      return `$${usdPerMinute(pricing).toFixed(4)} ${t('settings.perMinute')}`;
     default: {
       // Exhaustivité compile-time : une nouvelle BillingUnit casse ce `never` et force
       // un case explicite — évite un "tarif indisponible" silencieux sur un modèle pourtant tarifé.

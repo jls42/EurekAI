@@ -26,17 +26,22 @@ describe('modelPriceLabel', () => {
     expect(modelPriceLabel('mistral-ocr-4-0', t)).toBe('$4 settings.perKPages');
   });
 
-  it('formats character pricing for TTS', () => {
-    expect(modelPriceLabel('voxtral-mini-tts-latest', t)).toBe('$16 settings.perMChars');
+  it('formats character pricing for TTS (Voxtral TTS $16, TTS 3 at its own $13)', () => {
+    expect(modelPriceLabel('voxtral-mini-tts-2603', t)).toBe('$16 settings.perMChars');
+    expect(modelPriceLabel('voxtral-mini-tts-3-0', t)).toBe('$13 settings.perMChars');
   });
 
   it('returns priceUnknown for an unknown model', () => {
     expect(modelPriceLabel('gpt-4o', t)).toBe('settings.priceUnknown');
   });
 
-  // audio-seconds (STT voxtral-mini) est tarifé mais n'est exposé dans aucun sélecteur Réglages :
-  // choix explicite documenté en code (case dédié) — verrouille le comportement contre une régression.
-  it('returns priceUnknown for audio-seconds models (STT not surfaced in selectors)', () => {
-    expect(modelPriceLabel('voxtral-mini-latest', t)).toBe('settings.priceUnknown');
+  // Sélecteur « Transcription » des Réglages : prix par minute, 4 décimales (comme la ligne de coût
+  // « $0.0035/min ») ; chaque modèle a son tarif, Transcribe 3 n'hérite pas de celui de Transcribe 2.
+  it.each([
+    ['voxtral-mini-2602', '$0.0030 settings.perMinute'],
+    ['voxtral-mini-transcribe-3-0', '$0.0035 settings.perMinute'],
+    ['voxtral-small-transcribe-3-0', '$0.0040 settings.perMinute'],
+  ])('formats per-minute pricing for STT %s', (model, label) => {
+    expect(modelPriceLabel(model, t)).toBe(label);
   });
 });

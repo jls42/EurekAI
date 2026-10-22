@@ -23,6 +23,7 @@ import { createGenerate } from './generate';
 import { createGenerations } from './generations';
 import { createChat } from './chat';
 import { createRender } from './render';
+import { watchViewMedia } from './view-media';
 import type { AppContext } from './app-context';
 
 export function app() {
@@ -49,6 +50,8 @@ export function app() {
 
     async init(this: AppContext) {
       document.documentElement.dataset.theme = this.theme;
+      // Vue quittée : son coupé, position gardée (vues en x-show, jamais retirées du DOM).
+      watchViewMedia(this);
 
       this.checkMobile();
       let resizeTimeout: ReturnType<typeof setTimeout>;

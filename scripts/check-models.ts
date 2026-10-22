@@ -9,8 +9,8 @@
  *      la table « Legacy/Deprecated » expose les dates de RETRAIT + le modèle de remplacement, que
  *      l'API n'expose pas (et corrige les `deprecation: null` incomplets côté API).
  *
- * Alertes (à traiter) sur `WATCHED_MODELS` (alias `-latest` résolus par l'app + versions épinglées
- * importées des sources uniques) :
+ * Alertes (à traiter) sur `WATCHED_MODELS` (alias `-latest` de chat résolus par l'app + versions
+ * épinglées importées des sources uniques : chat, OCR, modération, STT, TTS) :
  *   - nom absent de `/v1/models` (piège 2026-09 : `mistral-moderation-latest` n'y est plus listé) ;
  *   - alias ambigu : plusieurs groupes distincts le listent (jamais « la 1re entrée gagne ») ;
  *   - groupe déprécié (API) ou listé Legacy, via l'id OU un frère (piège 2026-06 :
@@ -18,7 +18,9 @@
  *   - défaut épinglé `P-M-m` en retard sur l'alias de sa génération `P-M` (piège 2026-09 :
  *     `mistral-ocr-4-0` alors que `mistral-ocr-4` → `mistral-ocr-4-1`), sauf retard assumé.
  * Informations (à lire) : retard assumé sur UN candidat documenté, nouvelle génération (`P-latest`),
- * modèle non suivi dans la famille d'un épinglé sans alias (modération).
+ * modèle non suivi d'un rôle épinglé, repéré par sa famille de nom (modération) ou par sa capacité
+ * dans `/v1/models` (`audio_transcription` → STT, `audio_speech` → TTS : piège 2026-10, Voxtral 3
+ * arrivé sans qu'aucun alias surveillé ne bouge).
  *
  * Informatif et **NON BLOQUANT** : `exit 0` toujours, skip sans `MISTRAL_API_KEY`, tolérant au shape de
  * l'API, dégrade gracieusement au diagnostic API-seul si l'overview/Lightpanda échoue ou rend une
@@ -32,17 +34,14 @@ import { lightpanda } from '@lightpanda/browser';
 import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
+import { DEFAULT_STT_MODEL, STT_MODELS } from '../helpers/stt-models.js';
+import { TTS_MODELS } from '../helpers/tts-models.js';
 
-// Alias `-latest` RÉSOLUS par l'app à l'exécution (défauts config/générateurs, Réglages, routeur,
-// STT, TTS). Ni `mistral-ocr-latest` ni `mistral-moderation-latest` : l'app envoie des versions
-// épinglées (sources uniques ci-dessous), jamais ces alias.
-const WATCHED_ALIASES = [
-  'mistral-large-latest',
-  'mistral-medium-latest',
-  'mistral-small-latest',
-  'voxtral-mini-latest',
-  'voxtral-mini-tts-latest',
-];
+// Alias `-latest` de chat RÉSOLUS par l'app à l'exécution (défauts config/générateurs, Réglages,
+// routeur). Ni `mistral-ocr-latest`, ni `mistral-moderation-latest`, ni les alias Voxtral
+// (`voxtral-mini-latest`, `voxtral-mini-tts-latest`) : l'app envoie des versions épinglées (sources
+// uniques ci-dessous), jamais ces alias.
+const WATCHED_ALIASES = ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'];
 
 /** Tout id que l'app envoie tel quel à l'API : alias ci-dessus + versions épinglées (sources uniques). */
 export const WATCHED_MODELS: readonly string[] = [
@@ -50,6 +49,8 @@ export const WATCHED_MODELS: readonly string[] = [
   MISTRAL_LARGE_4,
   ...OCR_MODELS,
   MODERATION_MODEL,
+  ...STT_MODELS,
+  ...TTS_MODELS,
 ];
 
 const OVERVIEW_URL = 'https://docs.mistral.ai/models/overview';
@@ -58,6 +59,8 @@ interface ModelEntry {
   id: string;
   aliases?: string[];
   deprecation?: string | null;
+  /** Rôles du modèle (`audio_transcription`, `audio_speech`…) : seule la valeur `true` compte. */
+  capabilities?: Record<string, unknown>;
 }
 
 interface LegacyEntry {
@@ -80,12 +83,15 @@ interface TrackedDefault {
   acceptedLag?: AcceptedLag;
 }
 
-/** Épinglé sans alias listé : veille des autres modèles de sa famille (`family-…`). */
-interface FamilyWatch {
-  family: string;
-  pinned: string;
-  hint: string;
-}
+/**
+ * Veille des modèles non suivis d'un rôle épinglé. Candidats : les ids de la famille `family-…`, OU
+ * les modèles dont la capacité `capability` vaut `true` dans /v1/models — exactement un des deux
+ * critères (imposé par le type : une veille sans critère signalerait tout le catalogue). Les groupes
+ * de tous les ids de `tracked` (frères compris) ne sont jamais signalés.
+ */
+type FamilyWatch = (
+  { family: string; capability?: undefined } | { family?: undefined; capability: string }
+) & { tracked: readonly string[]; hint: string };
 
 /** `alert` = à traiter (absent, ambigu, fin de vie, retard) ; `info` = à lire (choix, nouveauté). */
 interface Finding {
@@ -97,15 +103,39 @@ interface Finding {
 // de retard comme de la veille de famille (test dédié) — seul le défaut OCR est suivi.
 // Retard assumé : ajouter `acceptedLag: { candidate, since, reason }` à l'entrée (ex. OCR 4.0 gardé face
 // à OCR 4.1 du 2026-09-26 au retrait de 4.0 le 2026-09-30) ; aucun aujourd'hui.
-const TRACKED_DEFAULTS: readonly TrackedDefault[] = [{ pinned: DEFAULT_OCR_MODEL }];
+// STT : défaut daté (`voxtral-mini-2602`) → `parsePinned` nul, entrée inerte ; elle s'active seule
+// si le défaut devient major-minor (`voxtral-mini-transcribe-3-0` : génération
+// `voxtral-mini-transcribe-3`, et aucun `voxtral-mini-transcribe-latest` qui ferait un faux signal).
+// PAS le défaut TTS : `voxtral-mini-tts-latest` pointe encore l'ancien `voxtral-mini-tts-2603`, et
+// un défaut `voxtral-mini-tts-3-0` ferait annoncer à tort par la règle « latest » une « nouvelle
+// génération » (2603, plus ancienne ; test dédié). Les modèles de synthèse sont veillés par capacité.
+export const TRACKED_DEFAULTS: readonly TrackedDefault[] = [
+  { pinned: DEFAULT_OCR_MODEL },
+  { pinned: DEFAULT_STT_MODEL },
+];
 
-// Épinglés SANS alias listé par /v1/models (ni génération ni `-latest` à suivre) : veille de famille,
-// indépendante du schéma de nommage (daté `2603`, major-minor `3-0`…) — remplace toute règle YYMM.
-const FAMILY_WATCHES: readonly FamilyWatch[] = [
+// Épinglés qu'aucun alias de génération ne suit : veille des modèles NON suivis de leur rôle.
+// Modération : par FAMILLE de nom, indépendante du schéma (daté `2603`, major-minor `3-0`…) —
+// remplace toute règle YYMM. Transcription et synthèse : par CAPACITÉ de /v1/models, sans préfixe,
+// car le nom ne dit rien du rôle (`voxtral-mini-2602` transcrit sans « transcribe » dans son id ;
+// `voxtral-small-2507`, affiché « Voxtral Small Transcribe », n'a que `audio`, la compréhension
+// audio du chat) et un préfixe `voxtral` raterait un modèle d'une autre marque. Clé EXACTE :
+// `audio_transcription_realtime` (transcription en flux, que l'app n'utilise pas) ne compte pas.
+export const FAMILY_WATCHES: readonly FamilyWatch[] = [
   {
     family: 'mistral-moderation',
-    pinned: MODERATION_MODEL,
+    tracked: [MODERATION_MODEL],
     hint: 'évaluer (taxonomie, prix) avant de changer MODERATION_MODEL',
+  },
+  {
+    capability: 'audio_transcription',
+    tracked: STT_MODELS,
+    hint: "mesurer (WER, langues, prix) puis l'ajouter à STT_MODELS (helpers/stt-models.ts)",
+  },
+  {
+    capability: 'audio_speech',
+    tracked: TTS_MODELS,
+    hint: "vérifier (compatibilité des voix, écoute, prix) puis l'ajouter à TTS_MODELS (helpers/tts-models.ts)",
   },
 ];
 
@@ -440,30 +470,53 @@ export function findLaggingDefaults(
   return tracked.map((t) => lagOf(models, legacy, t)).filter(isFinding);
 }
 
-// Ids du groupe épinglé (frères compris, union si ambigu) : exclus de la veille de sa famille.
-const pinnedGroupIds = (models: readonly ModelEntry[], pinned: string): ReadonlySet<string> =>
-  new Set([pinned, ...distinctGroups(entriesNamed(models, pinned)).flat()]);
+// Ids des groupes suivis (frères compris, union si ambigu) : jamais signalés par leur veille.
+const trackedGroupIds = (
+  models: readonly ModelEntry[],
+  tracked: readonly string[],
+): ReadonlySet<string> => {
+  return new Set(tracked.flatMap((id) => [id, ...distinctGroups(entriesNamed(models, id)).flat()]));
+};
+
+// Capacité de /v1/models strictement à `true`. Lecture par Map, sans index dynamique : rien du
+// prototype (`constructor`…) ni valeur approchante (`'true'`, `1`) ne compte, et un `capabilities`
+// absent ou d'une autre forme (null, chaîne) ne lève pas.
+const hasCapability = (m: ModelEntry, capability: string): boolean => {
+  return new Map(Object.entries(m.capabilities ?? {})).get(capability) === true;
+};
+
+// Candidat d'une veille : hors des groupes suivis, puis de la famille `family-…` ou porteur de la
+// capacité (le type de FamilyWatch impose exactement un des deux critères).
+const isCandidate = (m: ModelEntry, w: FamilyWatch, trackedIds: ReadonlySet<string>): boolean => {
+  if (groupOf(m).some((id) => trackedIds.has(id))) return false;
+  if (w.family !== undefined) return m.id.startsWith(`${w.family}-`);
+  return hasCapability(m, w.capability);
+};
+
+// Périmètre affiché : « dans la famille X » (message de la modération inchangé) ou « avec la
+// capacité Y ».
+const scopeLabel = (w: FamilyWatch): string => {
+  if (w.family !== undefined) return `dans la famille ${w.family}`;
+  return `avec la capacité ${w.capability}`;
+};
 
 const familyFindings = (
   models: readonly ModelEntry[],
   legacy: ReadonlyMap<string, LegacyEntry>,
   w: FamilyWatch,
 ): Finding[] => {
-  const pinnedIds = pinnedGroupIds(models, w.pinned);
-  const others = models.filter(
-    (m) => m.id.startsWith(`${w.family}-`) && !groupOf(m).some((id) => pinnedIds.has(id)),
-  );
-  return distinctGroups(others)
+  const trackedIds = trackedGroupIds(models, w.tracked);
+  const candidates = models.filter((m) => isCandidate(m, w, trackedIds));
+  return distinctGroups(candidates)
     .filter((ids) => isCurrent(models, ids, legacy))
-    .map((ids) =>
-      infoFinding(`modèle non suivi dans la famille ${w.family} : ${displayId(ids)} — ${w.hint}`),
-    );
+    .map((ids) => infoFinding(`modèle non suivi ${scopeLabel(w)} : ${displayId(ids)} — ${w.hint}`));
 };
 
 /**
- * Veille de famille des épinglés sans alias listé : UNE information par groupe dont un id commence
- * par `family-`, hors du groupe épinglé (frères exclus), ni déprécié ni Legacy — quel que soit son
- * schéma de nommage (`mistral-moderation-2611` comme `mistral-moderation-3-0`).
+ * Veille des rôles épinglés (FAMILY_WATCHES) : UNE information par groupe candidat (famille
+ * `family-…` ou capacité `capability` à `true`), hors des groupes suivis (frères exclus), ni
+ * déprécié ni Legacy — quel que soit son schéma de nommage (`mistral-moderation-2611` comme
+ * `mistral-moderation-3-0`, `voxtral-mini-transcribe-3-0` comme un futur `voxtral-speech-4-0`).
  */
 export function findUntrackedFamilyModels(
   models: readonly ModelEntry[],
@@ -546,7 +599,7 @@ const reportFindings = (findings: readonly Finding[], legacyChecked: boolean): v
     );
     for (const f of alerts) console.log(`  - ${f.message}`);
     console.log(
-      '  → mettre à jour la version épinglée (helpers/ocr-models.ts, helpers/moderation-model.ts) après vérif prix (scripts/update-pricing.ts), statut GA, compat et qualité — ou documenter un retard assumé (`acceptedLag` dans TRACKED_DEFAULTS) ; alias -latest déprécié → épingler la version courante.',
+      '  → mettre à jour la version épinglée (helpers/ocr-models.ts, helpers/moderation-model.ts, helpers/stt-models.ts, helpers/tts-models.ts) après vérif prix (scripts/update-pricing.ts), statut GA, compat et qualité — ou documenter un retard assumé (`acceptedLag` dans TRACKED_DEFAULTS) ; alias -latest déprécié → épingler la version courante.',
     );
   }
   for (const f of findings.filter((x) => x.level === 'info')) console.log(`  ℹ ${f.message}`);

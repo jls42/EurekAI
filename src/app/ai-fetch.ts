@@ -21,11 +21,23 @@ function usableKey(key: string | null | undefined): string | null {
 }
 
 /**
+ * Clé d'une action longue, capturée à son lancement (Auto, import, enregistrement vocal, génération
+ * dont le pré-contrôle attend la modération) : l'action continue après un changement de profil avec
+ * la clé de SON profil, jamais celle du profil affiché au moment de l'envoi. À passer en
+ * `keyOverride` : '' (aucune clé) omet les en-têtes et le serveur retombe sur la clé d'env, alors
+ * qu'un `keyOverride` absent relirait la clé active.
+ */
+export const captureAiKey = (): string => {
+  return getActiveKey() ?? '';
+};
+
+/**
  * Décore un RequestInit avec `X-EurekAI-AI-Provider` + `X-EurekAI-AI-Key`.
  * - Omet les DEUX headers si aucune clé utilisable (→ fallback clé d'env côté serveur).
  * - N'ajoute JAMAIS de `Content-Type` (les uploads multipart FormData posent leur boundary).
  * - Merge immuable de tous les formats `HeadersInit` (Headers / array / objet), sans muter `init`.
- * - `opts.keyOverride` : pour tester une clé brouillon (bouton « tester » des réglages).
+ * - `opts.keyOverride` : clé brouillon (bouton « tester » des réglages) ou clé capturée au lancement
+ *   d'une action (captureAiKey ; '' = aucune clé, jamais la clé active du moment).
  */
 export function withAiHeaders(
   init: RequestInit = {},

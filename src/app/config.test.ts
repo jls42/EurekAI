@@ -29,6 +29,9 @@ vi.mock('./ai-fetch', () => ({
 
 import { createConfig } from './config';
 import { setKey, clearKey, loadActiveKey, isStorageEncryptable, purgeKeyring } from './api-key';
+import { DEFAULT_OCR_MODEL, OCR_MODELS, OCR_MODEL_LABELS } from '@helpers/ocr-models';
+import { DEFAULT_STT_MODEL, STT_MODELS, STT_MODEL_LABELS } from '@helpers/stt-models';
+import { DEFAULT_TTS_MODEL, TTS_MODELS, TTS_MODEL_LABELS } from '@helpers/tts-models';
 
 globalThis.fetch = vi.fn();
 
@@ -81,6 +84,8 @@ function makeContext(overrides: any = {}) {
     langToFlag: config.langToFlag,
     voiceLabel: config.voiceLabel,
     defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
+    modelPriceLabel: config.modelPriceLabel,
+    modelOptionLabel: config.modelOptionLabel,
     saveSettings: config.saveSettings,
     resetSettings: config.resetSettings,
     closeSettingsDialog: config.closeSettingsDialog,
@@ -419,7 +424,10 @@ describe('saveSettings', () => {
     expect(sentBody.models.summary).toBe('mistral-large-latest');
     // _ocrModel absent → normalisé vers le défaut OCR 4 (modèle courant)
     expect(sentBody.models.ocr).toBe('mistral-ocr-4-1');
+    // _sttModel absent → défaut épinglé Transcribe 2, jamais un champ vide
+    expect(sentBody.models.stt).toBe('voxtral-mini-2602');
     expect(sentBody._mainModel).toBeUndefined();
+    expect(sentBody._sttModel).toBeUndefined();
     expect(sentBody.mistralVoices).toBeUndefined();
     expect(sentBody.mistralVoicesSource).toBeUndefined();
 
@@ -442,26 +450,67 @@ describe('saveSettings', () => {
     expect(sentBody._ocrModel).toBeUndefined();
   });
 
-  it('auto-corrige ttsModel quand un ID eleven_* legacy est présent', async () => {
-    const savedConfig = {
-      models: { summary: 'mistral-large-latest' },
-      ttsModel: 'voxtral-mini-tts-2603',
-    };
-    mockFetchOk(savedConfig);
-    mockFetchOk({ mistral: true, ttsAvailable: true });
+  it('forwards the selected STT model (Small Transcribe 3 opt-in) on save and strips _sttModel', async () => {
+    mockFetchOk({ models: {}, ttsModel: 'voxtral-mini-tts-2603' }); // PUT /api/config
+    mockFetchOk({ mistral: true, ttsAvailable: true }); // GET /api/config/status
 
-    const ctx = makeContext({
-      configDraft: {
-        ...makeContext().configDraft,
-        ttsModel: 'eleven_v3',
-        _mainModel: 'mistral-large-latest',
-      },
-    });
+    const ctx = makeContext();
+    ctx.configDraft._sttModel = 'voxtral-small-transcribe-3-0';
     await config.saveSettings.call(ctx);
 
-    const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
-    const sentBody = JSON.parse(putCall[1].body as string);
-    expect(sentBody.ttsModel).toBe('voxtral-mini-tts-latest');
+    const sentBody = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string);
+    expect(sentBody.models.stt).toBe('voxtral-small-transcribe-3-0');
+    expect(sentBody._sttModel).toBeUndefined();
+  });
+
+  it('normalise un _sttModel hors liste (alias voxtral-mini-latest) vers le défaut', async () => {
+    mockFetchOk({ models: {}, ttsModel: 'voxtral-mini-tts-2603' });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
+
+    const ctx = makeContext();
+    ctx.configDraft._sttModel = 'voxtral-mini-latest';
+    await config.saveSettings.call(ctx);
+
+    const sentBody = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string);
+    expect(sentBody.models.stt).toBe('voxtral-mini-2602');
+  });
+
+  // Le serveur rejette tout ttsModel hors TTS_MODELS : un brouillon legacy (`eleven_*`), l'alias
+  // mouvant ou un id libre partirait en warn côté serveur sans être appliqué.
+  it.each(['eleven_v3', 'voxtral-mini-tts-latest', 'voxtral-custom'])(
+    'auto-corrige un ttsModel %s vers Voxtral TTS épinglé',
+    async (legacy) => {
+      mockFetchOk({
+        models: { summary: 'mistral-large-latest' },
+        ttsModel: 'voxtral-mini-tts-2603',
+      });
+      mockFetchOk({ mistral: true, ttsAvailable: true });
+
+      const ctx = makeContext({
+        configDraft: {
+          ...makeContext().configDraft,
+          ttsModel: legacy,
+          _mainModel: 'mistral-large-latest',
+        },
+      });
+      await config.saveSettings.call(ctx);
+
+      const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
+      const sentBody = JSON.parse(putCall[1].body as string);
+      expect(sentBody.ttsModel).toBe('voxtral-mini-tts-2603');
+    },
+  );
+
+  it('envoie TTS 3 (option) tel quel', async () => {
+    mockFetchOk({ models: {}, ttsModel: 'voxtral-mini-tts-3-0' });
+    mockFetchOk({ mistral: true, ttsAvailable: true });
+
+    const ctx = makeContext();
+    ctx.configDraft.ttsModel = 'voxtral-mini-tts-3-0';
+    await config.saveSettings.call(ctx);
+
+    const sentBody = JSON.parse(vi.mocked(globalThis.fetch).mock.calls[0][1].body as string);
+    expect(sentBody.ttsModel).toBe('voxtral-mini-tts-3-0');
   });
 
   it('strips stale global voice fields before saving settings', async () => {
@@ -562,6 +611,227 @@ describe('resetSettings', () => {
     await config.resetSettings.call(ctx);
     expect(ctx.showToast).toHaveBeenCalledWith('toast.settingsError', 'error');
   });
+});
+
+// --- Brouillon des Réglages (toDraft) ---
+
+// Chaque chemin qui remplace le brouillon par une config renvoyée par le serveur.
+const viaLoadConfig = async (ctx: any, serverConfig: unknown) => {
+  mockFetchOk(serverConfig); // GET /api/config
+  mockFetchOk({ mistral: true, ttsAvailable: true }); // GET /api/config/status
+  mockFetchOk({ all: [], defaults: {} }); // GET /api/moderation-categories
+  mockFetchOk([]); // GET /api/config/voices
+  await config.loadConfig.call(ctx);
+};
+const viaSaveSettings = async (ctx: any, serverConfig: unknown) => {
+  mockFetchOk(serverConfig); // PUT /api/config
+  mockFetchOk({ mistral: true, ttsAvailable: true }); // GET /api/config/status
+  mockFetchOk([]); // GET /api/config/voices
+  await config.saveSettings.call(ctx);
+};
+const viaResetSettings = async (ctx: any, serverConfig: unknown) => {
+  mockFetchOk(serverConfig); // POST /api/config/reset
+  mockFetchOk([]); // GET /api/config/voices
+  await config.resetSettings.call(ctx);
+};
+type DraftPath = typeof viaLoadConfig;
+const DRAFT_PATHS: [string, DraftPath][] = [
+  ['loadConfig', viaLoadConfig],
+  ['saveSettings', viaSaveSettings],
+  ['resetSettings', viaResetSettings],
+];
+
+describe('brouillon des Réglages (toDraft) : sélecteurs épinglés normalisés', () => {
+  // Config d'un serveur pas encore redémarré : un id hors liste laisserait un <select> sans option
+  // choisie (et serait renvoyé tel quel au prochain enregistrement).
+  const STALE_CONFIG = {
+    models: {
+      summary: 'mistral-medium-latest',
+      ocr: 'mistral-ocr-latest',
+      stt: 'voxtral-mini-latest',
+    },
+    ttsModel: 'voxtral-mini-tts-latest',
+  };
+  const OPT_IN_CONFIG = {
+    models: {
+      summary: 'mistral-large-latest',
+      ocr: 'mistral-ocr-2512',
+      stt: 'voxtral-small-transcribe-3-0',
+    },
+    ttsModel: 'voxtral-mini-tts-3-0',
+  };
+
+  it.each(DRAFT_PATHS)('%s : alias et ids hors liste → défauts épinglés', async (_path, run) => {
+    const ctx = makeContext();
+    await run(ctx, STALE_CONFIG);
+    expect(ctx.configDraft).toMatchObject({
+      _mainModel: 'mistral-medium-latest',
+      _ocrModel: 'mistral-ocr-4-1',
+      _sttModel: 'voxtral-mini-2602',
+      ttsModel: 'voxtral-mini-tts-2603',
+    });
+  });
+
+  it.each(DRAFT_PATHS)(
+    '%s : options choisies gardées (OCR 3, Small Transcribe 3, TTS 3)',
+    async (_path, run) => {
+      const ctx = makeContext();
+      await run(ctx, OPT_IN_CONFIG);
+      expect(ctx.configDraft).toMatchObject({
+        _mainModel: 'mistral-large-latest',
+        _ocrModel: 'mistral-ocr-2512',
+        _sttModel: 'voxtral-small-transcribe-3-0',
+        ttsModel: 'voxtral-mini-tts-3-0',
+      });
+    },
+  );
+
+  it.each(DRAFT_PATHS)(
+    '%s : config sans modèles (champs absents) → défauts',
+    async (_path, run) => {
+      const ctx = makeContext();
+      await run(ctx, {});
+      expect(ctx.configDraft).toMatchObject({
+        _mainModel: 'mistral-large-latest',
+        _ocrModel: 'mistral-ocr-4-1',
+        _sttModel: 'voxtral-mini-2602',
+        ttsModel: 'voxtral-mini-tts-2603',
+      });
+    },
+  );
+});
+
+// --- modelOptionLabel (options des sélecteurs de modèles) ---
+
+describe('modelOptionLabel', () => {
+  it.each([
+    ['voxtral-mini-2602', 'Mini Transcribe 2 — $0.0030 settings.perMinute'],
+    [
+      'voxtral-mini-transcribe-3-0',
+      'Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview',
+    ],
+    [
+      'voxtral-small-transcribe-3-0',
+      'Small Transcribe 3 — $0.0040 settings.perMinute · settings.preview',
+    ],
+    ['voxtral-mini-tts-2603', 'Voxtral TTS — $16 settings.perMChars'],
+    ['voxtral-mini-tts-3-0', 'Voxtral TTS 3 — $13 settings.perMChars · settings.preview'],
+    ['mistral-ocr-4-1', 'OCR 4 — $4 settings.perKPages'],
+    ['mistral-ocr-2512', 'OCR 3 — $2 settings.perKPages'],
+  ])('%s : nom produit, tarif et préversion signalée', (modelId, label) => {
+    expect(config.modelOptionLabel.call(makeContext(), modelId)).toBe(label);
+  });
+
+  it('modèle de génération : id technique, sans suffixe de préversion', () => {
+    expect(config.modelOptionLabel.call(makeContext(), 'mistral-large-latest')).toBe(
+      'mistral-large-latest — $0.50 / $1.50 settings.perMTokens',
+    );
+  });
+
+  it("id hérité d'Object.prototype : jamais un membre du prototype comme nom", () => {
+    expect(config.modelOptionLabel.call(makeContext(), 'constructor')).toBe(
+      'constructor — settings.priceUnknown',
+    );
+  });
+});
+
+// --- selectedModelLabel (libellé complet sous le sélecteur, sur téléphone) ---
+
+describe('selectedModelLabel', () => {
+  it('modèle recommandé : libellé de son option, suivi de « Recommandé »', () => {
+    const label = config.selectedModelLabel.call(
+      makeContext(),
+      'voxtral-mini-2602',
+      'voxtral-mini-2602',
+    );
+    expect(label).toBe('Mini Transcribe 2 — $0.0030 settings.perMinute · settings.recommended');
+  });
+
+  it('autre modèle : libellé de son option, préversion comprise, sans « Recommandé »', () => {
+    const label = config.selectedModelLabel.call(
+      makeContext(),
+      'voxtral-mini-transcribe-3-0',
+      'voxtral-mini-2602',
+    );
+    expect(label).toBe('Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview');
+  });
+});
+
+// --- Gabarit des Réglages : sélecteurs de modèles épinglés ---
+
+describe('dialog-settings.html : sélecteurs de modèles alignés sur leurs sources uniques', () => {
+  const html = readFileSync(new URL('../partials/dialog-settings.html', import.meta.url), 'utf-8');
+  // Guillemets en \x22 : dans une regex littérale, Lizard les prend pour des chaînes et ne
+  // délimite plus les fonctions suivantes (cf. CLAUDE.md, pièges Lizard).
+  const VALUE_RE = /\svalue=\x22([^\x22]*)\x22/;
+  const X_TEXT_RE = /\sx-text=\x22([^\x22]*)\x22/;
+  const FALLBACK_RE = /\x22\s*>([^<]*)<\/option>/;
+
+  // Bloc `<select id="…">…</select>` du sélecteur.
+  const selectBlock = (id: string): string => {
+    const at = html.indexOf(`id="${id}"`);
+    expect(at, id).toBeGreaterThan(-1);
+    return html.slice(html.lastIndexOf('<select', at), html.indexOf('</select>', at));
+  };
+  // Groupe capturé (sans espaces autour), '' si le motif est absent.
+  const capture = (re: RegExp, chunk: string): string => {
+    return re.exec(chunk)?.[1].trim() ?? '';
+  };
+  // Attributs d'une option (texte qui suit `<option`) et son texte de repli.
+  const parseOption = (chunk: string) => {
+    return {
+      value: capture(VALUE_RE, chunk),
+      xText: capture(X_TEXT_RE, chunk),
+      fallback: capture(FALLBACK_RE, chunk),
+    };
+  };
+  const optionsOf = (block: string) => block.split('<option').slice(1).map(parseOption);
+
+  type SelectorCase = [string, string, readonly string[], string, Record<string, string>];
+  const SELECTORS: SelectorCase[] = [
+    ['cfg-ocr-model', 'configDraft._ocrModel', OCR_MODELS, DEFAULT_OCR_MODEL, OCR_MODEL_LABELS],
+    ['cfg-stt-model', 'configDraft._sttModel', STT_MODELS, DEFAULT_STT_MODEL, STT_MODEL_LABELS],
+    ['cfg-tts-model', 'configDraft.ttsModel', TTS_MODELS, DEFAULT_TTS_MODEL, TTS_MODEL_LABELS],
+  ];
+
+  it.each(SELECTORS)('#%s (%s) : une option par modèle, dans l’ordre', (id, xModel, models) => {
+    const block = selectBlock(id);
+    expect(block).toContain(`x-model="${xModel}"`);
+    expect(optionsOf(block).map((o) => o.value)).toEqual([...models]);
+    // L'id technique réel reste affiché sous le sélecteur.
+    expect(html).toContain(`x-text="${xModel}"`);
+  });
+
+  it.each(SELECTORS)(
+    '#%s : libellé du même modèle que la valeur, défaut seul « recommandé »',
+    (id, _xModel, _models, defaultModel, labels) => {
+      for (const { value, xText, fallback } of optionsOf(selectBlock(id))) {
+        expect(xText.startsWith(`modelOptionLabel('${value}')`), value).toBe(true);
+        expect(xText.includes("t('settings.recommended')"), value).toBe(value === defaultModel);
+        // Texte de repli (avant Alpine) = nom produit de la source unique.
+        expect(fallback, value).toBe(labels[value]);
+      }
+    },
+  );
+
+  // Un <select> fermé ne passe pas à la ligne : à 390 px, tarif et « Recommandé » étaient coupés
+  // (release-test du 2026-10-22). Le libellé complet du modèle choisi s'affiche dessous, sur
+  // téléphone seulement, avec le même modèle recommandé que l'option marquée du sélecteur.
+  it.each([
+    ['cfg-main-model', 'configDraft._mainModel', 'mistral-large-latest'],
+    ...SELECTORS.map(([id, xModel, , defaultModel]) => [id, xModel, defaultModel]),
+  ])(
+    '#%s : libellé complet du modèle choisi sous le sélecteur, sur téléphone',
+    (id, xModel, rec) => {
+      const selectEnd = html.indexOf('</select>', html.indexOf(`id="${id}"`));
+      const nextSelect = html.indexOf('<select', selectEnd);
+      const at = html.indexOf(`selectedModelLabel(${xModel}, '${rec}')`);
+      expect(at, id).toBeGreaterThan(selectEnd);
+      if (nextSelect !== -1) expect(at, id).toBeLessThan(nextSelect);
+      expect(html.slice(html.lastIndexOf('<p', at), at), id).toContain('sm:hidden');
+      expect(html).toContain(`modelOptionLabel('${rec}') + ' · ' + t('settings.recommended')`);
+    },
+  );
 });
 
 // --- closeSettingsDialog ---

@@ -71,7 +71,7 @@ vi.mock('./generate.js', () => ({
 }));
 
 vi.mock('../config.js', () => ({
-  getConfig: vi.fn(() => ({ models: { ocr: 'mistral-ocr-2512' } })),
+  getConfig: vi.fn(() => ({ models: { ocr: 'mistral-ocr-2512', stt: 'voxtral-mini-2602' } })),
 }));
 
 import { ocrFile } from '../generators/ocr.js';
@@ -82,6 +82,7 @@ import { detectConsigne } from '../generators/consigne.js';
 import { fetchPageContent } from '../helpers/index.js';
 import { recordUsage } from '../helpers/usage-context.js';
 import { getMarkdown } from './generate.js';
+import { getConfig } from '../config.js';
 import { MODERATION_WAIT_MS } from '../helpers/source-moderation.js';
 import type { ModerationStatus } from '../types.js';
 
@@ -1803,6 +1804,7 @@ describe('POST /:pid/sources/voice', () => {
       Buffer.from('fake-audio'),
       'record.webm',
       'fr',
+      'voxtral-mini-2602',
     );
     expect(res.json).toHaveBeenCalledTimes(1);
     const source = res.json.mock.calls[0][0];
@@ -1899,8 +1901,63 @@ describe('POST /:pid/sources/voice', () => {
 
     await handler(req, res);
 
-    expect(transcribeAudio).toHaveBeenCalledWith(client, Buffer.from('audio'), 'audio.webm', 'fr');
+    expect(transcribeAudio).toHaveBeenCalledWith(
+      client,
+      Buffer.from('audio'),
+      'audio.webm',
+      'fr',
+      'voxtral-mini-2602',
+    );
   });
+
+  // Modèle de transcription des Réglages (normalizeSttModel(getConfig().models.stt)) : config
+  // remplacée le temps d'un appel, implémentation d'origine rétablie ensuite.
+  const postVoiceWithStt = async (stt: string) => {
+    const previous = vi.mocked(getConfig).getMockImplementation();
+    vi.mocked(getConfig).mockReturnValue({ models: { ocr: 'mistral-ocr-2512', stt } } as any);
+    try {
+      const project = store.createProject('P1');
+      const handler = getHandler(router, 'post', '/:pid/sources/voice');
+      await handler(
+        mockReq({
+          params: { pid: project.meta.id },
+          body: { lang: 'en' },
+          file: { buffer: Buffer.from('audio'), originalname: 'audio.webm' },
+        }),
+        mockRes(),
+      );
+    } finally {
+      if (previous) vi.mocked(getConfig).mockImplementation(previous);
+    }
+  };
+
+  it.each(['voxtral-mini-transcribe-3-0', 'voxtral-small-transcribe-3-0'])(
+    'transmet le modèle %s choisi dans les Réglages, avec la langue de la requête',
+    async (stt) => {
+      await postVoiceWithStt(stt);
+      expect(transcribeAudio).toHaveBeenCalledWith(
+        client,
+        Buffer.from('audio'),
+        'audio.webm',
+        'en',
+        stt,
+      );
+    },
+  );
+
+  it.each(['voxtral-mini-latest', 'garbage'])(
+    'config pas encore migrée (%s) : défaut épinglé Transcribe 2, jamais la valeur brute',
+    async (stt) => {
+      await postVoiceWithStt(stt);
+      expect(transcribeAudio).toHaveBeenCalledWith(
+        client,
+        Buffer.from('audio'),
+        'audio.webm',
+        'en',
+        'voxtral-mini-2602',
+      );
+    },
+  );
 });
 
 // =============================================================================

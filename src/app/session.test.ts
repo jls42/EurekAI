@@ -145,6 +145,80 @@ describe('resetSession', () => {
 
     expect(() => sessionMixin.resetSession.call(ctx)).not.toThrow();
   });
+
+  // Règle « on lance un truc, ça continue même si on change de page » (2026-10-21) : l'Auto en
+  // cours (analyse puis étapes) continue vers son cours ; seuls ses liens avec l'écran sont retirés.
+  it('épargne les contrôleurs d’un Auto en cours, aborte les autres', () => {
+    const auto = new AbortController();
+    const single = new AbortController();
+    const ctx = makeCtx({
+      autoRuns: { 'pid-1': { controller: auto, analysing: false } },
+      abortControllers: { auto, quiz: auto, summary: single },
+      abortControllersByGid: { 'gid-1': single },
+      loading: { auto: true, quiz: true } as Record<string, boolean>,
+    });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(auto.signal.aborted).toBe(false);
+    expect(single.signal.aborted).toBe(true);
+    expect(ctx.abortControllers).toEqual({});
+    expect(ctx.loading).toEqual({ auto: false, quiz: false });
+    expect(ctx.autoRuns).toEqual({ 'pid-1': { controller: auto, analysing: false } });
+  });
+
+  // Jamais d'enregistrement qui survit à un changement de cours ou de profil : arrêté ici, envoyé
+  // vers le cours où il a commencé (recorder.ts).
+  it('arrête l’enregistrement vocal en cours', () => {
+    const stopRecording = vi.fn();
+    const ctx = makeCtx({ recording: true, stopRecording } as Partial<AppContext>);
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(stopRecording).toHaveBeenCalledOnce();
+  });
+
+  it('sans enregistrement en cours : stopRecording n’est pas appelé', () => {
+    const stopRecording = vi.fn();
+    const ctx = makeCtx({ recording: false, stopRecording } as Partial<AppContext>);
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(stopRecording).not.toHaveBeenCalled();
+  });
+
+  it('remet à zéro chatLoading et consigneLoading (boutons du cours suivant)', () => {
+    const ctx = makeCtx({ chatLoading: true, consigneLoading: true });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.chatLoading).toBe(false);
+    expect(ctx.consigneLoading).toBe(false);
+  });
+
+  // Un message qui attend la réponse du tuteur continue vers son cours : au retour sur ce cours,
+  // applyProjectSnapshot rétablit chatLoading depuis ce registre (chat-in-flight.ts).
+  it('garde le registre des messages du chat en attente de réponse (chatInFlight)', () => {
+    const ctx = makeCtx({ chatLoading: true, chatInFlight: { 'pid-1': true } });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.chatLoading).toBe(false);
+    expect(ctx.chatInFlight).toEqual({ 'pid-1': true });
+  });
+
+  // Autre cours choisi, autre profil ou cours supprimé pendant l'ouverture d'un cours : son snapshot
+  // n'est plus attendu, sa requête est abortée (elle quitte la file du navigateur).
+  it('abandonne l’ouverture d’un cours encore en cours (requête abortée, chargement terminé)', () => {
+    const load = new AbortController();
+    const ctx = makeCtx({ projectLoading: true, projectLoadController: load });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(load.signal.aborted).toBe(true);
+    expect(ctx.projectLoadController).toBeNull();
+    expect(ctx.projectLoading).toBe(false);
+  });
 });
 
 // Régression-lock invariant CLAUDE.md "Pending generations & notifications" :

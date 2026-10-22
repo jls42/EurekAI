@@ -53,8 +53,9 @@ const NO_MEDIA = (): unknown[] => [];
 const MEDIA_EXTRACTORS: MediaExtractors = {
   // Lecture à voix haute par section ; `audioUrl` = ancien format (une seule piste).
   summary: (gen) => [gen.data.audioUrl, ...Object.values(gen.data.audioUrls ?? {})],
-  // La lecture à voix haute des flashcards n'est jamais persistée : balayage par préfixe.
-  flashcards: NO_MEDIA,
+  // Lecture à voix haute (une piste pour toutes les cartes). Celles écrites avant son
+  // enregistrement dans la génération restent retrouvées par le balayage (readAloudUrls).
+  flashcards: (gen) => [gen.audioUrl],
   quiz: NO_MEDIA,
   'fill-blank': NO_MEDIA,
   podcast: (gen) => [gen.data.audioUrl],
@@ -115,7 +116,8 @@ export const deleteMediaFiles = (
 };
 
 // Lecture à voix haute de la génération retirée, retrouvée par son préfixe : celle des flashcards
-// n'est jamais référencée, et une section relue remplace son URL sans supprimer l'ancien fichier.
+// écrite avant son enregistrement dans la génération (`audioUrl`) n'est référencée nulle part, et
+// une section relue remplace son URL sans supprimer l'ancien fichier.
 // Aucun balayage si le préfixe d'une autre génération du projet commence pareil (id8 identiques).
 const readAloudUrls = (
   projectDir: string,

@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createSources } from './sources';
 import { createProfiles } from './profiles';
+import { setKey, _resetActiveKey } from './api-key';
 import type { Source } from '../../types';
+
+// Clé Mistral active (comme après selectProfile → refreshKeyState).
+const activateKey = (plaintext: string) => {
+  const data = new Map<string, string>();
+  const storage = {
+    getItem: (k: string) => data.get(k) ?? null,
+    setItem: (k: string, v: string) => {
+      data.set(k, v);
+    },
+  };
+  return setKey({ scope: 'global', plaintext }, storage);
+};
 
 // Mock document.querySelector for openSourceDialog
 const mockDialog = { showModal: vi.fn() };
@@ -33,11 +46,8 @@ function makeContext(overrides: any = {}) {
     textInput: '  hello world  ',
     showTextInput: true,
     uploadSessions: [] as any[],
-    get uploading(): boolean {
-      return this.uploadSessions.some((s: any) =>
-        s.files.some((f: any) => f.status === 'pending' || f.status === 'uploading'),
-      );
-    },
+    // Cours affiché au lancement d'un import : son nom est mémorisé dans la session.
+    currentProject: { meta: { id: 'pid-1', name: 'Histoire' } } as any,
     dragging: false,
     locale: 'fr',
     viewSource: null as any,
@@ -129,7 +139,7 @@ describe('createSources', () => {
       expect(ctx.textInput).toBe('');
       expect(ctx.showTextInput).toBe(false);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.textAdded', 'success');
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     // La session d'import est retirée dès la fin de runAddText (finally) : la relecture différée
@@ -160,7 +170,7 @@ describe('createSources', () => {
 
       expect(ctx.sources).toEqual([]);
       expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error');
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('shows network error on exception', async () => {
@@ -168,7 +178,7 @@ describe('createSources', () => {
       await src.addText.call(ctx);
 
       expect(ctx.showToast).toHaveBeenCalledWith('toast.error', 'error', expect.any(Function));
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
   });
 
@@ -661,14 +671,14 @@ describe('createSources', () => {
     it('returns early if fileList is null', async () => {
       await src.handleFiles.call(ctx, null);
       expect(globalThis.fetch).not.toHaveBeenCalled();
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('returns early if fileList is empty', async () => {
       const emptyList = makeFileList();
       await src.handleFiles.call(ctx, emptyList);
       expect(globalThis.fetch).not.toHaveBeenCalled();
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('returns early if no currentProjectId', async () => {
@@ -700,7 +710,7 @@ describe('createSources', () => {
       expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
       vi.advanceTimersByTime(3000);
       expect(ctx.uploadSessions).toEqual([]);
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('multiple files uploaded sequentially with per-file status', async () => {
@@ -722,7 +732,7 @@ describe('createSources', () => {
       expect(session.files[0].status).toBe('done');
       expect(session.files[1].status).toBe('done');
       vi.advanceTimersByTime(3000);
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('one file fails (res.ok=false) then continues to next file', async () => {
@@ -793,7 +803,7 @@ describe('createSources', () => {
       vi.advanceTimersByTime(5000);
       expect(ctx.uploadSessions).toHaveLength(1);
       expect(ctx.uploadSessions[0].files[0].status).toBe('error');
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('schedules only refreshConsigne at batch level (not refreshModeration)', async () => {
@@ -900,7 +910,7 @@ describe('createSources', () => {
       expect(ctx.refreshConsigne).not.toHaveBeenCalled();
     });
 
-    it('ignores upload when only currentProjectId changes (session still tracked)', async () => {
+    it('keeps importing in the background when the project changes: nothing on the new screen, a toast names the project', async () => {
       const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
       let resolveFetch: any;
       vi.mocked(globalThis.fetch).mockImplementationOnce(
@@ -913,16 +923,104 @@ describe('createSources', () => {
       const promise = src.handleFiles.call(ctx, makeFileList(file));
       await vi.advanceTimersByTimeAsync(10);
 
-      // currentProjectId flips but session remains in uploadSessions
+      // Autre cours affiché ; la session reste suivie (resetState ne vide plus uploadSessions).
       ctx.currentProjectId = 'pid-2';
 
       resolveFetch({ ok: true, json: async () => [{ id: 's1', text: 'ocr' }] });
       await promise;
 
       expect(ctx.sources).toEqual([]);
+      expect(ctx.uploadSessions[0].files[0].status).toBe('done');
+      expect(ctx.t).toHaveBeenCalledWith('toast.importDoneIn', { project: 'Histoire', n: '1' });
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.importDoneIn', 'success');
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.sourcesAdded', 'success');
     });
 
-    it('stops processing remaining files when project switches after first file', async () => {
+    it('sends the rest of the batch to its project after a project change (vécu le 2026-10-21)', async () => {
+      const files = ['a', 'b', 'c'].map(
+        (n) => new File([n], `${n}.pdf`, { type: 'application/pdf' }),
+      );
+      let resolve1: any;
+      vi.mocked(globalThis.fetch)
+        .mockImplementationOnce(
+          () =>
+            new Promise((r) => {
+              resolve1 = r;
+            }),
+        )
+        .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 's2', text: 'ocr2' }] } as any)
+        .mockResolvedValueOnce({ ok: true, json: async () => [{ id: 's3', text: 'ocr3' }] } as any);
+
+      const promise = src.handleFiles.call(ctx, makeFileList(...files));
+      await vi.advanceTimersByTimeAsync(10);
+      ctx.currentProjectId = 'pid-2';
+      resolve1({ ok: true, json: async () => [{ id: 's1', text: 'ocr1' }] });
+      await promise;
+
+      const urls = vi.mocked(globalThis.fetch).mock.calls.map((c) => c[0]);
+      expect(urls).toEqual(Array(3).fill('/api/projects/pid-1/sources/upload'));
+      expect(ctx.sources).toEqual([]);
+      const statuses = ctx.uploadSessions[0].files.map((f: any) => f.status);
+      expect(statuses).toEqual(['done', 'done', 'done']);
+      expect(ctx.t).toHaveBeenCalledWith('toast.importDoneIn', { project: 'Histoire', n: '3' });
+    });
+
+    it('keeps a background error in its session without an error toast, then sums it up', async () => {
+      const files = ['a', 'b'].map((n) => new File([n], `${n}.pdf`, { type: 'application/pdf' }));
+      let resolve1: any;
+      vi.mocked(globalThis.fetch)
+        .mockImplementationOnce(
+          () =>
+            new Promise((r) => {
+              resolve1 = r;
+            }),
+        )
+        .mockResolvedValueOnce({
+          ok: false,
+          statusText: 'Bad Request',
+          json: async () => ({ error: 'upload_failed' }),
+        } as any);
+
+      const promise = src.handleFiles.call(ctx, makeFileList(...files));
+      await vi.advanceTimersByTimeAsync(10);
+      ctx.currentProjectId = 'pid-2';
+      resolve1({ ok: true, json: async () => [{ id: 's1', text: 'ocr1' }] });
+      await promise;
+
+      const [first, second] = ctx.uploadSessions[0].files;
+      expect(first.status).toBe('done');
+      expect(second.status).toBe('error');
+      expect(second.errorMsg).toBe('upload_failed');
+      expect(ctx.showToast).not.toHaveBeenCalledWith('toast.error', 'error');
+      expect(ctx.t).toHaveBeenCalledWith('toast.importErrorsIn', { project: 'Histoire', n: '1' });
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.importErrorsIn', 'warning');
+    });
+
+    it('back on the project during the import: a source already reloaded is not added twice', async () => {
+      const file = new File(['x'], 'a.pdf', { type: 'application/pdf' });
+      let resolveFetch: any;
+      vi.mocked(globalThis.fetch).mockImplementationOnce(
+        () =>
+          new Promise((r) => {
+            resolveFetch = r;
+          }),
+      );
+
+      const promise = src.handleFiles.call(ctx, makeFileList(file));
+      await vi.advanceTimersByTimeAsync(10);
+      // Aller-retour : selectProject a relu la source que le serveur venait d'enregistrer.
+      ctx.currentProjectId = 'pid-2';
+      ctx.currentProjectId = 'pid-1';
+      ctx.sources = [{ id: 's1', text: 'ocr' }];
+      resolveFetch({ ok: true, json: async () => [{ id: 's1', text: 'ocr' }] });
+      await promise;
+
+      expect(ctx.sources.map((s: any) => s.id)).toEqual(['s1']);
+      expect(ctx.selectedIds).toEqual([]);
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.sourcesAdded', 'success');
+    });
+
+    it('stops processing remaining files when the session disappears (project deleted)', async () => {
       const f1 = new File(['a'], 'a.pdf', { type: 'application/pdf' });
       const f2 = new File(['b'], 'b.pdf', { type: 'application/pdf' });
       const f3 = new File(['c'], 'c.pdf', { type: 'application/pdf' });
@@ -938,7 +1036,7 @@ describe('createSources', () => {
       const promise = src.handleFiles.call(ctx, makeFileList(f1, f2, f3));
       await vi.advanceTimersByTimeAsync(10);
 
-      // Switch project while 1st file is pending
+      // Cours supprimé pendant l'envoi du 1er fichier : deleteProject retire ses sessions.
       ctx.currentProjectId = 'pid-2';
       ctx.uploadSessions = [];
 
@@ -963,6 +1061,116 @@ describe('createSources', () => {
       const [url] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, unknown];
       expect(url).toBe('/api/projects/pid-1/sources/upload');
       expect(url).not.toContain('WRONG');
+    });
+  });
+
+  describe('projectUploadSessions', () => {
+    it("lists only the displayed project's imports (the others continue in the background)", () => {
+      ctx.uploadSessions = [
+        { id: 'a', projectId: 'pid-1', cleanupScheduled: false, files: [] },
+        { id: 'b', projectId: 'pid-2', cleanupScheduled: false, files: [] },
+      ];
+      expect(src.projectUploadSessions.call(ctx).map((s: any) => s.id)).toEqual(['a']);
+      ctx.currentProjectId = 'pid-2';
+      expect(src.projectUploadSessions.call(ctx).map((s: any) => s.id)).toEqual(['b']);
+    });
+  });
+
+  // Bloc « Générer » masqué et « Ajouter » (texte) désactivé pendant un import du cours affiché.
+  // MÉTHODE : le getter `uploading` de createState valait false en permanence dans l'objet donné à
+  // Alpine depuis #14 (« Ajouter » jamais désactivé → doublons ; cf. index.test.ts).
+  describe('isUploading', () => {
+    const session = (projectId: string, ...statuses: string[]) => ({
+      id: `s-${projectId}`,
+      projectId,
+      cleanupScheduled: false,
+      files: statuses.map((status, i) => ({
+        id: `f${i}`,
+        name: `f${i}.pdf`,
+        file: null,
+        status,
+        errorMsg: null,
+      })),
+    });
+
+    it.each([
+      ['pending', true],
+      ['hashing', true],
+      ['uploading', true],
+      ['duplicate', false],
+      ['error', false],
+      ['done', false],
+    ])('fichier « %s » du cours affiché → %s', (status, expected) => {
+      ctx.uploadSessions = [session('pid-1', 'done', status)];
+      expect(src.isUploading.call(ctx)).toBe(expected);
+    });
+
+    it('ignore l’import d’un autre cours (il continue en arrière-plan)', () => {
+      ctx.uploadSessions = [session('pid-2', 'uploading'), session('pid-1', 'done')];
+      expect(src.isUploading.call(ctx)).toBe(false);
+    });
+
+    it('texte en cours d’envoi : « Ajouter » désactivé jusqu’à la réponse', async () => {
+      let respond!: (value: unknown) => void;
+      vi.mocked(globalThis.fetch).mockReturnValueOnce(
+        new Promise((resolve) => {
+          respond = resolve;
+        }) as any,
+      );
+      const adding = src.addText.call(ctx);
+      expect(src.isUploading.call(ctx)).toBe(true);
+      respond({ ok: true, json: async () => ({ id: 's1' }) });
+      await adding;
+      expect(src.isUploading.call(ctx)).toBe(false);
+    });
+  });
+
+  // Les fichiers restants d'un import partent avec la langue et la clé du profil qui l'a lancé, même
+  // après un changement de profil (avant : celles du profil affiché au moment de chaque envoi).
+  describe('import — langue et clé capturées au lancement', () => {
+    afterEach(() => {
+      _resetActiveKey();
+    });
+
+    it('profil changé pendant l’import : fichiers suivants avec la clé et la langue du lancement', async () => {
+      await activateKey('sk-profil-a');
+      const f1 = new File(['1'], 'a.pdf', { type: 'application/pdf' });
+      const f2 = new File(['2'], 'b.pdf', { type: 'application/pdf' });
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        // selectProfile : plus de cours affiché, langue et clé du nouveau profil.
+        ctx.currentProjectId = null;
+        ctx.locale = 'en';
+        await activateKey('sk-profil-b');
+        return { ok: true, json: async () => [{ id: 's1' }] } as any;
+      });
+      mockFetchOk([{ id: 's2' }]);
+
+      await src.handleFiles.call(ctx, makeFileList(f1, f2));
+
+      const calls = vi.mocked(globalThis.fetch).mock.calls as [string, RequestInit][];
+      expect(calls.map(([url]) => url)).toEqual([
+        '/api/projects/pid-1/sources/upload',
+        '/api/projects/pid-1/sources/upload',
+      ]);
+      for (const [, init] of calls) {
+        expect(new Headers(init.headers).get('X-EurekAI-AI-Key')).toBe('sk-profil-a');
+        expect((init.body as FormData).get('lang')).toBe('fr');
+      }
+    });
+
+    it('aucune clé au lancement : aucun en-tête de clé, même si une clé est devenue active', async () => {
+      const f1 = new File(['1'], 'a.pdf', { type: 'application/pdf' });
+      const f2 = new File(['2'], 'b.pdf', { type: 'application/pdf' });
+      vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+        await activateKey('sk-profil-b');
+        return { ok: true, json: async () => [{ id: 's1' }] } as any;
+      });
+      mockFetchOk([{ id: 's2' }]);
+
+      await src.handleFiles.call(ctx, makeFileList(f1, f2));
+
+      const second = vi.mocked(globalThis.fetch).mock.calls[1][1] as RequestInit;
+      expect(new Headers(second.headers).has('X-EurekAI-AI-Key')).toBe(false);
     });
   });
 
@@ -1070,7 +1278,7 @@ describe('createSources', () => {
 
       // Session is cleaned up in finally, but we can verify it was created with the right shape
       // by checking that uploading went through the cycle (no TS errors)
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
       expect(ctx.sources).toHaveLength(1);
     });
 
@@ -1200,7 +1408,7 @@ describe('createSources', () => {
       await src.handleFiles.call(ctx, makeFileList(file));
       expect(ctx.uploadSessions[0].files[0].status).toBe('duplicate');
       expect(globalThis.fetch).not.toHaveBeenCalled();
-      expect(ctx.uploading).toBe(false);
+      expect(src.isUploading.call(ctx)).toBe(false);
     });
 
     it('marks a file as duplicate when the server returns duplicates[] (HTTP-LAN fallback)', async () => {

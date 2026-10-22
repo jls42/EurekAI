@@ -12,7 +12,9 @@ import type { ModerationResult, Source } from '../../types';
 
 // Plafond de sourceIds de la route (400 invalid_input au-delà).
 const MAX_VERIFIED_SOURCE_IDS = 50;
-const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
+// Id de cours sûr à placer dans une URL d'API (validation avant les barrières taint de Codacy
+// rule-node-ssrf, cf. ci-dessous) ; partagé par generate.ts et recorder.ts.
+export const PROJECT_ID_SAFE = /^[a-zA-Z0-9_-]{1,64}$/;
 
 type ModerationEntry = { id?: unknown; moderation?: ModerationResult };
 
@@ -115,27 +117,43 @@ const sourcesToVerify = (state: AppContext, sourceIds?: readonly string[]): stri
 };
 
 /**
+ * Issue du pré-contrôle : `allowed` (la génération part), `refused` (toast de refus déjà affiché),
+ * `moved` (cours changé pendant la vérification : l'état local est celui d'un autre cours, rien n'a
+ * été fusionné ; l'appelant envoie quand même vers le cours d'origine, le serveur refait la garde).
+ */
+export type GenerationCheck = 'allowed' | 'refused' | 'moved';
+
+/**
  * Pré-contrôle ASYNCHRONE d'une génération, à appeler AVANT tout pending optimiste (sinon un
  * cancel pendant l'attente serveur trouverait 404 et la génération partirait quand même). Source
  * signalée : refus immédiat (même toast). Source en attente, en erreur ou jamais vérifiée : toast
  * « Vérification des sources… », vérification (requestSourceModeration), puis pré-contrôle sur
  * les statuts fusionnés (canStartGenerate) ; un échec réseau laisse l'état local, donc le toast en
- * attente/erreur. true si la génération peut partir sur le projet courant, inchangé pendant la
- * vérification.
+ * attente/erreur. Changer de cours pendant la vérification n'abandonne plus la génération
+ * (`moved`) : jusqu'en v1.7.11 elle était perdue sans un mot.
  */
-export const ensureGenerationAllowed = async (
+export const checkGenerationAllowed = async (
   state: AppContext,
   sourceIds?: readonly string[],
-): Promise<boolean> => {
+): Promise<GenerationCheck> => {
   const projectId = state.currentProjectId;
-  if (!projectId) return false;
+  if (!projectId) return 'refused';
   const toVerify = sourcesToVerify(state, sourceIds);
   if (toVerify.length > 0) {
     state.showToast(state.t('moderation.checking'), 'info');
     await requestSourceModeration(state, projectId, toVerify);
-    if (state.currentProjectId !== projectId) return false;
+    if (state.currentProjectId !== projectId) return 'moved';
   }
-  return canStartGenerate(state, sourceIds);
+  return canStartGenerate(state, sourceIds) ? 'allowed' : 'refused';
+};
+
+/** Variante booléenne (« Tout générer ») : true seulement si la génération part sur le cours affiché. */
+export const ensureGenerationAllowed = async (
+  state: AppContext,
+  sourceIds?: readonly string[],
+): Promise<boolean> => {
+  const outcome = await checkGenerationAllowed(state, sourceIds);
+  return outcome === 'allowed';
 };
 
 /**

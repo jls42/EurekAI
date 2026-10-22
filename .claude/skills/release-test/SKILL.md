@@ -20,14 +20,14 @@ Le skill ne touche jamais aux donnees reelles de l'user et ne reset rien. Mode p
 
 Les modes « etat actuel » (donnees de l'user) ou « reset » ne s'utilisent que si l'user le demande explicitement.
 
-**Variante instance isolee** (le depot principal sert l'app a quelqu'un, ou la branche a tester n'y est pas) : depuis le worktree de la branche (`npm ci` deja fait), `npm run build` puis `PORT=3001 NODE_ENV=production HTTPS_KEY=... HTTPS_CERT=... npx tsx --env-file=<depot principal>/.env server.ts` en arriere-plan (la CSP de production impose HTTPS ; `BASE_URL=https://localhost:3001` pour le script securite). Ses donnees vont dans le `output/` du worktree : pas de sauvegarde a faire, et l'origine `https://localhost:3001` a son propre `localStorage` (relever ses cles `sf-*` avant de les ecraser). En fin de run : profil de test supprime, cles `sf-*` de cette origine retirees, instance arretee, `output/` et `dist/` du worktree supprimes (vecu le 2026-10-04, PR #99).
+**Variante instance isolee** (le depot principal sert l'app a quelqu'un, ou la branche a tester n'y est pas) : depuis le worktree de la branche (`npm ci` deja fait), `npm run build` puis `PORT=3001 NODE_ENV=production HTTPS_KEY=... HTTPS_CERT=... npx tsx --env-file=<depot principal>/.env server.ts` en arriere-plan (la CSP de production impose HTTPS ; `BASE_URL=https://localhost:3001` pour le script securite). Ses donnees vont dans le `output/` du worktree : pas de sauvegarde a faire, et l'origine `https://localhost:3001` a son propre `localStorage` (relever ses cles `sf-*` avant de les ecraser). **Jamais sur le port d'une instance que l'user ouvre lui-meme** (instance de preversion lancee pour lui) : meme origine dans le meme Chrome = meme `localStorage`, et la langue ou le profil choisis par la recette s'affichent chez lui. Prendre alors un port libre (`3002`, verifie par `ss -ltnp`). En fin de run : profil de test supprime, cles `sf-*` de cette origine retirees, instance arretee, `output/` et `dist/` du worktree supprimes (vecu le 2026-10-04, PR #99).
 
 ### Pieges d'automatisation connus (mesures 2026-09-26)
 
 - **`pinLimiter` = 10 PIN FAUX / 15 min par IP** sur `PUT` et `DELETE /api/profiles/:id` (seuls les refus 403 comptent : un bon PIN et une requete sans `pin` ne comptent pas). Au-dela, TOUT PIN de cette IP recoit 429 `rate_limited` jusqu'a la fin de la fenetre, bon PIN compris : le `DELETE` de nettoyage aussi. Ne jamais taper de PIN faux en dehors d'un test voulu. `authLimiter` (30 / 15 min) ne couvre plus que la creation (`POST /api/profiles`) ; la lecture et les enregistrements sans PIN n'ont que `generalLimiter`. Apres un 429 : lire `Retry-After` (`curl -i`) et attendre, ou redemarrer le serveur de dev, qui remet tous les compteurs a zero (stockage memoire) : c'est le moyen de nettoyer tout de suite apres une rafale de PIN.
 - **Le script securite (phase 3) sature `aiLimiter` puis `generalLimiter`** (rafales de 75 puis 350 requetes, la generale en dernier) : lancer la phase 3 APRES les phases UI, et attendre environ 60 s avant de nouveaux appels. Sa rafale de PIN faux est desactivee par defaut (`PIN_BURST=1`, sur un profil qui a un PIN : `PIN_PROFILE_ID`) : elle bloque les PIN de l'IP 15 min, nettoyage compris (redemarrer le serveur de dev ensuite).
 - **Onglet Chrome en arriere-plan** : les transitions Alpine n'avancent qu'a chaque capture, et une vue parait « estompee ». Enchainer 2 captures (la premiere en `scale` 0.2) avant de juger un rendu.
-- **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-lang` (cle de langue lue par l'app, `src/i18n/index.ts`) dans le `localStorage`, puis recharger.
+- **Changer la langue de l'UI** : le menu de langue ne bascule pas de facon fiable sous automatisation. Faire `PUT /api/profiles/:id` avec `{pin, _updatedAt, locale}`, mettre a jour `sf-profile-locales` et `sf-lang` (cle de langue lue par l'app, `src/i18n/index.ts`) dans le `localStorage`, puis recharger. Remettre la langue d'origine des la verification faite, dans le meme lot d'actions : le `setLocale(…)` de l'app, appele en JS, ecrit lui aussi `sf-lang`, la langue du profil courant dans `sf-profile-locales` et, pour un profil sans PIN, sur le serveur (vecu le 2026-10-21 : une verification de l'arabe laissee en `ar` sur l'origine de l'instance de l'user lui a ouvert l'app en arabe).
 - **Champs PIN** : une extension de gestion de mots de passe peut bloquer `javascript_tool` quand le focus est sur le champ (erreur `chrome-extension://`) : utiliser clic + frappe, pas de JS sur ce champ.
 - **Sondes audio** : ne pas attendre les metadonnees `<audio>` en JS (delai de 45 s depasse). Mesurer les MP3 avec `ffprobe` sur `output/projects/<pid>/`.
 - **Clics manques (2026-10-04)** : une reference `find` peut viser un element masque (bouton du Tableau de bord quand la vue Sources est affichee) ou perime apres un decalage de mise en page (banniere des generations en cours) : le clic part ailleurs, sans erreur. Preferer un clic DOM sur l'element visible (`offsetParent !== null`, puis `.click()`) ou des coordonnees calculees en JS (`getBoundingClientRect()` multiplie par `1568 / innerWidth`, le cadre des captures), puis reverifier les compteurs (requetes, puces, toasts).
@@ -149,14 +149,15 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
 
 ### A — Libellés tarifaires dans les Réglages (Chrome, coût API nul)
 
-1. Ouvrir le dialog Réglages : `find` "bouton parametres / reglages / engrenage" puis clic. (Le dialog est `<dialog x-ref="settingsDialog">` ; les selecteurs ont des ids stables `#cfg-main-model`, `#cfg-ocr-model`.)
-2. Lire les options des deux selecteurs + le libellé TTS + la ligne ID réel OCR via `javascript_tool` :
+1. Ouvrir le dialog Réglages : `find` "bouton parametres / reglages / engrenage" puis clic. (Le dialog est `<dialog x-ref="settingsDialog">` ; les selecteurs ont des ids stables `#cfg-main-model`, `#cfg-ocr-model`, `#cfg-stt-model`, `#cfg-tts-model`.)
+2. Lire les options des quatre selecteurs + les lignes ID réel via `javascript_tool` :
    ```javascript
    const opts = (sel) => Array.from(document.querySelectorAll(sel + ' option'))
      .map((o) => ({ value: o.value, label: o.textContent.trim() }));
-   const tts = document.querySelector('[x-text*="voxtral-mini-tts"]')?.textContent.trim();
-   const ocrRealId = document.querySelector('[x-text="configDraft._ocrModel"]')?.textContent.trim();
-   ({ main: opts('#cfg-main-model'), ocr: opts('#cfg-ocr-model'), tts, ocrRealId });
+   const realId = (expr) => document.querySelector(`[x-text="${expr}"]`)?.textContent.trim();
+   ({ main: opts('#cfg-main-model'), ocr: opts('#cfg-ocr-model'), stt: opts('#cfg-stt-model'),
+      tts: opts('#cfg-tts-model'), ocrRealId: realId('configDraft._ocrModel'),
+      sttRealId: realId('configDraft._sttModel'), ttsRealId: realId('configDraft.ttsModel') });
    ```
 3. Assertions (croiser avec les `grep` ci-dessus, ne rien hardcoder) :
    - `ocr` (les `option.value`) = exactement les valeurs de `OCR_MODELS` (ordre actuel : OCR 4 puis OCR 3).
@@ -164,7 +165,10 @@ grep -E "mistral-(large|medium|small|ocr)|voxtral-mini" helpers/pricing.ts
    - L'**ID technique réel** est affiché sous le `<select>` en italique (`ocrRealId` = la valeur sélectionnée, ex. `mistral-ocr-4-1`).
    - L'option `DEFAULT_OCR_MODEL` (OCR 4) porte le suffixe recommande (texte i18n `settings.recommended`).
    - Labels modele principal : en USD par M tokens (entree / sortie) : `mistral-large` → 0.50 / 1.50, `mistral-large-4-0` → 1.36 / 4.18 (option, tarif public hors promotion), `mistral-medium` → 1.50 / 7.50, `mistral-small` → 0.15 / 0.60.
-   - `tts` affiche 16 USD par M caracteres.
+   - `stt` (les `option.value`) = exactement `STT_MODELS` (`helpers/stt-models.ts`, ordre : Mini Transcribe 2, Mini Transcribe 3, Small Transcribe 3) ; labels = noms produit (`STT_MODEL_LABELS`) avec un prix PAR MINUTE en USD (0.0030 / 0.0035 / 0.0040, clé i18n `settings.perMinute`) ; le défaut `DEFAULT_STT_MODEL` porte `settings.recommended`, les modèles de `STT_PREVIEW_MODELS` portent `settings.preview`.
+   - `tts` (les `option.value`) = exactement `TTS_MODELS` (`helpers/tts-models.ts` : Voxtral TTS puis Voxtral TTS 3) ; Voxtral TTS affiche 16 USD et Voxtral TTS 3 13 USD par M caracteres ; défaut `DEFAULT_TTS_MODEL` recommandé, TTS 3 marqué préversion.
+   - `sttRealId` / `ttsRealId` = l'id technique sélectionné (jamais un alias `-latest`).
+   - Choisir TTS 3, sauvegarder, rouvrir : la valeur est gardée ; la liste des voix (profil) propose alors aussi les voix natives (es, de, ar…) ; revenir à Voxtral TTS : ces voix disparaissent de la liste (elles sont refusées par ce modèle, 400 code 3051). Restaurer la config d'origine.
    - **AUCUN** label/span ne contient `tarif indisponible` / `price unavailable` (regression `modelPriceLabel` → `priceUnknown`, ex. unite `audio-seconds` non geree).
 4. Screenshot du dialog (preuve visuelle des tarifs).
 
@@ -285,14 +289,14 @@ Glisser/uploader le meme fichier via l'UI → statut **`'duplicate'`** par fichi
 
 ## Phase 2quinquies — check-models : surveillance modeles (Feature B, PR #42)
 
-Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alias ↔ versions, independants de l'ordre, + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) sur `WATCHED_MODELS` (5 alias `-latest` resolus par l'app, recopies dans `WATCHED_ALIASES`, + `OCR_MODELS` et `MODERATION_MODEL` importes des sources uniques). Alertes : modele surveille **absent** de `/v1/models`, **alias ambigu**, groupe **deprecie/retire**, **defaut epingle en retard** sur l'alias de sa generation (sauf retard assume : `acceptedLag` d'une entree de `TRACKED_DEFAULTS`, aucun depuis la v1.7.6). Informations : retard assume, nouvelle generation (`-latest`), modele non suivi dans la famille moderation. Script, pas d'UI.
+Couvre le garde-fou **non bloquant** qui croise l'API `/v1/models` (groupes alias ↔ versions, independants de l'ordre, + `deprecation`) et la table Legacy de l'overview (rendue Lightpanda → date de retrait + alternative) sur `WATCHED_MODELS` (3 alias `-latest` de chat resolus par l'app, recopies dans `WATCHED_ALIASES`, + `MISTRAL_LARGE_4`, `OCR_MODELS`, `MODERATION_MODEL`, `STT_MODELS` et `TTS_MODELS` importes des sources uniques). Alertes : modele surveille **absent** de `/v1/models`, **alias ambigu**, groupe **deprecie/retire**, **defaut epingle en retard** sur l'alias de sa generation (sauf retard assume : `acceptedLag` d'une entree de `TRACKED_DEFAULTS`, aucun depuis la v1.7.6). Informations : retard assume, nouvelle generation (`-latest`), modele non suivi dans la famille moderation, modele de transcription (`audio_transcription`) ou de synthese (`audio_speech`) non suivi. Script, pas d'UI.
 
 1. **Path nominal** (avec cle) — rend l'overview via Lightpanda (1-2 s mesure, budget timeout 120s) :
    ```bash
    timeout 120 npx tsx --env-file=.env scripts/check-models.ts; echo "exit=$?"
    ```
    - Assert `exit=0` (**toujours** non bloquant).
-   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-09-30 : `8 modèles surveillés OK`, sans ligne `ℹ` (defaut OCR 4.1, OCR 4.0 retire le 2026-09-30). Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés (table Legacy indisponible ou partielle)` = controle PARTIEL (table Legacy non lue, vide, ou partielle : `table Legacy partielle : N modèles lus...` ou `sentinelle(s) absente(s) ...`, rendu Lightpanda tronque) : a remonter aussi, ce n'est pas un OK complet.
+   - Sortie = `N modèles surveillés OK (...)` + d'eventuelles lignes `  ℹ ...` (informations), ou `⚠ modèles à vérifier` + une ligne par alerte + le pied de message. Une alerte n'est **PAS** un FAIL du skill : c'est l'info attendue. Reference au 2026-10-21 : `12 modèles surveillés OK`, sans ligne `ℹ` (defaut OCR 4.1 ; Voxtral 3 suivi par `STT_MODELS`/`TTS_MODELS`). Reporter le contenu verbatim ; toute nouvelle alerte (ex. `mistral-ocr-4-2`, `mistral-moderation-...`) est un finding a remonter a l'user. Une ligne `overview indisponible (...) — diagnostic API seul` suivie de `OK côté API ... retraits NON vérifiés (table Legacy indisponible ou partielle)` = controle PARTIEL (table Legacy non lue, vide, ou partielle : `table Legacy partielle : N modèles lus...` ou `sentinelle(s) absente(s) ...`, rendu Lightpanda tronque) : a remonter aussi, ce n'est pas un OK complet.
 2. **Path skip** (sans cle) :
    ```bash
    env -u MISTRAL_API_KEY npx tsx scripts/check-models.ts; echo "exit=$?"
@@ -417,6 +421,7 @@ Compiler dans la reponse a l'user :
 
 ### OCR + tarifs modeles (PR #41)
 - Selecteur OCR (OCR 3 / OCR 4 + tarifs) : ✓/✗
+- Selecteurs Transcription / Synthese vocale (Voxtral 3 en preversion, prix par minute, voix filtrees par modele) : ✓/✗
 - Libelles tarifaires modele principal + TTS (aucun "tarif indisponible") : ✓/✗
 - Routage live OCR 3 (cout/page ≈ 2 USD/1000) : ✓/✗/skip
 - Routage live OCR 4 (cout/page ≈ 2x OCR 3) : ✓/✗/skip

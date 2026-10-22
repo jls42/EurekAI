@@ -40,6 +40,17 @@ export interface ToolPricing {
   perCall: number;
 }
 
+/** Prix STT annoncé par minute (fiches Mistral) → tarif par million de secondes d'audio. */
+const perMinute = (usd: number): ModelPricing => ({
+  inputPerMillion: (usd * 1_000_000) / 60,
+  outputPerMillion: 0,
+  unit: 'audio-seconds',
+});
+
+/** Prix par minute d'un tarif `audio-seconds` (affichage : Réglages, détail du coût). */
+export const usdPerMinute = (pricing: ModelPricing): number =>
+  (pricing.inputPerMillion / 1_000_000) * 60;
+
 /** Model pricing keyed by prefix — `mistral-large-2512` matches `mistral-large`. */
 export const MODEL_PRICING: Record<string, ModelPricing> = {
   'mistral-large': { inputPerMillion: 0.5, outputPerMillion: 1.5, unit: 'tokens' },
@@ -50,8 +61,17 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   'mistral-large-4': { inputPerMillion: 1.36, outputPerMillion: 4.18, unit: 'tokens' },
   'mistral-medium': { inputPerMillion: 1.5, outputPerMillion: 7.5, unit: 'tokens' },
   'mistral-small': { inputPerMillion: 0.15, outputPerMillion: 0.6, unit: 'tokens' },
+  // Voxtral 3 (2026-10-20, Public Preview, options des Réglages ; fiches vérifiées le 2026-10-21) :
+  // clés plus longues que 'voxtral-mini-tts' / 'voxtral-mini' → gagnent le greedy-prefix pour l'id
+  // épinglé `-3-0` comme pour son alias `-3`. Sans elles, TTS 3 était compté 16 $ au lieu de 13 $
+  // et Mini Transcribe 3 0,003 $/min au lieu de 0,0035 ; Small Transcribe 3 n'avait aucun tarif.
+  // `voxtral-mini-transcribe-realtime-3-0` (temps réel, 0,008 $/min) tomberait sur 'voxtral-mini' :
+  // l'app ne l'envoie pas (pas de transcription en flux).
+  'voxtral-mini-tts-3': { inputPerMillion: 13, outputPerMillion: 0, unit: 'characters' },
+  'voxtral-mini-transcribe-3': perMinute(0.0035),
+  'voxtral-small-transcribe-3': perMinute(0.004),
   'voxtral-mini-tts': { inputPerMillion: 16, outputPerMillion: 0, unit: 'characters' },
-  'voxtral-mini': { inputPerMillion: 50, outputPerMillion: 0, unit: 'audio-seconds' },
+  'voxtral-mini': perMinute(0.003),
   // OCR 4.x ($4/1000 pages) : 'mistral-ocr-4' plus long que 'mistral-ocr' → gagne le greedy-prefix
   // pour mistral-ocr-4-1 (défaut depuis la v1.7.6) comme pour l'ancien mistral-ocr-4-0, retiré le
   // 2026-09-30 (même billing_model_name `mistral-ocr-4` sur /v1/models).
@@ -77,6 +97,9 @@ export const PRICING_SOURCES: Record<string, string> = {
   'mistral-large-4': 'https://docs.mistral.ai/models/mistral-large-4-0',
   'mistral-medium': 'https://docs.mistral.ai/models/mistral-medium-3-5-26-04',
   'mistral-small': 'https://docs.mistral.ai/models/mistral-small-4-0-26-03',
+  'voxtral-mini-tts-3': 'https://docs.mistral.ai/models/voxtral-mini-tts-3-0',
+  'voxtral-mini-transcribe-3': 'https://docs.mistral.ai/models/voxtral-mini-transcribe-3-0',
+  'voxtral-small-transcribe-3': 'https://docs.mistral.ai/models/voxtral-small-transcribe-3-0',
   'voxtral-mini-tts': 'https://docs.mistral.ai/models/voxtral-tts-26-03',
   'voxtral-mini': 'https://docs.mistral.ai/models/voxtral-mini-transcribe-26-02',
   'mistral-ocr-4': 'https://docs.mistral.ai/models/ocr-4-0',

@@ -11,6 +11,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { createGenerate } from './generate';
 import {
+  checkGenerationAllowed,
   ensureGenerationAllowed,
   generationSources,
   mergeSourceModerations,
@@ -269,6 +270,47 @@ describe('ensureGenerationAllowed', () => {
     await ensureGenerationAllowed(state);
 
     expect(sentBody().sourceIds).toHaveLength(50);
+  });
+});
+
+// Issue détaillée du pré-contrôle : un changement de cours pendant la vérification (`moved`)
+// n'abandonne plus la génération (génération simple, Auto, remédiation) ; ensureGenerationAllowed
+// (« Tout générer ») reste booléen.
+describe('checkGenerationAllowed', () => {
+  it('sources vérifiées safe : allowed', async () => {
+    const state = makeState({ sources: [{ id: 's1', moderation: moderation('pending') }] });
+    respondWith([{ id: 's1', moderation: moderation('safe') }]);
+
+    await expect(checkGenerationAllowed(state)).resolves.toBe('allowed');
+  });
+
+  it('source signalée : refused, toast de refus', async () => {
+    const state = makeState({ sources: [{ id: 's1', moderation: moderation('unsafe') }] });
+
+    await expect(checkGenerationAllowed(state)).resolves.toBe('refused');
+    expect(state.showToast).toHaveBeenCalledWith('moderation.blocked', 'error');
+  });
+
+  it('sans cours : refused, aucun appel', async () => {
+    await expect(checkGenerationAllowed(makeState({ currentProjectId: null }))).resolves.toBe(
+      'refused',
+    );
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+  });
+
+  it('cours changé pendant la vérification : moved, rien fusionné, aucun toast de refus', async () => {
+    const state = makeState({ sources: [{ id: 's1', moderation: moderation('pending') }] });
+    vi.mocked(globalThis.fetch).mockImplementationOnce(async () => {
+      state.currentProjectId = 'pid-2';
+      return {
+        ok: true,
+        json: async () => ({ sources: [{ id: 's1', moderation: moderation('safe') }] }),
+      } as any;
+    });
+
+    await expect(checkGenerationAllowed(state)).resolves.toBe('moved');
+    expect(state.sources[0].moderation.status).toBe('pending');
+    expect(state.showToast).not.toHaveBeenCalledWith('moderation.pending', 'error');
   });
 });
 

@@ -11,6 +11,9 @@
 import type { Mistral } from '@mistralai/mistralai';
 import type { MistralVoice, VoiceId } from '../helpers/voice-types.js';
 import { asVoiceId } from '../helpers/voice-types.js';
+import { normalizeTtsModel, type TtsModel } from '../helpers/tts-models.js';
+import { speakableText } from '../helpers/tts-text.js';
+import type { AppConfig } from '../types.js';
 
 // Re-export pour conserver la surface API publique de ce module.
 export type { MistralVoice, VoiceId } from '../helpers/voice-types.js';
@@ -18,9 +21,21 @@ export type { MistralVoice, VoiceId } from '../helpers/voice-types.js';
 // --- Types ---
 
 export interface TtsOptions {
-  model: string;
+  model: TtsModel;
   mistralClient: Mistral;
 }
+
+/**
+ * Options TTS d'un appel : modèle de la config normalisé (id de TTS_MODELS, jamais un alias ni une
+ * valeur libre, défense au point d'appel comme pour l'OCR) + client résolu de la requête.
+ */
+export const ttsOptionsFor = (
+  config: Pick<AppConfig, 'ttsModel'>,
+  client: Mistral,
+): TtsOptions => ({
+  model: normalizeTtsModel(config.ttsModel),
+  mistralClient: client,
+});
 
 // --- Mistral TTS ---
 
@@ -30,7 +45,7 @@ export async function textToSpeech(
   options: TtsOptions,
 ): Promise<Buffer> {
   const response = await options.mistralClient.audio.speech.complete({
-    input: text,
+    input: speakableText(text),
     model: options.model,
     voiceId,
     responseFormat: 'mp3',
@@ -63,6 +78,10 @@ function toMistralVoice(v: unknown): MistralVoice {
     gender: pickField<string | undefined>(o, 'gender', undefined),
     tags: pickField<string[] | undefined>(o, 'tags', undefined),
     createdAt: pickField<string | undefined>(o, 'createdAt', undefined),
+    // `kind` (ivc/pvc) est retiré par le SDK 2.7.0 : slug et userId portent la compatibilité
+    // des voix avec les modèles speech v1 (cf. voiceSupportsTtsModel, helpers/tts-models.ts).
+    slug: pickField<string | null>(o, 'slug', null) ?? undefined,
+    custom: pickField<string | null>(o, 'userId', null) !== null,
   };
 }
 

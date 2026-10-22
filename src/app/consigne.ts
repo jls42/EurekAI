@@ -94,6 +94,47 @@ const consigneCoversSources = (state: AppContext): boolean => {
   return Array.isArray(provenance) && ids.every((id) => provenance.includes(id));
 };
 
+// Consigne relue sur le serveur, appliquée seulement si son cours est encore affiché : sinon la
+// consigne d'un autre cours s'afficherait dans le cours ouvert entre-temps.
+const runRefreshConsigne = async (state: AppContext): Promise<void> => {
+  const projectId = state.currentProjectId;
+  if (!projectId) return;
+  try {
+    const res = await fetch(
+      '/api/projects/' + projectId + openingProfileQuery(state.currentProfile?.id),
+    );
+    if (!res.ok) return;
+    // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
+    const snapshot: unknown = await res.json();
+    const project = snapshot as ProjectData;
+    if (state.currentProjectId !== projectId || !project.consigne) return;
+    state.consigne = project.consigne;
+    void state.$nextTick(() => state.refreshIcons());
+  } catch {
+    /* silent: offline fallback, consigne absent OK */
+  }
+};
+
+// Réponse de la détection, appliquée au cours de la détection seulement (attente de la modération
+// comprise) : changé entre-temps, elle est ignorée (le serveur a persisté la consigne).
+const handleDetectConsigneResponse = async (
+  state: AppContext,
+  projectId: string,
+  res: Response,
+): Promise<void> => {
+  const body = await readJsonBody(res);
+  if (state.currentProjectId !== projectId) return;
+  if (res.ok) applyDetectedConsigne(state, body);
+  else showConsigneError(state, res, body);
+};
+
+// Fin de la détection : boutons « Détecter la consigne » réactivés sur son cours seulement (un
+// autre cours affiché peut avoir sa propre détection en cours ; resetSession a remis le drapeau).
+const endConsigneDetection = (state: AppContext, projectId: string): void => {
+  if (state.currentProjectId === projectId) state.consigneLoading = false;
+  void state.$nextTick(() => state.refreshIcons());
+};
+
 export function createConsigne() {
   // Jeton de la relecture en cours : une nouvelle demande la remplace (une seule à la fois), la
   // précédente s'arrête à sa prochaine étape.
@@ -115,23 +156,7 @@ export function createConsigne() {
 
   return {
     async refreshConsigne(this: AppContext) {
-      if (!this.currentProjectId) return;
-      try {
-        const res = await fetch(
-          '/api/projects/' + this.currentProjectId + openingProfileQuery(this.currentProfile?.id),
-        );
-        if (res.ok) {
-          // Corps typé par une variable : `(await res.json()) as …` coupait la mesure Lizard.
-          const snapshot: unknown = await res.json();
-          const project = snapshot as ProjectData;
-          if (project.consigne) {
-            this.consigne = project.consigne;
-            void this.$nextTick(() => this.refreshIcons());
-          }
-        }
-      } catch {
-        /* silent: offline fallback, consigne absent OK */
-      }
+      await runRefreshConsigne(this);
     },
 
     /**
@@ -160,16 +185,13 @@ export function createConsigne() {
             body: JSON.stringify({ lang: this.locale }),
           }),
         );
-        const body = await readJsonBody(res);
-        // Projet changé pendant la détection (attente de la modération comprise) : réponse ignorée.
-        if (this.currentProjectId !== projectId) return;
-        if (res.ok) applyDetectedConsigne(this, body);
-        else showConsigneError(this, res, body);
+        await handleDetectConsigneResponse(this, projectId, res);
       } catch {
-        this.showToast(this.t('toast.consigneError'), 'error');
+        if (this.currentProjectId === projectId) {
+          this.showToast(this.t('toast.consigneError'), 'error');
+        }
       } finally {
-        this.consigneLoading = false;
-        void this.$nextTick(() => this.refreshIcons());
+        endConsigneDetection(this, projectId);
       }
     },
   };
