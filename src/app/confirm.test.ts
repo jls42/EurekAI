@@ -440,6 +440,29 @@ describe('createConfirm', () => {
       expect(ctx.showToast).toHaveBeenCalledWith('toast.cancelledGeneration', 'info');
     });
 
+    it('un seul toast pour toutes les générations en cours, aucun par type (SSE compris)', () => {
+      const gids = [
+        '11111111-1111-4111-8111-111111111111',
+        '22222222-2222-4222-8222-222222222222',
+        '33333333-3333-4333-8333-333333333333',
+      ];
+      const types = ['quiz', 'summary', 'podcast'];
+      const fetchMock = vi.fn().mockResolvedValue({ ok: true });
+      (globalThis as any).fetch = fetchMock;
+      ctx.pendingById = Object.fromEntries(
+        gids.map((id, i) => [id, { id, type: types[i], status: 'pending' }]),
+      );
+
+      confirm.cancelGeneration.call(ctx);
+
+      // Cinq toasts d'un coup au release-test du 2026-10-22 (un par génération, plus le global).
+      expect(ctx.showToast.mock.calls).toEqual([['toast.cancelledGeneration', 'info']]);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      for (const gid of gids) {
+        expect(ctx.shownToastEventKeys.has(buildEventKey(gid, 'cancelled')), gid).toBe(true);
+      }
+    });
+
     it('arrête l’Auto du cours affiché, même absent de abortControllers, jamais celui d’un autre cours', () => {
       const shown = new AbortController();
       const other = new AbortController();

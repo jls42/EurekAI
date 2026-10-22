@@ -2054,6 +2054,10 @@ describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', ()
     expect(ctx.generations).toEqual([]);
     expect(allAgents.map((type) => ctx.loading[type])).toEqual(allAgents.map(() => false));
     expect(ctx.autoRuns).toEqual({});
+    // Seul le toast d'annulation : « Magie terminée ! » le suivait (release-test du 2026-10-22).
+    expect(ctx.showToast.mock.calls.map((call: any[]) => call[0])).toEqual([
+      'toast.cancelledGeneration',
+    ]);
   });
 
   it('retour sur le cours pendant les étapes de son Auto : « Tout annuler » arrête aussi celles en file', async () => {
@@ -2074,6 +2078,9 @@ describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', ()
     await run;
     expect(ctx.generations).toEqual([]);
     expect(ctx.autoRuns).toEqual({});
+    expect(ctx.showToast.mock.calls.map((call: any[]) => call[0])).toEqual([
+      'toast.cancelledGeneration',
+    ]);
   });
 
   it('moins de 3 étapes : toutes partent ensemble, sans attendre', async () => {

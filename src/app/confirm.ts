@@ -82,7 +82,10 @@ const restoreAfterFailedCancel = (
 // down / 5xx serveur), restaure l'entrée pending + toast erreur. Sans rollback,
 // l'utilisateur croirait que c'est annulé alors que le backend continue, et
 // recevrait plus tard un event SSE 'completed' pour un gid disparu côté UI.
-function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
+// Sans toast de confirmation : « Tout annuler » l'appelle pour chaque génération et n'en affiche
+// qu'un en tout (cinq toasts d'un coup au release-test du 2026-10-22) ; la puce ✕ passe par
+// cancelPendingByGid, qui nomme le type annulé.
+const cancelPendingSilently = (state: AppContext, gid: string, type: string): void => {
   const controller = state.abortControllersByGid[gid];
   const hadLocalController = Boolean(controller);
   if (controller) {
@@ -106,9 +109,8 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
     state.loading[type] = false;
   }
   const label = state.t('gen.' + type) || type;
-  state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
-  // L'événement SSE `cancelled` de ce gid afficherait le même toast : il est marqué comme déjà vu
-  // dans l'onglet. Sa notification persistée reste écrite par le SSE (source de vérité serveur).
+  // L'événement SSE `cancelled` de ce gid afficherait un toast : il est marqué comme déjà vu dans
+  // l'onglet. Sa notification persistée reste écrite par le SSE (source de vérité serveur).
   state.shownToastEventKeys.add(buildEventKey(gid, 'cancelled'));
 
   const pid = state.currentProjectId;
@@ -124,6 +126,13 @@ function cancelPendingByGid(state: AppContext, gid: string, type: string): void 
       // sans recourir au `void` operator interdit par sonarjs/void-use.
       console.error('[cancel] unexpected postCancel error', err);
     });
+};
+
+// Puce ✕ d'une génération : annulation, puis un toast qui nomme son type.
+function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
+  cancelPendingSilently(state, gid, type);
+  const label = state.t('gen.' + type) || type;
+  state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -243,10 +252,11 @@ const cancelOne = function (this: AppContext, key: string) {
 };
 
 const cancelGeneration = function (this: AppContext) {
-  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque)
+  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque), sans un toast par
+  //    génération : un seul toast pour tout, à la fin.
   for (const gid of Object.keys(this.pendingById)) {
     const entry = this.pendingById[gid];
-    cancelPendingByGid(this, gid, entry.type);
+    cancelPendingSilently(this, gid, entry.type);
   }
   // 2. Cancel les transients résiduels (auto/voice/websearch via abort
   //    controller par type seulement)

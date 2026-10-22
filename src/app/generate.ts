@@ -491,15 +491,13 @@ export function showAutoResult(
 }
 
 // Auto terminé pendant qu'un autre cours est affiché : un toast nomme son cours (comme l'import en
-// arrière-plan) ; les générations sont enregistrées côté serveur et apparaissent au retour. Rien
-// après une annulation ou la suppression du cours.
+// arrière-plan) ; les générations sont enregistrées côté serveur et apparaissent au retour.
 const notifyBackgroundAuto = (
   state: AppContext,
   launch: AutoLaunch,
   failures: number,
   planned: number,
 ): void => {
-  if (launch.controller.signal.aborted) return;
   const project = launch.projectName;
   if (planned > 0 && failures === 0) {
     state.showToast(state.t('toast.autoDoneIn', { project }), 'success');
@@ -511,6 +509,9 @@ const notifyBackgroundAuto = (
   }
 };
 
+// Rien après une annulation (« Tout annuler », puce de l'analyse) ou la suppression du cours : le
+// toast d'annulation suffit. Sur le cours affiché, « Magie terminée ! » le suivait, les étapes
+// abortées ne comptant pas comme des échecs (release-test du 2026-10-22).
 const showAutoOutcome = (
   state: AppContext,
   launch: AutoLaunch,
@@ -518,6 +519,7 @@ const showAutoOutcome = (
   planned: number,
   codes: FailedStepCode[],
 ): void => {
+  if (launch.controller.signal.aborted) return;
   if (autoShown(state, launch)) showAutoResult(state, failures, planned, codes);
   else notifyBackgroundAuto(state, launch, failures, planned);
 };
