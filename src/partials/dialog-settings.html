@@ -101,6 +101,14 @@
               mistral-small-latest
             </option>
           </select>
+          <!-- Téléphone : un menu déroulant fermé ne passe pas à la ligne ; le libellé complet du
+               modèle choisi (tarif, « Recommandé » ou « Préversion ») s'affiche dessous. -->
+          <p
+            class="sm:hidden text-xs text-text-secondary mt-1"
+            x-text="selectedModelLabel(configDraft._mainModel, 'mistral-large-latest')"
+          >
+            mistral-large-latest
+          </p>
           <p class="text-xs text-text-secondary mt-1" x-text="t('settings.aiModelHint')"></p>
         </div>
         <div>
@@ -125,6 +133,12 @@
               OCR 3
             </option>
           </select>
+          <p
+            class="sm:hidden text-xs text-text-secondary mt-1"
+            x-text="selectedModelLabel(configDraft._ocrModel, 'mistral-ocr-4-1')"
+          >
+            OCR 4
+          </p>
           <p class="text-xs italic text-text-secondary mt-1" x-text="configDraft._ocrModel">
             mistral-ocr-4-1
           </p>
@@ -161,6 +175,12 @@
               Small Transcribe 3
             </option>
           </select>
+          <p
+            class="sm:hidden text-xs text-text-secondary mt-1"
+            x-text="selectedModelLabel(configDraft._sttModel, 'voxtral-mini-2602')"
+          >
+            Mini Transcribe 2
+          </p>
           <p class="text-xs italic text-text-secondary mt-1" x-text="configDraft._sttModel">
             voxtral-mini-2602
           </p>
@@ -188,6 +208,12 @@
               Voxtral TTS 3
             </option>
           </select>
+          <p
+            class="sm:hidden text-xs text-text-secondary mt-1"
+            x-text="selectedModelLabel(configDraft.ttsModel, 'voxtral-mini-tts-2603')"
+          >
+            Voxtral TTS
+          </p>
           <p class="text-xs italic text-text-secondary mt-1" x-text="configDraft.ttsModel">
             voxtral-mini-tts-2603
           </p>

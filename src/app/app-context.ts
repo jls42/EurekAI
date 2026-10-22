@@ -163,6 +163,8 @@ export interface AppContext extends AppState {
   modelPriceLabel(modelId: string): string;
   // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
   modelOptionLabel(modelId: string): string;
+  // eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- idem
+  selectedModelLabel(modelId: string, recommendedId: string): string;
   saveSettings(): Promise<void>;
   resetSettings(): Promise<void>;
   closeSettingsDialog(): void;

@@ -203,6 +203,14 @@ export function createConfig() {
       return PREVIEW_MODELS.has(modelId) ? `${label} · ${this.t('settings.preview')}` : label;
     },
 
+    // Libellé complet du modèle choisi, affiché sous son sélecteur sur téléphone : un <select> fermé
+    // ne passe pas à la ligne, et le tarif ou « Recommandé » y étaient coupés à 390 px (release-test
+    // du 2026-10-22). Même texte que l'option du sélecteur.
+    selectedModelLabel(this: AppContext, modelId: string, recommendedId: string): string {
+      const label = this.modelOptionLabel(modelId);
+      return modelId === recommendedId ? `${label} · ${this.t('settings.recommended')}` : label;
+    },
+
     async saveSettings(this: AppContext) {
       try {
         const draft = this.configDraft as unknown as ConfigDraft;

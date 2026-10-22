@@ -735,6 +735,28 @@ describe('modelOptionLabel', () => {
   });
 });
 
+// --- selectedModelLabel (libellé complet sous le sélecteur, sur téléphone) ---
+
+describe('selectedModelLabel', () => {
+  it('modèle recommandé : libellé de son option, suivi de « Recommandé »', () => {
+    const label = config.selectedModelLabel.call(
+      makeContext(),
+      'voxtral-mini-2602',
+      'voxtral-mini-2602',
+    );
+    expect(label).toBe('Mini Transcribe 2 — $0.0030 settings.perMinute · settings.recommended');
+  });
+
+  it('autre modèle : libellé de son option, préversion comprise, sans « Recommandé »', () => {
+    const label = config.selectedModelLabel.call(
+      makeContext(),
+      'voxtral-mini-transcribe-3-0',
+      'voxtral-mini-2602',
+    );
+    expect(label).toBe('Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview');
+  });
+});
+
 // --- Gabarit des Réglages : sélecteurs de modèles épinglés ---
 
 describe('dialog-settings.html : sélecteurs de modèles alignés sur leurs sources uniques', () => {
@@ -789,6 +811,25 @@ describe('dialog-settings.html : sélecteurs de modèles alignés sur leurs sour
         // Texte de repli (avant Alpine) = nom produit de la source unique.
         expect(fallback, value).toBe(labels[value]);
       }
+    },
+  );
+
+  // Un <select> fermé ne passe pas à la ligne : à 390 px, tarif et « Recommandé » étaient coupés
+  // (release-test du 2026-10-22). Le libellé complet du modèle choisi s'affiche dessous, sur
+  // téléphone seulement, avec le même modèle recommandé que l'option marquée du sélecteur.
+  it.each([
+    ['cfg-main-model', 'configDraft._mainModel', 'mistral-large-latest'],
+    ...SELECTORS.map(([id, xModel, , defaultModel]) => [id, xModel, defaultModel]),
+  ])(
+    '#%s : libellé complet du modèle choisi sous le sélecteur, sur téléphone',
+    (id, xModel, rec) => {
+      const selectEnd = html.indexOf('</select>', html.indexOf(`id="${id}"`));
+      const nextSelect = html.indexOf('<select', selectEnd);
+      const at = html.indexOf(`selectedModelLabel(${xModel}, '${rec}')`);
+      expect(at, id).toBeGreaterThan(selectEnd);
+      if (nextSelect !== -1) expect(at, id).toBeLessThan(nextSelect);
+      expect(html.slice(html.lastIndexOf('<p', at), at), id).toContain('sm:hidden');
+      expect(html).toContain(`modelOptionLabel('${rec}') + ' · ' + t('settings.recommended')`);
     },
   );
 });
