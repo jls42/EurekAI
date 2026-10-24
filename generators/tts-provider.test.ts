@@ -10,7 +10,7 @@ function makeMistralClient(overrides: Partial<Mistral> = {}): Mistral {
   return {
     audio: {
       speech: { complete: vi.fn() },
-      voices: { list: vi.fn() },
+      voices: { search: vi.fn() },
     },
     ...overrides,
   } as unknown as Mistral;
@@ -116,47 +116,81 @@ describe('ttsOptionsFor', () => {
 });
 
 describe('listVoices', () => {
-  function voice(id: string, languages: string[]) {
-    return { id, name: id, languages };
+  // Voix minimale ; `kind` ivc par défaut (une voix sans `kind` est journalisée, cf. dernier test).
+  function voice(id: string, languages: string[], kind = 'ivc') {
+    return { id, name: id, languages, kind };
   }
+  // Réponse de `voices.search` (SDK 3) : une page de GET /v2/audio/voices.
+  function page(data: unknown[], nextPageToken: string | null = null) {
+    return { result: { data, nextPageToken } } as never;
+  }
+  const FIRST_CALL = { type: 'all', pageSize: 100, pageToken: undefined };
 
-  it('single-page: sort de la boucle quand items < limit (total atteint)', async () => {
+  it('une page : un seul appel (type all, pageSize 100), sans curseur', async () => {
     const client = makeMistralClient();
-    vi.mocked(client.audio.voices.list).mockResolvedValue({
-      items: [voice('v1', ['fr_fr']), voice('v2', ['en_us'])],
-      total: 2,
-    } as never);
+    vi.mocked(client.audio.voices.search).mockResolvedValue(
+      page([voice('v1', ['fr_fr']), voice('v2', ['en_us'])]),
+    );
     const result = await listVoices(client);
     expect(result).toHaveLength(2);
-    expect(client.audio.voices.list).toHaveBeenCalledTimes(1);
-    expect(client.audio.voices.list).toHaveBeenCalledWith({ limit: 100, offset: 0 });
+    expect(client.audio.voices.search).toHaveBeenCalledTimes(1);
+    expect(client.audio.voices.search).toHaveBeenCalledWith(FIRST_CALL);
   });
 
-  it("multi-page: paginate jusqu'à total atteint (offset incrémente)", async () => {
+  it("plusieurs pages : suit next_page_token jusqu'à son absence", async () => {
     const client = makeMistralClient();
     const page1 = Array.from({ length: 100 }, (_, i) => voice(`v${i}`, ['fr_fr']));
     const page2 = Array.from({ length: 50 }, (_, i) => voice(`v${100 + i}`, ['en_us']));
-    vi.mocked(client.audio.voices.list)
-      .mockResolvedValueOnce({ items: page1, total: 150 } as never)
-      .mockResolvedValueOnce({ items: page2, total: 150 } as never);
+    vi.mocked(client.audio.voices.search)
+      .mockResolvedValueOnce(page(page1, 'curseur-2'))
+      .mockResolvedValueOnce(page(page2));
     const result = await listVoices(client);
     expect(result).toHaveLength(150);
-    expect(client.audio.voices.list).toHaveBeenCalledTimes(2);
-    expect(client.audio.voices.list).toHaveBeenNthCalledWith(1, { limit: 100, offset: 0 });
-    expect(client.audio.voices.list).toHaveBeenNthCalledWith(2, { limit: 100, offset: 100 });
+    expect(client.audio.voices.search).toHaveBeenCalledTimes(2);
+    expect(client.audio.voices.search).toHaveBeenNthCalledWith(1, FIRST_CALL);
+    expect(client.audio.voices.search).toHaveBeenNthCalledWith(2, {
+      ...FIRST_CALL,
+      pageToken: 'curseur-2',
+    });
+  });
+
+  // L'itérateur du SDK s'arrêterait ici (page plus courte que pageSize) : la boucle suit le curseur.
+  it("page plus courte que pageSize mais suivie d'un curseur : la boucle continue", async () => {
+    const client = makeMistralClient();
+    vi.mocked(client.audio.voices.search)
+      .mockResolvedValueOnce(page([voice('a', ['fr_fr']), voice('b', ['fr_fr'])], 'curseur-2'))
+      .mockResolvedValueOnce(page([voice('c', ['en_us'])]));
+    const result = await listVoices(client);
+    expect(result.map((v) => v.id)).toEqual(['a', 'b', 'c']);
+    expect(client.audio.voices.search).toHaveBeenCalledTimes(2);
+  });
+
+  it('curseur vide : traité comme la dernière page', async () => {
+    const client = makeMistralClient();
+    vi.mocked(client.audio.voices.search).mockResolvedValue(page([voice('a', ['fr_fr'])], ''));
+    expect(await listVoices(client)).toHaveLength(1);
+    expect(client.audio.voices.search).toHaveBeenCalledTimes(1);
+  });
+
+  it('garde-fou : au plus 50 pages si le curseur ne finit jamais', async () => {
+    const client = makeMistralClient();
+    vi.mocked(client.audio.voices.search).mockResolvedValue(
+      page([voice('x', ['fr_fr'])], 'toujours'),
+    );
+    expect(await listVoices(client)).toHaveLength(50);
+    expect(client.audio.voices.search).toHaveBeenCalledTimes(50);
   });
 
   it('filter par lang (startsWith): en match en_us et en_gb, pas fr_fr', async () => {
     const client = makeMistralClient();
-    vi.mocked(client.audio.voices.list).mockResolvedValue({
-      items: [
+    vi.mocked(client.audio.voices.search).mockResolvedValue(
+      page([
         voice('en-us-1', ['en_us']),
         voice('en-gb-1', ['en_gb']),
         voice('fr-1', ['fr_fr']),
         voice('multi-1', ['en_us', 'fr_fr']),
-      ],
-      total: 4,
-    } as never);
+      ]),
+    );
     const result = await listVoices(client, 'en');
     expect(result.map((v) => v.id)).toEqual(['en-us-1', 'en-gb-1', 'multi-1']);
   });
@@ -164,16 +198,16 @@ describe('listVoices', () => {
   // `kind` (ivc/pvc, exposé depuis le SDK 3) porte la compatibilité d'une voix avec les modèles
   // speech v1 ; `slug` et `userId` (camelCase côté SDK, `user_id` dans l'API) servent de repli.
   it('lit kind, slug et caractère personnel (userId non nul) de chaque voix', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const client = makeMistralClient();
-    vi.mocked(client.audio.voices.list).mockResolvedValue({
-      items: [
-        { ...voice('marie', ['fr_fr']), slug: 'fr_marie_neutral', userId: null, kind: 'ivc' },
-        { ...voice('pvc-es', ['es_es']), slug: 'voice_3141', userId: null, kind: 'pvc' },
-        { ...voice('ma-voix', ['fr_fr']), slug: null, userId: 'user-42', kind: 'ivc' },
-        voice('sans-champs', ['en_us']),
-      ],
-      total: 4,
-    } as never);
+    vi.mocked(client.audio.voices.search).mockResolvedValue(
+      page([
+        { ...voice('marie', ['fr_fr']), slug: 'fr_marie_neutral', userId: null },
+        { ...voice('pvc-es', ['es_es'], 'pvc'), slug: 'voice_3141', userId: null },
+        { ...voice('ma-voix', ['fr_fr']), slug: null, userId: 'user-42' },
+        { id: 'sans-champs', name: 'sans-champs', languages: ['en_us'] },
+      ]),
+    );
     const result = await listVoices(client);
     expect(result.map(({ id, kind, slug, custom }) => ({ id, kind, slug, custom }))).toEqual([
       { id: 'marie', kind: 'ivc', slug: 'fr_marie_neutral', custom: false },
@@ -185,27 +219,21 @@ describe('listVoices', () => {
     // forme inconnue écartés.
     const accepted = result.filter((v) => voiceSupportsTtsModel(v, 'voxtral-mini-tts-2603'));
     expect(accepted.map((v) => v.id)).toEqual(['marie', 'ma-voix']);
+    warn.mockRestore();
   });
 
   it('signale une seule fois les voix arrivées sans kind (repli slug/userId)', async () => {
     const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
     const client = makeMistralClient();
-    vi.mocked(client.audio.voices.list).mockResolvedValue({
-      items: [
-        { ...voice('a', ['fr_fr']), kind: 'ivc' },
-        voice('b', ['fr_fr']),
-        voice('c', ['en_us']),
-      ],
-      total: 3,
-    } as never);
+    const withoutKind = (id: string) => ({ id, name: id, languages: ['fr_fr'] });
+    vi.mocked(client.audio.voices.search).mockResolvedValue(
+      page([voice('a', ['fr_fr']), withoutKind('b'), withoutKind('c')]),
+    );
     await listVoices(client);
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn).toHaveBeenCalledWith('tts', '2 voice(s) without kind: slug/userId fallback');
     warn.mockClear();
-    vi.mocked(client.audio.voices.list).mockResolvedValue({
-      items: [{ ...voice('a', ['fr_fr']), kind: 'ivc' }],
-      total: 1,
-    } as never);
+    vi.mocked(client.audio.voices.search).mockResolvedValue(page([voice('a', ['fr_fr'])]));
     await listVoices(client);
     expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();

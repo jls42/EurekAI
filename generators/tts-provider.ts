@@ -88,22 +88,28 @@ function toMistralVoice(v: unknown): MistralVoice {
 }
 
 const MAX_VOICE_PAGES = 50;
+// Plafond de `page_size` accepté par GET /v2/audio/voices (mesuré le 2026-10-24 : 101 → 422) ; les
+// 68 voix du catalogue tiennent alors en une page.
+const VOICE_PAGE_SIZE = 100;
 
-// `voices.list` (GET /v1/audio/voices, pagination par offset) est marqué déprécié depuis le SDK
-// 2.7.0 au profit de GET /v2/audio/voices (pagination par curseur `next_page_token`), que le SDK
-// n'expose pas encore. La v1 répond toujours (vérifié le 2026-09-26, aucune date de retrait
-// publiée) : migrer dès qu'une méthode v2 existe dans le SDK.
+// GET /v2/audio/voices (`voices.search`, SDK 3), pagination par curseur, suivi à la main :
+// l'itérateur du SDK (`next()`, `for await`) s'arrête dès qu'une page compte moins de `pageSize`
+// voix, même si un `next_page_token` suit (catalogue tronqué sans erreur). La v1 (`voices.list`,
+// par offset) est dépréciée : en-tête `sunset` au 2027-03-31 (relu le 2026-10-24).
 async function fetchAllVoices(client: Mistral): Promise<MistralVoice[]> {
   const voices: MistralVoice[] = [];
-  let offset = 0;
+  let pageToken: string | undefined;
   for (let page = 0; page < MAX_VOICE_PAGES; page++) {
-    // Pagination : l'offset de la page suivante dépend du nombre d'éléments de celle-ci.
-    // eslint-disable-next-line sonarjs/deprecation, no-await-in-loop -- v2 absente du SDK 2.7.0 (cf. ci-dessus) ; pagination séquentielle
-    const res = await client.audio.voices.list({ limit: 100, offset }); // NOSONAR(S1874) — v2 absente du SDK
-    const items = res.items ?? [];
-    for (const v of items) voices.push(toMistralVoice(v));
-    if (offset + items.length >= res.total) break;
-    offset += items.length;
+    // Pagination : le curseur de la page suivante vient de la réponse de celle-ci.
+    // eslint-disable-next-line no-await-in-loop -- pagination séquentielle par curseur
+    const res = await client.audio.voices.search({
+      type: 'all',
+      pageSize: VOICE_PAGE_SIZE,
+      pageToken,
+    });
+    for (const v of res.result.data) voices.push(toMistralVoice(v));
+    pageToken = res.result.nextPageToken ?? undefined;
+    if (!pageToken) break;
   }
   return voices;
 }

@@ -11,6 +11,7 @@ import { runWithUsageTracking } from './usage-context.js';
 import { calculateTotalCost } from './cost-calc.js';
 import { SDK_RETRIED_STATUSES } from './mistral-retry.js';
 import { extractErrorCode, httpStatusOf } from './error-code-resolution.js';
+import { listVoices } from '../generators/tts-provider.js';
 import { logger } from './logger.js';
 import { PODCAST_RESPONSE_FORMAT } from '../generators/podcast.js';
 
@@ -296,6 +297,67 @@ describe('client suivi — contrat du SDK installé', () => {
     );
     expect(Buffer.from(result.audioData, 'base64').toString()).toBe('ID3 fake mp3');
     expect(usage).toEqual([{ inputCharacters: input.length, model: 'voxtral-mini-tts-latest' }]);
+  });
+
+  // Voix brute de GET /v2/audio/voices (forme relevée le 2026-10-24) : `type` est obligatoire dans le
+  // schéma du SDK 3 (une voix sans lui ferait échouer toute la page), `kind` y est lu.
+  const rawVoice = (
+    id: string,
+    slug: string | null,
+    kind: string,
+    userId: string | null = null,
+  ) => ({
+    name: id,
+    slug,
+    languages: ['fr_fr'],
+    gender: null,
+    age: null,
+    tags: null,
+    color: null,
+    description: null,
+    appearance: null,
+    retention_notice: 30,
+    id,
+    created_at: '2026-10-19T19:25:22.158787Z',
+    user_id: userId,
+    sharing_scope: 'global',
+    trimmed_seconds: null,
+    kind,
+    enrollment: null,
+    type: userId === null ? 'preset' : 'custom',
+  });
+
+  it('audio.voices.search (GET /v2/audio/voices) : curseur suivi, kind et voix personnelle lus', async () => {
+    const pages = [
+      {
+        data: [
+          rawVoice('v-ivc', 'fr_marie_neutral', 'ivc'),
+          rawVoice('v-pvc', 'voice_3150', 'pvc'),
+        ],
+        next_page_token: 'curseur-2',
+      },
+      { data: [rawVoice('v-perso', null, 'ivc', 'user-42')], next_page_token: null },
+    ];
+    const queries: Array<Record<string, string>> = [];
+    const fakeFetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      const url = new URL((input instanceof Request ? input : new Request(input, init)).url);
+      if (url.pathname !== '/v2/audio/voices') {
+        return Promise.resolve(new Response('not found', { status: 404 }));
+      }
+      queries.push(Object.fromEntries(url.searchParams));
+      return Promise.resolve(jsonResponse(pages[queries.length - 1]));
+    };
+    vi.stubGlobal('fetch', vi.fn(fakeFetch));
+    const voices = await listVoices(newClient());
+    expect(queries).toEqual([
+      { page_size: '100', type: 'all' },
+      { page_size: '100', type: 'all', page_token: 'curseur-2' },
+    ]);
+    expect(voices.map(({ id, kind, slug, custom }) => ({ id, kind, slug, custom }))).toEqual([
+      { id: 'v-ivc', kind: 'ivc', slug: 'fr_marie_neutral', custom: false },
+      { id: 'v-pvc', kind: 'pvc', slug: 'voice_3150', custom: false },
+      { id: 'v-perso', kind: 'ivc', slug: undefined, custom: true },
+    ]);
   });
 
   it("beta.conversations.start (agent web_search) : usage et frais d'outil captés", async () => {
