@@ -52,6 +52,7 @@ function makeContext(overrides: any = {}) {
     projectLoadController: null as AbortController | null,
     uploadSessions: [] as any[],
     autoRuns: {} as Record<string, any>,
+    singleRuns: {} as Record<string, any>,
     loading: {} as Record<string, boolean>,
     abortControllers: {} as Record<string, AbortController>,
     useConsigne: true,
@@ -333,6 +334,23 @@ describe('selectProject', () => {
     await proj.selectProject.call(ctx, 'p1');
     expect(ctx.loading.auto).toBeUndefined();
     expect(ctx.abortControllers.auto).toBeUndefined();
+  });
+
+  // Génération simple partie avant de changer de cours : au retour, sa puce (relue du serveur) doit
+  // aborter son fetch, sinon la réponse 409 `cancelled` s'afficherait en erreur.
+  it('retour sur un cours : ses générations simples en vol redeviennent annulables', async () => {
+    mockFetchOk({ id: 'p1', sources: [{ id: 's1' }], results: { generations: [] } });
+    const mine = new AbortController();
+    const other = new AbortController();
+    const ctx = makeContext({
+      abortControllersByGid: {},
+      singleRuns: {
+        g1: { projectId: 'p1', controller: mine },
+        g2: { projectId: 'p2', controller: other },
+      },
+    });
+    await proj.selectProject.call(ctx, 'p1');
+    expect(ctx.abortControllersByGid).toEqual({ g1: mine });
   });
 
   // Tour assistant vide enregistré avant le correctif serveur : repli lisible dès l'ouverture du
@@ -733,6 +751,24 @@ describe('deleteProject', () => {
     expect(deleted.signal.aborted).toBe(true);
     expect(other.signal.aborted).toBe(false);
     expect(Object.keys(ctx.autoRuns)).toEqual(['p2']);
+  });
+
+  it('aborts the single generations in flight for the deleted project, keeps the others', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+    const deleted = new AbortController();
+    const other = new AbortController();
+    const ctx = makeContext({
+      currentProjectId: 'p1',
+      projects: [{ id: 'p1' }, { id: 'p2' }],
+      singleRuns: {
+        g1: { projectId: 'p1', controller: deleted },
+        g2: { projectId: 'p2', controller: other },
+      },
+    });
+    await proj.deleteProject.call(ctx, 'p1');
+    expect(deleted.signal.aborted).toBe(true);
+    expect(other.signal.aborted).toBe(false);
+    expect(Object.keys(ctx.singleRuns)).toEqual(['g2']);
   });
 
   it('resets state if current project deleted', async () => {

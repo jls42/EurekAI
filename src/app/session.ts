@@ -1,6 +1,7 @@
 import type { AppContext } from './app-context';
 import type { EventKey } from '../../helpers/event-bus';
 import { autoRunControllers } from './auto-runs';
+import { singleRunControllers } from './single-runs';
 
 // Reset agressif du state RAM lié à la session courante (toasts, loading,
 // abort controllers, pendings optimistes). À invoquer dès qu'on change de
@@ -17,7 +18,8 @@ import { autoRunControllers } from './auto-runs';
 // et doivent être replay quand on revient sur un profil.
 //
 // Ce qui CONTINUE vers son cours (règle « on lance un truc, ça continue même si on change de
-// page ») : l'Auto en cours (contrôleur épargné, cf. auto-runs.ts), l'import (sources.ts),
+// page ») : l'Auto en cours (contrôleur épargné, cf. auto-runs.ts), une génération simple déjà
+// envoyée (cf. single-runs.ts), l'import (sources.ts),
 // le message du chat en attente de réponse (registre chatInFlight, chat-in-flight.ts) et
 // l'enregistrement vocal, arrêté ici puis envoyé vers le cours où il a commencé (recorder.ts).
 
@@ -62,7 +64,7 @@ function doResetSession(ctx: AppContext): void {
   }
   stopActiveRecording(ctx);
   abandonProjectLoad(ctx);
-  const spared = autoRunControllers(ctx);
+  const spared = new Set([...autoRunControllers(ctx), ...singleRunControllers(ctx)]);
   abortAllExcept(ctx.abortControllers, spared);
   ctx.abortControllers = {};
   abortAllExcept(ctx.abortControllersByGid, spared);

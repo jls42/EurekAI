@@ -5,6 +5,7 @@ import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { endAutoRun, markAutoRunSteps, registerAutoRun } from './auto-runs';
 import { MAX_LONG_REQUESTS, withLongRequestSlot } from './request-slots';
+import { endSingleRun, registerSingleRun } from './single-runs';
 import {
   AUTO_AGENTS_SET,
   AUTO_AGENT_TYPES,
@@ -909,7 +910,7 @@ const acquireSingleLaunch = async function (
 // l'Auto et l'import en arrière-plan (jusqu'au 2026-10-24 : rien). Sans eventKey : avec une clé,
 // showToast enregistrerait la notification sous le cours AFFICHÉ, et la réconciliation du retour
 // (backfillCompletedNotifs) serait dédoublonnée sous ce mauvais cours. Rien si l'on est revenu sur
-// le cours (le SSE prend le relais) ou si le profil a changé.
+// le cours (le SSE prend le relais), si le profil a changé, ni après une annulation (autre onglet).
 const notifySingleElsewhere = async (
   state: AppContext,
   launch: SingleLaunch,
@@ -923,6 +924,7 @@ const notifySingleElsewhere = async (
     return;
   }
   const err = (await res.json().catch(() => ({}))) as { error?: string };
+  if (err.error === 'cancelled') return;
   const error = state.resolveError(err.error || res.statusText);
   state.showToast(state.t('toast.generationFailedIn', { ...params, error }), 'error');
 };
@@ -944,25 +946,32 @@ const sendGenerateInBackground = async function (
 // la requête est partie (le serveur la terminera même si son fetch est aborté ensuite).
 type SingleFlight = { gid: string; controller: AbortController; sent: boolean };
 
-// Envoi une fois la place obtenue ; réponse appliquée tant que le cours reste affiché.
+// Envoi une fois la place obtenue. Partie, la requête continue si l'on change de cours (inscrite
+// dans singleRuns, épargnée par resetSession) : sa réponse s'applique au cours s'il est affiché,
+// sinon un toast nomme ce cours.
 const requestWithPending = async (
   state: AppContext,
   launch: SingleLaunch,
   flight: SingleFlight,
 ): Promise<void> => {
   flight.sent = true;
-  const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
-  if (!res) return;
-  if (state.currentProjectId !== launch.projectId) {
-    await notifySingleElsewhere(state, launch, res);
-    return;
+  registerSingleRun(state, flight.gid, launch.projectId, flight.controller);
+  try {
+    const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
+    if (!res) return;
+    if (state.currentProjectId !== launch.projectId) {
+      await notifySingleElsewhere(state, launch, res);
+      return;
+    }
+    await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
+  } finally {
+    endSingleRun(state, flight.gid);
   }
-  await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
 };
 
 // Génération sur le cours affiché : pending optimiste (puce annulable) dès le clic, envoi quand une
-// place se libère parmi les requêtes longues de l'onglet, réponse appliquée tant que ce cours reste
-// affiché ; après un changement de cours, le serveur la termine et l'enregistre. Pendant l'attente :
+// place se libère parmi les requêtes longues de l'onglet ; partie, elle continue même si l'on change
+// de cours (single-runs.ts), et sa réponse nomme le cours s'il n'est plus affiché. Pendant l'attente :
 // annulée par sa puce ou « Tout annuler » (cours affiché), rien n'est envoyé et la file avance ;
 // cours ou profil quitté (resetSession aborte aussi son contrôleur ; selectProject, selectProfile et
 // deleteProject changent le cours affiché dans le même bloc synchrone, et ce catch s'exécute après),

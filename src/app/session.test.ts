@@ -167,6 +167,23 @@ describe('resetSession', () => {
     expect(ctx.autoRuns).toEqual({ 'pid-1': { controller: auto, analysing: false } });
   });
 
+  // Génération simple déjà envoyée : elle continue vers son cours, sa réponse le nommera.
+  it('épargne les contrôleurs des générations simples envoyées (single-runs.ts)', () => {
+    const sent = new AbortController();
+    const queued = new AbortController();
+    const ctx = makeCtx({
+      singleRuns: { 'gid-1': { projectId: 'pid-1', controller: sent } },
+      abortControllersByGid: { 'gid-1': sent, 'gid-2': queued },
+    } as Partial<AppContext>);
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(sent.signal.aborted).toBe(false);
+    expect(queued.signal.aborted).toBe(true);
+    expect(ctx.abortControllersByGid).toEqual({});
+    expect(ctx.singleRuns).toEqual({ 'gid-1': { projectId: 'pid-1', controller: sent } });
+  });
+
   // Jamais d'enregistrement qui survit à un changement de cours ou de profil : arrêté ici, envoyé
   // vers le cours où il a commencé (recorder.ts).
   it('arrête l’enregistrement vocal en cours', () => {
