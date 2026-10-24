@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- Codacy lance ESLint sans resolution des types vitest (describe/it/expect typés error) : faux positifs ; couvert par lint:ci local type-aware */
 import { describe, it, expect } from 'vitest';
-import { speakableText } from './tts-text.js';
+import { joinSentences, speakableText } from './tts-text.js';
 
 describe('speakableText', () => {
   it('retire les marqueurs de sources (2603 les prononçait : « Source 2, Source 3 »)', () => {
@@ -30,5 +30,26 @@ describe('speakableText', () => {
       'Question : choix A : Paris. Vrai ou faux ?',
     );
     expect(speakableText('volcan')).toBe('volcan');
+  });
+});
+
+describe('joinSentences', () => {
+  it("se comporte comme join('. ') sur des phrases sans ponctuation finale", () => {
+    expect(joinSentences(['Point 1', 'Point 2', 'Point 3'])).toBe('Point 1. Point 2. Point 3');
+  });
+
+  // Relevé le 2026-10-21 : « …la Terre.. Quand… » partait au TTS.
+  it("n'ajoute pas de point après une phrase qui se termine déjà", () => {
+    expect(joinSentences(['Il tourne autour de la Terre.', 'Quand il pleut', 'Fin.'])).toBe(
+      'Il tourne autour de la Terre. Quand il pleut. Fin.',
+    );
+    expect(joinSentences(['Pourquoi ?', 'Parce que !', 'Et ensuite…', 'Voilà'])).toBe(
+      'Pourquoi ? Parce que ! Et ensuite… Voilà',
+    );
+  });
+
+  it('retire les espaces autour et écarte les parties vides', () => {
+    expect(joinSentences(['  a  ', '', '   ', 'b'])).toBe('a. b');
+    expect(joinSentences([])).toBe('');
   });
 });

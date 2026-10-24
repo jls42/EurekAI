@@ -113,6 +113,9 @@ export const pt: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Conte\u00fado demasiado longo para o modelo',
   'errorCode.llm_invalid_json': 'Resposta inv\u00e1lida da IA',
   'errorCode.upload_failed': 'Falha no envio',
+  'errorCode.content_refused':
+    'O filtro de segurança da Mistral recusou este conteúdo. Tenta com outro texto.',
+  'errorCode.payload_too_large': 'Este conteúdo é demasiado grande. Tenta com um texto mais curto.',
   'errorCode.file_too_large': 'Este ficheiro \u00e9 demasiado grande. Tenta com um mais pequeno.',
   'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
   'errorCode.invalid_input': 'Pedido inválido',

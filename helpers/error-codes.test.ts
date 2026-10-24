@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { ConnectionError, RequestTimeoutError, SDKError } from '@mistralai/mistralai/models/errors';
 import { extractErrorCode } from './error-codes.js';
-import { httpStatusOf } from './error-code-resolution.js';
+import { httpStatusOf, isGuardrailRefusal } from './error-code-resolution.js';
 import type { FailedStepCode } from '../types.js';
 
 // Exhaustiveness check compile-time : toute addition à FailedStepCode casse tsc ici
@@ -14,15 +14,17 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
   auth_required: true,
   tts_upstream_error: true,
   context_length_exceeded: true,
+  content_refused: true,
   internal_error: true,
   cancelled: true,
 };
 
 describe('FailedStepCode registry', () => {
-  it('liste exhaustivement les 8 codes contractuels (garde compile-time + runtime)', () => {
+  it('liste exhaustivement les 9 codes contractuels (garde compile-time + runtime)', () => {
     expect(Object.keys(_KNOWN_CODES).sort((a, b) => a.localeCompare(b))).toEqual([
       'auth_required',
       'cancelled',
+      'content_refused',
       'context_length_exceeded',
       'internal_error',
       'llm_invalid_json',
@@ -36,6 +38,41 @@ describe('FailedStepCode registry', () => {
 describe('extractErrorCode', () => {
   it('mappe SyntaxError vers llm_invalid_json', () => {
     expect(extractErrorCode(new SyntaxError('Unexpected token'))).toBe('llm_invalid_json');
+  });
+
+  // Forme réelle du refus (SDK : message = « API error occurred: Status 403 … Body: {…} »), relevée
+  // le 2026-10-21 sur le TTS. Avant ce code, le 403 donnait auth_required (message de clé API).
+  const guardrailError = (): Error =>
+    Object.assign(
+      new Error(
+        'API error occurred: Status 403 Content-Type application/json\n' +
+          '{"object":"error","message":"Request blocked by guardrail policy",' +
+          '"type":"guardrail_violation","param":null,"code":"1920","raw_status_code":403}',
+      ),
+      { statusCode: 403 },
+    );
+
+  it.each(['tts', 'podcast', 'quiz-vocal', 'dictation', 'summary', undefined])(
+    'refus du garde-fou de Mistral (403 guardrail_violation) : content_refused pour %s',
+    (agent) => {
+      expect(extractErrorCode(guardrailError(), agent)).toBe('content_refused');
+    },
+  );
+
+  it('un 403 sans garde-fou reste auth_required', () => {
+    const forbidden = Object.assign(
+      new Error('API error occurred: Status 403. Body: {"message":"Forbidden"}'),
+      {
+        statusCode: 403,
+      },
+    );
+    expect(extractErrorCode(forbidden, 'tts')).toBe('auth_required');
+  });
+
+  it('isGuardrailRefusal reconnaît le refus, et lui seul', () => {
+    expect(isGuardrailRefusal(guardrailError())).toBe(true);
+    expect(isGuardrailRefusal(new Error('Status 403 Forbidden'))).toBe(false);
+    expect(isGuardrailRefusal('guardrail_violation')).toBe(true);
   });
 
   it('mappe rate_limit / 429 / quota vers quota_exceeded (message)', () => {

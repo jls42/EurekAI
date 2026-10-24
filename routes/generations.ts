@@ -46,6 +46,7 @@ import { runWithUsageTracking } from '../helpers/usage-context.js';
 import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
+import { joinSentences } from '../helpers/tts-text.js';
 import { extractErrorCode } from '../helpers/error-codes.js';
 import { resolveClient, requireKeyMiddleware } from '../helpers/mistral-client-factory.js';
 import { MULTIPART_FIELD_LIMITS } from '../helpers/multipart-limits.js';
@@ -280,13 +281,15 @@ const scoreDictationAttempt = (
 // --- Read Aloud (TTS) — helpers ---
 
 function sectionText(d: SummaryGeneration['data'], s: string): string {
-  if (s === 'intro') return `${d.title}. ${d.summary}`;
-  if (s === 'key_points') return d.key_points.join('. ');
+  if (s === 'intro') return joinSentences([d.title, d.summary]);
+  if (s === 'key_points') return joinSentences(d.key_points);
   if (s === 'fun_fact') return d.fun_fact || '';
   if (s === 'vocabulary')
-    return (d.vocabulary || [])
-      .map((v: { word: string; definition: string }) => `${v.word}: ${v.definition}`)
-      .join('. ');
+    return joinSentences(
+      (d.vocabulary || []).map(
+        (v: { word: string; definition: string }) => `${v.word}: ${v.definition}`,
+      ),
+    );
   return '';
 }
 

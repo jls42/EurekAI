@@ -8,6 +8,7 @@ import { textToSpeech, type TtsOptions } from './tts-provider.js';
 import type { PodcastLine } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { logger } from '../helpers/logger.js';
+import { isGuardrailRefusal } from '../helpers/error-code-resolution.js';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,6 +112,8 @@ const textToSpeechWithRetry = async (
       return await textToSpeech(text, voiceId, ttsOptions); // NOSONAR(S9382) — réessai séquentiel
     } catch (e) {
       lastErr = e;
+      // Refus du garde-fou de Mistral : la même phrase est refusée à chaque essai.
+      if (isGuardrailRefusal(e)) break;
       if (attempt < MAX_TTS_RETRIES - 1) {
         // eslint-disable-next-line no-await-in-loop -- backoff entre deux tentatives
         await delay(TTS_RETRY_BASE_DELAY_MS * Math.pow(2, attempt)); // NOSONAR(S9382) — backoff

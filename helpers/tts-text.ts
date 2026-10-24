@@ -9,6 +9,19 @@ import { SOURCE_MARKER_RE } from './source-markers.js';
 const BRACKET_RE = /[[\]]/g;
 const SPACES_RE = / {2,}/g;
 
+const ENDS_SENTENCE_RE = /[.!?…]$/;
+
+/**
+ * Phrases lues d'affilée, comme le `join('. ')` d'origine, sauf qu'un point ne s'ajoute entre deux
+ * phrases que si la première ne se termine pas déjà : il envoyait « …la Terre.. Quand… » quand les
+ * points clés finissaient par un point (relevé le 2026-10-21). Parties vides écartées.
+ */
+export const joinSentences = (parts: readonly string[]): string => {
+  const kept = parts.map((p) => p.trim()).filter((p) => p !== '');
+  const last = kept.length - 1;
+  return kept.map((p, i) => (i === last || ENDS_SENTENCE_RE.test(p) ? p : `${p}.`)).join(' ');
+};
+
 /**
  * Texte réellement envoyé au TTS : marqueurs `[Source N]` retirés, autres crochets ôtés (le mot
  * entre crochets reste lu), espaces laissées par le retrait recollées. Ne touche pas aux espaces

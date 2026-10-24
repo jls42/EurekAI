@@ -193,6 +193,21 @@ describe('generateAudio', () => {
     expect(result.toString()).toBe('retry-success');
   });
 
+  it('refus du garde-fou de Mistral : remonté dès le premier essai, sans réessai', async () => {
+    const refusal = Object.assign(
+      new Error('API error occurred: Status 403 {"type":"guardrail_violation","code":"1920"}'),
+      { statusCode: 403 },
+    );
+    vi.mocked(textToSpeech).mockReset().mockRejectedValue(refusal);
+
+    const script: PodcastLine[] = [{ speaker: 'host', text: 'phrase refusée' }];
+
+    await expect(generateAudio(script, voices, ttsOptions)).rejects.toBe(refusal);
+    expect(textToSpeech).toHaveBeenCalledTimes(1);
+
+    vi.mocked(textToSpeech).mockReset().mockResolvedValue(Buffer.from('segment-audio'));
+  });
+
   it('retry: 3 failures consécutives remontent la dernière erreur (max 3 attempts)', async () => {
     const ttsError = Object.assign(new Error('mistral_tts_empty_response'), { stage: 'tts' });
     vi.mocked(textToSpeech).mockReset().mockRejectedValue(ttsError);

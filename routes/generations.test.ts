@@ -1347,6 +1347,36 @@ describe('POST /:pid/generations/:gid/read-aloud', () => {
     expect(result.audioUrls.vocabulary).toContain('read-aloud-');
   });
 
+  // Relevé le 2026-10-21 : des points clés finissant par un point partaient « Terre.. Quand ».
+  it('lecture des points clés : un seul point entre deux phrases', async () => {
+    const { textToSpeech } = await import('../generators/tts-provider.js');
+    (textToSpeech as any).mockClear();
+    const gen: SummaryGeneration = {
+      id: 'sum-gen-points',
+      title: 'Points',
+      createdAt: new Date().toISOString(),
+      sourceIds: [],
+      type: 'summary',
+      data: {
+        title: 'Le cycle de l eau',
+        summary: 'Résumé',
+        key_points: ['Il tourne autour de la Terre.', 'Quand il pleut', 'Fin.'],
+        fun_fact: '',
+        vocabulary: [],
+      },
+    };
+    store.addGeneration(pid, gen);
+    const handler = getHandler(router, 'post', '/:pid/generations/:gid/read-aloud');
+    const req = mockReq({ params: { pid, gid: gen.id }, body: { section: 'key_points' } });
+
+    await handler(req, mockRes());
+
+    expect(textToSpeech).toHaveBeenCalledTimes(1);
+    expect((textToSpeech as any).mock.calls[0][0]).toBe(
+      'Il tourne autour de la Terre. Quand il pleut. Fin.',
+    );
+  });
+
   it('genere le TTS dual-voice pour des flashcards', async () => {
     const { textToSpeech } = await import('../generators/tts-provider.js');
     const { concatMp3, generateSilence } = await import('../generators/tts.js');

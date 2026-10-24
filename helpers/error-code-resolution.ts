@@ -1,5 +1,6 @@
 import type { FailedStepCode } from '../types.js';
 import { MATCHERS, type ErrContext } from './error-matchers.js';
+import { GUARDRAIL_REFUSAL } from './error-code-rules.js';
 
 function readObject(err: unknown): Record<string, unknown> {
   if (err === null || typeof err !== 'object') return {};
@@ -20,6 +21,11 @@ export function httpStatusOf(err: unknown): number | undefined {
   const obj = readObject(err);
   if (typeof obj.statusCode === 'number') return obj.statusCode;
   return typeof obj.status === 'number' ? obj.status : undefined;
+}
+
+/** Refus du garde-fou de Mistral : déterministe, à ne pas rejouer (cf. GUARDRAIL_REFUSAL). */
+export function isGuardrailRefusal(err: unknown): boolean {
+  return GUARDRAIL_REFUSAL.test(readMessage(err));
 }
 
 function buildContext(err: unknown, agent: string | undefined): ErrContext {

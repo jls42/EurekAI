@@ -113,6 +113,9 @@ export const fr: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Contenu trop volumineux pour le modèle',
   'errorCode.llm_invalid_json': "Réponse invalide de l'IA",
   'errorCode.upload_failed': "Échec de l'envoi",
+  'errorCode.content_refused':
+    'Le filtre de sécurité de Mistral a refusé ce contenu. Essaie avec un autre texte.',
+  'errorCode.payload_too_large': 'Ce contenu est trop volumineux. Essaie avec un texte plus court.',
   'errorCode.file_too_large': 'Ce fichier est trop gros. Essaie avec un fichier plus léger.',
   'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
   'errorCode.invalid_input': 'Demande invalide',

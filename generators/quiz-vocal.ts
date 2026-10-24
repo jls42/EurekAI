@@ -5,6 +5,7 @@ import { verifyAnswerSystem, verifyAnswerUser } from '../prompts.js';
 import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
+import { joinSentences } from '../helpers/tts-text.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
@@ -15,7 +16,7 @@ export async function ttsQuestion(
   // Phase 2.5 — Transformer "A) Paris" en "choix A : Paris" (localisé) avant TTS,
   // pour éviter que le moteur ne prononce "A parenthèse fermée Paris".
   const spokenChoices = question.choices.map((c) => toSpokenChoice(c, lang));
-  const text = `${question.question} ${spokenChoices.join('. ')}`;
+  const text = joinSentences([question.question, ...spokenChoices]);
   return textToSpeech(text, voiceId, ttsOptions);
 }
 

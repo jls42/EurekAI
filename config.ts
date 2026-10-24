@@ -460,7 +460,7 @@ const resolveMistralDefaults = (
   if (result.sameCharacterBucket) {
     logger.warn(
       VOICE_SELECTION_LOG,
-      `single-speaker bucket: host et guest partagent le même personnage (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — podcast jouera les deux rôles avec la même voix`,
+      `single-speaker bucket: host et guest partagent le même personnage (lang_matched=${result.langMatched ?? 'none'} bucketSize=${result.bucketSize} flow=${flow}) — les deux rôles auront la même voix`,
     );
   }
   return { host: result.host, guest: result.guest };
