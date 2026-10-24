@@ -256,6 +256,19 @@ section "Rate-limit AI (60/min sur les routes IA)"
 # (`lang = req.body.lang || 'fr'`) et EXECUTE le routeur LLM (cout ~$0.0009/appel)
 # au lieu de rejeter — un burst non throttle facturerait le run et fausserait le
 # cost-tracking. /generate/summary ne coute jamais rien sur body invalide.
+# Fenetre FIXE par client (MemoryStore d'express-rate-limit 8 : elle demarre a la premiere requete
+# apres la fin de la precedente, + 60 s, sans glisser), ouverte ici par les sections precedentes :
+# une rafale a cheval sur sa fin se coupe en deux moities sous la limite et ne voit aucun 429
+# (vecu le 2026-10-24 en HTTPS, 1 passage sur 2). On lit le `reset` de l'en-tete RateLimit d'une
+# requete temoin et on attend la fenetre suivante si celle-ci se termine dans moins de 30 s.
+reset=$(curl -s -D - -o /dev/null --max-time 2 -X POST \
+  "$BASE/api/projects/$PROJECT_ID/generate/summary" \
+  -H 'content-type: application/json' -d '{"lang":12345}' |
+  tr -d '\r' | sed -n 's/^[Rr]ate[Ll]imit: .*reset=\([0-9]*\).*/\1/p')
+if [ -n "$reset" ] && [ "$reset" -lt 30 ]; then
+  echo "  (fenetre IA presque finie, reset dans ${reset} s : attente de la suivante)"
+  sleep $((reset + 1))
+fi
 codes=""
 for _ in $(seq 1 75); do
   c=$(curl -s -o /dev/null -w '%{http_code}\n' --max-time 2 -X POST \
