@@ -570,6 +570,7 @@ export const hi: Record<string, string> = {
   'toast.generationDoneIn': '"{project}" में {type} बन गया!',
   'toast.generationFailedIn': '"{project}" में {type} नहीं बन सका: {error}',
   'toast.autoDoneIn': '"{project}" में जादू पूरा हुआ!',
+  'toast.autoPartial': 'जादू: {total} में से {count} जनरेशन सफल रहे।',
   'toast.autoPartialIn': '"{project}" में जादू: {total} में से {count} जनरेशन सफल रहे।',
   'toast.autoFailedIn':
     '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',

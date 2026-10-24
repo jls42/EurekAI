@@ -478,6 +478,7 @@ export const fr: Record<string, string> = {
   'toast.generationDoneIn': '{type} généré dans « {project} » !',
   'toast.generationFailedIn': "{type} n'a pas pu être généré dans « {project} » : {error}",
   'toast.autoDoneIn': 'Magie terminée dans « {project} » !',
+  'toast.autoPartial': 'Magie : {count} génération(s) sur {total} réussie(s).',
   'toast.autoPartialIn': 'Magie dans « {project} » : {count} génération(s) sur {total} réussie(s).',
   'toast.autoFailedIn':
     'La génération automatique de « {project} » a échoué. Réessaye dans ce cours.',

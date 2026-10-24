@@ -455,6 +455,7 @@ export const nl: Record<string, string> = {
   'toast.generationDoneIn': '{type} gegenereerd in "{project}"!',
   'toast.generationFailedIn': '{type} kon niet worden gegenereerd in "{project}": {error}',
   'toast.autoDoneIn': 'Magie voltooid in "{project}"!',
+  'toast.autoPartial': 'Magie: {count} van {total} generaties gelukt.',
   'toast.autoPartialIn': 'Magie in "{project}": {count} van {total} generaties gelukt.',
   'toast.autoFailedIn':
     'Automatische generatie in "{project}" mislukt. Probeer het opnieuw in dat project.',
