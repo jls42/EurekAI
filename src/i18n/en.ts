@@ -108,6 +108,8 @@ export const en: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Content too long for the model',
   'errorCode.llm_invalid_json': 'Invalid AI response',
   'errorCode.upload_failed': 'Upload failed',
+  'errorCode.content_refused': "Mistral's safety filter refused this content. Try another text.",
+  'errorCode.payload_too_large': 'This content is too large. Try a shorter text.',
   'errorCode.file_too_large': 'This file is too big. Try a smaller one.',
   'errorCode.all_steps_failed': 'All generations failed',
   'errorCode.invalid_input': 'Invalid request',

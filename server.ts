@@ -87,12 +87,26 @@ app.use(express.json({ limit: '5mb' }));
 // expose la stack trace Node (paths absolus, versions deps) via le default handler
 // Express. cf. CLAUDE.md "Codes d'erreur API (FailedStep)" — jamais err.message brut
 // dans une reponse HTTP.
+// Autres refus de body-parser (http-errors exposés, 4xx) : corps trop gros (413), jeu de caractères
+// ou encodage inconnu (415), corps compressé illisible (400). Ils partaient dans le handler HTML
+// d'Express (mesuré le 2026-10-24) : le front recevait une page au lieu d'un code stable.
+const bodyParserStatus = (err: unknown): number | undefined => {
+  const e = err as { expose?: unknown; status?: unknown } | null;
+  if (e?.expose !== true || typeof e.status !== 'number') return undefined;
+  return e.status >= 400 && e.status < 500 ? e.status : undefined;
+};
+
 app.use((err: unknown, _req: Request, res: Response, next: NextFunction) => {
   if (err instanceof SyntaxError && 'body' in err) {
     res.status(400).json({ error: 'invalid_json' });
     return;
   }
-  next(err);
+  const status = bodyParserStatus(err);
+  if (status === undefined) {
+    next(err);
+    return;
+  }
+  res.status(status).json({ error: status === 413 ? 'payload_too_large' : 'invalid_json' });
 });
 
 // Dev: Vite serves the frontend (proxy), Express = API only

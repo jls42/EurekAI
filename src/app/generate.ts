@@ -274,6 +274,7 @@ type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: FailedStepCode
 // inattendues vers 'internal_error' avant qu'elles ne polluent les codes[]
 // que pickAutoFailToast inspecte.
 const KNOWN_FAILED_STEP_CODES: ReadonlySet<FailedStepCode> = new Set<FailedStepCode>([
+  'content_refused',
   'llm_invalid_json',
   'quota_exceeded',
   'upstream_unavailable',

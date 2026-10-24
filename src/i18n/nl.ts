@@ -113,6 +113,9 @@ export const nl: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Inhoud te lang voor het model',
   'errorCode.llm_invalid_json': 'Ongeldig AI-antwoord',
   'errorCode.upload_failed': 'Uploaden mislukt',
+  'errorCode.content_refused':
+    'Het veiligheidsfilter van Mistral heeft deze inhoud geweigerd. Probeer een andere tekst.',
+  'errorCode.payload_too_large': 'Deze inhoud is te groot. Probeer een kortere tekst.',
   'errorCode.file_too_large': 'Dit bestand is te groot. Probeer een kleiner bestand.',
   'errorCode.all_steps_failed': 'Alle generaties mislukt',
   'errorCode.invalid_input': 'Ongeldig verzoek',

@@ -116,6 +116,9 @@ export const de: Record<string, string> = {
   'errorCode.context_length_exceeded': 'Inhalt zu lang f\u00fcr das Modell',
   'errorCode.llm_invalid_json': 'Ung\u00fcltige KI-Antwort',
   'errorCode.upload_failed': 'Upload fehlgeschlagen',
+  'errorCode.content_refused':
+    'Der Sicherheitsfilter von Mistral hat diesen Inhalt abgelehnt. Versuch es mit einem anderen Text.',
+  'errorCode.payload_too_large': 'Dieser Inhalt ist zu groß. Versuch es mit einem kürzeren Text.',
   'errorCode.file_too_large': 'Diese Datei ist zu gro\u00df. Versuch es mit einer kleineren Datei.',
   'errorCode.all_steps_failed': 'Alle Generierungen fehlgeschlagen',
   'errorCode.invalid_input': 'Ungültige Anfrage',

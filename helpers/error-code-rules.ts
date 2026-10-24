@@ -55,6 +55,12 @@ export const MESSAGE_RULES: readonly Rule[] = [
   },
 ];
 
+// Refus du garde-fou de Mistral, quel que soit le modèle (relevé le 2026-10-21 sur le TTS : une phrase
+// hindie anodine refusée à chaque essai) : 403, corps `{"type":"guardrail_violation","code":"1920",…}`,
+// recopié dans le message de l'erreur du SDK. Sans cette règle, le 403 était classé `auth_required`
+// et l'app parlait de clé API.
+export const GUARDRAIL_REFUSAL = /guardrail_violation/;
+
 // Agents dont l'échec peut venir de la pile audio : les générations qui exigent le TTS (source unique
 // TTS_DEPENDENT_AGENTS, dictée comprise) + les libellés des routes audio (lecture à voix haute, STT).
 export const TTS_AGENTS: ReadonlySet<string> = new Set([...TTS_DEPENDENT_AGENTS, 'tts', 'stt']);

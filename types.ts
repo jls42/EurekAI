@@ -272,6 +272,9 @@ export type FailedStepCode =
   | 'auth_required'
   | 'tts_upstream_error'
   | 'context_length_exceeded'
+  // Refus du garde-fou de Mistral (403, `guardrail_violation`, code 1920) : le contenu est en cause,
+  // pas la clé. Déterministe : jamais rejoué.
+  | 'content_refused'
   | 'internal_error'
   // Posé explicitement par store.markPendingCancelled / cancelAllPendingsAtBoot.
   // Jamais dérivé d'une exception via extractErrorCode (pas de mapping dans error-matchers).

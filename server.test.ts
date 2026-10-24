@@ -352,6 +352,28 @@ describe('server bootstrap', () => {
     expect(badJsonRes.statusMock).toHaveBeenCalledWith(400);
     expect(badJsonRes.jsonMock).toHaveBeenCalledWith({ error: 'invalid_json' });
 
+    // Autres refus de body-parser (http-errors exposés) : JSON à code stable, plus de page HTML.
+    for (const [status, code] of [
+      [413, 'payload_too_large'],
+      [415, 'invalid_json'],
+      [400, 'invalid_json'],
+    ] as const) {
+      const bodyError = Object.assign(new Error('refus de body-parser'), { status, expose: true });
+      const res = responseMock();
+      errorHandler(bodyError, {} as Request, res, vi.fn() as NextFunction);
+      expect(res.statusMock).toHaveBeenCalledWith(status);
+      expect(res.jsonMock).toHaveBeenCalledWith({ error: code });
+    }
+    // Une erreur interne (5xx ou non exposée) continue vers le handler suivant.
+    for (const internal of [
+      Object.assign(new Error('interne'), { status: 500, expose: false }),
+      Object.assign(new Error('non exposée'), { status: 400 }),
+    ]) {
+      const next = vi.fn();
+      errorHandler(internal, {} as Request, responseMock(), next as NextFunction);
+      expect(next).toHaveBeenCalledWith(internal);
+    }
+
     const nextError = vi.fn();
     const otherError = new Error('other');
     errorHandler(otherError, {} as Request, responseMock(), nextError as NextFunction);

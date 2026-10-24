@@ -1,5 +1,6 @@
 import type { FailedStepCode } from '../types.js';
 import {
+  GUARDRAIL_REFUSAL,
   MESSAGE_RULES,
   STATUS_RULES,
   STRUCTURED_CODE_RULES,
@@ -21,6 +22,11 @@ export interface ErrContext {
 // cancelAllPendingsAtBoot), jamais dérivé d'une exception upstream.
 // Le retour étroit le verrouille au compile time.
 export type Matcher = (ctx: ErrContext) => Exclude<FailedStepCode, 'cancelled'> | null;
+
+// Avant matchStatus : le refus du garde-fou est un 403, que STATUS_RULES classerait `auth_required`.
+export function matchGuardrail(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
+  return GUARDRAIL_REFUSAL.test(ctx.message) ? 'content_refused' : null;
+}
 
 export function matchStatus(ctx: ErrContext): Exclude<FailedStepCode, 'cancelled'> | null {
   if (typeof ctx.status !== 'number') return null;
@@ -53,6 +59,7 @@ export function matchTransport(ctx: ErrContext): Exclude<FailedStepCode, 'cancel
 }
 
 export const MATCHERS: readonly Matcher[] = [
+  matchGuardrail,
   matchStatus,
   matchStructuredCode,
   matchMessage,
