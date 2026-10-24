@@ -33,6 +33,10 @@ const TOAST_TYPED_ERROR = 'toast.typedError';
 const TOAST_GENERATION_BUSY = 'toast.generationBusy';
 const TOAST_VIEW = 'toast.view';
 const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
+// Bilan partiel d'un Auto : « {count} sur {total} ». `toast.partialGenerated` (« {count}/3 ») est
+// réservé à « Tout générer » (3 types) ; l'Auto l'affichait « 7/3 générations réussies »
+// (release-test du 2026-10-24).
+const TOAST_AUTO_PARTIAL = 'toast.autoPartial';
 const TOAST_AUTO_FAILED_IN = 'toast.autoFailedIn';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
@@ -478,7 +482,8 @@ export function showAutoResult(
   if (failures > 0 && failures < plannedCount) {
     const { key, type } = pickAutoFailToast(codes);
     if (key === TOAST_PARTIAL_GENERATED) {
-      state.showToast(state.t(key, { count: plannedCount - failures }), type);
+      const params = { count: plannedCount - failures, total: plannedCount };
+      state.showToast(state.t(TOAST_AUTO_PARTIAL, params), type);
     } else {
       state.showToast(state.t(key), type);
     }

@@ -1164,7 +1164,9 @@ describe('generateAuto', () => {
     await gen.generateAuto.call(ctx);
 
     expect(ctx.generations).toHaveLength(1);
-    expect(ctx.showToast).toHaveBeenCalledWith('toast.partialGenerated', 'warning');
+    // « 1 sur 3 » : la clé de « Tout générer » (« {count}/3 ») affichait « 7/3 » pour 7 réussites sur 8.
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoPartial', 'warning');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoPartial', { count: 1, total: 3 });
   });
 
   it('shows all-error toast when every individual generation fails', async () => {
@@ -1474,7 +1476,8 @@ describe('generateAuto — per-type progress', () => {
     await gen.generateAuto.call(ctx);
 
     expect(ctx.generations).toHaveLength(1);
-    expect(ctx.showToast).toHaveBeenCalledWith('toast.partialGenerated', 'warning');
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.autoPartial', 'warning');
+    expect(ctx.t).toHaveBeenCalledWith('toast.autoPartial', { count: 1, total: 2 });
   });
 
   it('ignores AbortError on individual generation', async () => {

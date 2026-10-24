@@ -559,6 +559,7 @@ export const ar: Record<string, string> = {
   'toast.generationDoneIn': 'تمّ توليد {type} في «{project}»!',
   'toast.generationFailedIn': 'تعذّر توليد {type} في «{project}»: {error}',
   'toast.autoDoneIn': 'اكتمل السحر في «{project}»!',
+  'toast.autoPartial': 'السحر: نجح {count} من أصل {total} من التوليدات.',
   'toast.autoPartialIn': 'السحر في «{project}»: نجح {count} من أصل {total} من التوليدات.',
   'toast.autoFailedIn': 'فشل التوليد التلقائي في «{project}». أعد المحاولة في ذلك المشروع.',
   'toast.voiceAddedIn': 'تم نسخ الصوت وإضافته إلى «{project}».',
