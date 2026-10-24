@@ -131,6 +131,13 @@ type AutoRun = {
   analysing: boolean;
 };
 
+// Génération simple déjà envoyée : son cours et son contrôleur (épargné par resetSession, cf.
+// single-runs.ts).
+type SingleRun = {
+  projectId: string;
+  controller: AbortController;
+};
+
 const initSourceState = () => ({
   sources: [] as Source[],
   selectedIds: [] as string[],
@@ -223,10 +230,12 @@ const initGenerationState = () => ({
 // avant que leur pending optimiste existe (cf. reserveLaunch, generate.ts).
 // autoRuns = générations automatiques en cours, par cours : elles continuent quand on change de
 // cours ou de profil (ni resetSession ni resetState ne les touchent, cf. auto-runs.ts).
+// singleRuns = générations simples déjà envoyées, par gid : même règle (cf. single-runs.ts).
 const initPendingLifecycleState = () => ({
   pendingById: {} as Record<string, PendingTrackerEntry>,
   launchingByType: {} as Record<string, number>,
   autoRuns: {} as Record<string, AutoRun>,
+  singleRuns: {} as Record<string, SingleRun>,
   abortControllersByGid: {} as Record<string, AbortController>,
   shownToastEventKeys: new Set<EventKey>(),
   crossTabSyncBroken: false,

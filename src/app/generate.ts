@@ -5,6 +5,7 @@ import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { endAutoRun, markAutoRunSteps, registerAutoRun } from './auto-runs';
 import { MAX_LONG_REQUESTS, withLongRequestSlot } from './request-slots';
+import { endSingleRun, registerSingleRun } from './single-runs';
 import {
   AUTO_AGENTS_SET,
   AUTO_AGENT_TYPES,
@@ -701,6 +702,9 @@ type SingleLaunch = {
   pendingSourceIds: string[];
   extraBody?: GenerateExtraBody;
   key: string;
+  // Pour le toast d'une génération finie pendant qu'un autre cours est affiché.
+  projectName: string;
+  profileId: string | null;
 };
 
 const captureSingleLaunch = (
@@ -716,6 +720,8 @@ const captureSingleLaunch = (
     // fiche existante) sans dupliquer le lifecycle.
     body: { ...buildGenerateBody(state), ...extraBody },
     pendingSourceIds: [...(extraBody?.sourceIds ?? state.selectedIds)],
+    projectName: state.currentProject?.meta.name ?? '',
+    profileId: state.currentProfile?.id ?? null,
     extraBody,
     key: captureAiKey(),
   };
@@ -900,9 +906,36 @@ const acquireSingleLaunch = async function (
 // rien poser sur l'écran affiché (pending, chargement, toast) ; le serveur refait la garde de
 // modération et enregistre le résultat, visible au retour sur le cours. Jusqu'en v1.7.11 : perdue
 // sans un mot. Gère ses erreurs : lançable sans l'attendre (`void`).
-const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<void> {
+// Génération simple terminée pendant qu'un autre cours est affiché : un toast nomme son cours, comme
+// l'Auto et l'import en arrière-plan (jusqu'au 2026-10-24 : rien). Sans eventKey : avec une clé,
+// showToast enregistrerait la notification sous le cours AFFICHÉ, et la réconciliation du retour
+// (backfillCompletedNotifs) serait dédoublonnée sous ce mauvais cours. Rien si l'on est revenu sur
+// le cours (le SSE prend le relais), si le profil a changé, ni après une annulation (autre onglet).
+const notifySingleElsewhere = async (
+  state: AppContext,
+  launch: SingleLaunch,
+  res: Response,
+): Promise<void> => {
+  if (state.currentProjectId === launch.projectId) return;
+  if ((state.currentProfile?.id ?? null) !== launch.profileId) return;
+  const params = { type: state.t(I18N_GEN_PREFIX + launch.type), project: launch.projectName };
+  if (res.ok) {
+    state.showToast(state.t('toast.generationDoneIn', params), 'success');
+    return;
+  }
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  if (err.error === 'cancelled') return;
+  const error = state.resolveError(err.error || res.statusText);
+  state.showToast(state.t('toast.generationFailedIn', { ...params, error }), 'error');
+};
+
+const sendGenerateInBackground = async function (
+  state: AppContext,
+  launch: SingleLaunch,
+): Promise<void> {
   try {
-    await withLongRequestSlot(() => fetchSingleGenerate(launch, crypto.randomUUID()));
+    const res = await withLongRequestSlot(() => fetchSingleGenerate(launch, crypto.randomUUID()));
+    if (res) await notifySingleElsewhere(state, launch, res);
   } catch (e: unknown) {
     console.warn('[generate] envoi vers un cours quitté impossible', launch.type, e);
   }
@@ -913,21 +946,32 @@ const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<
 // la requête est partie (le serveur la terminera même si son fetch est aborté ensuite).
 type SingleFlight = { gid: string; controller: AbortController; sent: boolean };
 
-// Envoi une fois la place obtenue ; réponse appliquée tant que le cours reste affiché.
+// Envoi une fois la place obtenue. Partie, la requête continue si l'on change de cours (inscrite
+// dans singleRuns, épargnée par resetSession) : sa réponse s'applique au cours s'il est affiché,
+// sinon un toast nomme ce cours.
 const requestWithPending = async (
   state: AppContext,
   launch: SingleLaunch,
   flight: SingleFlight,
 ): Promise<void> => {
   flight.sent = true;
-  const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
-  if (!res || state.currentProjectId !== launch.projectId) return;
-  await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
+  registerSingleRun(state, flight.gid, launch.projectId, flight.controller);
+  try {
+    const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
+    if (!res) return;
+    if (state.currentProjectId !== launch.projectId) {
+      await notifySingleElsewhere(state, launch, res);
+      return;
+    }
+    await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
+  } finally {
+    endSingleRun(state, flight.gid);
+  }
 };
 
 // Génération sur le cours affiché : pending optimiste (puce annulable) dès le clic, envoi quand une
-// place se libère parmi les requêtes longues de l'onglet, réponse appliquée tant que ce cours reste
-// affiché ; après un changement de cours, le serveur la termine et l'enregistre. Pendant l'attente :
+// place se libère parmi les requêtes longues de l'onglet ; partie, elle continue même si l'on change
+// de cours (single-runs.ts), et sa réponse nomme le cours s'il n'est plus affiché. Pendant l'attente :
 // annulée par sa puce ou « Tout annuler » (cours affiché), rien n'est envoyé et la file avance ;
 // cours ou profil quitté (resetSession aborte aussi son contrôleur ; selectProject, selectProfile et
 // deleteProject changent le cours affiché dans le même bloc synchrone, et ce catch s'exécute après),
@@ -948,7 +992,7 @@ const sendGenerateWithPending = async function (
     await withLongRequestSlot(request, flight.controller.signal);
   } catch (e: unknown) {
     if (state.currentProjectId !== projectId) {
-      if (!flight.sent) void sendGenerateInBackground(launch);
+      if (!flight.sent) void sendGenerateInBackground(state, launch);
       return;
     }
     delete state.pendingById[flight.gid];
@@ -972,7 +1016,7 @@ const runSingleGenerate = async function (
   if (outcome === 'refused') return;
   // Le pending optimiste prend le relais de la réservation anti-flood, sans intervalle.
   releaseLaunch(state, type);
-  if (outcome === 'moved') await sendGenerateInBackground(launch);
+  if (outcome === 'moved') await sendGenerateInBackground(state, launch);
   else await sendGenerateWithPending(state, launch);
 };
 

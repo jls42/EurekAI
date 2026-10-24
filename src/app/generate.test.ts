@@ -17,6 +17,7 @@ import { createSession } from './session';
 import { createConfirm } from './confirm';
 import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
 import { _resetLongRequestSlots, longRequestSlots, withLongRequestSlot } from './request-slots';
+import { restoreSingleRuns } from './single-runs';
 
 vi.mock('../i18n/index', () => ({ getLocale: vi.fn(() => 'fr') }));
 vi.mock('./helpers', () => ({ normalizeSummaryData: vi.fn() }));
@@ -79,6 +80,7 @@ function makeContext(overrides: any = {}) {
     pendingById: {},
     launchingByType: {},
     autoRuns: {} as Record<string, any>,
+    singleRuns: {} as Record<string, any>,
     shownToastEventKeys: new Set<string>(),
     notificationsVersion: 0,
     upsertGenerationById(gen: any) {
@@ -1925,7 +1927,7 @@ describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', ()
     expect(ctx.loading.quiz).toBe(false);
   });
 
-  it('cours quitté pendant l’attente : jamais partie, la génération part à son tour vers son cours, avec la clé et le corps du clic, sans rien afficher', async () => {
+  it('cours quitté pendant l’attente : jamais partie, la génération part à son tour vers son cours, avec la clé et le corps du clic, puis un toast nomme ce cours', async () => {
     await activateKey('sk-profil-a');
     const ctx = makeContext({ selectedIds: ['s1'] });
     const held = holdGenerations();
@@ -1948,29 +1950,144 @@ describe('requêtes longues : au plus 3 en même temps pour tout l’onglet', ()
     held.finishOldest();
     await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
 
-    // Rien sur l'écran du cours affiché : ni puce, ni chargement, ni génération, ni toast.
+    // Rien sur l'écran du cours affiché (ni puce, ni chargement, ni génération), sauf un toast qui
+    // nomme le cours de la génération (jusqu'au 2026-10-24 : aucun signe).
     expect(ctx.pendingById).toEqual({});
     expect(ctx.loading.summary).toBe(false);
     expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledTimes(1);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.generationDoneIn', 'success');
+    expect(ctx.t).toHaveBeenCalledWith('toast.generationDoneIn', {
+      type: 'gen.summary',
+      project: 'Histoire',
+    });
+  });
+
+  // Les trois cas suivants partent d'une génération en attente d'une place, cours quitté.
+  const leaveWhileWaiting = async (ctx: any) => {
+    const others = occupySlots(3);
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(longRequestSlots().waiting).toBe(1));
+    switchCourse(ctx, 'pid-2');
+    await run;
+    await others.free();
+  };
+
+  it('cours quitté : un échec en arrière-plan est signalé par un toast qui nomme le cours', async () => {
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (isRoute(url)) return routeReply();
+      return {
+        ok: false,
+        status: 500,
+        statusText: 'Internal Server Error',
+        json: async () => ({ error: 'content_refused' }),
+      } as any;
+    });
+    await leaveWhileWaiting(ctx);
+    await vi.waitFor(() =>
+      expect(ctx.showToast).toHaveBeenCalledWith('toast.generationFailedIn', 'error'),
+    );
+    expect(ctx.resolveError).toHaveBeenCalledWith('content_refused');
+    expect(ctx.t).toHaveBeenCalledWith('toast.generationFailedIn', {
+      type: 'gen.summary',
+      project: 'Histoire',
+      error: 'content_refused',
+    });
+  });
+
+  // Annulée par un autre onglet pendant qu'on est ailleurs : le serveur répond 409 `cancelled`,
+  // rien n'est affiché (comme après l'annulation d'un Auto).
+  it('cours quitté : une génération annulée ailleurs n’affiche rien', async () => {
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    vi.mocked(globalThis.fetch).mockImplementation(async (url) => {
+      if (isRoute(url)) return routeReply();
+      return {
+        ok: false,
+        status: 409,
+        statusText: 'Conflict',
+        json: async () => ({ error: 'cancelled', gid: 'x' }),
+      } as any;
+    });
+    await leaveWhileWaiting(ctx);
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
+    await nextMacrotask();
     expect(ctx.showToast).not.toHaveBeenCalled();
   });
 
-  // Déjà envoyée : resetSession aborte son fetch (connexion libérée), le serveur la termine et
-  // l'enregistre. La renvoyer en ferait une seconde.
-  it('génération déjà partie puis cours quitté : pas renvoyée, sa place est rendue', async () => {
+  it('revenu sur le cours avant la réponse : pas de toast « dans le cours », le SSE prend le relais', async () => {
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    const held = holdGenerations();
+    await leaveWhileWaiting(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']));
+    switchCourse(ctx, 'pid-1');
+    held.finishOldest();
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
+    await nextMacrotask();
+    expect(ctx.showToast).not.toHaveBeenCalledWith('toast.generationDoneIn', 'success');
+  });
+
+  it('profil changé avant la réponse : aucun toast du cours de l’autre profil', async () => {
+    const ctx = makeContext({ selectedIds: ['s1'] });
+    const held = holdGenerations();
+    await leaveWhileWaiting(ctx);
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(1));
+    ctx.currentProfile = { ...ctx.currentProfile, id: 'p2' };
+    held.finishOldest();
+    await vi.waitFor(() => expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 }));
+    await nextMacrotask();
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  // Déjà envoyée : elle continue vers son cours (single-runs.ts, épargnée par resetSession), garde
+  // sa place jusqu'à la réponse, n'est pas renvoyée, et sa réponse nomme le cours (jusqu'au
+  // 2026-10-24 : fetch aborté, réponse perdue, aucun toast).
+  it('génération déjà partie puis cours quitté : elle continue, puis un toast nomme son cours', async () => {
     const ctx = makeContext();
-    holdGenerations();
+    const held = holdGenerations();
     const run = gen.generate.call(ctx, 'summary');
     await vi.waitFor(() => expect(stepUrls()).toHaveLength(1));
     const signal = vi.mocked(globalThis.fetch).mock.calls[0][1]?.signal;
 
     switchCourse(ctx, 'pid-2');
-    await run;
     await nextMacrotask();
 
-    expect(signal?.aborted).toBe(true);
+    expect(signal?.aborted).toBe(false);
+    expect(longRequestSlots()).toEqual({ inFlight: 1, waiting: 0 });
+    expect(Object.keys(ctx.singleRuns)).toHaveLength(1);
+
+    held.finishOldest();
+    await run;
+
     expect(stepUrls()).toEqual(['/api/projects/pid-1/generate/summary']);
     expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 });
+    expect(ctx.singleRuns).toEqual({});
+    expect(ctx.generations).toEqual([]);
+    expect(ctx.showToast).toHaveBeenCalledTimes(1);
+    expect(ctx.showToast).toHaveBeenCalledWith('toast.generationDoneIn', 'success');
+  });
+
+  // Retour sur le cours : la puce relue du serveur aborte le fetch gardé (restoreSingleRuns, comme
+  // à l'ouverture d'un cours), sans quoi la réponse 409 `cancelled` s'afficherait en erreur.
+  it('partie, cours quitté puis retrouvé : l’annulation par la puce aborte le fetch, sans erreur', async () => {
+    const ctx = makeContext();
+    holdGenerations();
+    const run = gen.generate.call(ctx, 'summary');
+    await vi.waitFor(() => expect(stepUrls()).toHaveLength(1));
+    const signal = vi.mocked(globalThis.fetch).mock.calls[0][1]?.signal;
+    const gid = Object.keys(ctx.singleRuns)[0];
+
+    switchCourse(ctx, 'pid-2');
+    switchCourse(ctx, 'pid-1');
+    restoreSingleRuns(ctx, 'pid-1');
+    expect(ctx.abortControllersByGid[gid]).toBeDefined();
+
+    ctx.abortControllersByGid[gid].abort();
+    await run;
+
+    expect(signal?.aborted).toBe(true);
+    expect(longRequestSlots()).toEqual({ inFlight: 0, waiting: 0 });
+    expect(ctx.singleRuns).toEqual({});
     expect(ctx.showToast).not.toHaveBeenCalled();
   });
 

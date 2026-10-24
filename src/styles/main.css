@@ -720,8 +720,14 @@ dialog[open] {
   border: 2px solid transparent;
   cursor: pointer;
   background: var(--color-chip-bg);
+  /* Seules les propriétés qui changent (survol, puce active : fond, ombre, bordure et texte) :
+     `all` animerait aussi une future propriété sans qu'on le veuille (SonarCloud css:S9449). */
   @media (prefers-reduced-motion: no-preference) {
-    transition: all 200ms ease;
+    transition:
+      background-color 200ms ease,
+      box-shadow 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease;
   }
 }
 @media (min-width: 640px) {

@@ -452,6 +452,8 @@ export const nl: Record<string, string> = {
   'toast.importDoneIn': 'Import voltooid in "{project}": {n} bron(nen) toegevoegd.',
   'toast.importErrorsIn':
     'Import in "{project}": {n} bestand(en) mislukt, probeer opnieuw in dat project.',
+  'toast.generationDoneIn': '{type} gegenereerd in "{project}"!',
+  'toast.generationFailedIn': '{type} kon niet worden gegenereerd in "{project}": {error}',
   'toast.autoDoneIn': 'Magie voltooid in "{project}"!',
   'toast.autoPartialIn': 'Magie in "{project}": {count} van {total} generaties gelukt.',
   'toast.autoFailedIn':

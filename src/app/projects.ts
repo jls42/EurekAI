@@ -3,6 +3,7 @@ import { openingProfileQuery } from './project-snapshot';
 import { resumeProjectModeration } from './moderation-gate';
 import { withReplyFallback } from './chat-reply';
 import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
+import { abortSingleRuns, restoreSingleRuns } from './single-runs';
 import { restoreChatLoading } from './chat-in-flight';
 import type { AppContext } from './app-context';
 import type { Generation, ProjectData, ProjectMeta } from '../../types';
@@ -198,6 +199,7 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
   restoreAutoAnalysis(state, id);
+  restoreSingleRuns(state, id);
   restoreChatLoading(state, id);
   void state.$nextTick(() => state.refreshIcons());
   startSseStreamSafely(state, id);
@@ -330,8 +332,10 @@ const deleteProject = async function (this: AppContext, id: string) {
   this.projects = this.projects.filter((p) => p.id !== id);
   // Import en cours vers ce cours : sa session disparaît, la boucle s'arrête au fichier suivant.
   this.uploadSessions = this.uploadSessions.filter((s) => s.projectId !== id);
-  // Auto en cours sur ce cours : arrêté (resetSession l'épargnerait), aucune étape n'est envoyée.
+  // Auto en cours sur ce cours : arrêté (resetSession l'épargnerait), aucune étape n'est envoyée ;
+  // ses générations simples en vol aussi.
   abortAutoRun(this, id);
+  abortSingleRuns(this, id);
   if (this.currentProjectId === id) {
     this.currentProjectId = null;
     this.currentProject = null;

@@ -41,6 +41,11 @@ describe('feuilles de style', () => {
     expect(unguardedMotion(STYLES)).toEqual([]);
   });
 
+  // SonarCloud css:S9449 (ajoutée le 2026-10-23) : une transition nomme les propriétés qu'elle anime.
+  it("n'animent jamais `all`", () => {
+    expect(STYLES).not.toMatch(/transition(-property)?\s*:[^;]*\ball\b/);
+  });
+
   it('repèrent une animation hors de ce bloc (forme réelle de .btn-press avant le 2026-10-18)', () => {
     const before = '.btn-press {\n  transition: transform var(--transition-fast) ease;\n}';
     expect(unguardedMotion(before)).toEqual(['transition: transform var(--transition-fast) ease;']);

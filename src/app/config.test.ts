@@ -241,33 +241,38 @@ describe('translateEmotion', () => {
 // --- langToFlag ---
 
 describe('langToFlag', () => {
-  it('returns flag emoji for 2-letter lang with matching voice', () => {
-    const ctx = makeContext({
-      mistralVoicesList: [{ lang: 'fr', langFull: 'fr_FR' }],
-    });
-    const result = config.langToFlag.call(ctx, 'fr');
-    // FR flag: U+1F1EB U+1F1F7
-    expect(result).toBe('\uD83C\uDDEB\uD83C\uDDF7');
+  const flag = (country: string) =>
+    String.fromCodePoint(...[...country].map((c) => 0x1f1e6 + c.charCodeAt(0) - 65));
+  const ctx = () => makeContext({ mistralVoicesList: [] });
+
+  it('prend la région de la langue complète de la voix', () => {
+    expect(config.langToFlag.call(ctx(), 'en_gb')).toBe(flag('GB'));
+    expect(config.langToFlag.call(ctx(), 'en_GB')).toBe(flag('GB'));
+    expect(config.langToFlag.call(ctx(), 'en_us')).toBe(flag('US'));
+    expect(config.langToFlag.call(ctx(), 'fr_fr')).toBe(flag('FR'));
   });
 
-  it('returns flag using lang code when no voice found', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    const result = config.langToFlag.call(ctx, 'us');
-    // US flag: U+1F1FA U+1F1F8
-    expect(result).toBe('\uD83C\uDDFA\uD83C\uDDF8');
+  // Jusqu'au 2026-10-24, le code de langue passait pour un code pays : ar → Argentine, ca → Canada,
+  // hi, ja, ko et zh → drapeaux invalides (voix Voxtral 3 sans région).
+  it.each([
+    ['ar', 'SA'],
+    ['ca', 'AD'],
+    ['hi', 'IN'],
+    ['ja', 'JP'],
+    ['ko', 'KR'],
+    ['zh', 'CN'],
+    ['uk', 'UA'],
+    ['vi', 'VN'],
+    ['fr', 'FR'],
+  ])('langue sans région %s : pays par défaut %s', (lang, country) => {
+    expect(config.langToFlag.call(ctx(), lang)).toBe(flag(country));
   });
 
-  it('returns empty string for invalid lang', () => {
-    const ctx = makeContext({ mistralVoicesList: [] });
-    expect(config.langToFlag.call(ctx, '')).toBe('');
-    expect(config.langToFlag.call(ctx, 'a')).toBe('');
-  });
-
-  it('returns empty for lang where country code is not 2 uppercase letters', () => {
-    const ctx = makeContext({
-      mistralVoicesList: [{ lang: 'xx', langFull: 'xx_123' }],
-    });
-    expect(config.langToFlag.call(ctx, 'xx')).toBe('');
+  it('chaîne vide pour une langue inconnue ou une région invalide', () => {
+    expect(config.langToFlag.call(ctx(), '')).toBe('');
+    expect(config.langToFlag.call(ctx(), 'a')).toBe('');
+    expect(config.langToFlag.call(ctx(), 'xx')).toBe('');
+    expect(config.langToFlag.call(ctx(), 'xx_123')).toBe('');
   });
 });
 
@@ -286,6 +291,32 @@ describe('voiceLabel', () => {
       lang: 'fr',
     });
     expect(result).toBe('🇫🇷 Marie - Excited');
+  });
+
+  // La voix britannique ne prend plus le drapeau de la première voix anglaise (américaine).
+  it('drapeau de la langue complète de la voix, pas de la première voix de même langue', () => {
+    const ctx = makeContext({
+      mistralVoicesList: [
+        { lang: 'en', langFull: 'en_us' },
+        { lang: 'en', langFull: 'en_gb' },
+      ],
+    });
+    const result = config.voiceLabel.call(ctx, {
+      speaker: 'Jane',
+      emotion: '',
+      lang: 'en',
+      langFull: 'en_gb',
+    });
+    expect(result).toBe('🇬🇧 Jane');
+    // Et l'américaine garde le sien (le pays par défaut de l'anglais est GB) : seule la langue
+    // complète de la voix les distingue.
+    const us = config.voiceLabel.call(ctx, {
+      speaker: 'Paul',
+      emotion: '',
+      lang: 'en',
+      langFull: 'en_us',
+    });
+    expect(us).toBe('🇺🇸 Paul');
   });
 
   it('does not add a dash or emotion key for empty emotion', () => {
