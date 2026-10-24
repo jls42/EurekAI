@@ -97,6 +97,7 @@ Chaque source importée affiche son [score de confiance OCR, sa modération et s
 | 🗣️ | **Quiz vocal** | Questions lues à voix haute (voix custom possible), réponse orale, vérification IA |
 | 💬 | **Tuteur IA** | Chat contextuel avec vos documents de cours, avec appel d'outils |
 | 🧠 | **Routeur automatique** | Un routeur basé sur `mistral-small-latest` analyse le contenu et propose une combinaison de générateurs parmi les 8 types disponibles |
+| 🔁 | **Continuité entre les cours** | Imports, générations automatiques, enregistrement au micro, chat, recherche web et lecture à voix haute continuent vers leur cours quand on en ouvre un autre ; une notification nomme le cours quand ça se termine ailleurs |
 | 🔒 | **Contrôle parental** | Modération configurable par profil (catégories personnalisables), PIN parental, restrictions du chat |
 | 🌍 | **Multilingue** | Interface disponible en 9 langues ; génération IA pilotable dans 15 langues via les prompts |
 | 🔊 | **Lecture à voix haute** | Écoutez les fiches et flashcards (dialogue question/réponse) via Mistral Voxtral TTS |
@@ -137,7 +138,7 @@ EurekAI accepte 4 types de sources, modérées selon le profil (modération acti
 
 - **Import de fichiers** — Fichiers JPG, PNG ou PDF traités par OCR Mistral — **OCR 4.1** (`mistral-ocr-4-1`) par défaut, **OCR 3** (`mistral-ocr-2512`) en option dans les Réglages (moins cher, ~½ du coût ; lit mieux l'écriture manuscrite) — pour texte imprimé, tableaux et écriture manuscrite ; ou fichiers texte (TXT, MD) importés directement. Les uploads multi-fichiers utilisent un système de **sessions d'upload** : progress individuel par fichier, retry du fichier en échec sans re-soumettre les autres, dismiss de la session quand terminée. L'OCR expose un **score de confiance** moyenné (`average`, clampé dans `[0,1]`, calculé à partir de `averagePageConfidenceScore` retournés par Mistral), affiché dans l'UI sous forme de badge tier `high` / `medium` / `low` (seuils ~0.9 / ~0.7) — avertit sans bloquer si le scan est de mauvaise qualité. La copie du document envoyée à Mistral pour l'OCR est supprimée dès la fin du traitement, même en cas d'échec.
 - **Texte libre** — Tapez ou collez n'importe quel contenu. Modéré avant stockage si la modération est active.
-- **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par `voxtral-mini-latest`. Le paramètre `language="fr"` optimise la reconnaissance.
+- **Entrée vocale** — Enregistrez de l'audio dans le navigateur. Transcrit par **Voxtral Mini Transcribe 2** (`voxtral-mini-2602`) par défaut ; **Voxtral Mini Transcribe 3** et **Voxtral Small Transcribe 3** (préversion Mistral) en option dans les Réglages. La langue de l'interface est transmise au modèle (`language`) pour optimiser la reconnaissance.
 - **Web / URL** — Collez une ou plusieurs URLs pour scraper le contenu directement (Readability + Lightpanda pour les pages JS), ou tapez des mots-clés pour une recherche web via Agent Mistral. Le champ unique accepte les deux — URLs et mots-clés sont séparés automatiquement, chaque résultat crée une source indépendante.
 
 ### Génération de contenu IA
@@ -167,6 +168,8 @@ Un tuteur conversationnel avec accès complet aux documents de cours :
 ### Routeur automatique
 
 Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources et proposer les générateurs les plus pertinents parmi les 8 disponibles. L'interface affiche la progression en temps réel : d'abord une phase d'analyse, puis les générations individuelles avec annulation possible.
+
+Au plus 3 générations longues tournent en même temps dans un onglet (étapes de tous les Auto, générations lancées une à une, fiches de rappel) : les suivantes attendent leur tour, et un cours s'ouvre sans attendre la fin des générations en cours. « Tout annuler » arrête aussi les étapes de l'Auto du cours encore en attente, même après être passé par un autre cours, avec un seul message.
 
 ### Apprentissage adaptatif
 
@@ -202,10 +205,13 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 
 ### TTS (Mistral Voxtral) & voix personnalisées
 
-- **Mistral Voxtral TTS** : `voxtral-mini-tts-latest`, synthèse vocale 100% Mistral, pas de clé supplémentaire nécessaire
+- **Mistral Voxtral TTS** : **Voxtral TTS** (`voxtral-mini-tts-2603`) par défaut, **Voxtral TTS 3** (`voxtral-mini-tts-3-0`, préversion Mistral, voix natives dans plus de langues) en option dans les Réglages ; synthèse vocale 100% Mistral, pas de clé supplémentaire nécessaire. Seules les voix que le modèle choisi accepte sont proposées : Voxtral TTS refuse les voix ajoutées avec Voxtral 3
 - **Voix personnalisées** : les parents peuvent créer leurs propres voix via l'API Mistral Voices (à partir d'un échantillon audio) et les assigner aux rôles hôte/invité — les podcasts et quiz vocaux sont alors lus avec la voix d'un parent, rendant l'expérience encore plus immersive pour l'enfant
 - Deux rôles vocaux configurables : **hôte** (narrateur principal) et **invité** (deuxième voix du podcast)
 - Catalogue complet des voix Mistral disponible dans les paramètres, filtrable par langue
+- Une lecture (fiche, podcast, mot de dictée) se met en pause quand on quitte sa vue, et reprend là où elle s'était arrêtée
+- L'audio de la lecture à voix haute des flashcards est créé à la première écoute, puis conservé dans leur génération : il n'est ni recréé ni refacturé à chaque retour
+- Les marqueurs de sources (`[Source N]`) ne sont pas lus à voix haute
 
 ### Internationalisation
 
@@ -224,8 +230,8 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 | **Serveur de développement** | Vite 8.x (Rolldown) + tsx | HMR, partials Handlebars, proxy |
 | **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Interface réactive, TypeScript compilé par Vite |
 | **Templating** | vite-plugin-handlebars | Composition HTML par partials |
-| **IA** | Mistral AI SDK 2.x | Chat, OCR, STT, TTS, Agents, Modération |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`, synthèse vocale intégrée |
+| **IA** | Mistral AI SDK | Chat, OCR, STT, TTS, Agents, Modération |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-2603` (Voxtral TTS 3 en option), synthèse vocale intégrée |
 | **Icônes** | Lucide 1.x | Bibliothèque d'icônes SVG |
 | **Scraping web** | Readability + linkedom | Extraction du contenu principal des pages web (techno Firefox Reader View) |
 | **Headless browser** | Lightpanda | Navigateur headless ultra-léger (Zig + V8) pour les pages JS/SPA — fallback scraping |
@@ -244,10 +250,14 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 | `mistral-large-latest` | Fiche, Flashcards, Podcast, Quiz, Textes à trous, Chat, Vérification quiz vocal, Agent Image, Agent Web Search, Détection consigne | Meilleur multilingual + suivi d'instructions |
 | `mistral-ocr-4-1` (OCR 4.1, défaut) | OCR de documents | Texte imprimé, tableaux, écriture manuscrite ($4 / 1000 pages) |
 | `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages), lit mieux l'écriture manuscrite |
-| `voxtral-mini-latest` | Reconnaissance vocale (STT) | STT multilingue, optimisé avec `language="fr"` |
-| `voxtral-mini-tts-latest` | Synthèse vocale (TTS) | Podcasts, quiz vocal, lecture à voix haute |
+| `voxtral-mini-2602` (Voxtral Mini Transcribe 2, défaut) | Reconnaissance vocale (STT) | Entrée vocale et réponses orales du quiz vocal ($0.003 / min) |
+| `voxtral-mini-transcribe-3-0` / `voxtral-small-transcribe-3-0` (Transcribe 3, option, préversion) | Reconnaissance vocale (STT) | Sélectionnables dans Réglages ($0.0035 / min et $0.004 / min) |
+| `voxtral-mini-tts-2603` (Voxtral TTS, défaut) | Synthèse vocale (TTS) | Podcasts, quiz vocal, dictée, lecture à voix haute ($16 / M caractères) |
+| `voxtral-mini-tts-3-0` (Voxtral TTS 3, option, préversion) | Synthèse vocale (TTS) | Sélectionnable dans Réglages, voix natives dans plus de langues ($13 / M caractères) |
 | `mistral-moderation-2603` | Modération de contenu | 6 catégories bloquées pour enfant/ado (dont `jailbreaking`) |
 | `mistral-small-latest` | Routeur automatique | Analyse rapide du contenu pour décisions de routage |
+
+Sur téléphone, les Réglages affichent sous chaque sélecteur le libellé complet du modèle choisi (prix, « Recommandé » ou « Préversion »), que le menu fermé coupait.
 
 ---
 
@@ -410,6 +420,10 @@ helpers/
   reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
   ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
   moderation-model.ts     — Modèle de modération épinglé + ses 11 catégories + migration des catégories legacy
+  stt-models.ts           — Source de vérité sélection transcription (Mini Transcribe 2 défaut / Transcribe 3 option) + normalizeSttModel
+  tts-models.ts           — Source de vérité sélection synthèse vocale (Voxtral TTS défaut / TTS 3 option) + compatibilité des voix
+  tts-text.ts             — Texte envoyé au TTS : marqueurs de sources et crochets retirés (Voxtral les lit ou avale le mot)
+  source-markers.ts       — Regex des marqueurs `[Source N]` des fiches (pastilles côté navigateur, texte lu côté serveur)
   moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours), statut effectif, garde de la consigne
   moderation-profile.ts   — Profil propriétaire du projet et catégories actives (source unique des routes)
   source-moderation.ts    — Modérations en vol et reprise (démarrage, génération, chat, « Revérifier »)
@@ -453,15 +467,19 @@ src/                      — Frontend (Vite + Handlebars)
   app/                    — Modules applicatifs Alpine.js
     state.ts              — Gestion d'état réactif
     navigation.ts         — Routage des vues + gardes par âge
+    view-media.ts         — Pause du son au changement de vue (position gardée)
     profiles.ts           — Logique du sélecteur de profils
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
     generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
+    auto-runs.ts          — Générations automatiques en cours, par cours (elles continuent quand on change de cours)
+    request-slots.ts      — Au plus 3 générations longues en même temps pour l'onglet, file d'attente FIFO
     moderation-gate.ts    — Pré-contrôle de modération des générations (vérifie d'abord les sources en attente)
     effective-moderation.ts — Statut de modération affiché et masquage du contenu des sources
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
-    config.ts             — Interface de configuration (modèles, voix, modèle TTS)
+    chat-in-flight.ts     — Messages du chat en attente de réponse, par cours
+    config.ts             — Interface de configuration (modèles de chat, d'OCR, de transcription et de TTS, voix)
     render.ts             — Helpers de rendu HTML
     i18n.ts               — Changement de langue
     ...
@@ -490,7 +508,7 @@ scripts/                  — Tooling : check-deps, check-models, check-security
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **Pour les agents IA qui contribuent au code** : consulter [`CLAUDE.md`](CLAUDE.md) pour le contexte architecture détaillé, les règles obligatoires (codes d'erreur, cost tracking, et prompts sans mots méta, c'est-à-dire sans qualificatifs du document comme son type, car le modèle recopierait ces mots dans ses sorties) et les pièges connus (Lizard CCN, Opengrep, Codacy/Semgrep migration).
+> **Pour les agents IA qui contribuent au code** : consulter [`CLAUDE.md`](CLAUDE.md) (règles transverses, index) et les règles détaillées de [`.claude/rules/`](.claude/rules/), chargées à la demande selon les fichiers lus ou modifiés, pour le contexte architecture détaillé, les règles obligatoires (codes d'erreur, cost tracking, et prompts sans mots méta, c'est-à-dire sans qualificatifs du document comme son type, car le modèle recopierait ces mots dans ses sorties) et les pièges connus (Lizard CCN, Opengrep, Codacy/Semgrep migration).
 
 ---
 
@@ -551,7 +569,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Révision adaptative `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/remediation-summary` | Fiche de rappel ciblée sur les questions ratées d'un quiz `{generationId, weakQuestions}` — appelée en parallèle de `quiz-review` par le bouton de remédiation de la vue quiz |
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) — renvoie `{plan, costDelta}` (coût du routage seul) |
-| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 8 types : summary, flashcards, quiz, fill-blank, podcast, quiz-vocal, image, dictation). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 8 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
+| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 8 types : `summary`, `flashcards`, `quiz`, `fill-blank`, `podcast`, `quiz-vocal`, `image`, `dictation`). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 8 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
 
 Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` ; un `ageGroup` inconnu ou un `lang` qui n'est pas un code de langue valide (attendu : `fr`, `pt-BR`…) → 400 `invalid_input`, avant tout appel IA. `quiz-review` et `remediation-summary` exigent en plus `{generationId, weakQuestions}` et portent sur les sources du quiz d'origine.
 

@@ -5,7 +5,7 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>将任何内容转化为交互式学习体验——由 <a href="https://mistral.ai">Mistral AI</a> 驱动。</strong>
+  <strong>将任何内容转化为互动学习体验——由 <a href="https://mistral.ai">Mistral AI</a> 提供支持。</strong>
 </p>
 
 <p align="center">
@@ -38,70 +38,71 @@
 
 ---
 
-## 背景故事——为什么选择 EurekAI？
+## 项目缘起——为什么创建 EurekAI？
 
-**EurekAI** 诞生于 [Mistral AI 全球黑客松](https://luma.com/mistralhack-online)（[官方网站](https://worldwide-hackathon.mistral.ai/)）（2026 年 3 月）。当时我需要一个主题，而灵感来自一件非常具体的事：我经常陪女儿复习测验，于是想到，借助 AI，应该可以让这件事变得更有趣、更具互动性。
+**EurekAI** 诞生于 [Mistral AI 全球黑客马拉松](https://luma.com/mistralhack-online)（[官方网站](https://worldwide-hackathon.mistral.ai/)）（2026 年 3 月）。当时我需要一个参赛主题，而灵感来自一件非常具体的事：我经常陪女儿准备测验，于是想到，应该可以借助人工智能，让这件事变得更有趣、更具互动性。
 
-目标是：获取**任意输入内容**——课程照片、复制粘贴的文本、语音录音、网络搜索——并将其转化为**复习笔记、抽认卡、测验、播客、填空练习、插图等内容**。这一切均由法国企业 Mistral AI 的模型驱动，因此 EurekAI 天然适合法语学生使用。
+目标是：将**任何输入**——课程照片、复制粘贴的文字、录音、网络搜索结果——转化为**复习笔记、记忆卡片、测验、播客、填空题、插图等学习材料**。这一切都由法国企业 Mistral AI 的模型提供支持，因此 EurekAI 自然适合法语学生使用。
 
-[最初的原型](https://github.com/jls42/worldwide-hackathon.mistral.ai)是在黑客松期间用 48 小时构建的概念验证，基于 Mistral 服务打造——当时已可运行，但功能有限。此后，EurekAI 已发展成为一个真正的项目：填空练习、练习导航、网页抓取、可配置的家长内容审核、深入的代码审查，等等。全部代码均由 AI 生成——主要使用 [Claude Code](https://code.claude.com/)，另有部分内容通过 [Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/) 完成。
+[最初的原型](https://github.com/jls42/worldwide-hackathon.mistral.ai)是在黑客马拉松期间的 48 小时内完成的，作为基于 Mistral 服务构建的概念验证——当时已经可以运行，但功能有限。此后，EurekAI 发展成了一个完整的项目：填空题、练习导航、网页抓取、可配置的家长内容审核、深入的代码审查，以及更多功能。全部代码均由人工智能生成——主要使用 [Claude Code](https://code.claude.com/)，部分贡献通过 [Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/) 完成。
 
 ---
 
 ## 概览
 
 <p align="center">
-  <img src="docs/screenshots/eurekai-tour.gif" alt="EurekAI 导览：来源、复习笔记、测验、抽认卡、插图" width="820" />
+  <img src="docs/screenshots/eurekai-tour.gif" alt="EurekAI 功能导览：来源、笔记、测验、记忆卡片、插图" width="820" />
 </p>
 
 | | |
 |---|---|
-| ![仪表板](docs/screenshots/dashboard.webp)<br>**仪表板**——最近生成的内容、每张卡片和整个项目的预估成本、“自动——魔法！”按钮 | ![来源](docs/screenshots/sources.webp)<br>**来源**——导入照片/PDF/文本/语音/网页，一键生成，检测学习要求 |
+| ![仪表盘](docs/screenshots/dashboard.webp)<br>**仪表盘**——最近生成的内容、每张卡片及项目总计的预估费用、“自动——魔法！”按钮 | ![来源](docs/screenshots/sources.webp)<br>**来源**——导入照片/PDF/文字/语音/网页、一键生成、学习要求识别 |
 
-每个导入的来源都会显示其 [OCR 置信度、审核状态和预估成本](docs/screenshots/sources-list.webp)。
+每个导入的来源都会显示其 [OCR 置信度评分、内容审核结果和预估费用](docs/screenshots/sources-list.webp)。
 
-### 实际运行中的组件
-
-| | |
-|---|---|
-| ![复习笔记](docs/screenshots/notes.gif)<br>**复习笔记**——要点、词汇、附来源的引文、按章节播放音频 | ![测验](docs/screenshots/quiz.gif)<br>**选择题测验**——每题只有一个正确答案，立即提供反馈和解释，逐步导航 |
-| ![抽认卡](docs/screenshots/flashcards.gif)<br>**抽认卡**——翻转卡片后进行“我知道/我不知道”自我评估 | ![填空练习](docs/screenshots/fillblank.gif)<br>**填空练习**——按需提供提示，宽容校验答案 |
-| ![听写](docs/screenshots/dictation.gif)<br>**听写**——通过音频朗读单词，逐字母严格批改 | ![语音测验](docs/screenshots/vocal-quiz.gif)<br>**语音测验**——大声朗读问题，通过麦克风回答 |
-| ![播客](docs/screenshots/podcast.gif)<br>**播客**——双人迷你播客，可查看对话脚本 | ![插图](docs/screenshots/illustrations.gif)<br>**插图**——由 Agent 生成的教育图片 |
-| ![AI 导师](docs/screenshots/chat.gif)<br>**AI 导师**——基于课程文档的聊天，提供带解释的回答，并可生成测验和抽认卡 | |
-
-### 快速入门
+### 各组件的实际效果
 
 | | |
 |---|---|
-| ![选择个人资料](docs/screenshots/login.gif)<br>**选择个人资料**——每个孩子都有自己的空间、头像和语言 | ![创建个人资料](docs/screenshots/profile-create.gif)<br>**创建个人资料**——年龄、头像，以及供 15 岁以下用户使用的家长 PIN |
-| ![创建课程](docs/screenshots/course.gif)<br>**创建课程**——每节课对应一个项目，可随时添加来源 | ![设置](docs/screenshots/settings.gif)<br>**设置**——API 状态、选择 AI 模型并显示价格 |
+| ![复习笔记](docs/screenshots/notes.gif)<br>**复习笔记**——要点、词汇、带来源的引文、按章节朗读 | ![测验](docs/screenshots/quiz.gif)<br>**单项选择测验**——每题只有一个正确答案、即时反馈与解释、逐步导航 |
+| ![记忆卡片](docs/screenshots/flashcards.gif)<br>**记忆卡片**——翻转卡片，然后自行评估“我会了／我不会” | ![填空题](docs/screenshots/fillblank.gif)<br>**填空题**——按需提供提示、容错判定 |
+| ![听写](docs/screenshots/dictation.gif)<br>**听写**——语音听写单词、逐字母严格批改 | ![语音测验](docs/screenshots/vocal-quiz.gif)<br>**语音测验**——朗读问题、通过麦克风作答 |
+| ![播客](docs/screenshots/podcast.gif)<br>**播客**——双人迷你播客、可查看对话脚本 | ![插图](docs/screenshots/illustrations.gif)<br>**插图**——由智能体生成的教学图片 |
+| ![人工智能导师](docs/screenshots/chat.gif)<br>**人工智能导师**——基于课程文档的聊天、附带解释的回答、可生成测验和记忆卡片 | |
+
+### 入门
+
+| | |
+|---|---|
+| ![选择个人档案](docs/screenshots/login.gif)<br>**选择个人档案**——每个孩子都有自己的空间、头像和语言 | ![创建个人档案](docs/screenshots/profile-create.gif)<br>**创建个人档案**——年龄、头像、未满 15 岁用户的家长 PIN 码 |
+| ![创建课程](docs/screenshots/course.gif)<br>**创建课程**——每节课一个项目，随时可以添加来源 | ![设置](docs/screenshots/settings.gif)<br>**设置**——API 状态、显示价格的人工智能模型选择 |
 
 ---
 
 ## 功能
 
-| | 功能 | 说明 |
+| | 功能 | 描述 |
 |---|---|---|
-| 📷 | **导入文件** | 导入课程资料——照片、PDF（通过 Mistral OCR 处理，包含平均置信度和 `high`/`medium`/`low` 等级）或文本文件（TXT、MD）。上传会话支持按文件重试和单独显示进度 |
-| 📝 | **文本输入** | 直接输入或粘贴任意文本 |
-| 🎤 | **语音输入** | 录制语音——Voxtral STT 会将语音转写为文本 |
-| 🌐 | **网页/URL** | 粘贴 URL（通过 Readability + Lightpanda 直接抓取）或输入搜索内容（使用 Mistral Agent 的 web_search） |
+| 📷 | **文件导入** | 导入课程资料——照片、PDF（通过 Mistral OCR 处理，提供平均置信度评分，分为 `high`/`medium`/`low` 等级）或文本文件（TXT、MD）。上传会话支持逐文件重试，并单独显示进度 |
+| 📝 | **文本输入** | 直接输入或粘贴任意文字 |
+| 🎤 | **语音输入** | 录制语音——由 Voxtral STT 转写 |
+| 🌐 | **网页 / URL** | 粘贴 URL（通过 Readability + Lightpanda 直接抓取）或输入搜索内容（Mistral 智能体 web_search） |
 | 📄 | **复习笔记** | 包含要点、词汇、引文和趣闻的结构化笔记 |
-| 🃏 | **抽认卡** | 交互式问答卡片，支持对话式音频朗读 |
-| ❓ | **选择题测验** | 每题 4 个选项且仅有一个正确答案，并针对错题进行自适应复习（数量可配置） |
-| ✏️ | **填空练习** | 提供提示并支持宽容校验的填空练习 |
-| 🔤 | **听写** | 根据导入的列表通过音频朗读单词（Voxtral TTS），使用键盘输入，逐字母严格批改并解释拼写规则 |
-| 🎙️ | **播客** | 双人音频迷你播客——默认使用 Mistral 语音，也可使用自定义语音（包括家长的声音！） |
-| 🖼️ | **插图** | 由 Mistral Agent 生成的教育图片 |
-| 🗣️ | **语音测验** | 大声朗读问题（可使用自定义语音），口头回答，由 AI 校验 |
-| 💬 | **AI 导师** | 基于课程文档并支持工具调用的上下文聊天 |
-| 🧠 | **自动路由器** | 基于 `mistral-small-latest` 的路由器会分析内容，并从 8 种可用类型中推荐一组生成器 |
-| 🔒 | **家长控制** | 可按个人资料配置内容审核（可自定义类别）、家长 PIN、聊天限制 |
-| 🌍 | **多语言** | 界面支持 9 种语言；可通过提示词控制 AI 使用 15 种语言生成内容 |
-| 🔊 | **朗读** | 通过 Mistral Voxtral TTS 收听复习笔记和抽认卡（问题/答案对话） |
-| 💶 | **API 成本跟踪** | 透明估算每次生成和每个来源的欧元成本（token/字符/页数/音频秒数）。每张卡片显示徽章，仪表板中显示项目总成本 |
-| 🎨 | **按个人资料设置主题** | 每份个人资料都可选择 `dark` 或 `light` 主题——该选择会随个人资料保存，并在每次切换个人资料时重新应用 |
+| 🃏 | **记忆卡片** | 互动问答卡片、对话式语音朗读 |
+| ❓ | **单项选择测验** | 每题 4 个选项且只有一个正确答案，支持针对错题的自适应复习（题数可配置） |
+| ✏️ | **填空题** | 提供提示和容错判定的填空练习 |
+| 🔤 | **听写** | 根据导入的词表，以语音听写单词（Voxtral TTS），通过键盘输入，逐字母严格批改，并解释拼写规则 |
+| 🎙️ | **播客** | 双人语音迷你播客——默认使用 Mistral 声音，也可使用自定义声音（比如家长的声音！） |
+| 🖼️ | **插图** | 由 Mistral 智能体生成的教学图片 |
+| 🗣️ | **语音测验** | 朗读问题（可使用自定义声音）、口头作答、人工智能核验 |
+| 💬 | **人工智能导师** | 结合课程文档上下文进行聊天，支持工具调用 |
+| 🧠 | **自动路由器** | 基于 `mistral-small-latest` 的路由器分析内容，并从 8 种可用类型中推荐生成器组合 |
+| 🔁 | **跨课程连续运行** | 打开其他课程时，导入、自动生成、麦克风录音、聊天、网络搜索和朗读仍在原课程中继续；在其他课程中完成时，通知会显示所属课程名称 |
+| 🔒 | **家长控制** | 按个人档案配置内容审核（可自定义类别）、家长 PIN 码、聊天限制 |
+| 🌍 | **多语言** | 界面支持 9 种语言；通过提示词可控制人工智能使用 15 种语言生成内容 |
+| 🔊 | **朗读** | 通过 Mistral Voxtral TTS 收听复习笔记和记忆卡片（问答对话） |
+| 💶 | **API 费用追踪** | 透明估算每次生成和每个来源的费用（€），按词元 / 字符 / 页数 / 音频秒数计算。每张卡片显示费用徽章，仪表盘显示各项目总计 |
+| 🎨 | **个人档案主题** | 每个个人档案可选择 `dark` 或 `light` 主题——随个人档案保存，每次切换档案时重新应用 |
 
 ---
 
@@ -113,104 +114,109 @@
 
 ---
 
-## 模型使用分布图
+## 模型使用映射图
 
 <p align="center">
-  <img src="public/assets/model-map.webp" alt="AI 模型与任务映射" width="800" />
+  <img src="public/assets/model-map.webp" alt="人工智能模型与任务对应关系" width="800" />
 </p>
 
 ---
 
-## 用户历程
+## 用户流程
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="学生学习历程" width="800" />
+  <img src="public/assets/user-journey.webp" alt="学生学习流程" width="800" />
 </p>
 
 ---
 
-## 深入了解——功能
+## 功能详解
 
 ### 多模态输入
 
-EurekAI 支持 4 种来源类型，并根据个人资料进行内容审核（儿童和青少年个人资料默认启用审核）：
+EurekAI 接受 4 类来源，并根据个人档案进行内容审核（儿童和青少年档案默认启用审核）：
 
-- **导入文件**——由 Mistral OCR 处理 JPG、PNG 或 PDF 文件——默认使用 **OCR 4.1（`mistral-ocr-4-1`）**，也可在设置中选择 **OCR 3（`mistral-ocr-2512`）**（成本更低，约为前者的一半；手写内容识别效果更好）——可处理印刷文本、表格和手写内容；文本文件（TXT、MD）则直接导入。多文件上传采用**上传会话**系统：单独显示每个文件的进度，可仅重试失败的文件而无须重新提交其他文件，并可在完成后关闭会话。OCR 会提供平均**置信度**（`average`，在 `[0,1]` 中进行限幅，根据 Mistral 返回的 `averagePageConfidenceScore` 计算），并在界面中以 `high` / `medium` / `low` 等级徽章显示（阈值约为 0.9 / 0.7）——扫描质量较差时会发出警告，但不会阻止操作。发送给 Mistral 用于 OCR 的文档副本会在处理结束后立即删除，即使处理失败也不例外。
-- **自由文本**——输入或粘贴任意内容。如果启用了审核，则在存储前进行审核。
-- **语音输入**——在浏览器中录制音频。由 `voxtral-mini-latest` 转写。`language="fr"` 参数用于优化识别效果。
-- **网页/URL**——粘贴一个或多个 URL 以直接抓取内容（使用 Readability + Lightpanda 处理 JS 页面），或输入关键词，通过 Mistral Agent 进行网页搜索。同一个字段同时支持这两种输入——URL 和关键词会自动分离，每个结果都会创建一个独立来源。
+- **文件导入**——通过 Mistral OCR 处理 JPG、PNG 或 PDF 文件，默认使用 **OCR 4.1**（`mistral-ocr-4-1`），也可在设置中选择 **OCR 3**（`mistral-ocr-2512`）（更便宜，费用约为 ½；手写识别效果更好），支持印刷文字、表格和手写内容；文本文件（TXT、MD）则直接导入。多文件上传使用**上传会话**机制：每个文件单独显示进度，失败文件可重试，无需重新提交其他文件，完成后可关闭会话。OCR 提供平均**置信度评分**（`average`，限制在 `[0,1]` 范围内，根据 Mistral 返回的 `averagePageConfidenceScore` 计算），在界面中以 `high` / `medium` / `low` 等级徽章显示（阈值约为 0.9 / 0.7）——扫描质量较差时会发出警告，但不会阻止处理。发送给 Mistral 进行 OCR 的文档副本会在处理结束后立即删除，即使处理失败也一样。
+- **自由文本**——输入或粘贴任意内容。启用审核时，会在存储前进行审核。
+- **语音输入**——在浏览器中录制音频。默认通过 **Voxtral Mini Transcribe 2**（`voxtral-mini-2602`）转写；也可在设置中选择 **Voxtral Mini Transcribe 3** 和 **Voxtral Small Transcribe 3**（Mistral 预览版）。界面语言会传递给模型（`language`），以优化识别效果。
+- **网页 / URL**——粘贴一个或多个 URL 直接抓取内容（使用 Readability，涉及 JS 的页面使用 Lightpanda），也可输入关键词，通过 Mistral 智能体进行网络搜索。同一个输入框支持两种方式——URL 和关键词会自动分开处理，每条结果都会创建为独立来源。
 
-### AI 内容生成
+### 人工智能内容生成
 
-可生成八种学习材料：
+可生成八类学习材料：
 
 | 生成器 | 模型 | 输出 |
 |---|---|---|
 | **复习笔记** | `mistral-large-latest` | 标题、摘要、要点、词汇、引文、趣闻 |
-| **抽认卡** | `mistral-large-latest` | 带来源引用的问答卡片（数量可配置） |
-| **选择题测验** | `mistral-large-latest` | 每题 4 个选项且仅有一个正确答案、解释、自适应复习（数量可配置） |
-| **填空练习** | `mistral-large-latest` | 带提示的填空句子，宽容校验（Levenshtein） |
-| **听写** | `mistral-large-latest` + Voxtral TTS | 通过音频朗读关键词（每个单词 1 个 MP3）→ 键盘输入 → 严格批改（漏写一个重音符号也算错误）并解释规则 |
+| **记忆卡片** | `mistral-large-latest` | 带来源引用的问答卡片（数量可配置） |
+| **单项选择测验** | `mistral-large-latest` | 每题 4 个选项且只有一个正确答案，提供解释、自适应复习（题数可配置） |
+| **填空题** | `mistral-large-latest` | 带提示的句子填空、容错判定（Levenshtein） |
+| **听写** | `mistral-large-latest` + Voxtral TTS | 语音听写关键词（每个词 1 个 MP3）→ 键盘输入 → 严格批改（漏写重音符号也算错误），并解释规则 |
 | **播客** | `mistral-large-latest` + Voxtral TTS | 双人脚本 → MP3 音频 |
-| **插图** | Agent `mistral-large-latest` | 通过 `image_generation` 工具生成教育图片 |
-| **语音测验** | `mistral-large-latest` + Voxtral TTS + STT | TTS 朗读问题 → STT 转写回答 → AI 校验 |
+| **插图** | 智能体 `mistral-large-latest` | 通过 `image_generation` 工具生成教学图片 |
+| **语音测验** | `mistral-large-latest` + Voxtral TTS + STT | TTS 朗读问题 → STT 转写回答 → 人工智能核验 |
 
-### 聊天式 AI 导师
+### 聊天式人工智能导师
 
-可完整访问课程文档的对话式导师：
+能够完整访问课程文档的对话式导师：
 
 - 使用 `mistral-large-latest`
-- **工具调用**：可在对话期间生成复习笔记、抽认卡、测验或填空练习
+- **工具调用**：可以在对话过程中生成复习笔记、记忆卡片、测验或填空题
 - 每门课程保留 50 条消息的历史记录
-- 如果个人资料启用了审核：消息会接受检查，已标记的来源、检查失败的来源以及尚未检查的来源都会从上下文和工具中排除（系统会先重新检查失败或尚未检查的来源，最多等待 5 秒）
+- 若个人档案启用了审核：会检查消息，并将被标记的来源、检查失败的来源以及尚未检查的来源排除在上下文和工具之外（对于检查失败或尚未检查的来源，会先重新尝试检查，最多等待 5 秒）
 
 ### 自动路由器
 
-路由器使用 `mistral-small-latest` 分析来源内容，并从 8 种可用生成器中推荐最相关的生成器。界面会实时显示进度：先进行分析，然后逐项生成内容，并可取消操作。
+路由器使用 `mistral-small-latest` 分析来源内容，并从 8 种可用生成器中推荐最合适的选项。界面实时显示进度：先进行分析，再逐项生成，并支持取消。
+
+一个标签页中最多同时运行 3 项耗时较长的生成任务（所有自动生成流程的步骤、逐项手动启动的生成、复习提醒卡片）：后续任务排队等待，打开课程时无需等待正在进行的生成完成。“全部取消”也会停止该课程自动生成流程中仍在等待的步骤，即使中途切换过其他课程也同样有效，并只显示一条消息。
 
 ### 自适应学习
 
-- **测验统计**：跟踪每道题的作答次数和准确率
-- **测验复习**：根据原测验的来源，生成 5 至 10 道针对薄弱概念的新题（审核保护同样针对这些来源）
-- **学习要求检测**：检测复习要求（“如果我能……就说明我掌握了课程……”），并在兼容的文本生成器（复习笔记、抽认卡、测验、填空练习）中优先处理。启用审核后，检测会等待来源检查完成，并且只读取被判定为安全的来源；学习要求会保留其原始来源列表：如果其中任何来源后来被标记，该要求既不会显示，也不会应用；如果其中任何来源被删除，该要求也会被清除。其成本会计入统计
-
+- **测验统计**：按问题追踪作答次数和正确率
+- **测验复习**：根据原测验的来源，针对薄弱概念生成 5-10 道新题（内容审核也针对这些相同来源进行）
+- **学习要求识别**：识别复习要求（“如果我能……，就说明我掌握了这一课”），并在兼容的文本生成器中优先采用这些要求（复习笔记、记忆卡片、测验、填空题）。启用审核时，识别过程会等待来源检查完成，且只读取被判定为安全的来源；学习要求会保留其原始来源列表：如果其中某个来源被标记，该要求将不再显示或应用；如果其中某个来源被删除，该要求也会被清除。其费用会计入统计
 ### 安全与家长控制
 
-- **4 个年龄组**：儿童（≤10 岁）、青少年（11 至 15 岁）、学生（16 至 25 岁）、成人（26 岁以上）
-- **内容审核**：`mistral-moderation-2603`（Mistral Moderation 2）提供 11 个可用类别，新建儿童/青少年个人资料默认屏蔽其中 6 个类别（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`criminal`、`selfharm`、`jailbreaking`；在对包括历史课在内的 50 节课程进行测量且未发现任何误报后，又添加了 `criminal`）。可在设置中按个人资料自定义类别；Moderation 2 将旧的“危险内容”类别拆分为 `dangerous` + `criminal`（现有个人资料会自动迁移，屏蔽类别也适用于已经导入的来源）。默认安全策略：如果模型响应无法验证某个被屏蔽的类别，内容将被拒绝（“审核不可用”）；启用审核后，无论是内容生成还是聊天，都会排除已标记的来源、检查失败的来源以及正在检查的来源。从未接受检查的来源（在审核关闭时导入，或旧项目关联至个人资料后出现的来源）会在使用前接受检查。如果审核因重启而中断，并且服务器密钥允许，系统会在启动时恢复审核；否则，它会像出错的审核一样，在打开项目或下次生成内容时恢复。“重新检查”按钮可按需再次发起检查。启用审核后，在来源被判定为安全之前，其内容会对儿童隐藏（预览、文本、原始文档）；家长可使用 PIN 临时显示一次。语音测验的口头回答会先接受审核，然后再进行答案校验。带日期且固定的 ID 位于 `helpers/moderation-model.ts` 中：已弃用的别名 `-latest` 不再由 API 列出。
-- **家长 PIN**：使用 SHA-256 哈希，15 岁以下用户的个人资料必须设置；每个 IP 地址每 15 分钟最多可输错 10 次，超出后返回 429 `rate_limited`。生产环境部署时，应使用带盐的慢速哈希（Argon2id、bcrypt）。
-- **服务器数据**：`/output` 仅公开项目媒体（音频、图片、导入的文件）；`profiles.json`、`config.json`、`projects.json` 和 `project.json` 永远不会对外提供
-- **聊天限制**：16 岁以下用户默认禁用 AI 聊天，家长可将其启用
+- **4 个年龄组**：儿童（≤10 岁）、青少年（11-15）、学生（16-25）、成人（26+）
+- **内容审核**：使用 `mistral-moderation-2603`（Mistral Moderation 2），提供 11 个类别，新建儿童/青少年档案默认屏蔽 6 个类别（`sexual`、`hate_and_discrimination`、`violence_and_threats`、`criminal`、`selfharm`、`jailbreaking`；在包含历史课程的 50 节课中测试且没有出现任何误报后，加入了 `criminal`）。可在设置中为每个档案自定义类别；Moderation 2 将原有的“危险内容”类别拆分为 `dangerous` + `criminal`（现有档案会自动迁移，屏蔽类别也适用于已导入的来源）。默认安全机制：如果模型响应无法确认某个被屏蔽的类别，内容将被拒绝（“审核不可用”）；启用审核后，生成和聊天都会排除被标记、检查失败以及正在检查的来源。从未检查过的来源（在关闭审核时导入，或关联到档案的旧项目）会在使用前接受检查。因重启而中断的审核，如果服务器密钥允许，会在启动时恢复；否则，与出错的审核一样，会在打开项目或下次生成时恢复。“重新检查”按钮可按需重启检查。启用审核后，只要来源尚未被判定为安全，其内容就会对儿童隐藏（预览、文本、原始文档）；家长可使用 PIN 查看，仅限当次查看。语音测验的口头回答会先接受内容审核，再进行答案核验。在 `helpers/moderation-model.ts` 中固定了带日期的标识符：已弃用的别名 `-latest` 不再由 API 列出。
+- **家长 PIN**：使用 SHA-256 哈希，15 岁以下档案必须设置；每个 IP 地址每 15 分钟最多允许输入 10 次错误代码（429 `rate_limited`）。生产部署应采用带盐的慢速哈希（Argon2id、bcrypt）。
+- **服务器数据**：`/output` 仅公开项目媒体（音频、图片、导入文件）；`profiles.json`、`config.json`、`projects.json` 和 `project.json` 从不通过服务器提供
+- **聊天限制**：16 岁以下默认禁用人工智能聊天，可由家长启用
 
-### 多个人资料系统
+### 多档案系统
 
-- 支持多份个人资料，包含姓名、年龄、头像和语言偏好
-- **按个人资料设置语音**（`Profile.mistralVoices?: { host?, guest? }`——每个角色均为可选）——每个孩子都可拥有自己的一组播客/语音测验声音
-- **按个人资料设置主题**（`Profile.theme: 'dark' | 'light'`）——切换个人资料时自动切换，并在后端持久保存
-- 项目通过 `profileId` 与个人资料关联；没有个人资料的旧项目会关联至第一个打开它的个人资料，随后按照该个人资料进行审核
-- 级联删除：删除个人资料会同时删除其所有项目
-### API 成本跟踪
+- 支持多个档案，包含姓名、年龄、头像和语言偏好
+- **每个档案的声音**（`Profile.mistralVoices?: { host?, guest? }` — 每个角色均为可选）— 每个孩子都可以拥有自己的播客/语音测验声音组合
+- **每个档案的主题**（`Profile.theme: 'dark' | 'light'`）— 切换档案时自动切换，并在后端持久保存
+- 项目通过 `profileId` 关联到档案；没有档案的旧项目会关联到首次打开它的档案，然后按照该档案进行审核
+- 级联删除：删除档案会删除其所有项目
 
-每次可计费的 Mistral 调用（chat、OCR、STT、TTS、agents），包括指令检测和语音测验的口头回答，都会被检测，以便向用户提供**透明的**欧元成本估算。免费的内容审核不计入其中。Agent 工具费用包括：每次网络搜索 0.03 美元、每张生成图片 0.10 美元（Mistral 定价），以及这些工具生成的 tokens；估算时按 Agent 模型的输入费率计算这些 tokens。
+### API 费用跟踪
 
-- **事实来源**：`helpers/pricing.ts` — 按模型 prefix 设置 `MODEL_PRICING`（例如：`mistral-large` → 输入 0.5 欧元/M tokens，输出 1.5 欧元/M tokens），`PRICING_SOURCES` 包含 Mistral 文档 URLs，以便定期重新抓取
-- **支持的单位**：`tokens`、`characters`（TTS）、`pages`（OCR）、`audio-seconds`（STT）——转换由 `helpers/cost-calc.ts` 控制
-- **检测链路**：`helpers/tracked-client.ts`（封装 Mistral 客户端）→ `helpers/usage-context.ts`（AsyncLocalStorage）→ `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts`（注入 HTTP 响应）
-- **UI**：每次生成的成本徽章（`src/partials/cost-badge-gen.html`）、每个来源的成本徽章（`cost-badge-src.html`）、dashboard 中的累计总额（`Project.totalCost`）
-- **Endpoints**：`/generate/*` 和 `/sources/*` 响应使用 `estimatedCost`、`usage` 和 `costBreakdown` 扩充返回的对象（`Generation` / `Source`）。`POST /generate/route` 添加 `costDelta: number` 字段，仅表示路由成本；`POST /detect-consigne`（`{consigne, costDelta}`）以及口头回答验证也会返回各自的 `costDelta`。`GET /projects/:pid` 返回包含 `totalCost`（根据 `costLog[]` 计算的总和）及完整历史记录的扩充项目
+每次需要付费的 Mistral 调用（聊天、OCR、STT、TTS、智能体），包括指令检测和语音测验的口头回答，都进行了计量，以向用户提供**透明的**欧元费用估算。免费的内容审核不计入费用。智能体工具费用已包含在内：每次网络搜索 0,03 $，每张生成图片 0,10 $（Mistral 费率），另加这些工具产生的 token，估算时按智能体模型的输入费率计费。
 
-### TTS（Mistral Voxtral）与自定义语音
+- **权威数据源**：`helpers/pricing.ts` — 按模型前缀设置 `MODEL_PRICING`（例如：`mistral-large` → 输入 0.5 €/M tokens，输出 1.5 €/M tokens），`PRICING_SOURCES` 包含 Mistral 文档 URL，供定期重新抓取
+- **支持的单位**：`tokens`、`characters`（TTS）、`pages`（OCR）、`audio-seconds`（STT）— 由 `helpers/cost-calc.ts` 控制换算
+- **计量链路**：`helpers/tracked-client.ts`（封装 Mistral 客户端）→ `helpers/usage-context.ts`（AsyncLocalStorage）→ `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts`（注入 HTTP 响应）
+- **用户界面**：每次生成的费用标记（`src/partials/cost-badge-gen.html`）、每个来源的费用标记（`cost-badge-src.html`）、仪表板中的累计总额（`Project.totalCost`）
+- **端点**：`/generate/*` 和 `/sources/*` 的响应会在返回对象（`Generation` / `Source`）中附加 `estimatedCost`、`usage` 和 `costBreakdown`。`POST /generate/route` 添加 `costDelta: number` 字段，仅表示路由费用；`POST /detect-consigne`（`{consigne, costDelta}`）和口头回答核验也会返回各自的 `costDelta`。`GET /projects/:pid` 返回附加了 `totalCost` 的项目（根据 `costLog[]` 计算的总和）以及完整历史记录
 
-- **Mistral Voxtral TTS**：`voxtral-mini-tts-latest`，100% 基于 Mistral 的语音合成，无需额外密钥
-- **自定义语音**：家长可以通过 Mistral Voices API（使用音频样本）创建自己的语音，并将其分配给主持人/嘉宾角色——随后 podcast 和语音测验会使用家长的声音朗读，让孩子获得更具沉浸感的体验
-- 两个可配置的语音角色：**主持人**（主要讲述者）和**嘉宾**（podcast 的第二个声音）
-- 设置中提供完整的 Mistral 语音目录，可按语言筛选
+### TTS（Mistral Voxtral）与自定义声音
+
+- **Mistral Voxtral TTS**：默认使用 **Voxtral TTS**（`voxtral-mini-tts-2603`），可在设置中选择 **Voxtral TTS 3**（`voxtral-mini-tts-3-0`，Mistral 预览版，提供更多语言的原生声音）；语音合成完全由 Mistral 提供，无需额外密钥。仅提供所选模型支持的声音：Voxtral TTS 不接受 Voxtral 3 新增的声音
+- **自定义声音**：家长可以通过 Mistral Voices API（使用音频样本）创建自己的声音，并分配给主持人/嘉宾角色 — 播客和语音测验随后会使用家长的声音朗读，让孩子获得更有沉浸感的体验
+- 两种可配置的声音角色：**主持人**（主要旁白）和**嘉宾**（播客的第二个声音）
+- 设置中提供完整的 Mistral 声音目录，可按语言筛选
+- 离开当前视图时，播放（学习卡片、播客、听写词语）会暂停，返回后从暂停处继续
+- 记忆卡片的朗读音频在首次收听时创建，然后保存在对应的生成内容中：每次返回时不会重新创建或重复计费
+- 来源标记（`[Source N]`）不会被朗读
 
 ### 国际化
 
-- 界面支持 9 种语言：fr、en、es、pt、it、nl、de、hi、ar
-- AI prompts 支持 15 种语言（fr、en、es、de、it、pt、nl、ja、zh、ko、ar、hi、pl、ro、sv）
-- 可按个人资料配置语言
+- 界面支持 9 种语言：法语、英语、西班牙语、葡萄牙语、意大利语、荷兰语、德语、印地语、阿拉伯语
+- 人工智能提示词支持 15 种语言（法语、英语、西班牙语、德语、意大利语、葡萄牙语、荷兰语、日语、中文、韩语、阿拉伯语、印地语、波兰语、罗马尼亚语、瑞典语）
+- 可为每个档案配置语言
 
 ---
 
@@ -218,35 +224,39 @@ EurekAI 支持 4 种来源类型，并根据个人资料进行内容审核（儿
 
 | 层级 | 技术 | 作用 |
 |---|---|---|
-| **Runtime** | Node.js + TypeScript 6.x | 服务器与类型安全 |
-| **Backend** | Express 5.x | REST API |
-| **开发服务器** | Vite 8.x (Rolldown) + tsx | HMR、Handlebars partials、proxy |
-| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | 响应式界面，由 Vite 编译 TypeScript |
-| **Templating** | vite-plugin-handlebars | 通过 partials 组合 HTML |
-| **AI** | Mistral AI SDK 2.x | Chat、OCR、STT、TTS、Agents、内容审核 |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-latest`，集成式语音合成 |
+| **运行时** | Node.js + TypeScript 6.x | 服务器和类型安全 |
+| **后端** | Express 5.x | REST API |
+| **开发服务器** | Vite 8.x (Rolldown) + tsx | HMR、Handlebars 局部模板、代理 |
+| **前端** | HTML + TailwindCSS 4.x + Alpine.js 3.x | 响应式界面，由 Vite 编译 TypeScript |
+| **模板** | vite-plugin-handlebars | 通过局部模板组合 HTML |
+| **人工智能** | Mistral AI SDK | 聊天、OCR、STT、TTS、智能体、内容审核 |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-2603`（可选 Voxtral TTS 3），内置语音合成 |
 | **图标** | Lucide 1.x | SVG 图标库 |
 | **网页抓取** | Readability + linkedom | 提取网页主要内容（Firefox Reader View 技术） |
-| **Headless browser** | Lightpanda | 用于 JS/SPA 页面的超轻量 headless 浏览器（Zig + V8）——抓取 fallback |
-| **Markdown** | Marked | 在 chat 中渲染 markdown |
-| **文件上传** | Multer 2.x | multipart 表单管理 |
+| **无头浏览器** | Lightpanda | 用于 JS/SPA 页面的超轻量无头浏览器（Zig + V8）— 抓取备用方案 |
+| **Markdown** | Marked | 在聊天中渲染 Markdown |
+| **文件上传** | Multer 2.x | 处理 multipart 表单 |
 | **音频** | ffmpeg-static | 拼接音频片段 |
-| **测试** | Vitest | 单元测试——覆盖率由 SonarCloud 测量 |
+| **测试** | Vitest | 单元测试 — 由 SonarCloud 测量覆盖率 |
 | **持久化** | JSON 文件 | 无依赖存储 |
 
 ---
 
 ## 模型参考
 
-| 模型 | 用途 | 原因 |
+| 模型 | 用途 | 选择原因 |
 |---|---|---|
-| `mistral-large-latest` | 复习资料、Flashcards、Podcast、Quiz、填空文本、Chat、语音测验验证、图像 Agent、Web Search Agent、指令检测 | 更出色的多语言能力与指令遵循能力 |
-| `mistral-ocr-4-1`（OCR 4.1，默认） | 文档 OCR | 印刷文本、表格、手写内容（4 美元 / 1000 页） |
-| `mistral-ocr-2512`（OCR 3，可选） | 文档 OCR | 可在设置中选择，价格更低（2 美元 / 1000 页），手写内容识别效果更好 |
-| `voxtral-mini-latest` | 语音识别（STT） | 多语言 STT，使用 `language="fr"` 优化 |
-| `voxtral-mini-tts-latest` | 语音合成（TTS） | Podcasts、语音测验、朗读 |
+| `mistral-large-latest` | 学习卡片、记忆卡片、播客、测验、填空题、聊天、语音测验核验、图片智能体、网络搜索智能体、指令检测 | 更出色的多语言能力和指令遵循能力 |
+| `mistral-ocr-4-1`（OCR 4.1，默认） | 文档 OCR | 印刷文本、表格、手写文字（$4 / 1000 页） |
+| `mistral-ocr-2512`（OCR 3，可选） | 文档 OCR | 可在设置中选择，更便宜（$2 / 1000 页），手写文字识别更好 |
+| `voxtral-mini-2602`（Voxtral Mini Transcribe 2，默认） | 语音识别（STT） | 语音输入和语音测验的口头回答（$0.003 / min） |
+| `voxtral-mini-transcribe-3-0` / `voxtral-small-transcribe-3-0`（Transcribe 3，可选，预览版） | 语音识别（STT） | 可在设置中选择（$0.0035 / min 和 $0.004 / min） |
+| `voxtral-mini-tts-2603`（Voxtral TTS，默认） | 语音合成（TTS） | 播客、语音测验、听写、朗读（$16 / M 字符） |
+| `voxtral-mini-tts-3-0`（Voxtral TTS 3，可选，预览版） | 语音合成（TTS） | 可在设置中选择，提供更多语言的原生声音（$13 / M 字符） |
 | `mistral-moderation-2603` | 内容审核 | 为儿童/青少年屏蔽 6 个类别（包括 `jailbreaking`） |
-| `mistral-small-latest` | 自动路由器 | 快速分析内容以作出路由决策 |
+| `mistral-small-latest` | 自动路由器 | 快速分析内容以进行路由决策 |
+
+在手机上，设置会在每个选择器下方显示所选模型的完整标签（价格、“推荐”或“预览版”），避免菜单收起时标签被截断。
 
 ---
 
@@ -272,11 +282,11 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **注意**：Mistral Voxtral TTS 是唯一的 TTS provider——除 `MISTRAL_API_KEY` 外无需任何额外密钥。
+> **说明**：Mistral Voxtral TTS 是唯一的 TTS 提供方 — 除 `MISTRAL_API_KEY` 外无需任何额外密钥。
 
-> **用户输入的 API 密钥**：`MISTRAL_API_KEY` 现在为**可选项**。如果缺失，应用仍会启动，并提示每位用户在界面中输入**自己的 Mistral 密钥**。密钥**存储在浏览器中**（在安全上下文中通过 Web Crypto + IndexedDB 加密），并随请求发送——**绝不会持久化到服务器**。优先级：个人资料密钥 > 浏览器全局密钥 > `MISTRAL_API_KEY`（env）。设置 `EUREKAI_REQUIRE_USER_KEY=true` 会强制每位用户提供密钥（env 密钥此后仅用于预加载）。
+> **用户输入的 API 密钥**：`MISTRAL_API_KEY` 现在为**可选项**。如果未设置，应用仍会启动，并提示每位用户在界面中输入**自己的 Mistral 密钥**。密钥**存储在浏览器中**（在安全上下文中通过 Web Crypto + IndexedDB 加密），并随每次请求发送 — **绝不持久保存在服务器上**。优先级：档案密钥 > 浏览器全局密钥 > `MISTRAL_API_KEY`（环境变量）。设置 `EUREKAI_REQUIRE_USER_KEY=true` 会强制每位用户提供自己的密钥（环境变量中的密钥仅用于预加载）。
 
-> **本地 HTTPS（平板电脑/LAN）**：`localhost` 已经是安全上下文。如需通过 LAN（平板电脑）访问，请生成本地证书并启用 HTTPS：浏览器随后便可加密其存储的密钥，并在传输过程中加密该密钥：
+> **本地 HTTPS（平板/局域网）**：`localhost` 已处于安全上下文。对于局域网访问（平板），请生成本地证书并启用 HTTPS：这样浏览器就能加密其存储的密钥，密钥在传输过程中也会被加密：
 > ```bash
 > ./scripts/gen-cert.sh 192.168.1.42   # mkcert si dispo, sinon openssl self-signed
 > export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
@@ -285,14 +295,14 @@ npm run dev
 
 ### 环境变量
 
-| 变量 | 必需性 | 默认值 | 作用 |
+| 变量 | 是否必需 | 默认值 | 作用 |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | 可选 | — | Mistral API 密钥（chat、OCR、STT、TTS Voxtral、agents、内容审核）。如果缺失，用户需在应用中输入密钥（存储在浏览器中，绝不存储在服务器上） |
-| `EUREKAI_REQUIRE_USER_KEY` | 可选 | `false` | `true` → 禁用 AI 请求对 `MISTRAL_API_KEY` 的 fallback（每位用户都必须提供自己的密钥）。适用于公开部署的实例 |
-| `HTTPS_KEY` / `HTTPS_CERT` | 可选 | — | TLS 密钥/证书路径（参见 `scripts/gen-cert.sh`）→ Express 和 Vite 通过 HTTPS 提供服务（LAN/平板电脑安全上下文） |
-| `PORT` | 可选 | `3000` | Express backend 的 HTTP 端口 |
-| `NODE_ENV` | 可选 | `development` | 若为 `production` → Express 从 `dist/` 提供 frontend（否则为 `public/`） |
-| `SONAR_TOKEN` | CI 可选 | — | 仅由 GitHub Actions SonarCloud workflow 使用 |
+| `MISTRAL_API_KEY` | 可选 | — | Mistral API 密钥（聊天、OCR、STT、Voxtral TTS、智能体、内容审核）。如果未设置，用户需在应用中输入自己的密钥（存储在浏览器中，绝不存储在服务器上） |
+| `EUREKAI_REQUIRE_USER_KEY` | 可选 | `false` | `true` → 禁止人工智能请求回退使用 `MISTRAL_API_KEY`（每位用户必须提供自己的密钥）。适用于对外开放的实例 |
+| `HTTPS_KEY` / `HTTPS_CERT` | 可选 | — | TLS 密钥/证书路径（参见 `scripts/gen-cert.sh`）→ Express 和 Vite 通过 HTTPS 提供服务（局域网/平板的安全上下文） |
+| `PORT` | 可选 | `3000` | Express 后端的 HTTP 端口 |
+| `NODE_ENV` | 可选 | `development` | 如果为 `production` → Express 从 `dist/` 提供前端（否则为 `public/`） |
+| `SONAR_TOKEN` | 持续集成可选 | — | 仅用于 GitHub Actions 的 SonarCloud 工作流 |
 
 ### 测试、代码质量与贡献
 
@@ -305,9 +315,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git hooks（Husky）**：`pre-commit` 依次执行 `scripts/pre-commit-fast.sh`（冲突、大文件、shellcheck）、`lint-staged`，然后执行 `npm test`；`pre-push` 首先执行阻断式检查 `npm audit`（只要任何依赖项——即使是传递依赖——存在 `critical` 级别的漏洞就会阻断，参见 `scripts/audit-verdict.mjs`），然后执行 `npm run security`。任一阶段失败时，各 hook 都会阻止 commit/push。
+**Git 钩子（Husky）**：`pre-commit` 依次执行 `scripts/pre-commit-fast.sh`（冲突、大文件、shellcheck）、`lint-staged` 和 `npm test`；`pre-push` 首先执行具有阻断作用的 `npm audit` 检查（只要任意依赖，包括间接依赖，存在 `critical` 级别的漏洞就会阻止操作，参见 `scripts/audit-verdict.mjs`），然后执行 `npm run security`。任一阶段失败，对应钩子就会阻止提交/推送。
 
-**外部工具（运行应用时可选，但 `pretest` 和 `npm run security` 必须使用）**：
+**外部工具（启动应用时可选，执行 `pretest` 和 `npm run security` 时必需）**：
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -317,11 +327,11 @@ pipx install lizard          # ou : pipx run lizard
 ./scripts/install-opengrep.sh   # installe dans ~/.local/bin/
 ```
 
-如果缺少这些工具，`npm test` 会在 `pretest` 处失败（缺少 lizard），`npm run security` 也会失败（缺少 opengrep）。此时 husky hooks 会阻止 commit/push。
+没有这些工具，`npm test` 会在 `pretest` 阶段失败（缺少 lizard），`npm run security` 也会失败（缺少 opengrep）。此时 Husky 钩子会阻止提交/推送。
 
 ---
 
-## 使用容器部署
+## 容器部署
 
 镜像发布在 **GitHub Container Registry**：
 
@@ -339,7 +349,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`**：Podman rootless flag，可自动调整 volume 权限。
+> **`:U`**：Podman 无根模式标志，用于自动调整卷权限。
 
 ```bash
 # Build local
@@ -409,6 +419,10 @@ helpers/
   reading-comfort.ts      — Option « Confort de lecture » par profil (police Luciole, espacements) — partagé serveur/client
   ocr-models.ts           — Source de vérité sélection OCR (OCR 4 défaut / OCR 3 option) + normalizeOcrModel
   moderation-model.ts     — Modèle de modération épinglé + ses 11 catégories + migration des catégories legacy
+  stt-models.ts           — Source de vérité sélection transcription (Mini Transcribe 2 défaut / Transcribe 3 option) + normalizeSttModel
+  tts-models.ts           — Source de vérité sélection synthèse vocale (Voxtral TTS défaut / TTS 3 option) + compatibilité des voix
+  tts-text.ts             — Texte envoyé au TTS : marqueurs de sources et crochets retirés (Voxtral les lit ou avale le mot)
+  source-markers.ts       — Regex des marqueurs `[Source N]` des fiches (pastilles côté navigateur, texte lu côté serveur)
   moderation-http.ts      — Statut de modération → réponse HTTP (400 signalé / 503 indisponible / 409 en cours), statut effectif, garde de la consigne
   moderation-profile.ts   — Profil propriétaire du projet et catégories actives (source unique des routes)
   source-moderation.ts    — Modérations en vol et reprise (démarrage, génération, chat, « Revérifier »)
@@ -452,15 +466,19 @@ src/                      — Frontend (Vite + Handlebars)
   app/                    — Modules applicatifs Alpine.js
     state.ts              — Gestion d'état réactif
     navigation.ts         — Routage des vues + gardes par âge
+    view-media.ts         — Pause du son au changement de vue (position gardée)
     profiles.ts           — Logique du sélecteur de profils
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
     generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
+    auto-runs.ts          — Générations automatiques en cours, par cours (elles continuent quand on change de cours)
+    request-slots.ts      — Au plus 3 générations longues en même temps pour l'onglet, file d'attente FIFO
     moderation-gate.ts    — Pré-contrôle de modération des générations (vérifie d'abord les sources en attente)
     effective-moderation.ts — Statut de modération affiché et masquage du contenu des sources
     generations.ts        — Affichage + actions sur les générations
     chat.ts               — Interface de chat
-    config.ts             — Interface de configuration (modèles, voix, modèle TTS)
+    chat-in-flight.ts     — Messages du chat en attente de réponse, par cours
+    config.ts             — Interface de configuration (modèles de chat, d'OCR, de transcription et de TTS, voix)
     render.ts             — Helpers de rendu HTML
     i18n.ts               — Changement de langue
     ...
@@ -489,89 +507,88 @@ scripts/                  — Tooling : check-deps, check-models, check-security
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **面向代码贡献 AI Agents**：请参阅 [`CLAUDE.md`](CLAUDE.md)，了解详细的 architecture 背景、强制规则（错误码、cost tracking，以及不含元词汇的 prompts，即不使用文档类型等限定词，因为模型会将这些词复制到输出中）和已知陷阱（Lizard CCN、Opengrep、Codacy/Semgrep migration）。
+> **为代码作出贡献的人工智能代理**：请查阅 [`CLAUDE.md`](CLAUDE.md)（通用规则、索引）以及 [`.claude/rules/`](.claude/rules/) 中的详细规则，后者会根据读取或修改的文件按需加载。这些文档包含详细的架构背景、强制规则（错误代码、费用跟踪，以及提示词不得包含元描述词，即不得使用文档类型等描述文档本身的词语，因为模型会将这些词复制到输出中）和已知陷阱（Lizard CCN、Opengrep、Codacy/Semgrep 迁移）。
 
 ---
 
 ## API 参考
 
 ### 配置
-| 方法 | Endpoint | 描述 |
+| 方法 | 端点 | 说明 |
 |---|---|---|
 | `GET` | `/api/config` | 当前配置 |
-| `PUT` | `/api/config` | 修改配置（模型、语音、TTS 模型） |
-| `GET` | `/api/config/status` | API 状态：`mistral`（已设置 Mistral 密钥）、`ttsAvailable`（`mistral` 的 alias，Mistral Voxtral 是唯一的 TTS provider） |
-| `POST` | `/api/config/reset` | 重置为默认配置 |
-| `GET` | `/api/config/voices` | 列出 Mistral TTS 语音（可选 `?lang=fr`） |
-| `GET` | `/api/moderation-categories` | 可用的内容审核类别及各年龄段的默认值 |
-| `POST` | `/api/providers/mistral/validate` | 验证用户输入的 Mistral 密钥——始终返回 200 `{status}`（`ok`/`invalid`/`quota`/`network`/`missing`），不使用 env fallback |
+| `PUT` | `/api/config` | 修改配置（模型、声音、TTS 模型） |
+| `GET` | `/api/config/status` | API 状态：`mistral`（已设置 Mistral 密钥）、`ttsAvailable`（`mistral` 的别名，Mistral Voxtral 是唯一的 TTS 提供方） |
+| `POST` | `/api/config/reset` | 恢复默认配置 |
+| `GET` | `/api/config/voices` | 列出 Mistral TTS 声音（可选 `?lang=fr`） |
+| `GET` | `/api/moderation-categories` | 可用审核类别及各年龄段的默认设置 |
+| `POST` | `/api/providers/mistral/validate` | 验证用户输入的 Mistral 密钥 — 始终返回 200 `{status}`（`ok`/`invalid`/`quota`/`network`/`missing`），不回退使用环境变量 |
 
-### 个人资料
-| 方法 | Endpoint | 描述 |
+### 档案
+| 方法 | 端点 | 说明 |
 |---|---|---|
-| `GET` | `/api/profiles` | 列出所有个人资料 |
-| `POST` | `/api/profiles` | 创建个人资料 |
-| `PUT` | `/api/profiles/:id` | 修改个人资料（15 岁以下需要 PIN；15 分钟内 10 次 PIN 错误 → 429 `rate_limited`） |
-| `DELETE` | `/api/profiles/:id` | 删除个人资料，并级联处理项目 `{pin?}` → `{ok, deletedProjects}` |
+| `GET` | `/api/profiles` | 列出所有档案 |
+| `POST` | `/api/profiles` | 创建档案 |
+| `PUT` | `/api/profiles/:id` | 修改档案（< 15 岁需提供 PIN；15 min 内输入 10 次错误 PIN → 429 `rate_limited`） |
+| `DELETE` | `/api/profiles/:id` | 删除档案并级联删除项目 `{pin?}` → `{ok, deletedProjects}` |
 
 ### 项目
-| 方法 | Endpoint | 描述 |
+| 方法 | 端点 | 说明 |
 |---|---|---|
 | `GET` | `/api/projects` | 列出项目（`?profileId=` 可选） |
 | `POST` | `/api/projects` | 创建项目 `{name, profileId}` |
-| `GET` | `/api/projects/:pid` | 项目详情；`?profileId=` 将无个人资料的项目关联到打开该项目的个人资料 |
+| `GET` | `/api/projects/:pid` | 项目详情；`?profileId=` 将无档案的项目关联到打开它的档案 |
 | `PUT` | `/api/projects/:pid` | 重命名 `{name}` |
 | `DELETE` | `/api/projects/:pid` | 删除项目 |
-| `GET` | `/api/projects/:pid/events` | 生成状态转换（`completed`/`failed`/`cancelled`）的实时 SSE 流（`event: generation`）+ heartbeat keep-alive |
+| `GET` | `/api/projects/:pid/events` | 生成状态转换（`completed`/`failed`/`cancelled`）的实时 SSE 流（`event: generation`），以及用于保持连接的心跳 |
 
 ### 来源
-| 方法 | Endpoint | 描述 |
+| 方法 | 端点 | 说明 |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | 导入 multipart 文件（JPG/PNG/PDF 使用 OCR，TXT/MD 直接读取） |
+| `POST` | `/api/projects/:pid/sources/upload` | 通过 multipart 导入文件（JPG/PNG/PDF 使用 OCR，TXT/MD 直接读取） |
 | `POST` | `/api/projects/:pid/sources/text` | 自由文本 `{text}` |
 | `POST` | `/api/projects/:pid/sources/voice` | STT 语音（multipart 音频） |
-| `POST` | `/api/projects/:pid/sources/websearch` | URL 抓取或 Web 搜索 `{query}`——返回来源数组；若所有地址均被拒绝（内部网络），则返回 422 `url_blocked`；若无法创建任何来源，则返回 502 `all_sources_failed` |
-| `POST` | `/api/projects/:pid/sources/moderate` | 恢复待处理或出错的内容审核 `{sourceIds?}`（每次调用最多 10 个，等待 ≤ 10 秒）→ `{sources: [{id, moderation}]}` |
-| `DELETE` | `/api/projects/:pid/sources/:sid` | 删除来源、其导入文件以及依赖该来源的指令 → `{ok, consigne}` |
+| `POST` | `/api/projects/:pid/sources/websearch` | 抓取 URL 或网络搜索 `{query}` — 返回来源数组；如果所有地址都被拒绝（内部网络），返回 422 `url_blocked`；如果无法创建任何来源，返回 502 `all_sources_failed` |
+| `POST` | `/api/projects/:pid/sources/moderate` | 恢复待处理或出错的审核 `{sourceIds?}`（每次调用最多 10 个，等待 ≤ 10 s）→ `{sources: [{id, moderation}]}` |
+| `DELETE` | `/api/projects/:pid/sources/:sid` | 删除来源、其导入文件及依赖它的指令 → `{ok, consigne}` |
 | `POST` | `/api/projects/:pid/moderate` | 审核 `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | 检测复习指令（仅限已验证的来源）→ `{consigne, costDelta}` |
-
+| `POST` | `/api/projects/:pid/detect-consigne` | 检测复习指令（仅限已检查的来源）→ `{consigne, costDelta}` |
 ### 生成
-| 方法 | Endpoint | 描述 |
+| 方法 | 端点 | 说明 |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generate/summary` | 复习资料 |
-| `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
-| `POST` | `/api/projects/:pid/generate/quiz` | 多项选择测验（4 个选项，只有一个正确答案） |
-| `POST` | `/api/projects/:pid/generate/fill-blank` | 填空文本 |
-| `POST` | `/api/projects/:pid/generate/dictation` | 听写（单词 + 例句 + 规则，每个单词 1 段 TTS 音频；auto-router 也会推荐） |
-| `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
+| `POST` | `/api/projects/:pid/generate/flashcards` | 记忆卡片 |
+| `POST` | `/api/projects/:pid/generate/quiz` | 单项选择测验（4 个选项，仅一个正确答案） |
+| `POST` | `/api/projects/:pid/generate/fill-blank` | 填空练习 |
+| `POST` | `/api/projects/:pid/generate/dictation` | 听写（单词 + 例句 + 规则，每个单词配有 1 段 TTS 音频；自动路由器也会推荐） |
+| `POST` | `/api/projects/:pid/generate/podcast` | 播客 |
 | `POST` | `/api/projects/:pid/generate/image` | 插图 |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | 语音测验 |
 | `POST` | `/api/projects/:pid/generate/quiz-review` | 自适应复习 `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/remediation-summary` | 针对测验错题的定向复习资料 `{generationId, weakQuestions}`——测验视图的补救按钮会与 `quiz-review` 并行调用 |
-| `POST` | `/api/projects/:pid/generate/route` | 路由分析（要启动的生成器计划）——返回 `{plan, costDelta}`（仅路由成本） |
-| `POST` | `/api/projects/:pid/generate/auto` | Backend 自动生成（路由 + 8 种类型：summary、flashcards、quiz、fill-blank、podcast、quiz-vocal、image、dictation）。并行执行——要求 Mistral tier 的 rate-limit ≥ 8 个并发请求；否则 `failedSteps` 中可能出现多个 429。 |
+| `POST` | `/api/projects/:pid/generate/remediation-summary` | 针对测验错题的重点回顾资料 `{generationId, weakQuestions}` — 由测验视图中的补救练习按钮与 `quiz-review` 并行调用 |
+| `POST` | `/api/projects/:pid/generate/route` | 路由分析（待启动的生成器计划）— 返回 `{plan, costDelta}`（仅路由的费用） |
+| `POST` | `/api/projects/:pid/generate/auto` | 后端自动生成（路由 + 8 种类型：`summary`、`flashcards`、`quiz`、`fill-blank`、`podcast`、`quiz-vocal`、`image`、`dictation`）。并行执行 — 要求 Mistral 套餐的并发请求上限 ≥ 8；否则 `failedSteps` 中可能出现多个 429 错误。 |
 
-所有生成 routes 都接受 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`；未知的 `ageGroup` 或不是有效语言代码的 `lang`（预期：`fr`、`pt-BR`……）会在任何 AI 调用前返回 400 `invalid_input`。`quiz-review` 和 `remediation-summary` 还要求提供 `{generationId, weakQuestions}`，并作用于原始测验的来源。
+所有生成路由均接受 `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`；未知的 `ageGroup` 或并非有效语言代码的 `lang`（预期值：`fr`、`pt-BR`…）→ 400 `invalid_input`，在任何人工智能调用之前返回。`quiz-review` 和 `remediation-summary` 还要求提供 `{generationId, weakQuestions}`，并使用原始测验的来源。
 
-### 生成内容 CRUD
-| 方法 | Endpoint | 描述 |
+### 生成内容的 CRUD
+| 方法 | 端点 | 说明 |
 |---|---|---|
 | `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | 提交测验答案 `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 提交填空文本答案 `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | 提交听写答案 `{answers}`（服务器严格评分） |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 验证口头回答（音频 + questionIndex）；口头回答会在验证前接受内容审核（拒绝：400 `quiz.answerBlocked`），成本通过 `costDelta` 返回 |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 朗读（复习资料/flashcards） |
-| `POST` | `/api/projects/:pid/generations/:gid/cancel` | 取消正在进行的生成任务（取消 pending 状态任务的唯一途径） |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | 提交填空答案 `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | 提交听写答案 `{answers}`（服务器端严格评分） |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | 检查口头答案（音频 + questionIndex）；口头答案在检查前先经过内容审核（拒绝：400 `quiz.answerBlocked`），费用通过 `costDelta` 返回 |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS 朗读（复习资料/记忆卡片） |
+| `POST` | `/api/projects/:pid/generations/:gid/cancel` | 取消正在进行的生成任务（取消待处理任务的唯一途径） |
 | `PUT` | `/api/projects/:pid/generations/:gid` | 重命名 `{title}` |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | 删除生成内容及其媒体（音频、图像） |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | 删除生成内容及其媒体文件（音频、图像） |
 
-### Chat
-| 方法 | Endpoint | 描述 |
+### 聊天
+| 方法 | 端点 | 说明 |
 |---|---|---|
-| `GET` | `/api/projects/:pid/chat` | 获取 chat 历史记录 |
+| `GET` | `/api/projects/:pid/chat` | 获取聊天记录 |
 | `POST` | `/api/projects/:pid/chat` | 发送消息 `{message, lang, ageGroup, useConsigne?}` |
-| `DELETE` | `/api/projects/:pid/chat` | 清除 chat 历史记录 |
+| `DELETE` | `/api/projects/:pid/chat` | 清空聊天记录 |
 
 ---
 
@@ -579,30 +596,31 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 | 决策 | 理由 |
 |---|---|
-| **使用 Alpine.js 而不是 React/Vue** | 占用空间极小，通过 Vite 编译的 TypeScript 提供轻量响应能力。非常适合重视速度的 hackathon。 |
-| **使用 JSON 文件持久化** | 零依赖，即时启动。无需配置任何数据库——启动即可使用。 |
-| **Vite + Handlebars** | 两全其美：快速 HMR 改善开发体验，HTML partials 便于组织代码，Tailwind JIT。 |
-| **集中管理 prompts** | 所有 AI prompts 均位于 `prompts.ts`——便于迭代、测试，并针对语言/年龄组进行调整。 |
-| **多生成内容系统** | 每项生成内容都是具有自身 ID 的独立对象——每门课程可以有多份复习资料、测验等。 |
-| **按年龄调整 prompts** | 4 个年龄组采用不同的词汇、复杂度和语气——同一内容会根据学习者采用不同的教学方式。 |
-| **基于 Agents 的功能** | 图像生成和 Web 搜索使用临时 Mistral Agents——生命周期清晰，并自动清理。 |
-| **智能 URL 抓取** | 单个字段可接受混合输入的 URLs 和关键词——URLs 通过 Readability 抓取（静态页面），并以 Lightpanda 作为 fallback（JS/SPA 页面）；关键词则会触发 Mistral web_search Agent。每个结果都会创建独立来源。 |
-| **100% Mistral TTS** | Mistral Voxtral TTS（除 `MISTRAL_API_KEY` 外无需额外密钥）——语音合成已集成到成本链路和按语言解析语音的流程中。 |
+| **选择 Alpine.js 而非 React/Vue** | 资源占用极小，通过 Vite 编译的 TypeScript 实现轻量响应式功能。非常适合注重开发速度的黑客马拉松。 |
+| **使用 JSON 文件持久化存储** | 零依赖，即时启动。无需配置数据库 — 启动即可使用。 |
+| **Vite + Handlebars** | 兼具两者优势：开发时快速的 HMR、用于组织代码的 HTML 局部模板，以及 Tailwind JIT。 |
+| **集中管理提示词** | 所有人工智能提示词均位于 `prompts.ts` — 便于迭代、测试，并按语言/年龄组调整。 |
+| **多生成内容系统** | 每份生成内容都是具有独立 ID 的对象 — 每门课程可拥有多份复习资料、测验等。 |
+| **按年龄调整提示词** | 4 个年龄组采用不同的词汇、复杂度和语气 — 同一内容会根据学习者采用不同的教学方式。 |
+| **基于智能体的功能** | 图像生成和网页搜索使用临时 Mistral 智能体 — 生命周期清晰，并自动清理。 |
+| **智能 URL 抓取** | 单个输入框支持混合输入 URL 和关键词 — URL 通过 Readability（静态页面）抓取，并以 Lightpanda（JS/SPA 页面）作为备用方案；关键词则触发 Mistral web_search 智能体。每条结果都会创建独立来源。 |
+| **TTS 完全采用 Mistral** | Mistral Voxtral TTS（除 `MISTRAL_API_KEY` 外无需额外密钥）— 语音合成已纳入费用核算流程，并支持按语言选择声音。 |
 
 ---
+
 ## 鸣谢
 
-- **[Mistral AI](https://mistral.ai)** — AI 模型（Large、OCR、Voxtral STT、Voxtral TTS、Moderation、Small）+ Worldwide Hackathon
-- **[Alpine.js](https://alpinejs.dev)** — 轻量级响应式框架
-- **[TailwindCSS](https://tailwindcss.com)** — 实用工具优先的 CSS 框架
+- **[Mistral AI](https://mistral.ai)** — 人工智能模型（Large、OCR、Voxtral STT、Voxtral TTS、Moderation、Small）+ 全球黑客马拉松
+- **[Alpine.js](https://alpinejs.dev)** — 轻量响应式框架
+- **[TailwindCSS](https://tailwindcss.com)** — 实用类 CSS 框架
 - **[Vite](https://vitejs.dev)** — 前端构建工具
 - **[Lucide](https://lucide.dev)** — 图标库
 - **[Marked](https://marked.js.org)** — Markdown 解析器
-- **[Readability](https://github.com/mozilla/readability)** — 网页内容提取工具（采用 Firefox Reader View 技术）
-- **[Lightpanda](https://lightpanda.io)** — 用于抓取 JS/SPA 页面的超轻量级无头浏览器
-- **[Luciole](https://luciole-vision.com)** — 专为视障读者设计的字体，© Laurent Bourcellier 和 Jonathan Perez，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)（配置文件中的“舒适阅读”选项）
+- **[Readability](https://github.com/mozilla/readability)** — 网页内容提取（采用 Firefox Reader View 技术）
+- **[Lightpanda](https://lightpanda.io)** — 用于抓取 JS/SPA 页面的超轻量无头浏览器
+- **[Luciole](https://luciole-vision.com)** — 为视力障碍读者设计的字体，© Laurent Bourcellier & Jonathan Perez，[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)（个人资料中的“舒适阅读”选项）
 
-项目始于 Mistral AI Worldwide Hackathon（2026 年 3 月），并完全由 AI 使用 [Claude Code](https://code.claude.com/)、[Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/) 开发。
+项目发起于 Mistral AI 全球黑客马拉松期间（2026 年 3 月），全部由人工智能通过 [Claude Code](https://code.claude.com/)、[Codex](https://openai.com/codex/) 和 [Gemini CLI](https://geminicli.com/) 开发。
 
 ---
 
@@ -614,4 +632,4 @@ output/                   — Données d'exécution (projets, config, fichiers a
 
 [AGPL-3.0](LICENSE) — 版权所有 (C) 2026 Julien LS
 
-**使用 gpt-5.6-sol 将文章从法语翻译成中文。**
+**使用 gpt-6.1-sol 将文章从法语翻译成中文。**
