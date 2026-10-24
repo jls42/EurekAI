@@ -14,7 +14,7 @@
  *   `mistral-moderation-2603`) — tolérance NON garantie par la politique Mistral (un modèle
  *   retiré doit répondre 404) ;
  * - la réponse HTTP brute porte aussi un champ `usage`, retiré par le SDK (absent de
- *   `ModerationResponse`, en 2.3.0 comme en 2.7.0).
+ *   `ModerationResponse`, de la 2.3.0 à la 3.2.0).
  * Seul un id daté garantit une taxonomie, un tarif et une disponibilité déterministes.
  *
  * Procédure de bump (dans le même commit que le changement de cette constante) :
