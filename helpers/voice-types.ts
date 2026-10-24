@@ -24,4 +24,6 @@ export interface MistralVoice {
   slug?: string;
   /** Voix clonée par le compte (`userId` non nul dans l'API), pas un preset Mistral. */
   custom?: boolean;
+  /** Sorte de voix dans l'API : `ivc` (clonage instantané) ou `pvc` (preset Voxtral 3). */
+  kind?: string;
 }

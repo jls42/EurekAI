@@ -23,10 +23,11 @@ const isSdkCloneBug = (err: object): boolean => {
 };
 
 /**
- * Codes que le SDK rejoue déjà lui-même sur toutes ses opérations (`retryCodes` du SDK 2.7.0,
- * mesuré), avec le backoff de RETRY_CONFIG (`mistral-client-factory.ts`, ≤ 120 s). Les rejouer ici
- * empilerait 3 tentatives applicatives sur ce backoff : jusqu'à ~6 min d'attente sur un 429
- * persistant. Verrou au bump du SDK : `mistral-client-factory.contract.test.ts`.
+ * Codes que le SDK rejoue déjà lui-même sur toutes ses opérations (`retryCodes`, mesurés en 2.7.0,
+ * identiques en 3.2.0), avec le backoff de RETRY_CONFIG (`mistral-client-factory.ts` : nouvelles
+ * tentatives pendant 120 s, chacune bornée à 120 s depuis le SDK 3, soit ≈ 250 s au pire). Les
+ * rejouer ici empilerait 3 tentatives applicatives sur ce backoff : jusqu'à ~6 min d'attente sur
+ * un 429 persistant. Verrou au bump du SDK : `mistral-client-factory.contract.test.ts`.
  */
 export const SDK_RETRIED_STATUSES: ReadonlySet<number> = new Set([429, 500, 502, 503, 504]);
 

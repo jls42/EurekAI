@@ -76,23 +76,24 @@ const SPEECH_V1_MODELS: ReadonlySet<TtsModel> = new Set<TtsModel>([VOXTRAL_TTS_2
 const SPEECH_V1_PRESET_SLUG = /^[a-z]{2}_[a-z]+_[a-z]+$/;
 
 /**
- * Vrai si le modèle accepte la voix. Le SDK 2.7.0 retire le champ `kind` des voix : on reconnaît une
- * voix `ivc` à son slug de preset Voxtral 2 ou à son caractère personnel (voix clonée par le compte,
- * `userId` non nul : clonage instantané). Prédicat POSITIF : une voix d'une forme inconnue est
- * écartée des modèles speech v1 (repli sur une autre voix) plutôt qu'envoyée vers un 400. Vérifié le
- * 2026-10-21 contre le champ `kind` brut des 68 voix du catalogue (0 écart). Provisoire jusqu'au
- * SDK 3, dont `VoiceResponse` expose `kind`.
+ * Vrai si le modèle accepte la voix. Les modèles speech v1 n'acceptent que `kind: 'ivc'`, champ que
+ * le SDK expose depuis la 3.0 ; toute autre valeur est écartée. Sans `kind`, repli sur la
+ * reconnaissance d'avant le SDK 3 : slug de preset Voxtral 2 ou voix personnelle (voix clonée par
+ * le compte, `userId` non nul : clonage instantané), vérifiée le 2026-10-21 contre le `kind` brut
+ * des 68 voix du catalogue (0 écart). Prédicat POSITIF : une voix d'une forme inconnue est écartée
+ * des modèles speech v1 (repli sur une autre voix) plutôt qu'envoyée vers un 400.
  */
 export const voiceSupportsTtsModel = (
-  voice: Pick<MistralVoice, 'slug' | 'custom'>,
+  voice: Pick<MistralVoice, 'slug' | 'custom' | 'kind'>,
   model: TtsModel,
 ): boolean => {
   if (!SPEECH_V1_MODELS.has(model)) return true;
+  if (voice.kind !== undefined) return voice.kind === 'ivc';
   return voice.custom === true || SPEECH_V1_PRESET_SLUG.test(voice.slug ?? '');
 };
 
 /** Voix du catalogue que le modèle accepte (liste des Réglages, voix candidates d'un appel). */
-export const voicesForTtsModel = <V extends Pick<MistralVoice, 'slug' | 'custom'>>(
+export const voicesForTtsModel = <V extends Pick<MistralVoice, 'slug' | 'custom' | 'kind'>>(
   voices: readonly V[],
   model: TtsModel,
 ): V[] => voices.filter((v) => voiceSupportsTtsModel(v, model));

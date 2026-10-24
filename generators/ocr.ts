@@ -31,7 +31,7 @@ const uploadAndProcess = async (
 
   try {
     // OCR avec scores de confiance au niveau page. `includeBlocks: false` épinglé : le défaut vaut
-    // true côté API et dans le SDK ≥ 2.6.1 (donc la 2.7.0 installée) — sans cette ligne, l'OCR
+    // true côté API et dans le SDK ≥ 2.6.1 (donc la 3.2.0 installée) — sans cette ligne, l'OCR
     // renverrait les blocs (payload ~×3,6 mesuré), inutilisés ici.
     const ocrResult = await client.ocr.process({
       model,

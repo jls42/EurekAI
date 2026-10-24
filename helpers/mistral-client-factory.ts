@@ -27,6 +27,9 @@ import { recordUsage } from './usage-context.js';
 import { getModelLimits, setModelLimits } from '../config.js';
 import { logger } from './logger.js';
 
+// Délai PAR tentative depuis le SDK 3 (un AbortSignal neuf à chaque essai), et maxElapsedTime n'est
+// lu qu'après un échec : une dernière tentative peut partir vers 130 s et durer encore 120 s, soit
+// ≈ 250 s au pire par appel (≈ 130 s en 2.7.0, où un seul signal couvrait tous les essais).
 const TIMEOUT_MS = 120_000;
 const RETRY_CONFIG = {
   strategy: 'backoff' as const,
