@@ -94,7 +94,7 @@ Pour chaque bouton visible avec aria-label commencant par `"Générer"` :
 
 ### Test du router auto
 
-Cliquer le bouton **"Auto"** (gradient bleu/violet, texte contient "magique" ou equivalent — chercher par texte: `find` "bouton genere tous les contenus / Auto / magique"). Attendre la complétion :
+Cliquer le bouton **"Auto"** (gradient bleu/violet ; libellé « Auto — C'est magique ! » sur la vue Sources et sur un tableau de bord vide, mais « Auto — Magie ! » sur le tableau de bord d'un cours qui a déjà des générations — chercher le texte `Auto` + `/magi/i`, ou `find` "bouton genere tous les contenus / Auto / magique"). Attendre la complétion :
 - `POST /generate/route` retourne 200 (router LLM)
 - N appels `/generate/<agent>` parallels (typiquement tous les agents AUTO_AGENTS_SET)
 - Verifier via API serveur que `pendingTracker.length === 0` et que `generations.length` a augmente du nombre d'agents lances.
