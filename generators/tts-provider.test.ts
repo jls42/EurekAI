@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { textToSpeech, listVoices, ttsOptionsFor, type TtsOptions } from './tts-provider.js';
 import { asVoiceId } from '../helpers/voice-types.js';
 import { voiceSupportsTtsModel } from '../helpers/tts-models.js';
+import { logger } from '../helpers/logger.js';
 import type { Mistral } from '@mistralai/mistralai';
 
 function makeMistralClient(overrides: Partial<Mistral> = {}): Mistral {
@@ -160,29 +161,53 @@ describe('listVoices', () => {
     expect(result.map((v) => v.id)).toEqual(['en-us-1', 'en-gb-1', 'multi-1']);
   });
 
-  // Le SDK 2.7.0 retire `kind` (ivc/pvc) : `slug` et `userId` (camelCase côté SDK, `user_id` dans
-  // l'API) portent la compatibilité d'une voix avec les modèles speech v1.
-  it('lit slug et caractère personnel (userId non nul) de chaque voix', async () => {
+  // `kind` (ivc/pvc, exposé depuis le SDK 3) porte la compatibilité d'une voix avec les modèles
+  // speech v1 ; `slug` et `userId` (camelCase côté SDK, `user_id` dans l'API) servent de repli.
+  it('lit kind, slug et caractère personnel (userId non nul) de chaque voix', async () => {
     const client = makeMistralClient();
     vi.mocked(client.audio.voices.list).mockResolvedValue({
       items: [
-        { ...voice('marie', ['fr_fr']), slug: 'fr_marie_neutral', userId: null },
-        { ...voice('pvc-es', ['es_es']), slug: 'voice_3141', userId: null },
-        { ...voice('ma-voix', ['fr_fr']), slug: null, userId: 'user-42' },
+        { ...voice('marie', ['fr_fr']), slug: 'fr_marie_neutral', userId: null, kind: 'ivc' },
+        { ...voice('pvc-es', ['es_es']), slug: 'voice_3141', userId: null, kind: 'pvc' },
+        { ...voice('ma-voix', ['fr_fr']), slug: null, userId: 'user-42', kind: 'ivc' },
         voice('sans-champs', ['en_us']),
       ],
       total: 4,
     } as never);
     const result = await listVoices(client);
-    expect(result.map(({ id, slug, custom }) => ({ id, slug, custom }))).toEqual([
-      { id: 'marie', slug: 'fr_marie_neutral', custom: false },
-      { id: 'pvc-es', slug: 'voice_3141', custom: false },
-      { id: 'ma-voix', slug: undefined, custom: true },
-      { id: 'sans-champs', slug: undefined, custom: false },
+    expect(result.map(({ id, kind, slug, custom }) => ({ id, kind, slug, custom }))).toEqual([
+      { id: 'marie', kind: 'ivc', slug: 'fr_marie_neutral', custom: false },
+      { id: 'pvc-es', kind: 'pvc', slug: 'voice_3141', custom: false },
+      { id: 'ma-voix', kind: 'ivc', slug: undefined, custom: true },
+      { id: 'sans-champs', kind: undefined, slug: undefined, custom: false },
     ]);
     // Bout à bout : preset Voxtral 2 et voix personnelle acceptés par 2603, preset pvc et voix de
     // forme inconnue écartés.
     const accepted = result.filter((v) => voiceSupportsTtsModel(v, 'voxtral-mini-tts-2603'));
     expect(accepted.map((v) => v.id)).toEqual(['marie', 'ma-voix']);
+  });
+
+  it('signale une seule fois les voix arrivées sans kind (repli slug/userId)', async () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    const client = makeMistralClient();
+    vi.mocked(client.audio.voices.list).mockResolvedValue({
+      items: [
+        { ...voice('a', ['fr_fr']), kind: 'ivc' },
+        voice('b', ['fr_fr']),
+        voice('c', ['en_us']),
+      ],
+      total: 3,
+    } as never);
+    await listVoices(client);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('tts', '2 voice(s) without kind: slug/userId fallback');
+    warn.mockClear();
+    vi.mocked(client.audio.voices.list).mockResolvedValue({
+      items: [{ ...voice('a', ['fr_fr']), kind: 'ivc' }],
+      total: 1,
+    } as never);
+    await listVoices(client);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
   });
 });

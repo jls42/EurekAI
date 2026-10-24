@@ -15,8 +15,8 @@ const SPEECH_V1 = 'voxtral-mini-tts-2603';
 const TTS_3 = 'voxtral-mini-tts-3-0';
 
 // Catalogue RÉEL de GET /v1/audio/voices du 2026-10-21 (68 voix) : [slug, voix personnelle (userId
-// non nul), `kind` brut de l'API]. Le SDK 2.7.0 retire `kind` : il ne sert ici que de vérité terrain
-// pour juger le prédicat, qui ne lit que slug et custom.
+// non nul), `kind` brut de l'API]. Le prédicat lit `kind` depuis le SDK 3 ; le même catalogue sans
+// `kind` juge le repli slug/custom, qui doit rendre le même verdict voix par voix.
 const REAL_CATALOG_2026_10_21: ReadonlyArray<readonly [string | null, boolean, 'ivc' | 'pvc']> = [
   ['voice_3150', false, 'pvc'],
   ['voice_478', false, 'pvc'],
@@ -154,6 +154,15 @@ describe('tts-models', () => {
     // supported for speech v1 ») ; le prédicat doit reconnaître CHAQUE voix ivc, et seulement elles.
     it('Voxtral TTS (speech v1) accepte exactement les voix ivc, voix par voix', () => {
       for (const { slug, custom, kind } of catalogVoices) {
+        expect(voiceSupportsTtsModel({ slug, custom, kind }, SPEECH_V1), `${slug} (${kind})`).toBe(
+          kind === 'ivc',
+        );
+      }
+    });
+
+    // Repli quand `kind` manque (voix lue avant le SDK 3) : même verdict que `kind`, voix par voix.
+    it('repli slug/custom sans kind : même verdict que kind sur les 68 voix', () => {
+      for (const { slug, custom, kind } of catalogVoices) {
         expect(voiceSupportsTtsModel({ slug, custom }, SPEECH_V1), `${slug} (${kind})`).toBe(
           kind === 'ivc',
         );
@@ -161,8 +170,8 @@ describe('tts-models', () => {
     });
 
     it('TTS 3 accepte tout le catalogue, ivc comme pvc', () => {
-      for (const { slug, custom } of catalogVoices) {
-        expect(voiceSupportsTtsModel({ slug, custom }, TTS_3), String(slug)).toBe(true);
+      for (const { slug, custom, kind } of catalogVoices) {
+        expect(voiceSupportsTtsModel({ slug, custom, kind }, TTS_3), String(slug)).toBe(true);
       }
     });
 
@@ -174,9 +183,33 @@ describe('tts-models', () => {
     });
   });
 
+  describe('voiceSupportsTtsModel : kind', () => {
+    it('kind prime sur le slug et le caractère personnel', () => {
+      expect(voiceSupportsTtsModel({ slug: 'fr_marie_neutral', kind: 'pvc' }, SPEECH_V1)).toBe(
+        false,
+      );
+      expect(
+        voiceSupportsTtsModel({ slug: 'voice_3141', custom: false, kind: 'ivc' }, SPEECH_V1),
+      ).toBe(true);
+    });
+
+    // Prédicat POSITIF : seule la valeur exacte `ivc` passe speech v1.
+    it.each([
+      ['inconnu', 'xvc'],
+      ['vide', ''],
+      ['majuscules', 'IVC'],
+    ])('kind %s : refusé par Voxtral TTS, accepté par TTS 3', (_label, kind) => {
+      expect(
+        voiceSupportsTtsModel({ slug: 'fr_marie_neutral', custom: true, kind }, SPEECH_V1),
+      ).toBe(false);
+      expect(voiceSupportsTtsModel({ kind }, TTS_3)).toBe(true);
+    });
+  });
+
   describe('voiceSupportsTtsModel : formes inconnues', () => {
-    // Prédicat POSITIF : une voix qui n'a ni slug de preset Voxtral 2 ni caractère personnel est
-    // écartée de speech v1 (repli sur une autre voix) plutôt qu'envoyée vers un 400.
+    // Repli sans `kind`. Prédicat POSITIF : une voix qui n'a ni slug de preset Voxtral 2 ni
+    // caractère personnel est écartée de speech v1 (repli sur une autre voix) plutôt qu'envoyée vers
+    // un 400.
     it.each([
       ['slug pvc', 'voice_3141'],
       ['tirets', 'fr-marie-neutral'],
