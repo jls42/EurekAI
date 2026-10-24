@@ -556,6 +556,8 @@ export const ar: Record<string, string> = {
     '\u062a\u0645\u0651 \u0625\u0636\u0627\u0641\u0629 \u0627\u0644\u0645\u0635\u0627\u062f\u0631!',
   'toast.importDoneIn': 'اكتمل الاستيراد في «{project}»: أُضيف {n} مصدر.',
   'toast.importErrorsIn': 'الاستيراد في «{project}»: {n} ملف به خطأ، أعد المحاولة في ذلك المشروع.',
+  'toast.generationDoneIn': 'تمّ توليد {type} في «{project}»!',
+  'toast.generationFailedIn': 'تعذّر توليد {type} في «{project}»: {error}',
   'toast.autoDoneIn': 'اكتمل السحر في «{project}»!',
   'toast.autoPartialIn': 'السحر في «{project}»: نجح {count} من أصل {total} من التوليدات.',
   'toast.autoFailedIn': 'فشل التوليد التلقائي في «{project}». أعد المحاولة في ذلك المشروع.',

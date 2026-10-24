@@ -445,6 +445,8 @@ export const en: Record<string, string> = {
   'toast.sourcesAdded': 'Sources added!',
   'toast.importDoneIn': 'Import finished in "{project}": {n} source(s) added.',
   'toast.importErrorsIn': 'Import in "{project}": {n} file(s) failed, retry them in that project.',
+  'toast.generationDoneIn': '{type} generated in "{project}"!',
+  'toast.generationFailedIn': '{type} could not be generated in "{project}": {error}',
   'toast.autoDoneIn': 'Magic complete in "{project}"!',
   'toast.autoPartialIn': 'Magic in "{project}": {count} of {total} generations succeeded.',
   'toast.autoFailedIn': 'Automatic generation in "{project}" failed. Try again in that project.',

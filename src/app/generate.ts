@@ -701,6 +701,9 @@ type SingleLaunch = {
   pendingSourceIds: string[];
   extraBody?: GenerateExtraBody;
   key: string;
+  // Pour le toast d'une génération finie pendant qu'un autre cours est affiché.
+  projectName: string;
+  profileId: string | null;
 };
 
 const captureSingleLaunch = (
@@ -716,6 +719,8 @@ const captureSingleLaunch = (
     // fiche existante) sans dupliquer le lifecycle.
     body: { ...buildGenerateBody(state), ...extraBody },
     pendingSourceIds: [...(extraBody?.sourceIds ?? state.selectedIds)],
+    projectName: state.currentProject?.meta.name ?? '',
+    profileId: state.currentProfile?.id ?? null,
     extraBody,
     key: captureAiKey(),
   };
@@ -900,9 +905,35 @@ const acquireSingleLaunch = async function (
 // rien poser sur l'écran affiché (pending, chargement, toast) ; le serveur refait la garde de
 // modération et enregistre le résultat, visible au retour sur le cours. Jusqu'en v1.7.11 : perdue
 // sans un mot. Gère ses erreurs : lançable sans l'attendre (`void`).
-const sendGenerateInBackground = async function (launch: SingleLaunch): Promise<void> {
+// Génération simple terminée pendant qu'un autre cours est affiché : un toast nomme son cours, comme
+// l'Auto et l'import en arrière-plan (jusqu'au 2026-10-24 : rien). Sans eventKey : avec une clé,
+// showToast enregistrerait la notification sous le cours AFFICHÉ, et la réconciliation du retour
+// (backfillCompletedNotifs) serait dédoublonnée sous ce mauvais cours. Rien si l'on est revenu sur
+// le cours (le SSE prend le relais) ou si le profil a changé.
+const notifySingleElsewhere = async (
+  state: AppContext,
+  launch: SingleLaunch,
+  res: Response,
+): Promise<void> => {
+  if (state.currentProjectId === launch.projectId) return;
+  if ((state.currentProfile?.id ?? null) !== launch.profileId) return;
+  const params = { type: state.t(I18N_GEN_PREFIX + launch.type), project: launch.projectName };
+  if (res.ok) {
+    state.showToast(state.t('toast.generationDoneIn', params), 'success');
+    return;
+  }
+  const err = (await res.json().catch(() => ({}))) as { error?: string };
+  const error = state.resolveError(err.error || res.statusText);
+  state.showToast(state.t('toast.generationFailedIn', { ...params, error }), 'error');
+};
+
+const sendGenerateInBackground = async function (
+  state: AppContext,
+  launch: SingleLaunch,
+): Promise<void> {
   try {
-    await withLongRequestSlot(() => fetchSingleGenerate(launch, crypto.randomUUID()));
+    const res = await withLongRequestSlot(() => fetchSingleGenerate(launch, crypto.randomUUID()));
+    if (res) await notifySingleElsewhere(state, launch, res);
   } catch (e: unknown) {
     console.warn('[generate] envoi vers un cours quitté impossible', launch.type, e);
   }
@@ -921,7 +952,11 @@ const requestWithPending = async (
 ): Promise<void> => {
   flight.sent = true;
   const res = await fetchSingleGenerate(launch, flight.gid, flight.controller.signal);
-  if (!res || state.currentProjectId !== launch.projectId) return;
+  if (!res) return;
+  if (state.currentProjectId !== launch.projectId) {
+    await notifySingleElsewhere(state, launch, res);
+    return;
+  }
   await dispatchGenerateResponse(state, launch.type, flight.gid, res, launch.extraBody);
 };
 
@@ -948,7 +983,7 @@ const sendGenerateWithPending = async function (
     await withLongRequestSlot(request, flight.controller.signal);
   } catch (e: unknown) {
     if (state.currentProjectId !== projectId) {
-      if (!flight.sent) void sendGenerateInBackground(launch);
+      if (!flight.sent) void sendGenerateInBackground(state, launch);
       return;
     }
     delete state.pendingById[flight.gid];
@@ -972,7 +1007,7 @@ const runSingleGenerate = async function (
   if (outcome === 'refused') return;
   // Le pending optimiste prend le relais de la réservation anti-flood, sans intervalle.
   releaseLaunch(state, type);
-  if (outcome === 'moved') await sendGenerateInBackground(launch);
+  if (outcome === 'moved') await sendGenerateInBackground(state, launch);
   else await sendGenerateWithPending(state, launch);
 };
 

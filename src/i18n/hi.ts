@@ -567,6 +567,8 @@ export const hi: Record<string, string> = {
   'toast.importDoneIn': '"{project}" में आयात पूरा: {n} स्रोत जोड़े गए।',
   'toast.importErrorsIn':
     '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.generationDoneIn': '"{project}" में {type} बन गया!',
+  'toast.generationFailedIn': '"{project}" में {type} नहीं बन सका: {error}',
   'toast.autoDoneIn': '"{project}" में जादू पूरा हुआ!',
   'toast.autoPartialIn': '"{project}" में जादू: {total} में से {count} जनरेशन सफल रहे।',
   'toast.autoFailedIn':
