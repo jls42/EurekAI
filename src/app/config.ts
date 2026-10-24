@@ -88,6 +88,33 @@ const reloadMistralVoices = (state: AppContext): Promise<void> => {
   return state.loadMistralVoices ? state.loadMistralVoices() : Promise.resolve();
 };
 
+// Pays par défaut d'une langue sans région dans le catalogue de voix (voix Voxtral 3 : `ar`, `ca`,
+// `hi`…). Les 9 langues de l'interface gardent le drapeau de leur sélecteur (src/i18n/languages.ts) ;
+// le catalan prend celui d'Andorre, où il est la seule langue officielle.
+const LANG_DEFAULT_COUNTRY: Readonly<Record<string, string>> = {
+  ar: 'SA',
+  ca: 'AD',
+  de: 'DE',
+  en: 'GB',
+  es: 'ES',
+  fr: 'FR',
+  hi: 'IN',
+  hu: 'HU',
+  it: 'IT',
+  ja: 'JP',
+  ko: 'KR',
+  nl: 'NL',
+  no: 'NO',
+  pl: 'PL',
+  pt: 'BR',
+  ro: 'RO',
+  ru: 'RU',
+  tr: 'TR',
+  uk: 'UA',
+  vi: 'VN',
+  zh: 'CN',
+};
+
 export function createConfig() {
   return {
     async loadConfig(this: AppContext) {
@@ -151,12 +178,13 @@ export function createConfig() {
       return this.t('emotion.' + emotion) || emotion;
     },
 
+    // Drapeau d'une voix d'après SA langue (`en_gb`, `fr_fr`, ou `ar` sans région) : la région si elle
+    // est donnée, sinon le pays par défaut de la langue. Jusqu'au 2026-10-24, le code de langue passait
+    // pour un code pays (ar → Argentine, ca → Canada) et toutes les voix anglaises prenaient le
+    // drapeau de la première voix anglaise du catalogue (voix britanniques en 🇺🇸).
     langToFlag(this: AppContext, lang: string): string {
-      if (!lang || lang.length < 2) return '';
-      const list = this.mistralVoicesList as unknown as VoicesEnrichedEntry[];
-      const voice = list.find((v) => v.lang === lang);
-      const code = voice?.langFull?.split('_')[1] || lang;
-      const country = code.toUpperCase();
+      const [code = '', region = ''] = (lang || '').toLowerCase().split('_');
+      const country = (region || LANG_DEFAULT_COUNTRY[code] || '').toUpperCase();
       if (!/^[A-Z]{2}$/.test(country)) return '';
       return String.fromCodePoint(
         ...[...country].map((c) => 0x1f1e6 + (c.codePointAt(0) ?? 0) - 65),
@@ -166,7 +194,7 @@ export function createConfig() {
     voiceLabel(this: AppContext, voice: Partial<VoicesEnrichedEntry>): string {
       const speaker = voice.speaker || voice.name || voice.id || '';
       const emotion = this.translateEmotion(voice.emotion || '');
-      const flag = this.langToFlag(voice.lang || '');
+      const flag = this.langToFlag(voice.langFull || voice.lang || '');
       const name = emotion ? `${speaker} - ${emotion}` : speaker;
       return [flag, name].filter(Boolean).join(' ');
     },
