@@ -16,6 +16,7 @@ import type {
   Generation,
   GenerationEvent,
   PendingTrackerEntry,
+  PendingTrackerEntryTerminal,
   PodcastGeneration,
   PodcastLine,
   ProjectData,
@@ -938,6 +939,18 @@ const backfillCompletedNotifs = function (
   }
 };
 
+// Entrée terminée depuis la dernière visite, sauf l'étape annulée d'un lot Auto (annulée avec le
+// lot, ou interrompue par un redémarrage et encore reprenable) : le bilan du lot suffit, et une
+// étape annulée par sa puce a déjà eu son message.
+const needsTerminalNotif = (
+  t: PendingTrackerEntry,
+  cutoff: number,
+): t is PendingTrackerEntryTerminal => {
+  if (t.status === 'pending' || !t.completedAt) return false;
+  if (t.status === 'cancelled' && t.runId) return false;
+  return Date.parse(t.completedAt) > cutoff;
+};
+
 const backfillTerminalNotifs = function (
   this: AppContext,
   tracker: PendingTrackerEntry[],
@@ -946,8 +959,7 @@ const backfillTerminalNotifs = function (
   projectId: string,
 ): void {
   for (const t of tracker) {
-    if (t.status === 'pending') continue;
-    if (!t.completedAt || Date.parse(t.completedAt) <= cutoff) continue;
+    if (!needsTerminalNotif(t, cutoff)) continue;
     const cancelled = t.status === 'cancelled';
     appendNotification(profileId, {
       eventKey: buildEventKey(t.id, t.status),

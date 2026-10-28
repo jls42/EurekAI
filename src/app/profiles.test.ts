@@ -117,6 +117,16 @@ describe('createProfiles', () => {
       expect(mockStorage['sf-profileId']).toBe('p1');
     });
 
+    it('aucun toast gardé d’un profil à l’autre, « Reprendre » compris', () => {
+      const ctx = makeCtx({
+        profiles: [{ id: 'p1', name: 'Alice', locale: 'fr' }],
+        toasts: [{ id: 3, action: { persistent: true, projectId: 'x' } }],
+      });
+      callMethod('selectProfile', ctx, 'p1');
+
+      expect(ctx.toasts).toEqual([]);
+    });
+
     it('calls setLocale with the profile locale', () => {
       const ctx = makeCtx({
         profiles: [{ id: 'p1', name: 'Alice', locale: 'en' }],

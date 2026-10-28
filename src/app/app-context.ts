@@ -49,7 +49,7 @@ export interface ItemWithRefs {
   source?: string;
 }
 
-type ToastAction = { label: string; fn: () => void };
+type ToastAction = { label: string; fn: () => void; persistent?: boolean; projectId?: string };
 type NotifSpec = {
   messageKey: string;
   params?: Record<string, string | number>;
@@ -193,6 +193,7 @@ export interface AppContext extends AppState {
   generateSimplified(gen: Generation): Promise<void>;
   generateAll(): Promise<void>;
   generateAuto(): Promise<void>;
+  resumeAuto(projectId: string, runId: string, projectName: string): Promise<void>;
   generateVoice(gen: Generation, section?: string): Promise<void>;
   playSection(gen: Generation, section: string | null): void;
   playNextSection(gen: Generation): void;

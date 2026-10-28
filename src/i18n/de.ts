@@ -473,6 +473,7 @@ export const de: Record<string, string> = {
   'toast.autoJoined': 'Die Magie läuft für diesen Kurs bereits: Ich verfolge sie.',
   'toast.autoCancelledIn': 'Die Magie in „{project}“ wurde abgebrochen.',
   'toast.autoInterruptedIn': 'Die Magie in „{project}“ wurde unterbrochen (Server neu gestartet).',
+  'toast.resume': 'Fortsetzen',
   'toast.autoFailedIn':
     'Die automatische Generierung in „{project}“ ist fehlgeschlagen. Bitte in diesem Projekt erneut versuchen.',
   'toast.voiceAddedIn': 'Sprache transkribiert und zu „{project}“ hinzugefügt.',

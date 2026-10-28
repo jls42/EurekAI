@@ -33,6 +33,7 @@ function makeContext(overrides: any = {}) {
     currentProject: null as any,
     currentProfile: { id: 'p1', chatEnabled: true, ageGroup: 'enfant', useModeration: false },
     projects: [] as any[],
+    toasts: [] as any[],
     newProjectName: '',
     showNewProject: false,
     sources: [],
@@ -732,6 +733,19 @@ describe('deleteProject', () => {
     expect(ctx.showToast).toHaveBeenCalledWith('toast.projectDeleted', 'info');
     // Did not reset since we deleted a different project
     expect(ctx.currentProjectId).toBe('p2');
+  });
+
+  it('retire le « Reprendre » du lot du cours supprimé, garde celui d’un autre cours', async () => {
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
+    const mine = { id: 1, action: { persistent: true, projectId: 'p1' } };
+    const other = { id: 2, action: { persistent: true, projectId: 'p2' } };
+    const ctx = makeContext({
+      currentProjectId: 'p2',
+      projects: [{ id: 'p1' }, { id: 'p2' }],
+      toasts: [mine, other],
+    });
+    await proj.deleteProject.call(ctx, 'p1');
+    expect(ctx.toasts).toEqual([other]);
   });
 
   it('drops the upload sessions of the deleted project (its import stops), keeps the others', async () => {

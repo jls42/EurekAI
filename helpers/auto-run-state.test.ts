@@ -4,7 +4,10 @@ import {
   MAX_KEPT_AUTO_RUNS,
   applyStepTransition,
   endAutoRun,
+  isResumableAutoRun,
   pruneAutoRuns,
+  resumableStepCount,
+  resumeInterruptedSteps,
 } from './auto-run-state.js';
 import type { AutoRun, AutoRunStatus, ProjectData } from '../types.js';
 
@@ -62,5 +65,47 @@ describe('applyStepTransition / endAutoRun', () => {
     const run = makeRun('r', 'completed');
     expect(endAutoRun(run, 'cancelled', 'cancelled', iso(NOW))).toBeUndefined();
     expect(run.status).toBe('completed');
+  });
+});
+
+describe('resumeInterruptedSteps', () => {
+  const interrupted = (): AutoRun => {
+    const run = makeRun('r', 'interrupted');
+    run.steps = [
+      { agent: 'summary', gid: 'g1', status: 'completed' },
+      { agent: 'quiz', gid: 'g2', status: 'interrupted' },
+      { agent: 'flashcards', gid: 'g3', status: 'cancelled' },
+      { agent: 'fill-blank', gid: 'g4', status: 'interrupted' },
+    ];
+    return run;
+  };
+
+  it('étapes interrompues seules, gids neufs dans l’ordre du plan, lot running', () => {
+    const run = interrupted();
+    expect(resumableStepCount(run)).toBe(2);
+    const resumed = resumeInterruptedSteps(run, ['n1', 'n2'], iso(NOW));
+    expect(resumed).toEqual([
+      { agent: 'quiz', gid: 'n1' },
+      { agent: 'fill-blank', gid: 'n2' },
+    ]);
+    expect(run.steps.map((s) => [s.gid, s.status])).toEqual([
+      ['g1', 'completed'],
+      ['n1', 'pending'],
+      ['g3', 'cancelled'],
+      ['n2', 'pending'],
+    ]);
+    expect(run).toMatchObject({ status: 'running', resumedAt: iso(NOW), updatedAt: iso(NOW) });
+    expect(run.completedAt).toBeUndefined();
+  });
+
+  it('rien à reprendre : interrompu pendant l’analyse, autre statut, gids en nombre faux', () => {
+    expect(isResumableAutoRun(makeRun('a', 'interrupted'))).toBe(false);
+    const completed = interrupted();
+    completed.status = 'completed';
+    expect(resumableStepCount(completed)).toBe(0);
+    expect(resumeInterruptedSteps(completed, ['n1', 'n2'], iso(NOW))).toBeUndefined();
+    const run = interrupted();
+    expect(resumeInterruptedSteps(run, ['n1'], iso(NOW))).toBeUndefined();
+    expect(run.status).toBe('interrupted');
   });
 });

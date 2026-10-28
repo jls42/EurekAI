@@ -2,8 +2,9 @@
  * Réseau des lots Auto (état et affichage : auto-runs.ts). Lancement par
  * `POST …/generate/auto/start` : une requête courte, HORS de la file des requêtes longues de
  * l'onglet (request-slots.ts) — le serveur répond 202 et analyse puis génère en arrière-plan, au
- * plus 3 étapes en même temps par clé. Sondage de l'onglet lanceur pendant qu'un autre cours est
- * affiché (le flux SSE ne suit que le cours affiché). Annulation du lot entier en une requête.
+ * plus 3 étapes en même temps par clé. Reprise d'un lot interrompu (`POST …/generate/auto/resume`),
+ * suivie comme un lancement. Sondage de l'onglet lanceur pendant qu'un autre cours est affiché (le
+ * flux SSE ne suit que le cours affiché). Annulation du lot entier en une requête.
  */
 import type { AppContext } from './app-context';
 import type { AutoRun } from '../../types';
@@ -23,6 +24,8 @@ export type AutoLaunch = {
   runId: string;
   body: Record<string, unknown>;
   key: string;
+  // « Réessayer » d'un lancement refusé : un nouveau lot par défaut, la même reprise pour une reprise.
+  retry?: () => void;
 };
 
 type RunResponse = { run?: AutoRun; error?: string };
@@ -53,7 +56,8 @@ export const reportAutoStartError = (state: AppContext, launch: AutoLaunch, code
     return;
   }
   // Un refus de modération ne se réessaie pas (même refus à chaque fois).
-  const retry = code === 'moderation.blocked' ? null : () => state.generateAuto();
+  const again = launch.retry ?? (() => state.generateAuto());
+  const retry = code === 'moderation.blocked' ? null : again;
   state.showToast(state.t('toast.error', { error: state.resolveError(code) }), 'error', retry);
 };
 
@@ -99,6 +103,25 @@ export async function launchAutoLot(state: AppContext, launch: AutoLaunch): Prom
 const runUrlAllowed = (projectId: string, runId: string): boolean => {
   return PROJECT_ID_SAFE.test(projectId) && RUN_ID_SAFE.test(runId);
 };
+
+/**
+ * Reprise d'un lot interrompu (« Reprendre » de son bilan) avec la clé du clic : le serveur relance
+ * ses étapes interrompues, sans refaire l'analyse. 202 (repris, ou déjà repris ailleurs) et 409 (un
+ * autre lot tourne sur ce cours) : suivi comme un lancement ; 200 (lot terminé entre-temps, rien à
+ * reprendre) : lot oublié. URL validée avant le fetch (barrière SSRF).
+ */
+export async function resumeAutoLot(state: AppContext, launch: AutoLaunch): Promise<void> {
+  const url = `/api/projects/${launch.projectId}/generate/auto/resume`;
+  const allowedUrls = runUrlAllowed(launch.projectId, launch.runId) ? [url] : [];
+  if (allowedUrls.includes(url)) {
+    const init = jsonPost({ runId: launch.runId });
+    const res = await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
+    if (res.status === 200) forgetAutoRun(state, launch.projectId);
+    else await handleStartResponse(state, launch, res);
+    return;
+  }
+  forgetAutoRun(state, launch.projectId);
+}
 
 const applyRunResponse = async (state: AppContext, projectId: string, res: Response) => {
   if (res.status === 404) {

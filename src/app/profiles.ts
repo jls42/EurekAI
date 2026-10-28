@@ -352,6 +352,8 @@ const selectProfile = async function (this: AppContext, id: string) {
   this.currentProjectId = null;
   this.currentProject = null;
   this.resetSession();
+  // Aucun toast gardé d'un profil à l'autre : un « Reprendre » nommerait le cours d'un autre profil.
+  this.toasts = [];
   this.resetState();
   // Charge la clé Mistral du profil AVANT loadProjects (déchiffrement IndexedDB async,
   // doit être résolu avant les fetchs IA). Reste après les resets synchrones.

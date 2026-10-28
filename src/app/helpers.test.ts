@@ -2569,6 +2569,29 @@ describe('backfillCompletedNotifs / backfillTerminalNotifs (direct)', () => {
     expect(cancelled.type).toBe('info');
     expect(cancelled.paramKeys.type).toBe('gen.podcast');
   });
+
+  it('backfillTerminalNotifs : étape annulée d’un lot Auto (interrompue, ou annulée avec lui) : rien', () => {
+    const ctx = makeCtx();
+    const cutoff = Date.parse('2026-04-26T10:00:00Z');
+    const step = (id: string, status: string, failureCode: string): any => ({
+      id,
+      type: 'quiz',
+      status,
+      failureCode,
+      runId: 'run-1',
+      startedAt: '2026-04-26T10:30:00Z',
+      completedAt: '2026-04-26T11:00:00Z',
+    });
+    const tracker = [
+      step('s-cancelled', 'cancelled', 'cancelled'),
+      step('s-failed', 'failed', 'refused'),
+    ];
+
+    ctx.backfillTerminalNotifs.call(ctx as any, tracker, cutoff, 'profile-B', 'pid-Y');
+
+    const notifs = JSON.parse(storage['sf-profile-notifications'] ?? '{}')['profile-B'] ?? [];
+    expect(notifs.map((n: any) => n.eventKey)).toEqual(['generation:s-failed:failed']);
+  });
 });
 
 // --- mergeReconciledGenerations: merge completed gens missed by SSE drop ---

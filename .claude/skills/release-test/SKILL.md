@@ -104,7 +104,7 @@ Cliquer le bouton **"Auto"** (gradient bleu/violet ; libellé « Auto — C'est 
 - **deuxième onglet** sur le même cours : son clic Auto rejoint le lot (`toast.autoJoined`, 409 `auto_busy`), jamais un second lot ;
 - **✕ d'une étape** : seule elle s'arrête, le bilan ne la compte pas (« 2 sur 2 », jamais « 2 sur 3 ») ; **« Tout annuler »** : une requête `POST /auto-runs/:runId/cancel`, un seul message dans chaque onglet ;
 - **cours quitté pendant le lot** : à la fin, toast qui nomme le cours (`toast.autoDoneIn`…), notification rangée sous ce cours ;
-- **serveur arrêté en plein lot puis relancé** : `toast.autoInterruptedIn` une fois.
+- **serveur arrêté en plein lot puis relancé** : `toast.autoInterruptedIn` une fois, avec **« Reprendre »** (toast persistant) ; le clic → un seul `POST /generate/auto/resume` → 202, seules les étapes interrompues repartent (gids neufs), **aucune** nouvelle ligne de coût `generate/auto/route`, total du cours inchangé après un F5 ; même chose depuis un onglet rechargé après le redémarrage (bilan proposé à l'ouverture du cours, une fois).
 
 ### Test cancel
 

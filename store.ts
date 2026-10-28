@@ -30,6 +30,8 @@ import {
   findAutoRun,
   interruptActiveAutoRuns,
   pruneAutoRuns,
+  resumableStepCount,
+  resumeInterruptedSteps,
 } from './helpers/auto-run-state.js';
 import { buildEventKey, type EventKey } from './helpers/event-key.js';
 import { logger } from './helpers/logger.js';
@@ -64,6 +66,30 @@ export type CreateAutoRunResult = 'created' | 'missing' | 'busy' | 'duplicate';
 
 // Étape d'un lot au moment où ses entrées du tracker sont posées.
 export type AutoRunStepInit = Pick<AutoRunStep, 'agent' | 'gid'>;
+
+// Reprise d'un lot interrompu (cf. resumeAutoRun).
+export type ResumeAutoRunResult =
+  | { status: 'resumed'; run: AutoRun; steps: AutoRunStepInit[] }
+  | { status: 'missing' | 'busy' | 'not_resumable' };
+
+// Entrée du tracker de chaque étape posée : runId du lot et sources retenues au lancement.
+const stepTrackerEntries = (
+  run: AutoRun,
+  steps: AutoRunStepInit[],
+  now: string,
+): PendingTrackerEntryActive[] => {
+  const { sourceIds } = run.request;
+  return steps.map((step): PendingTrackerEntryActive => {
+    return {
+      id: step.gid,
+      type: step.agent,
+      status: 'pending',
+      startedAt: now,
+      sourceIds,
+      runId: run.id,
+    };
+  });
+};
 
 // Entrée en cours sans son statut : la base commune, `runId` compris (jamais recopiée champ par
 // champ : un champ ajouté à la base était perdu au passage en terminal).
@@ -776,17 +802,7 @@ export class ProjectStore {
     const run = data ? findAutoRun(data, runId) : undefined;
     if (!data || run?.status !== 'analysing') return null;
     const now = new Date().toISOString();
-    const entries = steps.map((step): PendingTrackerEntryActive => {
-      const { sourceIds } = run.request;
-      return {
-        id: step.gid,
-        type: step.agent,
-        status: 'pending',
-        startedAt: now,
-        sourceIds,
-        runId,
-      };
-    });
+    const entries = stepTrackerEntries(run, steps, now);
     const tracker = (data.results.pendingTracker ??= []);
     tracker.push(...entries);
     run.steps = steps.map((step) => ({ ...step, status: 'pending' }));
@@ -799,6 +815,39 @@ export class ProjectStore {
     for (const entry of entries) this.emitPendingEvent(projectId, entry);
     this.emitAutoRunChange(projectId, run);
     return run;
+  }
+
+  // Reprise d'un lot `interrupted` (« Reprendre »), en UNE écriture : chaque étape interrompue repart
+  // avec un gid neuf et sa propre entrée du tracker, le lot repart `running`. `busy` : un autre lot
+  // est actif sur ce cours (re-vérifié ici, au moment d'écrire) ; `not_resumable` : lot pas
+  // interrompu, ou interrompu pendant l'analyse (aucune étape à reprendre).
+  resumeAutoRun(projectId: string, runId: string): ResumeAutoRunResult {
+    const data = this.getProject(projectId);
+    const run = data ? findAutoRun(data, runId) : undefined;
+    if (!data || !run) return { status: 'missing' };
+    const count = resumableStepCount(run);
+    if (count === 0) return { status: 'not_resumable' };
+    if (findActiveAutoRun(data)) return { status: 'busy' };
+    const gids = Array.from({ length: count }, () => randomUUID());
+    const steps = this.writeResumedSteps(projectId, data, run, gids);
+    return { status: 'resumed', run, steps };
+  }
+
+  private writeResumedSteps(
+    projectId: string,
+    data: ProjectData,
+    run: AutoRun,
+    gids: string[],
+  ): AutoRunStepInit[] {
+    const now = new Date().toISOString();
+    const steps = resumeInterruptedSteps(run, gids, now) ?? [];
+    const entries = stepTrackerEntries(run, steps, now);
+    const tracker = (data.results.pendingTracker ??= []);
+    tracker.push(...entries);
+    this.saveProject(projectId, data);
+    for (const entry of entries) this.emitPendingEvent(projectId, entry);
+    this.emitAutoRunChange(projectId, run);
+    return steps;
   }
 
   // Analyse en échec : lot `failed` avec son code, aucune étape n'est partie. null si le lot n'est

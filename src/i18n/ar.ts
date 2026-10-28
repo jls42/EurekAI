@@ -566,6 +566,7 @@ export const ar: Record<string, string> = {
   'toast.autoJoined': 'السحر قيد التشغيل بالفعل لهذا الدرس: أتابعه.',
   'toast.autoCancelledIn': 'تم إلغاء السحر في «{project}».',
   'toast.autoInterruptedIn': 'توقّف السحر في «{project}» (أُعيد تشغيل الخادم).',
+  'toast.resume': 'استئناف',
   'toast.autoFailedIn': 'فشل التوليد التلقائي في «{project}». أعد المحاولة في ذلك المشروع.',
   'toast.voiceAddedIn': 'تم نسخ الصوت وإضافته إلى «{project}».',
   'toast.voiceErrorIn': 'تعذّرت إضافة الصوت المسجَّل لـ«{project}»: {error}',

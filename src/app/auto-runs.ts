@@ -10,7 +10,9 @@
 import type { AppContext } from './app-context';
 import type { AutoRun, AutoRunStatus, FailedStepCode, ProjectData } from '../../types';
 import { addCostDelta } from './cost-utils';
+import { hasSeenEvent } from './notifications';
 import { buildAutoRunEventKey } from '../../helpers/event-key';
+import { isResumableAutoRun } from '../../helpers/auto-run-state';
 
 type AutoRunEntry = AppContext['autoRuns'][string];
 type AutoRunsState = Pick<AppContext, 'autoRuns'>;
@@ -18,11 +20,20 @@ type AutoRunsState = Pick<AppContext, 'autoRuns'>;
 const ACTIVE_STATUSES: ReadonlySet<AutoRunStatus> = new Set(['analysing', 'running']);
 const TOAST_ERROR = 'toast.error';
 
-// Au niveau du module (resetSession n'y touche pas) : lots dont le bilan est déjà traité (un état
-// reçu deux fois, SSE puis sondage ou snapshot, ne refait rien) et lots annulés en entier (leurs
-// étapes annulées n'affichent pas chacune un toast : un message pour tout le lot).
-const finishedRuns = new Set<string>();
+// Au niveau du module (resetSession n'y touche pas) : lots dont le bilan est déjà traité, avec leur
+// statut final (un état reçu deux fois, SSE puis sondage ou snapshot, ne refait rien), et lots
+// annulés en entier (leurs étapes annulées n'affichent pas chacune un toast : un message pour tout
+// le lot).
+const finishedRuns = new Map<string, AutoRunStatus>();
 const cancelledRuns = new Set<string>();
+
+// Bilan déjà traité ; un lot interrompu qui redevient actif (« Reprendre », ici ou ailleurs) est
+// suivi de nouveau.
+const alreadyFinished = (run: AutoRun): boolean => {
+  const status = finishedRuns.get(run.id);
+  if (status === undefined) return false;
+  return status !== 'interrupted' || !ACTIVE_STATUSES.has(run.status);
+};
 
 /** Lot annulé en entier : ses étapes annulées n'ont pas de toast chacune. */
 export const isCancelledRun = (runId?: string): boolean => {
@@ -69,9 +80,10 @@ const adoptRun = (ctx: AppContext, projectId: string, run: AutoRun): AutoRunEntr
 };
 
 // Coût de l'analyse : ajouté une fois au total du cours affiché. Ailleurs, rien à ajouter : le total
-// du cours sera relu sur le serveur à son ouverture, analyse comprise.
+// du cours sera relu sur le serveur à son ouverture, analyse comprise. Lot repris (`resumedAt`) :
+// son analyse est déjà dans le total (comptée avant l'interruption, ou relue).
 const countAnalysisCost = (ctx: AppContext, entry: AutoRunEntry, shown: boolean): void => {
-  if (entry.analysisCostCounted || !entry.run?.analysisCost) return;
+  if (entry.analysisCostCounted || entry.run?.resumedAt || !entry.run?.analysisCost) return;
   entry.analysisCostCounted = true;
   if (shown) addCostDelta(ctx, entry.run.analysisCost, 'generate/auto/route');
 };
@@ -82,6 +94,7 @@ type FinalToast = {
   params?: Record<string, string | number>;
   retry?: boolean;
   view?: boolean;
+  resume?: boolean;
 };
 
 // Codes d'échec connus (types.ts : FailedStepCode) ; un code inattendu compte comme internal_error.
@@ -140,6 +153,19 @@ const failedToast = (shown: boolean, project: string): FinalToast => {
   return { key: 'toast.autoFailedIn', type: 'error', params: { project } };
 };
 
+// Lot interrompu : « Reprendre » relance ses étapes interrompues ; interrompu pendant l'analyse (rien
+// à reprendre), « Réessayer » lance un nouveau lot sur le cours affiché.
+const interruptedToast = (run: AutoRun, shown: boolean, project: string): FinalToast => {
+  const toast: FinalToast = {
+    key: 'toast.autoInterruptedIn',
+    type: 'warning',
+    params: { project },
+  };
+  if (isResumableAutoRun(run)) toast.resume = true;
+  else toast.retry = shown;
+  return toast;
+};
+
 const finalToast = (entry: AutoRunEntry, run: AutoRun, shown: boolean): FinalToast | null => {
   const project = entry.projectName;
   switch (run.status) {
@@ -151,7 +177,7 @@ const finalToast = (entry: AutoRunEntry, run: AutoRun, shown: boolean): FinalToa
       if (entry.cancelledHere) return null;
       return { key: 'toast.autoCancelledIn', type: 'info', params: { project } };
     case 'interrupted':
-      return { key: 'toast.autoInterruptedIn', type: 'warning', params: { project } };
+      return interruptedToast(run, shown, project);
     default:
       return null;
   }
@@ -170,6 +196,24 @@ const finalVisible = (ctx: AppContext, entry: AutoRunEntry, shown: boolean): boo
   return entry.launchedHere && entry.profileId === (ctx.currentProfile?.id ?? null);
 };
 
+const runEventKey = (run: AutoRun) => buildAutoRunEventKey(run.id, run.status, run.resumedAt);
+
+// « Voir » le tableau de bord, ou « Reprendre » le lot interrompu (toast persistant : il reste
+// affiché jusqu'au clic ou à sa fermeture). resumeAuto gère ses erreurs (toast).
+const finalAction = (
+  ctx: AppContext,
+  projectId: string,
+  entry: AutoRunEntry,
+  toast: FinalToast,
+) => {
+  if (toast.view) return { label: ctx.t('toast.view'), fn: () => ctx.goToView('dashboard') };
+  if (!toast.resume) return null;
+  const fn = () => {
+    void ctx.resumeAuto(projectId, entry.runId, entry.projectName);
+  };
+  return { label: ctx.t('toast.resume'), fn, persistent: true, projectId };
+};
+
 // Bilan rangé sous le cours du lot (NotifSpec.projectId), dédoublonné entre onglets par sa clé.
 const showFinal = (
   ctx: AppContext,
@@ -182,12 +226,9 @@ const showFinal = (
   const toast = finalToast(entry, run, shown);
   if (!toast) return;
   const retry = toast.retry ? () => ctx.generateAuto() : null;
-  const action = toast.view
-    ? { label: ctx.t('toast.view'), fn: () => ctx.goToView('dashboard') }
-    : null;
+  const action = finalAction(ctx, projectId, entry, toast);
   const notif = { messageKey: toast.key, params: toast.params, projectId };
-  const eventKey = buildAutoRunEventKey(run.id, run.status);
-  ctx.showToast(toastText(ctx, toast, run), toast.type, retry, action, eventKey, notif);
+  ctx.showToast(toastText(ctx, toast, run), toast.type, retry, action, runEventKey(run), notif);
 };
 
 // Entrée qui suit ce lot : celle du cours, sinon une nouvelle (lot d'un autre onglet). null : le
@@ -213,15 +254,18 @@ const adoptRunIfIdle = (
  * Lot d'un autre onglet : suivi dès maintenant. Lot terminé : bilan une fois, puis oublié.
  */
 export const applyAutoRunUpdate = (ctx: AppContext, projectId: string, run: AutoRun): void => {
-  if (finishedRuns.has(run.id)) return;
+  if (alreadyFinished(run)) return;
   const entry = entryFor(ctx, projectId, run);
   if (!entry) return;
   entry.run = run;
   const shown = ctx.currentProjectId === projectId;
   if (shown) ctx.loading.auto = run.status === 'analysing';
   countAnalysisCost(ctx, entry, shown);
-  if (ACTIVE_STATUSES.has(run.status)) return;
-  finishedRuns.add(run.id);
+  if (ACTIVE_STATUSES.has(run.status)) {
+    finishedRuns.delete(run.id);
+    return;
+  }
+  finishedRuns.set(run.id, run.status);
   if (run.status === 'cancelled') cancelledRuns.add(run.id);
   forgetAutoRun(ctx, projectId);
   showFinal(ctx, projectId, entry, shown);
@@ -247,11 +291,36 @@ const refreshKnownRun = (
   applyAutoRunUpdate(ctx, projectId, latest);
 };
 
+const adoptActiveRun = (
+  ctx: AppContext,
+  projectId: string,
+  active: AutoRun,
+  totalReloaded: boolean,
+): void => {
+  if (alreadyFinished(active)) return;
+  adoptRun(ctx, projectId, active).analysisCostCounted = inReloadedTotal(active, totalReloaded);
+  ctx.loading.auto = active.status === 'analysing';
+};
+
+// Sans lot suivi (page rechargée, onglet ouvert après le redémarrage du serveur) : le dernier lot du
+// cours, interrompu avec des étapes à reprendre et dont le bilan n'a été vu dans aucun onglet de ce
+// profil (registre des notifications), affiche son bilan et « Reprendre ». Son analyse est déjà
+// dans le total du cours.
+const offerUnseenResume = (ctx: AppContext, projectId: string, runs: AutoRun[]): void => {
+  const last = runs.at(-1);
+  const profileId = ctx.currentProfile?.id;
+  if (!last || !profileId || !isResumableAutoRun(last)) return;
+  if (finishedRuns.has(last.id) || hasSeenEvent(profileId, runEventKey(last))) return;
+  adoptRun(ctx, projectId, last).analysisCostCounted = true;
+  applyAutoRunUpdate(ctx, projectId, last);
+};
+
 /**
  * Cours relu (ouverture, ou reconnexion du flux SSE après une coupure ou un redémarrage du
  * serveur) : son lot actif est suivi (puce d'analyse rétablie, bouton Auto désactivé ; les puces
  * des étapes viennent du tracker) ; un lot déjà suivi prend l'état relu, et son bilan s'affiche s'il
- * s'est terminé entre-temps (`interrupted` après un redémarrage). `totalReloaded` : le total du
+ * s'est terminé entre-temps (`interrupted` après un redémarrage, avec « Reprendre ») ; sans lot
+ * suivi, un dernier lot interrompu jamais vu propose « Reprendre ». `totalReloaded` : le total du
  * cours vient d'être relu (ouverture), il comprend déjà l'analyse.
  */
 export const restoreAutoRun = (
@@ -267,7 +336,6 @@ export const restoreAutoRun = (
     return;
   }
   const active = runs.find((r) => ACTIVE_STATUSES.has(r.status));
-  if (!active || finishedRuns.has(active.id)) return;
-  adoptRun(ctx, projectId, active).analysisCostCounted = inReloadedTotal(active, totalReloaded);
-  ctx.loading.auto = active.status === 'analysing';
+  if (active) adoptActiveRun(ctx, projectId, active, totalReloaded);
+  else offerUnseenResume(ctx, projectId, runs);
 };

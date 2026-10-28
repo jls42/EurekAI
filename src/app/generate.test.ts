@@ -73,6 +73,7 @@ function makeContext(overrides: any = {}) {
     sources: [],
     generations: [],
     selectedIds: [],
+    toasts: [],
     loading: { ...defaultLoading },
     abortControllers: {},
     abortControllersByGid: {},
@@ -1143,6 +1144,19 @@ describe('anti-leak e.message in toasts', () => {
     const ctx = makeContext({ apiStatus: { ttsAvailable: false } });
     await gen.generateAuto.call(ctx);
     expect(JSON.stringify(ctx.showToast.mock.calls)).not.toContain(TOKEN);
+  });
+
+  it('resumeAuto() : erreur réseau sans e.message, lot oublié, « Réessayer » refait la reprise', async () => {
+    vi.mocked(globalThis.fetch).mockRejectedValueOnce(new Error(TOKEN));
+    const ctx = makeContext({ resumeAuto: vi.fn() });
+    const runId = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    await gen.resumeAuto.call(ctx, 'pid-1', runId, 'Cours');
+    const urls = vi.mocked(globalThis.fetch).mock.calls.map((c) => String(c[0]));
+    expect(urls).toEqual(['/api/projects/pid-1/generate/auto/resume']);
+    expect(JSON.stringify(ctx.showToast.mock.calls)).not.toContain(TOKEN);
+    expect(ctx.autoRuns['pid-1']).toBeUndefined();
+    ctx.showToast.mock.calls[0][2]();
+    expect(ctx.resumeAuto).toHaveBeenCalledWith('pid-1', runId, 'Cours');
   });
 });
 

@@ -11,6 +11,7 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { logger } from '../helpers/logger.js';
 import { INVALID_INPUT, isUuidV4 } from '../helpers/request-validation.js';
+import { isActiveAutoRun, isResumableAutoRun } from '../helpers/auto-run-state.js';
 import {
   buildGenerationDefs,
   planAutoRun,
@@ -21,7 +22,8 @@ import {
 
 // Lot Auto côté serveur : le navigateur lance (POST …/generate/auto/start, réponse 202 immédiate),
 // le serveur analyse puis enchaîne les étapes, chacune par le cœur des générations simples. Le
-// lot survit au rechargement de la page ; règles et décisions : .claude/rules/auto-runs.md.
+// lot survit au rechargement de la page ; interrompu par un redémarrage, il se reprend
+// (POST …/generate/auto/resume). Règles et décisions : .claude/rules/auto-runs.md.
 
 // Décisions du propriétaire du 2026-10-25.
 export const MAX_ACTIVE_AUTO_RUNS = 10;
@@ -162,11 +164,13 @@ const runAutoSteps = async (b: AutoBatch, steps: AutoRunStepInit[]): Promise<voi
   );
 };
 
-const runAutoBatch = async (b: AutoBatch): Promise<void> => {
+// Lot lancé : analyse puis étapes. Lot repris (`resumed`) : ses étapes interrompues seulement, sans
+// refaire l'analyse ; nouveau délai maximal, places de la clé de la reprise.
+const runAutoBatch = async (b: AutoBatch, resumed?: AutoRunStepInit[]): Promise<void> => {
   const deadline = setTimeout(() => expireAutoRun(b), AUTO_RUN_MAX_MS);
   deadline.unref();
   try {
-    const steps = await analyseAutoRun(b);
+    const steps = resumed ?? (await analyseAutoRun(b));
     if (steps) await runAutoSteps(b, steps);
   } catch (e) {
     logger.error('auto', `unexpected batch error: run=${b.runId}`, e);
@@ -181,15 +185,33 @@ const runAutoBatch = async (b: AutoBatch): Promise<void> => {
 // lot actif sur ce cours (409 auto_busy, avec ce lot), trop de lots dans ce process (429).
 type StartShortcut = { status: number; body: Record<string, unknown>; retryAfter?: number };
 
-const conflictFor = (store: ProjectStore, pid: string, runId: string): StartShortcut | null => {
-  const existing = store.getAutoRun(pid, runId);
-  if (existing) return { status: 202, body: { run: existing } };
+const PROJECT_NOT_FOUND: StartShortcut = { status: 404, body: { error: ERR_PROJECT_NOT_FOUND } };
+const RUN_NOT_FOUND: StartShortcut = { status: 404, body: { error: ERR_AUTO_RUN_NOT_FOUND } };
+
+const busyFor = (store: ProjectStore, pid: string): StartShortcut | null => {
   const active = store.getActiveAutoRun(pid);
   if (active) return { status: 409, body: { error: ERR_AUTO_BUSY, run: active } };
   if (activeRuns.size >= MAX_ACTIVE_AUTO_RUNS) {
     return { status: 429, body: { error: 'rate_limited' }, retryAfter: BUSY_RETRY_AFTER_S };
   }
   return null;
+};
+
+const conflictFor = (store: ProjectStore, pid: string, runId: string): StartShortcut | null => {
+  const existing = store.getAutoRun(pid, runId);
+  if (existing) return { status: 202, body: { run: existing } };
+  return busyFor(store, pid);
+};
+
+// Reprise qui ne relance rien : cours ou lot inconnu (404), lot actif (202 tel quel : déjà repris,
+// par un autre onglet), lot sans étape à reprendre (200 tel quel), autre lot actif (409), plafond.
+const resumeShortcut = (store: ProjectStore, pid: string, runId: string): StartShortcut | null => {
+  if (!store.getProject(pid)) return PROJECT_NOT_FOUND;
+  const run = store.getAutoRun(pid, runId);
+  if (!run) return RUN_NOT_FOUND;
+  if (isActiveAutoRun(run)) return { status: 202, body: { run } };
+  if (!isResumableAutoRun(run)) return { status: 200, body: { run } };
+  return busyFor(store, pid);
 };
 
 const sendShortcut = (res: Response, shortcut: StartShortcut): void => {
@@ -232,6 +254,14 @@ interface AutoLaunch {
   active: ActiveAutoRun;
 }
 
+// Lot inscrit dans le registre du process, puis analyse (ou étapes reprises) en arrière-plan.
+const startBatch = (l: AutoLaunch, resumed?: AutoRunStepInit[]): void => {
+  activeRuns.set(activeRunKey(l.pid, l.runId), l.active);
+  runAutoBatch(l, resumed).catch((e: unknown) =>
+    logger.error('auto', `batch cleanup error: run=${l.runId}`, e),
+  );
+};
+
 // Création atomique (store.createAutoRun re-vérifie le lot actif et le runId), puis analyse et
 // étapes en arrière-plan : la réponse part tout de suite.
 const launchAutoRun = (l: AutoLaunch, res: Response): void => {
@@ -243,15 +273,46 @@ const launchAutoRun = (l: AutoLaunch, res: Response): void => {
   const run = newAutoRun(l.runId, l.request);
   const created = l.store.createAutoRun(l.pid, run);
   if (created !== 'created') {
-    const fallback = { status: 404, body: { error: ERR_PROJECT_NOT_FOUND } };
-    sendShortcut(res, conflictFor(l.store, l.pid, l.runId) ?? fallback);
+    sendShortcut(res, conflictFor(l.store, l.pid, l.runId) ?? PROJECT_NOT_FOUND);
     return;
   }
-  activeRuns.set(activeRunKey(l.pid, l.runId), l.active);
-  runAutoBatch(l).catch((e: unknown) =>
-    logger.error('auto', `batch cleanup error: run=${l.runId}`, e),
-  );
+  startBatch(l);
   res.status(202).json({ run });
+};
+
+// Reprise en une écriture (store.resumeAutoRun re-vérifie le lot actif), puis étapes en
+// arrière-plan : la réponse part tout de suite.
+const relaunchAutoRun = (l: AutoLaunch, res: Response): void => {
+  const shortcut = resumeShortcut(l.store, l.pid, l.runId);
+  if (shortcut) {
+    sendShortcut(res, shortcut);
+    return;
+  }
+  const resumed = l.store.resumeAutoRun(l.pid, l.runId);
+  if (resumed.status !== 'resumed') {
+    sendShortcut(res, resumeShortcut(l.store, l.pid, l.runId) ?? RUN_NOT_FOUND);
+    return;
+  }
+  startBatch(l, resumed.steps);
+  res.status(202).json({ run: resumed.run });
+};
+
+type LaunchKey = { active: ActiveAutoRun; runId: string };
+
+// Clé (auth-first), puis runId UUID v4 ; null : refus déjà envoyé.
+const readLaunchKey = (req: Request, res: Response): LaunchKey | null => {
+  const resolved = resolveClient(req);
+  if (!resolved.ok) {
+    res.status(resolved.status).json({ error: resolved.error });
+    return null;
+  }
+  const runId: unknown = (req.body as { runId?: unknown } | undefined)?.runId;
+  if (!isUuidV4(runId)) {
+    res.status(400).json({ error: INVALID_INPUT });
+    return null;
+  }
+  const active = { client: resolved.client, fingerprint: resolved.fingerprint, stopped: false };
+  return { active, runId };
 };
 
 // Ordre des gardes : clé (auth-first), runId, projet, lot déjà lancé ou actif, plafond de lots,
@@ -263,38 +324,59 @@ const startAutoRun = async (
   req: Request,
   res: Response,
 ): Promise<void> => {
-  const resolved = resolveClient(req);
-  if (!resolved.ok) {
-    res.status(resolved.status).json({ error: resolved.error });
-    return;
-  }
+  const key = readLaunchKey(req, res);
+  if (!key) return;
+  const { active, runId } = key;
   const pid = String(req.params.pid);
-  const runId: unknown = (req.body as { runId?: unknown } | undefined)?.runId;
-  if (!isUuidV4(runId)) {
-    res.status(400).json({ error: INVALID_INPUT });
-    return;
-  }
-  const early = store.getProject(pid)
-    ? conflictFor(store, pid, runId)
-    : { status: 404, body: { error: ERR_PROJECT_NOT_FOUND } };
+  const early = store.getProject(pid) ? conflictFor(store, pid, runId) : PROJECT_NOT_FOUND;
   if (early) {
     sendShortcut(res, early);
     return;
   }
-  const built = await prepareAutoLaunch(store, profileStore, resolved.client, pid, req.body);
+  const built = await prepareAutoLaunch(store, profileStore, active.client, pid, req.body);
   if (!built.ok) {
     res.status(built.status).json({ error: built.error });
     return;
   }
-  const active = { client: resolved.client, fingerprint: resolved.fingerprint, stopped: false };
   const request = requestOf(built.ctx, req.body);
   launchAutoRun({ store, profileStore, pid, runId, ctx: built.ctx, request, active }, res);
+};
+
+// « Reprendre » un lot interrompu, avec la clé de CETTE requête : ses étapes interrompues
+// repartent, sans refaire l'analyse. Mêmes gardes que le lancement (clé, runId, cours, lot actif,
+// plafond, puis celles de l'analyse), avec le corps capturé au lancement du lot.
+const resumeInterruptedRun = async (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  const key = readLaunchKey(req, res);
+  if (!key) return;
+  const { active, runId } = key;
+  const pid = String(req.params.pid);
+  const early = resumeShortcut(store, pid, runId);
+  const run = store.getAutoRun(pid, runId);
+  if (early || !run) {
+    sendShortcut(res, early ?? RUN_NOT_FOUND);
+    return;
+  }
+  const { request } = run;
+  const built = await prepareAutoLaunch(store, profileStore, active.client, pid, request);
+  if (!built.ok) {
+    res.status(built.status).json({ error: built.error });
+    return;
+  }
+  relaunchAutoRun({ store, profileStore, pid, runId, ctx: built.ctx, request, active }, res);
 };
 
 export function autoRunRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
   router.post('/:pid/generate/auto/start', (req, res) =>
     startAutoRun(store, profileStore, req, res),
+  );
+  router.post('/:pid/generate/auto/resume', (req, res) =>
+    resumeInterruptedRun(store, profileStore, req, res),
   );
   router.get('/:pid/auto-runs/:runId', (req, res) => {
     const run = store.getAutoRun(String(req.params.pid), String(req.params.runId));

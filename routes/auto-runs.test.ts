@@ -648,3 +648,140 @@ describe('annulation, suppression, délai', () => {
     }
   });
 });
+
+describe('POST /:pid/generate/auto/resume — « Reprendre »', () => {
+  // État d'après un redémarrage : résumé produit, flashcards en cours au moment de l'arrêt.
+  const interruptedRun = (pid: string): string => {
+    const runId = randomUUID();
+    const now = new Date().toISOString();
+    const request = {
+      lang: 'fr',
+      ageGroup: 'enfant' as const,
+      sourceIds: ['src-1'],
+      useConsigne: true,
+    };
+    store.createAutoRun(pid, {
+      id: runId,
+      status: 'analysing',
+      startedAt: now,
+      updatedAt: now,
+      request,
+      steps: [],
+      skipped: [],
+    });
+    const steps = [
+      { agent: 'summary' as const, gid: randomUUID() },
+      { agent: 'flashcards' as const, gid: randomUUID() },
+    ];
+    store.startAutoRunSteps(pid, runId, steps, [], 0.0002);
+    const summary = {
+      id: steps[0].gid,
+      type: 'summary',
+      title: 'T',
+      createdAt: now,
+      sourceIds: [],
+    };
+    store.promoteToGeneration(pid, steps[0].gid, { ...summary, data: SUMMARY_DATA } as any);
+    store.cancelAllPendingsAtBoot();
+    return runId;
+  };
+
+  const resume = async (pid: string, runId: unknown) => {
+    const res = mockRes();
+    const handler = getHandler(router, 'post', '/:pid/generate/auto/resume');
+    await handler({ params: { pid }, body: { runId } }, res);
+    return { res, status: res.status.mock.calls[0]?.[0], json: res.json.mock.calls[0]?.[0] };
+  };
+
+  it('202 : étapes interrompues seules relancées, sans refaire l’analyse ; lot completed', async () => {
+    const pid = projectWithSource();
+    const runId = interruptedRun(pid);
+    const interruptedGid = runOf(pid, runId).steps[1].gid;
+    const { status, json } = await resume(pid, runId);
+    expect(status).toBe(202);
+    expect(json.run).toMatchObject({ id: runId, status: 'running', resumedAt: expect.any(String) });
+    await waitForStatus(pid, runId, 'completed');
+    expect(routeRequest).not.toHaveBeenCalled();
+    expect(generateSummary).not.toHaveBeenCalled();
+    expect(generateFlashcards).toHaveBeenCalledTimes(1);
+    expect(stepsOf(pid, runId)).toEqual([
+      ['summary', 'completed', null],
+      ['flashcards', 'completed', null],
+    ]);
+    const newGid = runOf(pid, runId).steps[1].gid;
+    expect(newGid).not.toBe(interruptedGid);
+    const ids = store.getProject(pid)!.results.generations.map((g) => g.id);
+    expect(ids).toEqual(expect.arrayContaining([runOf(pid, runId).steps[0].gid, newGid]));
+    expect(runOf(pid, runId).analysisCost).toBe(0.0002);
+  });
+
+  it('gardes : clé refusée 401, runId invalide 400, cours ou lot inconnu 404', async () => {
+    const pid = projectWithSource();
+    const runId = interruptedRun(pid);
+    authState.override = { ok: false, status: 401, error: 'auth_required' };
+    expect((await resume(pid, runId)).status).toBe(401);
+    authState.override = null;
+    expect((await resume(pid, 'abc')).json).toEqual({ error: 'invalid_input' });
+    const noProject = await resume('00000000-0000-4000-8000-000000000000', runId);
+    expect([noProject.status, noProject.json]).toEqual([404, { error: 'project_not_found' }]);
+    const noRun = await resume(pid, randomUUID());
+    expect([noRun.status, noRun.json]).toEqual([404, { error: 'auto_run_not_found' }]);
+    expect(runOf(pid, runId).status).toBe('interrupted');
+  });
+
+  it('lot déjà repris → 202 tel quel ; terminé ou interrompu pendant l’analyse → 200 tel quel', async () => {
+    const pid = projectWithSource();
+    const runId = interruptedRun(pid);
+    const gate = deferred();
+    vi.mocked(generateFlashcards).mockImplementationOnce(async () => {
+      await gate.promise;
+      return [{ question: 'Q', answer: 'A' }] as any;
+    });
+    expect((await resume(pid, runId)).status).toBe(202);
+    const again = await resume(pid, runId);
+    expect([again.status, again.json.run.status]).toEqual([202, 'running']);
+    gate.resolve();
+    await waitForStatus(pid, runId, 'completed');
+    const done = await resume(pid, runId);
+    expect([done.status, done.json.run.status]).toEqual([200, 'completed']);
+    expect(generateFlashcards).toHaveBeenCalledTimes(1);
+    const other = projectWithSource();
+    const routing = deferred();
+    vi.mocked(routeRequest).mockImplementationOnce(async () => {
+      await routing.promise;
+      return plan('summary') as any;
+    });
+    const analysing = (await start(other)).runId;
+    store.cancelAllPendingsAtBoot();
+    expect(runOf(other, analysing)).toMatchObject({ status: 'interrupted', steps: [] });
+    expect((await resume(other, analysing)).status).toBe(200);
+    routing.resolve();
+  });
+
+  it('autre lot actif sur le cours → 409 auto_busy avec ce lot, rien de relancé', async () => {
+    const pid = projectWithSource();
+    const runId = interruptedRun(pid);
+    const gate = deferred();
+    vi.mocked(routeRequest).mockImplementationOnce(async () => {
+      await gate.promise;
+      return plan('summary') as any;
+    });
+    const fresh = await start(pid);
+    const busy = await resume(pid, runId);
+    expect(busy.status).toBe(409);
+    expect(busy.json).toMatchObject({ error: 'auto_busy', run: { id: fresh.runId } });
+    expect(runOf(pid, runId).status).toBe('interrupted');
+    gate.resolve();
+    await waitForStatus(pid, fresh.runId, 'completed');
+  });
+
+  it('gardes de l’analyse avec le corps du lancement : plus de source → 400, lot interrompu', async () => {
+    const pid = projectWithSource();
+    const runId = interruptedRun(pid);
+    store.deleteSource(pid, 'src-1');
+    const { status, json } = await resume(pid, runId);
+    expect([status, json]).toEqual([400, { error: 'no_sources' }]);
+    expect(runOf(pid, runId).status).toBe('interrupted');
+    expect(generateFlashcards).not.toHaveBeenCalled();
+  });
+});
