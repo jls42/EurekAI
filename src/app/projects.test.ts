@@ -333,7 +333,8 @@ describe('selectProject', () => {
     await proj.selectProject.call(ctx, 'p1');
     expect(ctx.loading.auto).toBe(true);
     expect(ctx.autoRuns.p1).toMatchObject({ runId: 'r1', launchedHere: false });
-    expect(ctx.autoRuns.p1.analysisCostCounted).toBe(true);
+    // Relu pendant l'analyse : pas encore facturée, son coût sera ajouté à son arrivée.
+    expect(ctx.autoRuns.p1.analysisCostCounted).toBe(false);
   });
 
   it('cours dont le lot Auto envoie ses étapes : lot suivi, pas de puce d’analyse', async () => {

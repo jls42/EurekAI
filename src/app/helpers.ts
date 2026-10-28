@@ -8,7 +8,7 @@ import {
 } from './effective-moderation';
 import { openingProfileQuery } from './project-snapshot';
 import { addCostDelta } from './cost-utils';
-import { applyAutoRunUpdate, isCancelledRun } from './auto-runs';
+import { applyAutoRunUpdate, isCancelledRun, restoreAutoRun } from './auto-runs';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   AutoRunEvent,
@@ -858,6 +858,9 @@ const applyReconciledSnapshot = (
   ctx.mergeReconciledGenerations(project.results.generations, cutoff);
   ctx.backfillCompletedNotifs(project.results.generations, cutoff, profileId, projectId);
   ctx.backfillTerminalNotifs(project.results.pendingTracker ?? [], cutoff, profileId, projectId);
+  // Lot Auto : état relu (un lot terminé pendant la coupure, ou interrompu par un redémarrage du
+  // serveur, affiche son bilan et libère le bouton Auto).
+  restoreAutoRun(ctx, projectId, project, false);
 };
 
 const reconcilePendings = async function (

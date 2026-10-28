@@ -227,23 +227,47 @@ export const applyAutoRunUpdate = (ctx: AppContext, projectId: string, run: Auto
   showFinal(ctx, projectId, entry, shown);
 };
 
+// Coût de l'analyse déjà dans le total relu : seulement si le lot relu le porte (relu pendant
+// l'analyse, il n'est pas encore facturé : l'événement suivant l'ajoutera).
+const inReloadedTotal = (run: AutoRun, totalReloaded: boolean): boolean => {
+  return totalReloaded && run.analysisCost !== undefined;
+};
+
+// Lot déjà suivi : état relu (lancement encore en cours : rien à relire).
+const refreshKnownRun = (
+  ctx: AppContext,
+  projectId: string,
+  known: AutoRunEntry,
+  runs: AutoRun[],
+  totalReloaded: boolean,
+): void => {
+  const latest = known.run ? runs.find((r) => r.id === known.runId) : undefined;
+  if (!latest) return;
+  if (inReloadedTotal(latest, totalReloaded)) known.analysisCostCounted = true;
+  applyAutoRunUpdate(ctx, projectId, latest);
+};
+
 /**
- * Ouverture d'un cours (snapshot) : son lot actif est suivi (puce d'analyse rétablie, bouton Auto
- * désactivé ; les puces des étapes viennent du tracker) ; un lot déjà suivi prend l'état relu, et
- * son bilan s'affiche s'il s'est terminé entre-temps. Le total relu comprend déjà l'analyse.
+ * Cours relu (ouverture, ou reconnexion du flux SSE après une coupure ou un redémarrage du
+ * serveur) : son lot actif est suivi (puce d'analyse rétablie, bouton Auto désactivé ; les puces
+ * des étapes viennent du tracker) ; un lot déjà suivi prend l'état relu, et son bilan s'affiche s'il
+ * s'est terminé entre-temps (`interrupted` après un redémarrage). `totalReloaded` : le total du
+ * cours vient d'être relu (ouverture), il comprend déjà l'analyse.
  */
-export const restoreAutoRun = (ctx: AppContext, projectId: string, project: ProjectData): void => {
+export const restoreAutoRun = (
+  ctx: AppContext,
+  projectId: string,
+  project: ProjectData,
+  totalReloaded: boolean,
+): void => {
   const runs = project.results.autoRuns ?? [];
   const known = ctx.autoRuns[projectId];
   if (known) {
-    if (!known.run) return;
-    known.analysisCostCounted = true;
-    const latest = runs.find((r) => r.id === known.runId);
-    if (latest) applyAutoRunUpdate(ctx, projectId, latest);
+    refreshKnownRun(ctx, projectId, known, runs, totalReloaded);
     return;
   }
   const active = runs.find((r) => ACTIVE_STATUSES.has(r.status));
   if (!active || finishedRuns.has(active.id)) return;
-  adoptRun(ctx, projectId, active).analysisCostCounted = true;
+  adoptRun(ctx, projectId, active).analysisCostCounted = inReloadedTotal(active, totalReloaded);
   ctx.loading.auto = active.status === 'analysing';
 };

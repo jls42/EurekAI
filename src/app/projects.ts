@@ -199,7 +199,7 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
     state.openGens[genId] = true;
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
-  restoreAutoRun(state, id, project);
+  restoreAutoRun(state, id, project, true);
   restoreSingleRuns(state, id);
   restoreChatLoading(state, id);
   void state.$nextTick(() => state.refreshIcons());

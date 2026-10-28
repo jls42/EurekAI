@@ -233,13 +233,31 @@ describe('ouverture d’un cours (snapshot)', () => {
   it('lot actif : suivi, puce d’analyse, coût de l’analyse déjà compris dans le total relu', () => {
     const ctx = makeCtx();
     const id = newId();
-    restoreAutoRun(ctx, 'p1', {
-      results: { generations: [], autoRuns: [run(id, 'analysing', [], { analysisCost: 0.001 })] },
-    } as any);
+    restoreAutoRun(
+      ctx,
+      'p1',
+      {
+        results: { generations: [], autoRuns: [run(id, 'analysing', [], { analysisCost: 0.001 })] },
+      } as any,
+      true,
+    );
     expect(ctx.loading.auto).toBe(true);
     expect(ctx.autoRuns.p1).toMatchObject({ runId: id, analysisCostCounted: true });
     applyAutoRunUpdate(ctx, 'p1', run(id, 'running', [], { analysisCost: 0.001 }));
     expect(ctx.currentProject.totalCost).toBe(0);
+  });
+
+  it('relu pendant l’analyse (pas encore facturée) : coût de l’analyse ajouté à son arrivée', () => {
+    const ctx = makeCtx();
+    const id = newId();
+    restoreAutoRun(
+      ctx,
+      'p1',
+      { results: { generations: [], autoRuns: [run(id, 'analysing')] } } as any,
+      true,
+    );
+    applyAutoRunUpdate(ctx, 'p1', run(id, 'running', [], { analysisCost: 0.0003 }));
+    expect(ctx.currentProject.totalCost).toBeCloseTo(0.0003);
   });
 
   it('lot suivi, terminé entre-temps : son bilan s’affiche au retour', () => {
@@ -247,10 +265,32 @@ describe('ouverture d’un cours (snapshot)', () => {
     const id = newId();
     launched(ctx, id);
     ctx.autoRuns.p1.run = run(id, 'running');
-    restoreAutoRun(ctx, 'p1', {
-      results: { generations: [], autoRuns: [run(id, 'completed', [['quiz', 'completed']])] },
-    } as any);
+    restoreAutoRun(
+      ctx,
+      'p1',
+      {
+        results: { generations: [], autoRuns: [run(id, 'completed', [['quiz', 'completed']])] },
+      } as any,
+      true,
+    );
     expect(toastKeys(ctx)).toEqual(['toast.magicDone']);
+  });
+
+  it('reconnexion après un redémarrage du serveur : lot interrompu signalé, bouton libéré', () => {
+    const ctx = makeCtx();
+    const id = newId();
+    launched(ctx, id);
+    ctx.autoRuns.p1.run = run(id, 'running', [['quiz', 'pending']]);
+    restoreAutoRun(
+      ctx,
+      'p1',
+      {
+        results: { generations: [], autoRuns: [run(id, 'interrupted', [['quiz', 'interrupted']])] },
+      } as any,
+      false,
+    );
+    expect(toastKeys(ctx)).toEqual(['toast.autoInterruptedIn']);
+    expect(ctx.autoRuns.p1).toBeUndefined();
   });
 
   it('état d’un autre lot pendant qu’un lot tourne : ignoré', () => {
