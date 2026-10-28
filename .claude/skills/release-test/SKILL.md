@@ -92,12 +92,19 @@ Pour chaque bouton visible avec aria-label commencant par `"Générer"` :
 6. Pour `image` : verifier qu'une `<img>` charge un blob (pas d'erreur 404).
 7. Pour les exercices (quiz, fill-blank, flashcards) : cliquer une reponse / retourner une carte et verifier que le feedback s'affiche (Score change, message "Correct"/"Incorrect" visible).
 
-### Test du router auto
+### Test du router auto (lot Auto côté serveur)
 
-Cliquer le bouton **"Auto"** (gradient bleu/violet ; libellé « Auto — C'est magique ! » sur la vue Sources et sur un tableau de bord vide, mais « Auto — Magie ! » sur le tableau de bord d'un cours qui a déjà des générations — chercher le texte `Auto` + `/magi/i`, ou `find` "bouton genere tous les contenus / Auto / magique"). Attendre la complétion :
-- `POST /generate/route` retourne 200 (router LLM)
-- N appels `/generate/<agent>` parallels (typiquement tous les agents AUTO_AGENTS_SET)
-- Verifier via API serveur que `pendingTracker.length === 0` et que `generations.length` a augmente du nombre d'agents lances.
+Cliquer le bouton **"Auto"** (gradient bleu/violet ; libellé « Auto — C'est magique ! » sur la vue Sources et sur un tableau de bord vide, mais « Auto — Magie ! » sur le tableau de bord d'un cours qui a déjà des générations — chercher le texte `Auto` + `/magi/i`, ou `find` "bouton genere tous les contenus / Auto / magique"). Depuis le 2026-10-28, le navigateur lance un **lot serveur** (`.claude/rules/auto-runs.md`, section « Navigateur ») :
+- **un seul** `POST /generate/auto/start` → **202** `{ run }` (puis le pré-contrôle de modération éventuel avant lui) ; **aucun** `POST /generate/route` ni `/generate/<agent>` venant de l'onglet ;
+- puce « Auto — analyse… » pendant l'analyse, puis les puces des étapes (une par agent, annulables) arrivent par le SSE ;
+- au plus **3 étapes en vol** par clé (`GET /api/projects/:pid` pendant le lot : `pendingTracker` à 3 `pending` au plus qui avancent) ;
+- fin : `results.autoRuns[...]` en `completed`, `pendingTracker` sans `pending`, `generations.length` augmenté du nombre d'étapes réussies, un toast par étape et UN bilan (« Magie terminée ! » ou « Magie : N génération(s) sur M réussie(s). ») ;
+- **coût** : le total affiché dans l'onglet = `totalCost` du serveur (analyse comprise) ;
+- **F5 pendant l'analyse puis pendant les étapes** : le lot continue, puce d'analyse puis puces des étapes rétablies, bouton Auto désactivé, un seul bilan ;
+- **deuxième onglet** sur le même cours : son clic Auto rejoint le lot (`toast.autoJoined`, 409 `auto_busy`), jamais un second lot ;
+- **✕ d'une étape** : seule elle s'arrête, le bilan ne la compte pas (« 2 sur 2 », jamais « 2 sur 3 ») ; **« Tout annuler »** : une requête `POST /auto-runs/:runId/cancel`, un seul message dans chaque onglet ;
+- **cours quitté pendant le lot** : à la fin, toast qui nomme le cours (`toast.autoDoneIn`…), notification rangée sous ce cours ;
+- **serveur arrêté en plein lot puis relancé** : `toast.autoInterruptedIn` une fois.
 
 ### Test cancel
 
