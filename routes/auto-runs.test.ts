@@ -302,6 +302,30 @@ describe('POST /:pid/generate/auto/start — déroulé', () => {
     for (const r of runs) await waitForStatus(r.pid, r.runId, 'completed');
   });
 
+  it('même runId sur deux cours : deux lots comptés, la fin de l’un ne retire pas l’autre', async () => {
+    const gates = [deferred(), deferred()];
+    vi.mocked(routeRequest)
+      .mockImplementationOnce(async () => {
+        await gates[0].promise;
+        return plan() as any;
+      })
+      .mockImplementationOnce(async () => {
+        await gates[1].promise;
+        return plan() as any;
+      });
+    const runId = randomUUID();
+    const a = projectWithSource();
+    const b = projectWithSource();
+    expect((await start(a, { runId })).status).toBe(202);
+    expect((await start(b, { runId })).status).toBe(202);
+    expect(activeAutoRunCount()).toBe(2);
+    gates[0].resolve();
+    await waitForStatus(a, runId, 'completed');
+    await vi.waitFor(() => expect(activeAutoRunCount()).toBe(1));
+    gates[1].resolve();
+    await waitForStatus(b, runId, 'completed');
+  });
+
   it('analyse en échec → lot failed avec un code stable, aucune étape', async () => {
     const pid = projectWithSource();
     vi.mocked(routeRequest).mockRejectedValueOnce(new Error('boom'));

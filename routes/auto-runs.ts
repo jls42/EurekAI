@@ -45,7 +45,17 @@ interface ActiveAutoRun {
   stopped: boolean;
 }
 
+// Clé du registre : cours ET runId (le runId vient du navigateur : deux cours lancés avec le même
+// partageaient une entrée, le plafond était contourné et la fin de l'un retirait l'autre).
 const activeRuns = new Map<string, ActiveAutoRun>();
+
+const activeRunKey = (pid: string, runId: string): string => `${pid}:${runId}`;
+
+// Retire l'entrée seulement si c'est encore la sienne.
+const forgetActiveRun = (pid: string, runId: string, active: ActiveAutoRun): void => {
+  const key = activeRunKey(pid, runId);
+  if (activeRuns.get(key) === active) activeRuns.delete(key);
+};
 
 /** Lots en cours dans ce process (plafond MAX_ACTIVE_AUTO_RUNS, tests). */
 export const activeAutoRunCount = (): number => activeRuns.size;
@@ -80,7 +90,7 @@ const abandonAutoRun = (b: AutoBatch, code: StepFailureCode): void => {
 // dépassé chez Mistral), clé oubliée tout de suite. Un appel déjà en vol finit sans être promu.
 const expireAutoRun = (b: AutoBatch): void => {
   logger.warn('auto', `run expired after ${AUTO_RUN_MAX_MS / 60000} min: run=${b.runId}`);
-  activeRuns.delete(b.runId);
+  forgetActiveRun(b.pid, b.runId, b.active);
   abandonAutoRun(b, 'upstream_unavailable');
 };
 
@@ -162,7 +172,7 @@ const runAutoBatch = async (b: AutoBatch): Promise<void> => {
     abandonAutoRun(b, 'internal_error');
   } finally {
     clearTimeout(deadline);
-    activeRuns.delete(b.runId);
+    forgetActiveRun(b.pid, b.runId, b.active);
   }
 };
 
@@ -236,7 +246,7 @@ const launchAutoRun = (l: AutoLaunch, res: Response): void => {
     sendShortcut(res, conflictFor(l.store, l.pid, l.runId) ?? fallback);
     return;
   }
-  activeRuns.set(l.runId, l.active);
+  activeRuns.set(activeRunKey(l.pid, l.runId), l.active);
   runAutoBatch(l).catch((e: unknown) =>
     logger.error('auto', `batch cleanup error: run=${l.runId}`, e),
   );
