@@ -2030,15 +2030,49 @@ describe('applyGenerationEvent', () => {
       shownToastEventKeys: new Set<string>(),
       notificationsVersion: 0,
       showToast: vi.fn(),
-      upsertGenerationById(this: any, gen: any) {
-        const idx = this.generations.findIndex((g: any) => g.id === gen.id);
-        if (idx === -1) this.generations.push(gen);
-        else this.generations[idx] = gen;
-      },
+      currentProject: { totalCost: 0, costLog: [] } as any,
+      upsertGenerationById: helpers.upsertGenerationById,
+      initGenProps: helpers.initGenProps,
+      goToView: vi.fn(),
       t: (k: string) => k,
       applyGenerationEvent: helpers.applyGenerationEvent,
     };
   }
+
+  const completedEvent = (generation: any) =>
+    ({
+      pid: 'pid-1',
+      gid: generation.id,
+      type: generation.type,
+      status: 'completed',
+      generation,
+      at: '2026-10-28T10:00:00Z',
+      eventKey: `generation:${generation.id}:completed`,
+    }) as any;
+
+  // Génération reçue par le seul SSE (autre onglet, étape d'un Auto du serveur) : traitée comme une
+  // réponse 200 (registerGeneration) — normalisée, initialisée, coût compté une fois, « Voir ».
+  it('completed event seul : fiche normalisée, propriétés d’affichage, coût et bouton Voir', () => {
+    const ctx = makeCtx();
+    const gen = { id: 'g9', type: 'summary', data: { title: 'T' }, estimatedCost: 0.002 };
+    ctx.applyGenerationEvent.call(ctx as any, completedEvent(gen));
+    expect(gen.data).toMatchObject({ key_points: [], vocabulary: [], citations: [] });
+    expect((gen as any)._generatingVoice_all).toBe(false);
+    expect(ctx.currentProject.totalCost).toBeCloseTo(0.002);
+    const action = ctx.showToast.mock.calls[0][3];
+    expect(action.label).toBe('toast.view');
+    action.fn();
+    expect(ctx.goToView).toHaveBeenCalledWith('summary');
+  });
+
+  it('coût compté une fois : événement SSE répété ou génération déjà présente', () => {
+    const ctx = makeCtx();
+    const gen = { id: 'g10', type: 'quiz', data: [], estimatedCost: 0.001 };
+    ctx.applyGenerationEvent.call(ctx as any, completedEvent(gen));
+    ctx.applyGenerationEvent.call(ctx as any, completedEvent({ ...gen }));
+    expect(ctx.currentProject.totalCost).toBeCloseTo(0.001);
+    expect(ctx.generations).toHaveLength(1);
+  });
 
   it('hydrates pendingById on pending event', () => {
     const ctx = makeCtx();
@@ -2082,7 +2116,7 @@ describe('applyGenerationEvent', () => {
       'notif.generationDone',
       'success',
       null,
-      null,
+      { label: 'toast.view', fn: expect.any(Function) },
       'generation:g2:completed',
       { messageKey: 'notif.generationDone', paramKeys: { type: 'gen.quiz' } },
     );

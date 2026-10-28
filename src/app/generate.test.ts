@@ -11,7 +11,7 @@
    --
    Codacy lance ESLint sans les types Vitest/mocks; lint:ci local reste type-aware. */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { createGenerate } from './generate';
+import { createGenerate, registerGeneration } from './generate';
 import { setKey, _resetActiveKey } from './api-key';
 import { createSession } from './session';
 import { createConfirm } from './confirm';
@@ -87,6 +87,7 @@ function makeContext(overrides: any = {}) {
       const idx = this.generations.findIndex((g: any) => g.id === gen.id);
       if (idx === -1) this.generations.push(gen);
       else this.generations[idx] = gen;
+      return idx === -1;
     },
     openGens: {},
     useConsigne: false,
@@ -2653,5 +2654,25 @@ describe('playNextSection', () => {
     });
     gen.playNextSection.call(ctx, genObj);
     expect(genObj._activeAudioSection).toBe('intro');
+  });
+});
+
+// Coût d'une génération compté une fois dans l'onglet, que l'événement SSE `completed` (souvent
+// reçu avant la réponse) ou la réponse 200 arrive en premier.
+describe('registerGeneration — coût compté une fois', () => {
+  const gen = () => ({ id: 'g-cost', type: 'quiz', data: [], estimatedCost: 0.004 }) as any;
+
+  it('réponse 200 seule : coût ajouté', () => {
+    const ctx: any = makeContext({ initGenProps: vi.fn() });
+    registerGeneration(ctx, gen());
+    expect(ctx.currentProject.totalCost).toBeCloseTo(0.004);
+  });
+
+  it('réponse 200 après l’événement SSE (génération déjà présente) : pas de second ajout', () => {
+    const ctx: any = makeContext({ initGenProps: vi.fn() });
+    ctx.generations.push(gen());
+    registerGeneration(ctx, gen());
+    expect(ctx.currentProject.totalCost).toBe(0);
+    expect(ctx.generations).toHaveLength(1);
   });
 });

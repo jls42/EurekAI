@@ -74,10 +74,12 @@ export function registerGeneration(state: AppContext, gen: Generation): void {
   // openGens AVANT upsert : invariant doc dans helpers.ts applyGenerationEvent
   // (transition undefined→true ferait auto-play du quiz vocal). Idempotent par
   // gid via upsertGenerationById (payload 200 fallback + SSE 'completed' dans
-  // le même onglet absorbés sans doublon).
+  // le même onglet absorbés sans doublon) ; coût compté une fois, à l'insertion
+  // (l'événement SSE, souvent reçu avant la réponse, le compte déjà).
   state.openGens[gen.id] = true;
-  state.upsertGenerationById(gen);
-  addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
+  if (state.upsertGenerationById(gen)) {
+    addCostDelta(state, gen.estimatedCost, `generate/${gen.type}`);
+  }
 }
 
 // Corps d'une réponse de generateAll : la génération sur un succès, sinon null (échec journalisé).

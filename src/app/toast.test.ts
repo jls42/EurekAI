@@ -343,6 +343,20 @@ describe('createToast', () => {
       const persisted = JSON.parse(storage['sf-profile-notifications']);
       expect(persisted['profile-1'][0].projectId).toBe('proj-xyz');
     });
+
+    // Un Auto qui se termine pendant qu'un autre cours est affiché range sa notification sous SON
+    // cours (notifSpec.projectId), jamais sous le cours affiché.
+    it('notifSpec.projectId : notification rangée sous ce cours, pas sous le cours affiché', () => {
+      ctx.currentProjectId = 'cours-affiche';
+      showToast('Done', 'success', null, null, 'auto:run-1:completed', {
+        messageKey: 'toast.autoDoneIn',
+        params: { project: 'Histoire' },
+        projectId: 'cours-du-lot',
+      });
+
+      const persisted = JSON.parse(storage['sf-profile-notifications']);
+      expect(persisted['profile-1'][0].projectId).toBe('cours-du-lot');
+    });
   });
 });
 
