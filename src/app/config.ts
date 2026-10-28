@@ -234,7 +234,11 @@ export function createConfig() {
     // Libellé complet du modèle choisi, affiché sous son sélecteur sur téléphone : un <select> fermé
     // ne passe pas à la ligne, et le tarif ou « Recommandé » y étaient coupés à 390 px (release-test
     // du 2026-10-22). Même texte que l'option du sélecteur.
+    // Configuration pas encore chargée (`configDraft._mainModel`… absents, gabarit évalué dès le
+    // démarrage) : rien à afficher. Avant, `startsWith` sur `undefined` levait 3 exceptions dans la
+    // console à chaque chargement de page (relevé au release-test du 2026-10-28).
     selectedModelLabel(this: AppContext, modelId: string, recommendedId: string): string {
+      if (!modelId) return '';
       const label = this.modelOptionLabel(modelId);
       return modelId === recommendedId ? `${label} · ${this.t('settings.recommended')}` : label;
     },
