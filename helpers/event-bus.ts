@@ -1,5 +1,5 @@
 import { EventEmitter } from 'node:events';
-import type { GenerationEvent } from '../types.js';
+import type { AutoRunEvent, GenerationEvent } from '../types.js';
 
 // Bus d'événements en mémoire pour le pending tracker (single-process). Les
 // transitions sont reconstruites côté client via le snapshot project.json + le
@@ -16,6 +16,8 @@ const bus = new EventEmitter();
 bus.setMaxListeners(50);
 
 const EVENT_NAME = 'generation';
+// Canal des lots Auto (état complet d'un lot à chaque changement), même flux SSE par projet.
+const AUTO_EVENT_NAME = 'auto';
 const ERROR_EVENT = 'error';
 
 // Filet anti-uncaughtException : par défaut Node throw "Unhandled error event"
@@ -31,6 +33,10 @@ export function emitGenerationEvent(event: GenerationEvent): void {
   bus.emit(EVENT_NAME, event);
 }
 
+export function emitAutoRunEvent(event: AutoRunEvent): void {
+  bus.emit(AUTO_EVENT_NAME, event);
+}
+
 // Helper test-only : nombre de listeners actuellement attachés sur le canal
 // 'generation'. Permet de verrouiller "404 sur pid inconnu ne fuit aucun
 // listener" sans exposer le bus brut. Pas de dépendance ergonomique côté
@@ -39,6 +45,13 @@ export function generationListenerCount(): number {
   return bus.listenerCount(EVENT_NAME);
 }
 
+// Même usage test-only, canal des lots Auto.
+export function autoRunListenerCount(): number {
+  return bus.listenerCount(AUTO_EVENT_NAME);
+}
+
+type PidEventHandler<E> = (event: E) => void; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
 // Souscription filtrée par projectId. Retourne un unsubscribe à appeler à la
 // fermeture du stream SSE (close listener, error listener, ou heartbeat-stuck
 // cleanup) pour éviter les fuites de listeners.
@@ -46,12 +59,12 @@ export function generationListenerCount(): number {
 // 'error' du bus — pour qu'une seule connexion SSE buggée ne crashe pas les N
 // autres listeners ET que le filet `bus.on('error', ...)` ci-dessus soit le
 // point unique de log/observabilité (pas de console.error in-line dispersés).
-export function subscribeGeneration(
+const subscribeForPid = <E extends { pid: string }>(
+  channel: string,
   pid: string,
-  // eslint-disable-next-line no-unused-vars -- type-sig param required by TS
-  handler: (_event: GenerationEvent) => void,
-): () => void {
-  const wrapped = (event: GenerationEvent) => {
+  handler: PidEventHandler<E>,
+): (() => void) => {
+  const wrapped = (event: E) => {
     if (event.pid !== pid) return;
     try {
       handler(event);
@@ -60,8 +73,19 @@ export function subscribeGeneration(
       bus.emit(ERROR_EVENT, wrappedErr);
     }
   };
-  bus.on(EVENT_NAME, wrapped);
+  bus.on(channel, wrapped);
   return () => {
-    bus.off(EVENT_NAME, wrapped);
+    bus.off(channel, wrapped);
   };
+};
+
+export function subscribeGeneration(
+  pid: string,
+  handler: PidEventHandler<GenerationEvent>,
+): () => void {
+  return subscribeForPid(EVENT_NAME, pid, handler);
+}
+
+export function subscribeAutoRun(pid: string, handler: PidEventHandler<AutoRunEvent>): () => void {
+  return subscribeForPid(AUTO_EVENT_NAME, pid, handler);
 }

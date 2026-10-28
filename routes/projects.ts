@@ -1,8 +1,12 @@
 import { Router, type Response } from 'express';
 import type { ProjectStore } from '../store.js';
 import type { ProfileStore } from '../profiles.js';
-import type { ProjectData } from '../types.js';
-import { subscribeGeneration, type GenerationEvent } from '../helpers/event-bus.js';
+import type { AutoRunEvent, ProjectData } from '../types.js';
+import {
+  subscribeAutoRun,
+  subscribeGeneration,
+  type GenerationEvent,
+} from '../helpers/event-bus.js';
 import { logger } from '../helpers/logger.js';
 import { INVALID_INPUT } from '../helpers/request-validation.js';
 
@@ -10,11 +14,11 @@ const SSE_HEARTBEAT_MS = 25_000;
 const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 
 // Écrit un event SSE au format spécifié par le client EventSource :
-//   event: generation
+//   event: generation (ou auto, état complet d'un lot Auto)
 //   data: {...JSON...}
 //
-// La ligne `event: generation` est obligatoire pour matcher
-// addEventListener('generation', ...) côté client. Sans elle, l'event serait
+// La ligne `event:` est obligatoire pour matcher addEventListener('generation', ...)
+// ou addEventListener('auto', ...) côté client. Sans elle, l'event serait
 // dispatché comme 'message' (générique).
 //
 // Garde-fou writableEnded + try/catch : entre le `bus.emit` et le `res.write`,
@@ -22,10 +26,14 @@ const ERR_PROJECT_NOT_FOUND = 'project_not_found';
 // pas encore appelé). Sans cette garde, res.write throw ERR_STREAM_WRITE_AFTER_END
 // et l'EventEmitter propage l'erreur au listener (Node default = uncaught dans le
 // callback → process crash). Pas besoin de logger en succès — c'est attendu.
-function writeGenerationEvent(res: Response, event: GenerationEvent): void {
+function writeSseEvent(
+  res: Response,
+  name: 'generation' | 'auto',
+  event: GenerationEvent | AutoRunEvent,
+): void {
   if (res.writableEnded) return;
   try {
-    res.write(`event: generation\n`);
+    res.write(`event: ${name}\n`);
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   } catch (err) {
     logger.warn('sse', `write after close, dropping event: ${String(err)}`);
@@ -166,9 +174,16 @@ export function projectRoutes(
     // Node émet 'error' sur res. Sans listener, ça remonte uncaught et crash.
     res.on('error', (err) => cleanup(`error: ${String(err)}`));
 
-    unsubscribe = subscribeGeneration(pid, (event) => {
-      writeGenerationEvent(res, event);
+    const unsubscribeGeneration = subscribeGeneration(pid, (event) => {
+      writeSseEvent(res, 'generation', event);
     });
+    const unsubscribeAutoRun = subscribeAutoRun(pid, (event) => {
+      writeSseEvent(res, 'auto', event);
+    });
+    unsubscribe = () => {
+      unsubscribeGeneration();
+      unsubscribeAutoRun();
+    };
     // Si close a fire pendant l'await/attribution ci-dessus, cleanup() a tourné
     // sur unsubscribe=null. On rattrape l'unsubscribe qu'on vient d'obtenir.
     if (cleanedUp) {

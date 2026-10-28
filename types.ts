@@ -328,6 +328,59 @@ export interface ProjectResults {
   // sans guard : le tracker contient uniquement les métadonnées de cycle de vie
   // (pas de payload data).
   pendingTracker?: PendingTrackerEntry[];
+  // Lots Auto lancés côté serveur (analyse puis étapes) : un lot actif au plus par cours, gardé
+  // sur disque pour survivre au rechargement de la page et au redémarrage du serveur
+  // (cf. .claude/rules/auto-runs.md).
+  autoRuns?: AutoRun[];
+}
+
+// --- Lot Auto côté serveur ---
+// - 'analysing' : routage en cours (aucune étape encore) ;
+// - 'running' : étapes lancées, au moins une encore en cours ;
+// - 'completed' : toutes les étapes terminées, quelle que soit leur issue ;
+// - 'failed' : l'analyse a échoué (`failureCode`), aucune étape n'est partie ;
+// - 'cancelled' : lot annulé en entier ;
+// - 'interrupted' : serveur redémarré pendant l'analyse ou les étapes.
+export type AutoRunStatus =
+  'analysing' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+
+// Statut d'une étape, tenu à jour par le store à chaque transition de son entrée du tracker (même
+// gid) ; 'interrupted' : en cours au redémarrage du serveur.
+export type AutoRunStepStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
+
+export interface AutoRunStep {
+  agent: import('./generators/auto-agents.js').AutoAgentType;
+  // gid de l'entrée du tracker, puis de la génération produite.
+  gid: string;
+  status: AutoRunStepStatus;
+  // Présent seulement sur une étape 'failed'.
+  failureCode?: Exclude<FailedStepCode, 'cancelled'>;
+}
+
+// Corps capturé au lancement : chaque étape refait ses gardes avec lui, sur les sources retenues
+// au lancement (une source ajoutée pendant le lot n'y entre pas).
+export interface AutoRunRequest {
+  lang: string;
+  ageGroup: AgeGroup;
+  sourceIds: string[];
+  useConsigne: boolean;
+}
+
+export interface AutoRun {
+  // runId : UUID v4 envoyé par le navigateur au lancement.
+  id: string;
+  status: AutoRunStatus;
+  startedAt: string;
+  updatedAt: string;
+  // Présent dès que le lot est terminé (completed, failed, cancelled, interrupted).
+  completedAt?: string;
+  request: AutoRunRequest;
+  // Vide pendant l'analyse ; ensuite une étape par agent du plan, dans l'ordre du plan.
+  steps: AutoRunStep[];
+  // Agents du plan qui ne seront pas exécutés (non auto-exécutables, TTS indisponible).
+  skipped: string[];
+  // Présent seulement sur un lot 'failed' (analyse en échec).
+  failureCode?: FailedStepCode;
 }
 
 // Statut du cycle de vie d'une génération suivie par le tracker.
@@ -352,6 +405,9 @@ export interface PendingTrackerEntryBase {
   type: TrackedGenerationType;
   startedAt: string;
   sourceIds: string[];
+  // Lot Auto qui a lancé cette génération (absent : génération simple). Le store tient l'étape du
+  // lot à jour à chaque transition de l'entrée.
+  runId?: string;
 }
 
 // Discriminated union sur `status` : verrouille à compile-time que les champs
@@ -417,6 +473,8 @@ interface GenerationEventBase {
   // (helpers/event-key.ts) — le brand empêche les call sites d'inventer la
   // chaîne et de drift le format.
   eventKey: EventKey;
+  // Lot Auto de la génération (absent : génération simple).
+  runId?: string;
 }
 
 export interface GenerationEventPending extends GenerationEventBase {
@@ -437,6 +495,13 @@ export interface GenerationEventTerminal extends GenerationEventBase {
 
 export type GenerationEvent =
   GenerationEventPending | GenerationEventCompleted | GenerationEventTerminal;
+
+// Event SSE `auto` (même flux GET /api/projects/:pid/events) : état COMPLET d'un lot à chaque
+// changement (lancement, plan, étape, fin). Le client le remplace en bloc, sans fusion.
+export interface AutoRunEvent {
+  pid: string;
+  run: AutoRun;
+}
 
 export interface CostEntry {
   timestamp: string;

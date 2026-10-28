@@ -14,12 +14,23 @@ import type {
   CostEntry,
   ModerationResult,
   PendingTrackerEntry,
+  PendingTrackerEntryActive,
   PendingTrackerEntryBase,
   PendingTrackerEntryTerminal,
   FailedStepCode,
   GenerationStatus,
+  AutoRun,
+  AutoRunStep,
 } from './types.js';
-import { emitGenerationEvent } from './helpers/event-bus.js';
+import { emitAutoRunEvent, emitGenerationEvent } from './helpers/event-bus.js';
+import {
+  applyStepTransition,
+  endAutoRun,
+  findActiveAutoRun,
+  findAutoRun,
+  interruptActiveAutoRuns,
+  pruneAutoRuns,
+} from './helpers/auto-run-state.js';
 import { buildEventKey, type EventKey } from './helpers/event-key.js';
 import { logger } from './helpers/logger.js';
 
@@ -44,6 +55,24 @@ export type PromoteResult =
 export const DEFAULT_PRUNE_MAX_KEEP = 50;
 export const DEFAULT_PRUNE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Alias plutôt qu'un type fonction écrit dans la signature de replacePendingWithTerminal : Lizard
+// y coupait la méthode et ne mesurait plus aucune méthode de la classe après elle.
+type TerminalBuilder = (base: PendingTrackerEntryBase) => PendingTrackerEntryTerminal; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
+
+// Lancement d'un lot Auto (cf. createAutoRun).
+export type CreateAutoRunResult = 'created' | 'missing' | 'busy' | 'duplicate';
+
+// Étape d'un lot au moment où ses entrées du tracker sont posées.
+export type AutoRunStepInit = Pick<AutoRunStep, 'agent' | 'gid'>;
+
+// Entrée en cours sans son statut : la base commune, `runId` compris (jamais recopiée champ par
+// champ : un champ ajouté à la base était perdu au passage en terminal).
+const trackerBase = (entry: PendingTrackerEntryActive): PendingTrackerEntryBase => {
+  const base: Partial<PendingTrackerEntryActive> = { ...entry };
+  delete base.status;
+  return base as PendingTrackerEntryBase;
+};
+
 // Nom de fichier simple : ni vide, ni `.`/`..`, sans séparateur (basename identique).
 const isSimpleFileName = (name: string): boolean => {
   return name !== '' && name !== '.' && name !== '..' && basename(name) === name;
@@ -56,6 +85,77 @@ const consigneDependsOn = (consigne: ProjectData['consigne'], sourceId: string):
   if (!consigne) return false;
   const provenance = consigne.sourceIds;
   return !Array.isArray(provenance) || provenance.includes(sourceId);
+};
+
+// Fin d'une entrée terminale pour le pruning (completedAt ; startedAt pour une donnée ancienne).
+const terminalEndTime = (e: PendingTrackerEntryTerminal): number => {
+  return e.completedAt ? Date.parse(e.completedAt) : Date.parse(e.startedAt);
+};
+
+type TerminalPruning = { maxAgeMs: number; keep: number; nowMs: number };
+
+// Terminales gardées : récentes (maxAgeMs) ET parmi les `keep` plus récentes.
+const recentTerminals = (
+  tracker: PendingTrackerEntry[],
+  pruning: TerminalPruning,
+): PendingTrackerEntryTerminal[] => {
+  return tracker
+    .filter((e): e is PendingTrackerEntryTerminal => e.status !== 'pending')
+    .filter((e) => pruning.nowMs - terminalEndTime(e) <= pruning.maxAgeMs)
+    .sort((a, b) => terminalEndTime(b) - terminalEndTime(a))
+    .slice(0, pruning.keep);
+};
+
+type LegacySafeModeration = { safe?: boolean; categories?: Record<string, boolean> };
+
+const legacySafeModeration = (moderation: LegacySafeModeration): ModerationResult => ({
+  status: moderation.safe ? 'safe' : 'unsafe',
+  categories: moderation.categories ?? {},
+});
+
+const normalizeModeration = (
+  moderation: Source['moderation'] | LegacySafeModeration | undefined,
+): ModerationResult | undefined => {
+  if (!moderation) return undefined;
+  if ('status' in moderation && moderation.status) {
+    return { status: moderation.status, categories: moderation.categories ?? {} };
+  }
+  if ('safe' in moderation) return legacySafeModeration(moderation);
+  console.warn('Unknown moderation format during migration:', JSON.stringify(moderation));
+  return { status: 'error', categories: {} };
+};
+
+interface LegacyResults {
+  generations?: unknown;
+  summary?: SummaryGeneration['data'];
+  summaryEN?: SummaryGeneration['data'];
+  flashcards?: FlashcardsGeneration['data'];
+  flashcardsEN?: FlashcardsGeneration['data'];
+  quiz?: QuizGeneration['data'];
+  quizEN?: QuizGeneration['data'];
+  podcast?: PodcastGeneration['data'];
+}
+
+type LegacyField = { type: Generation['type']; title: string; data: unknown; dataEN?: unknown };
+
+const legacyGeneration = (field: LegacyField, now: string): Generation => {
+  const { type, title, data, dataEN } = field;
+  const gen = { id: randomUUID(), title, createdAt: now, sourceIds: [], type, data } as Generation;
+  if (dataEN) (gen as { dataEN?: unknown }).dataEN = dataEN;
+  return gen;
+};
+
+// Une génération par champ présent de l'ancien format, dans cet ordre (version anglaise gardée en
+// `dataEN`, sauf pour le podcast qui n'en avait pas).
+const legacyGenerations = (r: LegacyResults, now: string): Generation[] => {
+  const summaryTitle = r.summary?.title || 'Fiche de revision';
+  const fields: LegacyField[] = [
+    { type: 'summary', title: summaryTitle, data: r.summary, dataEN: r.summaryEN },
+    { type: 'flashcards', title: 'Flashcards', data: r.flashcards, dataEN: r.flashcardsEN },
+    { type: 'quiz', title: 'Quiz QCM', data: r.quiz, dataEN: r.quizEN },
+    { type: 'podcast', title: 'Podcast', data: r.podcast },
+  ];
+  return fields.filter((f) => f.data).map((f) => legacyGeneration(f, now));
 };
 
 export class ProjectStore {
@@ -455,9 +555,11 @@ export class ProjectStore {
     tracker.splice(idx, 1);
     const finalGen = { ...generation, completedAt: new Date().toISOString() } as Generation;
     data.results.generations.push(finalGen);
+    const run = applyStepTransition(data, entry, 'completed', finalGen.completedAt as string);
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
     this.emitCompletedEvent(projectId, entry, finalGen);
+    this.emitAutoRunChange(projectId, run);
     return { kind: 'promoted', generation: finalGen };
   }
 
@@ -514,32 +616,18 @@ export class ProjectStore {
       logger.error('store', `boot sweep skipped unreadable project ${projectId}`);
       return 0;
     }
-    const tracker = data.results.pendingTracker ?? [];
-    const cancelled: PendingTrackerEntryTerminal[] = [];
-    for (let i = 0; i < tracker.length; i++) {
-      const entry = tracker[i];
-      if (entry.status !== 'pending') continue;
-      // Construit une nouvelle entrée terminale (le discriminated union
-      // empêche la mutation in-place : flipper status sans poser failureCode
-      // + completedAt produirait un état impossible).
-      const terminal: PendingTrackerEntryTerminal = {
-        id: entry.id,
-        type: entry.type,
-        startedAt: entry.startedAt,
-        sourceIds: entry.sourceIds,
-        status: 'cancelled',
-        failureCode: 'cancelled',
-        completedAt: new Date().toISOString(),
-      };
-      tracker[i] = terminal;
-      cancelled.push(terminal);
-    }
-    if (cancelled.length > 0) {
+    const now = new Date().toISOString();
+    const cancelled = this.cancelPendingEntries(data, now);
+    // Lots actifs : `interrupted`, leurs étapes en cours aussi (et non `cancelled` : rien ne les
+    // a annulées, elles pourront être relancées).
+    const interrupted = interruptActiveAutoRuns(data, now);
+    if (cancelled.length > 0 || interrupted.length > 0) {
       this.pruneTrackerIfNeeded(data);
       this.saveProject(projectId, data);
       for (const entry of cancelled) {
         this.emitTerminalEvent(projectId, entry);
       }
+      for (const run of interrupted) this.emitAutoRunChange(projectId, run);
     }
     return cancelled.length;
   }
@@ -556,14 +644,14 @@ export class ProjectStore {
 
   // Remplace une entrée pending par une terminale fraîche (le discriminated
   // union interdit la mutation status-only sans poser failureCode +
-  // completedAt). Le builder reçoit la base commune (id/type/startedAt/sourceIds)
+  // completedAt). Le builder reçoit la base commune (id/type/startedAt/sourceIds/runId)
   // et produit l'arm spécialisée — chaque appelant locke ainsi son literal
   // ('failed' avec failureCode ≠ 'cancelled', 'cancelled' avec failureCode
   // strictement 'cancelled').
   private replacePendingWithTerminal(
     projectId: string,
     generationId: string,
-    builder: (base: PendingTrackerEntryBase) => PendingTrackerEntryTerminal,
+    builder: TerminalBuilder,
   ): boolean {
     const data = this.getProject(projectId);
     if (!data) return false;
@@ -572,16 +660,13 @@ export class ProjectStore {
     if (idx === -1) return false;
     const entry = tracker[idx];
     if (entry.status !== 'pending') return false;
-    const terminal = builder({
-      id: entry.id,
-      type: entry.type,
-      startedAt: entry.startedAt,
-      sourceIds: entry.sourceIds,
-    });
+    const terminal = builder(trackerBase(entry));
     tracker[idx] = terminal;
+    const run = this.applyTerminalToRun(data, terminal);
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
     this.emitTerminalEvent(projectId, terminal);
+    this.emitAutoRunChange(projectId, run);
     return true;
   }
 
@@ -599,6 +684,7 @@ export class ProjectStore {
     type: PendingTrackerEntry['type'];
     at: string;
     eventKey: EventKey;
+    runId?: string;
   } {
     const isTerminal = entry.status === 'failed' || entry.status === 'cancelled';
     const completedAt = isTerminal ? entry.completedAt : undefined;
@@ -608,6 +694,7 @@ export class ProjectStore {
       type: entry.type,
       at: completedAt ?? entry.startedAt ?? new Date().toISOString(),
       eventKey: buildEventKey(entry.id, status),
+      ...(entry.runId && { runId: entry.runId }),
     };
   }
 
@@ -640,6 +727,140 @@ export class ProjectStore {
     });
   }
 
+  // --- Lots Auto (results.autoRuns) ---
+  //
+  // Transitions pures : helpers/auto-run-state.ts ; règles : .claude/rules/auto-runs.md. Chaque
+  // changement d'un lot émet son état complet (SSE `auto`) après l'écriture.
+
+  getAutoRun(projectId: string, runId: string): AutoRun | null {
+    const data = this.getProject(projectId);
+    return (data && findAutoRun(data, runId)) ?? null;
+  }
+
+  // Un lot actif au plus par cours (`busy` tant qu'un autre analyse ou tourne) ; `duplicate` : ce
+  // runId existe déjà (lancement renvoyé après une coupure réseau).
+  createAutoRun(projectId: string, run: AutoRun): CreateAutoRunResult {
+    const data = this.getProject(projectId);
+    if (!data) return 'missing';
+    if (findAutoRun(data, run.id)) return 'duplicate';
+    if (findActiveAutoRun(data)) return 'busy';
+    const runs = (data.results.autoRuns ??= []);
+    runs.push(run);
+    pruneAutoRuns(data, Date.now());
+    this.saveProject(projectId, data);
+    this.emitAutoRunChange(projectId, run);
+    return 'created';
+  }
+
+  // Fin de l'analyse, en UNE écriture : une entrée du tracker par étape (runId, sources retenues au
+  // lancement), plan et statut `running` (`completed` d'emblée sans étape). null si le lot n'est
+  // plus en analyse (annulé pendant le routage, cours supprimé) : aucune étape ne part.
+  startAutoRunSteps(
+    projectId: string,
+    runId: string,
+    steps: AutoRunStepInit[],
+    skipped: string[],
+  ): AutoRun | null {
+    const data = this.getProject(projectId);
+    const run = data ? findAutoRun(data, runId) : undefined;
+    if (!data || run?.status !== 'analysing') return null;
+    const now = new Date().toISOString();
+    const entries = steps.map((step): PendingTrackerEntryActive => {
+      const { sourceIds } = run.request;
+      return {
+        id: step.gid,
+        type: step.agent,
+        status: 'pending',
+        startedAt: now,
+        sourceIds,
+        runId,
+      };
+    });
+    const tracker = (data.results.pendingTracker ??= []);
+    tracker.push(...entries);
+    run.steps = steps.map((step) => ({ ...step, status: 'pending' }));
+    run.skipped = skipped;
+    run.status = 'running';
+    run.updatedAt = now;
+    if (steps.length === 0) endAutoRun(run, 'completed', 'completed', now);
+    this.saveProject(projectId, data);
+    for (const entry of entries) this.emitPendingEvent(projectId, entry);
+    this.emitAutoRunChange(projectId, run);
+    return run;
+  }
+
+  // Analyse en échec : lot `failed` avec son code, aucune étape n'est partie. null si le lot n'est
+  // plus en analyse.
+  failAutoRun(projectId: string, runId: string, code: FailedStepCode): AutoRun | null {
+    const data = this.getProject(projectId);
+    const run = data ? findAutoRun(data, runId) : undefined;
+    if (!data || run?.status !== 'analysing') return null;
+    endAutoRun(run, 'failed', 'failed', new Date().toISOString());
+    run.failureCode = code;
+    this.saveProject(projectId, data);
+    this.emitAutoRunChange(projectId, run);
+    return run;
+  }
+
+  // Annulation du lot entier, en UNE écriture : le lot, ses étapes en cours et leurs entrées du
+  // tracker passent `cancelled` (une étape en vol chez Mistral ne sera pas promue). Lot déjà
+  // terminé : rendu tel quel, sans écriture. null si le lot est inconnu.
+  cancelAutoRun(projectId: string, runId: string): AutoRun | null {
+    const data = this.getProject(projectId);
+    const run = data ? findAutoRun(data, runId) : undefined;
+    if (!data || !run) return null;
+    const now = new Date().toISOString();
+    if (!endAutoRun(run, 'cancelled', 'cancelled', now)) return run;
+    const cancelled = this.cancelPendingEntries(data, now, runId);
+    this.pruneTrackerIfNeeded(data);
+    this.saveProject(projectId, data);
+    for (const entry of cancelled) this.emitTerminalEvent(projectId, entry);
+    this.emitAutoRunChange(projectId, run);
+    return run;
+  }
+
+  // Entrées en cours passées `cancelled` (toutes, ou celles du lot `runId`). Chacune est une
+  // NOUVELLE entrée terminale : le discriminated union empêche la mutation in-place (flipper
+  // status sans poser failureCode + completedAt produirait un état impossible).
+  private cancelPendingEntries(
+    data: ProjectData,
+    now: string,
+    runId?: string,
+  ): PendingTrackerEntryTerminal[] {
+    const tracker = data.results.pendingTracker ?? [];
+    const cancelled: PendingTrackerEntryTerminal[] = [];
+    tracker.forEach((entry, i) => {
+      if (entry.status !== 'pending') return;
+      if (runId !== undefined && entry.runId !== runId) return;
+      const terminal: PendingTrackerEntryTerminal = {
+        ...trackerBase(entry),
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        completedAt: now,
+      };
+      tracker[i] = terminal;
+      cancelled.push(terminal);
+    });
+    return cancelled;
+  }
+
+  // Étape du lot de l'entrée passée en terminal (annulation par sa puce, échec) : le lot continue.
+  private applyTerminalToRun(
+    data: ProjectData,
+    terminal: PendingTrackerEntryTerminal,
+  ): AutoRun | undefined {
+    const now = terminal.completedAt;
+    if (terminal.status === 'cancelled') {
+      return applyStepTransition(data, terminal, 'cancelled', now);
+    }
+    return applyStepTransition(data, terminal, 'failed', now, terminal.failureCode);
+  }
+
+  // Copie : l'événement garde l'état du lot à l'émission.
+  private emitAutoRunChange(pid: string, run: AutoRun | undefined): void {
+    if (run) emitAutoRunEvent({ pid, run: structuredClone(run) });
+  }
+
   private pruneTrackerIfNeeded(data: ProjectData): void {
     const tracker = data.results.pendingTracker;
     if (!tracker || tracker.length <= DEFAULT_PRUNE_MAX_KEEP) return;
@@ -651,120 +872,25 @@ export class ProjectStore {
     if (!tracker || tracker.length === 0) return;
     const maxKeep = opts?.maxKeep ?? DEFAULT_PRUNE_MAX_KEEP;
     const maxAgeMs = opts?.maxAgeMs ?? DEFAULT_PRUNE_MAX_AGE_MS;
-    const now = Date.now();
     const pendings = tracker.filter((e) => e.status === 'pending');
-    const terminals = tracker
-      .filter((e) => e.status !== 'pending')
-      .filter((e) => {
-        const ts = e.completedAt ? Date.parse(e.completedAt) : Date.parse(e.startedAt);
-        return now - ts <= maxAgeMs;
-      })
-      .sort(
-        (a, b) =>
-          Date.parse(b.completedAt ?? b.startedAt) - Date.parse(a.completedAt ?? a.startedAt),
-      )
-      .slice(0, Math.max(0, maxKeep - pendings.length));
+    const keep = Math.max(0, maxKeep - pendings.length);
+    const terminals = recentTerminals(tracker, { maxAgeMs, keep, nowMs: Date.now() });
     data.results.pendingTracker = [...pendings, ...terminals];
-  }
-
-  private normalizeModeration(
-    moderation:
-      Source['moderation'] | { safe?: boolean; categories?: Record<string, boolean> } | undefined,
-  ): ModerationResult | undefined {
-    if (!moderation) return undefined;
-    if ('status' in moderation && moderation.status) {
-      return {
-        status: moderation.status,
-        categories: moderation.categories ?? {},
-      };
-    }
-    if ('safe' in moderation) {
-      return {
-        status: moderation.safe ? 'safe' : 'unsafe',
-        categories: moderation.categories ?? {},
-      };
-    }
-    console.warn('Unknown moderation format during migration:', JSON.stringify(moderation));
-    return { status: 'error', categories: {} };
   }
 
   private migrateModerationFormat(data: ProjectData): void {
     for (const source of data.sources) {
-      source.moderation = this.normalizeModeration(source.moderation);
+      source.moderation = normalizeModeration(source.moderation);
     }
   }
 
   private migrateResultsFormat(data: ProjectData): void {
     // Legacy format : results.{summary|flashcards|quiz|podcast} à plat, remplacé
     // par results.generations[]. Les champs lus ici disparaissent en sortie.
-    interface LegacyResults {
-      generations?: unknown;
-      summary?: SummaryGeneration['data'];
-      summaryEN?: SummaryGeneration['data'];
-      flashcards?: FlashcardsGeneration['data'];
-      flashcardsEN?: FlashcardsGeneration['data'];
-      quiz?: QuizGeneration['data'];
-      quizEN?: QuizGeneration['data'];
-      podcast?: PodcastGeneration['data'];
-    }
     const r = data.results as LegacyResults;
     if (Array.isArray(r.generations)) return;
-
-    const generations: Generation[] = [];
-    const now = new Date().toISOString();
-
-    if (r.summary) {
-      const gen = {
-        id: randomUUID(),
-        title: (r.summary as { title?: string }).title || 'Fiche de revision',
-        createdAt: now,
-        sourceIds: [],
-        type: 'summary',
-        data: r.summary,
-      } as Generation;
-      if (r.summaryEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.summaryEN;
-      generations.push(gen);
-    }
-
-    if (r.flashcards) {
-      const gen = {
-        id: randomUUID(),
-        title: 'Flashcards',
-        createdAt: now,
-        sourceIds: [],
-        type: 'flashcards',
-        data: r.flashcards,
-      } as Generation;
-      if (r.flashcardsEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.flashcardsEN;
-      generations.push(gen);
-    }
-
-    if (r.quiz) {
-      const gen = {
-        id: randomUUID(),
-        title: 'Quiz QCM',
-        createdAt: now,
-        sourceIds: [],
-        type: 'quiz',
-        data: r.quiz,
-      } as Generation;
-      if (r.quizEN) (gen as { dataEN?: Generation['data'] }).dataEN = r.quizEN;
-      generations.push(gen);
-    }
-
-    if (r.podcast) {
-      generations.push({
-        id: randomUUID(),
-        title: 'Podcast',
-        createdAt: now,
-        sourceIds: [],
-        type: 'podcast',
-        data: r.podcast,
-      });
-    }
-
+    const generations = legacyGenerations(r, new Date().toISOString());
     data.results = { generations };
-
     if (generations.length > 0) {
       console.log(`  Migration resultats: ${generations.length} generation(s) converties`);
     }
