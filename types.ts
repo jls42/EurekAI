@@ -275,6 +275,9 @@ export type FailedStepCode =
   // Refus du garde-fou de Mistral (403, `guardrail_violation`, code 1920) : le contenu est en cause,
   // pas la clé. Déterministe : jamais rejoué.
   | 'content_refused'
+  // Étape d'un lot Auto refusée par ses gardes (modération, sources, limite de contexte) : le code
+  // exact du refus suit dans `refusal`. Posé par le cœur de génération, jamais par extractErrorCode.
+  | 'refused'
   | 'internal_error'
   // Posé explicitement par store.markPendingCancelled / cancelAllPendingsAtBoot.
   // Jamais dérivé d'une exception via extractErrorCode (pas de mapping dans error-matchers).
@@ -355,6 +358,8 @@ export interface AutoRunStep {
   status: AutoRunStepStatus;
   // Présent seulement sur une étape 'failed'.
   failureCode?: Exclude<FailedStepCode, 'cancelled'>;
+  // failureCode 'refused' : code stable du refus des gardes, à traduire pour le message de l'étape.
+  refusal?: string;
 }
 
 // Corps capturé au lancement : chaque étape refait ses gardes avec lui, sur les sources retenues
@@ -364,6 +369,8 @@ export interface AutoRunRequest {
   ageGroup: AgeGroup;
   sourceIds: string[];
   useConsigne: boolean;
+  // Nombre d'éléments demandé (quiz, flashcards…), absent = défaut de chaque générateur.
+  count?: number;
 }
 
 export interface AutoRun {
@@ -429,6 +436,8 @@ export interface PendingTrackerEntryFailed extends PendingTrackerEntryBase {
   status: 'failed';
   failureCode: Exclude<FailedStepCode, 'cancelled'>;
   completedAt: string;
+  // failureCode 'refused' : code stable du refus des gardes (`moderation.blocked`, `no_sources`…).
+  refusal?: string;
 }
 
 export interface PendingTrackerEntryCancelled extends PendingTrackerEntryBase {

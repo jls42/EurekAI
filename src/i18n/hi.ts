@@ -77,6 +77,9 @@ export const hi: Record<string, string> = {
 
   'errorCode.internal_error': 'आंतरिक सर्वर त्रुटि',
   'errorCode.cancelled': 'जनरेशन रद्द कर दी गई',
+  'errorCode.refused': 'जनरेशन अस्वीकार कर दी गई',
+  'errorCode.auto_busy': 'इस पाठ्यक्रम के लिए जादू पहले से चल रहा है।',
+  'errorCode.auto_run_not_found': 'यह जादू नहीं मिला: शायद इसे हटा दिया गया है।',
 
   // Notifications center
   'notif.openBell': 'सूचना केंद्र खोलें',

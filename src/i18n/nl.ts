@@ -71,6 +71,9 @@ export const nl: Record<string, string> = {
 
   'errorCode.internal_error': 'Interne serverfout',
   'errorCode.cancelled': 'Generatie geannuleerd',
+  'errorCode.refused': 'Generatie geweigerd',
+  'errorCode.auto_busy': 'De magie loopt al voor deze cursus.',
+  'errorCode.auto_run_not_found': 'Deze magie is niet gevonden: misschien is ze gewist.',
 
   // Notifications center
   'notif.openBell': 'Notificatiecentrum openen',

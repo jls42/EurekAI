@@ -71,6 +71,9 @@ export const pt: Record<string, string> = {
 
   'errorCode.internal_error': 'Erro interno do servidor',
   'errorCode.cancelled': 'Geração cancelada',
+  'errorCode.refused': 'Geração recusada',
+  'errorCode.auto_busy': 'A magia já está a decorrer neste curso.',
+  'errorCode.auto_run_not_found': 'Esta magia não foi encontrada: talvez tenha sido apagada.',
 
   // Notifications center
   'notif.openBell': 'Abrir centro de notificações',

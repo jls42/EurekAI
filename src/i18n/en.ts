@@ -69,6 +69,9 @@ export const en: Record<string, string> = {
 
   'errorCode.internal_error': 'Internal server error',
   'errorCode.cancelled': 'Generation cancelled',
+  'errorCode.refused': 'Generation refused',
+  'errorCode.auto_busy': 'Magic is already running on this course.',
+  'errorCode.auto_run_not_found': "This magic can't be found: it may have been cleared.",
 
   // Notifications center
   'notif.openBell': 'Open notifications center',

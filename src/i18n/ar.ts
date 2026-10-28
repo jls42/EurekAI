@@ -81,6 +81,9 @@ export const ar: Record<string, string> = {
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
   'errorCode.cancelled': 'تم إلغاء التوليد',
+  'errorCode.refused': 'تم رفض التوليد',
+  'errorCode.auto_busy': 'السحر قيد التشغيل بالفعل لهذا الدرس.',
+  'errorCode.auto_run_not_found': 'لم يُعثر على هذا السحر: ربما حُذف.',
 
   // Notifications center
   'notif.openBell': 'فتح مركز الإشعارات',

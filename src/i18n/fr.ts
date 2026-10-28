@@ -74,6 +74,9 @@ export const fr: Record<string, string> = {
   // Error codes (stable API codes → user-facing message)
   'errorCode.internal_error': 'Erreur interne du serveur',
   'errorCode.cancelled': 'Génération annulée',
+  'errorCode.refused': 'Génération refusée',
+  'errorCode.auto_busy': 'La magie est déjà en cours sur ce cours.',
+  'errorCode.auto_run_not_found': 'Cette magie est introuvable : elle a peut-être été effacée.',
 
   // Notifications center (cloche header)
   'notif.openBell': 'Ouvrir le centre de notifications',

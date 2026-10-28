@@ -71,6 +71,10 @@ export const de: Record<string, string> = {
 
   'errorCode.internal_error': 'Interner Serverfehler',
   'errorCode.cancelled': 'Generierung abgebrochen',
+  'errorCode.refused': 'Generierung abgelehnt',
+  'errorCode.auto_busy': 'Die Magie läuft für diesen Kurs bereits.',
+  'errorCode.auto_run_not_found':
+    'Diese Magie wurde nicht gefunden: Vielleicht wurde sie gelöscht.',
 
   // Notifications center
   'notif.openBell': 'Benachrichtigungszentrum öffnen',

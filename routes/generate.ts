@@ -81,6 +81,7 @@ import {
   INVALID_INPUT,
   isOptionalAgeGroup,
   isOptionalLangCode,
+  isUuidV4,
 } from '../helpers/request-validation.js';
 import {
   blockingModerationStatus,
@@ -312,7 +313,8 @@ const splitByAutoExecutable = <T extends { agent: string }>(
   return { executable, skipped };
 };
 
-type GenContextBase = Omit<GenContext, 'client'>;
+// Contexte d'une génération avant le client (exporté pour le lancement d'un lot Auto).
+export type GenContextBase = Omit<GenContext, 'client'>;
 type GenFailure = { ok: false; status: number; error: string };
 // Alias plutôt qu'une union écrite sur plusieurs lignes en type de retour : Lizard ne
 // mesurerait que la signature (cf. CLAUDE.md « Type de retour union multi-lignes »).
@@ -544,20 +546,13 @@ interface GenerationOptions {
   trackedType: TrackedGenerationType;
 }
 
-// UUID v4 strict : version nibble = '4', variant nibble dans [89ab].
-// Aligné sur la regex client (src/app/confirm.ts GID_UUID_V4) — assure que le
-// gid produit par crypto.randomUUID() côté client (RFC 4122 v4) traverse
-// inchangé et que toute autre valeur (UUID v1/v3/v5, hex shape valide non-v4)
-// retombe sur randomUUID() au lieu de propager un gid non conforme.
-const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-// Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
-// randomUUID. Le client génère son propre gid avant le fetch pour avoir
-// abortControllersByGid[gid] immédiatement opérationnel + identifiant stable
-// utilisable au moment du payload 200 fallback ou de l'event SSE.
+// Lit le gid envoyé par le client (body.gid), UUID v4 strict (isUuidV4) ou retombe sur randomUUID :
+// toute autre valeur (UUID v1/v3/v5, forme hexadécimale non v4) ne se propage pas. Le client génère
+// son propre gid avant le fetch pour avoir abortControllersByGid[gid] immédiatement opérationnel +
+// identifiant stable utilisable au moment du payload 200 fallback ou de l'event SSE.
 const readClientGid = (req: Request): string => {
   const candidate = (req.body as { gid?: unknown })?.gid;
-  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate) ? candidate : randomUUID();
+  return isUuidV4(candidate) ? candidate : randomUUID();
 };
 
 const makeTrackerEntry = (
@@ -728,7 +723,26 @@ interface GenerationRequest {
   gid: string;
   body: unknown;
   def: GenerationDef;
+  // Entrée du tracker déjà posée (étape d'un lot Auto, store.startAutoRunSteps) : pas
+  // d'addPendingEntry, et un refus des gardes passe cette entrée en échec `refused`.
+  preTracked?: boolean;
 }
+
+type GenContextFailure = Extract<GenContextResult, { ok: false }>;
+
+// Refus des gardes. Génération simple : aucune écriture (rien n'est encore suivi). Étape d'un lot :
+// son entrée passe `failed` / `refused` avec le code exact du refus, et le lot continue.
+const refusedGeneration = (r: GenerationRequest, failure: GenContextFailure): GenerationOutcome => {
+  if (r.preTracked) r.store.markPendingFailed(r.pid, r.gid, 'refused', failure.error);
+  return { kind: 'refused', status: failure.status, error: failure.error };
+};
+
+// Pose l'entrée du tracker d'une génération simple ; faux si ce gid est déjà suivi.
+const trackGeneration = (r: GenerationRequest, sourceIds: string[]): boolean => {
+  if (r.preTracked) return true;
+  const entry = makeTrackerEntry(r.def.options.trackedType, r.gid, sourceIds);
+  return r.store.addPendingEntry(r.pid, entry);
+};
 
 // Cœur d'une génération suivie, sans réponse HTTP. Ordre : reprise des modérations en attente,
 // gardes (buildGenContext : refus sans aucune écriture), entrée du tracker, file par type,
@@ -738,14 +752,11 @@ export const runTrackedGeneration = async (r: GenerationRequest): Promise<Genera
   await settleGenerationSources(store, profileStore, client, pid, r.body);
   const body = r.body as GenRequestBody;
   const built = buildGenContext(store, profileStore, pid, body, def.modelId, def.options);
-  if (!built.ok) return { kind: 'refused', status: built.status, error: built.error };
-  const type = def.options.trackedType;
-  if (!store.addPendingEntry(pid, makeTrackerEntry(type, gid, built.ctx.sourceIds))) {
-    return { kind: 'duplicate_gid' };
-  }
+  if (!built.ok) return refusedGeneration(r, built);
+  if (!trackGeneration(r, built.ctx.sourceIds)) return { kind: 'duplicate_gid' };
   const run: TrackedRun = { store, pid, gid, def, ctx: { ...built.ctx, client } };
   try {
-    return await withSameTypeQueue(pid, type, () => runQueuedGeneration(run));
+    return await withSameTypeQueue(pid, def.options.trackedType, () => runQueuedGeneration(run));
   } catch (e) {
     return failedGeneration(run, e);
   }
@@ -1559,6 +1570,26 @@ export const buildGenerationDefs = (store: ProjectStore): Record<AutoAgentType, 
       options: trackedAs(DICTATION),
     },
   };
+};
+
+// --- Lot Auto côté serveur (routes/auto-runs.ts) ---
+
+// Gardes du lancement d'un lot : celles de l'analyse de route (modèle routeur), dans le même ordre
+// (reprise des modérations, corps, projet, modération, sources, consigne, limite de contexte).
+export const prepareAutoLaunch = async (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+  pid: string,
+  body: unknown,
+): Promise<GenContextResult> => {
+  await settleGenerationSources(store, profileStore, client, pid, body);
+  return buildGenContext(store, profileStore, pid, body as GenRequestBody, ROUTER_MODEL);
+};
+
+// Analyse d'un lot : routage facturé et persisté, plan scindé en étapes exécutables et ignorées.
+export const planAutoRun = (store: ProjectStore, client: Mistral, ctx: GenContextBase) => {
+  return runAutoRouting(store, client, ctx.markdown, ctx.lang, ctx.ageGroup, ctx.pid);
 };
 
 const registerGenerationRoutes = (
