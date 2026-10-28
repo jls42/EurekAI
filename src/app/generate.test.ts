@@ -73,6 +73,7 @@ function makeContext(overrides: any = {}) {
     sources: [],
     generations: [],
     selectedIds: [],
+    toasts: [],
     loading: { ...defaultLoading },
     abortControllers: {},
     abortControllersByGid: {},

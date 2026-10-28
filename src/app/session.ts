@@ -54,6 +54,14 @@ const abandonProjectLoad = (ctx: AppContext): void => {
 // méthode object-literal qui forwarde via `this`. Workaround documenté ici une
 // seule fois pour les deux sites concernés (`doResetSession` ci-dessous et
 // `resetSession` dans le createSession factory).
+// Toasts gardés au changement de cours : ceux dont l'action est persistante (« Reprendre » un lot
+// Auto interrompu, qui nomme son cours et se reprend depuis n'importe quel cours) ; les nouveaux
+// ids partent après les leurs. Le changement de profil les retire (selectProfile).
+const keepPersistentToasts = (ctx: AppContext): void => {
+  ctx.toasts = ctx.toasts.filter((t) => t.action?.persistent === true);
+  ctx.toastCounter = ctx.toasts.reduce((max, t) => Math.max(max, t.id), 0);
+};
+
 function doResetSession(ctx: AppContext): void {
   // Stop EventSource SSE — sinon des events sur l'ancien contexte arrivent
   // après le switch et écrasent le nouveau (méthode injectée par
@@ -80,8 +88,7 @@ function doResetSession(ctx: AppContext): void {
   // Réservations de l'anti-flood : un lancement encore en attente la rend sur cette map neuve sans
   // jamais passer sous zéro (cf. releaseLaunch, generate.ts).
   ctx.launchingByType = {};
-  ctx.toasts = [];
-  ctx.toastCounter = 0;
+  keepPersistentToasts(ctx);
   ctx.shownToastEventKeys = new Set<EventKey>();
   // chatLoading et consigneLoading vivent hors de loading{} (flags dédiés) — un chat ou une
   // détection de consigne lancé sur le cours A garderait sinon, dans le cours B, l'input désactivé

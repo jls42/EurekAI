@@ -337,6 +337,8 @@ const deleteProject = async function (this: AppContext, id: string) {
   // en vol sont abortées.
   forgetAutoRun(this, id);
   abortSingleRuns(this, id);
+  // « Reprendre » le lot d'un cours supprimé : plus rien à reprendre.
+  this.toasts = this.toasts.filter((t) => t.action?.projectId !== id);
   if (this.currentProjectId === id) {
     this.currentProjectId = null;
     this.currentProject = null;

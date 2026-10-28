@@ -211,7 +211,7 @@ const finalAction = (
   const fn = () => {
     void ctx.resumeAuto(projectId, entry.runId, entry.projectName);
   };
-  return { label: ctx.t('toast.resume'), fn, persistent: true };
+  return { label: ctx.t('toast.resume'), fn, persistent: true, projectId };
 };
 
 // Bilan rangé sous le cours du lot (NotifSpec.projectId), dédoublonné entre onglets par sa clé.

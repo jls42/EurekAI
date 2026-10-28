@@ -49,7 +49,7 @@ export interface ItemWithRefs {
   source?: string;
 }
 
-type ToastAction = { label: string; fn: () => void; persistent?: boolean };
+type ToastAction = { label: string; fn: () => void; persistent?: boolean; projectId?: string };
 type NotifSpec = {
   messageKey: string;
   params?: Record<string, string | number>;

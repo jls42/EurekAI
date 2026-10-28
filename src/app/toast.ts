@@ -5,8 +5,14 @@ import type { EventKey } from '../../helpers/event-bus';
 // Alias : un type de fonction écrit en ligne dans la signature de showToast faisait perdre son
 // corps à Lizard (seule la signature était mesurée, cf. CLAUDE.md « Pièges Lizard »).
 type ToastRetry = (() => void) | null;
-// persistent : le toast reste affiché jusqu'à ce que l'utilisateur agisse (« Reprendre »).
-type ToastActionSpec = { label: string; fn: () => void; persistent?: boolean } | null;
+// persistent : le toast reste affiché jusqu'à ce que l'utilisateur agisse, et survit au changement
+// de cours (« Reprendre » un lot Auto, qui nomme son cours `projectId`, cf. session.ts).
+type ToastActionSpec = {
+  label: string;
+  fn: () => void;
+  persistent?: boolean;
+  projectId?: string;
+} | null;
 
 export interface Toast {
   id: number;

@@ -113,6 +113,19 @@ describe('resetSession', () => {
     expect(ctx.shownToastEventKeys.size).toBe(0);
   });
 
+  it('garde le toast « Reprendre » (action persistante) ; nouveaux ids après le sien', () => {
+    const resume = { id: 7, message: 'm', type: 'warning', action: { persistent: true } };
+    const ctx = makeCtx({
+      toasts: [{ id: 1, message: 'hello', type: 'info', action: { label: 'Voir' } }, resume] as any,
+      toastCounter: 9,
+    });
+
+    sessionMixin.resetSession.call(ctx);
+
+    expect(ctx.toasts).toEqual([resume]);
+    expect(ctx.toastCounter).toBe(7);
+  });
+
   it('reset le confirm dialog en vol', () => {
     // Stub trigger : objet partiel suffisant pour le test de reset (la
     // sémantique testée est `confirmTrigger != null avant → null après`).
