@@ -382,6 +382,9 @@ export interface AutoRun {
   skipped: string[];
   // Présent seulement sur un lot 'failed' (analyse en échec).
   failureCode?: FailedStepCode;
+  // Coût de l'analyse (routage), que le navigateur ajoute une fois au total du cours : aucun
+  // événement de génération ne le porte.
+  analysisCost?: number;
 }
 
 // Statut du cycle de vie d'une génération suivie par le tracker.
@@ -493,6 +496,8 @@ export interface GenerationEventCompleted extends GenerationEventBase {
 export interface GenerationEventTerminal extends GenerationEventBase {
   status: 'failed' | 'cancelled';
   failureCode: FailedStepCode;
+  // failureCode 'refused' (étape d'un lot Auto) : code exact du refus, pour un message précis.
+  refusal?: string;
 }
 
 export type GenerationEvent =

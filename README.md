@@ -169,7 +169,9 @@ Un tuteur conversationnel avec accès complet aux documents de cours :
 
 Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources et proposer les générateurs les plus pertinents parmi les 8 disponibles. L'interface affiche la progression en temps réel : d'abord une phase d'analyse, puis les générations individuelles avec annulation possible.
 
-Au plus 3 générations longues tournent en même temps dans un onglet (étapes de tous les Auto, générations lancées une à une, fiches de rappel) : les suivantes attendent leur tour, et un cours s'ouvre sans attendre la fin des générations en cours. « Tout annuler » arrête aussi les étapes de l'Auto du cours encore en attente, même après être passé par un autre cours, avec un seul message.
+L'Auto tourne sur le serveur : il continue si la page est rechargée, si l'on ouvre un autre cours ou si l'on change de profil, et un seul Auto à la fois tourne par cours (un deuxième onglet rejoint celui en cours). Le serveur lance au plus 3 générations en même temps par clé Mistral. Chaque génération terminée a son message, puis un bilan final s'affiche une seule fois ; s'il se termine pendant qu'un autre cours est affiché, le message nomme son cours. Une génération annulée seule ne compte pas comme un échec dans le bilan. « Tout annuler » arrête tout le lot du cours, avec un seul message. Si le serveur redémarre pendant un Auto, celui-ci est signalé comme interrompu.
+
+Au plus 3 générations longues lancées depuis l'onglet tournent en même temps (générations lancées une à une, fiches de rappel) : les suivantes attendent leur tour, et un cours s'ouvre sans attendre la fin des générations en cours.
 
 ### Apprentissage adaptatif
 
@@ -397,7 +399,8 @@ routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
   sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, scraping URL + recherche web, modération
-  generate.ts             — Endpoints de génération (8 types + auto + route)
+  generate.ts             — Endpoints de génération (8 types + route)
+  auto-runs.ts            — Lots Auto côté serveur : lancement, analyse et étapes en arrière-plan, état, annulation
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
 
@@ -409,6 +412,7 @@ helpers/
   generation-media.ts     — Noms uniques des médias (MP3/PNG) et suppression avec leur génération
   media-ledger.ts         — Médias écrits pendant une génération, supprimés si elle échoue ou est annulée
   keyed-lock.ts           — File d'attente par clé (OCR sérialisé par contenu)
+  keyed-slots.ts          — Places par clé (au plus 3 étapes d'Auto en même temps par clé Mistral)
   logger.ts               — Logger structuré (niveaux, contexte JSON)
 
   # Génération & UX
@@ -454,7 +458,8 @@ helpers/
   mistral-retry.ts        — Retry avec backoff sur erreurs transitoires Mistral (3 tentatives)
 
   # Événements & notifications (SSE)
-  event-bus.ts            — Bus d'événements de génération en mémoire (dispatch SSE, filet anti-uncaughtException)
+  event-bus.ts            — Bus d'événements de génération et de lots Auto en mémoire (dispatch SSE, filet anti-uncaughtException)
+  auto-run-state.ts       — Transitions d'un lot Auto (fonctions pures, appliquées par le store)
   event-key.ts            — Clé d'événement typée partagée client/serveur (idempotence notifications)
 
   # Voix & profils
@@ -471,8 +476,9 @@ src/                      — Frontend (Vite + Handlebars)
     profiles.ts           — Logique du sélecteur de profils
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
-    generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
-    auto-runs.ts          — Générations automatiques en cours, par cours (elles continuent quand on change de cours)
+    generate.ts           — Déclencheurs de génération (individuel, tout, Auto)
+    auto-launch.ts        — Lancement d'un Auto côté serveur, suivi pendant qu'un autre cours est affiché, annulation
+    auto-runs.ts          — Auto suivis par l'onglet : état reçu du serveur, bilan affiché une seule fois, coût de l'analyse
     request-slots.ts      — Au plus 3 générations longues en même temps pour l'onglet, file d'attente FIFO
     moderation-gate.ts    — Pré-contrôle de modération des générations (vérifie d'abord les sources en attente)
     effective-moderation.ts — Statut de modération affiché et masquage du contenu des sources
@@ -569,7 +575,9 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/quiz-review` | Révision adaptative `{generationId, weakQuestions}` |
 | `POST` | `/api/projects/:pid/generate/remediation-summary` | Fiche de rappel ciblée sur les questions ratées d'un quiz `{generationId, weakQuestions}` — appelée en parallèle de `quiz-review` par le bouton de remédiation de la vue quiz |
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) — renvoie `{plan, costDelta}` (coût du routage seul) |
-| `POST` | `/api/projects/:pid/generate/auto` | Génération auto backend (routage + 8 types : `summary`, `flashcards`, `quiz`, `fill-blank`, `podcast`, `quiz-vocal`, `image`, `dictation`). Exécution en parallèle — suppose un tier Mistral avec rate-limit ≥ 8 requêtes simultanées ; sinon plusieurs 429 peuvent remonter dans `failedSteps`. |
+| `POST` | `/api/projects/:pid/generate/auto/start` | Lancer un lot Auto côté serveur `{runId, …}` : réponse 202 immédiate, puis analyse et étapes en arrière-plan, au plus 3 étapes en même temps par clé Mistral ; le lot continue si la page est rechargée. 409 `auto_busy` si un lot tourne déjà sur ce cours |
+| `GET` | `/api/projects/:pid/auto-runs/:runId` | État d'un lot Auto : analyse, étapes et issue de chacune |
+| `POST` | `/api/projects/:pid/auto-runs/:runId/cancel` | Annuler un lot Auto entier (une étape seule s'annule comme une génération) |
 
 Toutes les routes de génération acceptent `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}` ; un `ageGroup` inconnu ou un `lang` qui n'est pas un code de langue valide (attendu : `fr`, `pt-BR`…) → 400 `invalid_input`, avant tout appel IA. `quiz-review` et `remediation-summary` exigent en plus `{generationId, weakQuestions}` et portent sur les sources du quiz d'origine.
 

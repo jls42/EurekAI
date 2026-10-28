@@ -2,7 +2,7 @@ import { normalizeSummaryData } from './helpers';
 import { openingProfileQuery } from './project-snapshot';
 import { resumeProjectModeration } from './moderation-gate';
 import { withReplyFallback } from './chat-reply';
-import { abortAutoRun, restoreAutoAnalysis } from './auto-runs';
+import { forgetAutoRun, restoreAutoRun } from './auto-runs';
 import { abortSingleRuns, restoreSingleRuns } from './single-runs';
 import { restoreChatLoading } from './chat-in-flight';
 import type { AppContext } from './app-context';
@@ -187,10 +187,11 @@ const startSseStreamSafely = function (state: AppContext, id: string): void {
   });
 };
 
-// Orchestrateur léger : hydrate + ouvre les dernières gens par type + démarre SSE. Retour sur un
-// cours dont l'Auto analyse encore (lancé avant un changement de cours) : puce « Auto — analyse… »
-// rétablie, annulable, et bouton Auto désactivé (isGenerating) au lieu d'en permettre un second ;
-// dont un message du chat attend encore sa réponse : indicateur rétabli, champ inactif.
+// Orchestrateur léger : hydrate + ouvre les dernières gens par type + démarre SSE. Cours dont un lot
+// Auto tourne sur le serveur (lancé avant un changement de cours, un rechargement, ou dans un autre
+// onglet) : lot suivi, puce « Auto — analyse… » rétablie pendant l'analyse et bouton Auto
+// désactivé (restoreAutoRun) ; dont un message du chat attend encore sa réponse : indicateur
+// rétabli, champ inactif.
 const applyProjectSnapshot = function (state: AppContext, project: ProjectData, id: string): void {
   hydrateProjectFields(state, project, id);
   normalizeGenerations(state, state.generations);
@@ -198,7 +199,7 @@ const applyProjectSnapshot = function (state: AppContext, project: ProjectData, 
     state.openGens[genId] = true;
   }
   state.activeView = state.sources.length === 0 ? 'sources' : 'dashboard';
-  restoreAutoAnalysis(state, id);
+  restoreAutoRun(state, id, project, true);
   restoreSingleRuns(state, id);
   restoreChatLoading(state, id);
   void state.$nextTick(() => state.refreshIcons());
@@ -332,9 +333,9 @@ const deleteProject = async function (this: AppContext, id: string) {
   this.projects = this.projects.filter((p) => p.id !== id);
   // Import en cours vers ce cours : sa session disparaît, la boucle s'arrête au fichier suivant.
   this.uploadSessions = this.uploadSessions.filter((s) => s.projectId !== id);
-  // Auto en cours sur ce cours : arrêté (resetSession l'épargnerait), aucune étape n'est envoyée ;
-  // ses générations simples en vol aussi.
-  abortAutoRun(this, id);
+  // Lot Auto de ce cours : oublié (le serveur l'arrête avec le cours) ; ses générations simples
+  // en vol sont abortées.
+  forgetAutoRun(this, id);
   abortSingleRuns(this, id);
   if (this.currentProjectId === id) {
     this.currentProjectId = null;

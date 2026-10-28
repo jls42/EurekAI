@@ -88,6 +88,7 @@ interface FakeContext {
   currentProjectId: string | null;
   reconcilePendings: SpyFn;
   applyGenerationEvent: SpyFn;
+  applyAutoRunEvent: SpyFn;
   // sse-pendings.ts L102 fait `this.startPendingsStream(projectId)` pour le
   // retry dans setTimeout — le ctx doit donc exposer la méthode. Arrow wrapper
   // (vs. assignment direct) évite `@typescript-eslint/unbound-method`.
@@ -103,6 +104,7 @@ function makeContext(): FakeContext {
     currentProjectId: null,
     reconcilePendings,
     applyGenerationEvent: makeSpy(),
+    applyAutoRunEvent: makeSpy(),
     // Réécrit par beforeEach avec l'arrow qui forwarde vers le stream courant.
     startPendingsStream: () => Promise.resolve(),
   };
@@ -215,6 +217,22 @@ $describe('createPendingsStream', () => {
 
     assert.equal(ctx.applyGenerationEvent.calls.length, 1);
     assert.deepEqual(ctx.applyGenerationEvent.calls[0][0], event);
+  });
+
+  // Lot Auto : même flux, canal `auto` (état complet du lot), vers applyAutoRunEvent.
+  $it('forwards parsed auto events to applyAutoRunEvent, not for a stale projectId', async () => {
+    ctx.currentProjectId = 'proj-1';
+    await start('proj-1');
+
+    const es = FakeEventSource.instances[0];
+    const event = { pid: 'proj-1', run: { id: 'r1', status: 'running', steps: [] } };
+    es.dispatch('auto', event);
+    ctx.currentProjectId = 'proj-other';
+    es.dispatch('auto', event);
+
+    assert.equal(ctx.applyAutoRunEvent.calls.length, 1);
+    assert.deepEqual(ctx.applyAutoRunEvent.calls[0][0], event);
+    assert.equal(ctx.applyGenerationEvent.calls.length, 0);
   });
 
   $it('ignores generation events for stale projectId', async () => {

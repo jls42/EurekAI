@@ -3,6 +3,7 @@ import type {
   Consigne,
   Generation,
   GenerationEvent,
+  AutoRunEvent,
   PendingTrackerEntry,
   PodcastGeneration,
   PodcastLine,
@@ -276,6 +277,7 @@ export interface AppContext extends AppState {
   notificationMessage(notif: PersistedNotification): string;
   formatRelativeTime(iso: string): string;
   applyGenerationEvent(event: GenerationEvent): void;
+  applyAutoRunEvent(event: AutoRunEvent): void;
   reconcilePendings(projectId: string, reconcileStartedAt: string): Promise<void>;
   hydratePendingByIdFromTracker(tracker: PendingTrackerEntry[]): void;
   mergeReconciledGenerations(generations: Generation[], cutoff: number): void;

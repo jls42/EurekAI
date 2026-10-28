@@ -1,9 +1,12 @@
 import type { AppContext } from './app-context';
 import type { PendingTrackerEntry } from '../../types';
 import { pendingOfTypeExists } from './pending-utils';
-import { abortAutoRun } from './auto-runs';
+import { cancelAutoLot } from './auto-launch';
 import { abortSingleRuns } from './single-runs';
 import { buildEventKey } from '../../helpers/event-key';
+
+const TOAST_CANCELLED_ONE = 'toast.cancelledOne';
+const GEN_AUTO = 'gen.auto';
 
 // UUID v4 strict pour l'identifiant de génération côté backend (cf. routes/generate.ts
 // readClientGid). Validation pré-fetch pour Codacy `rule-node-ssrf` : la regex
@@ -133,7 +136,7 @@ const cancelPendingSilently = (state: AppContext, gid: string, type: string): vo
 function cancelPendingByGid(state: AppContext, gid: string, type: string): void {
   cancelPendingSilently(state, gid, type);
   const label = state.t('gen.' + type) || type;
-  state.showToast(state.t('toast.cancelledOne', { type: label }), 'info');
+  state.showToast(state.t(TOAST_CANCELLED_ONE, { type: label }), 'info');
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,53 +229,96 @@ const closeConfirmDialog = function (this: AppContext) {
   restoreConfirmTriggerFocus(this);
 };
 
+// Annulation du lot Auto : un échec réseau est signalé (le lot continue sur le serveur).
+const cancelLotQuietly = async (state: AppContext, projectId: string): Promise<boolean> => {
+  try {
+    return await cancelAutoLot(state, projectId);
+  } catch (e: unknown) {
+    console.warn('[auto] annulation du lot impossible', e);
+    return false;
+  }
+};
+
+const cancelAutoRunWithToast = (state: AppContext, projectId: string): void => {
+  state.loading.auto = false;
+  state.showToast(state.t(TOAST_CANCELLED_ONE, { type: state.t(GEN_AUTO) }), 'info');
+  void cancelLotQuietly(state, projectId).then((ok) => {
+    if (!ok) state.showToast(state.t('toast.cancelFailed', { type: state.t(GEN_AUTO) }), 'error');
+  });
+};
+
+// Puce « Auto — analyse… » : le lot entier du cours affiché est annulé sur le serveur (une
+// requête). Faux s'il n'y a pas de lot sur ce cours.
+const cancelDisplayedAutoChip = (state: AppContext): boolean => {
+  const projectId = state.currentProjectId;
+  if (!projectId || !state.autoRuns[projectId]) return false;
+  cancelAutoRunWithToast(state, projectId);
+  return true;
+};
+
+// Fallback legacy : cancel par type (transients, voix, recherche web). On ne notifie
+// l'utilisateur que si quelque chose a réellement été annulé — sinon clic sur une chip stale
+// produirait un faux toast "annulé(e)" alors que rien ne tournait.
+const cancelTransient = (state: AppContext, key: string): void => {
+  const controller = state.abortControllers[key];
+  const wasLoading = state.loading[key] === true;
+  if (!controller && !wasLoading) return;
+  if (controller) {
+    controller.abort();
+    delete state.abortControllers[key];
+  }
+  if (!pendingOfTypeExists(state.pendingById, key)) state.loading[key] = false;
+  const label = state.t('gen.' + key) || key;
+  state.showToast(state.t(TOAST_CANCELLED_ONE, { type: label }), 'info');
+};
+
 // Le `key` accepte soit un type (transient : auto/voice/websearch/...),
 // soit un gid (UUID v4) pour cibler un pending Generation spécifique.
 // Détection : un gid trouvé dans pendingById prime sur le type pour
-// permettre le cancel précis en multi-onglets / auto parallel.
+// permettre le cancel précis en multi-onglets / étapes d'un lot Auto.
 const cancelOne = function (this: AppContext, key: string) {
   const pending = this.pendingById[key];
   if (pending) {
     cancelPendingByGid(this, key, pending.type);
     return;
   }
-  // Fallback legacy : cancel par type (transients ou auto qui mute loading{}).
-  // On ne notifie l'utilisateur que si quelque chose a réellement été annulé —
-  // sinon clic sur une chip stale produirait un faux toast "annulé(e)" alors
-  // que rien ne tournait.
-  const controller = this.abortControllers[key];
-  const wasLoading = this.loading[key] === true;
-  if (!controller && !wasLoading) return;
-  if (controller) {
-    controller.abort();
-    delete this.abortControllers[key];
-  }
-  if (!pendingOfTypeExists(this.pendingById, key)) this.loading[key] = false;
-  const label = this.t('gen.' + key) || key;
-  this.showToast(this.t('toast.cancelledOne', { type: label }), 'info');
+  if (key === 'auto' && cancelDisplayedAutoChip(this)) return;
+  cancelTransient(this, key);
 };
 
-const cancelGeneration = function (this: AppContext) {
-  // 1. Cancel tous les pendings par gid (envoi POST /cancel à chaque), sans un toast par
-  //    génération : un seul toast pour tout, à la fin.
-  for (const gid of Object.keys(this.pendingById)) {
-    const entry = this.pendingById[gid];
-    cancelPendingSilently(this, gid, entry.type);
+// Lot Auto du cours affiché, dans toutes ses phases : une requête annule le lot et ses étapes en
+// cours sur le serveur. Rend son runId (ses étapes ne sont pas annulées une à une).
+const cancelDisplayedLot = (state: AppContext): string | undefined => {
+  const projectId = state.currentProjectId;
+  const lotId = projectId ? state.autoRuns[projectId]?.runId : undefined;
+  if (projectId && lotId) void cancelLotQuietly(state, projectId);
+  return lotId;
+};
+
+// Tous les autres pendings par gid (POST /cancel à chaque), sans un toast par génération.
+const cancelOtherPendings = (state: AppContext, lotId: string | undefined): void => {
+  for (const gid of Object.keys(state.pendingById)) {
+    const entry = state.pendingById[gid];
+    if (lotId && entry.runId === lotId) continue;
+    cancelPendingSilently(state, gid, entry.type);
   }
-  // 2. Cancel les transients résiduels (auto/voice/websearch via abort
-  //    controller par type seulement)
-  for (const controller of Object.values(this.abortControllers)) {
+};
+
+// Transients résiduels (voix, recherche web : abort controller par type).
+const abortTransients = (state: AppContext): void => {
+  for (const controller of Object.values(state.abortControllers)) {
     controller.abort();
   }
-  this.abortControllers = {};
-  // 3. L'Auto du cours affiché, dans toutes ses phases : revenu sur le cours pendant ses étapes, son
-  //    contrôleur n'est plus dans abortControllers (resetSession ne garde que le registre autoRuns),
-  //    et ses étapes encore en file partaient après « Tout annuler » (recette du 2026-10-21).
-  //    Ses générations simples encore en vol aussi (gardées au changement de cours, single-runs.ts).
-  if (this.currentProjectId) {
-    abortAutoRun(this, this.currentProjectId);
-    abortSingleRuns(this, this.currentProjectId);
-  }
+  state.abortControllers = {};
+};
+
+// « Tout annuler » : lot Auto, générations en cours, transients et générations simples en vol du
+// cours affiché ; un seul toast pour tout.
+const cancelGeneration = function (this: AppContext) {
+  cancelOtherPendings(this, cancelDisplayedLot(this));
+  abortTransients(this);
+  // Générations simples encore en vol du cours (gardées au changement de cours, single-runs.ts).
+  if (this.currentProjectId) abortSingleRuns(this, this.currentProjectId);
   for (const key of Object.keys(this.loading)) {
     this.loading[key] = false;
   }

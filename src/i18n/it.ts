@@ -455,6 +455,9 @@ export const it: Record<string, string> = {
   'toast.autoDoneIn': 'Magia completata in «{project}»!',
   'toast.autoPartial': 'Magia: {count} generazioni riuscite su {total}.',
   'toast.autoPartialIn': 'Magia in «{project}»: {count} generazioni riuscite su {total}.',
+  'toast.autoJoined': 'La magia è già in corso in questo corso: la seguo.',
+  'toast.autoCancelledIn': 'La magia di «{project}» è stata annullata.',
+  'toast.autoInterruptedIn': 'La magia di «{project}» è stata interrotta (server riavviato).',
   'toast.autoFailedIn':
     'La generazione automatica di «{project}» non è riuscita. Riprova in quel progetto.',
   'toast.voiceAddedIn': 'Voce trascritta e aggiunta a «{project}».',

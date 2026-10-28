@@ -318,22 +318,36 @@ describe('selectProject', () => {
 
   // Auto lancé sur ce cours avant d'en changer, encore en analyse : puce « Auto — analyse… »
   // rétablie et annulable ; sans elle, le bouton Auto redevenait cliquable (second Auto).
-  it('retour sur un cours dont l’Auto analyse encore : puce rétablie, annulable', async () => {
-    mockFetchOk({ id: 'p1', sources: [{ id: 's1' }], results: { generations: [] } });
-    const controller = new AbortController();
-    const ctx = makeContext({ autoRuns: { p1: { controller, analysing: true } } });
+  // Lot Auto du serveur (rechargement, autre onglet, retour sur le cours) : suivi depuis le snapshot,
+  // puce d'analyse rétablie pendant l'analyse ; plus de puce une fois les étapes lancées (leurs puces
+  // viennent du tracker).
+  const RUN = { id: 'r1', status: 'analysing', steps: [], skipped: [], request: {} };
+  it('cours dont le lot Auto analyse encore : lot suivi, puce d’analyse rétablie', async () => {
+    mockFetchOk({
+      id: 'p1',
+      meta: { id: 'p1', name: 'Histoire' },
+      sources: [{ id: 's1' }],
+      results: { generations: [], autoRuns: [RUN] },
+    });
+    const ctx = makeContext();
     await proj.selectProject.call(ctx, 'p1');
     expect(ctx.loading.auto).toBe(true);
-    expect(ctx.abortControllers.auto).toBe(controller);
+    expect(ctx.autoRuns.p1).toMatchObject({ runId: 'r1', launchedHere: false });
+    // Relu pendant l'analyse : pas encore facturée, son coût sera ajouté à son arrivée.
+    expect(ctx.autoRuns.p1.analysisCostCounted).toBe(false);
   });
 
-  it('retour sur un cours dont l’Auto envoie ses étapes : pas de puce d’analyse', async () => {
-    mockFetchOk({ id: 'p1', sources: [{ id: 's1' }], results: { generations: [] } });
-    const controller = new AbortController();
-    const ctx = makeContext({ autoRuns: { p1: { controller, analysing: false } } });
+  it('cours dont le lot Auto envoie ses étapes : lot suivi, pas de puce d’analyse', async () => {
+    mockFetchOk({
+      id: 'p1',
+      meta: { id: 'p1', name: 'Histoire' },
+      sources: [{ id: 's1' }],
+      results: { generations: [], autoRuns: [{ ...RUN, id: 'r2', status: 'running' }] },
+    });
+    const ctx = makeContext();
     await proj.selectProject.call(ctx, 'p1');
-    expect(ctx.loading.auto).toBeUndefined();
-    expect(ctx.abortControllers.auto).toBeUndefined();
+    expect(ctx.loading.auto).toBe(false);
+    expect(ctx.autoRuns.p1.runId).toBe('r2');
   });
 
   // Génération simple partie avant de changer de cours : au retour, sa puce (relue du serveur) doit
@@ -735,21 +749,15 @@ describe('deleteProject', () => {
   });
 
   // resetSession épargne un Auto en cours : la suppression de son cours l'arrête explicitement.
-  it('aborts the Auto of the deleted project (no step sent), keeps the others', async () => {
+  it('oublie le lot Auto du cours supprimé (le serveur l’arrête avec le cours), garde les autres', async () => {
     vi.mocked(globalThis.fetch).mockResolvedValueOnce({ ok: true } as any);
-    const deleted = new AbortController();
-    const other = new AbortController();
+    const entry = { runId: 'r', run: null, launchedHere: true } as any;
     const ctx = makeContext({
       currentProjectId: 'p1',
       projects: [{ id: 'p1' }, { id: 'p2' }],
-      autoRuns: {
-        p1: { controller: deleted, analysing: true },
-        p2: { controller: other, analysing: false },
-      },
+      autoRuns: { p1: entry, p2: entry },
     });
     await proj.deleteProject.call(ctx, 'p1');
-    expect(deleted.signal.aborted).toBe(true);
-    expect(other.signal.aborted).toBe(false);
     expect(Object.keys(ctx.autoRuns)).toEqual(['p2']);
   });
 

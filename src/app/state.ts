@@ -8,6 +8,7 @@ import type {
   Source,
   ChatMessage,
   PendingTrackerEntry,
+  AutoRun as ServerAutoRun,
 } from '../../types';
 import type { EventKey } from '../../helpers/event-bus';
 import type { Toast } from './toast';
@@ -123,12 +124,21 @@ type UploadSession = {
   }>;
 };
 
-// Génération automatique en cours sur un cours : son contrôleur (épargné par resetSession, aborté
-// par une annulation explicite ou la suppression du cours) et sa phase (analyse de route, puis
-// étapes) ; `analysing` rétablit la puce « Auto — analyse… » au retour sur le cours.
+// Lot Auto suivi par cet onglet, par cours (cf. auto-runs.ts) : le lot vit sur le serveur, l'onglet
+// garde son dernier état connu (`run`, null pendant le lancement) et ce qu'il en a déjà fait.
 type AutoRun = {
-  controller: AbortController;
-  analysing: boolean;
+  runId: string;
+  run: ServerAutoRun | null;
+  // Cours et profil au lancement : toast de fin hors écran qui nomme le cours, et rien si le
+  // profil a changé entre-temps.
+  projectName: string;
+  profileId: string | null;
+  // Lancé (ou rejoint) par cet onglet : il le sonde quand un autre cours est affiché.
+  launchedHere: boolean;
+  // Annulé depuis cet onglet : pas de second message à l'arrivée de l'état « annulé ».
+  cancelledHere: boolean;
+  // Coût de l'analyse déjà compté (ou compris dans le total relu sur le serveur).
+  analysisCostCounted: boolean;
 };
 
 // Génération simple déjà envoyée : son cours et son contrôleur (épargné par resetSession, cf.

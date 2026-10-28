@@ -8,8 +8,10 @@ import {
 } from './effective-moderation';
 import { openingProfileQuery } from './project-snapshot';
 import { addCostDelta } from './cost-utils';
+import { applyAutoRunUpdate, isCancelledRun, restoreAutoRun } from './auto-runs';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
+  AutoRunEvent,
   Consigne,
   Generation,
   GenerationEvent,
@@ -764,6 +766,8 @@ const applyPendingEvent = (
     status: 'pending',
     startedAt: event.at,
     sourceIds: prev?.sourceIds ?? [],
+    // Étape d'un lot Auto : « Tout annuler » l'annule avec son lot, pas une à une.
+    ...(event.runId && { runId: event.runId }),
   };
 };
 
@@ -806,6 +810,9 @@ const applyTerminalEvent = (
   event: Extract<GenerationEvent, { status: 'failed' | 'cancelled' }>,
 ): void => {
   const cancelled = event.status === 'cancelled';
+  // Étapes d'un lot Auto annulé en entier : un seul message pour le lot (auto-runs.ts), pas un par
+  // étape. L'événement `auto` du lot arrive avant celles-ci (store.cancelAutoRun).
+  if (cancelled && isCancelledRun(event.runId)) return;
   const messageKey = cancelled ? 'notif.generationCancelled' : 'notif.generationFailed';
   const toastType = cancelled ? 'info' : 'error';
   ctx.showToast(
@@ -816,6 +823,12 @@ const applyTerminalEvent = (
     event.eventKey,
     { messageKey, paramKeys: { type: I18N_GEN_PREFIX + event.type } },
   );
+};
+
+// Événement SSE `auto` : état complet d'un lot Auto du cours affiché (auto-runs.ts).
+const applyAutoRunEvent = function (this: AppContext, event: AutoRunEvent): void {
+  if (!this.currentProfile || event.pid !== this.currentProjectId) return;
+  applyAutoRunUpdate(this, event.pid, event.run);
 };
 
 const applyGenerationEvent = function (this: AppContext, event: GenerationEvent): void {
@@ -845,6 +858,9 @@ const applyReconciledSnapshot = (
   ctx.mergeReconciledGenerations(project.results.generations, cutoff);
   ctx.backfillCompletedNotifs(project.results.generations, cutoff, profileId, projectId);
   ctx.backfillTerminalNotifs(project.results.pendingTracker ?? [], cutoff, profileId, projectId);
+  // Lot Auto : état relu (un lot terminé pendant la coupure, ou interrompu par un redémarrage du
+  // serveur, affiche son bilan et libère le bouton Auto).
+  restoreAutoRun(ctx, projectId, project, false);
 };
 
 const reconcilePendings = async function (
@@ -1010,10 +1026,17 @@ const formatRelativeTime = function (this: AppContext, iso: string): string {
   return this.t('notif.daysAgo', { count: days });
 };
 
+// Lot Auto en cours sur le cours affiché (lancement compris) : le bouton Auto reste désactivé.
+const autoRunActive = (ctx: AppContext): boolean => {
+  return Boolean(ctx.currentProjectId && ctx.autoRuns?.[ctx.currentProjectId]);
+};
+
 const isGenerating = function (this: AppContext) {
   const pendingValues = Object.values(this.pendingById ?? {});
   return (
-    Object.values(this.loading).some(Boolean) || pendingValues.some((p) => p.status === 'pending')
+    Object.values(this.loading).some(Boolean) ||
+    pendingValues.some((p) => p.status === 'pending') ||
+    autoRunActive(this)
   );
 };
 
@@ -1211,6 +1234,7 @@ const GENERATION_STATE_HELPERS = {
   isLoading,
   upsertGenerationById,
   applyGenerationEvent,
+  applyAutoRunEvent,
   reconcilePendings,
   hydratePendingByIdFromTracker,
   mergeReconciledGenerations,

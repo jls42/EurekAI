@@ -1,61 +1,273 @@
 /**
- * Générations automatiques en cours, par cours (`state.autoRuns`). Règle du propriétaire
- * (2026-10-21) : « on lance un truc, ça continue même si on change de page, sauf si techniquement on
- * ne peut rien y faire ». Jusqu'en v1.7.11, resetSession (changement de cours ou de profil) abortait
- * l'analyse Auto en vol : le serveur la facturait et aucune génération ne partait.
- * - resetSession épargne les contrôleurs de ce registre (autoRunControllers) ;
- * - seule une annulation explicite arrête un Auto : puce « Auto — analyse… » (cancelOne('auto')),
- *   « Tout annuler », suppression de son cours (abortAutoRun) ;
- * - retour sur le cours pendant l'analyse : puce rétablie (restoreAutoAnalysis), et un nouveau clic
- *   « Auto » sur ce cours reste sans effet tant que le premier tourne (generate.ts).
- * Module dédié, sans dépendance : partagé par generate.ts, session.ts et projects.ts.
+ * Lots Auto suivis par cet onglet (`state.autoRuns`, par cours). Le lot vit sur le serveur
+ * (routes/auto-runs.ts) : il continue quand la page est rechargée, qu'on change de cours ou de
+ * profil. Ce module, sans réseau, reçoit son état (événement SSE `auto`, sondage, réponses, snapshot
+ * du cours) et en tire l'affichage : puce « Auto — analyse… », coût de l'analyse compté une fois,
+ * et bilan final une seule fois par onglet et par lot. Les étapes s'affichent comme des générations
+ * simples (événements `generation`, avec leur `runId`). Lancement, sondage et annulation :
+ * auto-launch.ts. Règles : .claude/rules/auto-runs.md (section « Navigateur »).
  */
 import type { AppContext } from './app-context';
+import type { AutoRun, AutoRunStatus, FailedStepCode, ProjectData } from '../../types';
+import { addCostDelta } from './cost-utils';
+import { buildAutoRunEventKey } from '../../helpers/event-key';
 
+type AutoRunEntry = AppContext['autoRuns'][string];
 type AutoRunsState = Pick<AppContext, 'autoRuns'>;
-type AutoRunDisplayState = Pick<AppContext, 'autoRuns' | 'loading' | 'abortControllers'>;
 
-/** Contrôleurs des Auto en cours : resetSession ne les aborte pas (contexte partiel toléré). */
-export const autoRunControllers = (ctx: Partial<AutoRunsState>): Set<AbortController> => {
-  return new Set(Object.values(ctx.autoRuns ?? {}).map((run) => run.controller));
+const ACTIVE_STATUSES: ReadonlySet<AutoRunStatus> = new Set(['analysing', 'running']);
+const TOAST_ERROR = 'toast.error';
+
+// Au niveau du module (resetSession n'y touche pas) : lots dont le bilan est déjà traité (un état
+// reçu deux fois, SSE puis sondage ou snapshot, ne refait rien) et lots annulés en entier (leurs
+// étapes annulées n'affichent pas chacune un toast : un message pour tout le lot).
+const finishedRuns = new Set<string>();
+const cancelledRuns = new Set<string>();
+
+/** Lot annulé en entier : ses étapes annulées n'ont pas de toast chacune. */
+export const isCancelledRun = (runId?: string): boolean => {
+  return runId !== undefined && cancelledRuns.has(runId);
 };
 
-/** Inscrit l'Auto lancé sur ce cours, en phase d'analyse. */
-export const registerAutoRun = (
-  ctx: AutoRunsState,
-  projectId: string,
-  controller: AbortController,
-): void => {
-  ctx.autoRuns[projectId] = { controller, analysing: true };
+/** Annulation demandée depuis cet onglet, avant même la réponse du serveur. */
+export const markRunCancelled = (runId: string): void => {
+  cancelledRuns.add(runId);
 };
 
-/** Analyse terminée : l'Auto envoie ses étapes (la puce d'analyse n'est plus rétablie au retour). */
-export const markAutoRunSteps = (ctx: AutoRunsState, projectId: string): void => {
-  const run = ctx.autoRuns[projectId];
-  if (run) run.analysing = false;
+/** Lot actif (`run` null : lancement en cours, pré-contrôle ou requête de lancement). */
+export const isActiveRun = (run: AutoRun | null): boolean => {
+  return run === null || ACTIVE_STATUSES.has(run.status);
 };
 
-/** Fin de l'Auto : retiré du registre, sauf s'il a déjà été remplacé ou retiré (cours supprimé). */
-export const endAutoRun = (
-  ctx: AutoRunsState,
-  projectId: string,
-  controller: AbortController,
-): void => {
-  if (ctx.autoRuns[projectId]?.controller === controller) delete ctx.autoRuns[projectId];
+export const trackAutoRun = (ctx: AutoRunsState, projectId: string, entry: AutoRunEntry): void => {
+  ctx.autoRuns[projectId] = entry;
 };
 
-/** Retour sur un cours dont l'Auto analyse encore : puce « Auto — analyse… » rétablie, annulable. */
-export const restoreAutoAnalysis = (ctx: AutoRunDisplayState, projectId: string): void => {
-  const run = ctx.autoRuns[projectId];
-  if (!run?.analysing) return;
-  ctx.loading.auto = true;
-  ctx.abortControllers.auto = run.controller;
+/** Lancement annulé depuis cet onglet (« Tout annuler » pendant le pré-contrôle). */
+export const isLaunchCancelled = (ctx: AutoRunsState, projectId: string): boolean => {
+  return ctx.autoRuns[projectId]?.cancelledHere === true;
 };
 
-/** Cours supprimé : son Auto s'arrête (comme son import), aucune étape n'est plus envoyée. */
-export const abortAutoRun = (ctx: AutoRunsState, projectId: string): void => {
-  const run = ctx.autoRuns[projectId];
-  if (!run) return;
-  run.controller.abort();
+/** Lot oublié par l'onglet (cours supprimé, lancement refusé) : le serveur garde ce qu'il a fait. */
+export const forgetAutoRun = (ctx: AutoRunsState, projectId: string): void => {
   delete ctx.autoRuns[projectId];
+};
+
+// Lot reçu sans avoir été lancé ici (autre onglet, rechargement) : suivi dès maintenant.
+const adoptRun = (ctx: AppContext, projectId: string, run: AutoRun): AutoRunEntry => {
+  const entry: AutoRunEntry = {
+    runId: run.id,
+    run,
+    projectName: ctx.currentProject?.meta.name ?? '',
+    profileId: ctx.currentProfile?.id ?? null,
+    launchedHere: false,
+    cancelledHere: false,
+    analysisCostCounted: false,
+  };
+  trackAutoRun(ctx, projectId, entry);
+  return entry;
+};
+
+// Coût de l'analyse : ajouté une fois au total du cours affiché. Ailleurs, rien à ajouter : le total
+// du cours sera relu sur le serveur à son ouverture, analyse comprise.
+const countAnalysisCost = (ctx: AppContext, entry: AutoRunEntry, shown: boolean): void => {
+  if (entry.analysisCostCounted || !entry.run?.analysisCost) return;
+  entry.analysisCostCounted = true;
+  if (shown) addCostDelta(ctx, entry.run.analysisCost, 'generate/auto/route');
+};
+
+type FinalToast = {
+  key: string;
+  type: 'success' | 'warning' | 'error' | 'info';
+  params?: Record<string, string | number>;
+  retry?: boolean;
+  view?: boolean;
+};
+
+// Codes d'échec connus (types.ts : FailedStepCode) ; un code inattendu compte comme internal_error.
+const KNOWN_FAILED_STEP_CODES: ReadonlySet<FailedStepCode> = new Set<FailedStepCode>([
+  'content_refused',
+  'refused',
+  'llm_invalid_json',
+  'quota_exceeded',
+  'upstream_unavailable',
+  'auth_required',
+  'tts_upstream_error',
+  'context_length_exceeded',
+  'internal_error',
+  'cancelled',
+]);
+
+const knownCode = (code: FailedStepCode | undefined): FailedStepCode => {
+  return code && KNOWN_FAILED_STEP_CODES.has(code) ? code : 'internal_error';
+};
+
+const failureCodes = (run: AutoRun): FailedStepCode[] => {
+  return run.steps.filter((s) => s.status === 'failed').map((s) => knownCode(s.failureCode));
+};
+
+// Un code actionnable (clé, quota) prime sur le message générique.
+const actionableFailure = (codes: FailedStepCode[]): FinalToast | null => {
+  if (codes.includes('auth_required')) return { key: 'toast.audioAuthRequired', type: 'error' };
+  if (codes.includes('quota_exceeded')) return { key: 'toast.audioQuotaExceeded', type: 'warning' };
+  return null;
+};
+
+const completedElsewhereToast = (ok: number, total: number, project: string): FinalToast => {
+  if (ok === total) return { key: 'toast.autoDoneIn', type: 'success', params: { project } };
+  if (ok === 0) return { key: 'toast.autoFailedIn', type: 'error', params: { project } };
+  return { key: 'toast.autoPartialIn', type: 'warning', params: { project, count: ok, total } };
+};
+
+// Lot dont toutes les étapes ont fini. Une étape annulée par sa puce ne compte ni comme réussie ni
+// comme échouée (« 7 sur 7 », jamais « 7 sur 8 ») ; toutes annulées : rien de plus (chacune a eu
+// son toast).
+const completedToast = (run: AutoRun, shown: boolean, project: string): FinalToast | null => {
+  const counted = run.steps.filter((s) => s.status !== 'cancelled');
+  const ok = counted.filter((s) => s.status === 'completed').length;
+  const total = counted.length;
+  if (total === 0) return null;
+  if (!shown) return completedElsewhereToast(ok, total, project);
+  if (ok === total) return { key: 'toast.magicDone', type: 'success', view: true };
+  const actionable = actionableFailure(failureCodes(run));
+  if (actionable) return actionable;
+  if (ok === 0) return { key: 'toast.generationError', type: 'error' };
+  return { key: 'toast.autoPartial', type: 'warning', params: { count: ok, total } };
+};
+
+const failedToast = (shown: boolean, project: string): FinalToast => {
+  if (shown) return { key: TOAST_ERROR, type: 'error', retry: true };
+  return { key: 'toast.autoFailedIn', type: 'error', params: { project } };
+};
+
+const finalToast = (entry: AutoRunEntry, run: AutoRun, shown: boolean): FinalToast | null => {
+  const project = entry.projectName;
+  switch (run.status) {
+    case 'completed':
+      return completedToast(run, shown, project);
+    case 'failed':
+      return failedToast(shown, project);
+    case 'cancelled':
+      if (entry.cancelledHere) return null;
+      return { key: 'toast.autoCancelledIn', type: 'info', params: { project } };
+    case 'interrupted':
+      return { key: 'toast.autoInterruptedIn', type: 'warning', params: { project } };
+    default:
+      return null;
+  }
+};
+
+// Texte du bilan : l'échec de l'analyse traduit son code (toast.error {error}).
+const toastText = (ctx: AppContext, toast: FinalToast, run: AutoRun): string => {
+  if (toast.key !== TOAST_ERROR) return ctx.t(toast.key, toast.params);
+  return ctx.t(TOAST_ERROR, { error: ctx.resolveError(knownCode(run.failureCode)) });
+};
+
+// Hors écran, un bilan n'a de sens que pour un lot lancé ici et un profil inchangé : sinon la
+// notification irait sous un autre profil, et l'enfant verrait le bilan d'un autre.
+const finalVisible = (ctx: AppContext, entry: AutoRunEntry, shown: boolean): boolean => {
+  if (shown) return true;
+  return entry.launchedHere && entry.profileId === (ctx.currentProfile?.id ?? null);
+};
+
+// Bilan rangé sous le cours du lot (NotifSpec.projectId), dédoublonné entre onglets par sa clé.
+const showFinal = (
+  ctx: AppContext,
+  projectId: string,
+  entry: AutoRunEntry,
+  shown: boolean,
+): void => {
+  const run = entry.run;
+  if (!run || !finalVisible(ctx, entry, shown)) return;
+  const toast = finalToast(entry, run, shown);
+  if (!toast) return;
+  const retry = toast.retry ? () => ctx.generateAuto() : null;
+  const action = toast.view
+    ? { label: ctx.t('toast.view'), fn: () => ctx.goToView('dashboard') }
+    : null;
+  const notif = { messageKey: toast.key, params: toast.params, projectId };
+  const eventKey = buildAutoRunEventKey(run.id, run.status);
+  ctx.showToast(toastText(ctx, toast, run), toast.type, retry, action, eventKey, notif);
+};
+
+// Entrée qui suit ce lot : celle du cours, sinon une nouvelle (lot d'un autre onglet). null : le
+// cours suit un autre lot en cours (état périmé d'un lot précédent).
+const entryFor = (ctx: AppContext, projectId: string, run: AutoRun): AutoRunEntry | null => {
+  const known = ctx.autoRuns[projectId];
+  if (!known) return adoptRun(ctx, projectId, run);
+  if (known.runId === run.id) return known;
+  return known.run === null ? null : adoptRunIfIdle(ctx, projectId, run, known);
+};
+
+const adoptRunIfIdle = (
+  ctx: AppContext,
+  projectId: string,
+  run: AutoRun,
+  known: AutoRunEntry,
+): AutoRunEntry | null => {
+  return isActiveRun(known.run) ? null : adoptRun(ctx, projectId, run);
+};
+
+/**
+ * Nouvel état d'un lot (SSE `auto`, sondage, réponse au lancement ou à l'annulation, snapshot).
+ * Lot d'un autre onglet : suivi dès maintenant. Lot terminé : bilan une fois, puis oublié.
+ */
+export const applyAutoRunUpdate = (ctx: AppContext, projectId: string, run: AutoRun): void => {
+  if (finishedRuns.has(run.id)) return;
+  const entry = entryFor(ctx, projectId, run);
+  if (!entry) return;
+  entry.run = run;
+  const shown = ctx.currentProjectId === projectId;
+  if (shown) ctx.loading.auto = run.status === 'analysing';
+  countAnalysisCost(ctx, entry, shown);
+  if (ACTIVE_STATUSES.has(run.status)) return;
+  finishedRuns.add(run.id);
+  if (run.status === 'cancelled') cancelledRuns.add(run.id);
+  forgetAutoRun(ctx, projectId);
+  showFinal(ctx, projectId, entry, shown);
+};
+
+// Coût de l'analyse déjà dans le total relu : seulement si le lot relu le porte (relu pendant
+// l'analyse, il n'est pas encore facturé : l'événement suivant l'ajoutera).
+const inReloadedTotal = (run: AutoRun, totalReloaded: boolean): boolean => {
+  return totalReloaded && run.analysisCost !== undefined;
+};
+
+// Lot déjà suivi : état relu (lancement encore en cours : rien à relire).
+const refreshKnownRun = (
+  ctx: AppContext,
+  projectId: string,
+  known: AutoRunEntry,
+  runs: AutoRun[],
+  totalReloaded: boolean,
+): void => {
+  const latest = known.run ? runs.find((r) => r.id === known.runId) : undefined;
+  if (!latest) return;
+  if (inReloadedTotal(latest, totalReloaded)) known.analysisCostCounted = true;
+  applyAutoRunUpdate(ctx, projectId, latest);
+};
+
+/**
+ * Cours relu (ouverture, ou reconnexion du flux SSE après une coupure ou un redémarrage du
+ * serveur) : son lot actif est suivi (puce d'analyse rétablie, bouton Auto désactivé ; les puces
+ * des étapes viennent du tracker) ; un lot déjà suivi prend l'état relu, et son bilan s'affiche s'il
+ * s'est terminé entre-temps (`interrupted` après un redémarrage). `totalReloaded` : le total du
+ * cours vient d'être relu (ouverture), il comprend déjà l'analyse.
+ */
+export const restoreAutoRun = (
+  ctx: AppContext,
+  projectId: string,
+  project: ProjectData,
+  totalReloaded: boolean,
+): void => {
+  const runs = project.results.autoRuns ?? [];
+  const known = ctx.autoRuns[projectId];
+  if (known) {
+    refreshKnownRun(ctx, projectId, known, runs, totalReloaded);
+    return;
+  }
+  const active = runs.find((r) => ACTIVE_STATUSES.has(r.status));
+  if (!active || finishedRuns.has(active.id)) return;
+  adoptRun(ctx, projectId, active).analysisCostCounted = inReloadedTotal(active, totalReloaded);
+  ctx.loading.auto = active.status === 'analysing';
 };

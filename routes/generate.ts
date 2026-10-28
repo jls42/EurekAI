@@ -1140,7 +1140,12 @@ const runAutoRouting = async (
   const { result: route, usage } = await runWithUsageTracking(() =>
     routeRequest(client, markdown, ROUTER_MODEL, lang, ageGroup),
   );
-  persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
+  const persisted = persistUsage(
+    store,
+    pid,
+    `POST /api/projects/${pid}/generate/auto/route`,
+    usage,
+  );
   logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
   const { executable, skipped } = splitByAutoExecutable(route.plan);
   if (skipped.length > 0) {
@@ -1149,7 +1154,7 @@ const runAutoRouting = async (
       `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
     );
   }
-  return { executable, skipped };
+  return { executable, skipped, cost: persisted?.cost };
 };
 
 const trackedAs = (type: AutoAgentType, extra?: ContextCheckOptions): GenerationOptions => ({

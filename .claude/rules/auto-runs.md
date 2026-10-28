@@ -8,11 +8,14 @@ paths:
   - "routes/generate*.ts"
   - "routes/auto-runs*.ts"
   - "helpers/keyed-slots*.ts"
+  - "src/app/auto-runs*.ts"
+  - "src/app/auto-launch*.ts"
+  - "src/app/sse-pendings*.ts"
 ---
 
 # Lots Auto côté serveur
 
-Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechargement », décisions du propriétaire du 2026-10-25). Modèle, orchestrateur et routes en place côté serveur ; le navigateur pilote encore l'Auto lui-même (`/generate/route` puis une requête par étape) jusqu'à son passage sur le lot serveur.
+Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechargement », décisions du propriétaire du 2026-10-25). Modèle, orchestrateur et routes côté serveur ; depuis le 2026-10-28 le navigateur lance le lot et le suit (section « Navigateur »), il ne pilote plus les étapes.
 
 ## Modèle (`results.autoRuns`, `types.ts` : `AutoRun`)
 
@@ -47,10 +50,18 @@ Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechar
 - **Erreur inattendue** de l'orchestrateur : même arrêt avec `internal_error`. `runAutoBatch` ne rejette jamais (`.catch` journalisé au lancement).
 - Cours ou profil supprimé pendant le lot : les étapes trouvent le projet absent (refus 404, rien n'est écrit), le lot s'arrête.
 
-## Décisions du propriétaire (2026-10-25) qui restent à faire
+## Navigateur (`src/app/auto-launch.ts`, `src/app/auto-runs.ts`)
 
-- Navigateur : plus aucune étape d'Auto dans la file des 3 requêtes longues de l'onglet ; un toast par étape et un toast final ; lot annulé depuis un autre onglet : un seul message.
+- **Lancement** (`runGenerateAuto`, `generate.ts`) : cours, nom, corps (`buildGenerateBody`) et clé (`captureAiKey`) capturés AU CLIC, `runId` = `crypto.randomUUID()` ; le lot est inscrit tout de suite (`beginAutoLaunch`, `run` null) : un second clic pendant le pré-contrôle de modération (`checkGenerationAllowed`) est sans effet, « Tout annuler » pendant ce pré-contrôle empêche le départ. Puis `POST …/generate/auto/start`, une requête courte **hors** de la file des 3 requêtes longues de l'onglet (`request-slots.ts` : plus aucune étape d'Auto n'y passe), avec la barrière SSRF `allowedUrls.includes(url)` (`PROJECT_ID_SAFE`). 202 → lot suivi ; **409 `auto_busy` → l'onglet rejoint le lot en cours** (toast `toast.autoJoined`), jamais un second lot ; autre refus → lot oublié, `toast.error` traduit avec « Réessayer » (sauf `moderation.blocked`), ou `toast.autoFailedIn` si un autre cours est affiché.
+- **Registre** `state.autoRuns[projectId]` = `{ runId, run, projectName, profileId, launchedHere, cancelledHere, analysisCostCounted }`, sans contrôleur : `resetSession` le garde, la suppression du cours l'oublie (`forgetAutoRun`).
+- **Mises à jour** (`applyAutoRunUpdate`) depuis l'événement SSE `auto` (`applyAutoRunEvent`, cours affiché), le sondage, les réponses au lancement et à l'annulation, et le snapshot à l'ouverture d'un cours (`restoreAutoRun` : lot actif suivi, puce rétablie ; un lot suivi qui s'est terminé entre-temps affiche alors son bilan). Puce « Auto — analyse… » = `loading.auto` pendant `analysing` ; les puces des étapes sont celles des générations simples (événements `generation`, avec `runId` gardé dans `pendingById`). Bouton Auto désactivé tant qu'un lot est suivi sur le cours affiché (`isGenerating`).
+- **Coût** : chaque étape comme une génération simple (#123 : compté une fois, à l'insertion) ; **coût de l'analyse** (`run.analysisCost`, persisté par l'orchestrateur) ajouté UNE fois par lot au cours affiché ; ailleurs, ou restauré depuis le snapshot, il est déjà dans le total relu (`analysisCostCounted`).
+- **Bilan, une fois par onglet et par lot** (ensembles du module `finishedRuns` / `cancelledRuns`, que `resetSession` ne vide pas), clé `auto:<runId>:<status>` (`buildAutoRunEventKey`), notification rangée sous le cours du lot (`NotifSpec.projectId`) : `completed` → `toast.magicDone` (« Voir »), sinon code actionnable (clé, quota), tout en échec `toast.generationError`, partiel `toast.autoPartial {count, total}` ; **une étape annulée par sa puce ne compte ni comme réussie ni comme échouée** (« 7 sur 7 », jamais « 7 sur 8 ») ; `failed` (analyse) → `toast.error` traduit avec « Réessayer » ; `cancelled` → rien si annulé ici, sinon `toast.autoCancelledIn` ; `interrupted` → `toast.autoInterruptedIn` (le bouton « Reprendre » viendra). Autre cours affiché : variantes `…In` qui nomment le cours, seulement pour un lot lancé ici et un profil inchangé.
+- **Sondage** (`watchAutoLot`) : l'onglet lanceur relit `GET …/auto-runs/:runId` toutes les 4 s (`AUTO_POLL_MS`, minuteurs en chaîne) tant que le cours du lot n'est pas affiché (affiché : le SSE le suit) ; arrêt à la fin du lot, sur 404 (cours supprimé) ; une erreur réseau attend le tour suivant.
+- **Annulation** : puce « Auto — analyse… » (`cancelOne('auto')`) et « Tout annuler » → `POST …/auto-runs/:runId/cancel` (une requête ; « Tout annuler » ne réannule pas les étapes du lot une à une) ; puce ✕ d'une étape → `/generations/:gid/cancel`, le lot continue. **Un seul message pour un lot annulé** : le serveur émet l'état du lot AVANT les étapes annulées, et leurs toasts sont tus (`isCancelledRun` dans `applyTerminalEvent`) ; une étape refusée porte son `refusal` dans l'événement `generation`.
+
+## Reste à faire
+
 - Bouton « Reprendre » sur un lot `interrupted` (étapes manquantes, sans refaire l'analyse), avec la clé de la requête.
-- `POST /generate/auto` : supprimée le 2026-10-28 (décision du 2026-10-25), avec ses 8 constructeurs dupliqués et ses tests ; les comportements utiles sont repris par `routes/auto-runs.test.ts`.
 
-Verrous : `store.autoruns.test.ts`, `helpers/auto-run-state.test.ts`, `routes/projects.test.ts` (« écrit un event auto »), `routes/auto-runs.test.ts`, `helpers/keyed-slots.test.ts`.
+Verrous : `store.autoruns.test.ts`, `helpers/auto-run-state.test.ts`, `routes/projects.test.ts` (« écrit un event auto »), `routes/auto-runs.test.ts`, `helpers/keyed-slots.test.ts`, `src/app/auto-runs.test.ts`, `src/app/auto-launch.test.ts`, `src/app/sse-pendings.test.ts` (« forwards parsed auto events »), `src/app/confirm.test.ts` (« annule le lot Auto du cours affiché en une requête »).
