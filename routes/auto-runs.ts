@@ -120,7 +120,8 @@ const analyseAutoRun = async (b: AutoBatch): Promise<AutoRunStepInit[] | null> =
   if (!plan) return null;
   const steps = plan.executable.map((step) => ({ agent: step.agent, gid: randomUUID() }));
   const skipped = plan.skipped.map((step) => step.agent);
-  return b.store.startAutoRunSteps(b.pid, b.runId, steps, skipped) ? steps : null;
+  const started = b.store.startAutoRunSteps(b.pid, b.runId, steps, skipped, plan.cost);
+  return started ? steps : null;
 };
 
 // Une étape, à son tour parmi les places de sa clé. Annulée pendant l'attente (sa puce, le lot) ou

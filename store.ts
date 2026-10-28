@@ -723,10 +723,12 @@ export class ProjectStore {
   }
 
   private emitTerminalEvent(pid: string, entry: PendingTrackerEntryTerminal): void {
+    const refusal = entry.status === 'failed' ? entry.refusal : undefined;
     emitGenerationEvent({
       ...this.buildEventBase(pid, entry, entry.status),
       status: entry.status,
       failureCode: entry.failureCode,
+      ...(refusal && { refusal }),
     });
   }
 
@@ -768,6 +770,7 @@ export class ProjectStore {
     runId: string,
     steps: AutoRunStepInit[],
     skipped: string[],
+    analysisCost?: number,
   ): AutoRun | null {
     const data = this.getProject(projectId);
     const run = data ? findAutoRun(data, runId) : undefined;
@@ -788,6 +791,7 @@ export class ProjectStore {
     tracker.push(...entries);
     run.steps = steps.map((step) => ({ ...step, status: 'pending' }));
     run.skipped = skipped;
+    if (analysisCost) run.analysisCost = analysisCost;
     run.status = 'running';
     run.updatedAt = now;
     if (steps.length === 0) endAutoRun(run, 'completed', 'completed', now);
@@ -822,8 +826,10 @@ export class ProjectStore {
     const cancelled = this.cancelPendingEntries(data, now, runId);
     this.pruneTrackerIfNeeded(data);
     this.saveProject(projectId, data);
-    for (const entry of cancelled) this.emitTerminalEvent(projectId, entry);
+    // Le lot d'abord : un autre onglet le sait annulé avant de recevoir ses étapes annulées, et
+    // n'affiche qu'un message pour tout le lot.
     this.emitAutoRunChange(projectId, run);
+    for (const entry of cancelled) this.emitTerminalEvent(projectId, entry);
     return run;
   }
 

@@ -214,6 +214,34 @@ describe('cancelAutoRun', () => {
   });
 });
 
+describe('événements : ordre, coût de l’analyse, motif du refus', () => {
+  it('lot annulé : l’événement auto part AVANT les étapes annulées (un seul message ailleurs)', () => {
+    startRun();
+    const order: string[] = [];
+    const stop = [
+      subscribeAutoRun(pid, (e) => order.push(`auto:${e.run.status}`)),
+      subscribeGeneration(pid, (e) => order.push(`generation:${e.status}`)),
+    ];
+    store.cancelAutoRun(pid, RUN_ID);
+    stop.forEach((u) => u());
+    expect(order).toEqual(['auto:cancelled', 'generation:cancelled', 'generation:cancelled']);
+  });
+
+  it('coût de l’analyse gardé sur le lot', () => {
+    store.createAutoRun(pid, newRun());
+    const started = store.startAutoRunSteps(pid, RUN_ID, [...STEPS], [], 0.0003)!;
+    expect(started.analysisCost).toBe(0.0003);
+  });
+
+  it('refus d’une étape : motif exact sur l’entrée, l’étape et l’événement generation', () => {
+    startRun();
+    store.markPendingFailed(pid, 'gid-quiz', 'refused', 'moderation.blocked');
+    const failed = generationEvents.find((e) => e.status === 'failed');
+    expect(failed).toMatchObject({ failureCode: 'refused', refusal: 'moderation.blocked' });
+    expect(run().steps[1]).toMatchObject({ failureCode: 'refused', refusal: 'moderation.blocked' });
+  });
+});
+
 describe('failAutoRun', () => {
   it('analyse en échec : lot failed avec son code ; sans effet hors analyse', () => {
     store.createAutoRun(pid, newRun());
