@@ -5,12 +5,12 @@
 <h1 align="center">EurekAI</h1>
 
 <p align="center">
-  <strong>Verwandle beliebige Inhalte in ein interaktives Lernerlebnis — unterstützt von <a href="https://mistral.ai">Mistral AI</a>.</strong>
+  <strong>Verwandelt jeden Inhalt in ein interaktives Lernerlebnis — angetrieben von <a href="https://mistral.ai">Mistral AI</a>.</strong>
 </p>
 
 <p align="center">
-  <a href="README-en.md">🇬🇧 Englisch</a> · <a href="README-es.md">🇪🇸 Spanisch</a> · <a href="README-pt.md">🇧🇷 Portugiesisch</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italienisch</a> · <a href="README-nl.md">🇳🇱 Niederländisch</a> · <a href="README-ar.md">🇸🇦 Arabisch</a><br>
-  <a href="README-hi.md">🇮🇳 Hindi</a> · <a href="README-zh.md">🇨🇳 Chinesisch</a> · <a href="README-ja.md">🇯🇵 Japanisch</a> · <a href="README-ko.md">🇰🇷 Koreanisch</a> · <a href="README-pl.md">🇵🇱 Polnisch</a> · <a href="README-ro.md">🇷🇴 Rumänisch</a> · <a href="README-sv.md">🇸🇪 Schwedisch</a>
+  <a href="README-en.md">🇬🇧 English</a> · <a href="README-es.md">🇪🇸 Español</a> · <a href="README-pt.md">🇧🇷 Português</a> · <a href="README-de.md">🇩🇪 Deutsch</a> · <a href="README-it.md">🇮🇹 Italiano</a> · <a href="README-nl.md">🇳🇱 Nederlands</a> · <a href="README-ar.md">🇸🇦 العربية</a><br>
+  <a href="README-hi.md">🇮🇳 हिन्दी</a> · <a href="README-zh.md">🇨🇳 中文</a> · <a href="README-ja.md">🇯🇵 日本語</a> · <a href="README-ko.md">🇰🇷 한국어</a> · <a href="README-pl.md">🇵🇱 Polski</a> · <a href="README-ro.md">🇷🇴 Română</a> · <a href="README-sv.md">🇸🇪 Svenska</a>
 </p>
 
 <p align="center">
@@ -21,18 +21,18 @@
 
 <p align="center">
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=alert_status" alt="Quality Gate"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="Sicherheitsbewertung"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="Zuverlässigkeitsbewertung"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="Wartbarkeitsbewertung"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=security_rating" alt="Security Rating"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=reliability_rating" alt="Reliability Rating"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=sqale_rating" alt="Maintainability Rating"></a>
 </p>
 <p align="center">
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="Testabdeckung"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="Schwachstellen"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=coverage" alt="Coverage"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=vulnerabilities" alt="Vulnerabilities"></a>
   <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=code_smells" alt="Code Smells"></a>
-  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="Codezeilen"></a>
+  <a href="https://sonarcloud.io/summary/new_code?id=jls42_EurekAI"><img src="https://sonarcloud.io/api/project_badges/measure?project=jls42_EurekAI&metric=ncloc" alt="Lines of Code"></a>
 </p>
 <p align="center">
-  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy-Badge"></a>
+  <a href="https://app.codacy.com/gh/jls42/EurekAI/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/e4e3a71712194157a90c2335f84ba7e4" alt="Codacy Badge"></a>
   <a href="https://www.codefactor.io/repository/github/jls42/eurekai"><img src="https://www.codefactor.io/repository/github/jls42/eurekai/badge" alt="CodeFactor"></a>
 </p>
 
@@ -40,15 +40,15 @@
 
 ## Die Geschichte — Warum EurekAI?
 
-**EurekAI** entstand während des [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([offizielle Website](https://worldwide-hackathon.mistral.ai/)) (März 2026). Ich brauchte ein Thema — und die Idee kam aus einer ganz konkreten Situation: Ich bereite regelmäßig mit meiner Tochter Klassenarbeiten vor und dachte mir, dass sich das mithilfe von KI spielerischer und interaktiver gestalten lassen müsste.
+**EurekAI** entstand während des [Mistral AI Worldwide Hackathon](https://luma.com/mistralhack-online) ([offizielle Website](https://worldwide-hackathon.mistral.ai/)) (März 2026). Ich brauchte ein Thema — und die Idee kam aus etwas sehr Konkretem: Ich bereite mich regelmäßig mit meiner Tochter auf Klassenarbeiten vor und dachte mir, dass es mithilfe von KI doch möglich sein müsste, das Ganze spielerischer und interaktiver zu gestalten.
 
-Das Ziel: **beliebige Eingaben** — ein Foto des Unterrichtsstoffs, einen eingefügten Text, eine Sprachaufnahme, eine Websuche — in **Lernzettel, Flashcards, Quiz, Podcasts, Lückentexte, Illustrationen und vieles mehr** verwandeln. Alles wird von den Modellen des französischen Unternehmens Mistral AI unterstützt, wodurch EurekAI besonders gut für französischsprachige Schülerinnen und Schüler geeignet ist.
+Das Ziel: **jede beliebige Eingabe** — ein Foto der Unterrichtsstunde, einen kopierten Text, eine Sprachaufnahme, eine Websuche — zu nehmen und in **Lernzettel, Flashcards, Quizze, Podcasts, Lückentexte, Illustrationen und vieles mehr** zu verwandeln. Das alles angetrieben von den Modellen von Mistral AI, einem französischen Unternehmen, was EurekAI zu einer Lösung macht, die von Natur aus ideal auf französischsprachige Schülerinnen und Schüler zugeschnitten ist.
 
-Der [erste Prototyp](https://github.com/jls42/worldwide-hackathon.mistral.ai) wurde während des Hackathons in 48h als Proof of Concept auf Basis der Mistral-Dienste entwickelt — bereits funktionsfähig, aber eingeschränkt. Seitdem ist EurekAI zu einem vollwertigen Projekt geworden: Lückentexte, Navigation durch Übungen, Web-Scraping, konfigurierbare elterliche Moderation, gründliches Code-Review und vieles mehr. Der gesamte Code wird durch KI generiert — hauptsächlich mit [Claude Code](https://code.claude.com/), mit einigen Beiträgen über [Codex](https://openai.com/codex/) und [Gemini CLI](https://geminicli.com/).
+Der [erste Prototyp](https://github.com/jls42/worldwide-hackathon.mistral.ai) wurde während des Hackathons in 48 Stunden als Proof of Concept auf Basis der Mistral-Dienste entwickelt — bereits funktionsfähig, aber noch begrenzt. Seitdem ist EurekAI zu einem echten Projekt herangewachsen: Lückentexte, Navigation durch die Übungen, Web-Scraping, konfigurierbare elterliche Moderation, gründliches Code-Review und vieles mehr. Der gesamte Code wird durch KI generiert — hauptsächlich mit [Claude Code](https://code.claude.com/), ergänzt durch einige Beiträge über [Codex](https://openai.com/codex/) und [Gemini CLI](https://geminicli.com/).
 
 ---
 
-## Überblick
+## Vorschau
 
 <p align="center">
   <img src="docs/screenshots/eurekai-tour.gif" alt="Geführte Tour durch EurekAI: Quellen, Lernzettel, Quiz, Flashcards, Illustrationen" width="820" />
@@ -56,26 +56,26 @@ Der [erste Prototyp](https://github.com/jls42/worldwide-hackathon.mistral.ai) wu
 
 | | |
 |---|---|
-| ![Dashboard](docs/screenshots/dashboard.webp)<br>**Dashboard** — letzte Generierungen, geschätzte Kosten pro Karte und für das gesamte Projekt, Schaltfläche „Auto — Magie!“ | ![Quellen](docs/screenshots/sources.webp)<br>**Quellen** — Import von Fotos/PDF/Text/Sprache/Web, Generierung mit einem Klick, Erkennung von Lernvorgaben |
+| ![Dashboard](docs/screenshots/dashboard.webp)<br>**Dashboard** — letzte Generierungen, geschätzte Kosten pro Karte und Projektgesamtsumme, Button „Auto — Magie!“ | ![Quellen](docs/screenshots/sources.webp)<br>**Quellen** — Import von Foto/PDF/Text/Sprache/Web, Generierung mit einem Klick, Aufgabenerkennung |
 
-Für jede importierte Quelle werden [der OCR-Konfidenzwert, die Moderation und die geschätzten Kosten](docs/screenshots/sources-list.webp) angezeigt.
+Jede importierte Quelle zeigt ihren [OCR-Konfidenzwert, ihren Moderationsstatus und ihre geschätzten Kosten](docs/screenshots/sources-list.webp) an.
 
 ### Die Komponenten in Aktion
 
 | | |
 |---|---|
-| ![Lernzettel](docs/screenshots/notes.gif)<br>**Lernzettel** — Kernpunkte, Wortschatz, Zitate mit Quellenangaben, Audiowiedergabe pro Abschnitt | ![Quiz](docs/screenshots/quiz.gif)<br>**Multiple-Choice-Quiz** — genau eine richtige Antwort pro Frage, sofortiges Feedback mit Erklärung, schrittweise Navigation |
-| ![Flashcards](docs/screenshots/flashcards.gif)<br>**Flashcards** — Karte umdrehen, dann Selbsteinschätzung „wusste ich / wusste ich nicht“ | ![Lückentexte](docs/screenshots/fillblank.gif)<br>**Lückentexte** — Hinweise auf Wunsch, fehlertolerante Überprüfung |
-| ![Diktat](docs/screenshots/dictation.gif)<br>**Diktat** — per Audio diktiertes Wort, strenge Korrektur Buchstabe für Buchstabe | ![Sprachquiz](docs/screenshots/vocal-quiz.gif)<br>**Sprachquiz** — vorgelesene Frage, Antwort über das Mikrofon |
-| ![Podcast](docs/screenshots/podcast.gif)<br>**Podcast** — Mini-Podcast mit 2 Stimmen, einsehbares Dialogskript | ![Illustrationen](docs/screenshots/illustrations.gif)<br>**Illustrationen** — von einem Agent generierte Lernbilder |
-| ![KI-Tutor](docs/screenshots/chat.gif)<br>**KI-Tutor** — Chat auf Grundlage der Unterrichtsdokumente, erläuterte Antworten, kann Quiz und Flashcards generieren | |
+| ![Lernzettel](docs/screenshots/notes.gif)<br>**Lernzettel** — Kernpunkte, Vokabular, belegte Zitate, Audio-Vorlesefunktion pro Abschnitt | ![Quiz](docs/screenshots/quiz.gif)<br>**Multiple-Choice-Quiz** — nur eine richtige Antwort pro Frage, sofortiges Feedback mit Erklärung, Schritt-für-Schritt-Navigation |
+| ![Flashcards](docs/screenshots/flashcards.gif)<br>**Flashcards** — Karte zum Umdrehen mit anschließender Selbsteinschätzung „wusste ich / wusste ich nicht“ | ![Lückentexte](docs/screenshots/fillblank.gif)<br>**Lückentexte** — Hinweis auf Abruf, fehlertolerante Validierung |
+| ![Diktat](docs/screenshots/dictation.gif)<br>**Diktat** — per Audio diktiertes Wort, strenge Korrektur Buchstabe für Buchstabe | ![Sprachquiz](docs/screenshots/vocal-quiz.gif)<br>**Sprachquiz** — laut vorgelesene Frage, Antwort über das Mikrofon |
+| ![Podcast](docs/screenshots/podcast.gif)<br>**Podcast** — Mini-Podcast mit 2 Stimmen, einsehbares Dialogskript | ![Illustrationen](docs/screenshots/illustrations.gif)<br>**Illustrationen** — vom Agenten generierte Lernbilder |
+| ![KI-Tutor](docs/screenshots/chat.gif)<br>**KI-Tutor** — in den Kursdokumenten verankerter Chat, erklärte Antworten, kann Quizze und Flashcards generieren | |
 
 ### Erste Schritte
 
 | | |
 |---|---|
-| ![Profilauswahl](docs/screenshots/login.gif)<br>**Profilauswahl** — jedes Kind hat seinen eigenen Bereich, Avatar und seine eigene Sprache | ![Profilerstellung](docs/screenshots/profile-create.gif)<br>**Profilerstellung** — Alter, Avatar, Eltern-PIN für unter 15-Jährige |
-| ![Kurserstellung](docs/screenshots/course.gif)<br>**Kurserstellung** — ein Projekt pro Unterrichtseinheit, bereit für Quellen | ![Einstellungen](docs/screenshots/settings.gif)<br>**Einstellungen** — API-Status, Auswahl der KI-Modelle mit angezeigten Preisen |
+| ![Profilauswahl](docs/screenshots/login.gif)<br>**Profilauswahl** — jedes Kind hat seinen eigenen Bereich, seinen Avatar und seine Sprache | ![Profilerstellung](docs/screenshots/profile-create.gif)<br>**Profilerstellung** — Alter, Avatar, Eltern-PIN für Kinder unter 15 Jahren |
+| ![Kurserstellung](docs/screenshots/course.gif)<br>**Kurserstellung** — ein Projekt pro Lektion, bereit für das Hinzufügen von Quellen | ![Einstellungen](docs/screenshots/settings.gif)<br>**Einstellungen** — API-Status, Auswahl der KI-Modelle mit angezeigten Preisen |
 
 ---
 
@@ -83,26 +83,26 @@ Für jede importierte Quelle werden [der OCR-Konfidenzwert, die Moderation und d
 
 | | Funktion | Beschreibung |
 |---|---|---|
-| 📷 | **Dateiimport** | Importiere deinen Unterrichtsstoff — Foto, PDF (über Mistral OCR mit gemitteltem Konfidenzwert, Stufen `high`/`medium`/`low`) oder Textdatei (TXT, MD). Upload-Sitzungen mit Retry pro Datei und individueller Fortschrittsanzeige |
-| 📝 | **Texteingabe** | Beliebigen Text direkt eingeben oder einfügen |
-| 🎤 | **Spracheingabe** | Nimm dich auf — Voxtral STT transkribiert deine Stimme |
-| 🌐 | **Web / URL** | Eine URL einfügen (direktes Scraping über Readability + Lightpanda) oder einen Suchbegriff eingeben (Mistral Agent web_search) |
-| 📄 | **Lernzettel** | Strukturierte Notizen mit Kernpunkten, Wortschatz, Zitaten und Anekdoten |
-| 🃏 | **Flashcards** | Interaktive Frage-Antwort-Karten, Audiowiedergabe als Dialog |
-| ❓ | **Multiple-Choice-Quiz** | Fragen mit 4 Antwortmöglichkeiten und genau einer richtigen Antwort, mit adaptiver Wiederholung fehlerhaft beantworteter Fragen (Anzahl konfigurierbar) |
-| ✏️ | **Lückentexte** | Übungen zum Ergänzen mit Hinweisen und fehlertoleranter Überprüfung |
-| 🔤 | **Diktat** | Per Audio diktierte Wörter (Voxtral TTS) aus einer importierten Liste, Tastatureingabe, strenge Korrektur Buchstabe für Buchstabe mit Erläuterung der Rechtschreibregel |
-| 🎙️ | **Podcast** | Mini-Podcast mit 2 Stimmen als Audio — standardmäßig Mistral-Stimmen oder eigene Stimmen (Eltern!) |
-| 🖼️ | **Illustrationen** | Von einem Mistral Agent generierte Lernbilder |
-| 🗣️ | **Sprachquiz** | Vorgelesene Fragen (eigene Stimme möglich), mündliche Antwort, KI-Überprüfung |
-| 💬 | **KI-Tutor** | Kontextbezogener Chat mit deinen Unterrichtsdokumenten und Tool-Aufrufen |
-| 🧠 | **Automatischer Router** | Ein auf `mistral-small-latest` basierender Router analysiert den Inhalt und schlägt eine Kombination aus den 8 verfügbaren Generatortypen vor |
-| 🔁 | **Kursübergreifende Kontinuität** | Importe, automatische Generierungen, Mikrofonaufnahmen, Chat, Websuche und Vorlesen werden für ihren jeweiligen Kurs fortgesetzt, wenn ein anderer geöffnet wird; eine Benachrichtigung nennt den Kurs, wenn ein Vorgang dort abgeschlossen wird |
-| 🔒 | **Kindersicherung** | Pro Profil konfigurierbare Moderation (anpassbare Kategorien), Eltern-PIN, Chatbeschränkungen |
-| 🌍 | **Mehrsprachigkeit** | Benutzeroberfläche in 9 Sprachen verfügbar; KI-Generierung über Prompts in 15 Sprachen steuerbar |
-| 🔊 | **Vorlesen** | Lernzettel und Flashcards (Frage-Antwort-Dialog) über Mistral Voxtral TTS anhören |
-| 💶 | **API-Kostenverfolgung** | Transparente Schätzung der Kosten in € für jede Generierung und Quelle (Tokens / Zeichen / Seiten / Audiosekunden). Badge pro Karte + Gesamtsumme pro Projekt, im Dashboard sichtbar |
-| 🎨 | **Design pro Profil** | Jedes Profil wählt sein Design `dark` oder `light` — im Profil gespeichert und bei jedem Profilwechsel erneut angewendet |
+| 📷 | **Datei-Import** | Importieren Sie Ihre Unterrichtsmaterialien — Foto, PDF (über Mistral OCR mit gemitteltem Konfidenzwert, Stufen `high`/`medium`/`low`) oder Textdatei (TXT, MD). Upload-Sitzungen mit Wiederholungsversuch pro Datei und individuellem Fortschritt |
+| 📝 | **Texteingabe** | Tippen oder fügen Sie beliebigen Text direkt ein |
+| 🎤 | **Spracheingabe** | Nehmen Sie sich selbst auf — Voxtral STT transkribiert Ihre Stimme |
+| 🌐 | **Web / URL** | Fügen Sie eine URL ein (direktes Scraping über Readability + Lightpanda) oder geben Sie eine Suchanfrage ein (Mistral-Agent web_search) |
+| 📄 | **Lernzettel** | Strukturierte Notizen mit Kernpunkten, Vokabular, Zitaten und Anekdoten |
+| 🃏 | **Flashcards** | Interaktive Frage-/Antwort-Karten, dialogbasierte Audio-Wiedergabe |
+| ❓ | **Multiple-Choice-Quiz** | Fragen mit 4 Auswahlmöglichkeiten und genau einer richtigen Antwort, mit adaptiver Wiederholung von Fehlern (Anzahl konfigurierbar) |
+| ✏️ | **Lückentexte** | Ausfüllübungen mit Hinweisen und fehlertoleranter Validierung |
+| 🔤 | **Diktat** | Per Audio diktierte Wörter (Voxtral TTS) aus einer importierten Liste, Tastatureingabe, strenge Korrektur Buchstabe für Buchstabe mit erklärter Rechtschreibregel |
+| 🎙️ | **Podcast** | Audio-Mini-Podcast mit 2 Stimmen — Standardstimmen von Mistral oder benutzerdefinierte Stimmen (Eltern!) |
+| 🖼️ | **Illustrationen** | Von einem Mistral-Agenten generierte Lernbilder |
+| 🗣️ | **Sprachquiz** | Laut vorgelesene Fragen (eigene Stimme möglich), mündliche Antwort, KI-Überprüfung |
+| 💬 | **KI-Tutor** | Kontextbezogener Chat mit Ihren Kursdokumenten, inklusive Tool-Aufrufen (Tool Calling) |
+| 🧠 | **Automatischer Router** | Ein auf `mistral-small-latest` basierender Router analysiert den Inhalt und schlägt eine Kombination von Generatoren aus den 8 verfügbaren Typen vor |
+| 🔁 | **Kursübergreifende Kontinuität** | Importe, automatische Generierungen, Mikrofonaufnahmen, Chat, Websuche und Vorlesefunktion laufen in ihrem jeweiligen Kurs weiter, wenn ein anderer Kurs geöffnet wird; eine Benachrichtigung nennt den Kurs, sobald der Vorgang dort abgeschlossen ist |
+| 🔒 | **Kindersicherung** | Pro Profil konfigurierbare Moderation (anpassbare Kategorien), Eltern-PIN, Chat-Einschränkungen |
+| 🌍 | **Mehrsprachig** | Benutzeroberfläche in 9 Sprachen verfügbar; KI-Generierung über die Prompts in 15 Sprachen steuerbar |
+| 🔊 | **Vorlesefunktion** | Hören Sie sich Lernzettel und Flashcards (Frage-/Antwort-Dialog) über Mistral Voxtral TTS an |
+| 💶 | **API-Kostenverfolgung** | Transparente Schätzung der Kosten in € für jede Generierung und Quelle (Tokens / Zeichen / Seiten / Audio-Sekunden). Badge pro Karte + Gesamtsumme pro Projekt, sichtbar im Dashboard |
+| 🎨 | **Design pro Profil** | Jedes Profil wählt sein eigenes Design `dark` oder `light` — wird mit dem Profil gespeichert und bei jedem Profilwechsel wieder angewendet |
 
 ---
 
@@ -114,7 +114,7 @@ Für jede importierte Quelle werden [der OCR-Konfidenzwert, die Moderation und d
 
 ---
 
-## Übersicht der Modellverwendung
+## Modell-Einsatzkarte
 
 <p align="center">
   <img src="public/assets/model-map.webp" alt="Zuordnung von KI-Modellen zu Aufgaben" width="800" />
@@ -122,99 +122,102 @@ Für jede importierte Quelle werden [der OCR-Konfidenzwert, die Moderation und d
 
 ---
 
-## Nutzerablauf
+## Benutzerreise
 
 <p align="center">
-  <img src="public/assets/user-journey.webp" alt="Lernweg der Schülerinnen und Schüler" width="800" />
+  <img src="public/assets/user-journey.webp" alt="Lernreise der Schüler" width="800" />
 </p>
 
 ---
 
-## Im Detail — Funktionen
+## Detaillierter Einblick — Funktionen
 
 ### Multimodale Eingabe
 
-EurekAI akzeptiert 4 Arten von Quellen, die entsprechend dem Profil moderiert werden (Moderation für Kinder- und Jugendprofile standardmäßig aktiviert):
+EurekAI akzeptiert 4 Arten von Quellen, die je nach Profil moderiert werden (Moderation ist für Kinder- und Teenager-Profile standardmäßig aktiviert):
 
-- **Dateiimport** — JPG-, PNG- oder PDF-Dateien werden von Mistral OCR verarbeitet — standardmäßig **OCR 4.1** (`mistral-ocr-4-1`), optional **OCR 3** (`mistral-ocr-2512`) in den Einstellungen (günstiger, ~½ der Kosten; liest Handschrift besser) — für gedruckten Text, Tabellen und Handschrift; Textdateien (TXT, MD) werden direkt importiert. Uploads mehrerer Dateien verwenden ein System von **Upload-Sitzungen**: individuelle Fortschrittsanzeige pro Datei, Retry fehlgeschlagener Dateien ohne erneutes Einreichen der anderen, Schließen der Sitzung nach Abschluss. OCR stellt einen gemittelten **Konfidenzwert** bereit (`average`, auf `[0,1]` begrenzt, berechnet aus den von Mistral zurückgegebenen `averagePageConfidenceScore`), der in der UI als Badge mit der Stufe `high` / `medium` / `low` (Schwellenwerte ~0.9 / ~0.7) angezeigt wird — bei schlechter Scanqualität erfolgt eine Warnung ohne Blockierung. Die für OCR an Mistral gesendete Dokumentkopie wird unmittelbar nach Abschluss der Verarbeitung gelöscht, auch bei einem Fehler.
-- **Freitext** — Beliebige Inhalte eingeben oder einfügen. Bei aktiver Moderation vor dem Speichern moderiert.
-- **Spracheingabe** — Audio im Browser aufnehmen. Standardmäßig transkribiert durch **Voxtral Mini Transcribe 2** (`voxtral-mini-2602`); **Voxtral Mini Transcribe 3** und **Voxtral Small Transcribe 3** (Mistral-Vorschauversion) sind optional in den Einstellungen verfügbar. Die Sprache der Benutzeroberfläche wird an das Modell übermittelt (`language`), um die Erkennung zu optimieren.
-- **Web / URL** — Eine oder mehrere URLs einfügen, um Inhalte direkt zu scrapen (Readability + Lightpanda für JS-Seiten), oder Suchbegriffe für eine Websuche über einen Mistral Agent eingeben. Das gemeinsame Eingabefeld akzeptiert beides — URLs und Suchbegriffe werden automatisch getrennt, jedes Ergebnis erstellt eine eigenständige Quelle.
+- **Datei-Import** — JPG-, PNG- oder PDF-Dateien, die über Mistral OCR verarbeitet werden — standardmäßig **OCR 4.1** (`mistral-ocr-4-1`), optional **OCR 3** (`mistral-ocr-2512`) in den Einstellungen (günstiger, ~½ der Kosten; liest Handschrift besser) — für gedruckten Text, Tabellen und Handschrift; oder direkt importierte Textdateien (TXT, MD). Multi-Datei-Uploads nutzen ein System von **Upload-Sitzungen**: individueller Fortschritt pro Datei, erneuter Versuch für fehlgeschlagene Dateien ohne erneutes Hochladen der anderen, Schließen der Sitzung nach Abschluss. Die OCR liefert einen gemittelten **Konfidenzwert** (`average`, begrenzt auf `[0,1]`, berechnet aus den von Mistral zurückgegebenen `averagePageConfidenceScore`), der in der Benutzeroberfläche als Stufen-Badge `high` / `medium` / `low` (Schwellenwerte ~0.9 / ~0.7) angezeigt wird — warnt bei schlechter Scan-Qualität, ohne zu blockieren. Die zur OCR an Mistral gesendete Dokumentkopie wird sofort nach Abschluss der Verarbeitung gelöscht, selbst im Fehlerfall.
+- **Freitext** — Tippen oder fügen Sie beliebige Inhalte ein. Wird vor dem Speichern moderiert, sofern die Moderation aktiviert ist.
+- **Spracheingabe** — Nehmen Sie Audio direkt im Browser auf. Wird standardmäßig von **Voxtral Mini Transcribe 2** (`voxtral-mini-2602`) transkribiert; **Voxtral Mini Transcribe 3** und **Voxtral Small Transcribe 3** (Mistral-Vorschau) sind optional in den Einstellungen wählbar. Die Sprache der Benutzeroberfläche wird an das Modell übergeben (`language`), um die Erkennung zu optimieren.
+- **Web / URL** — Fügen Sie eine oder mehrere URLs ein, um den Inhalt direkt zu scrapen (Readability + Lightpanda für JS-Seiten), oder geben Sie Suchbegriffe für eine Websuche über den Mistral-Agenten ein. Das einzelne Eingabefeld akzeptiert beides — URLs und Suchbegriffe werden automatisch getrennt, und jedes Ergebnis erstellt eine unabhängige Quelle.
 
 ### KI-Inhaltsgenerierung
 
-Acht Arten generierter Lernmaterialien:
+Acht Arten von generiertem Lernmaterial:
 
 | Generator | Modell | Ausgabe |
 |---|---|---|
-| **Lernzettel** | `mistral-large-latest` | Titel, Zusammenfassung, Kernpunkte, Wortschatz, Zitate, Anekdote |
-| **Flashcards** | `mistral-large-latest` | Frage-Antwort-Karten mit Quellenverweisen (Anzahl konfigurierbar) |
-| **Multiple-Choice-Quiz** | `mistral-large-latest` | Fragen mit 4 Antwortmöglichkeiten und genau einer richtigen Antwort, Erklärungen, adaptive Wiederholung (Anzahl konfigurierbar) |
-| **Lückentexte** | `mistral-large-latest` | Sätze zum Ergänzen mit Hinweisen, fehlertolerante Überprüfung (Levenshtein) |
-| **Diktat** | `mistral-large-latest` + Voxtral TTS | Per Audio diktierte Schlüsselwörter (1 MP3/Wort) → Tastatureingabe → strenge Korrektur (ein vergessener Akzent zählt als Fehler) mit erläuterter Regel |
-| **Podcast** | `mistral-large-latest` + Voxtral TTS | Skript mit 2 Stimmen → MP3-Audio |
+| **Lernzettel** | `mistral-large-latest` | Titel, Zusammenfassung, Kernpunkte, Vokabular, Zitate, Anekdote |
+| **Flashcards** | `mistral-large-latest` | Frage-/Antwort-Karten mit Quellenverweisen (Anzahl konfigurierbar) |
+| **Multiple-Choice-Quiz** | `mistral-large-latest` | Fragen mit 4 Auswahlmöglichkeiten und genau einer richtigen Antwort, Erklärungen, adaptive Wiederholung (Anzahl konfigurierbar) |
+| **Lückentexte** | `mistral-large-latest` | Zu vervollständigende Sätze mit Hinweisen, fehlertolerante Validierung (Levenshtein) |
+| **Diktat** | `mistral-large-latest` + Voxtral TTS | Per Audio diktierte Schlüsselwörter (1 MP3/Wort) → Tastatureingabe → strenge Korrektur (ein vergessener Akzent zählt als Fehler) mit erklärter Regel |
+| **Podcast** | `mistral-large-latest` + Voxtral TTS | Skript für 2 Stimmen → MP3-Audio |
 | **Illustration** | Agent `mistral-large-latest` | Lernbild über das Tool `image_generation` |
 | **Sprachquiz** | `mistral-large-latest` + Voxtral TTS + STT | TTS-Fragen → STT-Antwort → KI-Überprüfung |
 
-### KI-Tutor im Chat
+### KI-Chat-Tutor
 
-Ein dialogorientierter Tutor mit vollständigem Zugriff auf die Unterrichtsdokumente:
+Ein dialogorientierter Tutor mit vollem Zugriff auf die Kursdokumente:
 
-- Verwendet `mistral-large-latest`
-- **Tool-Aufrufe**: kann während des Gesprächs Lernzettel, Flashcards, Quiz oder Lückentexte generieren
+- Nutzt `mistral-large-latest`
+- **Tool-Aufrufe (Tool Calling)**: kann während des Gesprächs Lernzettel, Flashcards, Quizze oder Lückentexte generieren
 - Verlauf von 50 Nachrichten pro Kurs
-- Moderation, sofern für das Profil aktiviert: Die Nachricht wird überprüft, und beanstandete Quellen sowie Quellen mit fehlgeschlagener oder noch ausstehender Überprüfung werden aus dem Kontext und den Tools ausgeschlossen (die Überprüfung von Quellen mit fehlgeschlagener oder noch ausstehender Überprüfung wird zunächst erneut gestartet, höchstens 5 s lang)
+- Moderation, falls für das Profil aktiviert: Die Nachricht wird überprüft, und gemeldete Quellen, Quellen mit fehlgeschlagener Überprüfung sowie noch nicht überprüfte Quellen werden aus dem Kontext und den Tools ausgeschlossen (die Überprüfung fehlgeschlagener oder noch nicht überprüfter Quellen wird zuvor erneut angestoßen, maximal 5 s)
 
 ### Automatischer Router
 
-Der Router verwendet `mistral-small-latest`, um den Inhalt der Quellen zu analysieren und die passendsten Generatoren aus den 8 verfügbaren vorzuschlagen. Die Benutzeroberfläche zeigt den Fortschritt in Echtzeit an: zuerst eine Analysephase, dann die einzelnen Generierungen mit Abbruchmöglichkeit.
+Der Router nutzt `mistral-small-latest`, um den Inhalt der Quellen zu analysieren und die relevantesten Generatoren aus den 8 verfügbaren vorzuschlagen. Die Benutzeroberfläche zeigt den Fortschritt in Echtzeit an: zuerst eine Analysephase, danach die einzelnen Generierungen mit der Möglichkeit zum Abbrechen.
 
-In einem Tab laufen höchstens 3 längere Generierungen gleichzeitig (Schritte aller Auto-Vorgänge, einzeln gestartete Generierungen, Wiederholungszettel): Weitere warten, bis sie an der Reihe sind, und ein Kurs wird geöffnet, ohne auf den Abschluss laufender Generierungen zu warten. „Alles abbrechen“ stoppt mit einer einzigen Meldung auch die noch wartenden Auto-Schritte des Kurses, selbst wenn zwischenzeitlich ein anderer Kurs geöffnet wurde.
+Der Auto-Modus läuft auf dem Server: Er läuft weiter, wenn die Seite neu geladen wird, wenn ein anderer Kurs geöffnet oder das Profil gewechselt wird, und pro Kurs läuft jeweils nur ein Auto-Vorgang gleichzeitig (ein zweiter Tab schließt sich dem laufenden Vorgang an). Der Server startet maximal 3 Generierungen gleichzeitig pro Mistral-Schlüssel. Jede abgeschlossene Generierung hat ihre eigene Meldung, und am Ende wird einmalig eine Gesamtbilanz angezeigt; wird der Vorgang abgeschlossen, während ein anderer Kurs geöffnet ist, nennt die Meldung den entsprechenden Kurs. Eine einzeln abgebrochene Generierung zählt in der Bilanz nicht als Fehler. „Alles abbrechen“ stoppt den gesamten Stapel des Kurses mit einer einzigen Meldung. Falls der Server während eines Auto-Vorgangs neu startet, wird dieser als unterbrochen markiert und bietet eine Schaltfläche „Fortsetzen“, die nur die noch nicht abgeschlossenen Generierungen neu startet, ohne die Analyse zu wiederholen.
+
+Maximal 3 über den Tab gestartete lange Generierungen laufen gleichzeitig (einzeln gestartete Generierungen, Wiederholungs-Lernzettel): Die folgenden warten, bis sie an der Reihe sind, und ein Kurs lässt sich öffnen, ohne auf das Ende laufender Generierungen warten zu müssen.
 
 ### Adaptives Lernen
 
-- **Quizstatistiken**: Erfassung der Versuche und der Antwortgenauigkeit pro Frage
-- **Quizwiederholung**: Generiert 5-10 neue Fragen zu noch unsicheren Konzepten anhand der Quellen des ursprünglichen Quiz (die Moderationsprüfung bezieht sich auf dieselben Quellen)
-- **Erkennung von Lernvorgaben**: Erkennt Lernvorgaben („Ich beherrsche den Stoff, wenn ich ... kann“) und priorisiert sie in den kompatiblen Textgeneratoren (Lernzettel, Flashcards, Quiz, Lückentexte). Bei aktiver Moderation wartet die Erkennung auf die Überprüfung der Quellen und liest nur die als sicher eingestuften; die Lernvorgabe behält die Liste ihrer ursprünglichen Quellen: Wird eine davon beanstandet, wird die Lernvorgabe weder angezeigt noch angewendet; wird eine davon gelöscht, wird die Lernvorgabe entfernt. Ihre Kosten werden erfasst
+- **Quiz-Statistiken**: Verfolgung der Versuche und der Genauigkeit pro Frage
+- **Quiz-Wiederholung**: generiert 5-10 neue Fragen, die gezielt auf Schwachstellen eingehen, basierend auf den Quellen des ursprünglichen Quiz (der Moderationsschutz bezieht sich auf genau diese Quellen)
+- **Aufgabenerkennung**: erkennt Lernziele („Ich kann meine Lektion, wenn ich weiß...“) und priorisiert sie in den kompatiblen textbasierten Generatoren (Lernzettel, Flashcards, Quiz, Lückentexte). Bei aktiver Moderation wartet die Erkennung auf die Überprüfung der Quellen und liest nur diejenigen, die als sicher eingestuft wurden; das Lernziel speichert die Liste seiner Ursprungsquellen: Wird eine davon nachträglich gemeldet, wird das Lernziel weder angezeigt noch angewendet, und wird eine davon gelöscht, wird das Lernziel entfernt. Die Kosten dafür werden erfasst
+
 ### Sicherheit & Kindersicherung
 
-- **4 Altersgruppen**: Kind (≤10 Jahre), Teenager (11-15), Studierende (16-25), Erwachsene (26+)
-- **Inhaltsmoderation**: `mistral-moderation-2603` (Mistral Moderation 2) mit 11 verfügbaren Kategorien, davon 6 standardmäßig für neue Kinder-/Teenagerprofile gesperrt (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `criminal`, `selfharm`, `jailbreaking`; `criminal` wurde nach einer Auswertung von 50 Lektionen einschließlich Geschichte ohne ein einziges falsch positives Ergebnis hinzugefügt). Die Kategorien lassen sich in den Einstellungen pro Profil anpassen; Moderation 2 hat die frühere Kategorie „gefährliche Inhalte“ in `dangerous` + `criminal` aufgeteilt (bestehende Profile werden automatisch migriert, und gesperrte Kategorien gelten auch für bereits importierte Quellen). Sicherheit als Standard: Wenn die Modellantwort keine Überprüfung einer gesperrten Kategorie ermöglicht, wird der Inhalt abgelehnt („Moderation nicht verfügbar“); bei aktiver Moderation schließen sowohl die Generierung als auch der Chat gemeldete Quellen, Quellen mit fehlgeschlagener Überprüfung und Quellen mit laufender Überprüfung aus. Eine noch nie überprüfte Quelle (importiert bei deaktivierter Moderation oder ein älteres Projekt, das einem Profil zugeordnet wurde) wird vor der Verwendung überprüft. Eine durch einen Neustart unterbrochene Moderation wird beim Start fortgesetzt, sofern der Serverschlüssel dies erlaubt; andernfalls wird sie wie eine fehlgeschlagene Moderation beim Öffnen des Projekts oder bei der nächsten Generierung fortgesetzt. Über die Schaltfläche „Erneut prüfen“ lässt sich die Überprüfung bei Bedarf neu starten. Bei aktiver Moderation bleibt der Inhalt einer Quelle für das Kind verborgen (Vorschau, Text, Originaldokument), bis sie als sicher eingestuft wurde; ein Elternteil kann ihn mit seiner PIN einmalig anzeigen lassen. Die gesprochene Antwort im Sprachquiz wird vor der Antwortprüfung moderiert. Datierte ID in `helpers/moderation-model.ts` fest hinterlegt: Der veraltete Alias `-latest` wird von der API nicht mehr aufgeführt.
-- **Eltern-PIN**: SHA-256-Hash, für Profile unter 15 Jahren erforderlich; höchstens 10 falsche Eingaben pro Viertelstunde und IP-Adresse (429 `rate_limited`). Für ein Produktionsdeployment einen langsamen Hash mit Salt vorsehen (Argon2id, bcrypt).
-- **Serverdaten**: `/output` stellt nur Projektmedien bereit (Audio, Bilder, importierte Dateien); `profiles.json`, `config.json`, `projects.json` und die `project.json` werden niemals ausgeliefert
-- **Chat-Einschränkungen**: KI-Chat für unter 16-Jährige standardmäßig deaktiviert, von Eltern aktivierbar
+- **4 Altersgruppen**: Kind (≤10 Jahre), Jugendlicher (11-15), Student (16-25), Erwachsener (26+)
+- **Inhaltsmoderation**: `mistral-moderation-2603` (Mistral Moderation 2) mit 11 verfügbaren Kategorien, davon 6 standardmäßig für neue Kinder-/Jugendprofile blockiert (`sexual`, `hate_and_discrimination`, `violence_and_threats`, `criminal`, `selfharm`, `jailbreaking`; `criminal` wurde nach einer Auswertung von 50 Lektionen, einschließlich Geschichte, ohne ein einziges falsch-positives Ergebnis hinzugefügt). Kategorien sind pro Profil in den Einstellungen anpassbar; Moderation 2 hat die alte Kategorie „gefährliche Inhalte" in `dangerous` + `criminal` aufgeteilt (bestehende Profile werden automatisch migriert, und die blockierten Kategorien gelten auch für bereits importierte Quellen). Standardmäßige Sicherheit: Wenn die Antwort des Modells die Überprüfung einer blockierten Kategorie nicht zulässt, wird der Inhalt abgelehnt („Moderation nicht verfügbar"); bei aktiver Moderation schließen sowohl die Generierung als auch der Chat gemeldete Quellen, Quellen mit fehlgeschlagener Überprüfung sowie Quellen, die gerade überprüft werden, aus. Eine noch nie überprüfte Quelle (die importiert wurde, als die Moderation deaktiviert war, oder aus einem alten Projekt stammt, das einem Profil zugeordnet wurde) wird vor der Verwendung überprüft. Eine durch einen Neustart unterbrochene Moderation wird beim Start wieder aufgenommen, sofern der Serverschlüssel dies zulässt; andernfalls wird sie, genau wie eine fehlgeschlagene Moderation, beim Öffnen des Projekts oder bei der nächsten Generierung wieder aufgenommen. Über eine Schaltfläche „Erneut überprüfen" lässt sich die Überprüfung bei Bedarf neu starten. Solange eine Quelle bei aktiver Moderation nicht als sicher eingestuft wurde, wird ihr Inhalt für das Kind ausgeblendet (Vorschau, Text, Originaldokument); ein Elternteil kann ihn mit seiner PIN für eine einmalige Ansicht einblenden. Die mündliche Antwort beim Sprachquiz wird moderiert, bevor sie überprüft wird. Datierte ID fest in `helpers/moderation-model.ts` hinterlegt: Der veraltete Alias `-latest` wird von der API nicht mehr aufgeführt.
+- **Eltern-PIN**: SHA-256-Hash, erforderlich für Profile unter 15 Jahren; maximal 10 falsche Codes pro Viertelstunde und IP-Adresse (429 `rate_limited`). Für einen Produktiveinsatz sollte ein langsamer Hash mit Salt (Argon2id, bcrypt) vorgesehen werden.
+- **Serverdaten**: `/output` veröffentlicht nur die Medien der Projekte (Audio, Bilder, importierte Dateien); `profiles.json`, `config.json`, `projects.json` und die `project.json` werden niemals ausgeliefert
+- **Chat-Einschränkungen**: KI-Chat für Nutzer unter 16 Jahren standardmäßig deaktiviert, durch Eltern aktivierbar
 
-### System mit mehreren Profilen
+### Multi-Profil-System
 
-- Mehrere Profile mit Name, Alter, Avatar und Spracheinstellungen
-- **Stimmen pro Profil** (`Profile.mistralVoices?: { host?, guest? }` — jede Rolle ist optional) — jedes Kind kann sein eigenes Stimmenpaar für Podcasts/Sprachquiz haben
+- Mehrere Profile mit Name, Alter, Avatar, Spracheinstellungen
+- **Stimme pro Profil** (`Profile.mistralVoices?: { host?, guest? }` — jede Rolle ist optional) — jedes Kind kann sein eigenes Stimmenpaar für Podcast/Sprachquiz haben
 - **Design pro Profil** (`Profile.theme: 'dark' | 'light'`) — automatischer Wechsel beim Profilwechsel, im Backend gespeichert
-- Projekte sind über `profileId` mit Profilen verknüpft; ein älteres Projekt ohne Profil wird dem ersten Profil zugeordnet, das es öffnet, und anschließend gemäß diesem Profil moderiert
-- Kaskadierendes Löschen: Beim Löschen eines Profils werden alle zugehörigen Projekte gelöscht
+- Projekte sind über `profileId` mit Profilen verknüpft; ein altes Projekt ohne Profil wird dem ersten Profil zugeordnet, das es öffnet, und anschließend gemäß diesem Profil moderiert
+- Kaskadierende Löschung: Das Löschen eines Profils löscht alle zugehörigen Projekte
 
-### Erfassung der API-Kosten
+### API-Kostenverfolgung
 
-Jeder kostenpflichtige Mistral-Aufruf (Chat, OCR, STT, TTS, Agents), einschließlich Aufgabenerkennung und gesprochener Antworten im Sprachquiz, wird erfasst, um dem Nutzer eine **transparente** Kostenschätzung in € bereitzustellen. Die kostenlose Moderation wird nicht mitgezählt. Die Tool-Gebühren der Agents sind enthalten: 0,03 $ pro Websuche und 0,10 $ pro generiertem Bild (Mistral-Tarife), zuzüglich der von diesen Tools erzeugten Tokens, die in der Schätzung zum Eingabetarif des Agent-Modells berechnet werden.
+Jeder kostenpflichtige Mistral-Aufruf (Chat, OCR, STT, TTS, Agenten), einschließlich Aufgabenerkennung und mündlicher Antworten im Sprachquiz, wird erfasst, um dem Benutzer eine **transparente** €-Schätzung bereitzustellen. Die kostenlose Moderation wird nicht mitgezählt. Die Tool-Gebühren der Agenten sind enthalten: 0,03 $ pro Websuche und 0,10 $ pro generiertem Bild (Mistral-Tarife) zuzüglich der von diesen Tools erzeugten Tokens, die bei der Schätzung zum Input-Tarif des Agentenmodells berechnet werden.
 
-- **Maßgebliche Datenquelle**: `helpers/pricing.ts` — `MODEL_PRICING` nach Modellpräfix (z. B.: `mistral-large` → Input 0.5 €/M Tokens, Output 1.5 €/M Tokens), `PRICING_SOURCES` mit URLs zur Mistral-Dokumentation für regelmäßiges erneutes Scraping
+- **Single Source of Truth**: `helpers/pricing.ts` — `MODEL_PRICING` nach Modellpräfix (z. B.: `mistral-large` → Input 0.5 €/M Tokens, Output 1.5 €/M Tokens), `PRICING_SOURCES` mit Mistral-Doku-URLs für regelmäßiges Re-Scraping
 - **Unterstützte Einheiten**: `tokens`, `characters` (TTS), `pages` (OCR), `audio-seconds` (STT) — Umrechnung gesteuert durch `helpers/cost-calc.ts`
-- **Instrumentierungskette**: `helpers/tracked-client.ts` (Wrapper für den Mistral-Client) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (Einfügen in die HTTP-Antwort)
-- **UI**: Kosten-Badge pro Generierung (`src/partials/cost-badge-gen.html`), pro Quelle (`cost-badge-src.html`), kumulierte Gesamtkosten im Dashboard (`Project.totalCost`)
-- **Endpoints**: Die Antworten von `/generate/*` und `/sources/*` ergänzen das zurückgegebene Objekt (`Generation` / `Source`) um `estimatedCost`, `usage` und `costBreakdown`. `POST /generate/route` fügt ein Feld `costDelta: number` nur für die Routing-Kosten hinzu; `POST /detect-consigne` (`{consigne, costDelta}`) und die Prüfung einer gesprochenen Antwort geben ebenfalls ihren `costDelta` zurück. `GET /projects/:pid` liefert das um `totalCost` ergänzte Projekt (aus `costLog[]` berechnete Summe) + den vollständigen Verlauf zurück
+- **Instrumentierungskette**: `helpers/tracked-client.ts` (umschließt den Mistral-Client) → `helpers/usage-context.ts` (AsyncLocalStorage) → `helpers/cost-calc.ts` → `helpers/cost-persist.ts` → `helpers/cost-middleware.ts` (Injektion in die HTTP-Antwort)
+- **UI**: Kosten-Badge pro Generierung (`src/partials/cost-badge-gen.html`), pro Quelle (`cost-badge-src.html`), kumulierte Gesamtsumme im Dashboard (`Project.totalCost`)
+- **Endpunkte**: Die Antworten von `/generate/*` und `/sources/*` ergänzen das zurückgegebene Objekt (`Generation` / `Source`) um `estimatedCost`, `usage` und `costBreakdown`. `POST /generate/route` fügt ein Feld `costDelta: number` allein für die Routing-Kosten hinzu; `POST /detect-consigne` (`{consigne, costDelta}`) und die Überprüfung einer mündlichen Antwort geben ebenfalls ihre `costDelta` zurück. `GET /projects/:pid` gibt das Projekt angereichert mit `totalCost` (berechnete Summe aus `costLog[]`) + dem vollständigen Verlauf zurück
 
 ### TTS (Mistral Voxtral) & benutzerdefinierte Stimmen
 
-- **Mistral Voxtral TTS**: **Voxtral TTS** (`voxtral-mini-tts-2603`) als Standard, **Voxtral TTS 3** (`voxtral-mini-tts-3-0`, Mistral-Vorschauversion, native Stimmen in mehr Sprachen) optional in den Einstellungen; Sprachsynthese zu 100% mit Mistral, kein zusätzlicher Schlüssel erforderlich. Es werden nur Stimmen angeboten, die das ausgewählte Modell unterstützt: Voxtral TTS lehnt Stimmen ab, die mit Voxtral 3 hinzugefügt wurden
-- **Benutzerdefinierte Stimmen**: Eltern können über die Mistral Voices API eigene Stimmen erstellen (aus einer Audioaufnahme) und den Rollen Gastgeber/Gast zuweisen — Podcasts und Sprachquiz werden dann mit der Stimme eines Elternteils vorgelesen, wodurch das Erlebnis für das Kind noch immersiver wird
-- Zwei konfigurierbare Sprechrollen: **Gastgeber** (Haupterzähler) und **Gast** (zweite Stimme des Podcasts)
+- **Mistral Voxtral TTS**: **Voxtral TTS** (`voxtral-mini-tts-2603`) standardmäßig, **Voxtral TTS 3** (`voxtral-mini-tts-3-0`, Mistral-Vorschau, native Stimmen in weiteren Sprachen) als Option in den Einstellungen; Sprachsynthese zu 100 % von Mistral, kein zusätzlicher Schlüssel erforderlich. Es werden nur Stimmen angeboten, die das gewählte Modell akzeptiert: Voxtral TTS lehnt Stimmen ab, die mit Voxtral 3 hinzugefügt wurden
+- **Benutzerdefinierte Stimmen**: Eltern können über die Mistral Voices API (aus einer Audioprobe) ihre eigenen Stimmen erstellen und sie den Rollen Moderator/Gast zuweisen — Podcasts und Sprachquizze werden dann mit der Stimme eines Elternteils vorgelesen, was das Erlebnis für das Kind noch immersiver macht
+- Zwei konfigurierbare Sprecherrollen: **Moderator** (Haupterzähler) und **Gast** (zweite Stimme im Podcast)
 - Vollständiger Katalog der Mistral-Stimmen in den Einstellungen verfügbar, nach Sprache filterbar
-- Eine Wiedergabe (Lernblatt, Podcast, Diktatwort) pausiert beim Verlassen ihrer Ansicht und wird an derselben Stelle fortgesetzt
-- Die Audiodatei zum Vorlesen von Flashcards wird beim ersten Anhören erstellt und anschließend in der zugehörigen Generierung gespeichert: Sie wird beim erneuten Aufrufen weder neu erstellt noch erneut berechnet
-- Quellenmarkierungen (`[Source N]`) werden nicht vorgelesen
+- Eine Wiedergabe (Lernblatt, Podcast, Diktatwort) wird pausiert, wenn man ihre Ansicht verlässt, und setzt dort fort, wo sie gestoppt wurde
+- Das Audio für das Vorlesen der Lernkarten wird beim ersten Anhören erstellt und dann in deren Generierung gespeichert: Es wird bei einer Rückkehr weder neu erstellt noch erneut berechnet
+- Die Quellenmarkierungen (`[Source N]`) werden nicht laut vorgelesen
 
 ### Internationalisierung
 
-- Oberfläche in 9 Sprachen verfügbar: fr, en, es, pt, it, nl, de, hi, ar
+- Benutzeroberfläche verfügbar in 9 Sprachen: fr, en, es, pt, it, nl, de, hi, ar
 - KI-Prompts unterstützen 15 Sprachen (fr, en, es, de, it, pt, nl, ja, zh, ko, ar, hi, pl, ro, sv)
 - Sprache pro Profil konfigurierbar
 
@@ -222,41 +225,41 @@ Jeder kostenpflichtige Mistral-Aufruf (Chat, OCR, STT, TTS, Agents), einschließ
 
 ## Technischer Stack
 
-| Schicht | Technologie | Aufgabe |
+| Schicht | Technologie | Rolle |
 |---|---|---|
 | **Runtime** | Node.js + TypeScript 6.x | Server und Typsicherheit |
 | **Backend** | Express 5.x | REST-API |
 | **Entwicklungsserver** | Vite 8.x (Rolldown) + tsx | HMR, Handlebars-Partials, Proxy |
-| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Reaktive Oberfläche, von Vite kompiliertes TypeScript |
-| **Templating** | vite-plugin-handlebars | HTML-Komposition mit Partials |
-| **KI** | Mistral AI SDK | Chat, OCR, STT, TTS, Agents, Moderation |
-| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-2603` (Voxtral TTS 3 optional), integrierte Sprachsynthese |
+| **Frontend** | HTML + TailwindCSS 4.x + Alpine.js 3.x | Reaktive Oberfläche, TypeScript kompiliert durch Vite |
+| **Templating** | vite-plugin-handlebars | HTML-Komposition über Partials |
+| **KI** | Mistral AI SDK | Chat, OCR, STT, TTS, Agenten, Moderation |
+| **TTS** | Mistral Voxtral TTS | `voxtral-mini-tts-2603` (Voxtral TTS 3 als Option), integrierte Sprachsynthese |
 | **Icons** | Lucide 1.x | SVG-Icon-Bibliothek |
-| **Web-Scraping** | Readability + linkedom | Extraktion des Hauptinhalts von Webseiten (Technologie von Firefox Reader View) |
-| **Headless browser** | Lightpanda | Ultraleichter Headless-Browser (Zig + V8) für JS-/SPA-Seiten — Scraping-Fallback |
+| **Web-Scraping** | Readability + linkedom | Extraktion des Hauptinhalts von Webseiten (Technologie aus Firefox Reader View) |
+| **Headless Browser** | Lightpanda | Ultraleichter Headless-Browser (Zig + V8) für JS-/SPA-Seiten — Scraping-Fallback |
 | **Markdown** | Marked | Markdown-Rendering im Chat |
 | **Datei-Upload** | Multer 2.x | Verarbeitung von Multipart-Formularen |
-| **Audio** | ffmpeg-static | Zusammenfügen von Audiosegmenten |
-| **Tests** | Vitest | Unit-Tests — Testabdeckung durch SonarCloud gemessen |
-| **Persistenz** | JSON-Dateien | Speicherung ohne Abhängigkeiten |
+| **Audio** | ffmpeg-static | Verkettung von Audiosegmenten |
+| **Tests** | Vitest | Unit-Tests — Abdeckung gemessen durch SonarCloud |
+| **Persistenz** | JSON-Dateien | Abhängigkeitsfreie Speicherung |
 
 ---
 
 ## Modellreferenz
 
-| Modell | Verwendung | Begründung |
+| Modell | Verwendung | Warum |
 |---|---|---|
-| `mistral-large-latest` | Lernblatt, Flashcards, Podcast, Quiz, Lückentexte, Chat, Prüfung im Sprachquiz, Image Agent, Web Search Agent, Aufgabenerkennung | Beste Mehrsprachigkeit + Befolgung von Anweisungen |
+| `mistral-large-latest` | Lernblatt, Lernkarten, Podcast, Quiz, Lückentexte, Chat, Sprachquiz-Überprüfung, Bild-Agent, Web-Search-Agent, Aufgabenerkennung | Beste Mehrsprachigkeit + Befolgung von Anweisungen |
 | `mistral-ocr-4-1` (OCR 4.1, Standard) | Dokumenten-OCR | Gedruckter Text, Tabellen, Handschrift ($4 / 1000 Seiten) |
-| `mistral-ocr-2512` (OCR 3, optional) | Dokumenten-OCR | In den Einstellungen auswählbar, günstiger ($2 / 1000 Seiten), liest Handschrift besser |
-| `voxtral-mini-2602` (Voxtral Mini Transcribe 2, Standard) | Spracherkennung (STT) | Spracheingabe und gesprochene Antworten im Sprachquiz ($0.003 / min) |
-| `voxtral-mini-transcribe-3-0` / `voxtral-small-transcribe-3-0` (Transcribe 3, optional, Vorschauversion) | Spracherkennung (STT) | In den Einstellungen auswählbar ($0.0035 / min und $0.004 / min) |
+| `mistral-ocr-2512` (OCR 3, Option) | Dokumenten-OCR | Auswählbar in den Einstellungen, günstiger ($2 / 1000 Seiten), liest Handschrift besser |
+| `voxtral-mini-2602` (Voxtral Mini Transcribe 2, Standard) | Spracherkennung (STT) | Spracheingabe und mündliche Antworten im Sprachquiz ($0.003 / min) |
+| `voxtral-mini-transcribe-3-0` / `voxtral-small-transcribe-3-0` (Transcribe 3, Option, Vorschau) | Spracherkennung (STT) | Auswählbar in den Einstellungen ($0.0035 / min und $0.004 / min) |
 | `voxtral-mini-tts-2603` (Voxtral TTS, Standard) | Sprachsynthese (TTS) | Podcasts, Sprachquiz, Diktat, Vorlesen ($16 / M Zeichen) |
-| `voxtral-mini-tts-3-0` (Voxtral TTS 3, optional, Vorschauversion) | Sprachsynthese (TTS) | In den Einstellungen auswählbar, native Stimmen in mehr Sprachen ($13 / M Zeichen) |
-| `mistral-moderation-2603` | Inhaltsmoderation | 6 gesperrte Kategorien für Kinder/Teenager (darunter `jailbreaking`) |
+| `voxtral-mini-tts-3-0` (Voxtral TTS 3, Option, Vorschau) | Sprachsynthese (TTS) | Auswählbar in den Einstellungen, native Stimmen in weiteren Sprachen ($13 / M Zeichen) |
+| `mistral-moderation-2603` | Inhaltsmoderation | 6 blockierte Kategorien für Kinder/Jugendliche (darunter `jailbreaking`) |
 | `mistral-small-latest` | Automatischer Router | Schnelle Inhaltsanalyse für Routing-Entscheidungen |
 
-Auf dem Smartphone zeigen die Einstellungen unter jedem Auswahlfeld die vollständige Bezeichnung des ausgewählten Modells (Preis, „Empfohlen“ oder „Vorschauversion“), die im geschlossenen Menü abgeschnitten wurde.
+Auf dem Smartphone zeigen die Einstellungen unter jedem Auswahlfeld die vollständige Bezeichnung des gewählten Modells an (Preis, „Empfohlen" oder „Vorschau"), die im geschlossenen Menü abgeschnitten wurde.
 
 ---
 
@@ -282,11 +285,11 @@ npm run dev
 # → Frontend : http://localhost:5173 (serveur Vite avec HMR)
 ```
 
-> **Hinweis**: Mistral Voxtral TTS ist der einzige TTS-Provider — über `MISTRAL_API_KEY` hinaus ist kein zusätzlicher Schlüssel erforderlich.
+> **Hinweis**: Mistral Voxtral TTS ist der einzige TTS-Anbieter — über `MISTRAL_API_KEY` hinaus ist kein zusätzlicher Schlüssel erforderlich.
 
-> **Vom Nutzer eingegebener API-Schlüssel**: `MISTRAL_API_KEY` ist jetzt **optional**. Fehlt er, startet die App trotzdem und fordert jeden Nutzer auf, **seinen eigenen Mistral-Schlüssel** in der Oberfläche einzugeben. Der Schlüssel wird **im Browser gespeichert** (in einem sicheren Kontext mit Web Crypto + IndexedDB verschlüsselt) und bei jeder Anfrage mitgesendet — **niemals auf dem Server gespeichert**. Priorität: Profilschlüssel > globaler Browserschlüssel > `MISTRAL_API_KEY` (env). Durch Setzen von `EUREKAI_REQUIRE_USER_KEY=true` muss jeder Nutzer seinen eigenen Schlüssel angeben (der env-Schlüssel wird nur noch zum Vorladen verwendet).
+> **Vom Benutzer eingegebener API-Schlüssel**: `MISTRAL_API_KEY` ist jetzt **optional**. Fehlt er, startet die App trotzdem und fordert jeden Benutzer auf, **seinen eigenen Mistral-Schlüssel** in der Oberfläche einzugeben. Der Schlüssel wird **im Browser gespeichert** (in einem sicheren Kontext über Web Crypto + IndexedDB verschlüsselt) und pro Anfrage mitgesendet — **niemals auf dem Server gespeichert**. Rangfolge: Profilschlüssel > globaler Browserschlüssel > `MISTRAL_API_KEY` (env). Das Setzen von `EUREKAI_REQUIRE_USER_KEY=true` zwingt jeden Benutzer dazu, seinen eigenen Schlüssel anzugeben (der Umgebungsschlüssel dient dann nur noch zum Vorladen).
 
-> **Lokales HTTPS (Tablet/LAN)**: `localhost` ist bereits ein sicherer Kontext. Für den LAN-Zugriff (Tablet) ein lokales Zertifikat erzeugen und HTTPS aktivieren: Der Browser kann dann den gespeicherten Schlüssel verschlüsseln, und der Schlüssel wird während der Übertragung verschlüsselt:
+> **Lokales HTTPS (Tablet/LAN)**: `localhost` ist bereits ein sicherer Kontext. Generiere für den LAN-Zugriff (Tablet) ein lokales Zertifikat und aktiviere HTTPS: Der Browser kann dann den gespeicherten Schlüssel verschlüsseln, und der Schlüssel ist während der Übertragung verschlüsselt:
 > ```bash
 > ./scripts/gen-cert.sh 192.168.1.42   # mkcert si dispo, sinon openssl self-signed
 > export HTTPS_KEY=certs/key.pem HTTPS_CERT=certs/cert.pem
@@ -295,16 +298,16 @@ npm run dev
 
 ### Umgebungsvariablen
 
-| Variable | Erforderlich | Standard | Aufgabe |
+| Variable | Erforderlich | Standard | Rolle |
 |---|---|---|---|
-| `MISTRAL_API_KEY` | optional | — | Mistral-API-Schlüssel (Chat, OCR, STT, TTS Voxtral, Agents, Moderation). Falls nicht vorhanden, gibt der Nutzer seinen Schlüssel in der App ein (im Browser gespeichert, niemals auf dem Server) |
-| `EUREKAI_REQUIRE_USER_KEY` | optional | `false` | `true` → deaktiviert den Fallback auf `MISTRAL_API_KEY` für KI-Anfragen (jeder Nutzer MUSS seinen eigenen Schlüssel angeben). Nützlich für eine öffentlich erreichbare Instanz |
-| `HTTPS_KEY` / `HTTPS_CERT` | optional | — | Pfade zu TLS-Schlüssel/-Zertifikat (siehe `scripts/gen-cert.sh`) → Express und Vite stellen Inhalte über HTTPS bereit (sicherer Kontext im LAN/auf dem Tablet) |
+| `MISTRAL_API_KEY` | optional | — | Mistral-API-Schlüssel (Chat, OCR, STT, Voxtral TTS, Agenten, Moderation). Falls nicht vorhanden, gibt der Benutzer seinen Schlüssel in der App ein (im Browser gespeichert, niemals auf dem Server) |
+| `EUREKAI_REQUIRE_USER_KEY` | optional | `false` | `true` → deaktiviert den Fallback auf `MISTRAL_API_KEY` für KI-Anfragen (jeder Benutzer MUSS seinen Schlüssel angeben). Nützlich bei einer öffentlich erreichbaren Instanz |
+| `HTTPS_KEY` / `HTTPS_CERT` | optional | — | Pfade zu TLS-Schlüssel/-Zertifikat (vgl. `scripts/gen-cert.sh`) → Express und Vite liefern über HTTPS aus (Secure Context für LAN/Tablet) |
 | `PORT` | optional | `3000` | HTTP-Port des Express-Backends |
-| `NODE_ENV` | optional | `development` | Wenn `production` → Express liefert das Frontend aus `dist/` aus (sonst `public/`) |
-| `SONAR_TOKEN` | optional für CI | — | Wird ausschließlich vom GitHub Actions SonarCloud-Workflow verwendet |
+| `NODE_ENV` | optional | `development` | Wenn `production` → Express liefert das Frontend aus `dist/` aus (andernfalls `public/`) |
+| `SONAR_TOKEN` | optional CI | — | Wird ausschließlich vom GitHub-Actions-Workflow für SonarCloud verwendet |
 
-### Tests, Codequalität und Beiträge
+### Tests, Codequalität und Mitwirkung
 
 ```bash
 npm test                # vitest (déclenche pretest : typecheck + lint:complexity + lint:ci + lint:deadcode)
@@ -315,9 +318,9 @@ npm run format          # prettier
 npm run security        # Opengrep (SAST local) — bloque sur finding ERROR
 ```
 
-**Git-Hooks (Husky)**: `pre-commit` führt nacheinander `scripts/pre-commit-fast.sh` (Konflikte, große Dateien, shellcheck), `lint-staged` und `npm test` aus; `pre-push` führt zuerst eine blockierende Prüfung `npm audit` aus (blockiert, sobald eine Abhängigkeit, auch eine transitive, eine Sicherheitslücke der Stufe `critical` aufweist, siehe `scripts/audit-verdict.mjs`), anschließend `npm run security`. Jeder Hook blockiert den Commit/Push, sobald einer seiner Schritte fehlschlägt.
+**Git-Hooks (Husky)**: `pre-commit` führt nacheinander `scripts/pre-commit-fast.sh` (Konflikte, große Dateien, shellcheck), `lint-staged` und anschließend `npm test` aus; `pre-push` führt zuerst eine blockierende Prüfung `npm audit` aus (blockiert, sobald eine Abhängigkeit, auch transitiv, eine Schwachstelle der Stufe `critical` aufweist, vgl. `scripts/audit-verdict.mjs`) und danach `npm run security`. Jeder Hook blockiert den Commit/Push, sobald einer seiner Schritte fehlschlägt.
 
-**Externe Tools (optional zum Starten der Anwendung, erforderlich für `pretest` und `npm run security`)**:
+**Externe Tools (optional zum Starten der Anwendung, unerlässlich für `pretest` und `npm run security`)**:
 
 ```bash
 # Lizard (Python) pour lint:complexity (CCN > 8 sur l'allowlist)
@@ -331,7 +334,7 @@ Ohne diese Tools schlägt `npm test` bei `pretest` fehl (lizard fehlt) und `npm 
 
 ---
 
-## Deployment mit Container
+## Bereitstellung mit Containern
 
 Das Image wird in der **GitHub Container Registry** veröffentlicht:
 
@@ -349,7 +352,7 @@ podman run -d --name eurekai \
 # → http://localhost:3000
 ```
 
-> **`:U`**: Flag für Podman im Rootless-Modus, das die Berechtigungen des Volumes automatisch anpasst.
+> **`:U`**: Rootless-Podman-Flag, das die Berechtigungen des Volumes automatisch anpasst.
 
 ```bash
 # Build local
@@ -396,7 +399,8 @@ routes/
   projects.ts             — CRUD projets
   profiles.ts             — CRUD profils avec gestion du PIN
   sources.ts              — Import fichiers (OCR + texte brut), texte libre, voix STT, scraping URL + recherche web, modération
-  generate.ts             — Endpoints de génération (8 types + auto + route)
+  generate.ts             — Endpoints de génération (8 types + route)
+  auto-runs.ts            — Lots Auto côté serveur : lancement, analyse et étapes en arrière-plan, état, annulation
   generations.ts          — Tentatives de quiz/fill-blank, réponses vocales, lecture à voix haute
   chat.ts                 — Chat IA avec appel d'outils
 
@@ -408,6 +412,7 @@ helpers/
   generation-media.ts     — Noms uniques des médias (MP3/PNG) et suppression avec leur génération
   media-ledger.ts         — Médias écrits pendant une génération, supprimés si elle échoue ou est annulée
   keyed-lock.ts           — File d'attente par clé (OCR sérialisé par contenu)
+  keyed-slots.ts          — Places par clé (au plus 3 étapes d'Auto en même temps par clé Mistral)
   logger.ts               — Logger structuré (niveaux, contexte JSON)
 
   # Génération & UX
@@ -453,7 +458,8 @@ helpers/
   mistral-retry.ts        — Retry avec backoff sur erreurs transitoires Mistral (3 tentatives)
 
   # Événements & notifications (SSE)
-  event-bus.ts            — Bus d'événements de génération en mémoire (dispatch SSE, filet anti-uncaughtException)
+  event-bus.ts            — Bus d'événements de génération et de lots Auto en mémoire (dispatch SSE, filet anti-uncaughtException)
+  auto-run-state.ts       — Transitions d'un lot Auto (fonctions pures, appliquées par le store)
   event-key.ts            — Clé d'événement typée partagée client/serveur (idempotence notifications)
 
   # Voix & profils
@@ -470,8 +476,9 @@ src/                      — Frontend (Vite + Handlebars)
     profiles.ts           — Logique du sélecteur de profils
     projects.ts           — CRUD des cours
     sources.ts            — Gestionnaires d'upload de sources
-    generate.ts           — Déclencheurs de génération (individuel, tout, auto 2 phases)
-    auto-runs.ts          — Générations automatiques en cours, par cours (elles continuent quand on change de cours)
+    generate.ts           — Déclencheurs de génération (individuel, tout, Auto)
+    auto-launch.ts        — Lancement d'un Auto côté serveur, suivi pendant qu'un autre cours est affiché, annulation
+    auto-runs.ts          — Auto suivis par l'onglet : état reçu du serveur, bilan affiché une seule fois, coût de l'analyse
     request-slots.ts      — Au plus 3 générations longues en même temps pour l'onglet, file d'attente FIFO
     moderation-gate.ts    — Pré-contrôle de modération des générations (vérifie d'abord les sources en attente)
     effective-moderation.ts — Statut de modération affiché et masquage du contenu des sources
@@ -507,81 +514,85 @@ scripts/                  — Tooling : check-deps, check-models, check-security
 output/                   — Données d'exécution (projets, config, fichiers audio) ; en mode prod (`NODE_ENV=production`), Express sert le frontend depuis `dist/` au lieu de `public/`
 ```
 
-> **Für KI-Agents, die zum Code beitragen**: [`CLAUDE.md`](CLAUDE.md) (übergreifende Regeln, Index) und die detaillierten Regeln unter [`.claude/rules/`](.claude/rules/) konsultieren. Diese werden je nach gelesenen oder geänderten Dateien bei Bedarf geladen und liefern detaillierten Architekturkontext, verbindliche Regeln (Fehlercodes, Cost Tracking und Prompts ohne Metabegriffe, also ohne Beschreibungen des Dokuments wie dessen Typ, da das Modell diese Wörter in seine Ausgaben übernehmen würde) sowie bekannte Fallstricke (Lizard CCN, Opengrep, Codacy/Semgrep-Migration).
+> **Für KI-Agenten, die zum Code beitragen**: Siehe [`CLAUDE.md`](CLAUDE.md) (übergreifende Regeln, Index) und die detaillierten Regeln in [`.claude/rules/`](.claude/rules/), die je nach gelesenen oder geänderten Dateien bei Bedarf geladen werden, für den detaillierten Architekturkontext, die verbindlichen Regeln (Fehlercodes, Cost Tracking und Prompts ohne Meta-Wörter, d. h. ohne Beschreibungen des Dokuments wie etwa dessen Typ, da das Modell diese Wörter in seine Ausgaben übernehmen würde) sowie bekannte Stolpersteine (Lizard CCN, Opengrep, Codacy/Semgrep-Migration).
 
 ---
 
 ## API-Referenz
 
 ### Config
-| Methode | Endpoint | Beschreibung |
+| Methode | Endpunkt | Beschreibung |
 |---|---|---|
 | `GET` | `/api/config` | Aktuelle Konfiguration |
 | `PUT` | `/api/config` | Konfiguration ändern (Modelle, Stimmen, TTS-Modell) |
-| `GET` | `/api/config/status` | API-Status: `mistral` (Mistral-Schlüssel festgelegt), `ttsAvailable` (Alias von `mistral`, Mistral Voxtral ist der einzige TTS-Provider) |
+| `GET` | `/api/config/status` | Status der APIs: `mistral` (Mistral-Schlüssel gesetzt), `ttsAvailable` (Alias von `mistral`, Mistral Voxtral ist der einzige TTS-Anbieter) |
 | `POST` | `/api/config/reset` | Konfiguration auf Standardwerte zurücksetzen |
 | `GET` | `/api/config/voices` | Mistral-TTS-Stimmen auflisten (optional `?lang=fr`) |
 | `GET` | `/api/moderation-categories` | Verfügbare Moderationskategorien + Standardwerte nach Alter |
-| `POST` | `/api/providers/mistral/validate` | Einen vom Nutzer eingegebenen Mistral-Schlüssel validieren — immer 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), kein env-Fallback |
+| `POST` | `/api/providers/mistral/validate` | Einen vom Benutzer eingegebenen Mistral-Schlüssel validieren — immer 200 `{status}` (`ok`/`invalid`/`quota`/`network`/`missing`), kein Env-Fallback |
 
 ### Profile
-| Methode | Endpoint | Beschreibung |
+| Methode | Endpunkt | Beschreibung |
 |---|---|---|
 | `GET` | `/api/profiles` | Alle Profile auflisten |
-| `POST` | `/api/profiles` | Profil erstellen |
-| `PUT` | `/api/profiles/:id` | Profil ändern (PIN für < 15 Jahre erforderlich; 10 falsche PINs / 15 min → 429 `rate_limited`) |
-| `DELETE` | `/api/profiles/:id` | Profil + zugehörige Projekte kaskadierend löschen `{pin?}` → `{ok, deletedProjects}` |
+| `POST` | `/api/profiles` | Ein Profil erstellen |
+| `PUT` | `/api/profiles/:id` | Ein Profil bearbeiten (PIN erforderlich für < 15 Jahre; 10 falsche PINs / 15 Min. → 429 `rate_limited`) |
+| `DELETE` | `/api/profiles/:id` | Ein Profil löschen + kaskadierende Löschung der Projekte `{pin?}` → `{ok, deletedProjects}` |
 
 ### Projekte
-| Methode | Endpoint | Beschreibung |
+| Methode | Endpunkt | Beschreibung |
 |---|---|---|
 | `GET` | `/api/projects` | Projekte auflisten (`?profileId=` optional) |
-| `POST` | `/api/projects` | Projekt erstellen `{name, profileId}` |
+| `POST` | `/api/projects` | Ein Projekt erstellen `{name, profileId}` |
 | `GET` | `/api/projects/:pid` | Projektdetails; `?profileId=` ordnet ein Projekt ohne Profil dem Profil zu, das es öffnet |
 | `PUT` | `/api/projects/:pid` | Umbenennen `{name}` |
 | `DELETE` | `/api/projects/:pid` | Projekt löschen |
-| `GET` | `/api/projects/:pid/events` | SSE-Echtzeitstream (`event: generation`) der Statusübergänge bei der Generierung (`completed`/`failed`/`cancelled`) + Keep-alive-Heartbeat |
+| `GET` | `/api/projects/:pid/events` | Echtzeit-SSE-Stream (`event: generation`) der Generierungsübergänge (`completed`/`failed`/`cancelled`) + Keep-Alive-Heartbeat |
 
 ### Quellen
-| Methode | Endpoint | Beschreibung |
+| Methode | Endpunkt | Beschreibung |
 |---|---|---|
-| `POST` | `/api/projects/:pid/sources/upload` | Multipart-Dateiimport (OCR für JPG/PNG/PDF, direktes Einlesen für TXT/MD) |
+| `POST` | `/api/projects/:pid/sources/upload` | Multipart-Dateiimport (OCR für JPG/PNG/PDF, direktes Lesen für TXT/MD) |
 | `POST` | `/api/projects/:pid/sources/text` | Freitext `{text}` |
-| `POST` | `/api/projects/:pid/sources/voice` | Sprache per STT (Multipart-Audio) |
+| `POST` | `/api/projects/:pid/sources/voice` | STT-Sprache (Multipart-Audio) |
 | `POST` | `/api/projects/:pid/sources/websearch` | URL-Scraping oder Websuche `{query}` — gibt ein Array von Quellen zurück; 422 `url_blocked`, wenn alle Adressen abgelehnt werden (internes Netzwerk), 502 `all_sources_failed`, wenn keine Quelle erstellt werden konnte |
-| `POST` | `/api/projects/:pid/sources/moderate` | Ausstehende oder fehlgeschlagene Moderationen fortsetzen `{sourceIds?}` (höchstens 10 pro Aufruf, Wartezeit ≤ 10 s) → `{sources: [{id, moderation}]}` |
-| `DELETE` | `/api/projects/:pid/sources/:sid` | Eine Quelle, ihre importierte Datei und die davon abhängige Aufgabenstellung löschen → `{ok, consigne}` |
+| `POST` | `/api/projects/:pid/sources/moderate` | Ausstehende oder fehlgeschlagene Moderationen wieder aufnehmen `{sourceIds?}` (höchstens 10 pro Aufruf, Wartezeit ≤ 10 s) → `{sources: [{id, moderation}]}` |
+| `DELETE` | `/api/projects/:pid/sources/:sid` | Eine Quelle, ihre importierte Datei und die davon abhängige Anweisung löschen → `{ok, consigne}` |
 | `POST` | `/api/projects/:pid/moderate` | Moderieren `{text}` |
-| `POST` | `/api/projects/:pid/detect-consigne` | Lernaufgaben erkennen (nur überprüfte Quellen) → `{consigne, costDelta}` |
+| `POST` | `/api/projects/:pid/detect-consigne` | Lernanweisungen erkennen (nur überprüfte Quellen) → `{consigne, costDelta}` |
+
 ### Generierung
 | Methode | Endpoint | Beschreibung |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generate/summary` | Lernübersicht |
-| `POST` | `/api/projects/:pid/generate/flashcards` | Flashcards |
-| `POST` | `/api/projects/:pid/generate/quiz` | Multiple-Choice-Quiz (4 Antwortmöglichkeiten, nur eine richtige Antwort) |
+| `POST` | `/api/projects/:pid/generate/summary` | Lernzettel |
+| `POST` | `/api/projects/:pid/generate/flashcards` | Karteikarten |
+| `POST` | `/api/projects/:pid/generate/quiz` | Multiple-Choice-Quiz (4 Auswahlmöglichkeiten, nur eine richtige Antwort) |
 | `POST` | `/api/projects/:pid/generate/fill-blank` | Lückentexte |
-| `POST` | `/api/projects/:pid/generate/dictation` | Diktat (Wörter + Beispielsätze + Regeln, 1 TTS-Audio pro Wort; auch vom Auto-Router angeboten) |
+| `POST` | `/api/projects/:pid/generate/dictation` | Diktat (Wörter + Beispielsätze + Regeln, 1 TTS-Audio pro Wort; wird auch vom Auto-Router vorgeschlagen) |
 | `POST` | `/api/projects/:pid/generate/podcast` | Podcast |
 | `POST` | `/api/projects/:pid/generate/image` | Illustration |
 | `POST` | `/api/projects/:pid/generate/quiz-vocal` | Sprachquiz |
-| `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptives Wiederholen `{generationId, weakQuestions}` |
-| `POST` | `/api/projects/:pid/generate/remediation-summary` | Gezielte Lernübersicht zu den falsch beantworteten Fragen eines Quiz `{generationId, weakQuestions}` — wird über den Button zum Nachlernen in der Quizansicht parallel zu `quiz-review` aufgerufen |
-| `POST` | `/api/projects/:pid/generate/route` | Routing-Analyse (Plan der zu startenden Generatoren) — gibt `{plan, costDelta}` zurück (Kosten nur für das Routing) |
-| `POST` | `/api/projects/:pid/generate/auto` | Automatische Backend-Generierung (Routing + 8 Typen: `summary`, `flashcards`, `quiz`, `fill-blank`, `podcast`, `quiz-vocal`, `image`, `dictation`). Parallele Ausführung — setzt einen Mistral-Tier mit einem Rate-Limit von ≥ 8 gleichzeitigen Anfragen voraus; andernfalls können mehrere 429 in `failedSteps` auftreten. |
+| `POST` | `/api/projects/:pid/generate/quiz-review` | Adaptive Wiederholung `{generationId, weakQuestions}` |
+| `POST` | `/api/projects/:pid/generate/remediation-summary` | Gezieltes Merkblatt zu den falsch beantworteten Fragen eines Quiz `{generationId, weakQuestions}` — wird über die Schaltfläche zur Nachbereitung in der Quiz-Ansicht parallel zu `quiz-review` aufgerufen |
+| `POST` | `/api/projects/:pid/generate/route` | Routing-Analyse (Plan der zu startenden Generatoren) — gibt `{plan, costDelta}` zurück (nur Kosten für das Routing) |
+| `POST` | `/api/projects/:pid/generate/auto/start` | Einen serverseitigen Auto-Batch starten `{runId, …}`: sofortige 202-Antwort, danach Analyse und Schritte im Hintergrund, maximal 3 Schritte gleichzeitig pro Mistral-Schlüssel; der Batch läuft weiter, wenn die Seite neu geladen wird. 409 `auto_busy`, falls für diesen Kurs bereits ein Batch läuft |
+| `POST` | `/api/projects/:pid/generate/auto/resume` | Einen durch einen Serverneustart unterbrochenen Auto-Batch fortsetzen `{runId}`: seine unterbrochenen Schritte starten mit dem Schlüssel dieser Anfrage neu, ohne die Analyse erneut durchzuführen (202-Antwort) |
+| `GET` | `/api/projects/:pid/auto-runs/:runId` | Status eines Auto-Batches: Analyse, Schritte und Ergebnis jedes einzelnen Schritts |
+| `POST` | `/api/projects/:pid/auto-runs/:runId/cancel` | Einen gesamten Auto-Batch abbrechen (ein einzelner Schritt wird wie eine reguläre Generierung abgebrochen) |
 
-Alle Generierungsrouten akzeptieren `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`; ein unbekannter `ageGroup` oder ein `lang`, der kein gültiger Sprachcode ist (erwartet: `fr`, `pt-BR`…), führt zu 400 `invalid_input`, noch vor jedem KI-Aufruf. `quiz-review` und `remediation-summary` erfordern zusätzlich `{generationId, weakQuestions}` und beziehen sich auf die Quellen des ursprünglichen Quiz.
+Alle Generierungs-Routen akzeptieren `{sourceIds?, lang?, ageGroup?, count?, useConsigne?}`; eine unbekannte `ageGroup` oder ein `lang`, der kein gültiger Sprachcode ist (erwartet: `fr`, `pt-BR`…) → 400 `invalid_input`, noch vor jedem KI-Aufruf. `quiz-review` und `remediation-summary` erfordern zusätzlich `{generationId, weakQuestions}` und beziehen sich auf die Quellen des ursprünglichen Quiz.
 
-### CRUD für Generierungen
+### CRUD Generierungen
 | Methode | Endpoint | Beschreibung |
 |---|---|---|
-| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Quizantworten übermitteln `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Antworten auf Lückentexte übermitteln `{answers}` |
-| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Diktatantworten übermitteln `{answers}` (strenge serverseitige Bewertung) |
-| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Eine mündliche Antwort prüfen (Audio + questionIndex); die mündliche Antwort wird vor der Prüfung moderiert (Ablehnung: 400 `quiz.answerBlocked`), Kosten werden in `costDelta` zurückgegeben |
-| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS-Vorlesen (Lernübersichten/Flashcards) |
-| `POST` | `/api/projects/:pid/generations/:gid/cancel` | Eine laufende Generierung abbrechen (einziger Weg, eine Generierung im Status pending abzubrechen) |
+| `POST` | `/api/projects/:pid/generations/:gid/quiz-attempt` | Quiz-Antworten einreichen `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/fill-blank-attempt` | Lückentext-Antworten einreichen `{answers}` |
+| `POST` | `/api/projects/:pid/generations/:gid/dictation-attempt` | Diktat-Antworten einreichen `{answers}` (strenge serverseitige Bewertung) |
+| `POST` | `/api/projects/:pid/generations/:gid/vocal-answer` | Eine mündliche Antwort überprüfen (Audio + questionIndex); die mündliche Antwort wird vor der Überprüfung moderiert (Ablehnung: 400 `quiz.answerBlocked`), Kosten werden in `costDelta` zurückgegeben |
+| `POST` | `/api/projects/:pid/generations/:gid/read-aloud` | TTS-Vorlesefunktion (Lernzettel/Karteikarten) |
+| `POST` | `/api/projects/:pid/generations/:gid/cancel` | Eine laufende Generierung abbrechen (einziger Weg zum Abbrechen eines Pending-Status) |
 | `PUT` | `/api/projects/:pid/generations/:gid` | Umbenennen `{title}` |
-| `DELETE` | `/api/projects/:pid/generations/:gid` | Generierung und zugehörige Medien (Audio, Bild) löschen |
+| `DELETE` | `/api/projects/:pid/generations/:gid` | Die Generierung und ihre Medien (Audio, Bild) löschen |
 
 ### Chat
 | Methode | Endpoint | Beschreibung |
@@ -596,31 +607,31 @@ Alle Generierungsrouten akzeptieren `{sourceIds?, lang?, ageGroup?, count?, useC
 
 | Entscheidung | Begründung |
 |---|---|
-| **Alpine.js statt React/Vue** | Minimaler Ressourcenbedarf, schlanke Reaktivität mit durch Vite kompiliertem TypeScript. Ideal für einen Hackathon, bei dem Geschwindigkeit zählt. |
-| **Persistenz in JSON-Dateien** | Keine Abhängigkeiten, sofortiger Start. Keine Datenbank zu konfigurieren — starten und loslegen. |
-| **Vite + Handlebars** | Das Beste aus beiden Welten: schnelles HMR für die Entwicklung, HTML-Partials zur Codeorganisation, Tailwind JIT. |
-| **Zentralisierte Prompts** | Alle KI-Prompts in `prompts.ts` — einfach zu überarbeiten, zu testen und je nach Sprache/Altersgruppe anzupassen. |
-| **System mit mehreren Generierungen** | Jede Generierung ist ein unabhängiges Objekt mit eigener ID — ermöglicht mehrere Lernübersichten, Quiz usw. pro Kurs. |
-| **Altersgerechte Prompts** | 4 Altersgruppen mit unterschiedlichem Wortschatz, unterschiedlicher Komplexität und Tonalität — derselbe Inhalt wird je nach lernender Person anders vermittelt. |
-| **Agentenbasierte Funktionen** | Bildgenerierung und Websuche verwenden temporäre Mistral-Agenten — sauberer Lebenszyklus mit automatischer Bereinigung. |
-| **Intelligentes URL-Scraping** | Ein einziges Feld akzeptiert URLs und Schlüsselwörter gemischt — URLs werden über Readability (statische Seiten) mit Lightpanda als Fallback (JS/SPA-Seiten) gescrapt, Schlüsselwörter lösen einen Mistral-Agenten mit web_search aus. Jedes Ergebnis erstellt eine unabhängige Quelle. |
-| **TTS zu 100% Mistral** | Mistral Voxtral TTS (kein zusätzlicher Schlüssel neben `MISTRAL_API_KEY`) — Sprachsynthese mit integrierter Kostenerfassung und sprachabhängiger Stimmenauswahl. |
+| **Alpine.js statt React/Vue** | Minimaler Footprint, leichtgewichtige Reaktivität mit durch Vite kompiliertem TypeScript. Perfekt für einen Hackathon, bei dem Geschwindigkeit zählt. |
+| **Persistenz in JSON-Dateien** | Null Abhängigkeiten, sofortiger Start. Keine Datenbank zu konfigurieren — einfach starten und loslegen. |
+| **Vite + Handlebars** | Das Beste aus beiden Welten: schnelles HMR für die Entwicklung, HTML-Partials für die Code-Organisation, Tailwind JIT. |
+| **Zentralisierte Prompts** | Alle KI-Prompts in `prompts.ts` — einfach zu iterieren, zu testen und nach Sprache/Altersgruppe anzupassen. |
+| **Multi-Generierungs-System** | Jede Generierung ist ein unabhängiges Objekt mit eigener ID — ermöglicht mehrere Lernzettel, Quizze usw. pro Kurs. |
+| **Altersgerechte Prompts** | 4 Altersgruppen mit unterschiedlichem Vokabular, Komplexitätsgrad und Tonfall — derselbe Inhalt wird je nach Lernendem unterschiedlich vermittelt. |
+| **Agentenbasierte Funktionen** | Die Bildgenerierung und die Websuche nutzen temporäre Mistral-Agenten — sauberer Lebenszyklus mit automatischer Bereinigung. |
+| **Intelligentes URL-Scraping** | Ein einziges Eingabefeld akzeptiert eine Mischung aus URLs und Suchbegriffen — URLs werden über Readability (statische Seiten) mit Lightpanda-Fallback (JS-/SPA-Seiten) gescrapt, Suchbegriffe lösen einen Mistral-Agenten mit web_search aus. Jedes Ergebnis erstellt eine unabhängige Quelle. |
+| **100 % Mistral-TTS** | Mistral Voxtral TTS (kein zusätzlicher Schlüssel über `MISTRAL_API_KEY` hinaus erforderlich) — Sprachsynthese integriert in die Kostenkette und die sprachabhängige Stimmauflösung. |
 
 ---
 
-## Mitwirkende & Danksagungen
+## Credits & Danksagungen
 
 - **[Mistral AI](https://mistral.ai)** — KI-Modelle (Large, OCR, Voxtral STT, Voxtral TTS, Moderation, Small) + Worldwide Hackathon
-- **[Alpine.js](https://alpinejs.dev)** — Schlankes reaktives Framework
-- **[TailwindCSS](https://tailwindcss.com)** — Utility-CSS-Framework
+- **[Alpine.js](https://alpinejs.dev)** — Leichtgewichtiges reaktives Framework
+- **[TailwindCSS](https://tailwindcss.com)** — Utility-First-CSS-Framework
 - **[Vite](https://vitejs.dev)** — Frontend-Build-Tool
 - **[Lucide](https://lucide.dev)** — Icon-Bibliothek
 - **[Marked](https://marked.js.org)** — Markdown-Parser
-- **[Readability](https://github.com/mozilla/readability)** — Extraktion von Webinhalten (Technologie der Firefox Reader View)
-- **[Lightpanda](https://lightpanda.io)** — Ultraleichter Headless-Browser zum Scraping von JS/SPA-Seiten
-- **[Luciole](https://luciole-vision.com)** — Für sehbehinderte Leser entwickelte Schriftart, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (Profiloption „Lesekomfort“)
+- **[Readability](https://github.com/mozilla/readability)** — Extraktion von Webinhalten (Technologie der Firefox-Leseansicht)
+- **[Lightpanda](https://lightpanda.io)** — Ultraleichter Headless-Browser für das Scraping von JS-/SPA-Seiten
+- **[Luciole](https://luciole-vision.com)** — Schriftart für sehbehinderte Leser, © Laurent Bourcellier & Jonathan Perez, [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) (Profiloption „Lesekomfort“)
 
-Während des Mistral AI Worldwide Hackathon (März 2026) begonnen und vollständig durch KI mit [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) und [Gemini CLI](https://geminicli.com/) entwickelt.
+Initiiert während des Mistral AI Worldwide Hackathon (März 2026), vollständig durch KI entwickelt mit [Claude Code](https://code.claude.com/), [Codex](https://openai.com/codex/) und [Gemini CLI](https://geminicli.com/).
 
 ---
 
@@ -632,4 +643,4 @@ Während des Mistral AI Worldwide Hackathon (März 2026) begonnen und vollständ
 
 [AGPL-3.0](LICENSE) — Copyright (C) 2026 Julien LS
 
-**Artikel mit gpt-6.1-sol aus dem Französischen ins Deutsche übersetzt.**
+**Artikel übersetzt von fr nach de mit gemini-4-argon-high.**
