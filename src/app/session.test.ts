@@ -148,23 +148,30 @@ describe('resetSession', () => {
 
   // Règle « on lance un truc, ça continue même si on change de page » (2026-10-21) : l'Auto en
   // cours (analyse puis étapes) continue vers son cours ; seuls ses liens avec l'écran sont retirés.
-  it('épargne les contrôleurs d’un Auto en cours, aborte les autres', () => {
-    const auto = new AbortController();
+  // Lot Auto : il vit sur le serveur, l'onglet n'a aucun contrôleur à épargner ; resetSession garde
+  // le registre (bilan et sondage continuent pendant qu'un autre cours est affiché).
+  it('garde le registre des lots Auto, sans rien aborter côté serveur', () => {
     const single = new AbortController();
+    const entry = {
+      runId: 'r1',
+      run: null,
+      projectName: 'Histoire',
+      profileId: 'p1',
+      launchedHere: true,
+      cancelledHere: false,
+      analysisCostCounted: false,
+    };
     const ctx = makeCtx({
-      autoRuns: { 'pid-1': { controller: auto, analysing: false } },
-      abortControllers: { auto, quiz: auto, summary: single },
-      abortControllersByGid: { 'gid-1': single },
+      autoRuns: { 'pid-1': entry },
+      abortControllers: { summary: single },
       loading: { auto: true, quiz: true } as Record<string, boolean>,
     });
 
     sessionMixin.resetSession.call(ctx);
 
-    expect(auto.signal.aborted).toBe(false);
     expect(single.signal.aborted).toBe(true);
-    expect(ctx.abortControllers).toEqual({});
     expect(ctx.loading).toEqual({ auto: false, quiz: false });
-    expect(ctx.autoRuns).toEqual({ 'pid-1': { controller: auto, analysing: false } });
+    expect(ctx.autoRuns).toEqual({ 'pid-1': entry });
   });
 
   // Génération simple déjà envoyée : elle continue vers son cours, sa réponse le nommera.

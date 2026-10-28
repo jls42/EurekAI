@@ -464,19 +464,37 @@ describe('createConfirm', () => {
       }
     });
 
-    it('arrête l’Auto du cours affiché, même absent de abortControllers, jamais celui d’un autre cours', () => {
-      const shown = new AbortController();
-      const other = new AbortController();
+    // Lot Auto du cours affiché : UNE requête d'annulation au serveur (lot et étapes en cours) ; ses
+    // étapes ne sont pas annulées une à une ; le lot d'un autre cours n'est pas touché.
+    it('annule le lot Auto du cours affiché en une requête, sans annuler ses étapes une à une', () => {
+      const RUN = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+      const STEP = '11111111-1111-4111-8111-111111111111';
+      const fetchMock = vi
+        .fn()
+        .mockResolvedValue({ ok: true, status: 200, json: async () => ({}) });
+      (globalThis as any).fetch = fetchMock;
+      const entry = (runId: string) => ({
+        runId,
+        run: { id: runId, status: 'running', steps: [], skipped: [] },
+        projectName: 'Histoire',
+        profileId: 'p1',
+        launchedHere: true,
+        cancelledHere: false,
+        analysisCostCounted: false,
+      });
       ctx.autoRuns = {
-        'pid-1': { controller: shown, analysing: false },
-        'pid-2': { controller: other, analysing: false },
+        'pid-1': entry(RUN),
+        'pid-2': entry('bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee'),
       };
+      ctx.pendingById = { [STEP]: { id: STEP, type: 'quiz', status: 'pending', runId: RUN } };
 
       confirm.cancelGeneration.call(ctx);
 
-      expect(shown.signal.aborted).toBe(true);
-      expect(other.signal.aborted).toBe(false);
-      expect(Object.keys(ctx.autoRuns)).toEqual(['pid-2']);
+      expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+        `/api/projects/pid-1/auto-runs/${RUN}/cancel`,
+      ]);
+      expect(ctx.autoRuns['pid-1'].cancelledHere).toBe(true);
+      expect(ctx.autoRuns['pid-2'].cancelledHere).toBe(false);
     });
 
     it('arrête les générations simples envoyées du cours affiché, jamais celles d’un autre cours', () => {

@@ -3,17 +3,13 @@ import { normalizeSummaryData } from './helpers';
 import { countPendingOfType, MAX_PARALLEL_PER_TYPE, pendingOfTypeExists } from './pending-utils';
 import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
-import { endAutoRun, markAutoRunSteps, registerAutoRun } from './auto-runs';
-import { MAX_LONG_REQUESTS, withLongRequestSlot } from './request-slots';
+import { forgetAutoRun, isLaunchCancelled } from './auto-runs';
+import { beginAutoLaunch, launchAutoLot, type AutoLaunch } from './auto-launch';
+import { withLongRequestSlot } from './request-slots';
 import { endSingleRun, registerSingleRun } from './single-runs';
-import {
-  AUTO_AGENTS_SET,
-  AUTO_AGENT_TYPES,
-  TTS_DEPENDENT_AGENTS,
-} from '../../generators/auto-agents';
 import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
 import type { AppContext, GenerateExtraBody } from './app-context';
-import type { FailedStepCode, Generation } from '../../types';
+import type { Generation } from '../../types';
 import { buildEventKey } from '../../helpers/event-key';
 import { blockingModerationStatus, pickBlockingSource } from '@helpers/moderation-http';
 import { currentBlockedCategories } from './effective-moderation';
@@ -36,7 +32,6 @@ const TOAST_PARTIAL_GENERATED = 'toast.partialGenerated';
 // Bilan partiel d'un Auto : « {count} sur {total} ». `toast.partialGenerated` (« {count}/3 ») est
 // réservé à « Tout générer » (3 types) ; l'Auto l'affichait « 7/3 générations réussies »
 // (release-test du 2026-10-24).
-const TOAST_AUTO_PARTIAL = 'toast.autoPartial';
 const TOAST_AUTO_FAILED_IN = 'toast.autoFailedIn';
 const I18N_GEN_PREFIX = 'gen.';
 const NOTIF_GENERATION_DONE = 'toast.generationDone';
@@ -128,8 +123,6 @@ type AutoBody = {
   count: number;
 };
 
-type AutoRoute = { plan: Array<{ agent: string }>; costDelta?: number };
-
 // Corps d'une génération, lu AU CLIC (avant le pré-contrôle de modération) : la sélection est
 // copiée, une case cochée ou un cours changé pendant l'attente ne modifie plus la demande.
 export function buildGenerateBody(state: AppContext): AutoBody {
@@ -141,397 +134,6 @@ export function buildGenerateBody(state: AppContext): AutoBody {
     count: state.generateCount,
   };
 }
-
-// Auto lancé : cours (et son nom, pour le toast de fin hors écran), corps, clé et disponibilité du
-// TTS capturés AU CLIC. Il continue vers son cours quand l'utilisateur change de cours ou de profil
-// (registre autoRuns, que resetSession épargne : auto-runs.ts) ; son état ne s'applique à l'écran
-// (chargement, puces, coût, générations, toasts) que si ce cours est affiché (autoShown).
-type AutoLaunch = {
-  projectId: string;
-  projectName: string;
-  body: AutoBody;
-  key: string;
-  ttsReady: boolean;
-  controller: AbortController;
-};
-
-const autoShown = (state: AppContext, launch: AutoLaunch): boolean => {
-  return state.currentProjectId === launch.projectId;
-};
-
-const startAutoLaunch = (state: AppContext, projectId: string): AutoLaunch => {
-  const launch: AutoLaunch = {
-    projectId,
-    projectName: state.currentProject?.meta.name ?? '',
-    body: buildGenerateBody(state),
-    key: captureAiKey(),
-    ttsReady: state.ttsReady(),
-    controller: new AbortController(),
-  };
-  registerAutoRun(state, projectId, launch.controller);
-  return launch;
-};
-
-// Échec de l'Auto alors qu'un autre cours est affiché : toast qui nomme son cours, sans réessai (il
-// relancerait l'Auto du cours affiché). Rien après une annulation ou la suppression du cours.
-const notifyAutoFailedIn = (state: AppContext, launch: AutoLaunch): void => {
-  if (launch.controller.signal.aborted) return;
-  state.showToast(state.t(TOAST_AUTO_FAILED_IN, { project: launch.projectName }), 'error');
-};
-
-const reportAutoRouteError = (state: AppContext, launch: AutoLaunch, code: string): void => {
-  if (!autoShown(state, launch)) {
-    notifyAutoFailedIn(state, launch);
-    return;
-  }
-  const error = state.resolveError(code);
-  state.showToast(state.t(TOAST_ERROR, { error }), 'error', () => state.generateAuto());
-};
-
-const reportAutoException = (state: AppContext, launch: AutoLaunch, e: unknown): void => {
-  if (e instanceof Error && e.name === 'AbortError') return;
-  console.error('[generate:auto]', e);
-  if (autoShown(state, launch)) {
-    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
-  } else {
-    notifyAutoFailedIn(state, launch);
-  }
-};
-
-// Analyse de route vers le cours de l'Auto, avec la clé capturée au clic. Coût du routage compté au
-// total du cours affiché seulement (le serveur l'a persisté dans tous les cas).
-export async function runAutoRoute(
-  state: AppContext,
-  launch: AutoLaunch,
-): Promise<AutoRoute | null> {
-  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + launch.projectId + '/generate/route';
-  // Barrière taint de Codacy rule-node-ssrf, forme `if (allowedUrls.includes(url)) { fetch(url, …) }`
-  // (cf. moderation-gate.ts) : l'id du cours, capturé au clic, est validé avant de composer l'URL.
-  const allowedUrls = PROJECT_ID_SAFE.test(launch.projectId) ? [url] : [];
-  if (allowedUrls.includes(url)) {
-    const routeRes = await fetch(
-      url,
-      withAiHeaders(postJson(launch.body, launch.controller.signal), { keyOverride: launch.key }),
-    );
-    return handleAutoRouteResponse(state, launch, routeRes);
-  }
-  return null;
-}
-
-const handleAutoRouteResponse = async (
-  state: AppContext,
-  launch: AutoLaunch,
-  routeRes: Response,
-): Promise<AutoRoute | null> => {
-  if (!routeRes.ok) {
-    const err = await routeRes.json().catch(() => ({}));
-    reportAutoRouteError(state, launch, err.error || routeRes.statusText);
-    return null;
-  }
-  const body: unknown = await routeRes.json();
-  const route = body as AutoRoute;
-  if (route.costDelta && autoShown(state, launch)) {
-    addCostDelta(state, route.costDelta, 'generate/route');
-  }
-  return route;
-};
-
-// Puce « Auto — analyse… » sur le cours affiché, annulable par cancelOne('auto').
-const showAutoAnalysis = (state: AppContext, launch: AutoLaunch): void => {
-  if (!autoShown(state, launch)) return;
-  state.loading.auto = true;
-  state.abortControllers.auto = launch.controller;
-};
-
-const endAutoAnalysisDisplay = (state: AppContext, launch: AutoLaunch): void => {
-  state.loading.auto = false;
-  if (state.abortControllers.auto === launch.controller) delete state.abortControllers.auto;
-};
-
-const showAutoStep = (state: AppContext, launch: AutoLaunch, type: string): void => {
-  state.loading[type] = true;
-  state.abortControllers[type] = launch.controller;
-};
-
-export function populateAutoPlan(
-  state: AppContext,
-  launch: AutoLaunch,
-  plan: Array<{ agent: string }>,
-  plannedTypes: string[],
-): void {
-  markAutoRunSteps(state, launch.projectId);
-  const shown = autoShown(state, launch);
-  if (shown) endAutoAnalysisDisplay(state, launch);
-  for (const step of plan) {
-    // Sans TTS au lancement, les générations audio (podcast, quiz vocal, dictée) sont écartées.
-    if (TTS_DEPENDENT_AGENTS.has(step.agent) && !launch.ttsReady) continue;
-    // Whitelist defense-in-depth : rejette tout agent hors contrat serveur
-    // (AUTO_AGENTS_SET, source unique dans generators/auto-agents.ts).
-    if (!AUTO_AGENTS_SET.has(step.agent)) continue;
-    plannedTypes.push(step.agent);
-    if (shown) showAutoStep(state, launch, step.agent);
-  }
-}
-
-type StepResult = 'success' | 'aborted' | { kind: 'failed'; code: FailedStepCode };
-
-// Le serveur garantit que les codes renvoyés (FailedStepCode) sont stables
-// (cf. types.ts). Source de vérité côté client pour normaliser les valeurs
-// inattendues vers 'internal_error' avant qu'elles ne polluent les codes[]
-// que pickAutoFailToast inspecte.
-const KNOWN_FAILED_STEP_CODES: ReadonlySet<FailedStepCode> = new Set<FailedStepCode>([
-  'content_refused',
-  'llm_invalid_json',
-  'quota_exceeded',
-  'upstream_unavailable',
-  'auth_required',
-  'tts_upstream_error',
-  'context_length_exceeded',
-  'internal_error',
-  'cancelled',
-]);
-
-const normalizeFailedStepCode = (raw: unknown): FailedStepCode => {
-  if (typeof raw !== 'string') return 'internal_error';
-  if (KNOWN_FAILED_STEP_CODES.has(raw as FailedStepCode)) return raw as FailedStepCode;
-  // Drift visible : un code non-vide non-listé = backend a déployé un nouveau
-  // FailedStepCode avant qu'il ne soit ajouté ici. Le user verra "internal_error"
-  // (toast générique) au lieu d'un toast actionnable. Logger en dev pour
-  // signaler aux opérateurs qu'il faut sync KNOWN_FAILED_STEP_CODES + types.ts.
-  if (raw.length > 0) {
-    console.warn('[generate] unknown FailedStepCode coerced to internal_error', raw);
-  }
-  return 'internal_error';
-};
-
-// Parse le body d'une réponse !ok pour extraire un code FailedStepCode normalisé
-// + un détail brut séparé. Le code reste typé (utilisable par pickAutoFailToast),
-// le détail est uniquement loggé en console pour diagnostic — sans polluer le
-// flux UI avec des blobs HTML 502 proxy.
-const parseStepErrorDetail = async (
-  res: Response,
-  fallback: string,
-): Promise<{ code: FailedStepCode; detail: string }> => {
-  const raw = await res.text().catch(() => '');
-  try {
-    const errorCode = JSON.parse(raw)?.error;
-    if (typeof errorCode === 'string' && errorCode.length > 0) {
-      return { code: normalizeFailedStepCode(errorCode), detail: errorCode };
-    }
-  } catch {
-    /* non-JSON body, fallback raw snippet */
-  }
-  return { code: 'internal_error', detail: raw.slice(0, 200) || fallback };
-};
-
-// eventKey idempotent avec l'event SSE 'completed' (cf. helpers.ts applyGenerationEvent) : dédup
-// tab-locale du toast UI + persistance notif via showToast → appendNotification (toast.ts). Le
-// HTTP devient un chemin de persistance complet quand SSE est down.
-const showAutoStepDone = (state: AppContext, type: string, gen: Generation): void => {
-  registerGeneration(state, gen);
-  state.showToast(
-    state.t(NOTIF_GENERATION_DONE, { type: state.t(I18N_GEN_PREFIX + type) }),
-    'success',
-    null,
-    { label: state.t(TOAST_VIEW), fn: () => state.goToView(type) },
-    buildEventKey(gen.id, 'completed'),
-  );
-};
-
-// Sous-helper extrait : si res.ok, génération montrée sur le cours affiché et 'success' (compté
-// pour le toast final, même hors écran). Sinon parse le code d'erreur normalisé. Sépare la branche
-// succès/échec du runAutoStep orchestrateur pour rester sous CCN 8.
-const handleAutoStepResponse = async function (
-  state: AppContext,
-  launch: AutoLaunch,
-  type: string,
-  res: Response,
-): Promise<StepResult> {
-  if (!res.ok) {
-    const { code, detail } = await parseStepErrorDetail(res, res.statusText);
-    console.error(`auto: ${type} failed (${res.status}):`, detail);
-    // Threader le code FailedStepCode normalisé permet à showAutoResult de
-    // dispatcher un toast actionnable (auth_required → settings,
-    // quota_exceeded → wait, etc.) au lieu d'un générique 'partialGenerated'.
-    return { kind: 'failed', code };
-  }
-  const gen: Generation = await res.json();
-  // Autre cours affiché : le serveur a enregistré la génération, elle apparaît au retour sur son
-  // cours (sa notification aussi, par reconcilePendings) ; un toast ici écrirait la notification
-  // sous le profil et le cours AFFICHÉS.
-  if (autoShown(state, launch)) showAutoStepDone(state, type, gen);
-  return 'success';
-};
-
-// Fin d'une étape : chargement et contrôleur du type libérés sur le cours de l'Auto seulement (un
-// autre cours affiché peut avoir sa propre génération de ce type en cours).
-const finishAutoStep = (state: AppContext, launch: AutoLaunch, type: string): void => {
-  if (autoShown(state, launch)) {
-    state.loading[type] = false;
-    if (state.abortControllers[type] === launch.controller) delete state.abortControllers[type];
-  }
-  void state.$nextTick(() => state.refreshIcons());
-};
-
-// Requête d'une étape, une fois sa place obtenue. URL composée ici, à côté du fetch : shape exact
-// `if (whitelist.includes(url)) { fetch(url, ...) }` reconnu par Codacy `rule-node-ssrf` ;
-// AUTO_AGENT_TYPES borne la liste finie de routes.
-const sendAutoStep = async (
-  state: AppContext,
-  launch: AutoLaunch,
-  type: string,
-  allowedUrls: string[],
-): Promise<StepResult> => {
-  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + encodeURIComponent(launch.projectId) + '/generate/' + type;
-  if (allowedUrls.includes(url)) {
-    const init = postJson(launch.body, launch.controller.signal);
-    const res = await fetch(url, withAiHeaders(init, { keyOverride: launch.key }));
-    return await handleAutoStepResponse(state, launch, type, res);
-  }
-  return { kind: 'failed', code: 'internal_error' };
-};
-
-// Étape envoyée quand une place se libère parmi les requêtes longues de l'onglet (request-slots.ts).
-// Auto annulé pendant cette attente : l'étape sort de la file sans partir, rejet AbortError traité
-// comme une étape abortée en vol ('aborted', ni échec ni code).
-export async function runAutoStep(
-  state: AppContext,
-  launch: AutoLaunch,
-  type: string,
-  allowedUrls: string[],
-): Promise<StepResult> {
-  if (!AUTO_AGENTS_SET.has(type)) return { kind: 'failed', code: 'internal_error' };
-  try {
-    const send = () => sendAutoStep(state, launch, type, allowedUrls);
-    return await withLongRequestSlot(send, launch.controller.signal);
-  } catch (e: unknown) {
-    if (e instanceof Error && e.name === 'AbortError') return 'aborted';
-    const msg = e instanceof Error ? e.message : String(e);
-    console.error(`auto: ${type} error:`, msg);
-    return { kind: 'failed', code: 'internal_error' };
-  } finally {
-    finishAutoStep(state, launch, type);
-  }
-}
-
-// File des étapes d'un Auto et bilan, partagés par ses voies (runAutoStepLane).
-type AutoStepPool = {
-  queue: string[];
-  allowedUrls: string[];
-  failures: number;
-  codes: FailedStepCode[];
-};
-
-// Une voie : prend l'étape suivante de la file dès que la sienne est terminée, jusqu'à ce que la
-// file soit vide ou l'Auto annulé (contrôleur aborté : les étapes encore en file ne partent plus,
-// ni échec ni code, comme une étape abortée). Récursive : une étape à la fois par voie, qui attend
-// sa place parmi les requêtes longues de l'onglet (runAutoStep).
-const runAutoStepLane = async (
-  state: AppContext,
-  launch: AutoLaunch,
-  pool: AutoStepPool,
-): Promise<void> => {
-  if (launch.controller.signal.aborted) return;
-  const type = pool.queue.shift();
-  if (type === undefined) return;
-  const result = await runAutoStep(state, launch, type, pool.allowedUrls);
-  if (typeof result === 'object' && result.kind === 'failed') {
-    pool.failures++;
-    pool.codes.push(result.code);
-  }
-  await runAutoStepLane(state, launch, pool);
-};
-
-// Voies d'un Auto : autant que de places pour les requêtes longues de l'onglet (MAX_LONG_REQUESTS,
-// request-slots.ts, limite GLOBALE : deux Auto à 4 étapes chacun saturaient les connexions du
-// navigateur). Seul, un Auto prend toutes les places ; avec un 2e Auto, une génération simple ou une
-// remédiation, il n'a jamais plus de MAX_LONG_REQUESTS étapes en vol ou en file, et les autres
-// passent entre ses étapes (deux Auto avancent ensemble) au lieu d'attendre que toutes les siennes
-// soient parties. Dans un Auto, les étapes partent dans l'ordre du plan.
-export async function runAutoSteps(
-  state: AppContext,
-  launch: AutoLaunch,
-  plannedTypes: string[],
-): Promise<{ failures: number; codes: FailedStepCode[] }> {
-  const safeProjectId = encodeURIComponent(launch.projectId);
-  const allowedUrls = AUTO_AGENT_TYPES.map(
-    (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
-  );
-  const pool: AutoStepPool = { queue: [...plannedTypes], allowedUrls, failures: 0, codes: [] };
-  const lanes = Math.min(MAX_LONG_REQUESTS, plannedTypes.length);
-  await Promise.all(Array.from({ length: lanes }, () => runAutoStepLane(state, launch, pool)));
-  return { failures: pool.failures, codes: pool.codes };
-}
-
-// Sélection priorisée du toast partial-fail : un code actionnable utilisateur
-// (auth_required > quota_exceeded) prime sur 'partial' générique. Évite de
-// noyer un user "clé API absente" dans un toast warning sans piste d'action.
-const pickAutoFailToast = (codes: FailedStepCode[]): { key: string; type: 'error' | 'warning' } => {
-  const set = new Set(codes);
-  if (set.has('auth_required')) return { key: 'toast.audioAuthRequired', type: 'error' };
-  if (set.has('quota_exceeded')) return { key: 'toast.audioQuotaExceeded', type: 'warning' };
-  return { key: TOAST_PARTIAL_GENERATED, type: 'warning' };
-};
-
-export function showAutoResult(
-  state: AppContext,
-  failures: number,
-  plannedCount: number,
-  codes: FailedStepCode[] = [],
-): void {
-  if (failures > 0 && failures < plannedCount) {
-    const { key, type } = pickAutoFailToast(codes);
-    if (key === TOAST_PARTIAL_GENERATED) {
-      const params = { count: plannedCount - failures, total: plannedCount };
-      state.showToast(state.t(TOAST_AUTO_PARTIAL, params), type);
-    } else {
-      state.showToast(state.t(key), type);
-    }
-  } else if (failures >= plannedCount) {
-    state.showToast(state.t(TOAST_GENERATION_ERROR), 'error');
-  } else {
-    state.showToast(state.t('toast.magicDone'), 'success', null, {
-      label: state.t(TOAST_VIEW),
-      fn: () => state.goToView('dashboard'),
-    });
-  }
-}
-
-// Auto terminé pendant qu'un autre cours est affiché : un toast nomme son cours (comme l'import en
-// arrière-plan) ; les générations sont enregistrées côté serveur et apparaissent au retour.
-const notifyBackgroundAuto = (
-  state: AppContext,
-  launch: AutoLaunch,
-  failures: number,
-  planned: number,
-): void => {
-  const project = launch.projectName;
-  if (planned > 0 && failures === 0) {
-    state.showToast(state.t('toast.autoDoneIn', { project }), 'success');
-  } else if (failures < planned) {
-    const params = { project, count: planned - failures, total: planned };
-    state.showToast(state.t('toast.autoPartialIn', params), 'warning');
-  } else {
-    notifyAutoFailedIn(state, launch);
-  }
-};
-
-// Rien après une annulation (« Tout annuler », puce de l'analyse) ou la suppression du cours : le
-// toast d'annulation suffit. Sur le cours affiché, « Magie terminée ! » le suivait, les étapes
-// abortées ne comptant pas comme des échecs (release-test du 2026-10-22).
-const showAutoOutcome = (
-  state: AppContext,
-  launch: AutoLaunch,
-  failures: number,
-  planned: number,
-  codes: FailedStepCode[],
-): void => {
-  if (launch.controller.signal.aborted) return;
-  if (autoShown(state, launch)) showAutoResult(state, failures, planned, codes);
-  else notifyBackgroundAuto(state, launch, failures, planned);
-};
 
 // Échec d'une génération nommé par son type (« Quiz : … ») : les toasts identiques étant regroupés,
 // deux types en échec restent deux toasts, chacun avec son « Réessayer ».
@@ -743,6 +345,7 @@ const fetchSingleGenerate = async function (
   // SINGLE_GENERATE_TYPES (= agents auto, dictée incluse) : chaque type a son
   // endpoint de génération unitaire /generate/<type> (cf. generation-types.ts).
   const allowedUrls = SINGLE_GENERATE_TYPES.map(
+    // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
     (t) => '/api/projects/' + safeProjectId + '/generate/' + t,
   );
   const url = '/api/projects/' + safeProjectId + '/generate/' + launch.type;
@@ -803,58 +406,47 @@ const runGenerateAll = async function (state: AppContext): Promise<void> {
   }
 };
 
-// Fin de l'Auto : retiré du registre ; chargement et contrôleurs libérés sur son cours seulement.
-// Les types individuels se nettoient dans leurs propres finally ; la boucle attrape les cas
-// d'abort précoce avant que les promises démarrent.
-const cleanupGenerateAutoPending = function (
-  state: AppContext,
-  launch: AutoLaunch,
-  plannedTypes: string[],
-): void {
-  endAutoRun(state, launch.projectId, launch.controller);
-  if (autoShown(state, launch)) {
-    endAutoAnalysisDisplay(state, launch);
-    for (const type of plannedTypes) {
-      if (!pendingOfTypeExists(state.pendingById, type)) state.loading[type] = false;
-      if (state.abortControllers[type] === launch.controller) delete state.abortControllers[type];
-    }
+// Lot Auto lancé sur le serveur (auto-launch.ts, auto-runs.ts) : cours, nom, corps et clé capturés
+// AU CLIC, runId choisi ici. Le lot est inscrit tout de suite : un second clic pendant le
+// pré-contrôle est sans effet, comme sur un cours dont le lot tourne déjà (autre onglet compris :
+// le serveur répond 409 et l'onglet le rejoint).
+const captureAutoLaunch = (state: AppContext, projectId: string): AutoLaunch => {
+  return {
+    projectId,
+    projectName: state.currentProject?.meta.name ?? '',
+    runId: crypto.randomUUID(),
+    body: buildGenerateBody(state),
+    key: captureAiKey(),
+  };
+};
+
+const reportAutoException = (state: AppContext, launch: AutoLaunch, e: unknown): void => {
+  console.error('[generate:auto]', e);
+  if (state.currentProjectId === launch.projectId) {
+    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
+  } else {
+    state.showToast(state.t(TOAST_AUTO_FAILED_IN, { project: launch.projectName }), 'error');
   }
-  void state.$nextTick(() => state.refreshIcons());
 };
 
-// Sous-helper d'orchestration : route → plan → steps → toast final, vers le cours de l'Auto même
-// si l'écran a changé entre-temps. Sépare la logique métier du try/catch/finally de runGenerateAuto
-// pour rester sous CCN 8.
-const orchestrateAutoSteps = async function (
-  state: AppContext,
-  launch: AutoLaunch,
-  plannedTypes: string[],
-): Promise<void> {
-  const route = await runAutoRoute(state, launch);
-  if (!route) return;
-  populateAutoPlan(state, launch, route.plan, plannedTypes);
-  const { failures, codes } = await runAutoSteps(state, launch, plannedTypes);
-  showAutoOutcome(state, launch, failures, plannedTypes.length, codes);
-};
-
-// Pré-contrôle AVANT l'analyse de route et les étapes (checkGenerationAllowed), sur un lancement
-// déjà capturé : cours changé pendant la vérification → l'Auto continue vers son cours (le serveur
-// refait la garde). Un seul Auto à la fois par cours : un nouveau clic pendant qu'il tourne (double
-// appui pendant la vérification, retour sur le cours) est sans effet.
+// Pré-contrôle (checkGenerationAllowed) AVANT le lancement : cours changé pendant la vérification →
+// le lot part quand même vers son cours (le serveur refait la garde). Annulé pendant la
+// vérification (« Tout annuler ») : rien ne part.
 const runGenerateAuto = async function (state: AppContext): Promise<void> {
   const projectId = state.currentProjectId;
   if (!projectId || state.autoRuns[projectId]) return;
-  const launch = startAutoLaunch(state, projectId);
-  const plannedTypes: string[] = [];
+  const launch = captureAutoLaunch(state, projectId);
+  beginAutoLaunch(state, launch);
   try {
     const outcome = await checkGenerationAllowed(state);
-    if (outcome === 'refused') return;
-    showAutoAnalysis(state, launch);
-    await orchestrateAutoSteps(state, launch, plannedTypes);
+    if (outcome === 'refused' || isLaunchCancelled(state, projectId)) {
+      forgetAutoRun(state, projectId);
+      return;
+    }
+    await launchAutoLot(state, launch);
   } catch (e: unknown) {
+    forgetAutoRun(state, projectId);
     reportAutoException(state, launch, e);
-  } finally {
-    cleanupGenerateAutoPending(state, launch, plannedTypes);
   }
 };
 

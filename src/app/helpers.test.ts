@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createHelpers } from './helpers';
+import { markRunCancelled } from './auto-runs';
 import { fr } from '../i18n/fr';
 import type { EventKey } from '../../helpers/event-bus.js';
 
@@ -2120,6 +2121,45 @@ describe('applyGenerationEvent', () => {
       'generation:g2:completed',
       { messageKey: 'notif.generationDone', paramKeys: { type: 'gen.quiz' } },
     );
+  });
+
+  // Lot Auto annulé en entier : un seul message pour le lot (auto-runs.ts), pas un par étape.
+  it('étape d’un lot annulé en entier : pending retiré, aucun toast', () => {
+    const ctx = makeCtx();
+    markRunCancelled('lot-annule');
+    ctx.pendingById = { g7: { id: 'g7', type: 'quiz', status: 'pending', runId: 'lot-annule' } };
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g7',
+        type: 'quiz',
+        status: 'cancelled',
+        failureCode: 'cancelled',
+        runId: 'lot-annule',
+        at: '2026-10-28T10:00:00Z',
+        eventKey: 'generation:g7:cancelled',
+      } as any,
+    );
+    expect(ctx.pendingById.g7).toBeUndefined();
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('pending d’une étape de lot : runId gardé (« Tout annuler » l’annule avec son lot)', () => {
+    const ctx = makeCtx();
+    ctx.applyGenerationEvent.call(
+      ctx as any,
+      {
+        pid: 'pid-1',
+        gid: 'g8',
+        type: 'quiz',
+        status: 'pending',
+        runId: 'lot-1',
+        at: '2026-10-28T10:00:00Z',
+        eventKey: 'generation:g8:pending',
+      } as any,
+    );
+    expect(ctx.pendingById.g8.runId).toBe('lot-1');
   });
 
   it('cancelled event: removes pending + info toast (no upsert)', () => {

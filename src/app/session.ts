@@ -1,6 +1,5 @@
 import type { AppContext } from './app-context';
 import type { EventKey } from '../../helpers/event-bus';
-import { autoRunControllers } from './auto-runs';
 import { singleRunControllers } from './single-runs';
 
 // Reset agressif du state RAM lié à la session courante (toasts, loading,
@@ -64,7 +63,7 @@ function doResetSession(ctx: AppContext): void {
   }
   stopActiveRecording(ctx);
   abandonProjectLoad(ctx);
-  const spared = new Set([...autoRunControllers(ctx), ...singleRunControllers(ctx)]);
+  const spared = new Set(singleRunControllers(ctx));
   abortAllExcept(ctx.abortControllers, spared);
   ctx.abortControllers = {};
   abortAllExcept(ctx.abortControllersByGid, spared);

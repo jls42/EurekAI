@@ -482,6 +482,9 @@ export const fr: Record<string, string> = {
   'toast.autoDoneIn': 'Magie terminée dans « {project} » !',
   'toast.autoPartial': 'Magie : {count} génération(s) sur {total} réussie(s).',
   'toast.autoPartialIn': 'Magie dans « {project} » : {count} génération(s) sur {total} réussie(s).',
+  'toast.autoJoined': 'La magie est déjà en cours sur ce cours : je la suis.',
+  'toast.autoCancelledIn': 'La magie de « {project} » a été annulée.',
+  'toast.autoInterruptedIn': 'La magie de « {project} » a été interrompue (serveur redémarré).',
   'toast.autoFailedIn':
     'La génération automatique de « {project} » a échoué. Réessaye dans ce cours.',
   'toast.voiceAddedIn': 'Voix transcrite et ajoutée à « {project} ».',

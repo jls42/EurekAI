@@ -57,6 +57,16 @@ export function createPendingsStream() {
 
       const url = '/api/projects/' + projectId + '/events';
       source = new EventSource(url);
+      // Lot Auto du cours (état complet à chaque changement) : auto-runs.ts.
+      source.addEventListener('auto', (msg: MessageEvent) => {
+        if (this.currentProjectId !== projectId) return;
+        try {
+          const raw: unknown = JSON.parse(msg.data as string);
+          this.applyAutoRunEvent(raw as Parameters<typeof this.applyAutoRunEvent>[0]);
+        } catch (err) {
+          console.warn('[sse] malformed auto event', err, msg.data);
+        }
+      });
       source.addEventListener('generation', (msg: MessageEvent) => {
         if (this.currentProjectId !== projectId) return;
         try {
