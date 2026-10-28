@@ -53,6 +53,7 @@ type NotifSpec = {
   messageKey: string;
   params?: Record<string, string | number>;
   paramKeys?: Record<string, string>;
+  projectId?: string;
 };
 
 export interface AppContext extends AppState {
@@ -264,7 +265,7 @@ export interface AppContext extends AppState {
   activeGenerations(): Array<{ key: string; label: string; color: string; icon: string }>;
   hasPendingOfType(type: string): boolean;
   isLoading(type: string): boolean;
-  upsertGenerationById(gen: Generation): void;
+  upsertGenerationById(gen: Generation): boolean;
   resetSession(): void;
   profileNotifications(): PersistedNotification[];
   unreadNotificationsCount(): number;

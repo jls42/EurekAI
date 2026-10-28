@@ -30,6 +30,9 @@ export interface NotifSpec {
   // Sous-clés à traduire au render — ex: { type: 'gen.summary' } pour résoudre
   // le label d'agent dans la langue UI courante.
   paramKeys?: Record<string, string>;
+  // Cours de la notification, par défaut le cours affiché : un Auto qui se termine pendant qu'un
+  // autre cours est affiché range sa notification sous SON cours.
+  projectId?: string;
 }
 
 const AUTO_DISMISS_MS = 5000;
@@ -97,7 +100,7 @@ const recordToastEvent = (
           }
         : { message }),
       type: type as 'info' | 'success' | 'warning' | 'error',
-      projectId: state.currentProjectId ?? undefined,
+      projectId: notifSpec?.projectId ?? state.currentProjectId ?? undefined,
     });
     if (created) state.notificationsVersion++;
   }

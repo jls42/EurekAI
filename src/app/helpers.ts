@@ -7,6 +7,7 @@ import {
   sourceContentMasked as contentMaskedFor,
 } from './effective-moderation';
 import { openingProfileQuery } from './project-snapshot';
+import { addCostDelta } from './cost-utils';
 import type { AppContext, CostPopoverItem, ItemWithRefs, MetaPopoverConfig } from './app-context';
 import type {
   Consigne,
@@ -37,6 +38,7 @@ const TEXT_TEXT_SECONDARY = 'text-text-secondary';
 const COLOR_PRIMARY = 'var(--color-primary)';
 const COLOR_ACCENT = 'var(--color-accent)';
 const I18N_GEN_PREFIX = 'gen.';
+const TOAST_VIEW = 'toast.view';
 const NOTIF_GENERATION_DONE_LABEL = 'notif.generationDone';
 
 // `GenerationEvent` est désormais une discriminated union sur `status` exportée
@@ -737,10 +739,13 @@ const isLoading = function (this: AppContext, type: string): boolean {
   return this.loading[type] === true;
 };
 
-const upsertGenerationById = function (this: AppContext, gen: Generation): void {
+// Vrai si la génération est nouvelle dans l'onglet : son coût n'y est compté qu'à ce moment, que
+// la réponse 200 ou l'événement SSE arrive en premier.
+const upsertGenerationById = function (this: AppContext, gen: Generation): boolean {
   const idx = this.generations.findIndex((g) => g.id === gen.id);
   if (idx === -1) this.generations.push(gen);
   else this.generations[idx] = gen;
+  return idx === -1;
 };
 
 // Sous-helpers extraits d'applyGenerationEvent pour fragmenter le CCN.
@@ -771,16 +776,23 @@ const applyCompletedEvent = (
     console.warn('[sse] completed event missing generation payload', event);
     return;
   }
+  // Mêmes étapes que registerGeneration (generate.ts) : une génération reçue par le seul SSE
+  // (autre onglet, étape d'un Auto du serveur) est normalisée, initialisée et comptée comme une
+  // réponse 200 (jusqu'au 2026-10-28 : ni normalisation, ni propriétés d'affichage, ni coût).
+  normalizeSummaryData(generation);
+  ctx.initGenProps(generation);
   // openGens AVANT upsert : l'upsert push dans state.generations ce qui
   // déclenche l'instanciation du composant Alpine. Son `x-init $watch` lirait
   // `undefined` initial → bug "audio joue tout seul" sans cette pose préalable.
   ctx.openGens[generation.id] = true;
-  ctx.upsertGenerationById(generation);
+  if (ctx.upsertGenerationById(generation)) {
+    addCostDelta(ctx, generation.estimatedCost, `generate/${generation.type}`);
+  }
   ctx.showToast(
     ctx.t(NOTIF_GENERATION_DONE_LABEL, { type: ctx.t(I18N_GEN_PREFIX + event.type) }),
     'success',
     null,
-    null,
+    { label: ctx.t(TOAST_VIEW), fn: () => ctx.goToView(event.type) },
     event.eventKey,
     {
       messageKey: NOTIF_GENERATION_DONE_LABEL,

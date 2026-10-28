@@ -42,6 +42,7 @@ function makeContext(overrides: any = {}) {
       const idx = this.generations.findIndex((g: any) => g.id === gen.id);
       if (idx === -1) this.generations.push(gen);
       else this.generations[idx] = gen;
+      return idx === -1;
     },
     scrollChatBottom: chat.scrollChatBottom,
     sendChatMessage: chat.sendChatMessage,
