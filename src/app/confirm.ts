@@ -97,7 +97,7 @@ const cancelPendingSilently = (state: AppContext, gid: string, type: string): vo
   }
   const snapshot = state.pendingById[gid];
   delete state.pendingById[gid];
-  // Cas server-owned (gid généré par /generate/auto runStepBody, pas par
+  // Cas server-owned (gid généré par le serveur pour une étape d'un lot Auto, pas par
   // state.generate) : aucun controller local n'a été aborté donc le finally
   // de la fetch ne s'exécutera pas pour ce type. Clear loading[type]
   // explicitement pour libérer le bouton/spinner UI sans attendre la fin du

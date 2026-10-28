@@ -24,7 +24,10 @@ import {
 import { routeRequest } from '../generators/router.js';
 import { generateSummary } from '../generators/summary.js';
 import { generateFlashcards } from '../generators/flashcards.js';
-import { generateQuiz } from '../generators/quiz.js';
+import { generateQuiz, generateQuizVocal } from '../generators/quiz.js';
+import { ttsQuestion } from '../generators/quiz-vocal.js';
+import { moderateContent } from '../generators/moderation.js';
+import { generateRoutes } from './generate.js';
 import { subscribeAutoRun } from '../helpers/event-bus.js';
 import type { AutoRun, AutoRunEvent, AutoRunStatus } from '../types.js';
 
@@ -66,6 +69,10 @@ vi.mock('../generators/podcast.js', () => ({
 }));
 vi.mock('../generators/tts.js', () => ({
   generateAudio: vi.fn().mockResolvedValue(Buffer.from('fake-audio')),
+}));
+vi.mock('../generators/quiz-vocal.js', () => ({
+  ttsQuestion: vi.fn(),
+  createQuizVocalGeneration: (fields: unknown) => fields,
 }));
 vi.mock('../generators/router.js', () => ({ routeRequest: vi.fn() }));
 vi.mock('../generators/moderation.js', () => ({
@@ -480,6 +487,72 @@ describe('étapes', () => {
       model: 'voxtral-mini-tts-3-0',
       mistralClient: mockClient,
     });
+  });
+});
+
+describe('comportements repris de l’ancienne route /generate/auto', () => {
+  it('source en attente de modération : remodérée avant l’analyse', async () => {
+    const profile = profileStore.create('Kid', 9, '0', 'fr');
+    const pid = store.createProject('Cours', profile.id).meta.id;
+    store.addSource(pid, {
+      id: 'src-1',
+      filename: 'lecon.txt',
+      markdown: 'Contenu',
+      uploadedAt: new Date().toISOString(),
+      moderation: { status: 'pending', categories: {} },
+    });
+    const { runId } = await start(pid);
+    await waitForStatus(pid, runId, 'completed');
+    expect(moderateContent).toHaveBeenCalled();
+    expect(vi.mocked(moderateContent).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(routeRequest).mock.invocationCallOrder[0],
+    );
+    expect(store.getProject(pid)!.sources[0].moderation?.status).toBe('safe');
+  });
+
+  it('étape quiz : attend le quiz lancé à la main et l’a dans son bloc d’exclusions', async () => {
+    vi.mocked(routeRequest).mockResolvedValueOnce(plan('quiz') as any);
+    const question = (q: string) => ({ question: q, choices: ['a', 'b', 'c', 'd'], correct: 0 });
+    const gate = deferred();
+    vi.mocked(generateQuiz)
+      .mockImplementationOnce(async () => {
+        await gate.promise;
+        return [question('Q-manuel')] as any;
+      })
+      .mockResolvedValueOnce([question('Q-auto')] as any);
+    const pid = projectWithSource();
+    const manual = getHandler(
+      generateRoutes(store, profileStore),
+      'post',
+      '/:pid/generate/quiz',
+    )({ params: { pid }, query: {}, body: { gid: randomUUID() } }, mockRes());
+    await vi.waitFor(() => expect(generateQuiz).toHaveBeenCalledTimes(1));
+    const { runId } = await start(pid);
+    await vi.waitFor(() => expect(runOf(pid, runId).steps).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 30));
+    expect(generateQuiz).toHaveBeenCalledTimes(1); // l'étape quiz est en file
+    gate.resolve();
+    await manual;
+    await waitForStatus(pid, runId, 'completed');
+    expect(vi.mocked(generateQuiz).mock.calls[1][6]).toContain('Q-manuel');
+  });
+
+  it('étape quiz vocal en échec à la question 1 : MP3 de la question 0 supprimé', async () => {
+    vi.mocked(routeRequest).mockResolvedValueOnce(plan('summary', 'quiz-vocal') as any);
+    const question = { question: 'Q', choices: ['a', 'b', 'c', 'd'], correct: 0 };
+    vi.mocked(generateQuizVocal).mockResolvedValueOnce([question, question] as any);
+    vi.mocked(ttsQuestion)
+      .mockResolvedValueOnce(Buffer.from('q0'))
+      .mockRejectedValueOnce(new Error('TTS API unreachable'));
+    const pid = projectWithSource();
+    const { runId } = await start(pid);
+    await waitForStatus(pid, runId, 'completed');
+    expect(stepsOf(pid, runId)).toEqual([
+      ['summary', 'completed', null],
+      ['quiz-vocal', 'failed', 'tts_upstream_error'],
+    ]);
+    const media = readdirSync(join(tmpDir, 'projects', pid)).filter((f) => f.endsWith('.mp3'));
+    expect(media).toEqual([]);
   });
 });
 

@@ -120,7 +120,6 @@ export const fr: Record<string, string> = {
     'Le filtre de sécurité de Mistral a refusé ce contenu. Essaie avec un autre texte.',
   'errorCode.payload_too_large': 'Ce contenu est trop volumineux. Essaie avec un texte plus court.',
   'errorCode.file_too_large': 'Ce fichier est trop gros. Essaie avec un fichier plus léger.',
-  'errorCode.all_steps_failed': 'Toutes les générations ont échoué',
   'errorCode.invalid_input': 'Demande invalide',
   'errorCode.profile_delete_partial':
     "Suppression du profil incomplète : certains projets n'ont pas pu être supprimés",

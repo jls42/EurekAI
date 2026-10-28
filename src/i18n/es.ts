@@ -120,7 +120,6 @@ export const es: Record<string, string> = {
     'Este contenido es demasiado grande. Prueba con un texto más corto.',
   'errorCode.file_too_large':
     'Este archivo es demasiado grande. Prueba con uno m\u00e1s peque\u00f1o.',
-  'errorCode.all_steps_failed': 'Todas las generaciones han fallado',
   'errorCode.invalid_input': 'Solicitud no válida',
   'errorCode.profile_delete_partial':
     'Eliminacion del perfil incompleta: algunos proyectos no se pudieron eliminar',

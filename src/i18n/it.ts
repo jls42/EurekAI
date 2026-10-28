@@ -117,7 +117,6 @@ export const it: Record<string, string> = {
   'errorCode.payload_too_large': 'Questo contenuto è troppo grande. Prova con un testo più breve.',
   'errorCode.file_too_large':
     'Questo file \u00e8 troppo grande. Prova con un file pi\u00f9 piccolo.',
-  'errorCode.all_steps_failed': 'Tutte le generazioni sono fallite',
   'errorCode.invalid_input': 'Richiesta non valida',
   'errorCode.profile_delete_partial':
     'Eliminazione del profilo incompleta: alcuni progetti non sono stati eliminati',

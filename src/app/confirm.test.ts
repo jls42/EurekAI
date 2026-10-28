@@ -295,7 +295,7 @@ describe('createConfirm', () => {
     });
 
     it('cancels server-owned gid (no local controller): clears loading[type] explicitly', () => {
-      // Scénario /generate/auto : le serveur génère le gid via runStepBody, le
+      // Scénario lot Auto : le serveur génère le gid de l'étape (startAutoRunSteps), le
       // tab reçoit le pending via SSE. abortControllersByGid[gid] est absent
       // (pas de fetch local pour ce gid) MAIS loading[type] a été set par
       // installPlanLoading. Sans clear explicite, le spinner persiste jusqu'à

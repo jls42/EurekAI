@@ -217,7 +217,7 @@ const initGenerationState = () => ({
 
 // --- Pending lifecycle ---
 // pendingById = source de vérité pour les 7 Generation persistées (multi-pendings
-// même type possibles : multi-onglets, /generate/auto parallel). Hydraté depuis
+// même type possibles : multi-onglets, étapes d'un Auto en parallèle). Hydraté depuis
 // project.results.pendingTracker au selectProject + via events SSE.
 // shownToastEventKeys = dédup toast UI per-tab (mémoire onglet, non persistée).
 // Combiné avec appendNotification (dédup persistée localStorage), garantit qu'un

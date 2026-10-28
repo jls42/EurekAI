@@ -5,7 +5,7 @@
  * écrit. Le registre sert à supprimer les médias d'une génération qui n'aboutit pas : échec en
  * cours de route (quiz vocal en échec à la question N : les N-1 MP3 déjà écrits) ou promotion
  * refusée (annulation, échec ou entrée disparue du tracker). Un contexte par génération : chaque
- * étape de /generate/auto a le sien, même quand les étapes tournent en parallèle.
+ * étape d'un lot Auto a le sien, même quand les étapes tournent en parallèle.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { deleteMediaFiles } from './generation-media.js';

@@ -123,7 +123,6 @@ export const hi: Record<string, string> = {
   'errorCode.payload_too_large': 'यह सामग्री बहुत बड़ी है। कोई छोटा पाठ आज़माओ।',
   'errorCode.file_too_large':
     '\u092F\u0939 \u092B\u093C\u093E\u0907\u0932 \u092C\u0939\u0941\u0924 \u092C\u0921\u093C\u0940 \u0939\u0948\u0964 \u0915\u094B\u0908 \u091B\u094B\u091F\u0940 \u092B\u093C\u093E\u0907\u0932 \u091A\u0941\u0928\u094B\u0964',
-  'errorCode.all_steps_failed': 'सभी जनरेशन विफल',
   'errorCode.invalid_input': 'अमान्य अनुरोध',
   'errorCode.profile_delete_partial': 'प्रोफ़ाइल हटाना अधूरा रहा: कुछ प्रोजेक्ट नहीं हट सके',
   'errorCode.rate_limited': 'एक साथ बहुत सारे अनुरोध। थोड़ा रुको, फिर दोबारा कोशिश करो।',
