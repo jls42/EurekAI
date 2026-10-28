@@ -563,16 +563,19 @@ export class ProjectStore {
     return { kind: 'promoted', generation: finalGen };
   }
 
+  // `refusal` : code exact d'un refus des gardes (failureCode 'refused', étape d'un lot Auto).
   markPendingFailed(
     projectId: string,
     generationId: string,
     code: Exclude<FailedStepCode, 'cancelled'>,
+    refusal?: string,
   ): boolean {
     return this.replacePendingWithTerminal(projectId, generationId, (base) => ({
       ...base,
       status: 'failed',
       failureCode: code,
       completedAt: new Date().toISOString(),
+      ...(refusal && { refusal }),
     }));
   }
 
@@ -737,6 +740,11 @@ export class ProjectStore {
     return (data && findAutoRun(data, runId)) ?? null;
   }
 
+  getActiveAutoRun(projectId: string): AutoRun | null {
+    const data = this.getProject(projectId);
+    return (data && findActiveAutoRun(data)) ?? null;
+  }
+
   // Un lot actif au plus par cours (`busy` tant qu'un autre analyse ou tourne) ; `duplicate` : ce
   // runId existe déjà (lancement renvoyé après une coupure réseau).
   createAutoRun(projectId: string, run: AutoRun): CreateAutoRunResult {
@@ -853,7 +861,8 @@ export class ProjectStore {
     if (terminal.status === 'cancelled') {
       return applyStepTransition(data, terminal, 'cancelled', now);
     }
-    return applyStepTransition(data, terminal, 'failed', now, terminal.failureCode);
+    const { failureCode: code, refusal } = terminal;
+    return applyStepTransition(data, terminal, 'failed', now, { code, refusal });
   }
 
   // Copie : l'événement garde l'état du lot à l'émission.

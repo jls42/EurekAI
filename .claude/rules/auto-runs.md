@@ -6,11 +6,13 @@ paths:
   - "helpers/event-bus*.ts"
   - "routes/projects*.ts"
   - "routes/generate*.ts"
+  - "routes/auto-runs*.ts"
+  - "helpers/keyed-slots*.ts"
 ---
 
 # Lots Auto côté serveur
 
-Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechargement », décisions du propriétaire du 2026-10-25). Le modèle de données est en place ; l'orchestrateur, les routes et le navigateur suivent.
+Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechargement », décisions du propriétaire du 2026-10-25). Modèle, orchestrateur et routes en place côté serveur ; le navigateur pilote encore l'Auto lui-même (`/generate/route` puis une requête par étape) jusqu'à son passage sur le lot serveur.
 
 ## Modèle (`results.autoRuns`, `types.ts` : `AutoRun`)
 
@@ -33,12 +35,22 @@ Créé le 2026-10-28 (plan « l'Auto continue côté serveur et survit au rechar
 - **SSE** : même flux `GET /api/projects/:pid/events`, ligne `event: auto`, `data` = `AutoRunEvent` `{ pid, run }`, l'état COMPLET du lot (copie à l'émission) à chaque changement : lancement, plan, étape, fin. Le client le remplace en bloc. Bus : `emitAutoRunEvent` / `subscribeAutoRun` (`helpers/event-bus.ts`, même enveloppe anti-exception que `subscribeGeneration`).
 - Le snapshot `GET /api/projects/:pid` porte `results.autoRuns` : un onglet rechargé retrouve le lot.
 
-## Décisions du propriétaire (2026-10-25), pour la suite
+## Orchestrateur et routes (`routes/auto-runs.ts`)
 
-- Clé API gardée en mémoire le temps du lot, 30 min au plus, jamais sur disque ni dans les journaux.
-- Au plus 3 étapes en vol par clé, 10 lots actifs au plus (429 `rate_limited` au-delà).
-- Refus pendant une étape : les autres étapes continuent ; l'étape refusée échoue avec un code précis.
-- Un toast par étape et un toast final ; lot annulé depuis un autre onglet : un seul message.
-- `POST /generate/auto` supprimée ; bouton « Reprendre » sur un lot `interrupted` (étapes manquantes, sans refaire l'analyse).
+- **`POST /:pid/generate/auto/start`** `{ runId, lang?, ageGroup?, sourceIds?, useConsigne?, count? }` → **202 `{ run }`** tout de suite, analyse et étapes en arrière-plan (`runAutoBatch`). Ordre des gardes, avant tout appel facturé et toute écriture : clé (auth-first, `resolveClient`), `runId` UUID v4 (`isUuidV4`, `helpers/request-validation.ts` ; sinon 400 `invalid_input`), projet (404 `project_not_found`), même `runId` déjà lancé (202 avec ce lot : renvoi après une coupure réseau), autre lot actif sur le cours (409 `auto_busy` avec ce lot), 10 lots en cours dans le process au plus (`MAX_ACTIVE_AUTO_RUNS`, 429 `rate_limited`, `Retry-After: 30`), puis les gardes de l'analyse de route (`prepareAutoLaunch` : reprise des modérations jusqu'à 8 s, corps, modération, sources, consigne, contexte). `createAutoRun` re-vérifie le lot actif et le `runId` au moment d'écrire (deux lancements simultanés : un seul lot). Sous `aiLimiter` (`AI_PATH_RE` couvre `generate/`).
+- **`GET /:pid/auto-runs/:runId`** → `{ run }` ; **`POST /:pid/auto-runs/:runId/cancel`** → `{ run }` (lot entier, `cancelAutoRun` ; déjà terminé : rendu tel quel) ; lot inconnu : 404 `auto_run_not_found`. Hors `aiLimiter` (jamais de limiteur IA sur une annulation). Une étape seule s'annule par `POST /generations/:gid/cancel` : le lot continue.
+- **Analyse** : `planAutoRun` (routage, coût persisté sous `…/generate/auto/route`), agents non exécutables dans `skipped` ; échec → `failAutoRun` avec `extractErrorCode(e, 'route')` (coût capté persisté sous `…/route/failed`). Puis toutes les étapes posées en une écriture (`startAutoRunSteps`, gid serveur par étape) ; `null` (lot annulé pendant le routage, délai, cours supprimé) → aucune étape ne part. L'analyse d'un lot annulé reste facturée.
+- **Étapes** : chacune par le cœur des générations simples (`runTrackedGeneration`, mode `preTracked` : l'entrée existe déjà), avec le corps du lancement (`request` : sources retenues au lancement, `count`) — gardes refaites, file par type (`withSameTypeQueue`), coût sous `…/generate/<type>`, promotion. **Au plus 3 en vol par clé, tous lots confondus** (`withKeyedSlots`, `helpers/keyed-slots.ts`, empreinte de la clé ; file FIFO dans l'ordre du plan, place passée de main en main, toujours rendue). À son tour, une étape annulée (puce, lot) ou un lot arrêté ne part pas (`pendingStatus`). Une génération simple ne prend pas de place.
+- **Refus pendant une étape** (décision du propriétaire : les autres continuent) : l'entrée passe `failed` avec le code **`refused`** et le code exact du refus dans **`refusal`** (`moderation.blocked`, `moderation.error`, `moderation.pending`, `no_sources`, `context_too_large:<pct>`, `project_not_found`…), recopiés sur l'étape. `refused` n'est jamais produit par `extractErrorCode`. Échec d'une étape (exception) : code de `extractErrorCode`, les autres continuent.
+- **Clé** : le client du lancement ne vit que dans le registre `activeRuns` du process (clé `pid:runId` : le `runId` vient du navigateur, deux cours lancés avec le même partageaient une entrée et contournaient le plafond ; entrée retirée seulement si c'est encore la sienne), jamais dans `AutoRun`, un événement ou un journal.
+- **Délai maximal de 30 min** (`AUTO_RUN_MAX_MS`, minuteur `unref()`, retiré en `finally`) : étapes encore en cours en échec **`upstream_unavailable`** (code d'un délai dépassé), donc lot `completed` ; analyse encore en cours → `failed` ; clé oubliée tout de suite. Un appel déjà en vol chez Mistral finit sans être promu.
+- **Erreur inattendue** de l'orchestrateur : même arrêt avec `internal_error`. `runAutoBatch` ne rejette jamais (`.catch` journalisé au lancement).
+- Cours ou profil supprimé pendant le lot : les étapes trouvent le projet absent (refus 404, rien n'est écrit), le lot s'arrête.
 
-Verrous : `store.autoruns.test.ts`, `helpers/auto-run-state.test.ts`, `routes/projects.test.ts` (« écrit un event auto »).
+## Décisions du propriétaire (2026-10-25) qui restent à faire
+
+- Navigateur : plus aucune étape d'Auto dans la file des 3 requêtes longues de l'onglet ; un toast par étape et un toast final ; lot annulé depuis un autre onglet : un seul message.
+- Bouton « Reprendre » sur un lot `interrupted` (étapes manquantes, sans refaire l'analyse), avec la clé de la requête.
+- `POST /generate/auto` : supprimée le 2026-10-28 (décision du 2026-10-25), avec ses 8 constructeurs dupliqués et ses tests ; les comportements utiles sont repris par `routes/auto-runs.test.ts`.
+
+Verrous : `store.autoruns.test.ts`, `helpers/auto-run-state.test.ts`, `routes/projects.test.ts` (« écrit un event auto »), `routes/auto-runs.test.ts`, `helpers/keyed-slots.test.ts`.

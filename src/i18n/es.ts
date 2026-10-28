@@ -70,6 +70,9 @@ export const es: Record<string, string> = {
 
   'errorCode.internal_error': 'Error interno del servidor',
   'errorCode.cancelled': 'Generación cancelada',
+  'errorCode.refused': 'Generación rechazada',
+  'errorCode.auto_busy': 'La magia ya está en marcha en este curso.',
+  'errorCode.auto_run_not_found': 'No se encuentra esta magia: quizá se ha borrado.',
 
   // Notifications center
   'notif.openBell': 'Abrir centro de notificaciones',
@@ -117,7 +120,6 @@ export const es: Record<string, string> = {
     'Este contenido es demasiado grande. Prueba con un texto más corto.',
   'errorCode.file_too_large':
     'Este archivo es demasiado grande. Prueba con uno m\u00e1s peque\u00f1o.',
-  'errorCode.all_steps_failed': 'Todas las generaciones han fallado',
   'errorCode.invalid_input': 'Solicitud no válida',
   'errorCode.profile_delete_partial':
     'Eliminacion del perfil incompleta: algunos proyectos no se pudieron eliminar',

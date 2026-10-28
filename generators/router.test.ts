@@ -66,7 +66,7 @@ describe('routeRequest', () => {
   });
 
   // Réponse inexploitable : plan de secours (normalizePlan([])) + warn, jamais d'exception
-  // (TypeError → internal_error, ou SyntaxError → échec de /generate/auto et /generate/route).
+  // (TypeError → internal_error, ou SyntaxError → échec de l'analyse d'un lot Auto et de /generate/route).
   describe('réponse inexploitable → plan de secours', () => {
     const rawClient = (content: string) =>
       ({

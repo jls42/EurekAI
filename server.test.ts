@@ -145,6 +145,7 @@ vi.mock('./profiles.js', () => ({
 vi.mock('./routes/projects.js', () => ({ projectRoutes: state.routeFactory }));
 vi.mock('./routes/sources.js', () => ({ sourceRoutes: state.routeFactory }));
 vi.mock('./routes/generate.js', () => ({ generateRoutes: state.routeFactory }));
+vi.mock('./routes/auto-runs.js', () => ({ autoRunRoutes: state.routeFactory }));
 vi.mock('./routes/generations.js', () => ({ generationCrudRoutes: state.routeFactory }));
 vi.mock('./routes/chat.js', () => ({ chatRoutes: state.routeFactory }));
 vi.mock('./routes/profiles.js', () => ({ profileRoutes: state.routeFactory }));

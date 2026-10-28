@@ -256,7 +256,8 @@ export type Generation =
   | FillBlankGeneration
   | DictationGeneration;
 
-// Codes d'erreur stables renvoyés par /generate/auto via FailedStep.
+// Codes d'erreur stables d'une génération en échec (entrée du tracker, étape d'un lot Auto, réponse
+// des routes /generate/<type>).
 // Contrat client : les détails bruts (err.message, stack) restent dans les logs serveur.
 // - quota_exceeded : 429 / tier limit / rate limit côté compte utilisateur.
 // - upstream_unavailable : 503 / 529 / "overloaded" / "capacity" — saturation backend
@@ -275,20 +276,16 @@ export type FailedStepCode =
   // Refus du garde-fou de Mistral (403, `guardrail_violation`, code 1920) : le contenu est en cause,
   // pas la clé. Déterministe : jamais rejoué.
   | 'content_refused'
+  // Étape d'un lot Auto refusée par ses gardes (modération, sources, limite de contexte) : le code
+  // exact du refus suit dans `refusal`. Posé par le cœur de génération, jamais par extractErrorCode.
+  | 'refused'
   | 'internal_error'
   // Posé explicitement par store.markPendingCancelled / cancelAllPendingsAtBoot.
   // Jamais dérivé d'une exception via extractErrorCode (pas de mapping dans error-matchers).
   | 'cancelled';
 
-export interface FailedStep {
-  // Toujours un agent exécutable par /generate/auto (cf. AUTO_AGENTS_SET) :
-  // les étapes skippedSteps vont dans un champ distinct avant exécution.
-  agent: import('./generators/auto-agents.js').AutoAgentType;
-  code: FailedStepCode;
-}
-
 // Section read-aloud (intro/key_points/fun_fact/vocabulary) qui a échoué pendant un batch.
-// Étend la sémantique de FailedStep à la surface partial-success HTTP 200 — l'UI peut
+// Code stable (FailedStepCode) sur la surface partial-success HTTP 200 — l'UI peut
 // dispatcher un toast actionnable selon le code (auth_required → settings, quota_exceeded
 // → message attente, sinon partial générique). Cohérence interne avec extractErrorCode
 // utilisé déjà dans le catch global de /read-aloud.
@@ -355,6 +352,8 @@ export interface AutoRunStep {
   status: AutoRunStepStatus;
   // Présent seulement sur une étape 'failed'.
   failureCode?: Exclude<FailedStepCode, 'cancelled'>;
+  // failureCode 'refused' : code stable du refus des gardes, à traduire pour le message de l'étape.
+  refusal?: string;
 }
 
 // Corps capturé au lancement : chaque étape refait ses gardes avec lui, sur les sources retenues
@@ -364,6 +363,8 @@ export interface AutoRunRequest {
   ageGroup: AgeGroup;
   sourceIds: string[];
   useConsigne: boolean;
+  // Nombre d'éléments demandé (quiz, flashcards…), absent = défaut de chaque générateur.
+  count?: number;
 }
 
 export interface AutoRun {
@@ -399,7 +400,7 @@ export type TrackedGenerationType = Generation['type'];
 
 // Champs communs aux entrées actives et terminales du tracker.
 export interface PendingTrackerEntryBase {
-  // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour /generate/auto).
+  // gid stable (généré côté client via crypto.randomUUID, ou côté serveur pour une étape d'un lot Auto).
   // Identique au `id` de la `Generation` finale après promotion.
   id: string;
   type: TrackedGenerationType;
@@ -429,6 +430,8 @@ export interface PendingTrackerEntryFailed extends PendingTrackerEntryBase {
   status: 'failed';
   failureCode: Exclude<FailedStepCode, 'cancelled'>;
   completedAt: string;
+  // failureCode 'refused' : code stable du refus des gardes (`moderation.blocked`, `no_sources`…).
+  refusal?: string;
 }
 
 export interface PendingTrackerEntryCancelled extends PendingTrackerEntryBase {
@@ -443,8 +446,7 @@ export type PendingTrackerEntryTerminal = PendingTrackerEntryFailed | PendingTra
 // du tracker et la Generation est ajoutée à `generations[]`.
 export type PendingTrackerEntry = PendingTrackerEntryActive | PendingTrackerEntryTerminal;
 
-// Réponse HTTP 409 quand la promotion échoue (route /generate/:type avec
-// trackedType, /generate/auto par step). Découple le contrat HTTP du
+// Réponse HTTP 409 quand la promotion échoue (routes /generate/:type). Découple le contrat HTTP du
 // discriminant interne `PromoteResult.kind` — sinon renommer le discriminant
 // store casserait le client sans warning compile. Le `'missing'` interne du
 // store est volontairement absent : c'est un signal observabilité (tracker

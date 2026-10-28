@@ -71,6 +71,9 @@ export const pt: Record<string, string> = {
 
   'errorCode.internal_error': 'Erro interno do servidor',
   'errorCode.cancelled': 'Geração cancelada',
+  'errorCode.refused': 'Geração recusada',
+  'errorCode.auto_busy': 'A magia já está a decorrer neste curso.',
+  'errorCode.auto_run_not_found': 'Esta magia não foi encontrada: talvez tenha sido apagada.',
 
   // Notifications center
   'notif.openBell': 'Abrir centro de notificações',
@@ -117,7 +120,6 @@ export const pt: Record<string, string> = {
     'O filtro de segurança da Mistral recusou este conteúdo. Tenta com outro texto.',
   'errorCode.payload_too_large': 'Este conteúdo é demasiado grande. Tenta com um texto mais curto.',
   'errorCode.file_too_large': 'Este ficheiro \u00e9 demasiado grande. Tenta com um mais pequeno.',
-  'errorCode.all_steps_failed': 'Todas as gera\u00e7\u00f5es falharam',
   'errorCode.invalid_input': 'Pedido inválido',
   'errorCode.profile_delete_partial':
     'Exclusao do perfil incompleta: alguns projetos nao puderam ser excluidos',

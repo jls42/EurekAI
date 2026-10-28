@@ -8,7 +8,7 @@
 flowchart TD
     User[Utilisateur<br/>photo/texte/voix] --> Route{Route API}
 
-    Route -->|/generate/auto| Router[routerSystem<br/>orchestrateur]
+    Route -->|/generate/route, lot Auto| Router[routerSystem<br/>orchestrateur]
     Route -->|/generate/summary| Summary[summarySystem]
     Route -->|/generate/flashcards| Flash[flashcardsSystem]
     Route -->|/generate/quiz| Quiz[quizSystem]
@@ -133,7 +133,7 @@ flowchart LR
 
 ### 2.1 `routerSystem(ageGroup, lang)`
 
-**Contexte** : utilisé par `generators/router.ts::routeRequest()` pour la route `/generate/auto`. Décide quels agents lancer selon le contenu. Appelle `ageInstruction` + `langInstruction`.
+**Contexte** : utilisé par `generators/router.ts::routeRequest()` pour `/generate/route` et l'analyse d'un lot Auto (`POST /generate/auto/start`). Décide quels agents lancer selon le contenu. Appelle `ageInstruction` + `langInstruction`.
 
 ```text
 Tu es un orchestrateur educatif intelligent. Analyse le contenu et decide quels types de materiel generer pour maximiser l'apprentissage.
@@ -197,7 +197,7 @@ Exemples FR :
 
 ## 3. Summary (fiche de révision)
 
-**Contexte** : appelé par `generators/summary.ts::generateSummary()`. Invariant pédagogique : toujours présent dans le plan `/generate/auto`. Produit un **objet JSON unique** (pas un tableau de fiches — garde-fou historique contre `{"fiches": [...]}` qui cassait `extractSummary`).
+**Contexte** : appelé par `generators/summary.ts::generateSummary()`. Invariant pédagogique : toujours présent dans le plan d'un lot Auto. Produit un **objet JSON unique** (pas un tableau de fiches — garde-fou historique contre `{"fiches": [...]}` qui cassait `extractSummary`).
 
 **Anti-leak lexical** : le prompt bannit les tokens méta (`"fiche"`, `"complete"`) au voisinage du champ `title` pour éviter que le LLM ne recycle `"— Fiche de révision COMPLÈTE"` dans ses titres (bug historique commit `feat/prompts-improvements`).
 

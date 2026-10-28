@@ -17,7 +17,6 @@ import type {
   AgeGroup,
   Consigne,
   DictationItem,
-  FailedStep,
   FailedStepCode,
   FillBlankItem,
   Generation,
@@ -60,7 +59,6 @@ import { routeRequest } from '../generators/router.js';
 import {
   AUTO_AGENT_TYPES,
   AUTO_AGENTS_SET,
-  TTS_DEPENDENT_AGENTS,
   type AutoAgentType,
 } from '../generators/auto-agents.js';
 import {
@@ -81,6 +79,7 @@ import {
   INVALID_INPUT,
   isOptionalAgeGroup,
   isOptionalLangCode,
+  isUuidV4,
 } from '../helpers/request-validation.js';
 import {
   blockingModerationStatus,
@@ -312,7 +311,8 @@ const splitByAutoExecutable = <T extends { agent: string }>(
   return { executable, skipped };
 };
 
-type GenContextBase = Omit<GenContext, 'client'>;
+// Contexte d'une génération avant le client (exporté pour le lancement d'un lot Auto).
+export type GenContextBase = Omit<GenContext, 'client'>;
 type GenFailure = { ok: false; status: number; error: string };
 // Alias plutôt qu'une union écrite sur plusieurs lignes en type de retour : Lizard ne
 // mesurerait que la signature (cf. CLAUDE.md « Type de retour union multi-lignes »).
@@ -544,20 +544,13 @@ interface GenerationOptions {
   trackedType: TrackedGenerationType;
 }
 
-// UUID v4 strict : version nibble = '4', variant nibble dans [89ab].
-// Aligné sur la regex client (src/app/confirm.ts GID_UUID_V4) — assure que le
-// gid produit par crypto.randomUUID() côté client (RFC 4122 v4) traverse
-// inchangé et que toute autre valeur (UUID v1/v3/v5, hex shape valide non-v4)
-// retombe sur randomUUID() au lieu de propager un gid non conforme.
-const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-// Lit le gid envoyé par le client (body.gid), valide UUID v4 ou retombe sur
-// randomUUID. Le client génère son propre gid avant le fetch pour avoir
-// abortControllersByGid[gid] immédiatement opérationnel + identifiant stable
-// utilisable au moment du payload 200 fallback ou de l'event SSE.
+// Lit le gid envoyé par le client (body.gid), UUID v4 strict (isUuidV4) ou retombe sur randomUUID :
+// toute autre valeur (UUID v1/v3/v5, forme hexadécimale non v4) ne se propage pas. Le client génère
+// son propre gid avant le fetch pour avoir abortControllersByGid[gid] immédiatement opérationnel +
+// identifiant stable utilisable au moment du payload 200 fallback ou de l'event SSE.
 const readClientGid = (req: Request): string => {
   const candidate = (req.body as { gid?: unknown })?.gid;
-  return typeof candidate === 'string' && UUID_V4_REGEX.test(candidate) ? candidate : randomUUID();
+  return isUuidV4(candidate) ? candidate : randomUUID();
 };
 
 const makeTrackerEntry = (
@@ -728,7 +721,26 @@ interface GenerationRequest {
   gid: string;
   body: unknown;
   def: GenerationDef;
+  // Entrée du tracker déjà posée (étape d'un lot Auto, store.startAutoRunSteps) : pas
+  // d'addPendingEntry, et un refus des gardes passe cette entrée en échec `refused`.
+  preTracked?: boolean;
 }
+
+type GenContextFailure = Extract<GenContextResult, { ok: false }>;
+
+// Refus des gardes. Génération simple : aucune écriture (rien n'est encore suivi). Étape d'un lot :
+// son entrée passe `failed` / `refused` avec le code exact du refus, et le lot continue.
+const refusedGeneration = (r: GenerationRequest, failure: GenContextFailure): GenerationOutcome => {
+  if (r.preTracked) r.store.markPendingFailed(r.pid, r.gid, 'refused', failure.error);
+  return { kind: 'refused', status: failure.status, error: failure.error };
+};
+
+// Pose l'entrée du tracker d'une génération simple ; faux si ce gid est déjà suivi.
+const trackGeneration = (r: GenerationRequest, sourceIds: string[]): boolean => {
+  if (r.preTracked) return true;
+  const entry = makeTrackerEntry(r.def.options.trackedType, r.gid, sourceIds);
+  return r.store.addPendingEntry(r.pid, entry);
+};
 
 // Cœur d'une génération suivie, sans réponse HTTP. Ordre : reprise des modérations en attente,
 // gardes (buildGenContext : refus sans aucune écriture), entrée du tracker, file par type,
@@ -738,14 +750,11 @@ export const runTrackedGeneration = async (r: GenerationRequest): Promise<Genera
   await settleGenerationSources(store, profileStore, client, pid, r.body);
   const body = r.body as GenRequestBody;
   const built = buildGenContext(store, profileStore, pid, body, def.modelId, def.options);
-  if (!built.ok) return { kind: 'refused', status: built.status, error: built.error };
-  const type = def.options.trackedType;
-  if (!store.addPendingEntry(pid, makeTrackerEntry(type, gid, built.ctx.sourceIds))) {
-    return { kind: 'duplicate_gid' };
-  }
+  if (!built.ok) return refusedGeneration(r, built);
+  if (!trackGeneration(r, built.ctx.sourceIds)) return { kind: 'duplicate_gid' };
   const run: TrackedRun = { store, pid, gid, def, ctx: { ...built.ctx, client } };
   try {
-    return await withSameTypeQueue(pid, type, () => runQueuedGeneration(run));
+    return await withSameTypeQueue(pid, def.options.trackedType, () => runQueuedGeneration(run));
   } catch (e) {
     return failedGeneration(run, e);
   }
@@ -790,26 +799,6 @@ const handleGeneration = (store: ProjectStore, profileStore: ProfileStore, def: 
     sendGenerationOutcome(res, gid, await runTrackedGeneration(request));
   };
 };
-
-interface AutoCtx {
-  client: Mistral;
-  markdown: string;
-  rawMarkdown: string;
-  config: ReturnType<typeof getConfig>;
-  hasConsigne: boolean;
-  lang: string;
-  ageGroup: AgeGroup;
-  sourceIds: string[];
-  count?: number;
-  pid: string;
-  store: ProjectStore;
-  generations: Generation[];
-  profileVoices?: { host?: VoiceId; guest?: VoiceId };
-  profileId?: string;
-}
-
-type StepOutcome =
-  { ok: true; gen: Generation } | { ok: false; agent: AutoAgentType; code: FailedStepCode };
 
 const makeGen = (
   type: string,
@@ -1139,334 +1128,6 @@ const buildFillBlankGeneration = async (ctx: GenContext): Promise<Generation> =>
   return makeGen(FILL_BLANK, data, ctx);
 };
 
-type AutoExecutor = (ctx: AutoCtx) => Promise<Generation>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
-
-const AUTO_EXECUTORS = new Map<string, AutoExecutor>([
-  ['summary', async (ctx) => buildAutoSummary(ctx)],
-  ['flashcards', async (ctx) => buildAutoFlashcards(ctx)],
-  ['quiz', async (ctx) => buildAutoQuiz(ctx)],
-  [FILL_BLANK, async (ctx) => buildAutoFillBlank(ctx)],
-  ['podcast', async (ctx) => buildAutoPodcast(ctx)],
-  [QUIZ_VOCAL, async (ctx) => buildAutoQuizVocal(ctx)],
-  ['image', async (ctx) => buildAutoImage(ctx)],
-  [DICTATION, async (ctx) => buildAutoDictation(ctx)],
-]);
-
-const buildAutoSummary = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateSummary(ctx.client, ctx.markdown, {
-    model: ctx.config.models.summary,
-    hasConsigne: ctx.hasConsigne,
-    lang: ctx.lang,
-    ageGroup: ctx.ageGroup,
-    exclusions: buildExclusionContext(ctx.generations, 'summary'),
-  });
-  return makeGen('summary', data, ctx);
-};
-
-const buildAutoFlashcards = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateFlashcards(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.flashcards,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    buildExclusionContext(ctx.generations, 'flashcards'),
-  );
-  return makeGen('flashcards', data, ctx);
-};
-
-const buildAutoQuiz = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateFreshQuiz({
-    client: ctx.client,
-    markdown: ctx.markdown,
-    model: ctx.config.models.quiz,
-    lang: ctx.lang,
-    ageGroup: ctx.ageGroup,
-    count: ctx.count,
-    generations: ctx.generations,
-  });
-  return makeGen('quiz', data, ctx);
-};
-
-const buildAutoFillBlank = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateFreshFillBlank({
-    client: ctx.client,
-    markdown: ctx.markdown,
-    model: ctx.config.models.quiz,
-    lang: ctx.lang,
-    ageGroup: ctx.ageGroup,
-    count: ctx.count,
-    generations: ctx.generations,
-  });
-  return makeGen(FILL_BLANK, data, ctx);
-};
-
-const buildAutoPodcast = async (ctx: AutoCtx): Promise<Generation> => {
-  const podcastResult = await generatePodcastScript(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.podcast,
-    ctx.lang,
-    ctx.ageGroup,
-    buildExclusionContext(ctx.generations, 'podcast'),
-  );
-  const ttsOpts = ttsOptionsFor(ctx.config, ctx.client);
-  const audioBuffer = await generateAudio(
-    podcastResult.script,
-    resolveVoices({
-      profileVoices: ctx.profileVoices,
-      lang: ctx.lang,
-      profileId: ctx.profileId,
-      flow: 'podcast',
-      model: ttsOpts.model,
-    }),
-    ttsOpts,
-  );
-  const audioUrl = saveAudioFile(audioBuffer, ctx.store.getProjectDir(ctx.pid), ctx.pid, 'podcast');
-  return {
-    ...makeGen(
-      'podcast',
-      {
-        script: podcastResult.script,
-        audioUrl,
-        sourceRefs: podcastResult.sourceRefs,
-        speakers: podcastResult.names,
-      },
-      ctx,
-    ),
-    lang: ctx.lang,
-  } as Generation;
-};
-
-const buildAutoQuizVocal = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateQuizVocal(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.quiz,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count,
-    buildExclusionContext(ctx.generations, QUIZ_VOCAL),
-  );
-  const audioUrls = await buildQuizVocalAudioUrls(ctx.store, ctx, data);
-  return {
-    ...makeGen(QUIZ_VOCAL, data, ctx),
-    audioUrls,
-    lang: ctx.lang,
-    ageGroup: ctx.ageGroup,
-  } as Generation;
-};
-
-const buildAutoDictation = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateDictation(
-    ctx.client,
-    ctx.markdown,
-    ctx.config.models.summary,
-    ctx.lang,
-    ctx.ageGroup,
-    ctx.count ?? DICTATION_DEFAULT_WORDS,
-    buildExclusionContext(ctx.generations, DICTATION),
-  );
-  const audioUrls = await buildDictationAudioUrls(ctx.store, ctx, data);
-  return {
-    ...makeGen(DICTATION, data, ctx),
-    audioUrls,
-    lang: ctx.lang,
-    ageGroup: ctx.ageGroup,
-  } as Generation;
-};
-
-const buildAutoImage = async (ctx: AutoCtx): Promise<Generation> => {
-  const data = await generateImage(
-    ctx.client,
-    ctx.rawMarkdown,
-    ctx.store.getProjectDir(ctx.pid),
-    ctx.pid,
-    ctx.lang,
-    ctx.ageGroup,
-  );
-  return makeGen('image', data, ctx);
-};
-
-const pickAutoStepFailureCode = (
-  result: Exclude<PromoteResult, { kind: 'promoted' }>,
-): FailedStepCode => {
-  switch (result.kind) {
-    case 'failed':
-      return result.code;
-    case 'cancelled':
-      return 'cancelled';
-    case 'missing':
-      return 'internal_error';
-    default:
-      return assertNever(result);
-  }
-};
-
-const runStepBody = async (
-  step: { agent: AutoAgentType },
-  executor: AutoExecutor,
-  autoCtx: AutoCtx,
-  st: ProjectStore,
-  pid: string,
-  gid: string,
-): Promise<StepOutcome> => {
-  const projectDir = st.getProjectDir(pid);
-  const run = await runWithUsageAndMedia(projectDir, pid, () => executor(autoCtx));
-  const persisted = persistUsage(
-    st,
-    pid,
-    `POST /api/projects/${pid}/generate/auto/${step.agent}`,
-    run.usage,
-  );
-  const finalGen = buildFinalGeneration(gid, run.result, persisted);
-  const promoteResult = st.promoteToGeneration(pid, gid, finalGen);
-  if (promoteResult.kind === 'promoted') {
-    logger.info('auto', `${step.agent} OK`);
-    return { ok: true, gen: promoteResult.generation };
-  }
-  // Étape annulée, échouée ou disparue du tracker : ses médias ne seront jamais référencés.
-  deleteMediaFiles(projectDir, pid, run.mediaUrls);
-  const code = pickAutoStepFailureCode(promoteResult);
-  if (promoteResult.kind === 'missing')
-    logger.error('auto', `${step.agent} tracker entry vanished: gid=${gid}`);
-  else logger.info('auto', `${step.agent} terminal status: ${promoteResult.kind}`);
-  return { ok: false, agent: step.agent, code };
-};
-
-// Même règle que runQueuedGeneration pour une étape du mode Auto.
-const runQueuedStep = async (
-  step: { agent: AutoAgentType },
-  executor: AutoExecutor,
-  autoCtx: AutoCtx,
-  st: ProjectStore,
-  pid: string,
-  gid: string,
-): Promise<StepOutcome> => {
-  const status = st.pendingStatus(pid, gid);
-  if (status !== 'pending') {
-    const kind = status === 'cancelled' ? 'cancelled' : 'missing';
-    return { ok: false, agent: step.agent, code: pickAutoStepFailureCode({ kind }) };
-  }
-  const generations = st.getProject(pid)?.results.generations ?? autoCtx.generations;
-  return runStepBody(step, executor, { ...autoCtx, generations }, st, pid, gid);
-};
-
-const runStepCatch = (
-  err: unknown,
-  step: { agent: AutoAgentType },
-  st: ProjectStore,
-  pid: string,
-  gid: string,
-): StepOutcome => {
-  const failedUsage = (err as { apiUsage?: ApiUsage[] }).apiUsage;
-  if (failedUsage?.length) {
-    persistUsage(
-      st,
-      pid,
-      `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-      failedUsage,
-    );
-  }
-  const code = extractErrorCode(err, step.agent);
-  st.markPendingFailed(pid, gid, code);
-  logger.error('auto', `${step.agent} FAILED:`, err);
-  return { ok: false, agent: step.agent, code };
-};
-
-const runStep = async (
-  step: { agent: AutoAgentType },
-  autoCtx: AutoCtx,
-  st: ProjectStore,
-  pid: string,
-): Promise<StepOutcome> => {
-  const executor = AUTO_EXECUTORS.get(step.agent);
-  if (!executor) {
-    logger.warn('auto', `Unknown agent "${step.agent}", skipping`);
-    return { ok: false, agent: step.agent, code: 'internal_error' };
-  }
-  const gid = randomUUID();
-  const added = st.addPendingEntry(pid, makeTrackerEntry(step.agent, gid, autoCtx.sourceIds));
-  if (!added) {
-    logger.error('auto', `unexpected duplicate gid for ${step.agent}, skipping`);
-    return { ok: false, agent: step.agent, code: 'internal_error' };
-  }
-  try {
-    return await withSameTypeQueue(pid, step.agent, () =>
-      runQueuedStep(step, executor, autoCtx, st, pid, gid),
-    );
-  } catch (err) {
-    return runStepCatch(err, step, st, pid, gid);
-  }
-};
-
-const pushStepOutcome = (
-  outcome: StepOutcome,
-  generations: Generation[],
-  failedSteps: FailedStep[],
-): void => {
-  if (outcome.ok) generations.push(outcome.gen);
-  else failedSteps.push({ agent: outcome.agent, code: outcome.code });
-};
-
-const pushRejectedStep = (
-  reason: unknown,
-  step: { agent: AutoAgentType },
-  st: ProjectStore,
-  pid: string,
-  failedSteps: FailedStep[],
-): void => {
-  logger.error('auto', `${step.agent} unexpected rejection:`, reason);
-  const failedUsage = (reason as { apiUsage?: ApiUsage[] })?.apiUsage;
-  if (failedUsage?.length) {
-    persistUsage(
-      st,
-      pid,
-      `POST /api/projects/${pid}/generate/auto/${step.agent}/failed`,
-      failedUsage,
-    );
-  }
-  failedSteps.push({ agent: step.agent, code: extractErrorCode(reason, step.agent) });
-};
-
-const executePlan = async (
-  plan: Array<{ agent: AutoAgentType }>,
-  autoCtx: AutoCtx,
-  st: ProjectStore,
-  pid: string,
-  generations: Generation[],
-  failedSteps: FailedStep[],
-): Promise<void> => {
-  const settled = await Promise.all(
-    plan.map(async (step) => {
-      try {
-        return { step, outcome: await runStep(step, autoCtx, st, pid) } as const;
-      } catch (reason) {
-        return { step, reason } as const;
-      }
-    }),
-  );
-  settled.forEach((result) => {
-    if ('reason' in result) pushRejectedStep(result.reason, result.step, st, pid, failedSteps);
-    else pushStepOutcome(result.outcome, generations, failedSteps);
-  });
-};
-
-const splitByTtsAvailability = <T extends { agent: AutoAgentType }>(
-  plan: T[],
-  ttsAvailable: boolean,
-): { runnable: T[]; ttsSkipped: T[] } => {
-  if (ttsAvailable) return { runnable: plan, ttsSkipped: [] };
-  const runnable: T[] = [];
-  const ttsSkipped: T[] = [];
-  for (const step of plan) {
-    if (TTS_DEPENDENT_AGENTS.has(step.agent)) ttsSkipped.push(step);
-    else runnable.push(step);
-  }
-  return { runnable, ttsSkipped };
-};
-
 const runAutoRouting = async (
   store: ProjectStore,
   client: Mistral,
@@ -1482,38 +1143,14 @@ const runAutoRouting = async (
   persistUsage(store, pid, `POST /api/projects/${pid}/generate/auto/route`, usage);
   logger.info('route', `plan: [${route.plan.map((s) => s.agent).join(', ')}]`);
   const { executable, skipped } = splitByAutoExecutable(route.plan);
-  const { runnable, ttsSkipped } = splitByTtsAvailability(executable, true);
-  if (ttsSkipped.length > 0) {
-    logger.warn(
-      'auto',
-      `skipped (tts unavailable): [${ttsSkipped.map((s) => s.agent).join(', ')}]`,
-    );
-  }
   if (skipped.length > 0) {
     logger.warn(
       'auto',
       `skipped (non-auto-executable): [${skipped.map((s) => s.agent).join(', ')}]`,
     );
   }
-  return { executable: runnable, skipped: [...skipped, ...ttsSkipped] };
+  return { executable, skipped };
 };
-
-const toAutoCtx = (store: ProjectStore, baseCtx: GenContextBase, client: Mistral): AutoCtx => ({
-  client,
-  markdown: baseCtx.markdown,
-  rawMarkdown: baseCtx.rawMarkdown,
-  config: baseCtx.config,
-  hasConsigne: baseCtx.hasConsigne,
-  lang: baseCtx.lang,
-  ageGroup: baseCtx.ageGroup,
-  sourceIds: baseCtx.sourceIds,
-  count: baseCtx.count,
-  pid: baseCtx.pid,
-  store,
-  generations: baseCtx.project.results.generations,
-  profileVoices: baseCtx.profileVoices,
-  profileId: baseCtx.profileId,
-});
 
 const trackedAs = (type: AutoAgentType, extra?: ContextCheckOptions): GenerationOptions => ({
   ...extra,
@@ -1559,6 +1196,26 @@ export const buildGenerationDefs = (store: ProjectStore): Record<AutoAgentType, 
       options: trackedAs(DICTATION),
     },
   };
+};
+
+// --- Lot Auto côté serveur (routes/auto-runs.ts) ---
+
+// Gardes du lancement d'un lot : celles de l'analyse de route (modèle routeur), dans le même ordre
+// (reprise des modérations, corps, projet, modération, sources, consigne, limite de contexte).
+export const prepareAutoLaunch = async (
+  store: ProjectStore,
+  profileStore: ProfileStore,
+  client: Mistral,
+  pid: string,
+  body: unknown,
+): Promise<GenContextResult> => {
+  await settleGenerationSources(store, profileStore, client, pid, body);
+  return buildGenContext(store, profileStore, pid, body as GenRequestBody, ROUTER_MODEL);
+};
+
+// Analyse d'un lot : routage facturé et persisté, plan scindé en étapes exécutables et ignorées.
+export const planAutoRun = (store: ProjectStore, client: Mistral, ctx: GenContextBase) => {
+  return runAutoRouting(store, client, ctx.markdown, ctx.lang, ctx.ageGroup, ctx.pid);
 };
 
 const registerGenerationRoutes = (
@@ -1713,93 +1370,11 @@ const registerRouteAnalysisRoute = (
   });
 };
 
-const sendAutoRouteResponse = (
-  res: Response,
-  executablePlan: Array<{ agent: AutoAgentType }>,
-  skippedSteps: Array<{ agent: string }>,
-  generations: Generation[],
-  failedSteps: FailedStep[],
-): void => {
-  const allFailed = generations.length === 0 && failedSteps.length > 0;
-  res.status(allFailed ? 502 : 200).json({
-    route: executablePlan,
-    generations,
-    ...(failedSteps.length > 0 && { failedSteps }),
-    ...(skippedSteps.length > 0 && { skippedSteps }),
-    ...(allFailed && { error: 'all_steps_failed' }),
-  });
-};
-
-const handleAutoRouteError = (
-  store: ProjectStore,
-  req: Request,
-  res: Response,
-  e: unknown,
-): void => {
-  const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
-  if (failedUsage?.length) {
-    persistUsage(
-      store,
-      String(req.params.pid),
-      `POST /api/projects/${req.params.pid}/generate/auto/failed`,
-      failedUsage,
-    );
-  }
-  logger.error('auto', 'error:', e);
-  res.status(500).json({ error: extractErrorCode(e) });
-};
-
-const registerAutoRoute = (
-  router: Router,
-  store: ProjectStore,
-  profileStore: ProfileStore,
-): void => {
-  router.post('/:pid/generate/auto', async (req, res) => {
-    try {
-      const resolved = resolveClient(req);
-      if (!resolved.ok) {
-        res.status(resolved.status).json({ error: resolved.error });
-        return;
-      }
-      const pid = String(req.params.pid);
-      await settleGenerationSources(store, profileStore, resolved.client, pid, req.body);
-      const built = buildGenContext(store, profileStore, pid, req.body, ROUTER_MODEL);
-      if (!built.ok) {
-        res.status(built.status).json({ error: built.error });
-        return;
-      }
-      const { ctx } = built;
-      const { executable: executablePlan, skipped: skippedSteps } = await runAutoRouting(
-        store,
-        resolved.client,
-        ctx.markdown,
-        ctx.lang,
-        ctx.ageGroup,
-        ctx.pid,
-      );
-      const generations: Generation[] = [];
-      const failedSteps: FailedStep[] = [];
-      await executePlan(
-        executablePlan,
-        toAutoCtx(store, ctx, resolved.client),
-        store,
-        ctx.pid,
-        generations,
-        failedSteps,
-      );
-      sendAutoRouteResponse(res, executablePlan, skippedSteps, generations, failedSteps);
-    } catch (e) {
-      handleAutoRouteError(store, req, res, e);
-    }
-  });
-};
-
 export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
   registerGenerationRoutes(router, store, profileStore);
   registerQuizReviewRoute(router, store, profileStore);
   registerRemediationSummaryRoute(router, store, profileStore);
   registerRouteAnalysisRoute(router, store, profileStore);
-  registerAutoRoute(router, store, profileStore);
   return router;
 }

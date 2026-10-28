@@ -71,6 +71,9 @@ export const nl: Record<string, string> = {
 
   'errorCode.internal_error': 'Interne serverfout',
   'errorCode.cancelled': 'Generatie geannuleerd',
+  'errorCode.refused': 'Generatie geweigerd',
+  'errorCode.auto_busy': 'De magie loopt al voor deze cursus.',
+  'errorCode.auto_run_not_found': 'Deze magie is niet gevonden: misschien is ze gewist.',
 
   // Notifications center
   'notif.openBell': 'Notificatiecentrum openen',
@@ -117,7 +120,6 @@ export const nl: Record<string, string> = {
     'Het veiligheidsfilter van Mistral heeft deze inhoud geweigerd. Probeer een andere tekst.',
   'errorCode.payload_too_large': 'Deze inhoud is te groot. Probeer een kortere tekst.',
   'errorCode.file_too_large': 'Dit bestand is te groot. Probeer een kleiner bestand.',
-  'errorCode.all_steps_failed': 'Alle generaties mislukt',
   'errorCode.invalid_input': 'Ongeldig verzoek',
   'errorCode.profile_delete_partial':
     'Profiel verwijderen onvolledig: sommige projecten konden niet worden verwijderd',

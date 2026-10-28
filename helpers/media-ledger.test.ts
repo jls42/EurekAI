@@ -54,7 +54,7 @@ describe('runWithMediaLedger', () => {
     expect(existsSync(join(projectDir, name))).toBe(true);
   });
 
-  it('contextes parallèles isolés (étapes /generate/auto concurrentes)', async () => {
+  it('contextes parallèles isolés (étapes concurrentes d’un lot Auto)', async () => {
     const step = (prefix: string) =>
       runWithMediaLedger(projectDir, 'p1', async () => {
         recordMediaUrl(`/output/projects/p1/${prefix}-1.mp3`);

@@ -1,6 +1,7 @@
 import type {
   AutoRun,
   AutoRunStatus,
+  AutoRunStep,
   AutoRunStepStatus,
   FailedStepCode,
   PendingTrackerEntryBase,
@@ -30,7 +31,13 @@ export const findActiveAutoRun = (data: ProjectData): AutoRun | undefined => {
 
 type TerminalRunStatus = Exclude<AutoRunStatus, 'analysing' | 'running'>;
 type TerminalStepStatus = Exclude<AutoRunStepStatus, 'pending'>;
-type StepFailureCode = Exclude<FailedStepCode, 'cancelled'>;
+// Échec d'une étape : son code, et pour un refus des gardes le code exact du refus.
+type StepFailure = { code: Exclude<FailedStepCode, 'cancelled'>; refusal?: string };
+
+const recordedFailure = (failure: StepFailure): Partial<AutoRunStep> => {
+  const { code, refusal } = failure;
+  return refusal ? { failureCode: code, refusal } : { failureCode: code };
+};
 
 const finishRun = (run: AutoRun, status: TerminalRunStatus, now: string): void => {
   run.status = status;
@@ -46,13 +53,13 @@ export const applyStepTransition = (
   entry: Pick<PendingTrackerEntryBase, 'id' | 'runId'>,
   status: TerminalStepStatus,
   now: string,
-  failureCode?: StepFailureCode,
+  failure?: StepFailure,
 ): AutoRun | undefined => {
   const run = entry.runId ? findAutoRun(data, entry.runId) : undefined;
   const step = run?.steps.find((s) => s.gid === entry.id);
   if (!run || step?.status !== 'pending') return undefined;
   step.status = status;
-  if (status === 'failed' && failureCode) step.failureCode = failureCode;
+  if (status === 'failed' && failure) Object.assign(step, recordedFailure(failure));
   run.updatedAt = now;
   if (run.status === 'running' && run.steps.every((s) => s.status !== 'pending')) {
     finishRun(run, 'completed', now);

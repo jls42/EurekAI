@@ -81,6 +81,9 @@ export const ar: Record<string, string> = {
 
   'errorCode.internal_error': 'خطأ داخلي في الخادم',
   'errorCode.cancelled': 'تم إلغاء التوليد',
+  'errorCode.refused': 'تم رفض التوليد',
+  'errorCode.auto_busy': 'السحر قيد التشغيل بالفعل لهذا الدرس.',
+  'errorCode.auto_run_not_found': 'لم يُعثر على هذا السحر: ربما حُذف.',
 
   // Notifications center
   'notif.openBell': 'فتح مركز الإشعارات',
@@ -123,7 +126,6 @@ export const ar: Record<string, string> = {
   'errorCode.payload_too_large': 'هذا المحتوى كبير جدًا. جرّب نصًا أقصر.',
   'errorCode.file_too_large':
     '\u0647\u0630\u0627 \u0627\u0644\u0645\u0644\u0641 \u0643\u0628\u064a\u0631 \u062c\u062f\u0627. \u0627\u062e\u062a\u0631 \u0645\u0644\u0641\u0627 \u0623\u0635\u063a\u0631.',
-  'errorCode.all_steps_failed': 'فشلت جميع عمليات التوليد',
   'errorCode.invalid_input': 'طلب غير صالح',
   'errorCode.profile_delete_partial': 'حذف الملف الشخصي غير مكتمل: تعذر حذف بعض المشاريع',
   'errorCode.rate_limited': 'طلبات كثيرة في وقت واحد. انتظر قليلا ثم أعد المحاولة.',

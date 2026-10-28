@@ -10,6 +10,14 @@ import { isAgeGroup } from '../profiles.js';
 // Même code que validateGenRequestBody (routes/generate.ts) : `errorCode.invalid_input` côté UI.
 export const INVALID_INPUT = 'invalid_input';
 
+// UUID v4 strict (version 4, variante 8 à b) : identifiants fournis par le navigateur (gid d'une
+// génération, runId d'un lot Auto), aligné sur la regex client (src/app/confirm.ts GID_UUID_V4).
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export const isUuidV4 = (value: unknown): value is string => {
+  return typeof value === 'string' && UUID_V4.test(value);
+};
+
 const DEFAULT_LANG = 'fr';
 const DEFAULT_AGE_GROUP: AgeGroup = 'enfant';
 

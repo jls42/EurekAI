@@ -69,6 +69,9 @@ export const en: Record<string, string> = {
 
   'errorCode.internal_error': 'Internal server error',
   'errorCode.cancelled': 'Generation cancelled',
+  'errorCode.refused': 'Generation refused',
+  'errorCode.auto_busy': 'Magic is already running on this course.',
+  'errorCode.auto_run_not_found': "This magic can't be found: it may have been cleared.",
 
   // Notifications center
   'notif.openBell': 'Open notifications center',
@@ -111,7 +114,6 @@ export const en: Record<string, string> = {
   'errorCode.content_refused': "Mistral's safety filter refused this content. Try another text.",
   'errorCode.payload_too_large': 'This content is too large. Try a shorter text.',
   'errorCode.file_too_large': 'This file is too big. Try a smaller one.',
-  'errorCode.all_steps_failed': 'All generations failed',
   'errorCode.invalid_input': 'Invalid request',
   'errorCode.profile_delete_partial':
     'Profile deletion incomplete: some projects could not be deleted',

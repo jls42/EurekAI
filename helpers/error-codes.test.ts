@@ -16,11 +16,12 @@ const _KNOWN_CODES: Record<FailedStepCode, true> = {
   context_length_exceeded: true,
   content_refused: true,
   internal_error: true,
+  refused: true,
   cancelled: true,
 };
 
 describe('FailedStepCode registry', () => {
-  it('liste exhaustivement les 9 codes contractuels (garde compile-time + runtime)', () => {
+  it('liste exhaustivement les 10 codes contractuels (garde compile-time + runtime)', () => {
     expect(Object.keys(_KNOWN_CODES).sort((a, b) => a.localeCompare(b))).toEqual([
       'auth_required',
       'cancelled',
@@ -29,6 +30,7 @@ describe('FailedStepCode registry', () => {
       'internal_error',
       'llm_invalid_json',
       'quota_exceeded',
+      'refused',
       'tts_upstream_error',
       'upstream_unavailable',
     ]);
