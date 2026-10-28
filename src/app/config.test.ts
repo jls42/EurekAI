@@ -786,6 +786,17 @@ describe('selectedModelLabel', () => {
     );
     expect(label).toBe('Mini Transcribe 3 — $0.0035 settings.perMinute · settings.preview');
   });
+
+  it('configuration pas encore chargée (modèle absent ou vide) : libellé vide, sans exception', () => {
+    for (const modelId of [undefined, '']) {
+      const label = config.selectedModelLabel.call(
+        makeContext(),
+        modelId as unknown as string,
+        'mistral-large-latest',
+      );
+      expect(label).toBe('');
+    }
+  });
 });
 
 // --- Gabarit des Réglages : sélecteurs de modèles épinglés ---
