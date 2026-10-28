@@ -85,8 +85,7 @@ const handleStartResponse = async (
 
 /** Lancement du lot avec la clé et le corps du clic. URL validée avant le fetch (barrière SSRF). */
 export async function launchAutoLot(state: AppContext, launch: AutoLaunch): Promise<void> {
-  // eslint-disable-next-line sonarjs/no-duplicate-string -- required: SSRF taint analysis needs literal inline near fetch
-  const url = '/api/projects/' + launch.projectId + '/generate/auto/start';
+  const url = `/api/projects/${launch.projectId}/generate/auto/start`;
   const allowedUrls = PROJECT_ID_SAFE.test(launch.projectId) ? [url] : [];
   if (allowedUrls.includes(url)) {
     const init = jsonPost({ ...launch.body, runId: launch.runId });
@@ -113,7 +112,7 @@ const applyRunResponse = async (state: AppContext, projectId: string, res: Respo
 
 // État du lot relu ; une erreur réseau attend le tour suivant (le lot continue sur le serveur).
 const pollAutoLot = async (state: AppContext, projectId: string, runId: string): Promise<void> => {
-  const url = '/api/projects/' + projectId + '/auto-runs/' + runId;
+  const url = `/api/projects/${projectId}/auto-runs/${runId}`;
   const allowedUrls = runUrlAllowed(projectId, runId) ? [url] : [];
   if (allowedUrls.includes(url)) {
     try {
@@ -152,7 +151,7 @@ export async function cancelAutoLot(state: AppContext, projectId: string): Promi
   entry.cancelledHere = true;
   if (!entry.run) return true;
   markRunCancelled(entry.runId);
-  const url = '/api/projects/' + projectId + '/auto-runs/' + entry.runId + '/cancel';
+  const url = `/api/projects/${projectId}/auto-runs/${entry.runId}/cancel`;
   const allowedUrls = runUrlAllowed(projectId, entry.runId) ? [url] : [];
   if (allowedUrls.includes(url)) {
     const res = await fetch(url, { method: 'POST' });

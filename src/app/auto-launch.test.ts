@@ -54,8 +54,12 @@ const launchOf = (runId: string) => ({
   key: 'sk-test-clé-du-clic'.replace('é', 'e'),
 });
 
-const reply = (status: number, body: unknown) =>
-  ({ ok: status < 300, status, statusText: 'x', json: async () => body }) as any;
+// Sans `<` (statut 2xx) : Lizard (Codacy) y lisait l'ouverture d'un type générique et comptait tout
+// le reste du fichier dans cette fonction.
+const reply = (status: number, body: unknown): any => {
+  const ok = Math.trunc(status / 100) === 2;
+  return { ok, status, statusText: 'x', json: () => Promise.resolve(body) };
+};
 
 beforeEach(() => {
   globalThis.fetch = vi.fn() as any;
