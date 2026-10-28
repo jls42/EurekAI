@@ -41,6 +41,7 @@ import { normalizeTtsModel, voicesForTtsModel } from './helpers/tts-models.js';
 import { projectRoutes } from './routes/projects.js';
 import { sourceRoutes } from './routes/sources.js';
 import { generateRoutes } from './routes/generate.js';
+import { autoRunRoutes } from './routes/auto-runs.js';
 import { generationCrudRoutes } from './routes/generations.js';
 import { chatRoutes } from './routes/chat.js';
 import { profileRoutes } from './routes/profiles.js';
@@ -254,6 +255,7 @@ app.use('/api/profiles', profileRoutes(outputDir, store));
 app.use(API_PROJECTS, projectRoutes(store, profileStore));
 app.use(API_PROJECTS, sourceRoutes(store, profileStore));
 app.use(API_PROJECTS, generateRoutes(store, profileStore));
+app.use(API_PROJECTS, autoRunRoutes(store, profileStore));
 app.use(API_PROJECTS, generationCrudRoutes(store, profileStore));
 app.use(API_PROJECTS, chatRoutes(store, profileStore));
 
