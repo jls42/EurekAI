@@ -58,6 +58,7 @@ import { persistUsage } from '../helpers/cost-persist.js';
 import type { ApiUsage } from '../helpers/pricing.js';
 import { routeRequest } from '../generators/router.js';
 import {
+  AUTO_AGENT_TYPES,
   AUTO_AGENTS_SET,
   TTS_DEPENDENT_AGENTS,
   type AutoAgentType,
@@ -93,21 +94,19 @@ const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
 };
 
-// Centralise le remap PromoteResult (interne store) → PromoteErrorOutcome (wire).
-// Source unique pour éviter la dérive entre les 2 dispatch sites (handleGeneration
-// + runStep auto). Le switch sur `kind` force exhaustivité au compile-time : un
-// nouveau arm de PromoteResult casse la build au lieu de tomber dans le default.
-function classifyPromoteFailure(result: Exclude<PromoteResult, { kind: 'promoted' }>): {
-  outcome: PromoteErrorOutcome;
-  isMissing: boolean;
-} {
+// Centralise le remap PromoteResult (interne store) → PromoteErrorOutcome (wire) : `missing`
+// part en `failed` (journalisé par notPromoted, jamais un code client). Le switch sur `kind` force
+// exhaustivité au compile-time : un nouveau arm de PromoteResult casse la build au lieu de tomber
+// dans le default.
+function classifyPromoteFailure(
+  result: Exclude<PromoteResult, { kind: 'promoted' }>,
+): PromoteErrorOutcome {
   switch (result.kind) {
     case 'cancelled':
-      return { outcome: 'cancelled', isMissing: false };
+      return 'cancelled';
     case 'failed':
-      return { outcome: 'failed', isMissing: false };
     case 'missing':
-      return { outcome: 'failed', isMissing: true };
+      return 'failed';
     default:
       return assertNever(result);
   }
@@ -216,8 +215,6 @@ interface GenContext {
   // (cf. helpers/voice-selection.ts) sur les routes dédiées podcast/quiz-vocal.
   profileId?: string;
   register?: SummaryRegister;
-  req: Request;
-  res: Response;
 }
 
 function parseCount(raw: unknown): number | undefined {
@@ -315,7 +312,7 @@ const splitByAutoExecutable = <T extends { agent: string }>(
   return { executable, skipped };
 };
 
-type GenContextBase = Omit<GenContext, 'req' | 'res' | 'client'>;
+type GenContextBase = Omit<GenContext, 'client'>;
 type GenFailure = { ok: false; status: number; error: string };
 // Alias plutôt qu'une union écrite sur plusieurs lignes en type de retour : Lizard ne
 // mesurerait que la signature (cf. CLAUDE.md « Type de retour union multi-lignes »).
@@ -536,16 +533,15 @@ function validateQuizReviewInputs(
   };
 }
 
-interface HandleGenerationOptions {
+interface GenerationOptions {
   skipContextCheck?: boolean;
   checkRawMarkdown?: boolean;
-  agentName?: string;
-  // Si défini, active le pending lifecycle :
-  // 1. addPendingEntry au début (409 duplicate_gid si gid déjà pris)
-  // 2. promoteToGeneration au succès (PromoteResult dispatch ou 409 si race cancel/fail)
-  // 3. markPendingFailed au catch
-  // Si absent, fallback comportement legacy (addGeneration direct).
-  trackedType?: TrackedGenerationType;
+  // Agent dont les règles d'erreur s'appliquent (extractErrorCode).
+  agentName: string;
+  // Type de l'entrée du tracker : addPendingEntry au début (409 duplicate_gid si gid déjà pris),
+  // promoteToGeneration au succès (409 si annulation ou échec ont gagné), markPendingFailed sur
+  // une exception.
+  trackedType: TrackedGenerationType;
 }
 
 // UUID v4 strict : version nibble = '4', variant nibble dans [89ab].
@@ -598,30 +594,40 @@ const buildFinalGeneration = (
   return final;
 };
 
-// Race : cancel/fail a gagné pendant que Mistral travaillait. Pas de réponse
-// 200 fantôme — le client refresh le projet pour voir l'état réel.
-const respondNotPromoted = (
-  res: Response,
-  pid: string,
-  gid: string,
-  result: Exclude<PromoteResult, { kind: 'promoted' }>,
-): void => {
-  const { outcome, isMissing } = classifyPromoteFailure(result);
-  if (isMissing) {
-    // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
-    // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
-    logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
-  }
-  const body: PromoteErrorResponse = { error: outcome, gid };
-  res.status(409).json(body);
-};
-
 // Alias plutôt qu'un type fonction en ligne dans une signature : Lizard y coupe la fonction
 // (signature seule mesurée, corps perdu ou détaché en anonyme) — runGeneratorAndPersist et
 // handleGeneration échappaient ainsi au plafond CCN.
 type GeneratorFn = (ctx: GenContext) => Promise<Generation | null>; // eslint-disable-line no-unused-vars, @typescript-eslint/no-unused-vars -- Codacy compte le nom du parametre de type comme unused.
 type AsyncThunk<T> = () => Promise<T>;
 type UsageAndMediaRun<T> = { result: T; mediaUrls: string[]; usage: ApiUsage[] };
+type NotPromoted = Exclude<PromoteResult, { kind: 'promoted' }>;
+
+// Une génération suivie : son générateur, le modèle dont la limite de contexte s'applique
+// (configuredModel) et ses options.
+interface GenerationDef {
+  build: GeneratorFn;
+  modelId?: string;
+  options: GenerationOptions;
+}
+
+// Issue d'une génération suivie, sans réponse HTTP : les routes /generate/<type> la traduisent
+// (sendGenerationOutcome), et elle reste lisible hors requête. Le tracker, les médias et le coût
+// sont déjà à jour quand elle est rendue.
+type GenerationOutcome =
+  | { kind: 'refused'; status: number; error: string }
+  | { kind: 'duplicate_gid' }
+  | { kind: 'promoted'; generation: Generation }
+  | { kind: 'not_promoted'; result: NotPromoted }
+  | { kind: 'failed'; code: FailedStepCode };
+
+// Une génération dont l'entrée du tracker est posée : tout ce qu'il faut pour la produire.
+interface TrackedRun {
+  store: ProjectStore;
+  pid: string;
+  gid: string;
+  def: GenerationDef;
+  ctx: GenContext;
+}
 
 // Coûts ET médias écrits d'une génération ou d'une étape auto, chacune dans son propre contexte
 // (étapes auto parallèles comprises). Si `fn` lève, runWithMediaLedger a déjà supprimé les médias
@@ -637,56 +643,47 @@ const runWithUsageAndMedia = async <T>(
   return { result: run.result, mediaUrls: run.mediaUrls, usage };
 };
 
-// Defense en profondeur : aucune closure ne devrait return null après le commit d'extraction des
-// validations early. Logger UNCONDITIONAL pour Sentry (la surface de bug doit être visible même si
-// trackedType absent).
-const respondNullGeneration = (
-  store: ProjectStore,
-  pid: string,
-  gid: string,
-  options: HandleGenerationOptions | undefined,
-  res: Response,
-): void => {
-  logger.error(
-    'generate',
-    `generator returned null: type=${options?.trackedType ?? 'unknown'} pid=${pid} gid=${gid}`,
-  );
-  if (options?.trackedType) store.markPendingFailed(pid, gid, 'internal_error');
-  res.status(500).json({ error: 'internal_error' });
+// Race : annulation ou échec a gagné pendant que Mistral travaillait (ou pendant l'attente de la
+// file). Pas de réponse 200 fantôme — le client relit le projet pour voir l'état réel.
+const notPromoted = (pid: string, gid: string, result: NotPromoted): GenerationOutcome => {
+  if (result.kind === 'missing') {
+    // Tracker entry retirée entre addPendingEntry et promote (race deleteProject
+    // ou corruption tracker). logger.error pour Sentry — jamais user-visible.
+    logger.error('generate', `tracker entry vanished: pid=${pid} gid=${gid}`);
+  }
+  return { kind: 'not_promoted', result };
 };
 
-const runGeneratorAndPersist = async (
-  store: ProjectStore,
-  generatorFn: GeneratorFn,
-  ctx: GenContext,
-  pid: string,
-  gid: string,
-  options: HandleGenerationOptions | undefined,
-  res: Response,
-): Promise<void> => {
+// Defense en profondeur : aucune closure ne devrait return null après le commit d'extraction des
+// validations early. Logger UNCONDITIONAL pour Sentry.
+const nullGeneration = (run: TrackedRun): GenerationOutcome => {
+  const { store, pid, gid } = run;
+  logger.error(
+    'generate',
+    `generator returned null: type=${run.def.options.trackedType} pid=${pid} gid=${gid}`,
+  );
+  store.markPendingFailed(pid, gid, 'internal_error');
+  return { kind: 'failed', code: 'internal_error' };
+};
+
+const runGeneratorAndPersist = async (run: TrackedRun): Promise<GenerationOutcome> => {
+  const { store, pid, gid } = run;
   const projectDir = store.getProjectDir(pid);
-  const run = await runWithUsageAndMedia(projectDir, pid, () => generatorFn(ctx));
-  const gen = run.result;
+  const generated = await runWithUsageAndMedia(projectDir, pid, () => run.def.build(run.ctx));
+  const gen = generated.result;
   if (!gen) {
-    deleteMediaFiles(projectDir, pid, run.mediaUrls);
-    respondNullGeneration(store, pid, gid, options, res);
-    return;
+    deleteMediaFiles(projectDir, pid, generated.mediaUrls);
+    return nullGeneration(run);
   }
   const route = `POST /api/projects/${pid}/generate/${gen.type}`;
-  const finalGen = buildFinalGeneration(gid, gen, persistUsage(store, pid, route, run.usage));
-  if (!options?.trackedType) {
-    store.addGeneration(pid, finalGen);
-    res.json(finalGen);
-    return;
-  }
+  const finalGen = buildFinalGeneration(gid, gen, persistUsage(store, pid, route, generated.usage));
   const promoteResult = store.promoteToGeneration(pid, gid, finalGen);
   if (promoteResult.kind === 'promoted') {
-    res.json(promoteResult.generation);
-    return;
+    return { kind: 'promoted', generation: promoteResult.generation };
   }
   // Annulation ou échec gagnant la course : aucune génération ne référencera ces médias.
-  deleteMediaFiles(projectDir, pid, run.mediaUrls);
-  respondNotPromoted(res, pid, gid, promoteResult);
+  deleteMediaFiles(projectDir, pid, generated.mediaUrls);
+  return notPromoted(pid, gid, promoteResult);
 };
 
 // Même projet, même type (avec bloc d'exclusions) : une génération après l'autre. Lancées ensemble,
@@ -699,51 +696,87 @@ const withSameTypeQueue = <T>(pid: string, type: string, fn: AsyncThunk<T>): Pro
 
 // Tour d'une génération mise en file : annulée pendant l'attente → aucun appel à Mistral ; sinon
 // projet relu, pour que le bloc d'exclusions voie les générations terminées entre-temps.
-const runQueuedGeneration = async (
-  store: ProjectStore,
-  generatorFn: GeneratorFn,
-  ctx: GenContext,
-  pid: string,
-  gid: string,
-  options: HandleGenerationOptions | undefined,
-  res: Response,
-): Promise<void> => {
-  const status = store.pendingStatus(pid, gid);
+const runQueuedGeneration = async (run: TrackedRun): Promise<GenerationOutcome> => {
+  const status = run.store.pendingStatus(run.pid, run.gid);
   if (status !== 'pending') {
-    respondNotPromoted(res, pid, gid, { kind: status === 'cancelled' ? 'cancelled' : 'missing' });
-    return;
+    return notPromoted(run.pid, run.gid, {
+      kind: status === 'cancelled' ? 'cancelled' : 'missing',
+    });
   }
-  const project = store.getProject(pid) ?? ctx.project;
-  await runGeneratorAndPersist(store, generatorFn, { ...ctx, project }, pid, gid, options, res);
+  const project = run.store.getProject(run.pid) ?? run.ctx.project;
+  return runGeneratorAndPersist({ ...run, ctx: { ...run.ctx, project } });
 };
 
-const handleGenerationFailure = (
-  store: ProjectStore,
-  pid: string,
-  gid: string,
-  e: unknown,
-  options: HandleGenerationOptions | undefined,
-  res: Response,
-): void => {
-  const code = extractErrorCode(e, options?.agentName);
-  if (options?.trackedType) store.markPendingFailed(pid, gid, code);
+const failedGeneration = (run: TrackedRun, e: unknown): GenerationOutcome => {
+  const { store, pid, gid } = run;
+  const code = extractErrorCode(e, run.def.options.agentName);
+  store.markPendingFailed(pid, gid, code);
   const failedUsage = (e as { apiUsage?: ApiUsage[] }).apiUsage;
   if (failedUsage?.length) {
     persistUsage(store, pid, `POST /api/projects/${pid}/generate/failed`, failedUsage);
   }
   logger.error('generate', 'error:', e);
-  res.status(500).json({ error: code });
+  return { kind: 'failed', code };
 };
 
-const handleGeneration = (
-  store: ProjectStore,
-  profileStore: ProfileStore,
-  generatorFn: GeneratorFn,
-  modelId?: string,
-  options?: HandleGenerationOptions,
-) => {
+interface GenerationRequest {
+  store: ProjectStore;
+  profileStore: ProfileStore;
+  // Client déjà résolu par l'appelant (auth-first : avant toute validation ou écriture).
+  client: Mistral;
+  pid: string;
+  gid: string;
+  body: unknown;
+  def: GenerationDef;
+}
+
+// Cœur d'une génération suivie, sans réponse HTTP. Ordre : reprise des modérations en attente,
+// gardes (buildGenContext : refus sans aucune écriture), entrée du tracker, file par type,
+// générateur, coût, promotion. Ne lève que si la reprise ou les gardes lèvent (avant le tracker).
+export const runTrackedGeneration = async (r: GenerationRequest): Promise<GenerationOutcome> => {
+  const { store, profileStore, client, pid, gid, def } = r;
+  await settleGenerationSources(store, profileStore, client, pid, r.body);
+  const body = r.body as GenRequestBody;
+  const built = buildGenContext(store, profileStore, pid, body, def.modelId, def.options);
+  if (!built.ok) return { kind: 'refused', status: built.status, error: built.error };
+  const type = def.options.trackedType;
+  if (!store.addPendingEntry(pid, makeTrackerEntry(type, gid, built.ctx.sourceIds))) {
+    return { kind: 'duplicate_gid' };
+  }
+  const run: TrackedRun = { store, pid, gid, def, ctx: { ...built.ctx, client } };
+  try {
+    return await withSameTypeQueue(pid, type, () => runQueuedGeneration(run));
+  } catch (e) {
+    return failedGeneration(run, e);
+  }
+};
+
+const sendGenerationOutcome = (res: Response, gid: string, outcome: GenerationOutcome): void => {
+  switch (outcome.kind) {
+    case 'refused':
+      res.status(outcome.status).json({ error: outcome.error });
+      return;
+    case 'duplicate_gid':
+      res.status(409).json({ error: 'duplicate_gid', gid });
+      return;
+    case 'promoted':
+      res.json(outcome.generation);
+      return;
+    case 'not_promoted': {
+      const body: PromoteErrorResponse = { error: classifyPromoteFailure(outcome.result), gid };
+      res.status(409).json(body);
+      return;
+    }
+    case 'failed':
+      res.status(500).json({ error: outcome.code });
+      return;
+    default:
+      assertNever(outcome);
+  }
+};
+
+const handleGeneration = (store: ProjectStore, profileStore: ProfileStore, def: GenerationDef) => {
   return async (req: Request, res: Response) => {
-    const pid = req.params.pid as string;
     // Auth-first : résoudre la clé AVANT toute validation/IO (et donc avant
     // addPendingEntry → aucun pending tracker orphelin si pas de clé).
     const resolved = resolveClient(req);
@@ -751,36 +784,10 @@ const handleGeneration = (
       res.status(resolved.status).json({ error: resolved.error });
       return;
     }
-    await settleGenerationSources(store, profileStore, resolved.client, pid, req.body);
-    const result = buildGenContext(store, profileStore, pid, req.body, modelId, options);
-    if (!result.ok) {
-      res.status(result.status).json({ error: result.error });
-      return;
-    }
     const gid = readClientGid(req);
-    if (options?.trackedType) {
-      const added = store.addPendingEntry(
-        pid,
-        makeTrackerEntry(options.trackedType, gid, result.ctx.sourceIds),
-      );
-      if (!added) {
-        res.status(409).json({ error: 'duplicate_gid', gid });
-        return;
-      }
-    }
-    const ctx: GenContext = { ...result.ctx, req, res, client: resolved.client };
-    const type = options?.trackedType;
-    try {
-      if (type) {
-        await withSameTypeQueue(pid, type, () =>
-          runQueuedGeneration(store, generatorFn, ctx, pid, gid, options, res),
-        );
-      } else {
-        await runGeneratorAndPersist(store, generatorFn, ctx, pid, gid, options, res);
-      }
-    } catch (e) {
-      handleGenerationFailure(store, pid, gid, e, options, res);
-    }
+    const pid = req.params.pid as string;
+    const request = { store, profileStore, client: resolved.client, pid, gid, body: req.body, def };
+    sendGenerationOutcome(res, gid, await runTrackedGeneration(request));
   };
 };
 
@@ -1508,85 +1515,61 @@ const toAutoCtx = (store: ProjectStore, baseCtx: GenContextBase, client: Mistral
   profileId: baseCtx.profileId,
 });
 
-const registerCoreGenerationRoutes = (
-  router: Router,
-  store: ProjectStore,
-  profileStore: ProfileStore,
-): void => {
-  router.post(
-    '/:pid/generate/summary',
-    handleGeneration(store, profileStore, buildSummaryGeneration, undefined, {
-      agentName: 'summary',
-      trackedType: 'summary',
-    }),
-  );
-  router.post(
-    '/:pid/generate/flashcards',
-    handleGeneration(store, profileStore, buildFlashcardsGeneration, 'flashcards', {
-      agentName: 'flashcards',
-      trackedType: 'flashcards',
-    }),
-  );
-  router.post(
-    '/:pid/generate/quiz',
-    handleGeneration(store, profileStore, buildQuizGeneration, 'quiz', {
-      agentName: 'quiz',
-      trackedType: 'quiz',
-    }),
-  );
+const trackedAs = (type: AutoAgentType, extra?: ContextCheckOptions): GenerationOptions => ({
+  ...extra,
+  agentName: type,
+  trackedType: type,
+});
+
+// Les 8 générations suivies, une par type : source unique des routes /generate/<type>. Record (et
+// non Map) : un type ajouté à AUTO_AGENT_TYPES sans sa définition casse la compilation.
+export const buildGenerationDefs = (store: ProjectStore): Record<AutoAgentType, GenerationDef> => {
+  return {
+    summary: { build: buildSummaryGeneration, options: trackedAs('summary') },
+    flashcards: {
+      build: buildFlashcardsGeneration,
+      modelId: 'flashcards',
+      options: trackedAs('flashcards'),
+    },
+    quiz: { build: buildQuizGeneration, modelId: 'quiz', options: trackedAs('quiz') },
+    [FILL_BLANK]: {
+      build: buildFillBlankGeneration,
+      modelId: 'quiz',
+      options: trackedAs(FILL_BLANK),
+    },
+    podcast: {
+      build: (ctx) => buildPodcastGeneration(store, ctx),
+      modelId: 'podcast',
+      options: trackedAs('podcast'),
+    },
+    [QUIZ_VOCAL]: {
+      build: (ctx) => buildQuizVocalGeneration(store, ctx),
+      modelId: 'quiz',
+      options: trackedAs(QUIZ_VOCAL),
+    },
+    image: {
+      build: (ctx) => buildImageGeneration(store, ctx),
+      modelId: 'mistral-large-latest',
+      options: trackedAs('image', { checkRawMarkdown: true }),
+    },
+    // Dictée : auto-routable et TTS-dépendante (TTS_DEPENDENT_AGENTS, generators/auto-agents.ts).
+    [DICTATION]: {
+      build: (ctx) => buildDictationGeneration(store, ctx),
+      modelId: 'summary',
+      options: trackedAs(DICTATION),
+    },
+  };
 };
 
-const registerMediaGenerationRoutes = (
+const registerGenerationRoutes = (
   router: Router,
   store: ProjectStore,
   profileStore: ProfileStore,
 ): void => {
-  router.post(
-    '/:pid/generate/podcast',
-    handleGeneration(store, profileStore, (ctx) => buildPodcastGeneration(store, ctx), 'podcast', {
-      agentName: 'podcast',
-      trackedType: 'podcast',
-    }),
-  );
-  router.post(
-    '/:pid/generate/quiz-vocal',
-    handleGeneration(store, profileStore, (ctx) => buildQuizVocalGeneration(store, ctx), 'quiz', {
-      agentName: QUIZ_VOCAL,
-      trackedType: QUIZ_VOCAL,
-    }),
-  );
-  router.post(
-    '/:pid/generate/image',
-    handleGeneration(
-      store,
-      profileStore,
-      (ctx) => buildImageGeneration(store, ctx),
-      'mistral-large-latest',
-      { checkRawMarkdown: true, agentName: 'image', trackedType: 'image' },
-    ),
-  );
-  router.post(
-    '/:pid/generate/fill-blank',
-    handleGeneration(store, profileStore, buildFillBlankGeneration, 'quiz', {
-      agentName: FILL_BLANK,
-      trackedType: FILL_BLANK,
-    }),
-  );
-  // Dictée : auto-routable (AUTO_AGENT_TYPES) et TTS-dépendante (TTS_DEPENDENT_AGENTS,
-  // generators/auto-agents.ts).
-  router.post(
-    '/:pid/generate/dictation',
-    handleGeneration(
-      store,
-      profileStore,
-      (ctx) => buildDictationGeneration(store, ctx),
-      'summary',
-      {
-        agentName: DICTATION,
-        trackedType: DICTATION,
-      },
-    ),
-  );
+  const defs = buildGenerationDefs(store);
+  for (const type of AUTO_AGENT_TYPES) {
+    router.post(`/:pid/generate/${type}`, handleGeneration(store, profileStore, defs[type]));
+  }
 };
 
 const registerQuizReviewRoute = (
@@ -1607,10 +1590,8 @@ const registerQuizReviewRoute = (
     }
     const { originalGen, weakQuestions, markdown, reviewLabel } = validation.data;
     scopeToOriginalQuizSources(req, originalGen);
-    await handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
+    await handleGeneration(store, profileStore, {
+      build: async (ctx) => {
         const data = await generateQuizReview(
           ctx.client,
           markdown,
@@ -1628,9 +1609,9 @@ const registerQuizReviewRoute = (
           data,
         };
       },
-      'quiz',
-      { skipContextCheck: true, agentName: 'quiz-review', trackedType: 'quiz' },
-    )(req, res);
+      modelId: 'quiz',
+      options: { skipContextCheck: true, agentName: 'quiz-review', trackedType: 'quiz' },
+    })(req, res);
   });
 };
 
@@ -1657,10 +1638,8 @@ const registerRemediationSummaryRoute = (
     const { originalGen, weakQuestions, markdown } = validation.data;
     const remediationLabel = remediationLabelForLang(req.body.lang || 'fr');
     scopeToOriginalQuizSources(req, originalGen);
-    await handleGeneration(
-      store,
-      profileStore,
-      async (ctx) => {
+    await handleGeneration(store, profileStore, {
+      build: async (ctx) => {
         const data = await generateRemediationSummary(
           ctx.client,
           markdown,
@@ -1678,9 +1657,9 @@ const registerRemediationSummaryRoute = (
           data,
         };
       },
-      'summary',
-      { skipContextCheck: true, agentName: 'remediation-summary', trackedType: 'summary' },
-    )(req, res);
+      modelId: 'summary',
+      options: { skipContextCheck: true, agentName: 'remediation-summary', trackedType: 'summary' },
+    })(req, res);
   });
 };
 
@@ -1817,10 +1796,9 @@ const registerAutoRoute = (
 
 export function generateRoutes(store: ProjectStore, profileStore: ProfileStore): Router {
   const router = Router();
-  registerCoreGenerationRoutes(router, store, profileStore);
+  registerGenerationRoutes(router, store, profileStore);
   registerQuizReviewRoute(router, store, profileStore);
   registerRemediationSummaryRoute(router, store, profileStore);
-  registerMediaGenerationRoutes(router, store, profileStore);
   registerRouteAnalysisRoute(router, store, profileStore);
   registerAutoRoute(router, store, profileStore);
   return router;

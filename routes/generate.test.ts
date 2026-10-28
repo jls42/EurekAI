@@ -16,7 +16,13 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ProjectStore } from '../store.js';
 import { MODERATION_CATEGORIES, ProfileStore } from '../profiles.js';
-import { getMarkdown, generateRoutes } from './generate.js';
+import {
+  buildGenerationDefs,
+  getMarkdown,
+  generateRoutes,
+  runTrackedGeneration,
+} from './generate.js';
+import { AUTO_AGENT_TYPES } from '../generators/auto-agents.js';
 import { moderateContent } from '../generators/moderation.js';
 import { MODERATION_WAIT_MS } from '../helpers/source-moderation.js';
 import type { ModerationResult, ModerationStatus, Source } from '../types.js';
@@ -4463,5 +4469,125 @@ describe('generateRoutes', () => {
       const gen = res.json.mock.calls[0][0];
       expect(mediaFiles(pid)).toEqual([gen.data.audioUrl.split('/').pop()]);
     });
+  });
+});
+
+// Cœur d'une génération suivie, appelé sans réponse HTTP (routes /generate/<type> ; étapes d'un lot
+// Auto ensuite) : l'issue rendue, le tracker et les générations du projet suffisent à la lire.
+describe('runTrackedGeneration (sans réponse HTTP)', () => {
+  let tmpDir: string;
+  let store: ProjectStore;
+  let profileStore: ProfileStore;
+  const GID = '11111111-2222-4333-8444-555555555555';
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'gen-core-'));
+    store = new ProjectStore(tmpDir);
+    profileStore = new ProfileStore(tmpDir);
+    vi.clearAllMocks();
+    vi.mocked(moderateContent).mockReset();
+  });
+
+  afterEach(() => rmSync(tmpDir, { recursive: true, force: true }));
+
+  const projectWithSource = (): string => {
+    const pid = store.createProject('Test').meta.id;
+    store.addSource(pid, makeSources(1)[0]);
+    return pid;
+  };
+
+  const run = (pid: string, body: unknown = { lang: 'fr', ageGroup: 'enfant' }) =>
+    runTrackedGeneration({
+      store,
+      profileStore,
+      client: mockClient as any,
+      pid,
+      gid: GID,
+      body,
+      def: buildGenerationDefs(store).summary,
+    });
+
+  it('chaque type a sa route /generate/<type> et sa définition suivie sous son nom', () => {
+    const router: any = generateRoutes(store, profileStore);
+    const defs = buildGenerationDefs(store);
+    expect(new Set(Object.keys(defs))).toEqual(new Set(AUTO_AGENT_TYPES));
+    expect(Object.keys(defs)).toHaveLength(AUTO_AGENT_TYPES.length);
+    for (const type of AUTO_AGENT_TYPES) {
+      expect(() => getHandler(router, 'post', `/:pid/generate/${type}`)).not.toThrow();
+      expect(defs[type].options).toMatchObject({ agentName: type, trackedType: type });
+    }
+  });
+
+  it('modèle de la limite de contexte par type, comme avant la table', () => {
+    const defs = buildGenerationDefs(store);
+    const models = Object.fromEntries(AUTO_AGENT_TYPES.map((t) => [t, defs[t].modelId]));
+    expect(models).toEqual({
+      summary: undefined,
+      flashcards: 'flashcards',
+      quiz: 'quiz',
+      'fill-blank': 'quiz',
+      podcast: 'podcast',
+      'quiz-vocal': 'quiz',
+      image: 'mistral-large-latest',
+      dictation: 'summary',
+    });
+    expect(defs.image.options.checkRawMarkdown).toBe(true);
+  });
+
+  it('succès → promoted, génération enregistrée sous le gid, tracker vidé', async () => {
+    const pid = projectWithSource();
+    const outcome = await run(pid);
+    expect(outcome).toMatchObject({ kind: 'promoted', generation: { id: GID, type: 'summary' } });
+    const { results } = store.getProject(pid)!;
+    expect(results.generations.map((g) => g.id)).toEqual([GID]);
+    expect(results.pendingTracker ?? []).toHaveLength(0);
+  });
+
+  it('garde refusée → refused, sans aucune écriture', async () => {
+    const outcome = await run('nonexistent');
+    expect(outcome).toEqual({ kind: 'refused', status: 404, error: 'project_not_found' });
+    const pid = projectWithSource();
+    expect(await run(pid, { lang: 'not a language code' })).toEqual({
+      kind: 'refused',
+      status: 400,
+      error: 'invalid_input',
+    });
+    expect(store.getProject(pid)!.results.pendingTracker ?? []).toHaveLength(0);
+  });
+
+  it('gid déjà suivi → duplicate_gid, sans appel au générateur', async () => {
+    const { generateSummary } = await import('../generators/summary.js');
+    const pid = projectWithSource();
+    store.addPendingEntry(pid, {
+      id: GID,
+      type: 'summary',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      sourceIds: [],
+    });
+    expect(await run(pid)).toEqual({ kind: 'duplicate_gid' });
+    expect(generateSummary).not.toHaveBeenCalled();
+  });
+
+  it('exception du générateur → failed avec code stable, entrée du tracker en échec', async () => {
+    const { generateSummary } = await import('../generators/summary.js');
+    vi.mocked(generateSummary).mockRejectedValueOnce(new Error('boom'));
+    const pid = projectWithSource();
+    const outcome = await run(pid);
+    expect(outcome).toEqual({ kind: 'failed', code: 'internal_error' });
+    const [entry] = store.getProject(pid)!.results.pendingTracker!;
+    expect(entry).toMatchObject({ id: GID, status: 'failed', failureCode: 'internal_error' });
+  });
+
+  it('annulée pendant la génération → not_promoted, rien enregistré', async () => {
+    const { generateSummary } = await import('../generators/summary.js');
+    const pid = projectWithSource();
+    vi.mocked(generateSummary).mockImplementationOnce(async () => {
+      store.markPendingCancelled(pid, GID);
+      return { title: 'T', summary: 'S', key_points: [], vocabulary: [], fun_fact: '' } as any;
+    });
+    const outcome = await run(pid);
+    expect(outcome).toEqual({ kind: 'not_promoted', result: { kind: 'cancelled' } });
+    expect(store.getProject(pid)!.results.generations).toHaveLength(0);
   });
 });
