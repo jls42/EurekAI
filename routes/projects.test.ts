@@ -540,6 +540,36 @@ describe('GET /:pid/events (SSE)', () => {
     req._trigger('close');
   });
 
+  // Lots Auto : même flux, canal `auto`, état complet du lot à chaque changement.
+  it('écrit un event auto (état complet du lot) quand le store change un lot', async () => {
+    const { autoRunListenerCount } = await import('../helpers/event-bus.js');
+    const listenersBefore = autoRunListenerCount();
+    const pid = store.createProject('SSE auto').meta.id;
+    const handler = getHandler(router, 'get', '/:pid/events');
+    const req = mockSseReq(pid);
+    const res = mockSseRes();
+    handler(req, res);
+
+    store.createAutoRun(pid, {
+      id: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      status: 'analysing',
+      startedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      request: { lang: 'fr', ageGroup: 'enfant', sourceIds: [], useConsigne: true },
+      steps: [],
+      skipped: [],
+    });
+
+    const autoWrites = res.writes.filter((w: string) => w === 'event: auto\n');
+    expect(autoWrites).toHaveLength(1);
+    expect(res.writes.join('')).toContain('"status":"analysing"');
+    req._trigger('close');
+    const writes = res.writes.length;
+    store.cancelAutoRun(pid, 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(res.writes).toHaveLength(writes);
+    expect(autoRunListenerCount()).toBe(listenersBefore);
+  });
+
   it('filtre les events des autres projets', () => {
     const project = store.createProject('SSE filter');
     const otherProject = store.createProject('Other');
@@ -606,8 +636,10 @@ describe('GET /:pid/events (SSE)', () => {
   // de listener bus (cap 50 → MaxListenersWarning sinon). Vérifie que le 404
   // pre-flushHeaders bloque effectivement subscribeGeneration.
   it('60 GET sur pid inexistant : 0 listener bus attache (pas de leak listener)', async () => {
-    const { generationListenerCount } = await import('../helpers/event-bus.js');
+    const { autoRunListenerCount, generationListenerCount } =
+      await import('../helpers/event-bus.js');
     const before = generationListenerCount();
+    const autoBefore = autoRunListenerCount();
     const handler = getHandler(router, 'get', '/:pid/events');
     for (let i = 0; i < 60; i++) {
       const req = mockSseReq(`bidon-${i}`);
@@ -617,6 +649,7 @@ describe('GET /:pid/events (SSE)', () => {
       handler(req, res);
     }
     expect(generationListenerCount()).toBe(before);
+    expect(autoRunListenerCount()).toBe(autoBefore);
   });
 
   // Régression-lock : writeGenerationEvent doit guarder writableEnded AVANT
