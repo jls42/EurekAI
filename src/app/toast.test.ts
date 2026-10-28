@@ -105,6 +105,15 @@ describe('createToast', () => {
     expect(ctx.toasts).toHaveLength(0);
   });
 
+  it('action persistante (« Reprendre ») : reste affiché jusqu’au clic ou à la fermeture', () => {
+    const action = { label: 'Reprendre', fn: vi.fn(), persistent: true };
+    showToast('Lot interrompu', 'warning', null, action);
+
+    vi.advanceTimersByTime(60000);
+    expect(ctx.toasts).toHaveLength(1);
+    expect(ctx.toasts[0].expiresAt).toBeNull();
+  });
+
   it('ne programme pas d auto-dismiss pour une erreur avec retry', () => {
     const retryFn = vi.fn();
     showToast('Erreur persistante', 'error', retryFn);

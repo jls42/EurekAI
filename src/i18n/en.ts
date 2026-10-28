@@ -455,6 +455,7 @@ export const en: Record<string, string> = {
   'toast.autoJoined': 'Magic is already running on this course: following it.',
   'toast.autoCancelledIn': 'The magic in "{project}" was cancelled.',
   'toast.autoInterruptedIn': 'The magic in "{project}" was interrupted (server restarted).',
+  'toast.resume': 'Resume',
   'toast.autoFailedIn': 'Automatic generation in "{project}" failed. Try again in that project.',
   'toast.voiceAddedIn': 'Voice transcribed and added to "{project}".',
   'toast.voiceErrorIn': 'The voice recorded for "{project}" could not be added: {error}',

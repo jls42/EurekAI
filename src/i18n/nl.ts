@@ -462,6 +462,7 @@ export const nl: Record<string, string> = {
   'toast.autoJoined': 'De magie loopt al voor deze cursus: ik volg haar.',
   'toast.autoCancelledIn': 'De magie van "{project}" is geannuleerd.',
   'toast.autoInterruptedIn': 'De magie van "{project}" is onderbroken (server opnieuw gestart).',
+  'toast.resume': 'Hervatten',
   'toast.autoFailedIn':
     'Automatische generatie in "{project}" mislukt. Probeer het opnieuw in dat project.',
   'toast.voiceAddedIn': 'Stem getranscribeerd en toegevoegd aan "{project}".',

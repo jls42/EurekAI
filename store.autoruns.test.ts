@@ -277,3 +277,72 @@ describe('démarrage du serveur (cancelAllPendingsAtBoot)', () => {
     expect(run().completedAt).toBeDefined();
   });
 });
+
+describe('resumeAutoRun (« Reprendre »)', () => {
+  const interruptAfterSummary = () => {
+    startRun();
+    store.promoteToGeneration(pid, 'gid-summary', gen('gid-summary', 'summary'));
+    store.cancelAllPendingsAtBoot();
+    autoEvents.length = 0;
+    generationEvents.length = 0;
+  };
+
+  it('en une écriture : étapes interrompues seules, gid neuf et entrée pending, lot running', () => {
+    interruptAfterSummary();
+    const resumed = store.resumeAutoRun(pid, RUN_ID);
+    expect(resumed.status).toBe('resumed');
+    if (resumed.status !== 'resumed') return;
+    expect(resumed.steps).toHaveLength(1);
+    const [step] = resumed.steps;
+    expect(step.agent).toBe('quiz');
+    expect(step.gid).not.toBe('gid-quiz');
+    expect(run()).toMatchObject({ status: 'running', resumedAt: expect.any(String) });
+    expect(run().completedAt).toBeUndefined();
+    expect(stepStatuses()).toEqual([
+      ['summary', 'completed', undefined],
+      ['quiz', 'pending', undefined],
+    ]);
+    const tracker = store.getProject(pid)!.results.pendingTracker!;
+    expect(tracker.find((e) => e.id === 'gid-quiz')?.status).toBe('cancelled');
+    expect(tracker.find((e) => e.id === step.gid)).toMatchObject({
+      status: 'pending',
+      type: 'quiz',
+      runId: RUN_ID,
+      sourceIds: ['s1'],
+    });
+    expect(generationEvents.map((e) => [e.gid, e.status])).toEqual([[step.gid, 'pending']]);
+    expect(autoEvents.map((e) => e.run.status)).toEqual(['running']);
+  });
+
+  it('étape reprise promue → lot completed', () => {
+    interruptAfterSummary();
+    const resumed = store.resumeAutoRun(pid, RUN_ID);
+    if (resumed.status !== 'resumed') throw new Error('not resumed');
+    const { gid } = resumed.steps[0];
+    expect(store.promoteToGeneration(pid, gid, gen(gid, 'quiz')).kind).toBe('promoted');
+    expect(run().status).toBe('completed');
+  });
+
+  it('lot actif ou terminé : not_resumable ; interrompu pendant l’analyse : not_resumable', () => {
+    startRun();
+    expect(store.resumeAutoRun(pid, RUN_ID)).toEqual({ status: 'not_resumable' });
+    store.cancelAutoRun(pid, RUN_ID);
+    expect(store.resumeAutoRun(pid, RUN_ID)).toEqual({ status: 'not_resumable' });
+    const other = 'bbbbbbbb-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+    store.createAutoRun(pid, newRun(other));
+    store.cancelAllPendingsAtBoot();
+    expect(store.getAutoRun(pid, other)!.status).toBe('interrupted');
+    expect(store.resumeAutoRun(pid, other)).toEqual({ status: 'not_resumable' });
+  });
+
+  it('autre lot actif sur le cours : busy, rien écrit ; lot ou cours inconnu : missing', () => {
+    interruptAfterSummary();
+    store.createAutoRun(pid, newRun('cccccccc-bbbb-4ccc-8ddd-eeeeeeeeeeee'));
+    expect(store.resumeAutoRun(pid, RUN_ID)).toEqual({ status: 'busy' });
+    expect(run().status).toBe('interrupted');
+    expect(store.resumeAutoRun(pid, 'dddddddd-bbbb-4ccc-8ddd-eeeeeeeeeeee')).toEqual({
+      status: 'missing',
+    });
+    expect(store.resumeAutoRun('nope', RUN_ID)).toEqual({ status: 'missing' });
+  });
+});

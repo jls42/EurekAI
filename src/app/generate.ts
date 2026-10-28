@@ -4,7 +4,7 @@ import { countPendingOfType, MAX_PARALLEL_PER_TYPE, pendingOfTypeExists } from '
 import { addCostDelta } from './cost-utils';
 import { captureAiKey, withAiHeaders } from './ai-fetch';
 import { forgetAutoRun, isLaunchCancelled } from './auto-runs';
-import { beginAutoLaunch, launchAutoLot, type AutoLaunch } from './auto-launch';
+import { beginAutoLaunch, launchAutoLot, resumeAutoLot, type AutoLaunch } from './auto-launch';
 import { withLongRequestSlot } from './request-slots';
 import { endSingleRun, registerSingleRun } from './single-runs';
 import { SINGLE_GENERATE_SET, SINGLE_GENERATE_TYPES } from '../../generators/generation-types';
@@ -423,7 +423,8 @@ const captureAutoLaunch = (state: AppContext, projectId: string): AutoLaunch => 
 const reportAutoException = (state: AppContext, launch: AutoLaunch, e: unknown): void => {
   console.error('[generate:auto]', e);
   if (state.currentProjectId === launch.projectId) {
-    state.showToast(state.t('toast.autoError'), 'error', () => state.generateAuto());
+    const retry = launch.retry ?? (() => state.generateAuto());
+    state.showToast(state.t('toast.autoError'), 'error', retry);
   } else {
     state.showToast(state.t(TOAST_AUTO_FAILED_IN, { project: launch.projectName }), 'error');
   }
@@ -444,6 +445,36 @@ const runGenerateAuto = async function (state: AppContext): Promise<void> {
       return;
     }
     await launchAutoLot(state, launch);
+  } catch (e: unknown) {
+    forgetAutoRun(state, projectId);
+    reportAutoException(state, launch, e);
+  }
+};
+
+// « Reprendre » un lot interrompu (bilan, auto-runs.ts) : clé capturée au clic, lot inscrit tout de
+// suite comme un lancement (sans pré-contrôle : le serveur refait les gardes). Sans effet si un lot
+// est déjà suivi sur ce cours ; « Réessayer » refait la même reprise.
+const runResumeAuto = async function (
+  state: AppContext,
+  projectId: string,
+  runId: string,
+  projectName: string,
+): Promise<void> {
+  if (state.autoRuns[projectId]) return;
+  const retry = () => {
+    void state.resumeAuto(projectId, runId, projectName);
+  };
+  const launch: AutoLaunch = {
+    projectId,
+    projectName,
+    runId,
+    body: {},
+    key: captureAiKey(),
+    retry,
+  };
+  beginAutoLaunch(state, launch);
+  try {
+    await resumeAutoLot(state, launch);
   } catch (e: unknown) {
     forgetAutoRun(state, projectId);
     reportAutoException(state, launch, e);
@@ -783,6 +814,10 @@ export function createGenerate() {
 
     async generateAuto(this: AppContext) {
       await runGenerateAuto(this);
+    },
+
+    async resumeAuto(this: AppContext, projectId: string, runId: string, projectName: string) {
+      await runResumeAuto(this, projectId, runId, projectName);
     },
 
     _audioSectionOrder: ['intro', 'key_points', 'fun_fact', 'vocabulary'],

@@ -5,7 +5,8 @@ import type { EventKey } from '../../helpers/event-bus';
 // Alias : un type de fonction écrit en ligne dans la signature de showToast faisait perdre son
 // corps à Lizard (seule la signature était mesurée, cf. CLAUDE.md « Pièges Lizard »).
 type ToastRetry = (() => void) | null;
-type ToastActionSpec = { label: string; fn: () => void } | null;
+// persistent : le toast reste affiché jusqu'à ce que l'utilisateur agisse (« Reprendre »).
+type ToastActionSpec = { label: string; fn: () => void; persistent?: boolean } | null;
 
 export interface Toast {
   id: number;
@@ -38,8 +39,10 @@ export interface NotifSpec {
 const AUTO_DISMISS_MS = 5000;
 const AUTO_DISMISS_WITH_ACTION_MS = 8000;
 
-// Une erreur qui propose « Réessayer » reste affichée jusqu'à ce que l'utilisateur agisse.
+// Une erreur qui propose « Réessayer », ou une action persistante, reste affichée jusqu'à ce que
+// l'utilisateur agisse.
 const isPersistent = (toast: Toast): boolean => {
+  if (toast.action?.persistent) return true;
   return toast.type === 'error' && toast.retryFn !== null;
 };
 

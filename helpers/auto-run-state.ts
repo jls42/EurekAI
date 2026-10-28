@@ -95,6 +95,41 @@ export const interruptActiveAutoRuns = (data: ProjectData, now: string): AutoRun
   return interrupted;
 };
 
+// Étapes en cours au redémarrage du serveur : celles que « Reprendre » relance.
+const interruptedSteps = (run: AutoRun): AutoRunStep[] => {
+  return run.status === 'interrupted' ? run.steps.filter((s) => s.status === 'interrupted') : [];
+};
+
+/** Lot interrompu pendant ses étapes : « Reprendre » relance ses étapes interrompues. Interrompu
+ * pendant l'analyse, il n'a aucune étape à reprendre (un nouveau lot refait l'analyse). */
+export const resumableStepCount = (run: AutoRun): number => interruptedSteps(run).length;
+
+export const isResumableAutoRun = (run: AutoRun): boolean => resumableStepCount(run) > 0;
+
+type ResumedStep = Pick<AutoRunStep, 'agent' | 'gid'>;
+
+// Reprise : chaque étape interrompue repart `pending` sous le gid neuf de même rang dans `gids` (son
+// ancienne entrée du tracker reste `cancelled`), dans l'ordre du plan, et le lot repart `running`.
+// Rend les étapes reprises, ou undefined (lot pas reprenable, ou un gid par étape manquant).
+export const resumeInterruptedSteps = (
+  run: AutoRun,
+  gids: string[],
+  now: string,
+): ResumedStep[] | undefined => {
+  const steps = interruptedSteps(run);
+  if (steps.length === 0 || steps.length !== gids.length) return undefined;
+  const resumed = steps.map((step, i): ResumedStep => {
+    step.gid = gids[i];
+    step.status = 'pending';
+    return { agent: step.agent, gid: step.gid };
+  });
+  run.status = 'running';
+  run.updatedAt = now;
+  run.resumedAt = now;
+  delete run.completedAt;
+  return resumed;
+};
+
 const runEndTime = (run: AutoRun): number => Date.parse(run.completedAt ?? run.updatedAt);
 
 export const pruneAutoRuns = (data: ProjectData, nowMs: number): void => {

@@ -14,8 +14,14 @@ export function buildEventKey(gid: string, status: GenerationStatus): EventKey {
   return `generation:${gid}:${status}` as EventKey;
 }
 
-// Bilan d'un lot Auto (toast final et notification) : 'auto:${runId}:${status}'. Même brand, même
-// dédup idempotente des notifications entre onglets.
-export function buildAutoRunEventKey(runId: string, status: AutoRunStatus): EventKey {
-  return `auto:${runId}:${status}` as EventKey;
+// Bilan d'un lot Auto (toast final et notification) : 'auto:${runId}:${status}', suivi de
+// ':${resumedAt}' pour un lot repris (interrompu une seconde fois, il a un nouveau bilan). Même
+// brand, même dédup idempotente des notifications entre onglets.
+export function buildAutoRunEventKey(
+  runId: string,
+  status: AutoRunStatus,
+  resumedAt?: string,
+): EventKey {
+  const key = `auto:${runId}:${status}`;
+  return (resumedAt ? `${key}:${resumedAt}` : key) as EventKey;
 }

@@ -169,7 +169,7 @@ Un tuteur conversationnel avec accès complet aux documents de cours :
 
 Le routeur utilise `mistral-small-latest` pour analyser le contenu des sources et proposer les générateurs les plus pertinents parmi les 8 disponibles. L'interface affiche la progression en temps réel : d'abord une phase d'analyse, puis les générations individuelles avec annulation possible.
 
-L'Auto tourne sur le serveur : il continue si la page est rechargée, si l'on ouvre un autre cours ou si l'on change de profil, et un seul Auto à la fois tourne par cours (un deuxième onglet rejoint celui en cours). Le serveur lance au plus 3 générations en même temps par clé Mistral. Chaque génération terminée a son message, puis un bilan final s'affiche une seule fois ; s'il se termine pendant qu'un autre cours est affiché, le message nomme son cours. Une génération annulée seule ne compte pas comme un échec dans le bilan. « Tout annuler » arrête tout le lot du cours, avec un seul message. Si le serveur redémarre pendant un Auto, celui-ci est signalé comme interrompu.
+L'Auto tourne sur le serveur : il continue si la page est rechargée, si l'on ouvre un autre cours ou si l'on change de profil, et un seul Auto à la fois tourne par cours (un deuxième onglet rejoint celui en cours). Le serveur lance au plus 3 générations en même temps par clé Mistral. Chaque génération terminée a son message, puis un bilan final s'affiche une seule fois ; s'il se termine pendant qu'un autre cours est affiché, le message nomme son cours. Une génération annulée seule ne compte pas comme un échec dans le bilan. « Tout annuler » arrête tout le lot du cours, avec un seul message. Si le serveur redémarre pendant un Auto, celui-ci est signalé comme interrompu, avec un bouton « Reprendre » qui relance seulement les générations qui n'avaient pas fini, sans refaire l'analyse.
 
 Au plus 3 générations longues lancées depuis l'onglet tournent en même temps (générations lancées une à une, fiches de rappel) : les suivantes attendent leur tour, et un cours s'ouvre sans attendre la fin des générations en cours.
 
@@ -576,6 +576,7 @@ output/                   — Données d'exécution (projets, config, fichiers a
 | `POST` | `/api/projects/:pid/generate/remediation-summary` | Fiche de rappel ciblée sur les questions ratées d'un quiz `{generationId, weakQuestions}` — appelée en parallèle de `quiz-review` par le bouton de remédiation de la vue quiz |
 | `POST` | `/api/projects/:pid/generate/route` | Analyse de routage (plan des générateurs à lancer) — renvoie `{plan, costDelta}` (coût du routage seul) |
 | `POST` | `/api/projects/:pid/generate/auto/start` | Lancer un lot Auto côté serveur `{runId, …}` : réponse 202 immédiate, puis analyse et étapes en arrière-plan, au plus 3 étapes en même temps par clé Mistral ; le lot continue si la page est rechargée. 409 `auto_busy` si un lot tourne déjà sur ce cours |
+| `POST` | `/api/projects/:pid/generate/auto/resume` | Reprendre un lot Auto interrompu par un redémarrage du serveur `{runId}` : ses étapes interrompues repartent avec la clé de cette requête, sans refaire l'analyse (réponse 202) |
 | `GET` | `/api/projects/:pid/auto-runs/:runId` | État d'un lot Auto : analyse, étapes et issue de chacune |
 | `POST` | `/api/projects/:pid/auto-runs/:runId/cancel` | Annuler un lot Auto entier (une étape seule s'annule comme une génération) |
 

@@ -577,6 +577,7 @@ export const hi: Record<string, string> = {
   'toast.autoJoined': 'इस पाठ्यक्रम के लिए जादू पहले से चल रहा है: मैं उसे देख रहा हूँ।',
   'toast.autoCancelledIn': '"{project}" का जादू रद्द कर दिया गया।',
   'toast.autoInterruptedIn': '"{project}" का जादू रुक गया (सर्वर फिर से शुरू हुआ)।',
+  'toast.resume': 'जारी रखें',
   'toast.autoFailedIn':
     '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',
   'toast.voiceAddedIn': 'आवाज़ लिखी गई और "{project}" में जोड़ी गई।',

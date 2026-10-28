@@ -462,6 +462,7 @@ export const es: Record<string, string> = {
   'toast.autoJoined': 'La magia ya está en marcha en este curso: la sigo.',
   'toast.autoCancelledIn': 'La magia de «{project}» se ha cancelado.',
   'toast.autoInterruptedIn': 'La magia de «{project}» se ha interrumpido (servidor reiniciado).',
+  'toast.resume': 'Reanudar',
   'toast.autoFailedIn':
     'La generación automática de «{project}» falló. Inténtalo de nuevo en ese proyecto.',
   'toast.voiceAddedIn': 'Voz transcrita y agregada a «{project}».',

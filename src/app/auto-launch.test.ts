@@ -12,9 +12,10 @@ import {
   beginAutoLaunch,
   cancelAutoLot,
   launchAutoLot,
+  resumeAutoLot,
   watchAutoLot,
 } from './auto-launch';
-import { isCancelledRun } from './auto-runs';
+import { applyAutoRunUpdate, isCancelledRun } from './auto-runs';
 
 // Réseau des lots Auto : lancement (hors file des requêtes longues), lot rejoint sur 409, refus,
 // sondage de l'onglet lanceur quand un autre cours est affiché, annulation du lot entier.
@@ -126,6 +127,70 @@ describe('launchAutoLot', () => {
       'toast.autoFailedIn {"project":"Histoire"}',
       'error',
     );
+  });
+});
+
+describe('resumeAutoLot (« Reprendre »)', () => {
+  const resumeOf = (runId: string, retry = vi.fn()) => ({ ...launchOf(runId), body: {}, retry });
+
+  // Bilan « interrompu » déjà affiché par cet onglet : le lot est tenu pour terminé.
+  const interruptedHere = (ctx: any, id: string) => {
+    applyAutoRunUpdate(ctx, 'p1', run(id, 'interrupted', [['quiz', 'interrupted']]));
+    ctx.showToast.mockClear();
+  };
+
+  it('202 : runId seul et clé du clic, lot repris suivi de nouveau et sondé', async () => {
+    vi.useFakeTimers();
+    const ctx = makeCtx();
+    const id = uuid();
+    interruptedHere(ctx, id);
+    beginAutoLaunch(ctx, resumeOf(id));
+    const resumed = { ...run(id, 'running', [['quiz', 'pending']]), resumedAt: 'x' };
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(reply(202, { run: resumed }));
+    await resumeAutoLot(ctx, resumeOf(id));
+    const [url, init] = vi.mocked(globalThis.fetch).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe('/api/projects/p1/generate/auto/resume');
+    expect(JSON.parse(String(init.body))).toEqual({ runId: id });
+    expect(new Headers(init.headers).get('X-EurekAI-AI-Key')).toBe('sk-test-cle-du-clic');
+    expect(ctx.autoRuns.p1).toMatchObject({ runId: id, launchedHere: true, run: resumed });
+    expect(vi.getTimerCount()).toBe(1);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('200 (lot terminé entre-temps) : lot oublié, aucun sondage, aucun message', async () => {
+    vi.useFakeTimers();
+    const ctx = makeCtx();
+    const id = uuid();
+    interruptedHere(ctx, id);
+    beginAutoLaunch(ctx, resumeOf(id));
+    const done = reply(200, { run: run(id, 'completed', [['quiz', 'completed']]) });
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(done);
+    await resumeAutoLot(ctx, resumeOf(id));
+    expect(ctx.autoRuns.p1).toBeUndefined();
+    expect(vi.getTimerCount()).toBe(0);
+    expect(ctx.showToast).not.toHaveBeenCalled();
+  });
+
+  it('refus : lot oublié, « Réessayer » refait la même reprise (jamais un nouveau lot)', async () => {
+    const ctx = makeCtx();
+    const id = uuid();
+    const retry = vi.fn();
+    beginAutoLaunch(ctx, resumeOf(id, retry));
+    vi.mocked(globalThis.fetch).mockResolvedValueOnce(reply(400, { error: 'no_sources' }));
+    await resumeAutoLot(ctx, resumeOf(id, retry));
+    expect(ctx.autoRuns.p1).toBeUndefined();
+    expect(ctx.showToast.mock.calls[0][0]).toBe('toast.error {"error":"err:no_sources"}');
+    ctx.showToast.mock.calls[0][2]();
+    expect(retry).toHaveBeenCalled();
+    expect(ctx.generateAuto).not.toHaveBeenCalled();
+  });
+
+  it('runId non UUID : aucune requête, lot oublié', async () => {
+    const ctx = makeCtx();
+    beginAutoLaunch(ctx, resumeOf('pas-un-uuid'));
+    await resumeAutoLot(ctx, resumeOf('pas-un-uuid'));
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(ctx.autoRuns.p1).toBeUndefined();
   });
 });
 

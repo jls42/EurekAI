@@ -385,6 +385,9 @@ export interface AutoRun {
   // Coût de l'analyse (routage), que le navigateur ajoute une fois au total du cours : aucun
   // événement de génération ne le porte.
   analysisCost?: number;
+  // Présent sur un lot repris après une interruption (« Reprendre ») : son analyse est déjà dans le
+  // total du cours, et son bilan suivant a sa propre clé d'événement.
+  resumedAt?: string;
 }
 
 // Statut du cycle de vie d'une génération suivie par le tracker.
