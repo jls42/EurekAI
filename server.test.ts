@@ -199,6 +199,16 @@ function getJsonErrorHandler() {
   return handler as ErrorRequestHandler;
 }
 
+// Gestionnaire d'erreurs final, monté sous /api après les routeurs.
+function getApiErrorHandler() {
+  const call = state.app.use.mock.calls.find(
+    ([path, middleware]) =>
+      path === '/api' && typeof middleware === 'function' && middleware.length === 4,
+  );
+  if (!call) throw new TypeError('Missing /api error handler');
+  return call[1] as ErrorRequestHandler;
+}
+
 // Rang d'appel (invocationCallOrder) du premier `app.use` qui vérifie `match`.
 function useCallOrder(match: (args: unknown[]) => boolean): number {
   const index = state.app.use.mock.calls.findIndex((args) => match(args));
@@ -341,6 +351,37 @@ describe('server bootstrap', () => {
     // Liste partielle (une langue) : jamais écrite dans le cache.
     expect(state.setVoiceCache).not.toHaveBeenCalled();
     expect(res.jsonMock).toHaveBeenCalledWith([]);
+  });
+
+  it('erreur laissée par une route : id de cours refusé → 400, le reste → 500 JSON', async () => {
+    await importServer();
+    const handler = getApiErrorHandler();
+    const refused = responseMock();
+    handler(new Error('invalid_project_id'), {} as Request, refused, vi.fn() as NextFunction);
+    expect(refused.statusMock).toHaveBeenCalledWith(400);
+    expect(refused.jsonMock).toHaveBeenCalledWith({ error: 'invalid_input' });
+
+    const other = responseMock();
+    handler(new Error('panne /chemin/interne'), {} as Request, other, vi.fn() as NextFunction);
+    expect(other.statusMock).toHaveBeenCalledWith(500);
+    expect(other.jsonMock).toHaveBeenCalledWith({ error: 'internal_error' });
+    expect(JSON.stringify(other.jsonMock.mock.calls)).not.toContain('/chemin/interne');
+
+    const sent = Object.assign(responseMock(), { headersSent: true });
+    const next = vi.fn();
+    const late = new Error('après envoi');
+    handler(late, {} as Request, sent, next as NextFunction);
+    expect(next).toHaveBeenCalledWith(late);
+    expect(sent.statusMock).not.toHaveBeenCalled();
+
+    // Monté après le dernier routeur : il voit les erreurs de toutes les routes.
+    const handlerOrder = useCallOrder(([path, mw]) => path === '/api' && mw === handler);
+    const routerOrders = state.app.use.mock.calls
+      .map((args, i) => ({ args, order: state.app.use.mock.invocationCallOrder[i] }))
+      .filter(({ args }) => args[0] === '/api/projects')
+      .map(({ order }) => order);
+    expect(routerOrders).toHaveLength(6);
+    expect(handlerOrder).toBeGreaterThan(Math.max(...routerOrders));
   });
 
   it('masque les details des payloads JSON invalides', async () => {
