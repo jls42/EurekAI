@@ -18,6 +18,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { logger } from './helpers/logger.js';
+import { INVALID_INPUT } from './helpers/request-validation.js';
 import {
   getBackgroundClient,
   getEnvClient,
@@ -258,6 +259,23 @@ app.use(API_PROJECTS, generateRoutes(store, profileStore));
 app.use(API_PROJECTS, autoRunRoutes(store, profileStore));
 app.use(API_PROJECTS, generationCrudRoutes(store, profileStore));
 app.use(API_PROJECTS, chatRoutes(store, profileStore));
+
+// Erreur qu'une route laisse passer, sous /api : un id de cours refusé par le store
+// (`invalid_project_id` : `:pid` manipulé, ex. `..%2F..%2Fetc`) → 400 `invalid_input` ; le reste →
+// 500 `internal_error` en JSON, jamais la page d'erreur d'Express (le front attend un code stable).
+// Le détail reste dans le journal.
+app.use('/api', (err: unknown, _req: Request, res: Response, next: NextFunction) => {
+  if (res.headersSent) {
+    next(err);
+    return;
+  }
+  if (err instanceof Error && err.message === 'invalid_project_id') {
+    res.status(400).json({ error: INVALID_INPUT });
+    return;
+  }
+  logger.error('http', 'unhandled route error', err);
+  res.status(500).json({ error: 'internal_error' });
+});
 
 // --- Start ---
 const onListen = (scheme: 'http' | 'https') => {
