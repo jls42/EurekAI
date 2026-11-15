@@ -284,25 +284,39 @@ describe('getMarkdown (exported)', () => {
   });
 });
 
-describe('generateRoutes', () => {
-  let tmpDir: string;
-  let store: ProjectStore;
-  let profileStore: ProfileStore;
-  let router: any;
+// Projet temporaire et routeur neufs avant chaque test, pour les deux describe de generateRoutes
+// (coupés en deux : Lizard plafonne une fonction à 2000 lignes, le describe en faisait 3280).
+type GenerateRouterCtx = {
+  tmpDir: string;
+  store: ProjectStore;
+  profileStore: ProfileStore;
+  router: any;
+};
+// eslint-disable-next-line no-unused-vars, @typescript-eslint/no-unused-vars -- nom de param documentaire (Codacy n'honore pas argsIgnorePattern)
+type OnGenerateRouter = (ctx: GenerateRouterCtx) => void;
 
+const useGenerateRouter = (onReady: OnGenerateRouter): void => {
+  let dir = '';
   beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'gen-test-'));
-    store = new ProjectStore(tmpDir);
-    profileStore = new ProfileStore(tmpDir);
-    router = generateRoutes(store, profileStore);
+    dir = mkdtempSync(join(tmpdir(), 'gen-test-'));
+    const store = new ProjectStore(dir);
+    const profileStore = new ProfileStore(dir);
+    onReady({ tmpDir: dir, store, profileStore, router: generateRoutes(store, profileStore) });
     vi.clearAllMocks();
     vi.mocked(moderateContent).mockReset();
   });
 
   afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
+    rmSync(dir, { recursive: true, force: true });
     authState.override = null;
   });
+};
+
+describe('generateRoutes', () => {
+  let store: ProjectStore;
+  let profileStore: ProfileStore;
+  let router: any;
+  useGenerateRouter((ctx) => ({ store, profileStore, router } = ctx));
 
   // --- Auth-first : resolveClient échoue → 4xx AVANT toute IO/addPendingEntry ---
   describe('auth-first (résolution clé échoue)', () => {
@@ -2126,6 +2140,14 @@ describe('generateRoutes', () => {
       expect(res.json).toHaveBeenCalledWith({ error: 'moderation.blocked' });
     });
   });
+});
+
+describe('generateRoutes (dictée, TTS, parcours, validation, modération, file, médias)', () => {
+  let tmpDir: string;
+  let store: ProjectStore;
+  let profileStore: ProfileStore;
+  let router: any;
+  useGenerateRouter((ctx) => ({ tmpDir, store, profileStore, router } = ctx));
 
   describe('POST /:pid/generate/dictation', () => {
     it('génère items + 1 audio par mot, lang/ageGroup figés', async () => {

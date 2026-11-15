@@ -18,6 +18,8 @@ import {
 /* eslint-disable sonarjs/no-hardcoded-ip */
 const PUBLIC_IPV4 = '93.184.215.14'; // example.com (RFC2606 doc)
 const PRIVATE_IPV4 = '10.0.0.5'; // RFC1918
+const PUBLIC_IPV6 = '2606:4700:4700::1111'; // résolveur public
+const PRIVATE_IPV6 = 'fd00::5'; // ULA (fc00::/7)
 /* eslint-enable sonarjs/no-hardcoded-ip */
 
 describe('getContent', () => {
@@ -346,6 +348,29 @@ describe('assertSafeFetchUrl', () => {
       { address: PRIVATE_IPV4, family: 4 },
     ] as unknown as never);
     await expect(assertSafeFetchUrl('http://evil.example.com/x')).rejects.toThrow('IP privee');
+  });
+
+  it('rejette un hostname dont une des adresses résolues est une IPv6 privee', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PUBLIC_IPV4, family: 4 },
+      { address: PRIVATE_IPV6, family: 6 },
+    ] as unknown as never);
+    await expect(assertSafeFetchUrl('http://evil.example.com/x')).rejects.toThrow('IP privee');
+  });
+
+  it('accepte un hostname qui resout vers une IPv6 publique', async () => {
+    vi.spyOn(dns, 'lookup').mockResolvedValue([
+      { address: PUBLIC_IPV6, family: 6 },
+    ] as unknown as never);
+    const url = await assertSafeFetchUrl('https://example.com/');
+    expect(url.hostname).toBe('example.com');
+  });
+
+  it('rejette un hostname que le DNS ne resout pas', async () => {
+    vi.spyOn(dns, 'lookup').mockRejectedValue(new Error('ENOTFOUND'));
+    await expect(assertSafeFetchUrl('http://inconnu.example.com/x')).rejects.toThrow(
+      'Resolution DNS impossible',
+    );
   });
 
   it('accepte une URL https publique', async () => {
