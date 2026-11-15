@@ -16,6 +16,7 @@ import {
 import { logger } from '../helpers/logger.js';
 import { fillBlankSystem, fillBlankUser, fillBlankRetryUser } from '../prompts.js';
 import type { FillBlankItem, AgeGroup } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 function isValidFillBlank(data: FillBlankItem[]): boolean {
   return (
@@ -70,7 +71,7 @@ export const FILL_BLANK_DEFAULT_COUNT = 10;
 export async function generateFillBlank(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count = FILL_BLANK_DEFAULT_COUNT,

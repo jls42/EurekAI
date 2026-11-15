@@ -30,7 +30,7 @@ describe('webSearchEnrich', () => {
 
     expect(client.beta.agents.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'mistral-large-latest',
+        model: 'mistral-large-2512',
         name: 'EurekAI Web Researcher',
         tools: [{ type: 'web_search' }],
       }),

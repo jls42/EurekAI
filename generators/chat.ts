@@ -3,6 +3,7 @@ import type { AssistantMessage } from '@mistralai/mistralai/models/components';
 import { chatSystem, chatDocsLabel } from '../prompts.js';
 import { getContent } from '../helpers/index.js';
 import type { AgeGroup } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 const TOOLS = [
   {
@@ -125,7 +126,7 @@ export async function chatWithSources(
   client: Mistral,
   messages: Array<{ role: string; content: string }>,
   sourceContext: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<ChatResult> {

@@ -1,6 +1,7 @@
 import { Mistral } from '@mistralai/mistralai';
 import { getContent, safeParseJson } from '../helpers/index.js';
 import { consigneSystem, consigneUser } from '../prompts.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 export interface ConsigneResult {
   found: boolean;
@@ -11,7 +12,7 @@ export interface ConsigneResult {
 export async function detectConsigne(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
 ): Promise<ConsigneResult> {
   const response = await client.chat.complete({

@@ -1,6 +1,7 @@
 import { selectVoices } from '@helpers/voice-selection';
 import type { MistralVoice } from '@helpers/voice-types';
 import { normalizeOcrModel, OCR_MODEL_LABELS } from '@helpers/ocr-models';
+import { DEFAULT_CHAT_MODEL } from '@helpers/chat-models';
 import { normalizeSttModel, STT_MODEL_LABELS, STT_PREVIEW_MODELS } from '@helpers/stt-models';
 import { normalizeTtsModel, TTS_MODEL_LABELS, TTS_PREVIEW_MODELS } from '@helpers/tts-models';
 import { modelPriceLabel as priceLabel } from './model-pricing';
@@ -53,7 +54,7 @@ interface ModerationCategoriesPayload {
   defaults?: Record<string, string[]>;
 }
 
-const DEFAULT_MAIN_MODEL = 'mistral-large-latest';
+const DEFAULT_MAIN_MODEL = DEFAULT_CHAT_MODEL;
 const TOAST_SETTINGS_ERROR = 'toast.settingsError';
 const PROFILE_VOICE_DEFAULT_I18N = 'profile.voiceDefault';
 

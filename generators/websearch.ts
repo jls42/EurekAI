@@ -2,6 +2,7 @@ import { Mistral } from '@mistralai/mistralai';
 import { timer, extractAllText } from '../helpers/index.js';
 import { logger } from '../helpers/logger.js';
 import { websearchInstructions, websearchInput } from '../prompts.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 export const webSearchEnrich = async (
   client: Mistral,
@@ -12,7 +13,7 @@ export const webSearchEnrich = async (
   const stop = timer();
 
   const agent = await client.beta.agents.create({
-    model: 'mistral-large-latest',
+    model: DEFAULT_CHAT_MODEL,
     name: 'EurekAI Web Researcher',
     description: 'Agent de recherche web educative',
     instructions: websearchInstructions(lang, ageGroup),

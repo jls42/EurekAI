@@ -17,8 +17,7 @@ import {
   quizRetryUser,
 } from '../prompts.js';
 import type { QuizQuestion, AgeGroup } from '../types.js';
-
-const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 // Type guard : le JSON du LLM peut contenir null ou des objets incomplets (champ
 // manquant, mauvais type) — safeParseJson ne répare rien, il parse ou lève.
@@ -98,7 +97,7 @@ export const QUIZ_DEFAULT_COUNT = 15;
 export async function generateQuiz(
   client: Mistral,
   markdown: string,
-  model = MISTRAL_LARGE_LATEST,
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
@@ -118,7 +117,7 @@ export async function generateQuiz(
 export async function generateQuizVocal(
   client: Mistral,
   markdown: string,
-  model = MISTRAL_LARGE_LATEST,
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,
@@ -140,7 +139,7 @@ export async function generateQuizReview(
   client: Mistral,
   markdown: string,
   weakQuestions: QuizQuestion[],
-  model = MISTRAL_LARGE_LATEST,
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<QuizQuestion[]> {

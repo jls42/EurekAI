@@ -2,7 +2,7 @@ import type { Mistral } from '@mistralai/mistralai';
 import type { ApiUsage, ToolCalls } from './pricing.js';
 import { resolvePricing, resolveToolPricing } from './pricing.js';
 import { callWithRetry } from './mistral-retry.js';
-import { withReasoningDefault } from './chat-models.js';
+import { DEFAULT_CHAT_MODEL, withReasoningDefault } from './chat-models.js';
 import { logger } from './logger.js';
 
 type UsageCallback = (usage: ApiUsage) => void;
@@ -59,7 +59,7 @@ const extractUsage = (response: UsageExtractableResponse, request: RequestWithMo
 
 // Modèle des agents créés par les generators (image, recherche web) : la réponse n'a pas de
 // champ `model` de premier niveau.
-const AGENT_MODEL = 'mistral-large-latest';
+const AGENT_MODEL = DEFAULT_CHAT_MODEL;
 
 // Compteur valide : entier fini ≥ 0 (Number.isInteger exclut NaN et ±Infinity).
 const isCount = (n: unknown): n is number => Number.isInteger(n) && (n as number) >= 0;

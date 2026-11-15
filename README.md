@@ -147,20 +147,20 @@ Huit types de matériel d'apprentissage généré :
 
 | Générateur | Modèle | Sortie |
 |---|---|---|
-| **Fiche de révision** | `mistral-large-latest` | Titre, résumé, points clés, vocabulaire, citations, anecdote |
-| **Flashcards** | `mistral-large-latest` | Cartes Q/R avec références aux sources (nombre configurable) |
-| **Quiz à choix multiples** | `mistral-large-latest` | Questions à 4 choix dont une seule bonne réponse, explications, révision adaptative (nombre configurable) |
-| **Textes à trous** | `mistral-large-latest` | Phrases à compléter avec indices, validation tolérante (Levenshtein) |
-| **Dictée** | `mistral-large-latest` + Voxtral TTS | Mots clés dictés en audio (1 MP3/mot) → saisie clavier → correction stricte (un accent oublié compte comme une faute) avec règle expliquée |
-| **Podcast** | `mistral-large-latest` + Voxtral TTS | Script 2 voix → audio MP3 |
-| **Illustration** | Agent `mistral-large-latest` | Image éducative via l'outil `image_generation` |
-| **Quiz vocal** | `mistral-large-latest` + Voxtral TTS + STT | Questions TTS → réponse STT → vérification IA |
+| **Fiche de révision** | `mistral-large-2512` | Titre, résumé, points clés, vocabulaire, citations, anecdote |
+| **Flashcards** | `mistral-large-2512` | Cartes Q/R avec références aux sources (nombre configurable) |
+| **Quiz à choix multiples** | `mistral-large-2512` | Questions à 4 choix dont une seule bonne réponse, explications, révision adaptative (nombre configurable) |
+| **Textes à trous** | `mistral-large-2512` | Phrases à compléter avec indices, validation tolérante (Levenshtein) |
+| **Dictée** | `mistral-large-2512` + Voxtral TTS | Mots clés dictés en audio (1 MP3/mot) → saisie clavier → correction stricte (un accent oublié compte comme une faute) avec règle expliquée |
+| **Podcast** | `mistral-large-2512` + Voxtral TTS | Script 2 voix → audio MP3 |
+| **Illustration** | Agent `mistral-large-2512` | Image éducative via l'outil `image_generation` |
+| **Quiz vocal** | `mistral-large-2512` + Voxtral TTS + STT | Questions TTS → réponse STT → vérification IA |
 
 ### Tuteur IA par chat
 
 Un tuteur conversationnel avec accès complet aux documents de cours :
 
-- Utilise `mistral-large-latest`
+- Utilise `mistral-large-2512`
 - **Appel d'outils** : peut générer des fiches, flashcards, quiz ou textes à trous pendant la conversation
 - Historique de 50 messages par cours
 - Modération si activée pour le profil : le message est vérifié, et les sources signalées, celles dont la vérification a échoué et celles pas encore vérifiées sont écartées du contexte et des outils (la vérification des sources en échec ou pas encore vérifiées est d'abord relancée, 5 s au plus)
@@ -249,7 +249,7 @@ Chaque appel Mistral facturable (chat, OCR, STT, TTS, agents), détection de con
 
 | Modèle | Utilisation | Pourquoi |
 |---|---|---|
-| `mistral-large-latest` | Fiche, Flashcards, Podcast, Quiz, Textes à trous, Chat, Vérification quiz vocal, Agent Image, Agent Web Search, Détection consigne | Meilleur multilingual + suivi d'instructions |
+| `mistral-large-2512` (Large 3, défaut épinglé) | Fiche, Flashcards, Podcast, Quiz, Textes à trous, Chat, Vérification quiz vocal, Agent Image, Agent Web Search, Détection consigne | Meilleur multilingual + suivi d'instructions ; épinglé car l'alias `mistral-large-latest` sert Large 4 depuis novembre 2026, trop lent pour nos générations (retrait de Large 3 annoncé pour le 30/04/2027) |
 | `mistral-ocr-4-1` (OCR 4.1, défaut) | OCR de documents | Texte imprimé, tableaux, écriture manuscrite ($4 / 1000 pages) |
 | `mistral-ocr-2512` (OCR 3, option) | OCR de documents | Sélectionnable dans Réglages, moins cher ($2 / 1000 pages), lit mieux l'écriture manuscrite |
 | `voxtral-mini-2602` (Voxtral Mini Transcribe 2, défaut) | Reconnaissance vocale (STT) | Entrée vocale et réponses orales du quiz vocal ($0.003 / min) |

@@ -56,7 +56,7 @@ describe('generateImage', () => {
 
     expect(client.beta.agents.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        model: 'mistral-large-latest',
+        model: 'mistral-large-2512',
         name: 'Illustrator',
         tools: [{ type: 'image_generation' }],
       }),

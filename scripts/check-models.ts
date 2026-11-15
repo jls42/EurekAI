@@ -31,21 +31,23 @@
  */
 import { pathToFileURL } from 'node:url';
 import { lightpanda } from '@lightpanda/browser';
-import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
+import { DEFAULT_CHAT_MODEL, MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 import { DEFAULT_STT_MODEL, STT_MODELS } from '../helpers/stt-models.js';
 import { TTS_MODELS } from '../helpers/tts-models.js';
 
-// Alias `-latest` de chat RÉSOLUS par l'app à l'exécution (défauts config/générateurs, Réglages,
-// routeur). Ni `mistral-ocr-latest`, ni `mistral-moderation-latest`, ni les alias Voxtral
-// (`voxtral-mini-latest`, `voxtral-mini-tts-latest`) : l'app envoie des versions épinglées (sources
-// uniques ci-dessous), jamais ces alias.
-const WATCHED_ALIASES = ['mistral-large-latest', 'mistral-medium-latest', 'mistral-small-latest'];
+// Alias `-latest` de chat RÉSOLUS par l'app à l'exécution (options Medium et Small des Réglages). Plus
+// `mistral-large-latest` : il sert Large 4 depuis sa GA et l'app envoie Large 3 épinglé
+// (`DEFAULT_CHAT_MODEL`, helpers/chat-models.ts). Ni `mistral-ocr-latest`, ni `mistral-moderation-latest`,
+// ni les alias Voxtral (`voxtral-mini-latest`, `voxtral-mini-tts-latest`) : l'app envoie des versions
+// épinglées (sources uniques ci-dessous), jamais ces alias.
+const WATCHED_ALIASES = ['mistral-medium-latest', 'mistral-small-latest'];
 
 /** Tout id que l'app envoie tel quel à l'API : alias ci-dessus + versions épinglées (sources uniques). */
 export const WATCHED_MODELS: readonly string[] = [
   ...WATCHED_ALIASES,
+  DEFAULT_CHAT_MODEL,
   MISTRAL_LARGE_4,
   ...OCR_MODELS,
   MODERATION_MODEL,

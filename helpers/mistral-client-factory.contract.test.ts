@@ -6,7 +6,7 @@
 // renommé, réponse rejetée) échoue ici, alors que tracked-client.test.ts tourne sur un faux client.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildTrackedClient } from './mistral-client-factory.js';
-import { MISTRAL_LARGE_4 } from './chat-models.js';
+import { DEFAULT_CHAT_MODEL, MISTRAL_LARGE_4 } from './chat-models.js';
 import { runWithUsageTracking } from './usage-context.js';
 import { calculateTotalCost } from './cost-calc.js';
 import { SDK_RETRIED_STATUSES } from './mistral-retry.js';
@@ -230,15 +230,15 @@ describe('client suivi — contrat du SDK installé', () => {
     });
   });
 
-  it('chat.complete : Large 4 part avec reasoning_effort none, sauf choix explicite', async () => {
+  it('chat.complete : Large 4 part avec reasoning_effort low, sauf choix explicite', async () => {
     const sent = stubFetch({ '/v1/chat/completions': CHAT_RESPONSE });
     const client = newClient();
     const messages = [{ role: 'user' as const, content: 'ok' }];
     await client.chat.complete({ model: MISTRAL_LARGE_4, messages });
     await client.chat.complete({ model: MISTRAL_LARGE_4, messages, reasoningEffort: 'high' });
-    await client.chat.complete({ model: 'mistral-large-latest', messages });
+    await client.chat.complete({ model: DEFAULT_CHAT_MODEL, messages });
     const efforts = sent.map((r) => (r.body as { reasoning_effort?: string }).reasoning_effort);
-    expect(efforts).toEqual(['none', 'high', undefined]);
+    expect(efforts).toEqual(['low', 'high', undefined]);
   });
 
   it('audio.transcriptions (STT) : secondes audio captées, segment à bornes nulles accepté', async () => {
@@ -377,7 +377,7 @@ describe('client suivi — contrat du SDK installé', () => {
         totalTokens: 8100,
         toolCalls: { web_search: 1 },
         connectorTokens: 7217,
-        model: 'mistral-large-latest',
+        model: DEFAULT_CHAT_MODEL,
       },
     ]);
     // ((789 + 7217) × 0,5 + 94 × 1,5)/M + 0,03 $
@@ -403,7 +403,7 @@ describe('client suivi — contrat du SDK installé', () => {
         totalTokens: 943,
         toolCalls: { image_generation: 1 },
         connectorTokens: 292,
-        model: 'mistral-large-latest',
+        model: DEFAULT_CHAT_MODEL,
       },
     ]);
     // (187 + 292) × 0,5/M + 464 × 1,5/M = 0,0009355 $ de tokens, + 0,10 $ pour l'image.

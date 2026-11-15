@@ -7,6 +7,7 @@ import { logger } from '../helpers/logger.js';
 import { recordMediaUrl } from '../helpers/media-ledger.js';
 import { imageSystem, imageUser } from '../prompts.js';
 import type { AgeGroup } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 // 'download' : URL signée renvoyée par l'outil, à télécharger (elle expire, cf. downloadUrlImage).
 interface ImageResult {
@@ -236,7 +237,7 @@ export const generateImage = async (
   ageGroup: AgeGroup = 'enfant',
 ): Promise<{ imageUrl: string; prompt: string }> => {
   const agent = await client.beta.agents.create({
-    model: 'mistral-large-latest',
+    model: DEFAULT_CHAT_MODEL,
     name: 'Illustrator',
     instructions: imageSystem(lang, ageGroup),
     tools: [{ type: 'image_generation' }],

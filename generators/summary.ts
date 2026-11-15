@@ -10,6 +10,7 @@ import {
   summaryRetryUser,
 } from '../prompts.js';
 import type { StudyFiche, AgeGroup, QuizQuestion, SummaryRegister } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 // `const = function` plutôt que `function` pour empêcher Lizard d'agglomérer le CCN
 // avec unwrapAndMerge / extractSummary qui suivent (cf. CLAUDE.md piège connu).
@@ -213,7 +214,7 @@ export async function generateSummary(
   options: SummaryOptions = {},
 ): Promise<StudyFiche> {
   const {
-    model = 'mistral-large-latest',
+    model = DEFAULT_CHAT_MODEL,
     hasConsigne = false,
     lang = 'fr',
     ageGroup = 'enfant',
@@ -234,7 +235,7 @@ export async function generateRemediationSummary(
   client: Mistral,
   markdown: string,
   weakQuestions: QuizQuestion[],
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
 ): Promise<StudyFiche> {
