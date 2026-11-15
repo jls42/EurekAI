@@ -37,6 +37,32 @@ globalThis.fetch = vi.fn();
 
 const config = createConfig();
 
+// Méthodes de config prêtées au contexte de test (hors de makeContext : Lizard plafonne une fonction à
+// 50 lignes de code, cf. Codacy).
+const CONFIG_METHODS = {
+  mistralReady: config.mistralReady,
+  ttsReady: config.ttsReady,
+  usesTts: config.usesTts,
+  ttsBlocked: config.ttsBlocked,
+  refreshKeyState: config.refreshKeyState,
+  openApiKeyDialog: config.openApiKeyDialog,
+  closeApiKeyDialog: config.closeApiKeyDialog,
+  saveApiKey: config.saveApiKey,
+  clearApiKey: config.clearApiKey,
+  testApiKey: config.testApiKey,
+  loadConfig: config.loadConfig,
+  loadMistralVoices: config.loadMistralVoices,
+  translateEmotion: config.translateEmotion,
+  langToFlag: config.langToFlag,
+  voiceLabel: config.voiceLabel,
+  defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
+  modelPriceLabel: config.modelPriceLabel,
+  modelOptionLabel: config.modelOptionLabel,
+  saveSettings: config.saveSettings,
+  resetSettings: config.resetSettings,
+  closeSettingsDialog: config.closeSettingsDialog,
+};
+
 function makeContext(overrides: any = {}) {
   return {
     apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false },
@@ -68,27 +94,7 @@ function makeContext(overrides: any = {}) {
     apiKeyConsentClear: false,
     keyTestStatus: '',
     currentProfile: null as { id: string } | null,
-    mistralReady: config.mistralReady,
-    ttsReady: config.ttsReady,
-    usesTts: config.usesTts,
-    ttsBlocked: config.ttsBlocked,
-    refreshKeyState: config.refreshKeyState,
-    openApiKeyDialog: config.openApiKeyDialog,
-    closeApiKeyDialog: config.closeApiKeyDialog,
-    saveApiKey: config.saveApiKey,
-    clearApiKey: config.clearApiKey,
-    testApiKey: config.testApiKey,
-    loadConfig: config.loadConfig,
-    loadMistralVoices: config.loadMistralVoices,
-    translateEmotion: config.translateEmotion,
-    langToFlag: config.langToFlag,
-    voiceLabel: config.voiceLabel,
-    defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
-    modelPriceLabel: config.modelPriceLabel,
-    modelOptionLabel: config.modelOptionLabel,
-    saveSettings: config.saveSettings,
-    resetSettings: config.resetSettings,
-    closeSettingsDialog: config.closeSettingsDialog,
+    ...CONFIG_METHODS,
     ...overrides,
   };
 }
