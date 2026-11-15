@@ -3643,7 +3643,7 @@ describe('runTrackedGeneration (sans réponse HTTP)', () => {
       'fill-blank': 'quiz',
       podcast: 'podcast',
       'quiz-vocal': 'quiz',
-      image: 'mistral-large-latest',
+      image: 'mistral-large-2512',
       dictation: 'summary',
     });
     expect(defs.image.options.checkRawMarkdown).toBe(true);

@@ -6,6 +6,7 @@ import { toSpokenChoice, stripChoiceLabel } from '../helpers/choice-labels.js';
 import type { AgeGroup, QuizQuestion, QuizVocalGeneration } from '../types.js';
 import type { VoiceId } from '../helpers/voice-types.js';
 import { joinSentences } from '../helpers/tts-text.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 export async function ttsQuestion(
   question: QuizQuestion,
@@ -34,7 +35,7 @@ export async function verifyAnswer(
   studentAnswer: string,
   options: VerifyAnswerOptions = {},
 ): Promise<{ correct: boolean; feedback: string }> {
-  const { model = 'mistral-large-latest', lang = 'fr', ageGroup = 'enfant' } = options;
+  const { model = DEFAULT_CHAT_MODEL, lang = 'fr', ageGroup = 'enfant' } = options;
   // Phase 2.5 — Aligner le strip sur le parseur de label (via stripChoiceLabel) pour absorber
   // les mêmes dérives typographiques que toSpokenChoice. Avant : strip strict /^[A-D]\)\s*/
   // ne reconnaissait que "A)" mais pas "A." ou "A:" — incohérent si le modèle dérive.

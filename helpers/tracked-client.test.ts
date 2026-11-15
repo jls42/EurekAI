@@ -109,7 +109,7 @@ describe('trackClient', () => {
     expect(captured).toHaveLength(1);
     expect(captured[0].promptTokens).toBe(200);
     expect(captured[0].completionTokens).toBe(150);
-    expect(captured[0].model).toBe('mistral-large-latest');
+    expect(captured[0].model).toBe('mistral-large-2512');
   });
 
   it('returns original response unchanged', async () => {
@@ -348,7 +348,7 @@ describe("trackClient — frais d'outils des agents", () => {
       totalTokens: 8100,
       toolCalls: { web_search: 1 },
       connectorTokens: 7217,
-      model: 'mistral-large-latest',
+      model: 'mistral-large-2512',
     });
   });
 

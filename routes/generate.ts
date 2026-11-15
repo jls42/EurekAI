@@ -88,6 +88,7 @@ import {
 } from '../helpers/moderation-http.js';
 import { activeModerationCategories, moderationProfileOf } from '../helpers/moderation-profile.js';
 import { MODERATION_WAIT_MS, settleSourceModeration } from '../helpers/source-moderation.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 const assertNever = (x: never): never => {
   throw new Error('exhaustive check failed: ' + JSON.stringify(x));
@@ -1191,7 +1192,7 @@ export const buildGenerationDefs = (store: ProjectStore): Record<AutoAgentType, 
     },
     image: {
       build: (ctx) => buildImageGeneration(store, ctx),
-      modelId: 'mistral-large-latest',
+      modelId: DEFAULT_CHAT_MODEL,
       options: trackedAs('image', { checkRawMarkdown: true }),
     },
     // Dictée : auto-routable et TTS-dépendante (TTS_DEPENDENT_AGENTS, generators/auto-agents.ts).

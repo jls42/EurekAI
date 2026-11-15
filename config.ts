@@ -15,6 +15,7 @@ import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
 import { DEFAULT_OCR_MODEL, normalizeOcrModel } from './helpers/ocr-models.js';
+import { DEFAULT_CHAT_MODEL, MOVING_LARGE_ALIAS, pinChatModel } from './helpers/chat-models.js';
 import { DEFAULT_STT_MODEL, normalizeSttModel } from './helpers/stt-models.js';
 import {
   DEFAULT_TTS_MODEL,
@@ -24,19 +25,17 @@ import {
   type TtsModel,
 } from './helpers/tts-models.js';
 
-const MISTRAL_LARGE_LATEST = 'mistral-large-latest';
-
 const DEFAULT_CONFIG: AppConfig = {
   models: {
-    summary: MISTRAL_LARGE_LATEST,
-    flashcards: MISTRAL_LARGE_LATEST,
-    quiz: MISTRAL_LARGE_LATEST,
-    podcast: MISTRAL_LARGE_LATEST,
-    translate: MISTRAL_LARGE_LATEST,
+    summary: DEFAULT_CHAT_MODEL,
+    flashcards: DEFAULT_CHAT_MODEL,
+    quiz: DEFAULT_CHAT_MODEL,
+    podcast: DEFAULT_CHAT_MODEL,
+    translate: DEFAULT_CHAT_MODEL,
     ocr: DEFAULT_OCR_MODEL,
     stt: DEFAULT_STT_MODEL,
-    quizVerify: MISTRAL_LARGE_LATEST,
-    chat: MISTRAL_LARGE_LATEST,
+    quizVerify: DEFAULT_CHAT_MODEL,
+    chat: DEFAULT_CHAT_MODEL,
   },
   ttsModel: DEFAULT_TTS_MODEL,
 };
@@ -229,6 +228,43 @@ const normalizeLegacySttModel = (): boolean => {
   return true;
 };
 
+// Champs de `models` qui portent un modèle de chat (OCR et STT ont leur propre régime ci-dessus).
+type ChatModelField = Exclude<keyof AppConfig['models'], 'ocr' | 'stt'>;
+const CHAT_MODEL_FIELDS: readonly ChatModelField[] = [
+  'summary',
+  'flashcards',
+  'quiz',
+  'podcast',
+  'translate',
+  'quizVerify',
+  'chat',
+];
+
+// Fige l'alias mouvant `mistral-large-latest` (défaut jusqu'en v1.7.14, qui sert Large 4 depuis sa GA)
+// sur Large 3 dans chaque champ de chat (cf. helpers/chat-models.ts). Renvoie les champs changés.
+const pinChatModelFields = (): ChatModelField[] => {
+  const changed: ChatModelField[] = [];
+  for (const field of CHAT_MODEL_FIELDS) {
+    const current = currentConfig.models[field];
+    const pinned = pinChatModel(current);
+    if (pinned === current) continue;
+    currentConfig.models[field] = pinned;
+    changed.push(field);
+  }
+  return changed;
+};
+
+// Migration one-time des config.json enregistrés avec l'alias (Réglages sauvegardés avant v1.7.15).
+const normalizeLegacyChatModels = (): boolean => {
+  const changed = pinChatModelFields();
+  if (changed.length === 0) return false;
+  logger.info(
+    'config',
+    `migration: chat models [${changed.join(',')}] '${MOVING_LARGE_ALIAS}' -> '${DEFAULT_CHAT_MODEL}'`,
+  );
+  return true;
+};
+
 // Écrit le config courant sur disque. Si le boot précédent a détecté un fichier corrompu
 // (lastLoadFailed), tente d'abord un `.corrupt.bak` à côté du fichier à écraser.
 //
@@ -307,6 +343,7 @@ export function initConfig(outputDir: string): void {
     removeLegacyGlobalVoiceFields(),
     normalizeLegacyOcrModel(),
     normalizeLegacySttModel(),
+    normalizeLegacyChatModels(),
   ].some(Boolean);
   if (changed) {
     try {
@@ -341,6 +378,16 @@ const enforcePinnedModel = (field: 'ocr' | 'stt', label: string, normalize: Mode
     `rejected legacy/unknown ${label} model '${requested}' at saveConfig, using '${normalized}'`,
   );
   currentConfig.models[field] = normalized;
+};
+
+// Même régime au saveConfig : un onglet ouvert avant la mise à jour renvoie l'alias mouvant.
+const enforcePinnedChatModels = (): void => {
+  const changed = pinChatModelFields();
+  if (changed.length === 0) return;
+  logger.warn(
+    'config',
+    `rejected moving alias '${MOVING_LARGE_ALIAS}' at saveConfig for [${changed.join(',')}], using '${DEFAULT_CHAT_MODEL}'`,
+  );
 };
 
 // Rejection legacy : une UI pré-PR ou un client automatisé peut encore POSTer un ttsModel
@@ -379,6 +426,7 @@ export function saveConfig(partial: Partial<AppConfig>): AppConfig {
     currentConfig.models = { ...currentConfig.models, ...partial.models };
     enforcePinnedModel('ocr', 'OCR', normalizeOcrModel);
     enforcePinnedModel('stt', 'STT', normalizeSttModel);
+    enforcePinnedChatModels();
   }
   if (partial.ttsModel) applyTtsModel(partial.ttsModel);
   warnLegacyVoiceFields(partial);

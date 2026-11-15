@@ -17,6 +17,7 @@ import {
   podcastRetryUser,
 } from '../prompts.js';
 import type { PodcastLine, AgeGroup, PodcastGeneration, PodcastSpeakers } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 interface ParsedPodcastResponse {
   script: PodcastLine[];
@@ -116,7 +117,7 @@ const parsePodcastResponse = (json: unknown): ParsedPodcastResponse => {
 export async function generatePodcastScript(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   exclusions?: string,

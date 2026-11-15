@@ -37,6 +37,32 @@ globalThis.fetch = vi.fn();
 
 const config = createConfig();
 
+// Méthodes de config prêtées au contexte de test (hors de makeContext : Lizard plafonne une fonction à
+// 50 lignes de code, cf. Codacy).
+const CONFIG_METHODS = {
+  mistralReady: config.mistralReady,
+  ttsReady: config.ttsReady,
+  usesTts: config.usesTts,
+  ttsBlocked: config.ttsBlocked,
+  refreshKeyState: config.refreshKeyState,
+  openApiKeyDialog: config.openApiKeyDialog,
+  closeApiKeyDialog: config.closeApiKeyDialog,
+  saveApiKey: config.saveApiKey,
+  clearApiKey: config.clearApiKey,
+  testApiKey: config.testApiKey,
+  loadConfig: config.loadConfig,
+  loadMistralVoices: config.loadMistralVoices,
+  translateEmotion: config.translateEmotion,
+  langToFlag: config.langToFlag,
+  voiceLabel: config.voiceLabel,
+  defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
+  modelPriceLabel: config.modelPriceLabel,
+  modelOptionLabel: config.modelOptionLabel,
+  saveSettings: config.saveSettings,
+  resetSettings: config.resetSettings,
+  closeSettingsDialog: config.closeSettingsDialog,
+};
+
 function makeContext(overrides: any = {}) {
   return {
     apiStatus: { mistral: false, ttsAvailable: false, voiceCacheReady: false },
@@ -46,7 +72,7 @@ function makeContext(overrides: any = {}) {
     configDraft: {
       models: { summary: '', flashcards: '', quiz: '', podcast: '', translate: '', ocr: '' },
       ttsModel: 'voxtral-mini-tts-2603',
-      _mainModel: 'mistral-large-latest',
+      _mainModel: 'mistral-large-2512',
     } as any,
     t: vi.fn((key: string) => key),
     showToast: vi.fn(),
@@ -68,27 +94,7 @@ function makeContext(overrides: any = {}) {
     apiKeyConsentClear: false,
     keyTestStatus: '',
     currentProfile: null as { id: string } | null,
-    mistralReady: config.mistralReady,
-    ttsReady: config.ttsReady,
-    usesTts: config.usesTts,
-    ttsBlocked: config.ttsBlocked,
-    refreshKeyState: config.refreshKeyState,
-    openApiKeyDialog: config.openApiKeyDialog,
-    closeApiKeyDialog: config.closeApiKeyDialog,
-    saveApiKey: config.saveApiKey,
-    clearApiKey: config.clearApiKey,
-    testApiKey: config.testApiKey,
-    loadConfig: config.loadConfig,
-    loadMistralVoices: config.loadMistralVoices,
-    translateEmotion: config.translateEmotion,
-    langToFlag: config.langToFlag,
-    voiceLabel: config.voiceLabel,
-    defaultVoiceOptionLabel: config.defaultVoiceOptionLabel,
-    modelPriceLabel: config.modelPriceLabel,
-    modelOptionLabel: config.modelOptionLabel,
-    saveSettings: config.saveSettings,
-    resetSettings: config.resetSettings,
-    closeSettingsDialog: config.closeSettingsDialog,
+    ...CONFIG_METHODS,
     ...overrides,
   };
 }
@@ -452,7 +458,7 @@ describe('saveSettings', () => {
     const putCall = vi.mocked(globalThis.fetch).mock.calls[0];
     expect(putCall[0]).toBe('/api/config');
     const sentBody = JSON.parse(putCall[1].body as string);
-    expect(sentBody.models.summary).toBe('mistral-large-latest');
+    expect(sentBody.models.summary).toBe('mistral-large-2512');
     // _ocrModel absent → normalisé vers le défaut OCR 4 (modèle courant)
     expect(sentBody.models.ocr).toBe('mistral-ocr-4-1');
     // _sttModel absent → défaut épinglé Transcribe 2, jamais un champ vide
@@ -723,7 +729,7 @@ describe('brouillon des Réglages (toDraft) : sélecteurs épinglés normalisés
       const ctx = makeContext();
       await run(ctx, {});
       expect(ctx.configDraft).toMatchObject({
-        _mainModel: 'mistral-large-latest',
+        _mainModel: 'mistral-large-2512',
         _ocrModel: 'mistral-ocr-4-1',
         _sttModel: 'voxtral-mini-2602',
         ttsModel: 'voxtral-mini-tts-2603',
@@ -860,7 +866,7 @@ describe('dialog-settings.html : sélecteurs de modèles alignés sur leurs sour
   // (release-test du 2026-10-22). Le libellé complet du modèle choisi s'affiche dessous, sur
   // téléphone seulement, avec le même modèle recommandé que l'option marquée du sélecteur.
   it.each([
-    ['cfg-main-model', 'configDraft._mainModel', 'mistral-large-latest'],
+    ['cfg-main-model', 'configDraft._mainModel', 'mistral-large-2512'],
     ...SELECTORS.map(([id, xModel, , defaultModel]) => [id, xModel, defaultModel]),
   ])(
     '#%s : libellé complet du modèle choisi sous le sélecteur, sur téléphone',

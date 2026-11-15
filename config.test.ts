@@ -56,8 +56,8 @@ describe('initConfig', () => {
   it('sans fichier existant retourne config par defaut sans voix globales', () => {
     initConfig(tempDir);
     const cfg = getConfig();
-    expect(cfg.models.summary).toBe('mistral-large-latest');
-    expect(cfg.models.quizVerify).toBe('mistral-large-latest');
+    expect(cfg.models.summary).toBe('mistral-large-2512');
+    expect(cfg.models.quizVerify).toBe('mistral-large-2512');
     // Ids épinglés, plus d'alias mouvant (`voxtral-mini-latest` codé en dur, `voxtral-mini-tts-latest`
     // par défaut jusqu'en v1.7.11).
     expect(cfg.models.stt).toBe(TRANSCRIBE_2);
@@ -115,6 +115,28 @@ describe('initConfig', () => {
     expect(infoSpy).toHaveBeenCalledWith(
       'config',
       `migration: stt model '${legacy}' -> '${TRANSCRIBE_2}'`,
+    );
+  });
+
+  // `mistral-large-latest` (défaut jusqu'en v1.7.14) sert Large 4 depuis sa GA : figé sur Large 3,
+  // champ par champ ; un autre modèle choisi dans les Réglages reste tel quel.
+  it('migration chat : alias mistral-large-latest → Large 3 épinglé, persisté et journalisé', () => {
+    const models = {
+      summary: 'mistral-large-latest',
+      chat: 'mistral-large-latest',
+      quiz: 'mistral-medium-latest',
+    };
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models }));
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
+    expect(getConfig().models.chat).toBe('mistral-large-2512');
+    expect(getConfig().models.quiz).toBe('mistral-medium-latest');
+    expect(readDisk().models.summary).toBe('mistral-large-2512');
+    expect(readDisk().models.chat).toBe('mistral-large-2512');
+    expect(infoSpy).toHaveBeenCalledWith(
+      'config',
+      "migration: chat models [summary,chat] 'mistral-large-latest' -> 'mistral-large-2512'",
     );
   });
 
@@ -220,14 +242,14 @@ describe('initConfig', () => {
     initConfig(tempDir);
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('custom-model');
-    expect(cfg.models.quiz).toBe('mistral-large-latest');
+    expect(cfg.models.quiz).toBe('mistral-large-2512');
   });
 
   it('fichier JSON invalide: fallback in-memory DEFAULT + disque préservé + log error', () => {
     const errSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
     writeFileSync(join(tempDir, 'config.json'), '{invalid json');
     initConfig(tempDir);
-    expect(getConfig().models.summary).toBe('mistral-large-latest');
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
     expect(getConfig().ttsModel).toBe(VOXTRAL_TTS);
     expect(getConfig().models.stt).toBe(TRANSCRIBE_2);
     expect(readFileSync(join(tempDir, 'config.json'), 'utf-8')).toBe('{invalid json');
@@ -293,7 +315,7 @@ describe('initConfig', () => {
     writeFileSync(configPath, shapeInvalid);
     vi.spyOn(logger, 'warn').mockImplementation(() => {});
     initConfig(tempDir);
-    expect(getConfig().models.summary).toBe('mistral-large-latest'); // DEFAULT
+    expect(getConfig().models.summary).toBe('mistral-large-2512'); // DEFAULT
     saveConfig({ ttsModel: VOXTRAL_TTS_3 });
     expect(existsSync(backupPath)).toBe(true);
     expect(readFileSync(backupPath, 'utf-8')).toBe(shapeInvalid);
@@ -362,20 +384,20 @@ describe('initConfig', () => {
   it('shape hostile: saved.models = null → fallback DEFAULT sans crash', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: null }));
     initConfig(tempDir);
-    expect(getConfig().models.chat).toBe('mistral-large-latest');
-    expect(getConfig().models.summary).toBe('mistral-large-latest');
+    expect(getConfig().models.chat).toBe('mistral-large-2512');
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
   });
 
   it('shape hostile: saved.models = string → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: 'haxor' }));
     initConfig(tempDir);
-    expect(getConfig().models.chat).toBe('mistral-large-latest');
+    expect(getConfig().models.chat).toBe('mistral-large-2512');
   });
 
   it('shape hostile: saved.models = array → fallback DEFAULT', () => {
     writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models: ['a', 'b'] }));
     initConfig(tempDir);
-    expect(getConfig().models.chat).toBe('mistral-large-latest');
+    expect(getConfig().models.chat).toBe('mistral-large-2512');
   });
 
   it('shape hostile: saved = array au top-level → fallback DEFAULT', () => {
@@ -401,7 +423,7 @@ describe('saveConfig', () => {
     saveConfig({ models: { summary: 'new-model' } as any });
     const cfg = getConfig();
     expect(cfg.models.summary).toBe('new-model');
-    expect(cfg.models.quiz).toBe('mistral-large-latest');
+    expect(cfg.models.quiz).toBe('mistral-large-2512');
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
     expect(onDisk.models.summary).toBe('new-model');
   });
@@ -505,6 +527,22 @@ describe('saveConfig', () => {
     },
   );
 
+  // Onglet ouvert avant la mise à jour : il renvoie l'alias pour les 7 champs de chat.
+  it("rejette l'alias mistral-large-latest POSTé et le fige sur Large 3", () => {
+    initConfig(tempDir);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({
+      models: { summary: 'mistral-large-latest', quiz: 'mistral-small-latest' } as any,
+    });
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
+    expect(getConfig().models.quiz).toBe('mistral-small-latest');
+    expect(readDisk().models.summary).toBe('mistral-large-2512');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      "rejected moving alias 'mistral-large-latest' at saveConfig for [summary], using 'mistral-large-2512'",
+    );
+  });
+
   it('un client qui ne connaît pas models.stt (onglet d’avant la mise à jour) garde le choix STT', () => {
     initConfig(tempDir);
     saveConfig({ models: { stt: SMALL_TRANSCRIBE_3 } as any });
@@ -574,9 +612,9 @@ describe('resetConfig', () => {
     initConfig(tempDir);
     saveConfig({ models: { summary: 'custom' } as any });
     const reset = resetConfig();
-    expect(reset.models.summary).toBe('mistral-large-latest');
+    expect(reset.models.summary).toBe('mistral-large-2512');
     const onDisk = JSON.parse(readFileSync(join(tempDir, 'config.json'), 'utf-8'));
-    expect(onDisk.models.summary).toBe('mistral-large-latest');
+    expect(onDisk.models.summary).toBe('mistral-large-2512');
     expect(onDisk.mistralVoices).toBeUndefined();
   });
 });

@@ -9,6 +9,7 @@ import {
 import { diversityParams } from '../helpers/diversity.js';
 import { flashcardsSystem, flashcardsUser, flashcardsRetryUser } from '../prompts.js';
 import type { Flashcard, AgeGroup } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 function isValidFlashcards(data: Flashcard[]): boolean {
   return (
@@ -26,7 +27,7 @@ function isValidFlashcards(data: Flashcard[]): boolean {
 export async function generateFlashcards(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count?: number,

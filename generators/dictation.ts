@@ -12,6 +12,7 @@ import { diversityParams } from '../helpers/diversity.js';
 import { maskWordInSentence } from '../helpers/dictation-diff.js';
 import { dictationSystem, dictationUser, dictationRetryUser } from '../prompts.js';
 import type { DictationItem, AgeGroup } from '../types.js';
+import { DEFAULT_CHAT_MODEL } from '../helpers/chat-models.js';
 
 // Cap serveur DUR : chaque item coûte un appel TTS (borne coût + latence,
 // la boucle audio est séquentielle comme quiz-vocal). Défaut volontairement bas.
@@ -59,7 +60,7 @@ export const shuffleItems = <T>(
 export async function generateDictation(
   client: Mistral,
   markdown: string,
-  model = 'mistral-large-latest',
+  model = DEFAULT_CHAT_MODEL,
   lang = 'fr',
   ageGroup: AgeGroup = 'enfant',
   count = DICTATION_DEFAULT_WORDS,

@@ -9,7 +9,7 @@ const { lightpandaFetch } = vi.hoisted(() => ({
 }));
 vi.mock('@lightpanda/browser', () => ({ lightpanda: { fetch: lightpandaFetch } }));
 
-import { MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
+import { DEFAULT_CHAT_MODEL, MISTRAL_LARGE_4 } from '../helpers/chat-models.js';
 import { MODERATION_MODEL } from '../helpers/moderation-model.js';
 import { DEFAULT_OCR_MODEL, OCR_MODELS } from '../helpers/ocr-models.js';
 import { DEFAULT_STT_MODEL, STT_MODELS } from '../helpers/stt-models.js';
@@ -1018,11 +1018,11 @@ describe('acceptance on the real /v1/models snapshot of 2026-10-21 (arrivée de 
 });
 
 describe('WATCHED_MODELS (sources uniques)', () => {
-  it('is the 3 resolved chat -latest aliases + Large 4 + OCR, moderation, STT and TTS sources', () => {
+  it('is the 2 resolved chat -latest aliases + Large 3 and 4 + OCR, moderation, STT and TTS sources', () => {
     expect(WATCHED_MODELS).toEqual([
-      'mistral-large-latest',
       'mistral-medium-latest',
       'mistral-small-latest',
+      DEFAULT_CHAT_MODEL,
       MISTRAL_LARGE_4,
       ...OCR_MODELS,
       MODERATION_MODEL,
