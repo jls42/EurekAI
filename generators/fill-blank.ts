@@ -59,6 +59,11 @@ const usableExercises = (data: FillBlankItem[]): FillBlankItem[] => {
   return kept;
 };
 
+// Exercices exploitables d'une réponse ; [] si sa forme est invalide (→ retry, puis échec).
+const usableFillBlanks = (data: FillBlankItem[]): FillBlankItem[] => {
+  return isValidFillBlank(data) ? usableExercises(data) : [];
+};
+
 // Nombre d'exercices quand l'appelant n'en demande pas (repris par la route pour en ajouter).
 export const FILL_BLANK_DEFAULT_COUNT = 10;
 
@@ -86,7 +91,7 @@ export async function generateFillBlank(
   // JSON invalide au 1er essai (réponse tronquée) → [] → retry, comme une validation ratée.
   const raw = getContent(response);
   const data: FillBlankItem[] = unwrapJsonArray(tryParseJson(raw));
-  const usable = isValidFillBlank(data) ? usableExercises(data) : [];
+  const usable = usableFillBlanks(data);
 
   if (usable.length > 0) return usable;
 
@@ -100,7 +105,7 @@ export async function generateFillBlank(
     ...diversityParams(FILL_BLANK),
   });
   const retryData: FillBlankItem[] = unwrapJsonArray(safeParseJson(getContent(retry)));
-  const retryUsable = isValidFillBlank(retryData) ? usableExercises(retryData) : [];
+  const retryUsable = usableFillBlanks(retryData);
 
   if (retryUsable.length === 0) {
     // SyntaxError → llm_invalid_json (extractErrorCode), pas internal_error.

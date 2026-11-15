@@ -105,18 +105,24 @@ const assertHostNotPrivate = (host: string): void => {
   if (isIPv6(host) && isPrivateIPv6(host)) throw new Error(`IP privee interdite: ${host}`);
 };
 
+type ResolvedAddress = { address: string; family: number };
+
+// Adresse renvoyée par le résolveur DNS, jugée selon la famille qu'il annonce.
+const isPrivateResolvedAddress = ({ address, family }: ResolvedAddress): boolean => {
+  if (family === 4) return isPrivateIPv4(address);
+  return family === 6 && isPrivateIPv6(address);
+};
+
 const assertResolvedAddressesArePublic = async (host: string): Promise<void> => {
   if (isIPv4(host) || isIPv6(host)) return;
-  let addrs: { address: string; family: number }[];
+  let addrs: ResolvedAddress[];
   try {
     addrs = await dns.lookup(host, { all: true });
   } catch {
     throw new Error(`Resolution DNS impossible: ${host}`);
   }
-  for (const { address, family } of addrs) {
-    const blocked =
-      (family === 4 && isPrivateIPv4(address)) || (family === 6 && isPrivateIPv6(address));
-    if (blocked) throw new Error(`Hostname resout vers IP privee: ${host}`);
+  if (addrs.some(isPrivateResolvedAddress)) {
+    throw new Error(`Hostname resout vers IP privee: ${host}`);
   }
 };
 

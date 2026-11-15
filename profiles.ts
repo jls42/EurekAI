@@ -180,6 +180,22 @@ const applyTheme = (profile: Profile, theme: 'dark' | 'light' | undefined): void
   }
 };
 
+// Accepte uniquement null (reset) ou objet structuré. Primitives (string/number/
+// boolean) ET arrays sont rejetés avec warn — sans ça, un client buggé qui POSTe
+// `mistralVoices: "Marie"` ou `mistralVoices: []` recevrait 200 OK alors que ses
+// voix existantes seraient écrasées (typeof [] === 'object', donc passerait dans
+// normalizeMistralVoices qui retournerait undefined faute de host/guest).
+// Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
+const applyMistralVoices = (profile: Profile, voices: ProfileUpdates['mistralVoices']): void => {
+  if (Array.isArray(voices)) {
+    logger.warn('profiles', 'update: rejected array mistralVoices payload');
+  } else if (typeof voices === 'object') {
+    profile.mistralVoices = normalizeMistralVoices(voices);
+  } else {
+    logger.warn('profiles', `update: rejected non-object mistralVoices (type=${typeof voices})`);
+  }
+};
+
 // Défauts de l'âge, ou ceux d'`enfant` (protection maximale) si `ageGroup` est illisible.
 // Object.hasOwn : un ageGroup hostile (`constructor`, `__proto__`) ne remonte pas au prototype.
 const fallbackModerationCategories = (ageGroup: AgeGroup): ModerationCategory[] => [
@@ -500,22 +516,7 @@ export class ProfileStore {
       profile.moderationCategories = applyModerationCategories(updates.moderationCategories);
     }
     if (updates.mistralVoices !== undefined) {
-      // Accepte uniquement null (reset) ou objet structuré. Primitives (string/number/
-      // boolean) ET arrays sont rejetés avec warn — sans ça, un client buggé qui POSTe
-      // `mistralVoices: "Marie"` ou `mistralVoices: []` recevrait 200 OK alors que ses
-      // voix existantes seraient écrasées (typeof [] === 'object', donc passerait dans
-      // normalizeMistralVoices qui retournerait undefined faute de host/guest).
-      // Cohérent avec normalizeMistralVoices.warnIfSilentDrop.
-      if (Array.isArray(updates.mistralVoices)) {
-        logger.warn('profiles', 'update: rejected array mistralVoices payload');
-      } else if (typeof updates.mistralVoices === 'object') {
-        profile.mistralVoices = normalizeMistralVoices(updates.mistralVoices);
-      } else {
-        logger.warn(
-          'profiles',
-          `update: rejected non-object mistralVoices (type=${typeof updates.mistralVoices})`,
-        );
-      }
+      applyMistralVoices(profile, updates.mistralVoices);
     }
     if (updates.theme !== undefined) {
       applyTheme(profile, updates.theme);
