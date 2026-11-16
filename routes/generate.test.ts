@@ -1466,7 +1466,7 @@ describe('generateRoutes', () => {
 
       const gen = res.json.mock.calls[0][0];
       expect(gen.type).toBe('quiz');
-      expect(gen.title).toBe('Quiz (1 questions)');
+      expect(gen.title).toBe('Quiz (1 question)');
       expect(gen.data).toHaveLength(1);
     });
   });
