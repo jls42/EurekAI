@@ -9,17 +9,25 @@ import type { ChatCompletionRequest } from '@mistralai/mistralai/models/componen
 // rappelle à chaque passage).
 export const DEFAULT_CHAT_MODEL = 'mistral-large-2512';
 
-// Mistral Large 4, proposé en option dans les Réglages (dialog-settings.html). Id épinglé :
-// `mistral-large-4` suivrait une future version 4.x, à un autre prix, sans évaluation.
+// Mistral Large 4, candidat à la succession de Large 3 (comparaison à l'aveugle prévue en mars 2027,
+// cf. .claude/rules/mistral-models.md). Il n'est plus proposé dans les Réglages depuis le 2026-11-16
+// (médiane 130 s sur nos générations, environ 20 fois le coût de Large 3), mais garde son tarif, sa
+// surveillance (check-models) et sa réflexion réduite (withReasoningDefault) pour cette comparaison.
+// Id épinglé : `mistral-large-4` suivrait une future version 4.x, à un autre prix, sans évaluation.
 export const MISTRAL_LARGE_4 = 'mistral-large-4-0';
 
 // Alias mouvant, figé sur Large 3 partout où il a été enregistré (config.json, saveConfig).
 export const MOVING_LARGE_ALIAS = 'mistral-large-latest';
 
-// Modèle de chat à envoyer : l'alias mouvant devient Large 3 (ce qu'il servait jusqu'à la bascule),
-// toute autre valeur passe telle quelle (choix de l'utilisateur dans les Réglages).
+// Modèles de chat qui ne se choisissent plus : l'alias mouvant (il sert Large 4 depuis sa GA) et
+// Large 4 lui-même, retiré des Réglages.
+const RETIRED_CHAT_MODELS: ReadonlySet<string> = new Set([MOVING_LARGE_ALIAS, MISTRAL_LARGE_4]);
+
+// Modèle de chat à enregistrer dans la config : un modèle retiré devient Large 3, toute autre valeur
+// passe telle quelle (choix de l'utilisateur dans les Réglages). Appliqué au démarrage et à chaque
+// sauvegarde (config.ts), jamais à l'appel : un script de comparaison peut encore viser Large 4.
 export const pinChatModel = (model: string): string => {
-  return model === MOVING_LARGE_ALIAS ? DEFAULT_CHAT_MODEL : model;
+  return RETIRED_CHAT_MODELS.has(model) ? DEFAULT_CHAT_MODEL : model;
 };
 
 // Familles qui raisonnent quand la requête ne précise rien : la réponse commence alors par un bloc
