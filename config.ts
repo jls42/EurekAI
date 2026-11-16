@@ -15,7 +15,7 @@ import { asVoiceId } from './helpers/voice-types.js';
 import { selectVoices } from './helpers/voice-selection.js';
 import { logger } from './helpers/logger.js';
 import { DEFAULT_OCR_MODEL, normalizeOcrModel } from './helpers/ocr-models.js';
-import { DEFAULT_CHAT_MODEL, MOVING_LARGE_ALIAS, pinChatModel } from './helpers/chat-models.js';
+import { DEFAULT_CHAT_MODEL, pinChatModel } from './helpers/chat-models.js';
 import { DEFAULT_STT_MODEL, normalizeSttModel } from './helpers/stt-models.js';
 import {
   DEFAULT_TTS_MODEL,
@@ -240,27 +240,34 @@ const CHAT_MODEL_FIELDS: readonly ChatModelField[] = [
   'chat',
 ];
 
-// Fige l'alias mouvant `mistral-large-latest` (défaut jusqu'en v1.7.14, qui sert Large 4 depuis sa GA)
-// sur Large 3 dans chaque champ de chat (cf. helpers/chat-models.ts). Renvoie les champs changés.
-const pinChatModelFields = (): ChatModelField[] => {
-  const changed: ChatModelField[] = [];
+// Champs de chat ramenés sur Large 3, et les valeurs qu'ils portaient (pour le journal).
+type PinnedChatModels = { fields: ChatModelField[]; replaced: string };
+
+// Ramène sur Large 3 chaque champ de chat qui vaut un modèle retiré : l'alias mouvant
+// `mistral-large-latest` (défaut jusqu'en v1.7.14, qui sert Large 4 depuis sa GA) ou Large 4, retiré
+// des Réglages en v1.7.16 (cf. helpers/chat-models.ts).
+const pinChatModelFields = (): PinnedChatModels => {
+  const fields: ChatModelField[] = [];
+  const replaced = new Set<string>();
   for (const field of CHAT_MODEL_FIELDS) {
     const current = currentConfig.models[field];
     const pinned = pinChatModel(current);
     if (pinned === current) continue;
     currentConfig.models[field] = pinned;
-    changed.push(field);
+    fields.push(field);
+    replaced.add(current);
   }
-  return changed;
+  return { fields, replaced: [...replaced].join("', '") };
 };
 
-// Migration one-time des config.json enregistrés avec l'alias (Réglages sauvegardés avant v1.7.15).
+// Migration one-time des config.json enregistrés avec un modèle retiré (alias : Réglages sauvegardés
+// avant v1.7.15 ; Large 4 : choisi dans les Réglages avant v1.7.16).
 const normalizeLegacyChatModels = (): boolean => {
-  const changed = pinChatModelFields();
-  if (changed.length === 0) return false;
+  const { fields, replaced } = pinChatModelFields();
+  if (fields.length === 0) return false;
   logger.info(
     'config',
-    `migration: chat models [${changed.join(',')}] '${MOVING_LARGE_ALIAS}' -> '${DEFAULT_CHAT_MODEL}'`,
+    `migration: chat models [${fields.join(',')}] '${replaced}' -> '${DEFAULT_CHAT_MODEL}'`,
   );
   return true;
 };
@@ -380,13 +387,14 @@ const enforcePinnedModel = (field: 'ocr' | 'stt', label: string, normalize: Mode
   currentConfig.models[field] = normalized;
 };
 
-// Même régime au saveConfig : un onglet ouvert avant la mise à jour renvoie l'alias mouvant.
+// Même régime au saveConfig : un onglet ouvert avant la mise à jour renvoie l'alias mouvant, ou
+// Large 4 s'il l'avait choisi.
 const enforcePinnedChatModels = (): void => {
-  const changed = pinChatModelFields();
-  if (changed.length === 0) return;
+  const { fields, replaced } = pinChatModelFields();
+  if (fields.length === 0) return;
   logger.warn(
     'config',
-    `rejected moving alias '${MOVING_LARGE_ALIAS}' at saveConfig for [${changed.join(',')}], using '${DEFAULT_CHAT_MODEL}'`,
+    `rejected retired chat model '${replaced}' at saveConfig for [${fields.join(',')}], using '${DEFAULT_CHAT_MODEL}'`,
   );
 };
 

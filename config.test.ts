@@ -140,6 +140,39 @@ describe('initConfig', () => {
     );
   });
 
+  // Large 4, retiré des Réglages en v1.7.16 (trop lent pour nos générations), suit le même chemin.
+  it('migration chat : Large 4 choisi avant la v1.7.16 → Large 3, persisté et journalisé', () => {
+    const models = { summary: 'mistral-large-4-0', chat: 'mistral-large-4-0' };
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models }));
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
+    expect(readDisk().models.chat).toBe('mistral-large-2512');
+    expect(infoSpy).toHaveBeenCalledWith(
+      'config',
+      "migration: chat models [summary,chat] 'mistral-large-4-0' -> 'mistral-large-2512'",
+    );
+  });
+
+  it('migration chat : alias et Large 4 mêlés → chaque valeur remplacée nommée une fois', () => {
+    const models = {
+      summary: 'mistral-large-latest',
+      quiz: 'mistral-large-4-0',
+      chat: 'mistral-large-latest',
+      flashcards: 'mistral-small-latest',
+    };
+    writeFileSync(join(tempDir, 'config.json'), JSON.stringify({ models }));
+    const infoSpy = vi.spyOn(logger, 'info').mockImplementation(() => {});
+    initConfig(tempDir);
+    expect(readDisk().models.summary).toBe('mistral-large-2512');
+    expect(readDisk().models.quiz).toBe('mistral-large-2512');
+    expect(readDisk().models.flashcards).toBe('mistral-small-latest');
+    expect(infoSpy).toHaveBeenCalledWith(
+      'config',
+      "migration: chat models [summary,quiz,chat] 'mistral-large-latest', 'mistral-large-4-0' -> 'mistral-large-2512'",
+    );
+  });
+
   it('options TTS 3 et Small Transcribe 3 (opt-in) préservées sans réécriture du fichier', () => {
     const content = JSON.stringify({
       models: { stt: SMALL_TRANSCRIBE_3 },
@@ -539,7 +572,23 @@ describe('saveConfig', () => {
     expect(readDisk().models.summary).toBe('mistral-large-2512');
     expect(warnSpy).toHaveBeenCalledWith(
       'config',
-      "rejected moving alias 'mistral-large-latest' at saveConfig for [summary], using 'mistral-large-2512'",
+      "rejected retired chat model 'mistral-large-latest' at saveConfig for [summary], using 'mistral-large-2512'",
+    );
+  });
+
+  // Onglet ouvert avant la v1.7.16 avec Large 4 choisi : il le renvoie à la sauvegarde.
+  it('rejette Large 4 POSTé (retiré des Réglages) et le ramène sur Large 3', () => {
+    initConfig(tempDir);
+    const warnSpy = vi.spyOn(logger, 'warn').mockImplementation(() => {});
+    saveConfig({
+      models: { summary: 'mistral-large-4-0', chat: 'mistral-medium-latest' } as any,
+    });
+    expect(getConfig().models.summary).toBe('mistral-large-2512');
+    expect(getConfig().models.chat).toBe('mistral-medium-latest');
+    expect(readDisk().models.summary).toBe('mistral-large-2512');
+    expect(warnSpy).toHaveBeenCalledWith(
+      'config',
+      "rejected retired chat model 'mistral-large-4-0' at saveConfig for [summary], using 'mistral-large-2512'",
     );
   });
 

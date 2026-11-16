@@ -41,9 +41,13 @@ describe('modèle de génération par défaut', () => {
     expect(DEFAULT_CHAT_MODEL).not.toBe(MOVING_LARGE_ALIAS);
   });
 
-  it('pinChatModel fige l’alias mouvant sur Large 3 et laisse les autres choix', () => {
-    expect(pinChatModel('mistral-large-latest')).toBe(DEFAULT_CHAT_MODEL);
-    for (const model of [MISTRAL_LARGE_4, 'mistral-medium-latest', 'mistral-small-latest']) {
+  // Large 4 n'est plus proposé dans les Réglages depuis la v1.7.16 : une config qui le garde
+  // revient sur Large 3, comme l'alias mouvant.
+  it('pinChatModel ramène l’alias mouvant et Large 4 sur Large 3 et laisse les autres choix', () => {
+    for (const retired of [MOVING_LARGE_ALIAS, MISTRAL_LARGE_4]) {
+      expect(pinChatModel(retired)).toBe(DEFAULT_CHAT_MODEL);
+    }
+    for (const model of [DEFAULT_CHAT_MODEL, 'mistral-medium-latest', 'mistral-small-latest']) {
       expect(pinChatModel(model)).toBe(model);
     }
   });
