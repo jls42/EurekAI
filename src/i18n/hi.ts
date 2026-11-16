@@ -417,8 +417,7 @@ export const hi: Record<string, string> = {
   'quiz.nextQuestion': '\u0905\u0917\u0932\u093E \u092A\u094D\u0930\u0936\u094D\u0928',
   'quiz.verificationError':
     '\u0913\u0939\u094B, \u092E\u0948\u0902 \u0924\u0941\u092E\u094D\u0939\u093E\u0930\u093E \u091C\u0935\u093E\u092C \u0938\u0941\u0928 \u0928\u0939\u0940\u0902 \u092A\u093E\u092F\u093E\u0964 \u092B\u093F\u0930 \u0938\u0947 \u0915\u094B\u0936\u093F\u0936 \u0915\u0930\u0947\u0902?',
-  'quiz.answerBlocked':
-    'मैं यह जवाब स्वीकार नहीं कर सकता। चलो, इसे दूसरे शब्दों में कहकर देखते हैं!',
+  'quiz.answerBlocked': 'मैं यह जवाब स्वीकार नहीं कर सकता। चलो, इसे दूसरे शब्दों में कहकर देखते हैं!',
 
   'chat.heading':
     '\u0905\u092A\u0928\u0947 \u092A\u093E\u0920\u094D\u092F\u0915\u094D\u0930\u092E \u0938\u0947 Chat \u0915\u0930\u0947\u0902',
@@ -567,8 +566,7 @@ export const hi: Record<string, string> = {
   'toast.sourcesAdded':
     '\u0938\u094D\u0930\u094B\u0924 \u091C\u094B\u0921\u093C\u0947 \u0917\u090F!',
   'toast.importDoneIn': '"{project}" में आयात पूरा: {n} स्रोत जोड़े गए।',
-  'toast.importErrorsIn':
-    '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.importErrorsIn': '"{project}" में आयात: {n} फ़ाइलों में त्रुटि, उसी प्रोजेक्ट में फिर से कोशिश करें।',
   'toast.generationDoneIn': '"{project}" में {type} बन गया!',
   'toast.generationFailedIn': '"{project}" में {type} नहीं बन सका: {error}',
   'toast.autoDoneIn': '"{project}" में जादू पूरा हुआ!',
@@ -578,8 +576,7 @@ export const hi: Record<string, string> = {
   'toast.autoCancelledIn': '"{project}" का जादू रद्द कर दिया गया।',
   'toast.autoInterruptedIn': '"{project}" का जादू रुक गया (सर्वर फिर से शुरू हुआ)।',
   'toast.resume': 'जारी रखें',
-  'toast.autoFailedIn':
-    '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',
+  'toast.autoFailedIn': '"{project}" में स्वचालित जनरेशन विफल रहा। उसी प्रोजेक्ट में फिर से कोशिश करें।',
   'toast.voiceAddedIn': 'आवाज़ लिखी गई और "{project}" में जोड़ी गई।',
   'toast.voiceErrorIn': '"{project}" के लिए रिकॉर्ड की गई आवाज़ नहीं जोड़ी जा सकी: {error}',
   'toast.textAdded':
