@@ -124,7 +124,9 @@ export async function generateImage(
   console.log(`  Modèle: ${modelId}`);
   console.log(`  Ratio: ${ratio}`);
 
-  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
+  // @google/genai 3 vise l'API v1 par défaut, où les modèles `-preview` de MODELS n'existent pas
+  // (404 « not found for API version v1 », mesuré le 2026-11-16) : on reste sur v1beta.
+  const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY, apiVersion: 'v1beta' });
   const response = await requestImage(ai, modelId, prompt, ratio);
   const parts = response.candidates?.[0]?.content?.parts || [];
 
