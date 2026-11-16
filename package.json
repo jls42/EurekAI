@@ -47,6 +47,12 @@
   "overrides": {
     "vite-plugin-handlebars": {
       "vite": "$vite"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "^11.0.5"
+    },
+    "eslint-plugin-sonarjs": {
+      "minimatch": "^11.0.5"
     }
   },
   "devDependencies": {
